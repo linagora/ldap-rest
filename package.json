@@ -1,0 +1,46 @@
+{
+  "name": "mini-dm",
+  "version": "0.0.1",
+  "description": "Light directory manager",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "npm run build:prod",
+    "build:prod": "NODE_ENV=production rollup -c",
+    "build:dev": "rollup -c",
+    "build:watch": "rollup -c --watch",
+    "clean": "rimraf dist",
+    "start": "./bin/server.js",
+    "dev": "npm run build:dev && npm start",
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/mini-dm.git"
+  },
+  "keywords": [
+    "Identity-Manager"
+  ],
+  "author": "Xavier Guimard <yadd@debian.org>",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/linagora/mini-dm/issues"
+  },
+  "homepage": "https://github.com/linagora/mini-dm#readme",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "@types/chai": "^5.2.2",
+    "@types/mocha": "^10.0.10",
+    "chai": "^6.0.1",
+    "ldapts": "^8.0.9",
+    "mocha": "^11.7.2",
+    "rimraf": "^6.0.1",
+    "rollup": "^4.50.2",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.2"
+  }
+}
