@@ -27,15 +27,18 @@ const shebangPlugin = () => {
           // Créer le répertoire si il n'existe pas
           const dir = dirname(outputFile);
           mkdirSync(dir, { recursive: true });
-          
+
           // Définir les permissions 755 (rwxr-xr-x)
           chmodSync(outputFile, 0o755);
           console.log(`✅ Permissions 755 définies sur ${outputFile}`);
         } catch (error) {
-          console.error(`❌ Erreur lors de la définition des permissions:`, error);
+          console.error(
+            `❌ Erreur lors de la définition des permissions:`,
+            error
+          );
         }
       }
-    }
+    },
   };
 };
 
@@ -51,41 +54,55 @@ export default {
     // Résoudre les modules Node.js
     nodeResolve({
       preferBuiltins: true,
-      exportConditions: ['node']
+      exportConditions: ['node'],
     }),
-    
+
     // Convertir les modules CommonJS
     commonjs(),
-    
+
     // Compiler TypeScript
     typescript({
       tsconfig: './tsconfig.json',
       declaration: false,
       declarationMap: false,
-      sourceMap: true
+      sourceMap: true,
     }),
 
-    process.env.NODE_ENV === 'production' && terser({
-      compress: {
-        drop_console: false, // Garder les console.log pour un serveur
-        drop_debugger: true
-      },
-      mangle: {
-        keep_classnames: true,
-        keep_fnames: true
-      },
-      format: {
-        comments: false
-      }
-    }),
-    
+    process.env.NODE_ENV === 'production' &&
+      terser({
+        compress: {
+          drop_console: false, // Garder les console.log pour un serveur
+          drop_debugger: true,
+        },
+        mangle: {
+          keep_classnames: true,
+          keep_fnames: true,
+        },
+        format: {
+          comments: false,
+        },
+      }),
+
     // Plugin personnalisé pour shebang et permissions
-    shebangPlugin()
+    shebangPlugin(),
   ],
-  
+
   // Exclure les modules Node.js natifs du bundle
   external: [
-    'fs', 'path', 'os', 'crypto', 'events', 'stream', 'util', 'buffer',
-    'querystring', 'url', 'http', 'https', 'net', 'tls', 'zlib'
-  ]
+    'fs',
+    'path',
+    'os',
+    'crypto',
+    'events',
+    'stream',
+    'util',
+    'buffer',
+    'querystring',
+    'url',
+    'http',
+    'https',
+    'net',
+    'tls',
+    'zlib',
+  ],
 };

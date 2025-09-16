@@ -1,0 +1,18 @@
+# Dossiers de build
+bin/
+dist/
+build/
+
+# Dépendances
+node_modules/
+
+# Fichiers générés
+*.min.js
+*.map
+
+# Autres fichiers à ignorer
+coverage/
+.nyc_output/
+logs/
+*.log
+.env
