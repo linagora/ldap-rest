@@ -1,3 +1,5 @@
+import { type Config } from '../config/args';
+
 export type ConfigTemplate = ConfigEntry[];
 
 export interface ConfigEntry {
@@ -10,10 +12,6 @@ export interface ConfigEntry {
 
 type ConfigResultValue = string | boolean | number | undefined;
 
-interface ConfigResult {
-  [key: string]: ConfigResultValue;
-}
-
 export class ConfigParser {
   private config: ConfigTemplate;
 
@@ -21,8 +19,9 @@ export class ConfigParser {
     this.config = config;
   }
 
-  parse(argv: string[] = process.argv): ConfigResult {
-    const result: ConfigResult = {};
+  parse(argv: string[] = process.argv): Config {
+    // @ts-expect-error: missing port
+    const result: Config = {};
     const cliArgs = this.parseCliArgs(argv);
     for (const entry of this.config) {
       const key = this.getKeyFromCliArg(entry.cliArg);
@@ -33,6 +32,8 @@ export class ConfigParser {
       if (envValue !== undefined) {
         if (entry.isBoolean) {
           value = envValue.toLowerCase() === 'true';
+        } else if (entry.isInteger) {
+          value = parseInt(envValue);
         } else {
           value = envValue;
         }
@@ -50,7 +51,7 @@ export class ConfigParser {
         }
       }
 
-      result[key] = value;
+      result[key as keyof Config] = value as never;
     }
 
     return result;
@@ -94,7 +95,7 @@ export class ConfigParser {
 export function parseConfig(
   config: ConfigEntry[],
   argv: string[] = process.argv
-): ConfigResult {
+): Config {
   const parser = new ConfigParser(config);
   return parser.parse(argv);
 }

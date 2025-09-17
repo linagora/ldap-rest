@@ -1,6 +1,8 @@
 import LdapActions from '../../src/lib/ldapActions';
 import { expect } from 'chai';
 import { Client } from 'ldapts';
+import { parseConfig } from '../../src/lib/parseConfig';
+import configTemplate from '../../src/config/args';
 
 let ldapActions: LdapActions;
 
@@ -16,12 +18,8 @@ describe('ldapActions', function () {
   });
 
   beforeEach(() => {
-    ldapActions = new LdapActions({
-      ldap_url: 'ldap://localhost',
-      ldap_dn: process.env.DM_LDAP_DN,
-      ldap_pwd: process.env.DM_LDAP_PWD,
-      port: 8081,
-    });
+    const config = parseConfig(configTemplate);
+    ldapActions = new LdapActions(config);
   });
 
   describe('connect', () => {
