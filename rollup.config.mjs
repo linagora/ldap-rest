@@ -53,6 +53,7 @@ export default {
       declaration: false,
       declarationMap: false,
       sourceMap: true,
+      include: ['src/**/*'],
     }),
     process.env.NODE_ENV === 'production' &&
       terser({
