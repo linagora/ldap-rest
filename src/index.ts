@@ -1,4 +1,3 @@
-// Exemple d'un serveur simple
 import { createServer } from 'http';
 
 const server = createServer((req, res) => {

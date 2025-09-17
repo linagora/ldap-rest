@@ -9,7 +9,7 @@ import nodePlugin from 'eslint-plugin-node';
 export default [
   // Configuration de base pour JavaScript
   js.configs.recommended,
-  
+
   // Configuration pour tous les fichiers TypeScript
   {
     files: ['src/**/*.{ts,tsx}'],
@@ -30,34 +30,34 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      'prettier': prettier,
-      'import': importPlugin,
-      'node': nodePlugin,
+      prettier: prettier,
+      import: importPlugin,
+      node: nodePlugin,
     },
     rules: {
       // Règles TypeScript recommandées
       ...tseslint.configs.recommended.rules,
       ...tseslint.configs['recommended-requiring-type-checking'].rules,
-      
+
       // Règles Prettier
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
-      
+
       // Règles personnalisées
       '@typescript-eslint/no-unused-vars': [
-        'error', 
-        { argsIgnorePattern: '^_' }
+        'error',
+        { argsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error', // Règle ESLint de base, pas TypeScript
       '@typescript-eslint/no-var-requires': 'error',
-      
+
       // Règles Node.js
       'node/no-missing-import': 'off',
       'node/no-unsupported-features/es-syntax': 'off',
       'node/no-unpublished-import': 'off',
-      
+
       // Règles import
       'import/order': [
         'error',
@@ -73,14 +73,14 @@ export default [
           'newlines-between': 'always',
         },
       ],
-      
+
       // Règles générales
       // 'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
     },
   },
-  
+
   // Configuration spécifique pour les fichiers JavaScript
   {
     files: ['*.js', '*.mjs'],
@@ -92,7 +92,7 @@ export default [
       '@typescript-eslint/no-var-requires': 'off',
     },
   },
-  
+
   // Fichiers à ignorer (remplace .eslintignore)
   {
     ignores: [
