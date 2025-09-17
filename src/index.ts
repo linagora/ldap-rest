@@ -2,29 +2,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import express from 'express';
 
-import { type Config } from './lib/parseConfig';
 import { parseConfig } from './lib/parseConfig';
+import configArgs from './config/args';
 
-const ConfigTemplate: Config = [
-  {
-    cliArg: '--port',
-    envVar: 'DM_PORT',
-    defaultValue: 8081,
-    isInteger: true,
-  },
-  {
-    cliArg: '--auth',
-    envVar: 'DM_AUTH',
-    defaultValue: '',
-  },
-  {
-    cliArg: '--llng-ini',
-    envVar: 'DM_LLNG_INI',
-    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
-  },
-];
-
-const config = parseConfig(ConfigTemplate);
+const config = parseConfig(configArgs);
 
 const app = express();
 

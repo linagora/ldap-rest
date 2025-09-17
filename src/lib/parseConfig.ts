@@ -1,4 +1,4 @@
-export type Config = ConfigEntry[];
+export type ConfigTemplate = ConfigEntry[];
 
 export interface ConfigEntry {
   cliArg: string;
@@ -15,9 +15,9 @@ interface ConfigResult {
 }
 
 export class ConfigParser {
-  private config: Config;
+  private config: ConfigTemplate;
 
-  constructor(config: Config) {
+  constructor(config: ConfigTemplate) {
     this.config = config;
   }
 
