@@ -1,3 +1,5 @@
+export type Config = ConfigEntry[];
+
 export interface ConfigEntry {
   cliArg: string;
   envVar: string;
@@ -13,9 +15,9 @@ interface ConfigResult {
 }
 
 export class ConfigParser {
-  private config: ConfigEntry[];
+  private config: Config;
 
-  constructor(config: ConfigEntry[]) {
+  constructor(config: Config) {
     this.config = config;
   }
 
@@ -81,9 +83,9 @@ export class ConfigParser {
 
   private getKeyFromCliArg(cliArg: string): string {
     if (cliArg.startsWith('--')) {
-      return cliArg.substring(2);
+      return cliArg.substring(2).replace(/-/g, '_');
     } else if (cliArg.startsWith('-')) {
-      return cliArg.substring(1);
+      return cliArg.substring(1).replace(/-/g, '_');
     }
     return cliArg;
   }

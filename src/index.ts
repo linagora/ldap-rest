@@ -1,11 +1,48 @@
-import { createServer } from 'http';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+import express from 'express';
 
-const server = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Hello World from TypeScript server!\n');
-});
+import { type Config } from './lib/parseConfig';
+import { parseConfig } from './lib/parseConfig';
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const ConfigTemplate: Config = [
+  {
+    cliArg: '--port',
+    envVar: 'DM_PORT',
+    defaultValue: 8081,
+    isInteger: true,
+  },
+  {
+    cliArg: '--auth',
+    envVar: 'DM_AUTH',
+    defaultValue: '',
+  },
+  {
+    cliArg: '--llng-ini',
+    envVar: 'DM_LLNG_INI',
+    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
+  },
+];
+
+const config = parseConfig(ConfigTemplate);
+
+const app = express();
+
+// If authentication is native lemonldap-ng, then load and use its middleware
+if (config.auth == 'llng') {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore: dynamic import (overriden into rollup config)
+  await import('lemonldap-ng-handler').then(llng => {
+    llng.init({
+      configStorage: {
+        confFile: config.llng_ini as string,
+      },
+      type: undefined,
+    });
+    app.use(llng.run);
+  });
+}
+
+app.listen(config.port, () => {
+  return console.debug(`Listening on port ${config.port}`);
 });

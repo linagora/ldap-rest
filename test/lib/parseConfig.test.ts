@@ -1,12 +1,8 @@
 import { expect } from 'chai';
-import {
-  ConfigParser,
-  parseConfig,
-  ConfigEntry,
-} from '../../src/lib/parseConfig';
+import { Config, parseConfig, ConfigParser } from '../../src/lib/parseConfig';
 
 describe('ConfigParser', () => {
-  const config: ConfigEntry[] = [
+  const config: Config = [
     { cliArg: '--foo', envVar: 'FOO', defaultValue: 'bar' },
     { cliArg: '--baz', envVar: 'BAZ', defaultValue: 42, isInteger: true },
     {

@@ -1,8 +1,9 @@
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
-import { writeFileSync, chmodSync } from 'fs';
+import { chmodSync } from 'fs';
 import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -20,23 +21,12 @@ const shebangPlugin = () => {
       }
     },
     writeBundle(options, bundle) {
-      // Définir les permissions après l'écriture du fichier
-      const outputFile = options.file;
-      if (outputFile) {
-        try {
-          // Créer le répertoire si il n'existe pas
-          const dir = dirname(outputFile);
-          mkdirSync(dir, { recursive: true });
-
-          // Définir les permissions 755 (rwxr-xr-x)
-          chmodSync(outputFile, 0o755);
-          console.log(`✅ Permissions 755 définies sur ${outputFile}`);
-        } catch (error) {
-          console.error(
-            `❌ Erreur lors de la définition des permissions:`,
-            error
-          );
-        }
+      const outputFile = 'bin/index.js';
+      try {
+        chmodSync(outputFile, 0o755);
+        console.log(`✅ chmod +x ${outputFile}`);
+      } catch (error) {
+        console.error(`❌ Unable to set permissions:`, error);
       }
     },
   };
@@ -45,22 +35,18 @@ const shebangPlugin = () => {
 export default {
   input: 'src/index.ts',
   output: {
-    file: 'bin/server.js',
-    format: 'cjs', // CommonJS pour Node.js
+    dir: 'bin',
+    format: 'es',
     sourcemap: true,
-    banner: '', // Le shebang sera ajouté par notre plugin
+    banner: '',
   },
   plugins: [
-    // Résoudre les modules Node.js
     nodeResolve({
       preferBuiltins: true,
       exportConditions: ['node'],
     }),
-
-    // Convertir les modules CommonJS
     commonjs(),
-
-    // Compiler TypeScript
+    json(),
     typescript({
       tsconfig: './tsconfig.json',
       module: 'ESNext',
@@ -68,11 +54,10 @@ export default {
       declarationMap: false,
       sourceMap: true,
     }),
-
     process.env.NODE_ENV === 'production' &&
       terser({
         compress: {
-          drop_console: false, // Garder les console.log pour un serveur
+          drop_console: false,
           drop_debugger: true,
         },
         mangle: {
@@ -83,13 +68,11 @@ export default {
           comments: false,
         },
       }),
-
-    // Plugin personnalisé pour shebang et permissions
     shebangPlugin(),
   ],
 
-  // Exclure les modules Node.js natifs du bundle
   external: [
+    // Builtins modules
     'fs',
     'path',
     'os',
@@ -105,5 +88,8 @@ export default {
     'net',
     'tls',
     'zlib',
+
+    // binary modules
+    're2',
   ],
 };
