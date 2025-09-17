@@ -63,6 +63,7 @@ export default {
     // Compiler TypeScript
     typescript({
       tsconfig: './tsconfig.json',
+      module: 'ESNext',
       declaration: false,
       declarationMap: false,
       sourceMap: true,
