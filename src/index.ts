@@ -13,15 +13,38 @@ const app = express();
 if (config.auth == 'llng') {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore: dynamic import (overriden into rollup config)
-  await import('lemonldap-ng-handler').then(llng => {
-    llng.init({
-      configStorage: {
-        confFile: config.llng_ini as string,
-      },
-      type: undefined,
+  await import('lemonldap-ng-handler')
+    .then(llng => {
+      void llng.init({
+        configStorage: {
+          confFile: config.llng_ini as string,
+        },
+        type: undefined,
+      });
+      app.use(llng.run);
+    })
+    .catch(err => {
+      console.error('Failed to load lemonldap-ng-handler:', err);
     });
-    app.use(llng.run);
-  });
+}
+
+if (config.plugin) {
+  for (let pluginName of config.plugin) {
+    if (pluginName.startsWith('core/')) {
+      pluginName = pluginName.replace('core/', './plugins/');
+    }
+    await import(pluginName)
+      .then(pluginModule => {
+        if (pluginModule && pluginModule.default) {
+          app.use(pluginModule.default);
+        } else {
+          console.error(`Plugin ${pluginName} has no default export`);
+        }
+      })
+      .catch(err => {
+        console.error(`Failed to load plugin ${pluginName}:`, err);
+      });
+  }
 }
 
 app.listen(config.port, () => {

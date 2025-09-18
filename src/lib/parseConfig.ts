@@ -2,15 +2,14 @@ import { type Config } from '../config/args';
 
 export type ConfigTemplate = ConfigEntry[];
 
+type ConfigResultValue = string | string[] | boolean | number | undefined;
+
 export interface ConfigEntry {
   cliArg: string;
-  envVar: string;
-  defaultValue: string | number | boolean;
-  isBoolean?: boolean;
-  isInteger?: boolean;
+  envVar?: string;
+  defaultValue?: string | string[] | boolean | number;
+  type?: 'string' | 'number' | 'boolean' | 'array';
 }
-
-type ConfigResultValue = string | boolean | number | undefined;
 
 export class ConfigParser {
   private config: ConfigTemplate;
@@ -25,29 +24,51 @@ export class ConfigParser {
     const cliArgs = this.parseCliArgs(argv);
     for (const entry of this.config) {
       const key = this.getKeyFromCliArg(entry.cliArg);
-      let value: string | boolean | number = entry.defaultValue;
+      let value: ConfigResultValue = entry.defaultValue;
 
       // Override with env value if exists
-      const envValue = process.env[entry.envVar];
-      if (envValue !== undefined) {
-        if (entry.isBoolean) {
-          value = envValue.toLowerCase() === 'true';
-        } else if (entry.isInteger) {
-          value = parseInt(envValue);
-        } else {
-          value = envValue;
+      if (entry.envVar !== undefined) {
+        const envValue = process.env[entry.envVar];
+        if (envValue !== undefined) {
+          if (entry.type === 'boolean') {
+            value = envValue.toLowerCase() === 'true';
+          } else if (entry.type === 'number') {
+            value = parseInt(envValue);
+          } else if (entry.type === 'array') {
+            value = envValue.split(/[,\s]+/).filter(v => v.length > 0);
+          } else {
+            value = envValue;
+          }
         }
       }
 
       // Override with CLI arg if exists
       if (cliArgs.has(entry.cliArg)) {
         const cliValue = cliArgs.get(entry.cliArg);
-        if (entry.isBoolean) {
-          value = cliValue === true || cliValue === 'true';
-        } else if (entry.isInteger) {
+        if (entry.type === 'boolean') {
+          value = true;
+        } else if (entry.type === 'number') {
           value = parseInt(cliValue as string);
+        } else if (entry.type === 'array') {
+          if (Array.isArray(value)) {
+            value = value.concat(cliValue as string[]);
+          } else {
+            value = cliValue as string[];
+          }
         } else {
           value = cliValue as string;
+        }
+      }
+      if (entry.type === 'array' && cliArgs.has(entry.cliArg + 's')) {
+        const cliValue = cliArgs.get(entry.cliArg + 's') || '';
+        if (Array.isArray(value)) {
+          value = value.concat(
+            (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
+          );
+        } else {
+          value = (cliValue as string)
+            .split(/[,\s]+/)
+            .filter(v => v.length > 0);
         }
       }
 
@@ -67,10 +88,15 @@ export class ConfigParser {
       if (arg.startsWith('--') || arg.startsWith('-')) {
         const configEntry = this.config.find(entry => entry.cliArg === arg);
 
-        if (configEntry?.isBoolean) {
+        if (configEntry?.type === 'boolean') {
           args.set(arg, true);
-        } else if (configEntry?.isInteger) {
+        } else if (configEntry?.type === 'number') {
           args.set(arg, parseInt(argv[i + 1]));
+        } else if (configEntry?.type === 'array') {
+          const tmp = args.get(arg) || [];
+          const nextArg = argv[i + 1];
+          (tmp as string[]).push(nextArg);
+          args.set(arg, tmp);
         } else {
           const nextArg = argv[i + 1];
           args.set(arg, nextArg);

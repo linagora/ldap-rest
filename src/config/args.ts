@@ -1,18 +1,22 @@
+import { ConfigTemplate } from '../lib/parseConfig';
+
 export interface Config {
   port: number;
   auth?: string;
-  llng_ini?: string;
-  ldap_url?: string;
   ldap_dn?: string;
+  llng_ini?: string;
   ldap_pwd?: string;
+  ldap_url?: string;
+  plugin?: string[];
+  plugins?: string;
 }
 
-const configArgs = [
+const configArgs: ConfigTemplate = [
   {
     cliArg: '--port',
     envVar: 'DM_PORT',
     defaultValue: 8081,
-    isInteger: true,
+    type: 'number',
   },
   {
     cliArg: '--auth',
@@ -38,6 +42,13 @@ const configArgs = [
     cliArg: '--ldap-pwd',
     envVar: 'DM_LDAP_PWD',
     defaultValue: 'admin',
+  },
+  // This automatically declares a --plugins arg as well
+  {
+    cliArg: '--plugin',
+    envVar: 'DM_PLUGINS',
+    defaultValue: [],
+    type: 'array',
   },
 ];
 
