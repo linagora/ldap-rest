@@ -2,6 +2,11 @@
 
 Lite LinID directory manager
 
+## Developers doc
+
+- [Plugins](./src/plugins/README.md)
+- [Hooks](./HOOKS.md)
+
 ## Copyright and license
 
 Copyright 2025-present [Linagora](https://linagora.com)

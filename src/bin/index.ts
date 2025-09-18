@@ -78,6 +78,7 @@ export class DM {
                     if (!this.hooks[hookName]) {
                       this.hooks[hookName] = [];
                     }
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                     this.hooks[hookName].push(pluginModule.hooks[hookName]);
                   }
                 }
