@@ -23,7 +23,7 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start": "./dist/bin/server.js",
     "dev": "npm run build:dev && npm start",
-    "test": "mocha"
+    "test": "tsc --noEmit && mocha"
   },
   "repository": {
     "type": "git",

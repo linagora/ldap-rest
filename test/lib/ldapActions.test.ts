@@ -1,6 +1,6 @@
 import LdapActions from '../../src/lib/ldapActions';
 import { expect } from 'chai';
-import { Client } from 'ldapts';
+import { Client, SearchResult } from 'ldapts';
 import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/config/args';
 
@@ -27,6 +27,26 @@ describe('ldapActions', function () {
       const result = await ldapActions.connect();
       expect(result).to.be.instanceOf(Client);
       await result?.unbind();
+    });
+  });
+
+  describe('search', () => {
+    it('should perform a search and return results', async () => {
+      const options = {
+        filter: '(uid=p*)',
+      };
+      let result = await ldapActions.search(options);
+      if (!(result as SearchResult).searchEntries) {
+        const tmp = await (result as AsyncGenerator<SearchResult>).next();
+        result = tmp.value;
+      }
+      expect(result).to.have.property('searchEntries');
+      if ((result as SearchResult).searchEntries) {
+        expect((result as SearchResult).searchEntries).to.be.an('array');
+        console.log((result as SearchResult).searchEntries.length, 'entries found');
+      } else {
+        expect(result)
+      }
     });
   });
 });

@@ -3,6 +3,7 @@ import { ConfigTemplate } from '../lib/parseConfig';
 export interface Config {
   port: number;
   auth?: string;
+  ldap_base?: string;
   ldap_dn?: string;
   llng_ini?: string;
   ldap_pwd?: string;
@@ -12,6 +13,7 @@ export interface Config {
 }
 
 const configArgs: ConfigTemplate = [
+  // Global options
   {
     cliArg: '--port',
     envVar: 'DM_PORT',
@@ -23,15 +25,19 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_AUTH',
     defaultValue: '',
   },
+  // NB: this automatically declares a --plugins arg as well
   {
-    cliArg: '--llng-ini',
-    envVar: 'DM_LLNG_INI',
-    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
+    cliArg: '--plugin',
+    envVar: 'DM_PLUGINS',
+    defaultValue: [],
+    type: 'array',
   },
+
+  // LDAP options
   {
-    cliArg: '--ldap-url',
-    envVar: 'DM_LDAP_URL',
-    defaultValue: 'ldap://localhost',
+    cliArg: '--ldap-base',
+    envVar: 'DM_LDAP_BASE',
+    defaultValue: '',
   },
   {
     cliArg: '--ldap-dn',
@@ -43,12 +49,17 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_LDAP_PWD',
     defaultValue: 'admin',
   },
-  // This automatically declares a --plugins arg as well
   {
-    cliArg: '--plugin',
-    envVar: 'DM_PLUGINS',
-    defaultValue: [],
-    type: 'array',
+    cliArg: '--ldap-url',
+    envVar: 'DM_LDAP_URL',
+    defaultValue: 'ldap://localhost',
+  },
+
+  // Lemonldap options
+  {
+    cliArg: '--llng-ini',
+    envVar: 'DM_LLNG_INI',
+    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
   },
 ];
 

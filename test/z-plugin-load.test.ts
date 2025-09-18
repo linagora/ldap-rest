@@ -7,6 +7,7 @@ describe('Plugin Loading', () => {
     process.env.DM_PORT = '64322';
     process.env.DM_PLUGINS =
       'core/helloworld,../../test/__plugins__/hello/index.js';
+    // @ts-ignore
     await import('../dist/bin/index.js');
   });
 

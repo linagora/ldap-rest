@@ -1,13 +1,25 @@
 import { Client } from 'ldapts';
-import { type ClientOptions } from 'ldapts';
+import { type ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 
 import { type Config } from '../config/args';
+
+const defaultSearchOptions: SearchOptions = {
+  scope: 'sub',
+  filter: '(objectClass=*)',
+  attributes: ['*'],
+  sizeLimit: 0,
+  timeLimit: 10,
+  paged: {
+    pageSize: 100,
+  },
+};
 
 class ldapActions {
   config: Config;
   options: ClientOptions;
   dn: string;
   pwd: string;
+  base: string;
 
   constructor(config: Config) {
     this.config = config;
@@ -19,6 +31,12 @@ class ldapActions {
     }
     if (!this.config.ldap_pwd) {
       throw new Error('LDAP password is not defined');
+    }
+    if (!this.config.ldap_base) {
+      this.base = this.config.ldap_dn.split(',', 2)[1];
+      console.warn(`LDAP base is not defined, using "${this.base}"`);
+    } else {
+      this.base = this.config.ldap_base;
     }
     this.options = {
       url: this.config.ldap_url,
@@ -42,15 +60,31 @@ class ldapActions {
    be monitored and reconnected if needed
    and such admin tool won't push a lot of requests
    */
-  async connect(): Promise<Client | null> {
+  async connect(): Promise<Client> {
     const client: Client = new Client(this.options);
     try {
       await client.bind(this.dn, this.pwd);
-      return client;
     } catch (error) {
       console.error('LDAP bind error:', error);
-      return null;
+      throw new Error('LDAP bind error');
     }
+    if (!client) throw new Error('LDAP connection error');
+    return client;
+  }
+
+  async search(
+    options: SearchOptions,
+    base: string = this.base
+  ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
+    const client = await this.connect();
+    const opts = {
+      ...defaultSearchOptions,
+      ...options,
+    };
+    if (opts.paged) {
+      return client.searchPaginated(base, opts);
+    }
+    return client.search(base, opts);
   }
 }
 
