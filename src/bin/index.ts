@@ -3,10 +3,11 @@
 import express from 'express';
 
 import { parseConfig } from '../lib/parseConfig';
-import configArgs, { Config } from '../config/args';
+import configArgs, { type Config } from '../config/args';
 import ldap from '../lib/ldapActions';
 
 export { ldap };
+export type { Config };
 
 //export const build = () => {
 
