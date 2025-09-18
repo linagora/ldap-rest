@@ -37,13 +37,14 @@ const shebangPlugin = () => {
   };
 };
 
-const commonPlugins = (dir) => [
+const commonPlugins = dir => [
   commonjs(),
   json(),
   typescript({
     tsconfig: './tsconfig.json',
     module: 'ESNext',
-    declaration: false,
+    declaration: true,
+    declarationDir: dir,
     declarationMap: false,
     sourceMap: true,
     include: ['src/**/*'],
@@ -94,7 +95,6 @@ async function getPluginEntries() {
 
     return tsFiles.map(file => {
       const name = basename(file, '.ts');
-      console.log('DEBUG', `${PLUGINS_OUT_DIR}/${name}.mjs`)
       return {
         input: `${PLUGINS_SRC_DIR}/${file}`,
         output: {

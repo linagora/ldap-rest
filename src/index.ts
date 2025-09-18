@@ -31,7 +31,9 @@ if (config.auth == 'llng') {
 if (config.plugin) {
   for (let pluginName of config.plugin) {
     if (pluginName.startsWith('core/')) {
-      pluginName = pluginName.replace('core/', '../plugins/');
+      pluginName = pluginName
+        .replace('core/', '../plugins/')
+        .replace(/$/, '.js');
     }
     await import(pluginName)
       .then(pluginModule => {

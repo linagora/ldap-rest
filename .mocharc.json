@@ -2,5 +2,6 @@
   "require": ["tsx/cjs"],
   "extensions": ["ts", "test.ts"],
   "spec": "test/**/*.test.ts",
+  "exit": true,
   "timeout": 30000
 }
