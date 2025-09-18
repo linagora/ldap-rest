@@ -43,9 +43,11 @@ describe('ldapActions', function () {
       expect(result).to.have.property('searchEntries');
       if ((result as SearchResult).searchEntries) {
         expect((result as SearchResult).searchEntries).to.be.an('array');
-        console.log((result as SearchResult).searchEntries.length, 'entries found');
+        expect((result as SearchResult).searchEntries.length).to.be.greaterThan(
+          0
+        );
       } else {
-        expect(result)
+        expect(result);
       }
     });
   });

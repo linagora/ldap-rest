@@ -12,7 +12,6 @@ import { basename, extname, join } from 'path';
 const PLUGINS_SRC_DIR = 'src/plugins';
 const PLUGINS_OUT_DIR = 'dist/plugins';
 
-// Plugin personnalisé pour ajouter le shebang et les permissions
 const shebangPlugin = () => {
   return {
     name: 'shebang-plugin',
@@ -88,59 +87,27 @@ const external = [
   're2',
 ];
 
+const corePlugins = [];
 async function getPluginEntries() {
-  try {
-    const files = await readdir(PLUGINS_SRC_DIR);
-    const tsFiles = files.filter(file => extname(file) === '.ts');
-
-    return tsFiles.map(file => {
-      const name = basename(file, '.ts');
-      return {
-        input: `${PLUGINS_SRC_DIR}/${file}`,
-        output: {
-          dir: PLUGINS_OUT_DIR,
-          name: `${name}.mjs`,
-          //file: `${PLUGINS_OUT_DIR}/${name}.mjs`,
-          format: 'es',
-          sourcemap: true,
-        },
-        external: ['express'], // Express reste externe
-        plugins: [
-          nodeResolve({
-            preferBuiltins: true,
-          }),
-          ...commonPlugins(PLUGINS_OUT_DIR),
-        ],
-      };
-    });
-  } catch (error) {
-    console.error('Unable to build plugins:', error);
-    return [];
-  }
+  const files = await readdir(PLUGINS_SRC_DIR);
+  return files
+    .filter(file => extname(file) === '.ts')
+    .map(file => `${PLUGINS_SRC_DIR}/${file}`);
 }
 
 export default async () => {
-  const pluginEntries = await getPluginEntries();
+  const p = await getPluginEntries();
   return [
-    // Core-plugins
-    ...pluginEntries,
-    // main
     {
-      input: 'src/index.ts',
+      input: ['src/bin/index.ts', ...p],
       output: {
-        dir: 'dist/bin',
+        dir: 'dist',
         format: 'es',
         sourcemap: true,
         banner: '',
+        preserveModules: true,
       },
-      plugins: [
-        nodeResolve({
-          preferBuiltins: true,
-          exportConditions: ['node'],
-        }),
-        ...commonPlugins('dist/bin'),
-        shebangPlugin(),
-      ],
+      plugins: commonPlugins('dist'),
       external,
     },
   ];

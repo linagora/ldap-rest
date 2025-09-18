@@ -2,8 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import express from 'express';
 
-import { parseConfig } from './lib/parseConfig';
-import configArgs from './config/args';
+import { parseConfig } from '../lib/parseConfig';
+import configArgs from '../config/args';
 
 const config = parseConfig(configArgs);
 
