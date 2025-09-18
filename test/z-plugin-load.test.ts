@@ -20,7 +20,7 @@ describe('Plugin Loading', () => {
       '/hello'
     );
     expect(res.status).to.equal(200);
-    expect(res.body).to.deep.equal({ message: 'Hello' });
+    expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
     res = await request(`http://localhost:${process.env.DM_PORT}`).get(
       '/hellopath'
     );

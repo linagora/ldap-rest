@@ -16,6 +16,8 @@ export class DM {
   config: Config;
   ready: Promise<void>;
   server?: import('http').Server;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  hooks: { [key: string]: Function[] } = {};
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -65,15 +67,28 @@ export class DM {
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                   pluginModule = pluginModule.default;
                 }
+                let validPlugin = false;
                 if (pluginModule.api) {
-                  pluginModule.api(this.app);
+                  validPlugin = true;
+                  pluginModule.api(this.app, this);
+                }
+                if (pluginModule.hooks) {
+                  validPlugin = true;
+                  for (const hookName in pluginModule.hooks) {
+                    if (!this.hooks[hookName]) {
+                      this.hooks[hookName] = [];
+                    }
+                    this.hooks[hookName].push(pluginModule.hooks[hookName]);
+                  }
+                }
+                if (validPlugin) {
+                  console.debug(`Plugin ${pluginName} loaded`);
                   resolve();
                 } else {
                   reject(
                     new Error(`Plugin ${pluginName} has no default export`)
                   );
                 }
-                reject(new Error(`Plugin ${pluginName} has no api export`));
               })
               .catch(err => {
                 reject(
