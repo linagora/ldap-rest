@@ -31,12 +31,14 @@ if (config.auth == 'llng') {
 if (config.plugin) {
   for (let pluginName of config.plugin) {
     if (pluginName.startsWith('core/')) {
-      pluginName = pluginName.replace('core/', './plugins/');
+      pluginName = pluginName.replace('core/', '../plugins/');
     }
     await import(pluginName)
       .then(pluginModule => {
         if (pluginModule && pluginModule.default) {
-          app.use(pluginModule.default);
+          pluginModule.default(app);
+        } else if (pluginModule) {
+          pluginModule(app);
         } else {
           console.error(`Plugin ${pluginName} has no default export`);
         }
