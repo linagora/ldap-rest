@@ -2,9 +2,9 @@
   "name": "mini-dm",
   "version": "0.0.1",
   "description": "Light directory manager",
-  "main": "dist/bin/index.js",
+  "main": "dist/bin/index.mjs",
   "bin": {
-    "mini-dm": "dist/bin/index.js"
+    "mini-dm": "bin/index.mjs"
   },
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "build:prod": "npm run clean && NODE_ENV=production rollup -c",
     "build:dev": "npm run clean && rollup -c",
     "build:watch": "rollup -c --watch",
-    "clean": "rimraf dist/* bin/*",
+    "clean": "rimraf dist/*",
     "check": "npm run lint && npm run format:check",
     "fix": "npm run lint:fix && npm run format:fix",
     "format:check": "prettier --check .",
@@ -57,9 +57,6 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.5.4",
-    "express": "^5.1.0",
-    "ldapts": "^8.0.9",
-    "lemonldap-ng-handler": "^0.7.1",
     "mocha": "^11.7.2",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
@@ -70,6 +67,11 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "express": "^5.1.0",
+    "ldapts": "^8.0.9",
     "re2": "^1.22.1"
+  },
+  "optionalDependencies": {
+    "lemonldap-ng-handler": "^0.7.1"
   }
 }

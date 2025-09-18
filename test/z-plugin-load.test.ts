@@ -1,14 +1,18 @@
 import { expect } from 'chai';
 import request from 'supertest';
+import { DM } from '../src/bin/index';
 
 describe('Plugin Loading', () => {
+  let server: DM | null;
   before(async () => {
     process.env.NODE_ENV = 'test';
     process.env.DM_PORT = '64322';
     process.env.DM_PLUGINS =
       'core/helloworld,../../test/__plugins__/hello/index.js';
     // @ts-ignore
-    await import('../dist/bin/index.js');
+    server = new DM();
+    await server.ready;
+    await server.run();
   });
 
   it('should load the helloworld plugin and respond to /hello', async () => {
@@ -28,5 +32,6 @@ describe('Plugin Loading', () => {
     delete process.env.NODE_ENV;
     delete process.env.DM_PORT;
     delete process.env.DM_PLUGINS;
+    server?.stop();
   });
 });

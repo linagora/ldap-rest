@@ -2,39 +2,14 @@
 /* eslint-disable no-undef */
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
-import { chmodSync } from 'fs';
 import { readdir } from 'fs/promises';
-import { basename, extname, join } from 'path';
+import { extname } from 'path';
+
+import pkg from './package.json' with { type: 'json' };
 
 const PLUGINS_SRC_DIR = 'src/plugins';
-const PLUGINS_OUT_DIR = 'dist/plugins';
-
-const shebangPlugin = () => {
-  return {
-    name: 'shebang-plugin',
-    generateBundle(options, bundle) {
-      // Ajouter le shebang au début du fichier
-      for (const fileName in bundle) {
-        const file = bundle[fileName];
-        if (file.type === 'chunk' && file.isEntry) {
-          file.code = '#!/usr/bin/env node\n' + file.code;
-        }
-      }
-    },
-    writeBundle(options, bundle) {
-      const outputFile = 'dist/bin/index.js';
-      try {
-        chmodSync(outputFile, 0o755);
-        console.log(`✅ chmod +x ${outputFile}`);
-      } catch (error) {
-        console.error(`❌ Unable to set permissions:`, error);
-      }
-    },
-  };
-};
 
 const commonPlugins = dir => [
   commonjs(),
@@ -85,6 +60,10 @@ const external = [
 
   // binary modules
   're2',
+
+  // declared dependencies
+  ...(pkg.dependencies ? Object.keys(pkg.dependencies) : []),
+  ...(pkg.optionalDependencies ? Object.keys(pkg.optionalDependencies) : []),
 ];
 
 const corePlugins = [];

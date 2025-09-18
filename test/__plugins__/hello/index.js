@@ -1,9 +1,9 @@
-const helloPlugin = app => {
+const api = app => {
   app.get('/hellopath', (req, res) => {
     res.json({ message: 'Hello path' });
   });
-  console.debug('Hello plugin loaded - routes: GET /hellopath');
+  console.debug('Hellopath plugin loaded - routes: GET /hellopath');
 };
 
-export { helloPlugin as default };
+export { api };
 //# sourceMappingURL=helloworld.js.map
