@@ -43,10 +43,12 @@ if (config.plugin) {
           pluginModule(app);
         } else {
           console.error(`Plugin ${pluginName} has no default export`);
+          process.exit(1);
         }
       })
       .catch(err => {
         console.error(`Failed to load plugin ${pluginName}:`, err);
+        process.exit(1);
       });
   }
 }
