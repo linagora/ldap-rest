@@ -1,15 +1,16 @@
-# Dossiers de build
+# Build files
 dist/
 build/
+package.json
 
-# Dépendances
+# Dependencies
 node_modules/
 
-# Fichiers générés
+# sourcemap and minified files
 *.min.js
 *.map
 
-# Autres fichiers à ignorer
+# Other
 coverage/
 .nyc_output/
 logs/
