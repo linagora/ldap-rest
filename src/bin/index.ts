@@ -4,10 +4,9 @@ import express from 'express';
 
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
-import ldap from '../lib/ldapActions';
 import { Hooks } from '../hooks';
+import ldapActions from '../lib/ldapActions';
 
-export { ldap };
 export type { Config };
 
 //export const build = () => {
@@ -20,11 +19,13 @@ export class DM {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   hooks: { [K in keyof Hooks]?: Function[] } = {};
   loadedPlugins: { [key: string]: object[] } = {};
+  ldap: ldapActions;
 
   constructor() {
     this.config = parseConfig(configArgs);
 
     this.app = express();
+    this.ldap = new ldapActions(this);
     const promises: Promise<void>[] = [];
 
     // If authentication is native lemonldap-ng, then load and use its middleware

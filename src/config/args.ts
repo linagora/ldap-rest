@@ -73,6 +73,15 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_LLNG_INI',
     defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
   },
+
+  // Plugins options
+
+  // LDAP groups plugin
+  {
+    cliArg: '--ldap-group-base',
+    envVar: 'DM_LDAP_GROUP_BASE',
+    defaultValue: '',
+  },
 ];
 
 export default configArgs;
