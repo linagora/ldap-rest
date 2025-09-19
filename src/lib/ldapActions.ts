@@ -25,7 +25,7 @@ export type { SearchOptions, SearchResult };
 // modify
 export interface ModifyRequest {
   add?: Record<string, AttributeValue>[];
-  replace?: Record<string, AttributeValue>[];
+  replace?: Record<string, AttributeValue>;
   delete?: string[] | Record<string, AttributeValue>[];
 }
 
@@ -128,6 +128,7 @@ class ldapActions {
     dn: string,
     entry: Record<string, AttributeValue>
   ): Promise<boolean> {
+    dn = this.setDn(dn);
     if (this.parent?.hooks['ldapaddrequest']) {
       for (const hook of this.parent.hooks['ldapaddrequest'] as Array<
         (
@@ -172,6 +173,7 @@ class ldapActions {
     LDAP modify
    */
   async modify(dn: string, changes: ModifyRequest): Promise<boolean> {
+    dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
     if (this.parent?.hooks['ldapmodifyrequest']) {
       for (const hook of this.parent.hooks['ldapmodifyrequest']) {
@@ -195,20 +197,19 @@ class ldapActions {
       }
     }
     if (changes.replace) {
-      for (const entry of changes.replace) {
-        for (const [key, value] of Object.entries(entry)) {
-          ldapChanges.push(
-            new Change({
-              operation: 'replace',
-              modification: new Attribute({
-                type: key,
-                values: Array.isArray(value) ? value : [value as string],
-              }),
-            })
-          );
-        }
+      for (const [key, value] of Object.entries(changes.replace)) {
+        ldapChanges.push(
+          new Change({
+            operation: 'replace',
+            modification: new Attribute({
+              type: key,
+              values: Array.isArray(value) ? value : [value as string],
+            }),
+          })
+        );
       }
     }
+
     if (changes.delete) {
       if (Array.isArray(changes.delete)) {
         for (const attr of changes.delete) {
@@ -256,6 +257,11 @@ class ldapActions {
     LDAP delete
    */
   async delete(dn: string | string[]): Promise<boolean> {
+    if (Array.isArray(dn)) {
+      dn = dn.map(d => this.setDn(d));
+    } else {
+      dn = this.setDn(dn);
+    }
     if (this.parent?.hooks['ldapdeleterequest']) {
       for (const hook of this.parent.hooks['ldapdeleterequest'] as Array<
         (dn: string | string[]) => string | string[]
@@ -280,9 +286,18 @@ class ldapActions {
         return true;
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`LDAP delete error: ${error}`);
+        throw new Error(`LDAP delete error (${dn}): ${error}`);
       }
     }
+  }
+
+  private setDn(dn: string): string {
+    if (!/=/.test(dn)) {
+      dn = `uid=${dn},${this.base}`;
+    } else if (!/,/.test(dn)) {
+      dn += `,${this.base}`;
+    }
+    return dn;
   }
 }
 

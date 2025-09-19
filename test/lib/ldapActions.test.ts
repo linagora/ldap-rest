@@ -35,6 +35,7 @@ describe('ldapActions', function () {
     it('should perform a search and return results', async () => {
       const options = {
         filter: '(uid=p*)',
+        paged: false,
       };
       let result = await ldapActions.search(options);
       if (!(result as SearchResult).searchEntries) {
@@ -42,14 +43,10 @@ describe('ldapActions', function () {
         result = tmp.value;
       }
       expect(result).to.have.property('searchEntries');
-      if ((result as SearchResult).searchEntries) {
-        expect((result as SearchResult).searchEntries).to.be.an('array');
-        expect((result as SearchResult).searchEntries.length).to.be.greaterThan(
-          0
-        );
-      } else {
-        expect(result);
-      }
+      expect((result as SearchResult).searchEntries).to.be.an('array');
+      expect((result as SearchResult).searchEntries.length).to.be.greaterThan(
+        0
+      );
     });
   });
 
@@ -72,11 +69,10 @@ describe('ldapActions', function () {
           await ldapActions.delete(testDN);
         } catch (err) {
           // Ignore errors if the entry does not exist
-          console.error('Ignored', err);
         }
       });
 
-      it('should add a new entry successfully', async () => {
+      it('should add a new entry successfully, modify it and delete it successfully', async () => {
         const entry = {
           objectClass: [
             'inetOrgPerson',
@@ -95,17 +91,57 @@ describe('ldapActions', function () {
         // Verify the entry was added
         const searchOptions = {
           filter: '(uid=testuser)',
+          paged: false,
         };
         const searchResult = await ldapActions.search(searchOptions);
-        if ((searchResult as SearchResult).searchEntries) {
-          expect((searchResult as SearchResult).searchEntries.length).to.equal(
-            1
-          );
-          expect((searchResult as SearchResult).searchEntries[0].dn).to.equal(
-            testDN
-          );
-        } else {
-          expect(searchResult);
+        expect((searchResult as SearchResult).searchEntries.length).to.equal(1);
+        expect((searchResult as SearchResult).searchEntries[0].dn).to.equal(
+          testDN
+        );
+
+        await ldapActions.modify(testDN, {
+          replace: { mail: 't@t.org' },
+        });
+        const modifiedResult = await ldapActions.search(searchOptions);
+        expect((modifiedResult as SearchResult).searchEntries.length).to.equal(
+          1
+        );
+        expect(
+          (modifiedResult as SearchResult).searchEntries[0].mail
+        ).to.include('t@t.org');
+
+        await ldapActions.delete('testuser');
+        let result = await ldapActions.search({ filter: '(uid=testuser)' });
+        if (!(result as SearchResult).searchEntries) {
+          const tmp = await (result as AsyncGenerator<SearchResult>).next();
+          result = tmp.value;
+        }
+        expect((result as SearchResult).searchEntries.length).to.equal(0);
+      });
+
+      it('should fail to add an entry that already exists', async () => {
+        const entry = {
+          objectClass: [
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+            'top',
+          ],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+          mail: 'test@test.org',
+        };
+        // First add
+        const firstAdd = await ldapActions.add(testDN, entry);
+        expect(firstAdd).to.be.true;
+
+        // Second add should fail
+        try {
+          await ldapActions.add(testDN, entry);
+          expect.fail('Expected error not thrown');
+        } catch (err) {
+          expect(err).to.have.property('message');
         }
       });
     });
