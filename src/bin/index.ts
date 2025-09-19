@@ -5,6 +5,7 @@ import express from 'express';
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
 import ldap from '../lib/ldapActions';
+import { Hooks } from '../hooks';
 
 export { ldap };
 export type { Config };
@@ -17,7 +18,8 @@ export class DM {
   ready: Promise<void>;
   server?: import('http').Server;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  hooks: { [key: string]: Function[] } = {};
+  hooks: { [K in keyof Hooks]?: Function[] } = {};
+  loadedPlugins: { [key: string]: object[] } = {};
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -67,29 +69,46 @@ export class DM {
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                   pluginModule = pluginModule.default;
                 }
-                let validPlugin = false;
-                if (pluginModule.api) {
-                  validPlugin = true;
-                  pluginModule.api(this.app, this);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                const obj = new pluginModule(this);
+                if (!obj) {
+                  return reject(new Error(`Unable to load ${pluginName}`));
                 }
-                if (pluginModule.hooks) {
-                  validPlugin = true;
-                  for (const hookName in pluginModule.hooks) {
-                    if (!this.hooks[hookName]) {
-                      this.hooks[hookName] = [];
+                if (!obj.name) {
+                  obj.name = pluginName;
+                }
+                if (obj.api) {
+                  obj.api(this.app, this);
+                }
+                if (obj.hooks as Hooks) {
+                  for (const hookName in pluginModule.hooks as Hooks) {
+                    const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
+                    if (!this.hooks[hookName as keyof Hooks]) {
+                      this.hooks[hookName as keyof Hooks] = [];
                     }
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-                    this.hooks[hookName].push(pluginModule.hooks[hookName]);
+                    if (hook && typeof hook === 'function') {
+                      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                      // @ts-ignore: object is defined
+                      this.hooks[hookName as keyof Hooks].push(hook);
+                    } else {
+                      return reject(
+                        new Error(
+                          `Plugin ${pluginName}: hook ${hookName} is invalid`
+                        )
+                      );
+                    }
                   }
                 }
-                if (validPlugin) {
-                  console.debug(`Plugin ${pluginName} loaded`);
-                  resolve();
-                } else {
-                  reject(
-                    new Error(`Plugin ${pluginName} has no default export`)
+                if (this.loadedPlugins[obj.name]) {
+                  return reject(
+                    new Error(
+                      `Plugin ${pluginName} use a name that is already used`
+                    )
                   );
                 }
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                this.loadedPlugins[obj.name] = obj;
+                resolve();
               })
               .catch(err => {
                 reject(

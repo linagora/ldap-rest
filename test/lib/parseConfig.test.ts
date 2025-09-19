@@ -143,6 +143,20 @@ describe('ConfigParser', () => {
     expect(result.plugin).to.deep.equal(['a', 'b', 'x', 'y', 'm', 'n']);
   });
 
+  it('should store additional command-line args', () => {
+    const argv = [
+      'node',
+      'script.js',
+      '--plugins',
+      'm, n',
+      '--zig-zag',
+      'test',
+    ];
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse(argv);
+    expect(result).to.have.property('zig_zag').that.equals('test');
+  });
+
   /*
   it('should handle short CLI args', () => {
     const argv = ['node', 'script.js', '-s', 'shortval'];

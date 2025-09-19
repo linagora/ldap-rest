@@ -26,6 +26,9 @@ describe('Plugin Loading', () => {
     );
     expect(res.status).to.equal(200);
     expect(res.body).to.deep.equal({ message: 'Hello path' });
+
+    expect(server?.loadedPlugins.hello).to.be.an('object');
+    expect(server?.loadedPlugins.hellopath).to.be.an('object');
   });
 
   after(() => {

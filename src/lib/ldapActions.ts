@@ -89,7 +89,9 @@ class ldapActions {
         opts = hook(opts);
       }
     }
-    let res = opts.paged ? client.searchPaginated(base, opts) : client.search(base, opts);
+    let res = opts.paged
+      ? client.searchPaginated(base, opts)
+      : client.search(base, opts);
     if (this.parent?.hooks['ldapsearchresult']) {
       for (const hook of this.parent.hooks['ldapsearchresult']) {
         res = hook(res);

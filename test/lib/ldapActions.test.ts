@@ -20,7 +20,7 @@ describe('ldapActions', function () {
 
   beforeEach(() => {
     const config = parseConfig(configTemplate);
-    ldapActions = new LdapActions(config, new DM);
+    ldapActions = new LdapActions(config, new DM());
   });
 
   describe('connect', () => {

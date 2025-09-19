@@ -58,6 +58,7 @@ export class ConfigParser {
         } else {
           value = cliValue as string;
         }
+        cliArgs.delete(entry.cliArg);
       }
       if (entry.type === 'array' && cliArgs.has(entry.cliArg + 's')) {
         const cliValue = cliArgs.get(entry.cliArg + 's') || '';
@@ -70,10 +71,19 @@ export class ConfigParser {
             .split(/[,\s]+/)
             .filter(v => v.length > 0);
         }
+        cliArgs.delete(entry.cliArg + 's');
       }
 
       result[key as keyof Config] = value as never;
     }
+
+    // Store additional arguments
+    cliArgs.forEach((v, k) => {
+      if (result[k]) {
+        throw new Error(`Error in command line: ${k} redefined`);
+      }
+      result[k.replace(/^-+/, '').replace(/-/g, '_')] = v;
+    });
 
     return result;
   }

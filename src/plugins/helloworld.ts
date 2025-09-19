@@ -1,23 +1,20 @@
 import type { Express, Request, Response } from 'express';
 
-import { type DM } from '../bin';
+import DmPlugin from '../abstract/plugin';
 
-let server: DM;
+export default class HelloWorld extends DmPlugin {
+  name = 'hello';
 
-const api = (app: Express, caller: DM): void => {
-  console.debug('Hello plugin loaded - routes: GET /hello');
-  server = caller;
-  console.debug(' => I stored caller object to have hooks later');
-  app.get('/hello', (req: Request, res: Response) => {
-    const response = { message: 'Hello', hookResults: [] as unknown[] };
-    if (server.hooks && server.hooks['hello']) {
-      for (const hook of server.hooks['hello']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        response.hookResults.push(hook());
+  api(app: Express): void {
+    app.get('/hello', (req: Request, res: Response) => {
+      const response = { message: 'Hello', hookResults: [] as unknown[] };
+      if (this.server.hooks && this.server.hooks['hello']) {
+        for (const hook of this.server.hooks['hello']) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          response.hookResults.push(hook());
+        }
       }
-    }
-    res.json(response);
-  });
-};
-
-export { api };
+      res.json(response);
+    });
+  }
+}

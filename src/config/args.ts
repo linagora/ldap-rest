@@ -10,6 +10,7 @@ export interface Config {
   ldap_url?: string;
   plugin?: string[];
   plugins?: string;
+  [key: string]: string | string[] | boolean | number | undefined;
 }
 
 const configArgs: ConfigTemplate = [
