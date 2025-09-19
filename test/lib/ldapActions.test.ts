@@ -20,7 +20,7 @@ describe('ldapActions', function () {
 
   beforeEach(() => {
     const config = parseConfig(configTemplate);
-    ldapActions = new LdapActions(config, new DM());
+    ldapActions = new LdapActions(new DM());
   });
 
   describe('connect', () => {
@@ -119,14 +119,8 @@ describe('ldapActions', function () {
         expect((result as SearchResult).searchEntries.length).to.equal(0);
       });
 
-      it('should fail to add an entry that already exists', async () => {
+      it('should fail to add an entry that already exists (this tests also an entry without objectClass)', async () => {
         const entry = {
-          objectClass: [
-            'inetOrgPerson',
-            'organizationalPerson',
-            'person',
-            'top',
-          ],
           cn: 'Test User',
           sn: 'User',
           uid: 'testuser',

@@ -37,39 +37,39 @@ class ldapActions {
   dn: string;
   pwd: string;
   base: string;
-  parent?: DM;
+  parent: DM;
 
-  constructor(config: Config, server?: DM) {
-    this.config = config;
-    if (server) this.parent = server;
-    if (!this.config.ldap_url) {
+  constructor(server: DM) {
+    this.parent = server;
+    this.config = server.config;
+    if (!server.config.ldap_url) {
       throw new Error('LDAP URL is not defined');
     }
-    if (!this.config.ldap_dn) {
+    if (!server.config.ldap_dn) {
       throw new Error('LDAP DN is not defined');
     }
-    if (!this.config.ldap_pwd) {
+    if (!server.config.ldap_pwd) {
       throw new Error('LDAP password is not defined');
     }
-    if (!this.config.ldap_base) {
-      this.base = this.config.ldap_dn.split(',', 2)[1];
+    if (!server.config.ldap_base) {
+      this.base = server.config.ldap_dn.split(',', 2)[1];
       console.warn(`LDAP base is not defined, using "${this.base}"`);
     } else {
-      this.base = this.config.ldap_base;
+      this.base = server.config.ldap_base;
     }
     this.options = {
-      url: this.config.ldap_url,
+      url: server.config.ldap_url,
       timeout: 0,
       connectTimeout: 0,
       strictDN: true,
     };
-    if (this.config.ldap_url.startsWith('ldaps://')) {
+    if (server.config.ldap_url.startsWith('ldaps://')) {
       this.options.tlsOptions = {
         minVersion: 'TLSv1.2',
       };
     }
-    this.dn = this.config.ldap_dn;
-    this.pwd = this.config.ldap_pwd;
+    this.dn = server.config.ldap_dn;
+    this.pwd = server.config.ldap_pwd;
   }
 
   /* Connect to LDAP server
@@ -129,6 +129,12 @@ class ldapActions {
     entry: Record<string, AttributeValue>
   ): Promise<boolean> {
     dn = this.setDn(dn);
+    if (
+      (!entry.objectClass || entry.objectClass.length === 0) &&
+      this.config.user_class
+    ) {
+      entry.objectClass = this.config.user_class;
+    }
     if (this.parent?.hooks['ldapaddrequest']) {
       for (const hook of this.parent.hooks['ldapaddrequest'] as Array<
         (

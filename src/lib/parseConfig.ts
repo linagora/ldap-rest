@@ -9,6 +9,7 @@ export interface ConfigEntry {
   envVar?: string;
   defaultValue?: string | string[] | boolean | number;
   type?: 'string' | 'number' | 'boolean' | 'array';
+  plural?: string; // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
 }
 
 export class ConfigParser {
@@ -60,8 +61,8 @@ export class ConfigParser {
         }
         cliArgs.delete(entry.cliArg);
       }
-      if (entry.type === 'array' && cliArgs.has(entry.cliArg + 's')) {
-        const cliValue = cliArgs.get(entry.cliArg + 's') || '';
+      if (entry.type === 'array' && entry.plural && cliArgs.has(entry.plural)) {
+        const cliValue = cliArgs.get(entry.plural) || '';
         if (Array.isArray(value)) {
           value = value.concat(
             (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
@@ -71,7 +72,7 @@ export class ConfigParser {
             .split(/[,\s]+/)
             .filter(v => v.length > 0);
         }
-        cliArgs.delete(entry.cliArg + 's');
+        cliArgs.delete(entry.plural);
       }
 
       result[key as keyof Config] = value as never;

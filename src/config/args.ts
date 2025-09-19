@@ -10,6 +10,8 @@ export interface Config {
   ldap_url?: string;
   plugin?: string[];
   plugins?: string;
+  user_class?: string[];
+  user_classes?: string;
   [key: string]: string | string[] | boolean | number | undefined;
 }
 
@@ -32,6 +34,7 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_PLUGINS',
     defaultValue: [],
     type: 'array',
+    plural: '--plugins',
   },
 
   // LDAP options
@@ -54,6 +57,14 @@ const configArgs: ConfigTemplate = [
     cliArg: '--ldap-url',
     envVar: 'DM_LDAP_URL',
     defaultValue: 'ldap://localhost',
+  },
+  // Default classes to insert into LDAP
+  {
+    cliArg: '--user-class',
+    envVar: 'DM_USER_CLASSES',
+    defaultValue: ['inetOrgPerson'],
+    type: 'array',
+    plural: '--user-classes',
   },
 
   // Lemonldap options
