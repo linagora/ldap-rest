@@ -1,9 +1,15 @@
-import { Client } from 'ldapts';
-import { type ClientOptions, SearchResult, SearchOptions } from 'ldapts';
+import { Client, Attribute, Change } from 'ldapts';
+import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
+// Typescript interface
+
+// Entry
+export type AttributeValue = Buffer | Buffer[] | string[] | string;
+
+// search
 const defaultSearchOptions: SearchOptions = {
   scope: 'sub',
   filter: '(objectClass=*)',
@@ -14,6 +20,16 @@ const defaultSearchOptions: SearchOptions = {
     pageSize: 100,
   },
 };
+export type { SearchOptions, SearchResult };
+
+// modify
+export interface ModifyRequest {
+  add?: Record<string, AttributeValue>[];
+  replace?: Record<string, AttributeValue>[];
+  delete?: string[] | Record<string, AttributeValue>[];
+}
+
+// Code
 
 class ldapActions {
   config: Config;
@@ -75,6 +91,9 @@ class ldapActions {
     return client;
   }
 
+  /*
+    LDAP search
+   */
   async search(
     options: SearchOptions,
     base: string = this.base
@@ -86,6 +105,7 @@ class ldapActions {
     };
     if (this.parent?.hooks['ldapsearchopts']) {
       for (const hook of this.parent.hooks['ldapsearchopts']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
         opts = hook(opts);
       }
     }
@@ -94,10 +114,175 @@ class ldapActions {
       : client.search(base, opts);
     if (this.parent?.hooks['ldapsearchresult']) {
       for (const hook of this.parent.hooks['ldapsearchresult']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
         res = hook(res);
       }
     }
     return res;
+  }
+
+  /*
+    LDAP add
+   */
+  async add(
+    dn: string,
+    entry: Record<string, AttributeValue>
+  ): Promise<boolean> {
+    if (this.parent?.hooks['ldapaddrequest']) {
+      for (const hook of this.parent.hooks['ldapaddrequest'] as Array<
+        (
+          dn: string,
+          entry: Record<string, AttributeValue>
+        ) => {
+          dn: string;
+          entry: Record<string, AttributeValue>;
+        }
+      >) {
+        const res = hook(dn, entry);
+        dn = res.dn;
+        entry = res.entry;
+      }
+    }
+    const client = await this.connect();
+    // Convert Buffer/Buffer[] values to string/string[]
+    const sanitizedEntry: Record<string, string | string[]> = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (Buffer.isBuffer(value)) {
+        sanitizedEntry[key] = value.toString();
+      } else if (
+        Array.isArray(value) &&
+        value.length > 0 &&
+        Buffer.isBuffer(value[0])
+      ) {
+        sanitizedEntry[key] = (value as Buffer[]).map(v => v.toString());
+      } else {
+        sanitizedEntry[key] = value as string | string[];
+      }
+    }
+    try {
+      await client.add(dn, sanitizedEntry);
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`LDAP add error: ${error}`);
+    }
+  }
+
+  /*
+    LDAP modify
+   */
+  async modify(dn: string, changes: ModifyRequest): Promise<boolean> {
+    const ldapChanges: Change[] = [];
+    if (this.parent?.hooks['ldapmodifyrequest']) {
+      for (const hook of this.parent.hooks['ldapmodifyrequest']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        changes = hook(changes);
+      }
+    }
+    if (changes.add) {
+      for (const entry of changes.add) {
+        for (const [key, value] of Object.entries(entry)) {
+          ldapChanges.push(
+            new Change({
+              operation: 'add',
+              modification: new Attribute({
+                type: key,
+                values: Array.isArray(value) ? value : [value as string],
+              }),
+            })
+          );
+        }
+      }
+    }
+    if (changes.replace) {
+      for (const entry of changes.replace) {
+        for (const [key, value] of Object.entries(entry)) {
+          ldapChanges.push(
+            new Change({
+              operation: 'replace',
+              modification: new Attribute({
+                type: key,
+                values: Array.isArray(value) ? value : [value as string],
+              }),
+            })
+          );
+        }
+      }
+    }
+    if (changes.delete) {
+      if (Array.isArray(changes.delete)) {
+        for (const attr of changes.delete) {
+          if (attr)
+            ldapChanges.push(
+              new Change({
+                operation: 'delete',
+                modification: new Attribute({
+                  type: attr as string,
+                  values: [],
+                }),
+              })
+            );
+        }
+      } else {
+        for (const [key, value] of Object.entries(changes.delete)) {
+          ldapChanges.push(
+            new Change({
+              operation: 'delete',
+              modification: new Attribute({
+                type: key,
+                values: Array.isArray(value) ? value : [value],
+              }),
+            })
+          );
+        }
+      }
+    }
+    if (ldapChanges.length !== 0) {
+      const client = await this.connect();
+      try {
+        await client.modify(dn, ldapChanges);
+        return true;
+      } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        throw new Error(`LDAP modify error: ${error}`);
+      }
+    } else {
+      console.error('No changes to apply');
+      return false;
+    }
+  }
+
+  /*
+    LDAP delete
+   */
+  async delete(dn: string | string[]): Promise<boolean> {
+    if (this.parent?.hooks['ldapdeleterequest']) {
+      for (const hook of this.parent.hooks['ldapdeleterequest'] as Array<
+        (dn: string | string[]) => string | string[]
+      >) {
+        dn = hook(dn);
+      }
+    }
+    const client = await this.connect();
+    if (Array.isArray(dn)) {
+      for (const entry of dn) {
+        try {
+          await client.del(entry);
+        } catch (error) {
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          throw new Error(`LDAP delete error: ${error}`);
+        }
+      }
+      return true;
+    } else {
+      try {
+        await client.del(dn);
+        return true;
+      } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        throw new Error(`LDAP delete error: ${error}`);
+      }
+    }
   }
 }
 

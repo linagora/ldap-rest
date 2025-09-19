@@ -52,4 +52,62 @@ describe('ldapActions', function () {
       }
     });
   });
+
+  describe('Modify entries', () => {
+    before(function () {
+      // Skip tests if env vars are not set
+      if (!process.env.DM_LDAP_BASE) {
+        // eslint-disable-next-line no-console
+        console.warn('Skipping LDAP modify: DM_LDAP_BASE not set');
+        // @ts-ignore
+        this.skip();
+      }
+    });
+
+    describe('add', () => {
+      const testDN = `uid=testuser,${process.env.DM_LDAP_BASE}`;
+      afterEach(async () => {
+        // Clean up: delete the test entry if it exists
+        try {
+          await ldapActions.delete(testDN);
+        } catch (err) {
+          // Ignore errors if the entry does not exist
+          console.error('Ignored', err);
+        }
+      });
+
+      it('should add a new entry successfully', async () => {
+        const entry = {
+          objectClass: [
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+            'top',
+          ],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+          mail: 'test@test.org',
+        };
+        const addResult = await ldapActions.add(testDN, entry);
+        expect(addResult).to.be.true;
+
+        // Verify the entry was added
+        const searchOptions = {
+          filter: '(uid=testuser)',
+        };
+        const searchResult = await ldapActions.search(searchOptions);
+        if ((searchResult as SearchResult).searchEntries) {
+          expect((searchResult as SearchResult).searchEntries.length).to.equal(
+            1
+          );
+          expect((searchResult as SearchResult).searchEntries[0].dn).to.equal(
+            testDN
+          );
+        } else {
+          expect(searchResult);
+        }
+      });
+    });
+  });
 });
