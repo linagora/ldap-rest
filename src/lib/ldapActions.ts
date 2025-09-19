@@ -2,6 +2,7 @@ import { Client } from 'ldapts';
 import { type ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 
 import { type Config } from '../config/args';
+import { type DM } from '../bin';
 
 const defaultSearchOptions: SearchOptions = {
   scope: 'sub',
@@ -20,9 +21,11 @@ class ldapActions {
   dn: string;
   pwd: string;
   base: string;
+  parent?: DM;
 
-  constructor(config: Config) {
+  constructor(config: Config, server?: DM) {
     this.config = config;
+    if (server) this.parent = server;
     if (!this.config.ldap_url) {
       throw new Error('LDAP URL is not defined');
     }
@@ -77,14 +80,22 @@ class ldapActions {
     base: string = this.base
   ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
     const client = await this.connect();
-    const opts = {
+    let opts = {
       ...defaultSearchOptions,
       ...options,
     };
-    if (opts.paged) {
-      return client.searchPaginated(base, opts);
+    if (this.parent?.hooks['ldapsearchopts']) {
+      for (const hook of this.parent.hooks['ldapsearchopts']) {
+        opts = hook(opts);
+      }
     }
-    return client.search(base, opts);
+    let res = opts.paged ? client.searchPaginated(base, opts) : client.search(base, opts);
+    if (this.parent?.hooks['ldapsearchresult']) {
+      for (const hook of this.parent.hooks['ldapsearchresult']) {
+        res = hook(res);
+      }
+    }
+    return res;
   }
 }
 

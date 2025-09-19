@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from 'express';
 
-import { DM } from '../bin';
+import { type DM } from '../bin';
 
 let server: DM;
 

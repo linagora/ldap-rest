@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import { Client, SearchResult } from 'ldapts';
 import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/config/args';
+import { DM } from '../../src/bin';
 
 let ldapActions: LdapActions;
 
@@ -19,7 +20,7 @@ describe('ldapActions', function () {
 
   beforeEach(() => {
     const config = parseConfig(configTemplate);
-    ldapActions = new LdapActions(config);
+    ldapActions = new LdapActions(config, new DM);
   });
 
   describe('connect', () => {

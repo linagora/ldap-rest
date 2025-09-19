@@ -1,4 +1,4 @@
-import { ConfigTemplate } from '../lib/parseConfig';
+import { type ConfigTemplate } from '../lib/parseConfig';
 
 export interface Config {
   port: number;
