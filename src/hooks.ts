@@ -14,8 +14,8 @@ export interface Hooks {
   ldapsearchresult?: (results: SearchResult) => SearchResult;
   // add
   ldapaddrequest?: (
-    entry: Record<string, AttributeValue>
-  ) => Record<string, AttributeValue>;
+    args: [string, Record<string, AttributeValue>]
+  ) => [string, Record<string, AttributeValue>];
   // modify
   ldapmodifyrequest?: (changes: ModifyRequest) => ModifyRequest;
   // delete

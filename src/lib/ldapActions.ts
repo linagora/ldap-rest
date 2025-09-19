@@ -138,16 +138,12 @@ class ldapActions {
     if (this.parent?.hooks['ldapaddrequest']) {
       for (const hook of this.parent.hooks['ldapaddrequest'] as Array<
         (
-          dn: string,
-          entry: Record<string, AttributeValue>
-        ) => {
-          dn: string;
-          entry: Record<string, AttributeValue>;
-        }
+          arg: [string, Record<string, AttributeValue>]
+        ) => [string, Record<string, AttributeValue>]
       >) {
-        const res = hook(dn, entry);
-        dn = res.dn;
-        entry = res.entry;
+        const res = hook([dn, entry]);
+        dn = res[0];
+        entry = res[1];
       }
     }
     const client = await this.connect();
