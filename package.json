@@ -2,18 +2,51 @@
   "name": "mini-dm",
   "version": "0.0.1",
   "description": "Light directory manager",
+  "keywords": [
+    "Identity-Manager"
+  ],
+  "homepage": "https://github.com/linagora/mini-dm#readme",
+  "bugs": {
+    "url": "https://github.com/linagora/mini-dm/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linagora/mini-dm.git"
+  },
+  "license": "AGPL-3.0",
+  "author": "Xavier Guimard <yadd@debian.org>",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/bin/index.js",
+      "types": "./dist/src/bin/index.d.ts"
+    },
+    "hooks": {
+      "types": "./dist/src/hooks.d.ts"
+    },
+    "plugin-helloworld": {
+      "import": "./dist/plugins/helloworld.js",
+      "types": "./dist/src/plugins/helloworld.d.ts"
+    }
+  },
   "main": "dist/bin/index.mjs",
   "bin": {
     "mini-dm": "bin/index.mjs"
   },
-  "type": "module",
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "package.json"
+  ],
   "scripts": {
     "build": "npm run build:prod",
-    "build:prod": "npm run clean && NODE_ENV=production rollup -c",
     "build:dev": "npm run clean && rollup -c",
+    "build:prod": "npm run clean && NODE_ENV=production rollup -c",
     "build:watch": "rollup -c --watch",
-    "clean": "rimraf dist/*",
     "check": "npm run lint && npm run format:check",
+    "clean": "rimraf dist/*",
+    "dev": "npm run build:dev && npm start",
     "fix": "npm run lint:fix && npm run format:fix",
     "format:check": "prettier --check .",
     "format:check-diff": "prettier --check $(git diff $(git rev-parse --abbrev-ref --symbolic-full-name @{u}) --name-status|grep -E '^M|A'|cut -f2)",
@@ -22,22 +55,13 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start": "./dist/bin/server.js",
-    "dev": "npm run build:dev && npm start",
     "test": "tsc --noEmit && mocha"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/linagora/mini-dm.git"
+  "dependencies": {
+    "express": "^5.1.0",
+    "ldapts": "^8.0.9",
+    "re2": "^1.22.1"
   },
-  "keywords": [
-    "Identity-Manager"
-  ],
-  "author": "Xavier Guimard <yadd@debian.org>",
-  "license": "AGPL-3.0",
-  "bugs": {
-    "url": "https://github.com/linagora/mini-dm/issues"
-  },
-  "homepage": "https://github.com/linagora/mini-dm#readme",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-json": "^6.1.0",
@@ -61,15 +85,11 @@
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "rollup": "^4.50.2",
+    "sort-package-json": "^3.4.0",
     "supertest": "^7.1.4",
     "tslib": "^2.8.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "express": "^5.1.0",
-    "ldapts": "^8.0.9",
-    "re2": "^1.22.1"
   },
   "optionalDependencies": {
     "lemonldap-ng-handler": "^0.7.1"
