@@ -6,6 +6,8 @@ import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import { readdir } from 'fs/promises';
 import { extname } from 'path';
+import sort from 'sort-package-json';
+import { writeFileSync } from 'fs';
 
 import pkg from './package.json' with { type: 'json' };
 
@@ -69,16 +71,35 @@ const external = [
 const corePlugins = [];
 async function getPluginEntries() {
   const files = await readdir(PLUGINS_SRC_DIR);
-  return files
-    .filter(file => extname(file) === '.ts')
-    .map(file => `${PLUGINS_SRC_DIR}/${file}`);
+  return files.filter(file => extname(file) === '.ts');
 }
+
+pkg.exports = {
+  '.': {
+    import: './dist/bin/index.js',
+    types: './dist/src/bin/index.d.ts',
+  },
+  hooks: {
+    types: './dist/src/hooks.d.ts',
+  },
+};
 
 export default async () => {
   const p = await getPluginEntries();
+  p.forEach(plugin => {
+    const name = plugin.replace(/\.ts$/, '');
+    pkg.exports[`plugin-${name}`] = {
+      import: `./dist/plugins/${name}.js`,
+      types: `./dist/src/plugins/${name}.d.ts`,
+    };
+  });
+  writeFileSync('package.json', sort(JSON.stringify(pkg, null, 2)));
   return [
     {
-      input: ['src/bin/index.ts', ...p],
+      input: [
+        'src/bin/index.ts',
+        ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
+      ],
       output: {
         dir: 'dist',
         format: 'es',
