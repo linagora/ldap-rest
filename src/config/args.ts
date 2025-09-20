@@ -3,6 +3,8 @@ import { type ConfigTemplate } from '../lib/parseConfig';
 export interface Config {
   port: number;
   auth?: string;
+
+  // LDAP
   ldap_base?: string;
   ldap_dn?: string;
   llng_ini?: string;
@@ -12,6 +14,13 @@ export interface Config {
   plugins?: string;
   user_class?: string[];
   user_classes?: string;
+
+  // LDAP groups plugin
+  ldap_group_base?: string;
+  group_class?: string[];
+  group_classes?: string[];
+
+  // Accept additional config keys for non core plugins
   [key: string]: string | string[] | boolean | number | undefined;
 }
 
@@ -62,7 +71,7 @@ const configArgs: ConfigTemplate = [
   {
     cliArg: '--user-class',
     envVar: 'DM_USER_CLASSES',
-    defaultValue: ['inetOrgPerson'],
+    defaultValue: ['top', 'inetOrgPerson'],
     type: 'array',
     plural: '--user-classes',
   },
@@ -81,6 +90,13 @@ const configArgs: ConfigTemplate = [
     cliArg: '--ldap-group-base',
     envVar: 'DM_LDAP_GROUP_BASE',
     defaultValue: '',
+  },
+  {
+    cliArg: '--group-class',
+    envVar: 'DM_GROUP_CLASSES',
+    defaultValue: ['top', 'groupOfNames'],
+    type: 'array',
+    plural: '--group-classes',
   },
 ];
 

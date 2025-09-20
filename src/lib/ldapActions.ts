@@ -106,7 +106,7 @@ class ldapActions {
     if (this.parent?.hooks['ldapsearchopts']) {
       for (const hook of this.parent.hooks['ldapsearchopts']) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        opts = hook(opts);
+        opts = await hook(opts);
       }
     }
     let res = opts.paged
@@ -115,7 +115,7 @@ class ldapActions {
     if (this.parent?.hooks['ldapsearchresult']) {
       for (const hook of this.parent.hooks['ldapsearchresult']) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        res = hook(res);
+        res = await hook(res);
       }
     }
     return res;
@@ -136,14 +136,9 @@ class ldapActions {
       entry.objectClass = this.config.user_class;
     }
     if (this.parent?.hooks['ldapaddrequest']) {
-      for (const hook of this.parent.hooks['ldapaddrequest'] as Array<
-        (
-          arg: [string, Record<string, AttributeValue>]
-        ) => [string, Record<string, AttributeValue>]
-      >) {
-        const res = hook([dn, entry]);
-        dn = res[0];
-        entry = res[1];
+      for (const hook of this.parent.hooks['ldapaddrequest']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        [dn, entry] = await hook([dn, entry]);
       }
     }
     const client = await this.connect();
@@ -180,7 +175,7 @@ class ldapActions {
     if (this.parent?.hooks['ldapmodifyrequest']) {
       for (const hook of this.parent.hooks['ldapmodifyrequest']) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        changes = hook(changes);
+        changes = await hook(changes);
       }
     }
     if (changes.add) {
@@ -265,10 +260,9 @@ class ldapActions {
       dn = this.setDn(dn);
     }
     if (this.parent?.hooks['ldapdeleterequest']) {
-      for (const hook of this.parent.hooks['ldapdeleterequest'] as Array<
-        (dn: string | string[]) => string | string[]
-      >) {
-        dn = hook(dn);
+      for (const hook of this.parent.hooks['ldapdeleterequest']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        dn = await hook(dn);
       }
     }
     const client = await this.connect();

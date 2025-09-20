@@ -10,16 +10,26 @@ export interface Hooks {
   /* LDAP */
 
   // search
-  ldapsearchopts?: (opts: SearchOptions) => SearchOptions;
-  ldapsearchresult?: (results: SearchResult) => SearchResult;
+  ldapsearchopts?: (
+    opts: SearchOptions
+  ) => SearchOptions | Promise<SearchOptions>;
+  ldapsearchresult?: (
+    results: SearchResult
+  ) => SearchResult | Promise<SearchResult>;
   // add
   ldapaddrequest?: (
     args: [string, Record<string, AttributeValue>]
-  ) => [string, Record<string, AttributeValue>];
+  ) =>
+    | [string, Record<string, AttributeValue>]
+    | Promise<[string, Record<string, AttributeValue>]>;
   // modify
-  ldapmodifyrequest?: (changes: ModifyRequest) => ModifyRequest;
+  ldapmodifyrequest?: (
+    changes: ModifyRequest
+  ) => ModifyRequest | Promise<ModifyRequest>;
   // delete
-  ldapdeleterequest?: (dn: string | string[]) => string | string[];
+  ldapdeleterequest?: (
+    dn: string | string[]
+  ) => string | string[] | Promise<string | string[]>;
 
   /*
    * Plugins
@@ -27,4 +37,22 @@ export interface Hooks {
 
   /* Demo plugin */
   hello?: () => string;
+
+  /* LdapGroups plugin */
+  ldapgroupadd?: (
+    args: [string, Record<string, AttributeValue>]
+  ) =>
+    | [string, Record<string, AttributeValue>]
+    | Promise<[string, Record<string, AttributeValue>]>;
+  ldapgroupdelete?: (dn: string) => string | Promise<string>;
+  ldapgroupaddmember?: (
+    args: [string, string[]]
+  ) => [string, string[]] | Promise<[string, string[]]>;
+  ldapgroupdeletemember?: (
+    args: [string, string[]]
+  ) => [string, string[]] | Promise<[string, string[]]>;
+  // this hook is for low-level ldap listGroups method
+  _ldapgrouplist?: (
+    groups: AsyncGenerator<SearchResult>
+  ) => [AsyncGenerator<SearchResult> | Promise<AsyncGenerator<SearchResult>>];
 }

@@ -88,7 +88,7 @@ export default async () => {
   const p = await getPluginEntries();
   p.forEach(plugin => {
     const name = plugin.replace(/\.ts$/, '');
-    pkg.exports[`plugin-${name}`] = {
+    pkg.exports[`plugin-${name.toLowerCase()}`] = {
       import: `./dist/plugins/${name}.js`,
       types: `./dist/src/plugins/${name}.d.ts`,
     };

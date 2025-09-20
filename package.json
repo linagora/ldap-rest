@@ -27,6 +27,10 @@
     "plugin-helloworld": {
       "import": "./dist/plugins/helloworld.js",
       "types": "./dist/src/plugins/helloworld.d.ts"
+    },
+    "plugin-ldapgroups": {
+      "import": "./dist/plugins/ldapGroups.js",
+      "types": "./dist/src/plugins/ldapGroups.d.ts"
     }
   },
   "main": "dist/bin/index.mjs",
