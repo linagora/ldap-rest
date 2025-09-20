@@ -26,7 +26,7 @@ export type { SearchOptions, SearchResult };
 export interface ModifyRequest {
   add?: Record<string, AttributeValue>[];
   replace?: Record<string, AttributeValue>;
-  delete?: string[] | Record<string, AttributeValue>[];
+  delete?: string[] | Record<string, AttributeValue>;
 }
 
 // Code
@@ -215,7 +215,7 @@ class ldapActions {
               new Change({
                 operation: 'delete',
                 modification: new Attribute({
-                  type: attr as string,
+                  type: attr,
                   values: [],
                 }),
               })
@@ -223,15 +223,18 @@ class ldapActions {
         }
       } else {
         for (const [key, value] of Object.entries(changes.delete)) {
-          ldapChanges.push(
-            new Change({
-              operation: 'delete',
-              modification: new Attribute({
-                type: key,
-                values: Array.isArray(value) ? value : [value],
-              }),
-            })
-          );
+          const change = new Change({
+            operation: 'delete',
+            modification: value
+              ? new Attribute({
+                  type: key,
+                  values: Array.isArray(value)
+                    ? (value as string[])
+                    : [value as string],
+                })
+              : new Attribute({ type: key }),
+          });
+          ldapChanges.push(change);
         }
       }
     }

@@ -145,7 +145,7 @@ export default class LdapGroups extends DmPlugin {
     }
     return await this.ldap
       .modify(dn, {
-        delete: [{ member }],
+        delete: { member: member },
       })
       .catch(err => {
         throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
@@ -170,7 +170,7 @@ export default class LdapGroups extends DmPlugin {
       res.searchEntries.map(entry =>
         this.ldap
           .modify(entry.dn, {
-            delete: [{ member: memberDn }],
+            delete: { member: memberDn },
           })
           .catch(err => {
             console.error(
