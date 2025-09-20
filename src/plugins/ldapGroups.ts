@@ -78,6 +78,10 @@ export default class LdapGroups extends DmPlugin {
     },
   };
 
+  /*
+   * API routes
+   */
+
   api(app: Express): void {
     // Add group
     app.post('/api/v1/ldap/groups/add', async (req, res) => {
