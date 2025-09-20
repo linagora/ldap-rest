@@ -13,6 +13,8 @@
  * - ldapdeleterequest: to catch user deletion and remove them from all groups
  */
 
+import { Entry } from 'ldapts';
+
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type { Hooks } from '../hooks';
@@ -56,6 +58,34 @@ export default class LdapGroups extends DmPlugin {
     },
   };
 
+  async searchGroupsByName(
+    cn: string,
+    partial = false,
+    attributes: string[] = ['cn', 'member']
+  ): Promise<Record<string, Entry>> {
+    const filter = partial ? `(cn=*${cn}*)` : `(cn=${cn})`;
+    const _res = (await this.ldap.search(
+      {
+        filter,
+        paged: false,
+        attributes,
+      },
+      this.base as string
+    )) as SearchResult;
+    const res: Record<string, Entry> = {};
+    _res.searchEntries.map(entry => {
+      const s = entry.cn as string;
+      if (s) res[s] = entry;
+      if (!Array.isArray(res[s].member))
+        res[s].member = [res[s].member as string];
+      res[s].member = (res[s].member as string[]).filter((m: string) => {
+        return m !== 'cn=fakeuser';
+      });
+    });
+    return res;
+    //return _res.searchEntries.map(entry => entry.cn as string).filter(cn => cn);
+  }
+
   async addGroup(cn: string, members: string[] = []): Promise<boolean> {
     let dn: string;
     if (/^cn=/.test(cn)) {
@@ -68,7 +98,7 @@ export default class LdapGroups extends DmPlugin {
     let entry = {
       objectClass: this.config.group_class as string[],
       cn,
-      member: members.length ? members : ['cn=dummy'], // LDAP groupOfNames must have at least one member
+      member: members.length ? ['cn=fakeuser', ...members] : ['cn=fakeuser'], // LDAP groupOfNames must have at least one member
     };
     if (this.registeredHooks.ldapgroupadd) {
       for (const func of this.registeredHooks.ldapgroupadd) {

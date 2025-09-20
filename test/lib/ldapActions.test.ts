@@ -19,7 +19,6 @@ describe('ldapActions', function () {
   });
 
   beforeEach(() => {
-    const config = parseConfig(configTemplate);
     ldapActions = new LdapActions(new DM());
   });
 
