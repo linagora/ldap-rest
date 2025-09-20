@@ -1,5 +1,7 @@
-import { Config, DM } from '../bin';
-import { Hooks } from '../hooks';
+import type { Express } from 'express';
+
+import type { Config, DM } from '../bin';
+import type { Hooks } from '../hooks';
 
 export default abstract class DmPlugin {
   server: DM;
@@ -8,6 +10,8 @@ export default abstract class DmPlugin {
   registeredHooks: { [K in keyof Hooks]?: Function[] } = {};
 
   hooks?: Hooks;
+
+  api?(app: Express): void;
 
   abstract name: string;
 

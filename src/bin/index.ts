@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import express from 'express';
+import bodyParser from 'body-parser';
 
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
@@ -25,6 +26,8 @@ export class DM {
     this.config = parseConfig(configArgs);
 
     this.app = express();
+    this.app.use(bodyParser.json());
+    this.app.use(bodyParser.urlencoded({ extended: true }));
     this.ldap = new ldapActions(this);
     const promises: Promise<void>[] = [];
 

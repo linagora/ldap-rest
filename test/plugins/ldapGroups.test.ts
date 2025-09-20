@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import LdapGroups from '../../src/plugins/ldapGroups';
 import { DM } from '../../src/bin';
+import supertest from 'supertest';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 
@@ -25,7 +26,7 @@ describe('LdapGroups Plugin', function () {
   let plugin: LdapGroups;
 
   before(() => {
-    process.env.DM_PLUGINS = 'core/ldapGroups';
+    //process.env.DM_PLUGINS = 'core/ldapGroups';
     server = new DM();
     plugin = new LdapGroups(server);
   });
@@ -141,6 +142,41 @@ describe('LdapGroups Plugin', function () {
           member: [],
         },
       });
+    });
+  });
+
+  describe('API', () => {
+    let request: any;
+    before(() => {
+      plugin.api(server.app);
+      request = supertest(server.app);
+    });
+
+    it('should add/del group via API', async () => {
+      let res = await request
+        .post('/api/v1/ldap/groups/add')
+        .type('json')
+        .send({
+          cn: 'testgroup',
+          member: ['uid=user1,ou=users,dc=example,dc=com'],
+        });
+      expect(res.body).to.deep.equal({ success: true });
+      expect(res.status).to.equal(200);
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: ['uid=user1,ou=users,dc=example,dc=com'],
+        },
+      });
+
+      res = await request
+        .post('/api/v1/ldap/groups/delete')
+        .type('json')
+        .send({ cn: 'testgroup' });
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ success: true });
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
     });
   });
 });
