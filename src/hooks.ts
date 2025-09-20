@@ -44,6 +44,9 @@ export interface Hooks {
   ) =>
     | [string, Record<string, AttributeValue>]
     | Promise<[string, Record<string, AttributeValue>]>;
+  ldapgroupmodify?: (
+    changes: ModifyRequest
+  ) => ModifyRequest | Promise<ModifyRequest>;
   ldapgroupdelete?: (dn: string) => string | Promise<string>;
   ldapgroupaddmember?: (
     args: [string, string[]]

@@ -19,7 +19,7 @@ import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type { Hooks } from '../hooks';
 import type ldapActions from '../lib/ldapActions';
-import { SearchResult } from '../lib/ldapActions';
+import { AttributeValue, SearchResult } from '../lib/ldapActions';
 
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
@@ -86,7 +86,11 @@ export default class LdapGroups extends DmPlugin {
     //return _res.searchEntries.map(entry => entry.cn as string).filter(cn => cn);
   }
 
-  async addGroup(cn: string, members: string[] = []): Promise<boolean> {
+  async addGroup(
+    cn: string,
+    members: string[] = [],
+    additional: Record<string, AttributeValue> = {}
+  ): Promise<boolean> {
     let dn: string;
     if (/^cn=/.test(cn)) {
       dn = cn;
@@ -99,6 +103,7 @@ export default class LdapGroups extends DmPlugin {
       objectClass: this.config.group_class as string[],
       cn,
       member: members.length ? ['cn=fakeuser', ...members] : ['cn=fakeuser'], // LDAP groupOfNames must have at least one member
+      ...additional,
     };
     if (this.registeredHooks.ldapgroupadd) {
       for (const func of this.registeredHooks.ldapgroupadd) {
@@ -111,11 +116,33 @@ export default class LdapGroups extends DmPlugin {
     });
   }
 
+  async modifyGroup(
+    cn: string,
+    changes: {
+      add?: Record<string, AttributeValue>[];
+      replace?: Record<string, AttributeValue>;
+      delete?: string[] | Record<string, AttributeValue>;
+    }
+  ): Promise<boolean> {
+    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    if (this.registeredHooks.ldapgroupmodify) {
+      for (const func of this.registeredHooks.ldapgroupmodify) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        if (func) [dn, changes] = await func([dn, changes]);
+      }
+    }
+    return await this.ldap.modify(dn, changes);
+  }
+
   async deleteGroup(cn: string): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    return await this.ldap.delete(dn).catch(err => {
-      throw new Error(`Failed to delete group ${dn}: ${err}`);
-    });
+    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    if (this.registeredHooks.ldapgroupdelete) {
+      for (const func of this.registeredHooks.ldapgroupdelete) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        if (func) dn = await func(dn);
+      }
+    }
+    return await this.ldap.delete(dn);
   }
 
   async addMember(cn: string, member: string): Promise<boolean> {

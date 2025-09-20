@@ -1,7 +1,5 @@
 import { expect } from 'chai';
 import LdapGroups from '../../src/plugins/ldapGroups';
-import { parseConfig } from '../../src/lib/parseConfig';
-import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
@@ -65,13 +63,53 @@ describe('LdapGroups Plugin', function () {
       expect(await plugin.deleteGroup('testgroup')).to.be.true;
     });
 
-    it('should add group with dummy member if no members', async () => {
+    it('should add/delete group even if no members', async () => {
       await plugin.addGroup('testgroup');
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
           member: [],
+        },
+      });
+      expect(await plugin.deleteGroup('testgroup')).to.be.true;
+    });
+
+    it('should add/modify/delete group with additional attributes', async () => {
+      await plugin.addGroup(
+        'testgroup',
+        ['uid=user1,ou=users,dc=example,dc=com'],
+        { description: 'My test group' }
+      );
+      expect(
+        await plugin.searchGroupsByName('testgroup', false, [
+          'cn',
+          'description',
+          'member',
+        ])
+      ).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          description: 'My test group',
+        },
+      });
+      await plugin.modifyGroup('testgroup', {
+        replace: { description: 'My modified test group' },
+      });
+      expect(
+        await plugin.searchGroupsByName('testgroup', false, [
+          'cn',
+          'description',
+          'member',
+        ])
+      ).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          description: 'My modified test group',
         },
       });
       expect(await plugin.deleteGroup('testgroup')).to.be.true;
@@ -92,7 +130,10 @@ describe('LdapGroups Plugin', function () {
           member: ['uid=user2,ou=users,dc=example,dc=com'],
         },
       });
-      await plugin.deleteMember('testgroup', 'uid=user2,ou=users,dc=example,dc=com');
+      await plugin.deleteMember(
+        'testgroup',
+        'uid=user2,ou=users,dc=example,dc=com'
+      );
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
