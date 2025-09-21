@@ -22,14 +22,19 @@ export interface Hooks {
   ) =>
     | [string, Record<string, AttributeValue>]
     | Promise<[string, Record<string, AttributeValue>]>;
+  ldapadddone?: (
+    args: [string, Record<string, AttributeValue>]
+  ) => void | Promise<void>;
   // modify
   ldapmodifyrequest?: (
     changes: ModifyRequest
   ) => ModifyRequest | Promise<ModifyRequest>;
+  ldapmodifydone?: (args: [string, ModifyRequest]) => void | Promise<void>;
   // delete
   ldapdeleterequest?: (
     dn: string | string[]
   ) => string | string[] | Promise<string | string[]>;
+  ldapdeletedone?: (dn: string | string[]) => void | Promise<void>;
 
   /*
    * Plugins

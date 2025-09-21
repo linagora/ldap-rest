@@ -4,6 +4,8 @@ import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
+import { launchHooks, launchHooksChained } from './utils';
+
 // Typescript interface
 
 // Entry
@@ -103,21 +105,14 @@ class ldapActions {
       ...defaultSearchOptions,
       ...options,
     };
-    if (this.parent?.hooks['ldapsearchopts']) {
-      for (const hook of this.parent.hooks['ldapsearchopts']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        opts = await hook(opts);
-      }
-    }
+    opts = await launchHooksChained(this.parent.hooks.ldapsearchopts, opts);
     let res = opts.paged
       ? client.searchPaginated(base, opts)
       : client.search(base, opts);
-    if (this.parent?.hooks['ldapsearchresult']) {
-      for (const hook of this.parent.hooks['ldapsearchresult']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        res = await hook(res);
-      }
-    }
+    res = (await launchHooksChained(
+      this.parent.hooks.ldapsearchresult,
+      res
+    )) as typeof res;
     return res;
   }
 
@@ -135,12 +130,6 @@ class ldapActions {
     ) {
       entry.objectClass = this.config.user_class;
     }
-    if (this.parent?.hooks['ldapaddrequest']) {
-      for (const hook of this.parent.hooks['ldapaddrequest']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        [dn, entry] = await hook([dn, entry]);
-      }
-    }
     const client = await this.connect();
     // Convert Buffer/Buffer[] values to string/string[]
     const sanitizedEntry: Record<string, string | string[]> = {};
@@ -157,8 +146,13 @@ class ldapActions {
         sanitizedEntry[key] = value as string | string[];
       }
     }
+    [dn, entry] = (await launchHooksChained(this.parent.hooks.ldapaddrequest, [
+      dn,
+      sanitizedEntry,
+    ])) as [string, typeof entry];
     try {
       await client.add(dn, sanitizedEntry);
+      void launchHooks(this.parent.hooks.ldapadddone, dn, entry);
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -172,12 +166,10 @@ class ldapActions {
   async modify(dn: string, changes: ModifyRequest): Promise<boolean> {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
-    if (this.parent?.hooks['ldapmodifyrequest']) {
-      for (const hook of this.parent.hooks['ldapmodifyrequest']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        changes = await hook(changes);
-      }
-    }
+    changes = await launchHooksChained(
+      this.parent.hooks.ldapmodifyrequest,
+      changes
+    );
     if (changes.add) {
       for (const entry of changes.add) {
         for (const [key, value] of Object.entries(entry)) {
@@ -242,6 +234,7 @@ class ldapActions {
       const client = await this.connect();
       try {
         await client.modify(dn, ldapChanges);
+        void launchHooks(this.parent.hooks.ldapmodifydone, dn, changes);
         return true;
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -262,32 +255,22 @@ class ldapActions {
     } else {
       dn = this.setDn(dn);
     }
-    if (this.parent?.hooks['ldapdeleterequest']) {
-      for (const hook of this.parent.hooks['ldapdeleterequest']) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        dn = await hook(dn);
-      }
-    }
+    if (!Array.isArray(dn)) dn = [dn];
+    dn = (await launchHooksChained(
+      this.parent?.hooks.ldapdeleterequest,
+      dn
+    )) as string | string[];
     const client = await this.connect();
-    if (Array.isArray(dn)) {
-      for (const entry of dn) {
-        try {
-          await client.del(entry);
-        } catch (error) {
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          throw new Error(`LDAP delete error: ${error}`);
-        }
-      }
-      return true;
-    } else {
+    for (const entry of dn) {
       try {
-        await client.del(dn);
-        return true;
+        await client.del(entry);
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`LDAP delete error (${dn}): ${error}`);
+        throw new Error(`LDAP delete error: ${error}`);
       }
+      void launchHooks(this.parent.hooks.ldapdeletedone, entry);
     }
+    return true;
   }
 
   private setDn(dn: string): string {
