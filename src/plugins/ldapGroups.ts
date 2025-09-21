@@ -36,10 +36,7 @@ interface postAdd {
   cn: string;
   [key: string]: AttributeValue;
 }
-interface postModify {
-  dn: string;
-  changes: ModifyRequest;
-}
+type postModify = ModifyRequest;
 
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
@@ -84,7 +81,7 @@ export default class LdapGroups extends DmPlugin {
 
   api(app: Express): void {
     // Add group
-    app.post('/api/v1/ldap/groups/add', async (req, res) => {
+    app.post('/api/v1/ldap/groups', async (req, res) => {
       // Verify it's an AJAX request
       if (!wantJson(req, res)) return;
       const body = jsonBody(req, res, 'cn') as postAdd | false;
@@ -100,52 +97,44 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Delete group
-    app.post('/api/v1/ldap/groups/delete', async (req, res) => {
+    app.delete('/api/v1/ldap/groups/:cn', async (req, res) => {
       if (!wantJson(req, res)) return;
-      const body = jsonBody(req, res) as postAdd | false;
-      if (!body) return;
-      const cn = body.cn ? body.cn : body.dn;
-      if (!cn) {
-        return badRequest(res, 'cn is required');
-      }
+      const cn = decodeURIComponent(req.params.cn);
+      if (!cn) return badRequest(res, 'cn is required');
       await tryMethod(res, this.deleteGroup.bind(this), cn);
     });
 
     // Modify group
-    app.post('/api/v1/ldap/groups/modify', async (req, res) => {
+    app.put('/api/v1/ldap/groups/:cn', async (req, res) => {
       if (!wantJson(req, res)) return;
-      const body = jsonBody(req, res, 'dn', 'changes') as postModify | false;
+      const body = jsonBody(req, res) as postModify | false;
       if (!body) return;
-      if (!/,/.test(body.dn)) return badRequest(res, 'Malformed dn');
-      await tryMethod(res, this.modifyGroup.bind(this), body.dn, body.changes);
+      const dn = this.fixDn(decodeURIComponent(req.params.cn));
+      if (!dn) return badRequest(res);
+      await tryMethod(res, this.modifyGroup.bind(this), dn, body);
     });
 
     // Add member to group
-    app.post('/api/v1/ldap/groups/member/add', async (req, res) => {
+    app.post('/api/v1/ldap/groups/:cn/members', async (req, res) => {
       if (!wantJson(req, res)) return;
-      const body = jsonBody(req, res, 'member') as
-        | { cn?: string; dn?: string; member: string }
-        | false;
+      const cn = decodeURIComponent(req.params.cn);
+      if (!cn) return badRequest(res, 'cn is required');
+      const body = jsonBody(req, res, 'member') as {
+        member: string | string[];
+      };
       if (!body) return;
-      const cn = body.cn ? body.cn : body.dn;
-      if (!cn) {
-        return badRequest(res, 'cn is required');
-      }
       await tryMethod(res, this.addMember.bind(this), cn, body.member);
     });
 
     // Delete member from group
-    app.post('/api/v1/ldap/groups/member/delete', async (req, res) => {
+    app.delete('/api/v1/ldap/groups/:cn/members/:member', async (req, res) => {
       if (!wantJson(req, res)) return;
-      const body = jsonBody(req, res, 'member') as
-        | { cn?: string; dn?: string; member: string }
-        | false;
-      if (!body) return;
-      const cn = body.cn ? body.cn : body.dn;
-      if (!cn) {
-        return badRequest(res, 'cn is required');
+      const cn = decodeURIComponent(req.params.cn);
+      const member = decodeURIComponent(req.params.member);
+      if (!cn || !member) {
+        return badRequest(res, 'cn and member are required');
       }
-      await tryMethod(res, this.deleteMember.bind(this), cn, body.member);
+      await tryMethod(res, this.deleteMember.bind(this), cn, member);
     });
   }
 
@@ -239,7 +228,7 @@ export default class LdapGroups extends DmPlugin {
     return await this.ldap.delete(dn);
   }
 
-  async addMember(cn: string, member: string): Promise<boolean> {
+  async addMember(cn: string, member: string | string[]): Promise<boolean> {
     const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
     if (this.registeredHooks.ldapgroupaddmember) {
       for (const func of this.registeredHooks.ldapgroupaddmember) {
@@ -252,7 +241,7 @@ export default class LdapGroups extends DmPlugin {
         add: [{ member }],
       })
       .catch(err => {
-        throw new Error(`Failed to add member ${member} to ${dn}: ${err}`);
+        throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
       });
   }
 
@@ -326,5 +315,10 @@ export default class LdapGroups extends DmPlugin {
       }
     }
     return _res;
+  }
+
+  protected fixDn(dn: string): string | false {
+    if (!dn) return false;
+    return /,/.test(dn) ? dn : `cn=${dn},${this.base}`;
   }
 }

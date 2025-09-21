@@ -154,7 +154,7 @@ describe('LdapGroups Plugin', function () {
 
     it('should add/del group via API', async () => {
       let res = await request
-        .post('/api/v1/ldap/groups/add')
+        .post('/api/v1/ldap/groups')
         .type('json')
         .send({
           cn: 'testgroup',
@@ -171,9 +171,9 @@ describe('LdapGroups Plugin', function () {
       });
 
       res = await request
-        .post('/api/v1/ldap/groups/delete')
+        .delete('/api/v1/ldap/groups/testgroup')
         .type('json')
-        .send({ cn: 'testgroup' });
+        .send();
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ success: true });
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
@@ -182,10 +182,9 @@ describe('LdapGroups Plugin', function () {
     it('should add/del member via API', async () => {
       await plugin.addGroup('testgroup');
       let res = await request
-        .post('/api/v1/ldap/groups/member/add')
+        .post('/api/v1/ldap/groups/testgroup/members')
         .type('json')
         .send({
-          cn: 'testgroup',
           member: 'uid=user2,ou=users,dc=example,dc=com',
         });
       expect(res.status).to.equal(200);
@@ -199,12 +198,11 @@ describe('LdapGroups Plugin', function () {
       });
 
       res = await request
-        .post('/api/v1/ldap/groups/member/delete')
+        .delete(
+          '/api/v1/ldap/groups/testgroup/members/uid=user2,ou=users,dc=example,dc=com'
+        )
         .type('json')
-        .send({
-          cn: 'testgroup',
-          member: 'uid=user2,ou=users,dc=example,dc=com',
-        });
+        .send();
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ success: true });
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({

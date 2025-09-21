@@ -59,7 +59,8 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start": "./dist/bin/server.js",
-    "test": "tsc --noEmit && mocha"
+    "test": "tsc --noEmit && mocha",
+    "test:one": "mocha --config .mocharc-one.json"
   },
   "dependencies": {
     "body-parser": "^2.2.0",
