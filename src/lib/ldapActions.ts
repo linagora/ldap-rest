@@ -166,9 +166,10 @@ class ldapActions {
   async modify(dn: string, changes: ModifyRequest): Promise<boolean> {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
-    changes = await launchHooksChained(
+    const op: number = this.opNumber();
+    [dn, changes] = await launchHooksChained(
       this.parent.hooks.ldapmodifyrequest,
-      changes
+      [dn, changes, op]
     );
     if (changes.add) {
       for (const entry of changes.add) {
@@ -234,7 +235,7 @@ class ldapActions {
       const client = await this.connect();
       try {
         await client.modify(dn, ldapChanges);
-        void launchHooks(this.parent.hooks.ldapmodifydone, dn, changes);
+        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
         return true;
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -242,6 +243,7 @@ class ldapActions {
       }
     } else {
       console.error('No changes to apply');
+      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]);
       return false;
     }
   }
@@ -280,6 +282,10 @@ class ldapActions {
       dn += `,${this.base}`;
     }
     return dn;
+  }
+
+  opNumber(): number {
+    return this.parent.operationSequence++;
   }
 }
 

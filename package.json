@@ -31,6 +31,10 @@
     "plugin-ldapgroups": {
       "import": "./dist/plugins/ldapGroups.js",
       "types": "./dist/src/plugins/ldapGroups.d.ts"
+    },
+    "plugin-onldapchange": {
+      "import": "./dist/plugins/onLdapChange.js",
+      "types": "./dist/src/plugins/onLdapChange.d.ts"
     }
   },
   "main": "dist/bin/index.mjs",

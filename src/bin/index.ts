@@ -31,7 +31,7 @@ export class DM {
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.ldap = new ldapActions(this);
     this.operationSequence = 0;
-    const promises: Promise<void>[] = [];
+    const promises: Promise<void | boolean>[] = [];
 
     // If authentication is native lemonldap-ng, then load and use its middleware
     if (this.config.auth == 'llng') {
@@ -66,63 +66,7 @@ export class DM {
             )
             .replace(/$/, '.js');
         }
-        console.debug('Loading plugin', pluginName);
-        promises.push(
-          new Promise<void>((resolve, reject) => {
-            import(pluginName)
-              .then(pluginModule => {
-                if (pluginModule && pluginModule.default) {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                  pluginModule = pluginModule.default;
-                }
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                const obj = new pluginModule(this);
-                if (!obj) {
-                  return reject(new Error(`Unable to load ${pluginName}`));
-                }
-                if (!obj.name) {
-                  obj.name = pluginName;
-                }
-                if (obj.api) {
-                  obj.api(this.app, this);
-                }
-                if (obj.hooks as Hooks) {
-                  for (const hookName in pluginModule.hooks as Hooks) {
-                    const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
-                    if (!this.hooks[hookName as keyof Hooks]) {
-                      this.hooks[hookName as keyof Hooks] = [];
-                    }
-                    if (hook && typeof hook === 'function') {
-                      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                      // @ts-ignore: object is defined
-                      this.hooks[hookName as keyof Hooks].push(hook);
-                    } else {
-                      return reject(
-                        new Error(
-                          `Plugin ${pluginName}: hook ${hookName} is invalid`
-                        )
-                      );
-                    }
-                  }
-                }
-                if (this.loadedPlugins[obj.name]) {
-                  return reject(
-                    new Error(
-                      `Plugin ${pluginName} use a name that is already used`
-                    )
-                  );
-                }
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                this.loadedPlugins[obj.name] = obj;
-                resolve();
-              })
-              .catch(err => {
-                reject(
-                  new Error(`Failed to load plugin ${pluginName}: ${err}`)
-                );
-              });
-          })
-        );
+        promises.push(this.loadPlugin(pluginName));
       }
     }
     this.ready = new Promise((resolve, reject) => {
@@ -153,5 +97,61 @@ export class DM {
     this.app.removeAllListeners();
     this.server?.close();
     console.debug('Server stopped');
+  }
+
+  loadPlugin(pluginName: string): Promise<boolean> {
+    console.debug('Loading plugin', pluginName);
+    return new Promise<boolean>((resolve, reject) => {
+      import(pluginName)
+        .then(async pluginModule => {
+          if (pluginModule && pluginModule.default) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            pluginModule = pluginModule.default;
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const obj = new pluginModule(this);
+          if (!obj) return reject(new Error(`Unable to load ${pluginName}`));
+          if (!obj.name) obj.name = pluginName;
+          if (this.loadedPlugins[obj.name]) {
+            console.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
+            return resolve(false);
+          }
+          if (obj.dependencies) {
+            for (const dependency in obj.dependencies) {
+              if (!this.loadedPlugins[dependency]) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+                await this.loadPlugin(obj.dependencies[dependency]);
+              }
+            }
+          }
+          if (obj.api) {
+            obj.api(this.app, this);
+          }
+          if (obj.hooks as Hooks) {
+            for (const hookName in pluginModule.hooks as Hooks) {
+              const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
+              if (!this.hooks[hookName as keyof Hooks]) {
+                this.hooks[hookName as keyof Hooks] = [];
+              }
+              if (hook && typeof hook === 'function') {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore: object is defined
+                this.hooks[hookName as keyof Hooks].push(hook);
+              } else {
+                return reject(
+                  new Error(`Plugin ${pluginName}: hook ${hookName} is invalid`)
+                );
+              }
+            }
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          this.loadedPlugins[obj.name] = obj;
+          resolve(true);
+        })
+        .catch(err => {
+          reject(new Error(`Failed to load plugin ${pluginName}: ${err}`));
+        });
+    });
   }
 }

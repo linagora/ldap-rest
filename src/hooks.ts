@@ -1,6 +1,7 @@
 import type { SearchOptions, SearchResult } from 'ldapts';
 
 import { ModifyRequest, AttributeValue } from './lib/ldapActions';
+import { ChangesToNotify } from './plugins/onLdapChange';
 
 export interface Hooks {
   /*
@@ -27,9 +28,13 @@ export interface Hooks {
   ) => void | Promise<void>;
   // modify
   ldapmodifyrequest?: (
-    changes: ModifyRequest
-  ) => ModifyRequest | Promise<ModifyRequest>;
-  ldapmodifydone?: (args: [string, ModifyRequest]) => void | Promise<void>;
+    args: [string, ModifyRequest, number]
+  ) =>
+    | [string, ModifyRequest, number]
+    | Promise<[string, ModifyRequest, number]>;
+  ldapmodifydone?: (
+    args: [string, ModifyRequest, number]
+  ) => void | Promise<void>;
   // delete
   ldapdeleterequest?: (
     dn: string | string[]
@@ -77,4 +82,7 @@ export interface Hooks {
   _ldapgrouplist?: (
     groups: AsyncGenerator<SearchResult>
   ) => [AsyncGenerator<SearchResult> | Promise<AsyncGenerator<SearchResult>>];
+
+  /* onLdapChange */
+  onLdapChange?: (dn: string, changes: ChangesToNotify) => void | Promise<void>;
 }

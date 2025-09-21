@@ -11,6 +11,8 @@ export default abstract class DmPlugin {
 
   hooks?: Hooks;
 
+  dependencies?: Record<string, string>;
+
   api?(app: Express): void;
 
   abstract name: string;
@@ -19,5 +21,9 @@ export default abstract class DmPlugin {
     this.server = server;
     this.config = server.config;
     this.registeredHooks = server.hooks;
+  }
+
+  opNumber(): number {
+    return this.server.operationSequence++;
   }
 }
