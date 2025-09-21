@@ -1,0 +1,155 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "LDAP Groups API",
+    "version": "1.0.0",
+    "description": "API for managing LDAP groups and their members"
+  },
+  "paths": {
+    "/api/v1/ldap/groups": {
+      "post": {
+        "summary": "Add a new group",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cn": { "type": "string" },
+                  "member": {
+                    "oneOf": [
+                      { "type": "string" },
+                      { "type": "array", "items": { "type": "string" } }
+                    ]
+                  }
+                },
+                "additionalProperties": true,
+                "required": ["cn"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Group added" },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/api/v1/ldap/groups/{cn}": {
+      "delete": {
+        "summary": "Delete a group",
+        "parameters": [
+          {
+            "name": "cn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Group deleted" },
+          "400": { "description": "Bad request" }
+        }
+      },
+      "put": {
+        "summary": "Modify a group",
+        "parameters": [
+          {
+            "name": "cn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "add": {
+                    "type": "array",
+                    "items": { "type": "object" }
+                  },
+                  "replace": { "type": "object" },
+                  "delete": {
+                    "oneOf": [
+                      { "type": "array", "items": { "type": "string" } },
+                      { "type": "object" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Group modified" },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/api/v1/ldap/groups/{cn}/members": {
+      "post": {
+        "summary": "Add member(s) to a group",
+        "parameters": [
+          {
+            "name": "cn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "member": {
+                    "oneOf": [
+                      { "type": "string" },
+                      { "type": "array", "items": { "type": "string" } }
+                    ]
+                  }
+                },
+                "required": ["member"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Member(s) added" },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
+    "/api/v1/ldap/groups/{cn}/members/{member}": {
+      "delete": {
+        "summary": "Delete a member from a group",
+        "parameters": [
+          {
+            "name": "cn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Member deleted" },
+          "400": { "description": "Bad request" }
+        }
+      }
+    }
+  },
+  "components": {}
+}
