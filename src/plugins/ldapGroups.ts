@@ -31,6 +31,7 @@ import {
   tryMethod,
   wantJson,
 } from '../lib/expressFormatedResponses';
+import { launchHooks, launchHooksChained } from '../lib/utils';
 
 interface postAdd {
   cn: string;
@@ -188,15 +189,19 @@ export default class LdapGroups extends DmPlugin {
       member: members.length ? ['cn=fakeuser', ...members] : ['cn=fakeuser'], // LDAP groupOfNames must have at least one member
       ...additional,
     };
-    if (this.registeredHooks.ldapgroupadd) {
-      for (const func of this.registeredHooks.ldapgroupadd) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) [dn, entry] = await func([dn, entry]);
-      }
-    }
-    return await this.ldap.add(dn, entry).catch(err => {
+    [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
+      dn,
+      entry,
+    ]);
+    let res;
+    try {
+      res = await this.ldap.add(dn, entry);
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add group ${dn}: ${err}`);
-    });
+    }
+    void launchHooks(this.registeredHooks.ldapgroupadddone, [dn, entry]);
+    return res;
   }
 
   async modifyGroup(
@@ -208,34 +213,35 @@ export default class LdapGroups extends DmPlugin {
     }
   ): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    if (this.registeredHooks.ldapgroupmodify) {
-      for (const func of this.registeredHooks.ldapgroupmodify) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) [dn, changes] = await func([dn, changes]);
-      }
-    }
-    return await this.ldap.modify(dn, changes);
+    const op = this.server.operationSequence++;
+    [dn, changes] = await launchHooksChained(
+      this.registeredHooks.ldapgroupmodify,
+      [dn, changes, op]
+    );
+    const res = await this.ldap.modify(dn, changes);
+    void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
+      dn,
+      changes,
+      op,
+    ]);
+    return res;
   }
 
   async deleteGroup(cn: string): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    if (this.registeredHooks.ldapgroupdelete) {
-      for (const func of this.registeredHooks.ldapgroupdelete) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) dn = await func(dn);
-      }
-    }
-    return await this.ldap.delete(dn);
+    dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
+    const res = await this.ldap.delete(dn);
+    void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
+    return res;
   }
 
   async addMember(cn: string, member: string | string[]): Promise<boolean> {
     const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    if (this.registeredHooks.ldapgroupaddmember) {
-      for (const func of this.registeredHooks.ldapgroupaddmember) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) [cn, member] = await func([cn, [member]]);
-      }
-    }
+    if (!Array.isArray(member)) member = [member];
+    [cn, member] = await launchHooksChained(
+      this.registeredHooks.ldapgroupaddmember,
+      [cn, member]
+    );
     return await this.ldap
       .modify(dn, {
         add: [{ member }],
@@ -247,12 +253,10 @@ export default class LdapGroups extends DmPlugin {
 
   async deleteMember(cn: string, member: string): Promise<boolean> {
     const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    if (this.registeredHooks.ldapgroupdeletemember) {
-      for (const func of this.registeredHooks.ldapgroupdeletemember) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) [cn, member] = await func([cn, [member]]);
-      }
-    }
+    [cn, member] = await launchHooksChained(
+      this.registeredHooks.ldapgroupdeletemember,
+      [cn, member]
+    );
     return await this.ldap
       .modify(dn, {
         delete: { member: member },
@@ -307,13 +311,7 @@ export default class LdapGroups extends DmPlugin {
         throw new Error(`Failed to list groups from ${this.base}: ${err}`);
       })) as AsyncGenerator<SearchResult>;
 
-    // let res = _res.searchEntries.map(entry => entry.cn as string);
-    if (this.registeredHooks._ldapgrouplist) {
-      for (const func of this.registeredHooks._ldapgrouplist) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        if (func) _res = await func(_res);
-      }
-    }
+    _res = await launchHooksChained(this.registeredHooks._ldapgrouplist, _res);
     return _res;
   }
 

@@ -21,6 +21,7 @@ export class DM {
   hooks: { [K in keyof Hooks]?: Function[] } = {};
   loadedPlugins: { [key: string]: object[] } = {};
   ldap: ldapActions;
+  operationSequence: number;
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -29,6 +30,7 @@ export class DM {
     this.app.use(bodyParser.json());
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.ldap = new ldapActions(this);
+    this.operationSequence = 0;
     const promises: Promise<void>[] = [];
 
     // If authentication is native lemonldap-ng, then load and use its middleware

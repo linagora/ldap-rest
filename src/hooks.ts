@@ -49,10 +49,24 @@ export interface Hooks {
   ) =>
     | [string, Record<string, AttributeValue>]
     | Promise<[string, Record<string, AttributeValue>]>;
+  ldapgroupadddone?: (
+    args: [string, Record<string, AttributeValue>]
+  ) => void | Promise<void>;
+
+  // the number given as 3rd argument is a uniq operation number
+  // It can be used to save state before modify and launch the
+  // real hook after change but with previous value
   ldapgroupmodify?: (
-    changes: ModifyRequest
-  ) => ModifyRequest | Promise<ModifyRequest>;
+    args: [string, ModifyRequest, number]
+  ) =>
+    | [string, ModifyRequest, number]
+    | Promise<[string, ModifyRequest, number]>;
+  ldapgroupmodifydone?: (
+    args: [string, ModifyRequest, number]
+  ) => void | Promise<void>;
+
   ldapgroupdelete?: (dn: string) => string | Promise<string>;
+  ldapgroupdeletedone?: (dn: string) => void | Promise<void>;
   ldapgroupaddmember?: (
     args: [string, string[]]
   ) => [string, string[]] | Promise<[string, string[]]>;
