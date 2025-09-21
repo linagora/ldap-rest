@@ -1,4 +1,4 @@
-/*
+/**
  * Plugin to manage groups into LDAP server
  *
  * - add/delete groups
@@ -59,8 +59,8 @@ export default class LdapGroups extends DmPlugin {
     }
   }
 
-  /*
-    Catch all deletion to remove deleted users from groups
+  /**
+   * Catch all deletion to remove deleted users from groups
    */
   hooks: Hooks = {
     ldapdeleterequest: dn => {
@@ -78,7 +78,7 @@ export default class LdapGroups extends DmPlugin {
     },
   };
 
-  /*
+  /**
    * API routes
    */
 
@@ -121,7 +121,7 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Add member to group
-    app.post('/api/v1/ldap/groups/addMember', async (req, res) => {
+    app.post('/api/v1/ldap/groups/member/add', async (req, res) => {
       if (!wantJson(req, res)) return;
       const body = jsonBody(req, res, 'member') as
         | { cn?: string; dn?: string; member: string }
@@ -135,7 +135,7 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Delete member from group
-    app.post('/api/v1/ldap/groups/deleteMember', async (req, res) => {
+    app.post('/api/v1/ldap/groups/member/delete', async (req, res) => {
       if (!wantJson(req, res)) return;
       const body = jsonBody(req, res, 'member') as
         | { cn?: string; dn?: string; member: string }
@@ -148,6 +148,10 @@ export default class LdapGroups extends DmPlugin {
       await tryMethod(res, this.deleteMember.bind(this), cn, body.member);
     });
   }
+
+  /**
+   * LDAP group methods
+   */
 
   async searchGroupsByName(
     cn: string,

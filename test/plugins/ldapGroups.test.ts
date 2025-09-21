@@ -178,5 +178,42 @@ describe('LdapGroups Plugin', function () {
       expect(res.body).to.deep.equal({ success: true });
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
     });
+
+    it('should add/del member via API', async () => {
+      await plugin.addGroup('testgroup');
+      let res = await request
+        .post('/api/v1/ldap/groups/member/add')
+        .type('json')
+        .send({
+          cn: 'testgroup',
+          member: 'uid=user2,ou=users,dc=example,dc=com',
+        });
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ success: true });
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: ['uid=user2,ou=users,dc=example,dc=com'],
+        },
+      });
+
+      res = await request
+        .post('/api/v1/ldap/groups/member/delete')
+        .type('json')
+        .send({
+          cn: 'testgroup',
+          member: 'uid=user2,ou=users,dc=example,dc=com',
+        });
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ success: true });
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: [],
+        },
+      });
+    });
   });
 });
