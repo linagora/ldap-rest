@@ -44,7 +44,7 @@ export interface Config {
     | undefined;
 }
 
-/**
+/*
  * Config arguments
  *
  * Format:

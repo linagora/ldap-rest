@@ -22,7 +22,7 @@ const commonPlugins = dir => [
     declaration: true,
     declarationDir: dir,
     declarationMap: false,
-    sourceMap: true,
+    sourceMap: process.env.NODE_ENV !== 'production',
     include: ['src/**/*'],
     outDir: dir,
   }),
@@ -103,7 +103,7 @@ export default async () => {
       output: {
         dir: 'dist',
         format: 'es',
-        sourcemap: true,
+        sourcemap: process.env.NODE_ENV !== 'production',
         banner: '',
         preserveModules: true,
       },

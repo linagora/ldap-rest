@@ -4,7 +4,7 @@ import type { ModifyRequest, AttributesList } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/onLdapChange';
 
 export interface Hooks {
-  /*
+  /**
    * Libraries
    */
 
@@ -37,14 +37,14 @@ export interface Hooks {
   ) => string | string[] | Promise<string | string[]>;
   ldapdeletedone?: (dn: string | string[]) => void | Promise<void>;
 
-  /*
+  /**
    * Plugins
    */
 
-  /* Demo plugin */
+  /** Demo plugin */
   hello?: () => string;
 
-  /* LdapGroups plugin */
+  /** LdapGroups plugin */
   ldapgroupvalidatemembers?: (
     args: [string, string[]]
   ) => [string, string[]] | Promise<[string, string[]]>;
@@ -78,7 +78,7 @@ export interface Hooks {
     groups: AsyncGenerator<SearchResult>
   ) => [AsyncGenerator<SearchResult> | Promise<AsyncGenerator<SearchResult>>];
 
-  /* "onLdapChange" */
+  /** "onLdapChange" */
   onLdapChange?: (dn: string, changes: ChangesToNotify) => void | Promise<void>;
   onLdapMailChange?: (
     dn: string,
@@ -86,7 +86,7 @@ export interface Hooks {
     newMail: string
   ) => void | Promise<void>;
 
-  /* TwakeExternalUsersInGroup */
+  /** TwakeExternalUsersInGroup */
   externaluserentry?: (
     arg: [string, AttributesList]
   ) => [string, AttributesList] | Promise<[string, AttributesList]>;
