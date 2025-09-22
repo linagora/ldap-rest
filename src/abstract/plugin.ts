@@ -4,7 +4,6 @@ import type { Config, DM } from '../bin';
 import type { Hooks } from '../hooks';
 
 export default abstract class DmPlugin {
-
   /**
    * Properties inherited from parent (DM)
    */
@@ -17,7 +16,6 @@ export default abstract class DmPlugin {
   /* Hooks registered into DM */
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   registeredHooks: { [K in keyof Hooks]?: Function[] } = {};
-
 
   /**
    * Interfaces
@@ -34,7 +32,6 @@ export default abstract class DmPlugin {
 
   /* Uniq name of this plugin */
   abstract name: string;
-
 
   /**
    * Constructor
