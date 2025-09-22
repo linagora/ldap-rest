@@ -9,14 +9,17 @@ This guide explains how to create a plugin using the API and hooks.
 
 ## Plugin Structure
 
-- A plugin is a class with optional `api` methods and/or `hooks` property.
-- It should also have a uniq property "name".
+See [abstract class](../abstract/plugin.ts) for more
+
+- A plugin is a class with optional **api** methods and/or **hooks** property.
+- It should also have a uniq property "**name**".
 - It may inherit from [plugin abstract class](../abstract/plugin.ts)
 - Its constructor receives one argument _(the server)_ which exposes
   - hooks: an object `{ [K in keyof Hooks]?: Function[] }` where plugin
     can find functions to launch if it exposes hooks
   - ldap: a [LDAP object](../lib/ldapActions.ts)
   - config: the [config](../config/args.ts) given by command-line arguments and environment variables
+- It may have a **dependencies** property: _`Record<uniqname, path>`_ of plugins that needs to be loaded before this one
 
 ### Expose an API _(or any [express](https://www.npmjs.com/package/express) hook)_
 

@@ -21,7 +21,6 @@ describe('LdapGroups Plugin', function () {
     return;
   }
 
-  let ldapMock: any;
   let server: DM;
   let plugin: LdapGroups;
 
