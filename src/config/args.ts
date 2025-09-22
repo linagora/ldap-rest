@@ -22,6 +22,7 @@ export interface Config {
   group_classes?: string[];
   group_default_attributes?: AttributesList;
   groups_allow_unexistent_members?: boolean;
+  group_dummy_user?: string
 
   // Accept additional config keys for non core plugins
   [key: string]:
@@ -117,6 +118,11 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_GROUP_DEFAULT_ATTRIBUTES',
     defaultValue: {},
     type: 'json',
+  },
+  {
+    cliArg: '--group-dummy-user',
+    envVar: 'DM_GROUP_DUMMY_USER',
+    defaultValue: 'cn=fakeuser',
   },
 
   // Authentication options

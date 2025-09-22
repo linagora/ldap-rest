@@ -177,7 +177,7 @@ export default class LdapGroups extends DmPlugin {
       if (!Array.isArray(res[s].member))
         res[s].member = [res[s].member as string];
       res[s].member = (res[s].member as string[]).filter((m: string) => {
-        return m !== 'cn=fakeuser';
+        return m !== this.config.group_dummy_user;
       });
     });
     return res;
@@ -198,7 +198,7 @@ export default class LdapGroups extends DmPlugin {
     await this.validateMembers(members);
 
     // Build entry
-    let entry = {
+    let entry: AttributesList = {
       // Classes from --group-class
       objectClass: this.config.group_class as string[],
       // Default attributes from --group-default-attributes
@@ -206,9 +206,10 @@ export default class LdapGroups extends DmPlugin {
       // cn calculated here
       cn,
       // members with at least one fake member to satisfy LDAP groupOfNames schema
-      member: members.length ? ['cn=fakeuser', ...members] : ['cn=fakeuser'], // LDAP groupOfNames must have at least one member
+      member: [this.config.group_dummy_user as string],
       ...additional,
     };
+    if (members.length) (entry.member as string[]).push(...members);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,
       entry,
