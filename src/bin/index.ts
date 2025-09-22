@@ -5,8 +5,9 @@ import bodyParser from 'body-parser';
 
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
-import { Hooks } from '../hooks';
+import type { Hooks } from '../hooks';
 import ldapActions from '../lib/ldapActions';
+import type DmPlugin from '../abstract/plugin';
 
 export type { Config };
 
@@ -19,7 +20,7 @@ export class DM {
   server?: import('http').Server;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   hooks: { [K in keyof Hooks]?: Function[] } = {};
-  loadedPlugins: { [key: string]: object[] } = {};
+  loadedPlugins: { [key: string]: DmPlugin } = {};
   ldap: ldapActions;
   operationSequence: number;
 
@@ -56,16 +57,6 @@ export class DM {
 
     if (this.config.plugin) {
       for (let pluginName of this.config.plugin) {
-        if (pluginName.startsWith('core/')) {
-          pluginName = pluginName
-            .replace(
-              'core/',
-              process.env.NODE_ENV === 'test'
-                ? '../../dist/plugins/'
-                : '../plugins/'
-            )
-            .replace(/$/, '.js');
-        }
         promises.push(this.loadPlugin(pluginName));
       }
     }
@@ -101,6 +92,16 @@ export class DM {
 
   loadPlugin(pluginName: string): Promise<boolean> {
     console.debug('Loading plugin', pluginName);
+    if (pluginName.startsWith('core/')) {
+      pluginName = pluginName
+        .replace(
+          'core/',
+          process.env.NODE_ENV === 'test'
+            ? '../../dist/plugins/'
+            : '../plugins/'
+        )
+        .replace(/$/, '.js');
+    }
     return new Promise<boolean>((resolve, reject) => {
       import(pluginName)
         .then(async pluginModule => {
@@ -111,47 +112,47 @@ export class DM {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const obj = new pluginModule(this);
           if (!obj) return reject(new Error(`Unable to load ${pluginName}`));
-          if (!obj.name) obj.name = pluginName;
-          if (this.loadedPlugins[obj.name]) {
-            console.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
-            return resolve(false);
-          }
-          if (obj.dependencies) {
-            for (const dependency in obj.dependencies) {
-              if (!this.loadedPlugins[dependency]) {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-                await this.loadPlugin(obj.dependencies[dependency]);
-              }
-            }
-          }
-          if (obj.api) {
-            obj.api(this.app, this);
-          }
-          if (obj.hooks as Hooks) {
-            for (const hookName in pluginModule.hooks as Hooks) {
-              const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
-              if (!this.hooks[hookName as keyof Hooks]) {
-                this.hooks[hookName as keyof Hooks] = [];
-              }
-              if (hook && typeof hook === 'function') {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore: object is defined
-                this.hooks[hookName as keyof Hooks].push(hook);
-              } else {
-                return reject(
-                  new Error(`Plugin ${pluginName}: hook ${hookName} is invalid`)
-                );
-              }
-            }
-          }
-
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          this.loadedPlugins[obj.name] = obj;
-          resolve(true);
+          resolve(await this.registerPlugin(pluginName, obj as DmPlugin));
         })
         .catch(err => {
           reject(new Error(`Failed to load plugin ${pluginName}: ${err}`));
         });
     });
+  }
+
+  async registerPlugin(pluginName: string, obj: DmPlugin): Promise<boolean> {
+    if (!obj.name) obj.name = pluginName;
+    if (this.loadedPlugins[obj.name]) {
+      console.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
+      return false;
+    }
+    if (obj.dependencies) {
+      for (const dependency in obj.dependencies) {
+        if (!this.loadedPlugins[dependency]) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          await this.loadPlugin(obj.dependencies[dependency]);
+        }
+      }
+    }
+    if (obj.api) {
+      obj.api(this.app);
+    }
+    if (obj.hooks as Hooks) {
+      for (const hookName in obj.hooks as Hooks) {
+        const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
+        if (!this.hooks[hookName as keyof Hooks]) {
+          this.hooks[hookName as keyof Hooks] = [];
+        }
+        if (hook && typeof hook === 'function') {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore: object is defined
+          this.hooks[hookName as keyof Hooks].push(hook);
+        } else {
+          throw new Error(`Plugin ${pluginName}: hook ${hookName} is invalid`);
+        }
+      }
+    }
+    this.loadedPlugins[obj.name] = obj;
+    return true;
   }
 }
