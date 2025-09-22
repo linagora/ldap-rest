@@ -67,6 +67,12 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_LDAP_URL',
     defaultValue: 'ldap://localhost',
   },
+  // Special attributes
+  {
+    cliArg: '--mail-attribute',
+    envVar: 'DM_MAIL_ATTRIBUTE',
+    defaultValue: 'mail',
+  },
   // Default classes to insert into LDAP
   {
     cliArg: '--user-class',
@@ -74,13 +80,6 @@ const configArgs: ConfigTemplate = [
     defaultValue: ['top', 'inetOrgPerson'],
     type: 'array',
     plural: '--user-classes',
-  },
-
-  // Lemonldap options
-  {
-    cliArg: '--llng-ini',
-    envVar: 'DM_LLNG_INI',
-    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
   },
 
   // Plugins options
@@ -97,6 +96,15 @@ const configArgs: ConfigTemplate = [
     defaultValue: ['top', 'groupOfNames'],
     type: 'array',
     plural: '--group-classes',
+  },
+
+  // Authentication options
+
+  // Lemonldap options
+  {
+    cliArg: '--llng-ini',
+    envVar: 'DM_LLNG_INI',
+    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
   },
 ];
 
