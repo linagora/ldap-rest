@@ -194,6 +194,7 @@ export default class LdapGroups extends DmPlugin {
     } else {
       dn = `cn=${cn},${this.base}`;
     }
+    await this.validateMembers(members);
 
     let entry = {
       objectClass: this.config.group_class as string[],
@@ -254,6 +255,7 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupaddmember,
       [cn, member]
     );
+    await this.validateMembers(member);
     return await this.ldap
       .modify(dn, {
         add: [{ member }],
@@ -330,5 +332,23 @@ export default class LdapGroups extends DmPlugin {
   protected fixDn(dn: string): string | false {
     if (!dn) return false;
     return /,/.test(dn) ? dn : `cn=${dn},${this.base}`;
+  }
+
+  async validateMembers(members: string[]): Promise<void> {
+    if (!members || !members.length) return;
+    try {
+      await Promise.all(
+        members.map(async m => {
+          try {
+            await this.ldap.search({ paged: false }, m);
+          } catch (e) {
+            throw new Error(`Member ${m} not found: ${e}`);
+          }
+        })
+      );
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to find member(s): ${err}`);
+    }
   }
 }

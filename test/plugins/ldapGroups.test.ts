@@ -25,10 +25,31 @@ describe('LdapGroups Plugin', function () {
   let server: DM;
   let plugin: LdapGroups;
 
-  before(() => {
+  const user1 = `uid=user1,${process.env.DM_LDAP_BASE}`;
+  const user2 = `uid=user2,${process.env.DM_LDAP_BASE}`;
+
+  before(async () => {
     //process.env.DM_PLUGINS = 'core/ldapGroups';
     server = new DM();
     plugin = new LdapGroups(server);
+    const entry = {
+      objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+      cn: 'Test User',
+      sn: 'User',
+      uid: 'testuser',
+      mail: 'test@test.org',
+    };
+    await plugin.ldap.add(user1, entry);
+    await plugin.ldap.add(user2, { ...entry, mail: 'test2@test.org' });
+  });
+
+  after(async () => {
+    try {
+      await plugin.ldap.delete(user1);
+      await plugin.ldap.delete(user2);
+    } catch (e) {
+      // ignore
+    }
   });
 
   afterEach(async () => {
@@ -47,9 +68,7 @@ describe('LdapGroups Plugin', function () {
 
   describe('New group', () => {
     it('should add/delete group with members', async () => {
-      await plugin.addGroup('testgroup', [
-        'uid=user1,ou=users,dc=example,dc=com',
-      ]);
+      await plugin.addGroup('testgroup', [user1]);
       const list = await plugin.listGroups();
       // @ts-ignore
       const listEntries = (await list.next()).value.searchEntries;
@@ -58,7 +77,7 @@ describe('LdapGroups Plugin', function () {
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          member: [user1],
         },
       });
       expect(await plugin.deleteGroup('testgroup')).to.be.true;
@@ -77,11 +96,9 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should add/modify/delete group with additional attributes', async () => {
-      await plugin.addGroup(
-        'testgroup',
-        ['uid=user1,ou=users,dc=example,dc=com'],
-        { description: 'My test group' }
-      );
+      await plugin.addGroup('testgroup', [user1], {
+        description: 'My test group',
+      });
       expect(
         await plugin.searchGroupsByName('testgroup', false, [
           'cn',
@@ -92,7 +109,7 @@ describe('LdapGroups Plugin', function () {
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          member: [user1],
           description: 'My test group',
         },
       });
@@ -109,7 +126,7 @@ describe('LdapGroups Plugin', function () {
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          member: [user1],
           description: 'My modified test group',
         },
       });
@@ -120,21 +137,35 @@ describe('LdapGroups Plugin', function () {
   describe('Manipulate member', () => {
     it('should add/delete member to group', async () => {
       await plugin.addGroup('testgroup');
-      await plugin.addMember(
-        'testgroup',
-        'uid=user2,ou=users,dc=example,dc=com'
-      );
+      await plugin.addMember('testgroup', user2);
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user2,ou=users,dc=example,dc=com'],
+          member: [user2],
         },
       });
-      await plugin.deleteMember(
-        'testgroup',
-        'uid=user2,ou=users,dc=example,dc=com'
-      );
+      await plugin.deleteMember('testgroup', user2);
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: [],
+        },
+      });
+    });
+
+    it('should not accept unexisting user as member', async () => {
+      await plugin.addGroup('testgroup');
+      try {
+        await plugin.addMember(
+          'testgroup',
+          'uid=unexistinguser,' + process.env.DM_LDAP_BASE
+        );
+        expect.fail('Should not accept unexisting user as member');
+      } catch (e) {
+        expect((e as Error).message).to.match(/uid=unexistinguser.* not found/);
+      }
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
@@ -147,7 +178,7 @@ describe('LdapGroups Plugin', function () {
 
   describe('API', () => {
     let request: any;
-    before(() => {
+    before(async () => {
       plugin.api(server.app);
       request = supertest(server.app);
     });
@@ -158,7 +189,7 @@ describe('LdapGroups Plugin', function () {
         .type('json')
         .send({
           cn: 'testgroup',
-          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          member: [user1],
         });
       expect(res.body).to.deep.equal({ success: true });
       expect(res.status).to.equal(200);
@@ -166,7 +197,7 @@ describe('LdapGroups Plugin', function () {
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user1,ou=users,dc=example,dc=com'],
+          member: [user1],
         },
       });
 
@@ -185,7 +216,7 @@ describe('LdapGroups Plugin', function () {
         .post('/api/v1/ldap/groups/testgroup/members')
         .type('json')
         .send({
-          member: 'uid=user2,ou=users,dc=example,dc=com',
+          member: user2,
         });
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ success: true });
@@ -193,14 +224,12 @@ describe('LdapGroups Plugin', function () {
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
           cn: 'testgroup',
-          member: ['uid=user2,ou=users,dc=example,dc=com'],
+          member: [user2],
         },
       });
 
       res = await request
-        .delete(
-          '/api/v1/ldap/groups/testgroup/members/uid=user2,ou=users,dc=example,dc=com'
-        )
+        .delete(`/api/v1/ldap/groups/testgroup/members/${user2}`)
         .type('json')
         .send();
       expect(res.status).to.equal(200);
