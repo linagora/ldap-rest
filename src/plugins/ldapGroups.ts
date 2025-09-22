@@ -5,10 +5,6 @@
  * - add/delete members of groups
  * - detect user deletion to remove them from groups (hook)
  *
- * Configuration options (can be set via CLI or env variables):
- * --ldap-group-base / DM_LDAP_GROUP_BASE : base DN where groups are stored
- * --group-class / DM_GROUP_CLASSES : object classes to use for groups (default: top, groupOfNames)
- *
  * Hooks used:
  * - ldapdeleterequest: to catch user deletion and remove them from all groups
  */
@@ -195,7 +191,7 @@ export default class LdapGroups extends DmPlugin {
     } else {
       dn = `cn=${cn},${this.base}`;
     }
-    await this.validateMembers(members);
+    await this.validateMembers(dn, members);
 
     // Build entry
     let entry: AttributesList = {
@@ -263,7 +259,7 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupaddmember,
       [cn, member]
     );
-    await this.validateMembers(member);
+    await this.validateMembers(dn, member);
     return await this.ldap
       .modify(dn, {
         add: { member },
@@ -342,7 +338,11 @@ export default class LdapGroups extends DmPlugin {
     return /,/.test(dn) ? dn : `cn=${dn},${this.base}`;
   }
 
-  async validateMembers(members: string[]): Promise<void> {
+  async validateMembers(dn: string, members: string[]): Promise<void> {
+    [dn, members] = await launchHooksChained(
+      this.server.hooks.ldapgroupvalidatemembers,
+      [dn, members]
+    );
     if (this.config.groups_allow_unexistent_members) return;
     if (!members || !members.length) return;
     try {

@@ -1,3 +1,7 @@
+/**
+ * Demo plugin, add /hello API + consumes 'hello' hook
+ */
+
 import type { Express, Request, Response } from 'express';
 
 import DmPlugin from '../abstract/plugin';

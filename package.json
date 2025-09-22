@@ -35,6 +35,10 @@
     "plugin-onldapchange": {
       "import": "./dist/plugins/onLdapChange.js",
       "types": "./dist/src/plugins/onLdapChange.d.ts"
+    },
+    "plugin-twakeexternalusersingroups": {
+      "import": "./dist/plugins/twakeExternalUsersInGroups.js",
+      "types": "./dist/src/plugins/twakeExternalUsersInGroups.d.ts"
     }
   },
   "main": "dist/bin/index.mjs",

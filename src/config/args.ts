@@ -6,6 +6,7 @@ export interface Config {
   auth?: string;
 
   // LDAP
+  top_dn?: string;
   ldap_base?: string;
   ldap_dn?: string;
   llng_ini?: string;
@@ -22,7 +23,10 @@ export interface Config {
   group_classes?: string[];
   group_default_attributes?: AttributesList;
   groups_allow_unexistent_members?: boolean;
-  group_dummy_user?: string
+  group_dummy_user?: string;
+
+  // External users in groups
+  external_members_branch?: string;
 
   // Accept additional config keys for non core plugins
   [key: string]:
@@ -77,6 +81,11 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_LDAP_URL',
     defaultValue: 'ldap://localhost',
   },
+  {
+    cliArg: '--top-dn',
+    envVar: 'DM_TOP_DN',
+    defaultValue: 'dc=example,dc=com',
+  },
   // Special attributes
   {
     cliArg: '--mail-attribute',
@@ -123,6 +132,13 @@ const configArgs: ConfigTemplate = [
     cliArg: '--group-dummy-user',
     envVar: 'DM_GROUP_DUMMY_USER',
     defaultValue: 'cn=fakeuser',
+  },
+
+  // twakeExternalUsersInGroups
+  {
+    cliArg: '--external-members-branch',
+    envVar: 'DM_EXTERNAL_MEMBERS_BRANCH',
+    defaultValue: 'ou=contacts,dc=example,dc=com',
   },
 
   // Authentication options

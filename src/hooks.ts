@@ -45,6 +45,9 @@ export interface Hooks {
   hello?: () => string;
 
   /* LdapGroups plugin */
+  ldapgroupvalidatemembers?: (
+    args: [string, string[]]
+  ) => [string, string[]] | Promise<[string, string[]]>;
   ldapgroupadd?: (
     args: [string, AttributesList]
   ) => [string, AttributesList] | Promise<[string, AttributesList]>;

@@ -1,3 +1,8 @@
+/**
+ * Check for ldap modify events and generate hooks:
+ *  - onLdapChange
+ *  - onLdapMailChange
+ */
 import { Entry } from 'ldapts';
 
 import DmPlugin from '../abstract/plugin';
