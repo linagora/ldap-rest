@@ -1,6 +1,12 @@
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 
+/**
+ * Typescript declaration of config
+ *
+ * See below for config arguments, corresponding environment variables,
+ * default value, type and optional plural name
+ */
 export interface Config {
   port: number;
   auth?: string;
@@ -38,117 +44,81 @@ export interface Config {
     | undefined;
 }
 
+/**
+ * Config arguments
+ *
+ * Format:
+ * [ command-line-option, env-variable, default-value, type?, plural? ]
+ *
+ * type can be one of:
+ * - string (default value)
+ * - boolean:
+ *    * --option is enough
+ *    * env variable must be set to "true" to be considered as truthy
+ * - number
+ * - json: parameter s a string that will be converted into an object during configuration parsing
+ *
+ * Additional command-line:
+ * to permit to non-core plugin to use command-line, all command-line pairs `--key-name value`
+ * are stored into config (string only) as `config.key_name = value`
+ */
 const configArgs: ConfigTemplate = [
   // Global options
-  {
-    cliArg: '--port',
-    envVar: 'DM_PORT',
-    defaultValue: 8081,
-    type: 'number',
-  },
-  {
-    cliArg: '--auth',
-    envVar: 'DM_AUTH',
-    defaultValue: '',
-  },
-  // NB: this automatically declares a --plugins arg as well
-  {
-    cliArg: '--plugin',
-    envVar: 'DM_PLUGINS',
-    defaultValue: [],
-    type: 'array',
-    plural: '--plugins',
-  },
+  ['--port', 'DM_PORT', 8081, 'number'],
+  ['--auth', 'DM_AUTH', ''],
+  ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins'],
 
   // LDAP options
-  {
-    cliArg: '--ldap-base',
-    envVar: 'DM_LDAP_BASE',
-    defaultValue: '',
-  },
-  {
-    cliArg: '--ldap-dn',
-    envVar: 'DM_LDAP_DN',
-    defaultValue: 'cn=admin,dc=example,dc=org',
-  },
-  {
-    cliArg: '--ldap-pwd',
-    envVar: 'DM_LDAP_PWD',
-    defaultValue: 'admin',
-  },
-  {
-    cliArg: '--ldap-url',
-    envVar: 'DM_LDAP_URL',
-    defaultValue: 'ldap://localhost',
-  },
-  {
-    cliArg: '--top-dn',
-    envVar: 'DM_TOP_DN',
-    defaultValue: 'dc=example,dc=com',
-  },
+  ['--ldap-base', 'DM_LDAP_BASE', ''],
+  ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=org'],
+  ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
+  ['--ldap-url', 'DM_LDAP_URL', 'ldap://localhost'],
+  ['--top-dn', 'DM_TOP_DN', 'dc=example,dc=com'],
+
   // Special attributes
-  {
-    cliArg: '--mail-attribute',
-    envVar: 'DM_MAIL_ATTRIBUTE',
-    defaultValue: 'mail',
-  },
+  ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],
+
   // Default classes to insert into LDAP
-  {
-    cliArg: '--user-class',
-    envVar: 'DM_USER_CLASSES',
-    defaultValue: ['top', 'inetOrgPerson'],
-    type: 'array',
-    plural: '--user-classes',
-  },
+  [
+    '--user-class',
+    'DM_USER_CLASSES',
+    ['top', 'inetOrgPerson'],
+    'array',
+    '--user-classes',
+  ],
 
   // Plugins options
-
   // LDAP groups plugin
-  {
-    cliArg: '--ldap-group-base',
-    envVar: 'DM_LDAP_GROUP_BASE',
-    defaultValue: '',
-  },
-  {
-    cliArg: '--group-class',
-    envVar: 'DM_GROUP_CLASSES',
-    defaultValue: ['top', 'groupOfNames'],
-    type: 'array',
-    plural: '--group-classes',
-  },
-  {
-    cliArg: '--group-allow-unexistent-members',
-    envVar: 'DM_ALLOW_UNEXISTENT_MEMBERS',
-    defaultValue: false,
-    type: 'boolean',
-  },
-  {
-    cliArg: '--group-default-attributes',
-    envVar: 'DM_GROUP_DEFAULT_ATTRIBUTES',
-    defaultValue: {},
-    type: 'json',
-  },
-  {
-    cliArg: '--group-dummy-user',
-    envVar: 'DM_GROUP_DUMMY_USER',
-    defaultValue: 'cn=fakeuser',
-  },
+
+  ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
+  [
+    '--group-class',
+    'DM_GROUP_CLASSES',
+    ['top', 'groupOfNames'],
+    'array',
+    '--group-classes',
+  ],
+  [
+    '--group-allow-unexistent-members',
+    'DM_ALLOW_UNEXISTENT_MEMBERS',
+    false,
+    'boolean',
+  ],
+  ['--group-default-attributes', 'DM_GROUP_DEFAULT_ATTRIBUTES', {}, 'json'],
+  ['--group-dummy-user', 'DM_GROUP_DUMMY_USER', 'cn=fakeuser'],
 
   // twakeExternalUsersInGroups
-  {
-    cliArg: '--external-members-branch',
-    envVar: 'DM_EXTERNAL_MEMBERS_BRANCH',
-    defaultValue: 'ou=contacts,dc=example,dc=com',
-  },
+
+  [
+    '--external-members-branch',
+    'DM_EXTERNAL_MEMBERS_BRANCH',
+    'ou=contacts,dc=example,dc=com',
+  ],
 
   // Authentication options
-
   // Lemonldap options
-  {
-    cliArg: '--llng-ini',
-    envVar: 'DM_LLNG_INI',
-    defaultValue: '/etc/lemonldap-ng/lemonldap-ng.ini',
-  },
+
+  ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
 ];
 
 export default configArgs;

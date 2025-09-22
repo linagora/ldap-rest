@@ -12,18 +12,13 @@ type ConfigResultValue =
   | Record<string, AttributeValue>
   | undefined;
 
-export interface ConfigEntry {
-  cliArg: string;
-  envVar?: string;
-  defaultValue?:
-    | string
-    | string[]
-    | boolean
-    | number
-    | Record<string, AttributeValue>;
-  type?: 'string' | 'number' | 'boolean' | 'array' | 'json';
-  plural?: string; // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
-}
+export type ConfigEntry = [
+  string, // arg
+  string, // env value
+  string | string[] | boolean | number | Record<string, AttributeValue>, // default value
+  ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
+  (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
+];
 
 export class ConfigParser {
   private config: ConfigTemplate;
@@ -37,26 +32,26 @@ export class ConfigParser {
     const result: Config = {};
     const cliArgs = this.parseCliArgs(argv);
     for (const entry of this.config) {
-      const key = this.getKeyFromCliArg(entry.cliArg);
-      let value: ConfigResultValue = entry.defaultValue;
+      const key = this.getKeyFromCliArg(entry[0]);
+      let value: ConfigResultValue = entry[2];
 
       // Override with env value if exists
-      if (entry.envVar !== undefined) {
-        const envValue = process.env[entry.envVar];
+      if (entry[1] !== undefined) {
+        const envValue = process.env[entry[1]];
         if (envValue !== undefined) {
-          if (entry.type === 'boolean') {
+          if (entry[3] === 'boolean') {
             value = envValue.toLowerCase() === 'true';
-          } else if (entry.type === 'number') {
+          } else if (entry[3] === 'number') {
             value = parseInt(envValue);
-          } else if (entry.type === 'array') {
+          } else if (entry[3] === 'array') {
             value = envValue.split(/[,\s]+/).filter(v => v.length > 0);
-          } else if (entry.type === 'json') {
+          } else if (entry[3] === 'json') {
             try {
               value = JSON.parse(envValue) as Record<string, AttributeValue>;
             } catch (e) {
               throw new Error(
                 // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-                `Error parsing JSON from environment variable ${entry.envVar}: ${e}`
+                `Error parsing JSON from environment variable ${entry[1]}: ${e}`
               );
             }
           } else {
@@ -66,19 +61,19 @@ export class ConfigParser {
       }
 
       // Override with CLI arg if exists
-      if (cliArgs.has(entry.cliArg)) {
-        const cliValue = cliArgs.get(entry.cliArg);
-        if (entry.type === 'boolean') {
+      if (cliArgs.has(entry[0])) {
+        const cliValue = cliArgs.get(entry[0]);
+        if (entry[3] === 'boolean') {
           value = true;
-        } else if (entry.type === 'number') {
+        } else if (entry[3] === 'number') {
           value = parseInt(cliValue as string);
-        } else if (entry.type === 'array') {
+        } else if (entry[3] === 'array') {
           if (Array.isArray(value)) {
             value = value.concat(cliValue as string[]);
           } else {
             value = cliValue as string[];
           }
-        } else if (entry.type === 'json') {
+        } else if (entry[3] === 'json') {
           try {
             value = JSON.parse(cliValue as string) as Record<
               string,
@@ -87,16 +82,16 @@ export class ConfigParser {
           } catch (e) {
             throw new Error(
               // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-              `Error parsing JSON from command line argument ${entry.cliArg}: ${e}`
+              `Error parsing JSON from command line argument ${entry[0]}: ${e}`
             );
           }
         } else {
           value = cliValue as string;
         }
-        cliArgs.delete(entry.cliArg);
+        cliArgs.delete(entry[0]);
       }
-      if (entry.type === 'array' && entry.plural && cliArgs.has(entry.plural)) {
-        const cliValue = cliArgs.get(entry.plural) || '';
+      if (entry[3] === 'array' && entry[4] && cliArgs.has(entry[4])) {
+        const cliValue = cliArgs.get(entry[4]) || '';
         if (Array.isArray(value)) {
           value = value.concat(
             (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
@@ -106,7 +101,7 @@ export class ConfigParser {
             .split(/[,\s]+/)
             .filter(v => v.length > 0);
         }
-        cliArgs.delete(entry.plural);
+        cliArgs.delete(entry[4]);
       }
 
       result[key as keyof Config] = value as never;
@@ -131,13 +126,13 @@ export class ConfigParser {
       const arg = argv[i];
 
       if (arg.startsWith('--') || arg.startsWith('-')) {
-        const configEntry = this.config.find(entry => entry.cliArg === arg);
+        const configEntry = this.config.find(entry => entry[0] === arg);
 
-        if (configEntry?.type === 'boolean') {
+        if (configEntry && configEntry[3] === 'boolean') {
           args.set(arg, true);
-        } else if (configEntry?.type === 'number') {
+        } else if (configEntry && configEntry[3] === 'number') {
           args.set(arg, parseInt(argv[i + 1]));
-        } else if (configEntry?.type === 'array') {
+        } else if (configEntry && configEntry[3] === 'array') {
           const tmp = args.get(arg) || [];
           const nextArg = argv[i + 1];
           (tmp as string[]).push(nextArg);
