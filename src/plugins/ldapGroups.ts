@@ -230,7 +230,7 @@ export default class LdapGroups extends DmPlugin {
     }
   ): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    const op = this.server.operationSequence++;
+    const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks.ldapgroupmodify,
       [dn, changes, op]
