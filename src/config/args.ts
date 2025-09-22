@@ -19,6 +19,7 @@ export interface Config {
   ldap_group_base?: string;
   group_class?: string[];
   group_classes?: string[];
+  groups_allow_unexistent_members?: boolean;
 
   // Accept additional config keys for non core plugins
   [key: string]: string | string[] | boolean | number | undefined;
@@ -96,6 +97,12 @@ const configArgs: ConfigTemplate = [
     defaultValue: ['top', 'groupOfNames'],
     type: 'array',
     plural: '--group-classes',
+  },
+  {
+    cliArg: '--group-allow-unexistent-members',
+    envVar: 'DM_ALLOW_UNEXISTENT_MEMBERS',
+    defaultValue: false,
+    type: 'boolean',
   },
 
   // Authentication options

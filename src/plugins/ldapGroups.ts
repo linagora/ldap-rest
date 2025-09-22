@@ -335,6 +335,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async validateMembers(members: string[]): Promise<void> {
+    if (this.config.groups_allow_unexistent_members) return;
     if (!members || !members.length) return;
     try {
       await Promise.all(
