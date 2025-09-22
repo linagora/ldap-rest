@@ -21,6 +21,7 @@ import type { DM } from '../bin';
 import type { Hooks } from '../hooks';
 import type ldapActions from '../lib/ldapActions';
 import type {
+  AttributesList,
   AttributeValue,
   ModifyRequest,
   SearchResult,
@@ -128,7 +129,7 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const cn = body.cn;
     const members = body.member ? body.member : [];
-    const additional: Record<string, AttributeValue> = Object.fromEntries(
+    const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
         ([key, _value]) => key !== 'cn' && key !== 'member'
       )
@@ -185,7 +186,7 @@ export default class LdapGroups extends DmPlugin {
   async addGroup(
     cn: string,
     members: string[] = [],
-    additional: Record<string, AttributeValue> = {}
+    additional: AttributesList = {}
   ): Promise<boolean> {
     let dn: string;
     if (/^cn=/.test(cn)) {
@@ -196,9 +197,15 @@ export default class LdapGroups extends DmPlugin {
     }
     await this.validateMembers(members);
 
+    // Build entry
     let entry = {
+      // Classes from --group-class
       objectClass: this.config.group_class as string[],
+      // Default attributes from --group-default-attributes
+      ...this.config.group_default_attributes,
+      // cn calculated here
       cn,
+      // members with at least one fake member to satisfy LDAP groupOfNames schema
       member: members.length ? ['cn=fakeuser', ...members] : ['cn=fakeuser'], // LDAP groupOfNames must have at least one member
       ...additional,
     };
@@ -220,9 +227,9 @@ export default class LdapGroups extends DmPlugin {
   async modifyGroup(
     cn: string,
     changes: {
-      add?: Record<string, AttributeValue>[];
-      replace?: Record<string, AttributeValue>;
-      delete?: string[] | Record<string, AttributeValue>;
+      add?: AttributesList;
+      replace?: AttributesList;
+      delete?: string[] | AttributesList;
     }
   ): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
@@ -258,7 +265,7 @@ export default class LdapGroups extends DmPlugin {
     await this.validateMembers(member);
     return await this.ldap
       .modify(dn, {
-        add: [{ member }],
+        add: { member },
       })
       .catch(err => {
         throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
@@ -343,6 +350,7 @@ export default class LdapGroups extends DmPlugin {
           try {
             await this.ldap.search({ paged: false }, m);
           } catch (e) {
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
             throw new Error(`Member ${m} not found: ${e}`);
           }
         })

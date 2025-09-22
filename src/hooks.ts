@@ -1,7 +1,7 @@
 import type { SearchOptions, SearchResult } from 'ldapts';
 
-import { ModifyRequest, AttributeValue } from './lib/ldapActions';
-import { ChangesToNotify } from './plugins/onLdapChange';
+import type { ModifyRequest, AttributesList } from './lib/ldapActions';
+import type { ChangesToNotify } from './plugins/onLdapChange';
 
 export interface Hooks {
   /*
@@ -19,13 +19,9 @@ export interface Hooks {
   ) => SearchResult | Promise<SearchResult>;
   // add
   ldapaddrequest?: (
-    args: [string, Record<string, AttributeValue>]
-  ) =>
-    | [string, Record<string, AttributeValue>]
-    | Promise<[string, Record<string, AttributeValue>]>;
-  ldapadddone?: (
-    args: [string, Record<string, AttributeValue>]
-  ) => void | Promise<void>;
+    args: [string, AttributesList]
+  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
+  ldapadddone?: (args: [string, AttributesList]) => void | Promise<void>;
   // modify
   ldapmodifyrequest?: (
     args: [string, ModifyRequest, number]
@@ -50,13 +46,9 @@ export interface Hooks {
 
   /* LdapGroups plugin */
   ldapgroupadd?: (
-    args: [string, Record<string, AttributeValue>]
-  ) =>
-    | [string, Record<string, AttributeValue>]
-    | Promise<[string, Record<string, AttributeValue>]>;
-  ldapgroupadddone?: (
-    args: [string, Record<string, AttributeValue>]
-  ) => void | Promise<void>;
+    args: [string, AttributesList]
+  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
+  ldapgroupadddone?: (args: [string, AttributesList]) => void | Promise<void>;
 
   // the number given as 3rd argument is a uniq operation number
   // It can be used to save state before modify and launch the

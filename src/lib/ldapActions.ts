@@ -10,6 +10,7 @@ import { launchHooks, launchHooksChained } from './utils';
 
 // Entry
 export type AttributeValue = Buffer | Buffer[] | string[] | string;
+export type AttributesList = Record<string, AttributeValue>;
 
 // search
 const defaultSearchOptions: SearchOptions = {
@@ -26,9 +27,9 @@ export type { SearchOptions, SearchResult };
 
 // modify
 export interface ModifyRequest {
-  add?: Record<string, AttributeValue>[];
-  replace?: Record<string, AttributeValue>;
-  delete?: string[] | Record<string, AttributeValue>;
+  add?: AttributesList;
+  replace?: AttributesList;
+  delete?: string[] | AttributesList;
 }
 
 // Code
@@ -119,10 +120,7 @@ class ldapActions {
   /*
     LDAP add
    */
-  async add(
-    dn: string,
-    entry: Record<string, AttributeValue>
-  ): Promise<boolean> {
+  async add(dn: string, entry: AttributesList): Promise<boolean> {
     dn = this.setDn(dn);
     if (
       (!entry.objectClass || entry.objectClass.length === 0) &&
@@ -172,18 +170,16 @@ class ldapActions {
       [dn, changes, op]
     );
     if (changes.add) {
-      for (const entry of changes.add) {
-        for (const [key, value] of Object.entries(entry)) {
-          ldapChanges.push(
-            new Change({
-              operation: 'add',
-              modification: new Attribute({
-                type: key,
-                values: Array.isArray(value) ? value : [value as string],
-              }),
-            })
-          );
-        }
+      for (const [key, value] of Object.entries(changes.add)) {
+        ldapChanges.push(
+          new Change({
+            operation: 'add',
+            modification: new Attribute({
+              type: key,
+              values: Array.isArray(value) ? value : [value as string],
+            }),
+          })
+        );
       }
     }
     if (changes.replace) {

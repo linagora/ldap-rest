@@ -1,4 +1,5 @@
-import { type ConfigTemplate } from '../lib/parseConfig';
+import type { AttributesList } from '../lib/ldapActions';
+import type { ConfigTemplate } from '../lib/parseConfig';
 
 export interface Config {
   port: number;
@@ -19,10 +20,17 @@ export interface Config {
   ldap_group_base?: string;
   group_class?: string[];
   group_classes?: string[];
+  group_default_attributes?: AttributesList;
   groups_allow_unexistent_members?: boolean;
 
   // Accept additional config keys for non core plugins
-  [key: string]: string | string[] | boolean | number | undefined;
+  [key: string]:
+    | string
+    | string[]
+    | boolean
+    | number
+    | AttributesList
+    | undefined;
 }
 
 const configArgs: ConfigTemplate = [
@@ -103,6 +111,12 @@ const configArgs: ConfigTemplate = [
     envVar: 'DM_ALLOW_UNEXISTENT_MEMBERS',
     defaultValue: false,
     type: 'boolean',
+  },
+  {
+    cliArg: '--group-default-attributes',
+    envVar: 'DM_GROUP_DEFAULT_ATTRIBUTES',
+    defaultValue: {},
+    type: 'json',
   },
 
   // Authentication options

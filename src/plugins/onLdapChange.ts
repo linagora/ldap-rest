@@ -38,10 +38,8 @@ class OnLdapChange extends DmPlugin {
       }
       const res: ChangesToNotify = {};
       if (changes.add) {
-        for (const entry of changes.add) {
-          for (const [key, value] of Object.entries(entry)) {
-            res[key] = [null, value];
-          }
+        for (const [key, value] of Object.entries(changes.add)) {
+          res[key] = [null, value];
         }
       }
       if (changes.delete) {

@@ -1,14 +1,27 @@
-import { type Config } from '../config/args';
+import type { Config } from '../config/args';
+
+import type { AttributeValue } from './ldapActions';
 
 export type ConfigTemplate = ConfigEntry[];
 
-type ConfigResultValue = string | string[] | boolean | number | undefined;
+type ConfigResultValue =
+  | string
+  | string[]
+  | boolean
+  | number
+  | Record<string, AttributeValue>
+  | undefined;
 
 export interface ConfigEntry {
   cliArg: string;
   envVar?: string;
-  defaultValue?: string | string[] | boolean | number;
-  type?: 'string' | 'number' | 'boolean' | 'array';
+  defaultValue?:
+    | string
+    | string[]
+    | boolean
+    | number
+    | Record<string, AttributeValue>;
+  type?: 'string' | 'number' | 'boolean' | 'array' | 'json';
   plural?: string; // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
 }
 
@@ -37,6 +50,15 @@ export class ConfigParser {
             value = parseInt(envValue);
           } else if (entry.type === 'array') {
             value = envValue.split(/[,\s]+/).filter(v => v.length > 0);
+          } else if (entry.type === 'json') {
+            try {
+              value = JSON.parse(envValue) as Record<string, AttributeValue>;
+            } catch (e) {
+              throw new Error(
+                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                `Error parsing JSON from environment variable ${entry.envVar}: ${e}`
+              );
+            }
           } else {
             value = envValue;
           }
@@ -55,6 +77,18 @@ export class ConfigParser {
             value = value.concat(cliValue as string[]);
           } else {
             value = cliValue as string[];
+          }
+        } else if (entry.type === 'json') {
+          try {
+            value = JSON.parse(cliValue as string) as Record<
+              string,
+              AttributeValue
+            >;
+          } catch (e) {
+            throw new Error(
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+              `Error parsing JSON from command line argument ${entry.cliArg}: ${e}`
+            );
           }
         } else {
           value = cliValue as string;
