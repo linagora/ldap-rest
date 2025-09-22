@@ -7,6 +7,7 @@ import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { Hooks } from '../hooks';
 import ldapActions, { AttributesList } from '../lib/ldapActions';
+import { launchHooks, launchHooksChained } from '../lib/utils';
 
 export default class TwakeExternalUsersInGroups extends DmPlugin {
   name = 'twakeExternalUsersInGroups';
@@ -36,18 +37,29 @@ export default class TwakeExternalUsersInGroups extends DmPlugin {
               this.ldap
                 .search({ paged: false }, m)
                 .then(resolve)
-                .catch(() => {
+                .catch(async () => {
                   const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
                   if (!mail) return reject(new Error(`Malformed member ${m}`));
-                  const entry: AttributesList = {
+                  let entry: AttributesList = {
                     objectClass: this.config.user_class as string[],
                     mail,
                     cn: mail,
                     sn: mail,
                   };
+                  [m, entry] = await launchHooksChained(
+                    this.registeredHooks.externaluserentry,
+                    [m, entry]
+                  );
                   this.ldap
                     .add(m, entry)
-                    .then(resolve)
+                    .then(() => {
+                      void launchHooks(
+                        this.registeredHooks.externaluseradded,
+                        m,
+                        entry
+                      );
+                      resolve(true);
+                    })
                     .catch(e =>
                       reject(new Error(`Unable to insert ${m}: ${e}`))
                     );

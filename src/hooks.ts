@@ -78,11 +78,17 @@ export interface Hooks {
     groups: AsyncGenerator<SearchResult>
   ) => [AsyncGenerator<SearchResult> | Promise<AsyncGenerator<SearchResult>>];
 
-  /* onLdapChange */
+  /* "onLdapChange" */
   onLdapChange?: (dn: string, changes: ChangesToNotify) => void | Promise<void>;
   onLdapMailChange?: (
     dn: string,
     oldMail: string,
     newMail: string
   ) => void | Promise<void>;
+
+  /* TwakeExternalUsersInGroup */
+  externaluserentry?: (
+    arg: [string, AttributesList]
+  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
+  externaluseradded?: (dn: string, mail: string) => void | Promise<void>;
 }
