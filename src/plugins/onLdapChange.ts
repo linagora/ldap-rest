@@ -66,6 +66,34 @@ class OnLdapChange extends DmPlugin {
 
   notify(dn: string, changes: ChangesToNotify): void {
     void launchHooks(this.server.hooks.onLdapChange, dn, changes);
+    if (changes[this.config.mail_attribute as string]) {
+      this.notifyAttributeChange(
+        this.config.mail_attribute as string,
+        'onLdapMailChange',
+        dn,
+        changes
+      );
+    }
+  }
+
+  notifyAttributeChange(
+    attribute: string,
+    hookName: keyof Hooks,
+    dn: string,
+    changes: ChangesToNotify,
+    stringOnly: boolean = false
+  ): void {
+    const [oldValue, newValue] = changes[attribute] || [];
+    if (oldValue === undefined && newValue === undefined) return;
+    if (stringOnly && (Array.isArray(oldValue) || Array.isArray(newValue))) {
+      console.error(
+        `Attribute ${attribute} change detected but one of the values is an array, cannot handle that`
+      );
+      return;
+    }
+    if (oldValue !== newValue) {
+      void launchHooks(this.server.hooks[hookName], dn, oldValue, newValue);
+    }
   }
 }
 

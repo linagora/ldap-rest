@@ -85,4 +85,9 @@ export interface Hooks {
 
   /* onLdapChange */
   onLdapChange?: (dn: string, changes: ChangesToNotify) => void | Promise<void>;
+  onLdapMailChange?: (
+    dn: string,
+    oldMail: string,
+    newMail: string
+  ) => void | Promise<void>;
 }

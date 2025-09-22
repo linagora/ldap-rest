@@ -65,6 +65,7 @@ export const jsonBody = (
   ...requiredFields: string[]
 ): object | false => {
   try {
+    if (!wantJson(req, res)) return false;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const body = req.body;
 
