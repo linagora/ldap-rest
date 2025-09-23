@@ -39,6 +39,10 @@
     "plugin-onldapchange": {
       "import": "./dist/plugins/onLdapChange.js",
       "types": "./dist/src/plugins/onLdapChange.d.ts"
+    },
+    "plugin-static": {
+      "import": "./dist/plugins/static.js",
+      "types": "./dist/src/plugins/static.d.ts"
     }
   },
   "main": "dist/bin/index.mjs",

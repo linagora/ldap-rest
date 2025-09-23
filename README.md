@@ -6,6 +6,7 @@ Lite LinID directory manager
 
 All configuration is done via command-line arguments and/or environment variables.
 Example:
+
 ```shell
 npx mini-dm --ldap-base 'ou=users,o=comp,c=fr' \
     --ldap-dn 'cn-admin,o=comp,c=fr' --ldap-pwd adm \

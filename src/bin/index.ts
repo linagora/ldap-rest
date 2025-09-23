@@ -49,9 +49,9 @@ export class DM {
             });
             this.app.use(llng.run);
           })
-          .catch(err => {
-            console.error('Failed to load lemonldap-ng-handler:', err);
-          })
+          .catch(err =>
+            console.error('Failed to load lemonldap-ng-handler:', err)
+          )
       );
     }
 
@@ -63,12 +63,8 @@ export class DM {
     this.ready = new Promise((resolve, reject) => {
       if (promises.length > 0) {
         Promise.all(promises)
-          .then(() => {
-            resolve();
-          })
-          .catch(err => {
-            reject(new Error('Error loading plugins: ' + err));
-          });
+          .then(() => resolve())
+          .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
         resolve();
       }
@@ -114,9 +110,9 @@ export class DM {
           if (!obj) return reject(new Error(`Unable to load ${pluginName}`));
           resolve(await this.registerPlugin(pluginName, obj as DmPlugin));
         })
-        .catch(err => {
-          reject(new Error(`Failed to load plugin ${pluginName}: ${err}`));
-        });
+        .catch(err =>
+          reject(new Error(`Failed to load plugin ${pluginName}: ${err}`))
+        );
     });
   }
 

@@ -34,6 +34,13 @@ export interface Config {
   // External users in groups
   external_members_branch?: string;
 
+  // Static
+  static_path?: string;
+  static_name?: string;
+
+  // Special attributes
+  mail_attribute?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -114,6 +121,10 @@ const configArgs: ConfigTemplate = [
     'DM_EXTERNAL_MEMBERS_BRANCH',
     'ou=contacts,dc=example,dc=com',
   ],
+
+  // static
+  ['--static-path', 'DM_STATIC_PATH', ''],
+  ['--static-name', 'DM_STATIC_NAME', 'static'],
 
   // Authentication options
   // Lemonldap options
