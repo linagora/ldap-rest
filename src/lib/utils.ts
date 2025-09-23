@@ -2,6 +2,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
+import type { Config } from '../bin';
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored
 export const launchHooks = async (
   hooks: Function[] | undefined,
@@ -31,4 +33,20 @@ export const launchHooksChained = async <T>(
     }
   }
   return args;
+};
+
+export const transformSchemas = (
+  schemas: string | Buffer,
+  config: Config
+): string => {
+  const str = schemas.toString().replace(/__(\S+)__/g, (_, prm) => {
+    if (!prm || typeof prm !== 'string') return _;
+    const key: string = prm.trim().toLowerCase();
+    if (config[key]) {
+      if (typeof config[key] !== 'object') return config[key] as string;
+      return JSON.stringify(config[key]);
+    }
+    return _;
+  });
+  return str;
 };

@@ -43,6 +43,10 @@
     "plugin-static": {
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
+    },
+    "schema-groups": {
+      "import": "./static/schemas/groups.json",
+      "require": "./static/schemas/groups.json"
     }
   },
   "main": "dist/bin/index.mjs",

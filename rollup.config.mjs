@@ -74,6 +74,11 @@ async function getPluginEntries() {
   return files.filter(file => extname(file) === '.ts');
 }
 
+async function getSpecs() {
+  const files = await readdir('static/schemas');
+  return files.filter(file => extname(file) === '.json');
+}
+
 pkg.exports = {
   '.': {
     import: './dist/bin/index.js',
@@ -91,6 +96,13 @@ export default async () => {
     pkg.exports[`plugin-${name.toLowerCase()}`] = {
       import: `./dist/plugins/${name}.js`,
       types: `./dist/src/plugins/${name}.d.ts`,
+    };
+  });
+  (await getSpecs()).forEach(spec => {
+    const name = spec.replace(/\.json$/, '');
+    pkg.exports[`schema-${name.toLowerCase()}`] = {
+      import: `./static/schemas/${spec}`,
+      require: `./static/schemas/${spec}`,
     };
   });
   writeFileSync('package.json', sort(JSON.stringify(pkg, null, 2)));

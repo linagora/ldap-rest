@@ -13,6 +13,9 @@ import type { ConfigTemplate } from '../lib/parseConfig';
 export interface Config {
   port: number;
   auth?: string;
+  plugin?: string[];
+  plugins?: string;
+  schemas_path: string;
 
   // LDAP
   top_dn?: string;
@@ -21,8 +24,6 @@ export interface Config {
   llng_ini?: string;
   ldap_pwd?: string;
   ldap_url?: string;
-  plugin?: string[];
-  plugins?: string;
   user_class?: string[];
   user_classes?: string;
 
@@ -84,6 +85,17 @@ const configArgs: ConfigTemplate = [
   ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
   ['--ldap-url', 'DM_LDAP_URL', 'ldap://localhost'],
   ['--top-dn', 'DM_TOP_DN', 'dc=example,dc=com'],
+  [
+    '--schemas-path',
+    'DM_SCHEMAS_PATH',
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      'static',
+      'schemas'
+    ),
+  ],
 
   // Special attributes
   ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],

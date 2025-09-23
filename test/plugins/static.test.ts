@@ -14,6 +14,7 @@ describe('static', () => {
     beforeEach(async () => {
       process.env.NODE_ENV = 'test';
       process.env.DM_STATIC_PATH = dir;
+      process.env.DM_LDAP_BASE = 'dc=example,dc=com';
       dm = new DM();
       await dm.ready;
       try {
@@ -74,12 +75,14 @@ describe('static', () => {
       await dm.ready;
     });
 
-    it('should use default static path', async () => {
+    it('should use default paths and replace parameters', async () => {
       plugin = new Static(dm);
       await dm.registerPlugin('static', plugin);
       const request = supertest(dm.app);
       const res = await request.get('/static/schemas/groups.json');
       expect(res.status).to.equal(200);
+      expect(res.type).to.equal('application/json');
+      expect(JSON.stringify(res.body)).to.match(/dc=example/);
     });
   });
 });
