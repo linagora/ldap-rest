@@ -251,7 +251,9 @@ describe('LdapGroups Plugin', function () {
         });
       expect(res.body).to.deep.equal({ success: true });
       expect(res.status).to.equal(200);
-      res = await request.get('/api/v1/ldap/groups?match=cn=*estgrou*&attributes=cn,member').set('Accept', 'application/json');
+      res = await request
+        .get('/api/v1/ldap/groups?match=cn=*estgrou*&attributes=cn,member')
+        .set('Accept', 'application/json');
       expect(res.status).to.equal(200);
       expect(res.body).to.have.property('testgroup');
       expect(res.body.testgroup).to.deep.equal({
@@ -260,6 +262,5 @@ describe('LdapGroups Plugin', function () {
         member: [user1],
       });
     });
-
   });
 });
