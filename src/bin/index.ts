@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
 import express from 'express';
 import bodyParser from 'body-parser';
 
@@ -91,11 +92,12 @@ export class DM {
   loadPlugin(pluginName: string): Promise<boolean> {
     console.debug('Loading plugin', pluginName);
     if (pluginName.startsWith('core/')) {
-      pluginName =
-        pluginName.replace(
+      pluginName = pluginName
+        .replace(
           'core/',
-          join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins')
-        ) + '/'.replace(/$/, '.js');
+          join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins') + '/'
+        )
+        .replace(/$/, '.js');
     }
     return new Promise<boolean>((resolve, reject) => {
       import(pluginName)

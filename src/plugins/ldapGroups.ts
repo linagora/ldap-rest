@@ -304,12 +304,12 @@ export default class LdapGroups extends DmPlugin {
           .modify(entry.dn, {
             delete: { member: memberDn },
           })
-          .catch(err => {
+          .catch(err =>
             console.error(
               `Failed to remove ${memberDn} from group ${entry.dn}:`,
               err
-            );
-          })
+            )
+          )
       )
     );
   }
