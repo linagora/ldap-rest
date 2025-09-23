@@ -19,12 +19,15 @@ import type ldapActions from '../lib/ldapActions';
 import type {
   AttributesList,
   AttributeValue,
+  LdapList,
   ModifyRequest,
   SearchResult,
 } from '../lib/ldapActions';
 import {
   badRequest,
   jsonBody,
+  ok,
+  serverError,
   tryMethod,
   wantJson,
 } from '../lib/expressFormatedResponses';
@@ -78,6 +81,27 @@ export default class LdapGroups extends DmPlugin {
    */
 
   api(app: Express): void {
+    // List groups
+    app.get('/api/v1/ldap/groups', async (req, res) => {
+      if (!wantJson(req, res)) return;
+      try {
+        const args: [string?, string[]?] = [];
+        if (
+          req.query.match &&
+          (typeof req.query.match !== 'string' ||
+            !/^[\w*=]+$/.test(req.query.match))
+        )
+          return badRequest(res, 'Invalid match query');
+        if (req.query.match) args.push(req.query.match);
+        if (req.query.attributes && typeof req.query.attributes === 'string')
+          args.push(req.query.attributes.split(','));
+        const list = await this.listGroups(...args);
+        return ok(res, list);
+      } catch (err) {
+        return serverError(res, err);
+      }
+    });
+
     // Add group
     app.post('/api/v1/ldap/groups', async (req, res) =>
       this.apiAdd(req, res, 'cn')
@@ -314,23 +338,47 @@ export default class LdapGroups extends DmPlugin {
     );
   }
 
-  //
-  async listGroups(): Promise<AsyncGenerator<SearchResult>> {
-    let _res = (await this.ldap
+  /**
+   * List groups from LDAP
+   * @param filter uncontrolled filter, be careful
+   * @param attributes attributes to fetch (eg. ['cn','member'])
+   * @returns LdapList (Record<string, AttributesList>)
+   */
+  async listGroups(
+    filter: string = '(objectClass=*)',
+    attributes: string[] = ['cn', 'description', 'member']
+  ): Promise<LdapList> {
+    const _res: AsyncGenerator<SearchResult> = (await this.ldap
       .search(
         {
-          filter: '(objectClass=*)',
-          // paged: false,
-          attributes: ['cn'],
+          filter,
+          attributes,
         },
         this.base as string
       )
       .catch(err => {
         throw new Error(`Failed to list groups from ${this.base}: ${err}`);
       })) as AsyncGenerator<SearchResult>;
+    let entries: LdapList = {};
+    for await (const r of _res) {
+      r.searchEntries.map(entry => {
+        const s = entry.cn as string;
+        if (s) entries[s] = entry;
+        if (!Array.isArray(entries[s].member))
+          entries[s].member = [entries[s].member as string];
+        entries[s].member = (entries[s].member as string[]).filter(
+          (m: string) => {
+            return m !== this.config.group_dummy_user;
+          }
+        );
+      });
+    }
 
-    _res = await launchHooksChained(this.registeredHooks._ldapgrouplist, _res);
-    return _res;
+    entries = await launchHooksChained(
+      this.registeredHooks._ldapgrouplist,
+      entries
+    );
+    return entries;
   }
 
   protected fixDn(dn: string): string | false {
@@ -338,6 +386,16 @@ export default class LdapGroups extends DmPlugin {
     return /,/.test(dn) ? dn : `cn=${dn},${this.base}`;
   }
 
+  /**
+   * Verify that each member exists in LDAP
+   *
+   * It calls ldapgroupvalidatemembers hook before validation
+   * so that plugins can modify the members list and/or the group DN
+   * and/or create missing members on the fly
+   * @param dn Group DN (given to hooks)
+   * @param members Array of member DNs to check
+   * @returns nothing, throw if error
+   */
   async validateMembers(dn: string, members: string[]): Promise<void> {
     [dn, members] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatemembers,

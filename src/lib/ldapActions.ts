@@ -11,6 +11,7 @@ import { launchHooks, launchHooksChained } from './utils';
 // Entry
 export type AttributeValue = Buffer | Buffer[] | string[] | string;
 export type AttributesList = Record<string, AttributeValue>;
+export type LdapList = Record<string, AttributesList>;
 
 // search
 const defaultSearchOptions: SearchOptions = {

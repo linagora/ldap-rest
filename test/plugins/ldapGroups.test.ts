@@ -68,10 +68,9 @@ describe('LdapGroups Plugin', function () {
   describe('New group', () => {
     it('should add/delete group with members', async () => {
       await plugin.addGroup('testgroup', [user1]);
-      const list = await plugin.listGroups();
+      const listEntries = await plugin.listGroups();
       // @ts-ignore
-      const listEntries = (await list.next()).value.searchEntries;
-      expect(listEntries.length).to.be.greaterThan(0);
+      expect(listEntries).to.have.property('testgroup');
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
@@ -241,5 +240,26 @@ describe('LdapGroups Plugin', function () {
         },
       });
     });
+
+    it('should list via API', async () => {
+      let res = await request
+        .post('/api/v1/ldap/groups')
+        .type('json')
+        .send({
+          cn: 'testgroup',
+          member: [user1],
+        });
+      expect(res.body).to.deep.equal({ success: true });
+      expect(res.status).to.equal(200);
+      res = await request.get('/api/v1/ldap/groups?match=cn=*estgrou*&attributes=cn,member').set('Accept', 'application/json');
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('testgroup');
+      expect(res.body.testgroup).to.deep.equal({
+        dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+        cn: 'testgroup',
+        member: [user1],
+      });
+    });
+
   });
 });

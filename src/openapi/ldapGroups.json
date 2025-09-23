@@ -6,6 +6,55 @@
     "description": "API for managing LDAP groups and their members"
   },
   "paths": {
+    "api/v1/ldap/groups": {
+      "get": {
+        "summary": "List agroups",
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "(objectClass=*)" },
+            "description": "LDAP filter to apply"
+          },
+          {
+            "name": "attributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                { "type": "string" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "default": ["cn", "description", "member"]
+            },
+            "description": "Attributes to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        { "type": "string" },
+                        { "type": "array", "items": { "type": "string" } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" }
+        }
+      }
+    },
     "/api/v1/ldap/groups": {
       "post": {
         "summary": "Add a new group",
@@ -24,7 +73,6 @@
                     ]
                   }
                 },
-                "additionalProperties": true,
                 "required": ["cn"]
               }
             }
