@@ -28,6 +28,10 @@ class OnLdapChange extends DmPlugin {
       )) as SearchResult;
       if (tmp.searchEntries.length == 1) {
         this.stack[op] = tmp.searchEntries[0];
+      } else {
+        console.warn(
+          `Could not find unique entry ${dn} before modification, got ${tmp.searchEntries.length} entries`
+        );
       }
       return [dn, attributes, op];
     },
