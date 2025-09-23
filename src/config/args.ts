@@ -1,3 +1,6 @@
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 
@@ -123,7 +126,11 @@ const configArgs: ConfigTemplate = [
   ],
 
   // static
-  ['--static-path', 'DM_STATIC_PATH', ''],
+  [
+    '--static-path',
+    'DM_STATIC_PATH',
+    join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'static'),
+  ],
   ['--static-name', 'DM_STATIC_NAME', 'static'],
 
   // Authentication options

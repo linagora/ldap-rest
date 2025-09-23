@@ -1,0 +1,6 @@
+{
+  "objectClass": {
+    "type": "array",
+    "default": ["top", "groupOfNames"]
+  }
+}
