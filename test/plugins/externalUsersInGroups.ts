@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import LdapGroups from '../../src/plugins/ldapGroups';
 import { DM } from '../../src/bin';
-import TwakeExternalUsersInGroups from '../../src/plugins/twakeExternalUsersInGroups';
+import ExternalUsersInGroups from '../../src/plugins/externalUsersInGroups';
 import { SearchResult } from 'ldapts';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
@@ -32,8 +32,8 @@ describe('External users in groups', function () {
     plugin = new LdapGroups(server);
     server.registerPlugin('ldapGroups', plugin);
     server.registerPlugin(
-      'twakeExternalUsersInGroups',
-      new TwakeExternalUsersInGroups(server)
+      'externalUsersInGroups',
+      new ExternalUsersInGroups(server)
     );
   });
 
@@ -50,7 +50,7 @@ describe('External users in groups', function () {
     }
   });
 
-  it('should load twakeExternalUsersInGroups', () => {
+  it('should load externalUsersInGroups', () => {
     expect(plugin.constructor.name).to.equal('LdapGroups');
   });
 

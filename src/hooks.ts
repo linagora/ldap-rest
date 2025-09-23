@@ -86,7 +86,7 @@ export interface Hooks {
     newMail: string
   ) => void | Promise<void>;
 
-  /** TwakeExternalUsersInGroup */
+  /** externalUsersInGroup */
   externaluserentry?: (
     arg: [string, AttributesList]
   ) => [string, AttributesList] | Promise<[string, AttributesList]>;

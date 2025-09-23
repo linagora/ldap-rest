@@ -24,6 +24,10 @@
     "hooks": {
       "types": "./dist/src/hooks.d.ts"
     },
+    "plugin-externalusersingroups": {
+      "import": "./dist/plugins/externalUsersInGroups.js",
+      "types": "./dist/src/plugins/externalUsersInGroups.d.ts"
+    },
     "plugin-helloworld": {
       "import": "./dist/plugins/helloworld.js",
       "types": "./dist/src/plugins/helloworld.d.ts"
@@ -35,10 +39,6 @@
     "plugin-onldapchange": {
       "import": "./dist/plugins/onLdapChange.js",
       "types": "./dist/src/plugins/onLdapChange.d.ts"
-    },
-    "plugin-twakeexternalusersingroups": {
-      "import": "./dist/plugins/twakeExternalUsersInGroups.js",
-      "types": "./dist/src/plugins/twakeExternalUsersInGroups.d.ts"
     }
   },
   "main": "dist/bin/index.mjs",
@@ -68,6 +68,7 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start": "./dist/bin/server.js",
     "test": "tsc --noEmit && mocha",
+    "test:dev": "./.dev.mk test",
     "test:one": "mocha --config .mocharc-one.json"
   },
   "dependencies": {

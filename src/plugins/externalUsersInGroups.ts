@@ -9,8 +9,8 @@ import { Hooks } from '../hooks';
 import ldapActions, { AttributesList } from '../lib/ldapActions';
 import { launchHooks, launchHooksChained } from '../lib/utils';
 
-export default class TwakeExternalUsersInGroups extends DmPlugin {
-  name = 'twakeExternalUsersInGroups';
+export default class ExternalUsersInGroups extends DmPlugin {
+  name = 'externalUsersInGroups';
 
   dependencies = { ldapGroups: 'core/ldapGroups' };
 

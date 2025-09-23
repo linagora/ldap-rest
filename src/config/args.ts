@@ -107,7 +107,7 @@ const configArgs: ConfigTemplate = [
   ['--group-default-attributes', 'DM_GROUP_DEFAULT_ATTRIBUTES', {}, 'json'],
   ['--group-dummy-user', 'DM_GROUP_DUMMY_USER', 'cn=fakeuser'],
 
-  // twakeExternalUsersInGroups
+  // externalUsersInGroups
 
   [
     '--external-members-branch',

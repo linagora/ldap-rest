@@ -25,14 +25,15 @@ describe('External users in groups', function () {
 
   before(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.DM_PLUGINS = 'core/twakeExternalUsersInGroups';
+    process.env.DM_PLUGINS = 'core/externalUsersInGroups';
     server = new DM();
     await server.ready;
     plugin = server.loadedPlugins.ldapGroups as unknown as LdapGroups;
   });
 
-  it('should load twakeExternalUsersInGroups', () => {
+  it('should load externalUsersInGroups', () => {
     console.error('OK', plugin);
     expect(plugin.constructor.name).to.equal('LdapGroups');
+    expect(plugin.server.loadedPlugins).to.have.key('externalUsersInGroups');
   });
 });
