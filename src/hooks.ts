@@ -3,6 +3,12 @@ import type { SearchOptions, SearchResult } from 'ldapts';
 import type { ModifyRequest, AttributesList } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/onLdapChange';
 
+export type MaybePromise<T> = Promise<T> | T;
+export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
+export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+export type OtherHook = Function;
+
 export interface Hooks {
   /**
    * Libraries
@@ -11,31 +17,19 @@ export interface Hooks {
   /* LDAP */
 
   // search
-  ldapsearchopts?: (
-    opts: SearchOptions
-  ) => SearchOptions | Promise<SearchOptions>;
-  ldapsearchresult?: (
-    results: SearchResult
-  ) => SearchResult | Promise<SearchResult>;
+  ldapsearchopts?: ChainedHook<SearchOptions>;
+  ldapsearchresult?: ChainedHook<SearchResult>;
   // add
-  ldapaddrequest?: (
-    args: [string, AttributesList]
-  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
-  ldapadddone?: (args: [string, AttributesList]) => void | Promise<void>;
+  ldapaddrequest?: ChainedHook<[string, AttributesList]>;
+  ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
   // modify
-  ldapmodifyrequest?: (
-    args: [string, ModifyRequest, number]
-  ) =>
-    | [string, ModifyRequest, number]
-    | Promise<[string, ModifyRequest, number]>;
+  ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number]>;
   ldapmodifydone?: (
     args: [string, ModifyRequest, number]
-  ) => void | Promise<void>;
+  ) => MaybePromise<void>;
   // delete
-  ldapdeleterequest?: (
-    dn: string | string[]
-  ) => string | string[] | Promise<string | string[]>;
-  ldapdeletedone?: (dn: string | string[]) => void | Promise<void>;
+  ldapdeleterequest?: ChainedHook<string | string[]>;
+  ldapdeletedone?: (dn: string | string[]) => MaybePromise<void>;
 
   /**
    * Plugins
@@ -45,50 +39,41 @@ export interface Hooks {
   hello?: () => string;
 
   /** LdapGroups plugin */
-  ldapgroupvalidatemembers?: (
-    args: [string, string[]]
-  ) => [string, string[]] | Promise<[string, string[]]>;
-  ldapgroupadd?: (
-    args: [string, AttributesList]
-  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
-  ldapgroupadddone?: (args: [string, AttributesList]) => void | Promise<void>;
+  ldapgroupvalidatemembers?: ChainedHook<[string, string[]]>;
+  ldapgroupadd?: ChainedHook<[string, AttributesList]>;
+  ldapgroupadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
 
   // the number given as 3rd argument is a uniq operation number
   // It can be used to save state before modify and launch the
   // real hook after change but with previous value
-  ldapgroupmodify?: (
-    args: [string, ModifyRequest, number]
-  ) =>
-    | [string, ModifyRequest, number]
-    | Promise<[string, ModifyRequest, number]>;
+  ldapgroupmodify?: ChainedHook<[string, ModifyRequest, number]>;
   ldapgroupmodifydone?: (
     args: [string, ModifyRequest, number]
-  ) => void | Promise<void>;
+  ) => MaybePromise<void>;
 
-  ldapgroupdelete?: (dn: string) => string | Promise<string>;
-  ldapgroupdeletedone?: (dn: string) => void | Promise<void>;
-  ldapgroupaddmember?: (
-    args: [string, string[]]
-  ) => [string, string[]] | Promise<[string, string[]]>;
-  ldapgroupdeletemember?: (
-    args: [string, string[]]
-  ) => [string, string[]] | Promise<[string, string[]]>;
+  ldapgroupdelete?: ChainedHook<string>;
+  ldapgroupdeletedone?: (dn: string) => MaybePromise<void>;
+  ldapgroupaddmember?: ChainedHook<[string, string[]]>;
+  ldapgroupdeletemember?: ChainedHook<[string, string[]]>;
   // this hook is for low-level ldap listGroups method
-  _ldapgrouplist?: (
-    groups: AsyncGenerator<SearchResult>
-  ) => [AsyncGenerator<SearchResult> | Promise<AsyncGenerator<SearchResult>>];
+  _ldapgrouplist?: ChainedHook<AsyncGenerator<SearchResult>>;
 
   /** "onLdapChange" */
-  onLdapChange?: (dn: string, changes: ChangesToNotify) => void | Promise<void>;
+  onLdapChange?: (dn: string, changes: ChangesToNotify) => MaybePromise<void>;
   onLdapMailChange?: (
     dn: string,
     oldMail: string,
     newMail: string
-  ) => void | Promise<void>;
+  ) => MaybePromise<void>;
 
   /** externalUsersInGroup */
-  externaluserentry?: (
-    arg: [string, AttributesList]
-  ) => [string, AttributesList] | Promise<[string, AttributesList]>;
-  externaluseradded?: (dn: string, mail: string) => void | Promise<void>;
+  externaluserentry?: ChainedHook<[string, AttributesList]>;
+  externaluseradded?: (dn: string, mail: string) => MaybePromise<void>;
+
+  // External hooks
+  [K: string]:
+    | ChainedHook<unknown>
+    | VoidHook<unknown[]>
+    | OtherHook
+    | undefined;
 }

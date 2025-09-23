@@ -56,7 +56,7 @@ export class DM {
     }
 
     if (this.config.plugin) {
-      for (let pluginName of this.config.plugin) {
+      for (const pluginName of this.config.plugin) {
         promises.push(this.loadPlugin(pluginName));
       }
     }
@@ -129,7 +129,6 @@ export class DM {
     if (obj.dependencies) {
       for (const dependency in obj.dependencies) {
         if (!this.loadedPlugins[dependency]) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           await this.loadPlugin(obj.dependencies[dependency]);
         }
       }
