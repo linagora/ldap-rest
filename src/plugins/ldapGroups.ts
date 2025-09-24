@@ -259,6 +259,32 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupmodify,
       [dn, changes, op]
     );
+    if (changes.add) {
+      if (changes.add.member)
+        throw new Error('Use dedicated API to add members');
+      if (changes.add.cn) throw new Error('cn attribute iq unique, cannot add');
+    }
+    if (changes.delete) {
+      if (changes.delete instanceof Object) {
+        if ((changes.delete as AttributesList).member)
+          throw new Error('Use dedicated API to delete members');
+        if ((changes.delete as AttributesList).cn)
+          throw new Error('Cannot delete cn attribute');
+      }
+      if (Array.isArray(changes.delete)) {
+        if (changes.delete.includes('member'))
+          throw new Error('Use dedicated API to delete members');
+        if (changes.delete.includes('cn'))
+          throw new Error('Cannot delete cn attribute');
+      }
+    }
+    if (changes.replace) {
+      if (changes.replace.member)
+        throw new Error('Use dedicated API to replace members');
+      if (changes.replace.cn)
+        throw new Error('Use dedicated API to change cn attribute');
+    }
+
     const res = await this.ldap.modify(dn, changes);
     void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
       dn,
@@ -311,6 +337,8 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
     );
+    if (member === this.config.group_dummy_user)
+      throw new Error('Cannot delete dummy member from group');
     return await this.ldap
       .modify(dn, {
         delete: { member: member },

@@ -133,6 +133,14 @@ describe('LdapGroups Plugin', function () {
   });
 
   describe('Manipulate member', () => {
+    this.afterEach(async () => {
+      try {
+        await plugin.deleteGroup('testgroupbis');
+      } catch (e) {
+        // ignore
+      }
+    });
+
     it('should add/delete member to group', async () => {
       await plugin.addGroup('testgroup');
       await plugin.addMember('testgroup', user2);
