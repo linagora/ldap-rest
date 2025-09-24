@@ -9,7 +9,6 @@
  * - ldapdeleterequest: to catch user deletion and remove them from all groups
  */
 
-import { Entry } from 'ldapts';
 import type { Express, Request, Response } from 'express';
 
 import DmPlugin from '../abstract/plugin';
@@ -87,17 +86,20 @@ export default class LdapGroups extends DmPlugin {
     app.get('/api/v1/ldap/groups', async (req, res) => {
       if (!wantJson(req, res)) return;
       try {
-        const args: [string?, string[]?] = [];
+        const args: { filter?: string; attributes?: string[] } = {};
         if (
           req.query.match &&
           (typeof req.query.match !== 'string' ||
-            !/^[\w*=]+$/.test(req.query.match))
+            !/^[\w*=()&|]+$/.test(req.query.match))
         )
           return badRequest(res, 'Invalid match query');
-        if (req.query.match) args.push(req.query.match);
+        if (req.query.match)
+          args.filter = /=/.test(req.query.match)
+            ? `${req.query.match}`
+            : `(${this.cn}=${req.query.match})`;
         if (req.query.attributes && typeof req.query.attributes === 'string')
-          args.push(req.query.attributes.split(','));
-        const list = await this.listGroups(...args);
+          args.attributes = req.query.attributes.split(',');
+        const list = await this.listGroups(args);
         return ok(res, list);
       } catch (err) {
         return serverError(res, err);
@@ -178,33 +180,6 @@ export default class LdapGroups extends DmPlugin {
   /**
    * LDAP group methods
    */
-
-  async searchGroupsByName(
-    cn: string,
-    partial = false,
-    attributes: string[] = [this.cn, 'member']
-  ): Promise<Record<string, Entry>> {
-    const filter = partial ? `(${this.cn}=*${cn}*)` : `(${this.cn}=${cn})`;
-    const _res = (await this.ldap.search(
-      {
-        filter,
-        paged: false,
-        attributes,
-      },
-      this.base as string
-    )) as SearchResult;
-    const res: Record<string, Entry> = {};
-    _res.searchEntries.map(entry => {
-      const s = entry[this.cn] as string;
-      if (s) res[s] = entry;
-      if (!Array.isArray(res[s].member))
-        res[s].member = [res[s].member as string];
-      res[s].member = (res[s].member as string[]).filter((m: string) => {
-        return m !== this.config.group_dummy_user;
-      });
-    });
-    return res;
-  }
 
   async addGroup(
     cn: string,
@@ -384,19 +359,24 @@ export default class LdapGroups extends DmPlugin {
 
   /**
    * List groups from LDAP
-   * @param filter uncontrolled filter, be careful
-   * @param attributes attributes to fetch (eg. ['cn','member'])
+   * @param param0? {filter, attributes}:
+   * - filter: LDAP filter (default '(objectClass=*)')
+   * - attributes: attributes to fetch (default ['cn','member'])
    * @returns LdapList (Record<string, AttributesList>)
    */
-  async listGroups(
-    filter: string = '(objectClass=*)',
-    attributes: string[] = [this.cn, 'description', 'member']
-  ): Promise<LdapList> {
+  async listGroups({
+    filter,
+    attributes,
+  }: {
+    filter?: string;
+    attributes?: string[];
+  } = {}): Promise<LdapList> {
     const _res: AsyncGenerator<SearchResult> = (await this.ldap
       .search(
         {
-          filter,
-          attributes,
+          filter: filter || '(objectClass=*)',
+          attributes: attributes || [this.cn, 'member'],
+          paged: true,
         },
         this.base as string
       )
@@ -423,6 +403,22 @@ export default class LdapGroups extends DmPlugin {
       entries
     );
     return entries;
+  }
+
+  /**
+   * Simple formatter for listGroups()
+   * @param cn main attribute value (partial or full)
+   * @param partial? boolean, true for partial search (default false)
+   * @param attributes? array of attributes to return
+   * @returns LdapList (means Record<string, AttributesList> where key is the --ldap-user-main-attribute value [default: cn])
+   */
+  async searchGroupsByName(
+    cn: string,
+    partial = false,
+    attributes: string[] = [this.cn, 'member']
+  ): Promise<LdapList> {
+    const filter = partial ? `(${this.cn}=*${cn}*)` : `(${this.cn}=${cn})`;
+    return await this.listGroups({ filter, attributes });
   }
 
   protected fixDn(dn: string): string | false {
