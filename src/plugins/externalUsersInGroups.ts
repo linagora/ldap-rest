@@ -43,7 +43,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
                   let entry: AttributesList = {
                     objectClass: this.config.user_class as string[],
                     mail,
-                    cn: mail,
+                    [this.config.ldap_groups_main_attribute as string]: mail,
                     sn: mail,
                   };
                   [m, entry] = await launchHooksChained(

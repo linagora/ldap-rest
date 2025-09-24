@@ -34,8 +34,8 @@ import {
 import { launchHooks, launchHooksChained } from '../lib/utils';
 
 export interface postAdd {
-  cn: string;
-  [key: string]: AttributeValue;
+  cn?: string;
+  [key: string]: AttributeValue | undefined;
 }
 export type postModify = ModifyRequest;
 
@@ -43,11 +43,13 @@ export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
   base?: string;
   ldap: ldapActions;
+  cn: string;
 
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
     this.base = this.config.ldap_group_base as string;
+    this.cn = this.config.ldap_groups_main_attribute as string;
     if (!this.base) {
       this.base = this.config.ldap_base;
       console.warn(`LDAP group base is not defined, using "${this.base}"`);
@@ -104,7 +106,7 @@ export default class LdapGroups extends DmPlugin {
 
     // Add group
     app.post('/api/v1/ldap/groups', async (req, res) =>
-      this.apiAdd(req, res, 'cn')
+      this.apiAdd(req, res, this.cn)
     );
 
     // Delete group
@@ -147,13 +149,14 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<void> {
     const body = jsonBody(req, res, ...requiredFields) as postAdd | false;
     if (!body) return;
-    const cn = body.cn;
+    const cn = body[this.cn];
     const members = body.member ? body.member : [];
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
-        ([key, _value]) => key !== 'cn' && key !== 'member'
+        ([key, _value]) =>
+          key !== this.cn && key !== 'member' && _value !== undefined
       )
-    );
+    ) as AttributesList;
     await tryMethod(res, this.addGroup.bind(this), cn, members, additional);
   }
 
@@ -179,9 +182,9 @@ export default class LdapGroups extends DmPlugin {
   async searchGroupsByName(
     cn: string,
     partial = false,
-    attributes: string[] = ['cn', 'member']
+    attributes: string[] = [this.cn, 'member']
   ): Promise<Record<string, Entry>> {
-    const filter = partial ? `(cn=*${cn}*)` : `(cn=${cn})`;
+    const filter = partial ? `(${this.cn}=*${cn}*)` : `(${this.cn}=${cn})`;
     const _res = (await this.ldap.search(
       {
         filter,
@@ -192,7 +195,7 @@ export default class LdapGroups extends DmPlugin {
     )) as SearchResult;
     const res: Record<string, Entry> = {};
     _res.searchEntries.map(entry => {
-      const s = entry.cn as string;
+      const s = entry[this.cn] as string;
       if (s) res[s] = entry;
       if (!Array.isArray(res[s].member))
         res[s].member = [res[s].member as string];
@@ -209,11 +212,11 @@ export default class LdapGroups extends DmPlugin {
     additional: AttributesList = {}
   ): Promise<boolean> {
     let dn: string;
-    if (/^cn=/.test(cn)) {
+    if (new RegExp(`^${this.cn}=`).test(cn)) {
       dn = cn;
-      cn = cn.replace(/^cn=([^,]+).*$/, '$1');
+      cn = cn.replace(new RegExp(`^${this.cn}=([^,]+).*`), '$1');
     } else {
-      dn = `cn=${cn},${this.base}`;
+      dn = `${this.cn}=${cn},${this.base}`;
     }
     await this.validateMembers(dn, members);
 
@@ -224,7 +227,7 @@ export default class LdapGroups extends DmPlugin {
       // Default attributes from --group-default-attributes
       ...this.config.group_default_attributes,
       // cn calculated here
-      cn,
+      [this.cn]: cn,
       // members with at least one fake member to satisfy LDAP groupOfNames schema
       member: [this.config.group_dummy_user as string],
       ...additional,
@@ -253,7 +256,7 @@ export default class LdapGroups extends DmPlugin {
       delete?: string[] | AttributesList;
     }
   ): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks.ldapgroupmodify,
@@ -262,27 +265,28 @@ export default class LdapGroups extends DmPlugin {
     if (changes.add) {
       if (changes.add.member)
         throw new Error('Use dedicated API to add members');
-      if (changes.add.cn) throw new Error('cn attribute iq unique, cannot add');
+      if (changes.add[this.cn])
+        throw new Error(`${this.cn} attribute iq unique, cannot add`);
     }
     if (changes.delete) {
       if (changes.delete instanceof Object) {
         if ((changes.delete as AttributesList).member)
           throw new Error('Use dedicated API to delete members');
-        if ((changes.delete as AttributesList).cn)
-          throw new Error('Cannot delete cn attribute');
+        if ((changes.delete as AttributesList)[this.cn])
+          throw new Error(`Cannot delete ${this.cn} attribute`);
       }
       if (Array.isArray(changes.delete)) {
         if (changes.delete.includes('member'))
           throw new Error('Use dedicated API to delete members');
-        if (changes.delete.includes('cn'))
-          throw new Error('Cannot delete cn attribute');
+        if (changes.delete.includes(this.cn))
+          throw new Error(`Cannot delete ${this.cn} attribute`);
       }
     }
     if (changes.replace) {
       if (changes.replace.member)
         throw new Error('Use dedicated API to replace members');
-      if (changes.replace.cn)
-        throw new Error('Use dedicated API to change cn attribute');
+      if (changes.replace[this.cn])
+        throw new Error(`Use dedicated API to change ${this.cn} attribute`);
     }
 
     const res = await this.ldap.modify(dn, changes);
@@ -295,8 +299,8 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async renameGroup(cn: string, newCn: string): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
-    let newDn = /,/.test(newCn) ? newCn : `cn=${newCn},${this.base}`;
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    let newDn = /,/.test(newCn) ? newCn : `${this.cn}=${newCn},${this.base}`;
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks.ldapgrouprename,
       [dn, newDn]
@@ -307,7 +311,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteGroup(cn: string): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
     dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
     const res = await this.ldap.delete(dn);
     void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
@@ -315,7 +319,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async addMember(cn: string, member: string | string[]): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
     if (!Array.isArray(member)) member = [member];
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupaddmember,
@@ -332,7 +336,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteMember(cn: string, member: string): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
@@ -354,7 +358,7 @@ export default class LdapGroups extends DmPlugin {
         {
           filter: `member=${memberDn}`,
           paged: false,
-          attributes: ['cn'],
+          attributes: [this.cn],
         },
         this.base as string
       )
@@ -386,7 +390,7 @@ export default class LdapGroups extends DmPlugin {
    */
   async listGroups(
     filter: string = '(objectClass=*)',
-    attributes: string[] = ['cn', 'description', 'member']
+    attributes: string[] = [this.cn, 'description', 'member']
   ): Promise<LdapList> {
     const _res: AsyncGenerator<SearchResult> = (await this.ldap
       .search(
@@ -402,7 +406,7 @@ export default class LdapGroups extends DmPlugin {
     let entries: LdapList = {};
     for await (const r of _res) {
       r.searchEntries.map(entry => {
-        const s = entry.cn as string;
+        const s = entry[this.cn] as string;
         if (s) entries[s] = entry;
         if (!Array.isArray(entries[s].member))
           entries[s].member = [entries[s].member as string];
@@ -423,7 +427,7 @@ export default class LdapGroups extends DmPlugin {
 
   protected fixDn(dn: string): string | false {
     if (!dn) return false;
-    return /,/.test(dn) ? dn : `cn=${dn},${this.base}`;
+    return /,/.test(dn) ? dn : `${this.cn}=${dn},${this.base}`;
   }
 
   /**

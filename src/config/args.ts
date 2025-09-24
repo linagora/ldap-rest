@@ -27,6 +27,7 @@ export interface Config {
 
   // LDAP groups plugin
   ldap_group_base?: string;
+  ldap_groups_main_attribute?: string;
   group_class?: string[];
   group_classes?: string[];
   group_default_attributes?: AttributesList;
@@ -113,6 +114,7 @@ const configArgs: ConfigTemplate = [
   // LDAP groups plugin
 
   ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
+  ['--ldap-groups-main-attribute', 'DM_LDAP_GROUPS_MAIN_ATTRIBUTE', 'cn'],
   [
     '--group-class',
     'DM_GROUP_CLASSES',

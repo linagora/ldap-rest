@@ -192,7 +192,9 @@ describe('ldapActions', function () {
         }
         expect((result as SearchResult).searchEntries.length).to.equal(1);
         expect((result as SearchResult).searchEntries[0].dn).to.equal(newDN);
-        expect((result as SearchResult).searchEntries[0].uid).to.equal('newtestuser');
+        expect((result as SearchResult).searchEntries[0].uid).to.equal(
+          'newtestuser'
+        );
       });
     });
   });
