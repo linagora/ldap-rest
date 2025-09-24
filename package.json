@@ -82,6 +82,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start": "./dist/bin/server.js",
+    "start:dev": "./.dev.mk start",
     "test": "tsc --noEmit && mocha",
     "test:dev": "./.dev.mk test",
     "test:one": "mocha --config .mocharc-one.json"

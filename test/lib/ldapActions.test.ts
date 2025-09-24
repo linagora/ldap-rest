@@ -138,5 +138,62 @@ describe('ldapActions', function () {
         }
       });
     });
+
+    describe('rename', () => {
+      const testDN = `uid=testuser,${process.env.DM_LDAP_BASE}`;
+      const newDN = `uid=newtestuser,${process.env.DM_LDAP_BASE}`;
+      afterEach(async () => {
+        // Clean up: delete the test entry if it exists
+        try {
+          await ldapActions.delete(testDN);
+        } catch (err) {
+          // Ignore errors if the entry does not exist
+        }
+        try {
+          await ldapActions.delete(newDN);
+        } catch (err) {
+          // Ignore errors if the entry does not exist
+        }
+      });
+
+      it('should rename an existing entry successfully', async () => {
+        const entry = {
+          objectClass: [
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+            'top',
+          ],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+          mail: 'test@test.org',
+        };
+        const addResult = await ldapActions.add(testDN, entry);
+        expect(addResult).to.be.true;
+
+        // Rename the entry
+        const renameResult = await ldapActions.rename(testDN, newDN);
+        expect(renameResult).to.be.true;
+
+        // Verify the old DN no longer exists
+        let result = await ldapActions.search({ filter: '(uid=testuser)' });
+        if (!(result as SearchResult).searchEntries) {
+          const tmp = await (result as AsyncGenerator<SearchResult>).next();
+          result = tmp.value;
+        }
+        expect((result as SearchResult).searchEntries.length).to.equal(0);
+
+        // Verify the new DN exists
+        result = await ldapActions.search({ filter: '(uid=newtestuser)' });
+        if (!(result as SearchResult).searchEntries) {
+          const tmp = await (result as AsyncGenerator<SearchResult>).next();
+          result = tmp.value;
+        }
+        expect((result as SearchResult).searchEntries.length).to.equal(1);
+        expect((result as SearchResult).searchEntries[0].dn).to.equal(newDN);
+        expect((result as SearchResult).searchEntries[0].uid).to.equal('newtestuser');
+      });
+    });
   });
 });

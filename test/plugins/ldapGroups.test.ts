@@ -172,6 +172,26 @@ describe('LdapGroups Plugin', function () {
         },
       });
     });
+
+    it('should rename group', async () => {
+      await plugin.addGroup('testgroup', [user1]);
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+          member: [user1],
+        },
+      });
+      await plugin.renameGroup('testgroup', 'testgroupbis');
+      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
+      expect(await plugin.searchGroupsByName('testgroupbis')).to.deep.equal({
+        testgroupbis: {
+          dn: `cn=testgroupbis,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroupbis',
+          member: [user1],
+        },
+      });
+    });
   });
 
   describe('API', () => {

@@ -30,6 +30,9 @@ export interface Hooks {
   // delete
   ldapdeleterequest?: ChainedHook<string | string[]>;
   ldapdeletedone?: (dn: string | string[]) => MaybePromise<void>;
+  // rename
+  ldaprnrequest?: ChainedHook<[string, string]>;
+  ldaprndone?: (args: [string, string]) => MaybePromise<void>;
 
   /**
    * Plugins

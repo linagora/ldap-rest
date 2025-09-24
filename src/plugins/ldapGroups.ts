@@ -268,6 +268,18 @@ export default class LdapGroups extends DmPlugin {
     return res;
   }
 
+  async renameGroup(cn: string, newCn: string): Promise<boolean> {
+    let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
+    let newDn = /,/.test(newCn) ? newCn : `cn=${newCn},${this.base}`;
+    [dn, newDn] = await launchHooksChained(
+      this.registeredHooks.ldapgrouprename,
+      [dn, newDn]
+    );
+    const res = await this.ldap.rename(dn, newDn);
+    void launchHooks(this.registeredHooks.ldapgrouprenamedone, [dn, newDn]);
+    return res;
+  }
+
   async deleteGroup(cn: string): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `cn=${cn},${this.base}`;
     dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);

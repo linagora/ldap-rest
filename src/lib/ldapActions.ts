@@ -245,6 +245,24 @@ class ldapActions {
     }
   }
 
+  async rename(dn: string, newRdn: string): Promise<boolean> {
+    dn = this.setDn(dn);
+    newRdn = this.setDn(newRdn);
+    [dn, newRdn] = await launchHooksChained(
+      this.parent.hooks.ldaprenamerequest,
+      [dn, newRdn]
+    );
+    const client = await this.connect();
+    try {
+      await client.modifyDN(dn, newRdn);
+      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`LDAP rename error: ${error}`);
+    }
+  }
+
   /*
     LDAP delete
    */
