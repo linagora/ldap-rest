@@ -292,7 +292,7 @@ class ldapActions {
 
   private setDn(dn: string): string {
     if (!/=/.test(dn)) {
-      dn = `uid=${dn},${this.base}`;
+      dn = `${this.config.ldap_user_main_attribute as string}=${dn},${this.base}`;
     } else if (!/,/.test(dn)) {
       dn += `,${this.base}`;
     }

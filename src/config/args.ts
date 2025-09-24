@@ -17,11 +17,11 @@ export interface Config {
   schemas_path: string;
 
   // LDAP
-  top_dn?: string;
   ldap_base?: string;
   ldap_dn?: string;
   ldap_pwd?: string;
   ldap_url?: string;
+  ldap_user_main_attribute?: string;
   user_class?: string[];
   user_classes?: string;
 
@@ -82,10 +82,10 @@ const configArgs: ConfigTemplate = [
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],
-  ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=org'],
+  ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=com'],
   ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
   ['--ldap-url', 'DM_LDAP_URL', 'ldap://localhost'],
-  ['--top-dn', 'DM_TOP_DN', 'dc=example,dc=com'],
+  ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   [
     '--schemas-path',
     'DM_SCHEMAS_PATH',

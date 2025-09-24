@@ -23,10 +23,10 @@ ENV NODE_ENV=production \
  DM_PORT="8081" \
  DM_PLUGINS=core/static,core/helloworld \
  DM_LDAP_BASE= \
- DM_LDAP_DN="cn=admin,dc=example,dc=org" \
+ DM_LDAP_DN="cn=admin,dc=example,dc=com" \
  DM_LDAP_PWD="admin" \
  DM_LDAP_URL="ldap://localhost" \
- DM_TOP_DN="dc=example,dc=com" \
+ DM_LDAP_USER_ATTRIBUTE="uid" \
  DM_SCHEMAS_PATH="/app/node_modules/mini-dm/static/schemas" \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_USER_CLASSES=top,inetOrgPerson \
