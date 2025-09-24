@@ -37,27 +37,6 @@ export class DM {
     this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
-    // If authentication is native lemonldap-ng, then load and use its middleware
-    if (this.config.auth == 'llng') {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore: dynamic import (overriden into rollup config)
-      promises.push(
-        import('lemonldap-ng-handler')
-          .then(llng => {
-            void llng.init({
-              configStorage: {
-                confFile: this.config.llng_ini as string,
-              },
-              type: undefined,
-            });
-            this.app.use(llng.run);
-          })
-          .catch(err =>
-            console.error('Failed to load lemonldap-ng-handler:', err)
-          )
-      );
-    }
-
     if (this.config.plugin) {
       for (const pluginName of this.config.plugin) {
         promises.push(this.loadPlugin(pluginName));
@@ -131,7 +110,7 @@ export class DM {
       }
     }
     if (obj.api) {
-      obj.api(this.app);
+      await obj.api(this.app);
     }
     if (obj.hooks as Hooks) {
       for (const hookName in obj.hooks as Hooks) {

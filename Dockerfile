@@ -21,7 +21,6 @@ RUN npm install --no-optional --no-package-lock /tmp/app.tgz && rm -f /tmp/app.t
 
 ENV NODE_ENV=production \
  DM_PORT="8081" \
- DM_AUTH= \
  DM_PLUGINS=core/static,core/helloworld \
  DM_LDAP_BASE= \
  DM_LDAP_DN="cn=admin,dc=example,dc=org" \

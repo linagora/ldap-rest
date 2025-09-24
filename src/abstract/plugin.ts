@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 
 import type { Config, DM } from '../bin';
-import type { Hooks } from '../hooks';
+import type { Hooks, MaybePromise } from '../hooks';
 
 export default abstract class DmPlugin {
   /**
@@ -28,7 +28,7 @@ export default abstract class DmPlugin {
   dependencies?: Record<string, string>;
 
   /* Function to register API */
-  api?(app: Express): void;
+  api?(app: Express): MaybePromise<void>;
 
   /* Uniq name of this plugin */
   abstract name: string;

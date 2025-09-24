@@ -24,6 +24,10 @@
     "hooks": {
       "types": "./dist/src/hooks.d.ts"
     },
+    "plugin-authllng": {
+      "import": "./dist/plugins/authLlng.js",
+      "types": "./dist/src/plugins/authLlng.d.ts"
+    },
     "plugin-externalusersingroups": {
       "import": "./dist/plugins/externalUsersInGroups.js",
       "types": "./dist/src/plugins/externalUsersInGroups.d.ts"

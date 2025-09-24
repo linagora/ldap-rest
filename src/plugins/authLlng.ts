@@ -1,0 +1,18 @@
+import llng from 'lemonldap-ng-handler';
+import type { Express } from 'express';
+
+import DmPlugin from '../abstract/plugin';
+
+export default class AuthLLNG extends DmPlugin {
+  name = 'authLemonldapNg';
+
+  async api(app: Express): Promise<void> {
+    await llng.init({
+      configStorage: {
+        confFile: this.config.llng_ini as string,
+      },
+      type: undefined,
+    });
+    app.use(llng.run);
+  }
+}

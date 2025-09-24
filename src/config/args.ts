@@ -12,7 +12,6 @@ import type { ConfigTemplate } from '../lib/parseConfig';
  */
 export interface Config {
   port: number;
-  auth?: string;
   plugin?: string[];
   plugins?: string;
   schemas_path: string;
@@ -21,7 +20,6 @@ export interface Config {
   top_dn?: string;
   ldap_base?: string;
   ldap_dn?: string;
-  llng_ini?: string;
   ldap_pwd?: string;
   ldap_url?: string;
   user_class?: string[];
@@ -41,6 +39,9 @@ export interface Config {
   // Static
   static_path?: string;
   static_name?: string;
+
+  // AuthLlng
+  llng_ini?: string;
 
   // Special attributes
   mail_attribute?: string;
@@ -76,7 +77,6 @@ export interface Config {
 const configArgs: ConfigTemplate = [
   // Global options
   ['--port', 'DM_PORT', 8081, 'number'],
-  ['--auth', 'DM_AUTH', ''],
   ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins'],
 
   // LDAP options
@@ -145,7 +145,8 @@ const configArgs: ConfigTemplate = [
   ],
   ['--static-name', 'DM_STATIC_NAME', 'static'],
 
-  // Authentication options
+  /* Access control plugins */
+
   // Lemonldap options
 
   ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
