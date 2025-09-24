@@ -1,3 +1,9 @@
+/**
+ * @file src/config/args.ts
+ * @description command-line options, corresponding environment variables, default values and types
+ * Contains also the typescript declaration of config
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -57,7 +63,7 @@ export interface Config {
     | undefined;
 }
 
-/*
+/**
  * Config arguments
  *
  * Format:

@@ -1,3 +1,8 @@
+/**
+ * @file src/abstract/plugin.ts
+ * @description Abstract class for plugins
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import type { Express } from 'express';
 
 import type { Config, DM } from '../bin';

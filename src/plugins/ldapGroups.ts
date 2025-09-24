@@ -1,12 +1,11 @@
 /**
- * Plugin to manage groups into LDAP server
+ * @plugin core/ldapGroups
+ * @description Plugin to manage groups into LDAP server
+ * @author Xavier Guimard <xguimard@linagora.com>
  *
  * - add/delete groups
  * - add/delete members of groups
  * - detect user deletion to remove them from groups (hook)
- *
- * Hooks used:
- * - ldapdeleterequest: to catch user deletion and remove them from all groups
  */
 
 import type { Express, Request, Response } from 'express';

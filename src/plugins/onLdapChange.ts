@@ -1,7 +1,9 @@
 /**
- * Check for ldap modify events and generate hooks:
+ * @plugin core/onLdapChange
+ * @description Check for ldap modify events and generate hooks:
  *  - onLdapChange
  *  - onLdapMailChange
+ * @author Xavier Guimard <xguimard@linagora.com>
  */
 import { Entry } from 'ldapts';
 

@@ -1,3 +1,9 @@
+/**
+ * @plugin core/authLlng
+ * @description Lemonldap::NG authentication plugin
+ * @author Xavier Guimard <xguimard@linagora.com>
+ * This plugin enables authentication and authorization using Lemonldap::NG.
+ */
 import llng from 'lemonldap-ng-handler';
 import type { Express } from 'express';
 

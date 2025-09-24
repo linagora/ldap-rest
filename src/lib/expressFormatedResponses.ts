@@ -1,3 +1,8 @@
+/**
+ * @file src/lib/expressFormatedResponses.ts
+ * @description Standard express responses and express utilities
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import type { Request, Response } from 'express';
 
 // Utility that generates standard responses depending on the success of the method

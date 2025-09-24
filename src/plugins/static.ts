@@ -1,3 +1,14 @@
+/**
+ * @plugin core/static
+ * @description Serve static files and JSON schemas
+ *
+ * This plugin serves static files from a specified directory.
+ * It provides access to JSON schemas if stored in a "schemas" subdirectory
+ * and modify them on-the-fly to replace __FOO_BAR__ by --foo-bar value.
+ *
+ * This permits to share the same schemas between server and JS embedded in web pages.
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import fs from 'fs';
 import { join } from 'path';
 

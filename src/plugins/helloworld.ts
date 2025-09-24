@@ -1,5 +1,7 @@
 /**
- * Demo plugin, add /hello API + consumes 'hello' hook
+ * @plugin core/helloworld
+ * @description Demo plugin, add /hello API + consumes 'hello' hook
+ * @author Xavier Guimard <xguimard@linagora.com>
  */
 
 import type { Express, Request, Response } from 'express';

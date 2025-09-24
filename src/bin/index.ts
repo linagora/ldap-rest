@@ -1,3 +1,11 @@
+/**
+ * @file src/bin/index.ts
+ * @description Main server file
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * It loads plugins, setup express app,... and start the server
+ */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { fileURLToPath } from 'url';

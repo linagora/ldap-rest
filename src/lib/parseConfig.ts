@@ -1,3 +1,9 @@
+/**
+ * @file src/lib/parseConfig.ts
+ * @description Configuration parser
+ * Order: default < env < cli
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import type { Config } from '../config/args';
 
 import type { AttributeValue } from './ldapActions';

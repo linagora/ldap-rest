@@ -1,3 +1,8 @@
+/**
+ * @file src/lib/utils.ts
+ * @description Utility functions
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */

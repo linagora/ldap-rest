@@ -1,3 +1,8 @@
+/**
+ * @file src/lib/ldapActions.ts
+ * @description LDAP low-level library
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 

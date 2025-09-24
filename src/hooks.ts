@@ -1,3 +1,8 @@
+/**
+ * @file src/hooks.ts
+ * @description Types for hooks
+ * @author Xavier Guimard <xguimard@linagora.com>
+ */
 import type { SearchOptions, SearchResult } from 'ldapts';
 
 import type { ModifyRequest, AttributesList } from './lib/ldapActions';
