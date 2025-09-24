@@ -121,7 +121,7 @@
     "typescript": "^5.9.2"
   },
   "optionalDependencies": {
-    "lemonldap-ng-handler": "^0.7.1",
+    "lemonldap-ng-handler": "^0.7.3",
     "re2": "^1.22.1"
   }
 }
