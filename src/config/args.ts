@@ -23,6 +23,7 @@ export interface Config {
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   logger?: 'console';
+  api_prefix?: string;
   // LDAP
   ldap_base?: string;
   ldap_dn?: string;
@@ -88,6 +89,7 @@ const configArgs: ConfigTemplate = [
   ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins'],
   ['--log-level', 'DM_LOG_LEVEL', 'info'],
   ['--logger', 'DM_LOGGER', 'console'],
+  ['--api-prefix', 'DM_API_PREFIX', '/api'],
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],

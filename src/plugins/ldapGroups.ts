@@ -82,7 +82,7 @@ export default class LdapGroups extends DmPlugin {
 
   api(app: Express): void {
     // List groups
-    app.get('/api/v1/ldap/groups', async (req, res) => {
+    app.get(`${this.config.api_prefix}/v1/ldap/groups`, async (req, res) => {
       if (!wantJson(req, res)) return;
       try {
         const args: { filter?: string; attributes?: string[] } = {};
@@ -106,41 +106,48 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Add group
-    app.post('/api/v1/ldap/groups', async (req, res) =>
+    app.post(`${this.config.api_prefix}/v1/ldap/groups`, async (req, res) =>
       this.apiAdd(req, res, this.cn)
     );
 
     // Delete group
-    app.delete('/api/v1/ldap/groups/:cn', async (req, res) =>
-      this.apiDelete(req, res)
+    app.delete(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn`,
+      async (req, res) => this.apiDelete(req, res)
     );
 
     // Modify group
-    app.put('/api/v1/ldap/groups/:cn', async (req, res) =>
+    app.put(`${this.config.api_prefix}/v1/ldap/groups/:cn`, async (req, res) =>
       this.apiModify(req, res)
     );
 
     // Add member to group
-    app.post('/api/v1/ldap/groups/:cn/members', async (req, res) => {
-      const cn = decodeURIComponent(req.params.cn);
-      if (!cn) return badRequest(res, 'cn is required');
-      const body = jsonBody(req, res, 'member') as {
-        member: string | string[];
-      };
-      if (!body) return;
-      await tryMethod(res, this.addMember.bind(this), cn, body.member);
-    });
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn/members`,
+      async (req, res) => {
+        const cn = decodeURIComponent(req.params.cn);
+        if (!cn) return badRequest(res, 'cn is required');
+        const body = jsonBody(req, res, 'member') as {
+          member: string | string[];
+        };
+        if (!body) return;
+        await tryMethod(res, this.addMember.bind(this), cn, body.member);
+      }
+    );
 
     // Delete member from group
-    app.delete('/api/v1/ldap/groups/:cn/members/:member', async (req, res) => {
-      if (!wantJson(req, res)) return;
-      const cn = decodeURIComponent(req.params.cn);
-      const member = decodeURIComponent(req.params.member);
-      if (!cn || !member) {
-        return badRequest(res, 'cn and member are required');
+    app.delete(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn/members/:member`,
+      async (req, res) => {
+        if (!wantJson(req, res)) return;
+        const cn = decodeURIComponent(req.params.cn);
+        const member = decodeURIComponent(req.params.member);
+        if (!cn || !member) {
+          return badRequest(res, 'cn and member are required');
+        }
+        await tryMethod(res, this.deleteMember.bind(this), cn, member);
       }
-      await tryMethod(res, this.deleteMember.bind(this), cn, member);
-    });
+    );
   }
 
   async apiAdd(

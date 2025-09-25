@@ -30,8 +30,8 @@ describe('External users in groups', function () {
     server = new DM();
     await server.ready;
     plugin = new LdapGroups(server);
-    server.registerPlugin('ldapGroups', plugin);
-    server.registerPlugin(
+    await server.registerPlugin('ldapGroups', plugin);
+    await server.registerPlugin(
       'externalUsersInGroups',
       new ExternalUsersInGroups(server)
     );

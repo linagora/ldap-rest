@@ -8,13 +8,16 @@ ALLPLUGINS=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
 all: $(DSTFILES)
 
 dist/%.js: src/%.ts
-	$(MAKE) -f .dev.mk builddev
+	$(MAKE) -f .dev.mk _builddev
 
 build:
 	npm run build:prod
 
-builddev:
-	npm run build:dev
+builddev: $(DSTFILES) Dockerfile
+
+_builddev:
+	npx rimraf dist
+	npx rollup -c
 
 builddocker: Dockerfile
 	docker build -t mini-dm .

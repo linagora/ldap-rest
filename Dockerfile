@@ -24,6 +24,7 @@ ENV NODE_ENV=production \
  DM_PLUGINS=core/static,core/helloworld \
  DM_LOG_LEVEL="info" \
  DM_LOGGER="console" \
+ DM_API_PREFIX="/api" \
  DM_LDAP_BASE= \
  DM_LDAP_DN="cn=admin,dc=example,dc=com" \
  DM_LDAP_PWD="admin" \

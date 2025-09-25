@@ -68,10 +68,15 @@ export class DM {
   }
 
   run(): Promise<void> {
-    return new Promise(resolve => {
-      this.server = this.app.listen(this.config.port, () => {
-        this.logger.debug(`Listening on port ${this.config.port}`);
-        resolve();
+    return new Promise((resolve, reject) => {
+      this.server = this.app.listen(this.config.port, err => {
+        if (err) {
+          this.logger.error(`Error starting server: ${err}`);
+          reject(err);
+        } else {
+          this.logger.debug(`Server started on port ${this.config.port}`);
+          resolve();
+        }
       });
     });
   }
@@ -83,6 +88,42 @@ export class DM {
   }
 
   loadPlugin(pluginName: string): Promise<boolean> {
+    let name: string | undefined;
+    let overrides: Config | undefined;
+    if (/:/.test(pluginName)) {
+      let tmp: string = pluginName.substring(pluginName.indexOf(':') + 1);
+      pluginName = pluginName.substring(0, pluginName.indexOf(':'));
+      if (/:/.test(tmp)) {
+        name = tmp.substring(0, tmp.indexOf(':'));
+        if (!name) name = undefined;
+        tmp = tmp.substring(tmp.indexOf(':') + 1);
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          overrides = JSON.parse(tmp);
+          if (typeof overrides !== 'object') {
+            this.logger.error(
+              `Overrides for plugin ${pluginName} are not valid: ${tmp}`
+            );
+            overrides = undefined;
+          } else {
+            this.logger.debug(
+              `Overrides for plugin ${name || pluginName}: ${tmp}`
+            );
+          }
+        } catch (err) {
+          this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+            `Failed to parse overrides for plugin ${pluginName}: ${err}, using ${tmp}`
+          );
+          overrides = undefined;
+        }
+      } else {
+        name = tmp;
+        if (!name) name = undefined;
+      }
+    } else {
+      name = undefined;
+    }
     this.logger.debug(`Loading plugin ${pluginName}`);
     if (pluginName.startsWith('core/')) {
       pluginName = pluginName
@@ -99,10 +140,17 @@ export class DM {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             pluginModule = pluginModule.default;
           }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const obj = new pluginModule(this);
+          let obj;
+          if (overrides) {
+            const newConfig = { ...this.config, ...overrides };
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            obj = new pluginModule({ ...this, config: newConfig } as DM);
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            obj = new pluginModule(this);
+          }
           if (!obj) return reject(new Error(`Unable to load ${pluginName}`));
-          resolve(await this.registerPlugin(pluginName, obj as DmPlugin));
+          resolve(await this.registerPlugin(pluginName, obj as DmPlugin, name));
           this.logger.debug(`Plugin ${obj.name} loaded`);
         })
         .catch(err =>
@@ -111,8 +159,13 @@ export class DM {
     });
   }
 
-  async registerPlugin(pluginName: string, obj: DmPlugin): Promise<boolean> {
+  async registerPlugin(
+    pluginName: string,
+    obj: DmPlugin,
+    name?: string
+  ): Promise<boolean> {
     if (!obj.name) obj.name = pluginName;
+    if (name) obj.name = name;
     if (this.loadedPlugins[obj.name]) {
       this.logger.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
       return false;

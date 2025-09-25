@@ -1,15 +1,14 @@
 import { expect } from 'chai';
 import request from 'supertest';
-import { DM } from '../src/bin/index';
+import { DM } from '../../src/bin';
 
-describe('Plugin Loading', () => {
+describe('Plugin Override', () => {
   let server: DM | null;
   before(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.DM_PORT = '64322';
+    process.env.DM_PORT = '64321';
     process.env.DM_PLUGINS =
-      '../../dist/plugins/helloworld.js,../../test/__plugins__/hello/index.js';
-    // @ts-ignore
+      '../../dist/plugins/helloworld.js;../../dist/plugins/helloworld.js:myHello:{"api_prefix":"/myapi"}';
     server = new DM();
     await server.ready;
     await server.run();
@@ -21,20 +20,19 @@ describe('Plugin Loading', () => {
     );
     expect(res.status).to.equal(200);
     expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
-    res = await request(`http://localhost:${process.env.DM_PORT}`).get(
-      '/hellopath'
+  });
+
+  it('should load the helloworld plugin and respond to /myapi/hello', async () => {
+    let res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/myapi/hello'
     );
     expect(res.status).to.equal(200);
-    expect(res.body).to.deep.equal({ message: 'Hello path' });
-
-    expect(server?.loadedPlugins.hello).to.be.an('object');
-    expect(server?.loadedPlugins.hellopath).to.be.an('object');
+    expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
   });
 
   after(() => {
     delete process.env.NODE_ENV;
     delete process.env.DM_PORT;
     delete process.env.DM_PLUGINS;
-    server?.stop();
   });
 });

@@ -70,7 +70,7 @@
   ],
   "scripts": {
     "build": "npm run build:prod",
-    "build:dev": "npm run clean && npm run build:dockerfile && rollup -c",
+    "build:dev": "./.dev.mk builddev",
     "build:docker": "./.dev.mk builddocker",
     "build:dockerfile": "./.dev.mk Dockerfile",
     "build:prod": "npm run clean && npm run build:dockerfile && NODE_ENV=production rollup -c",

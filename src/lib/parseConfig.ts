@@ -50,7 +50,11 @@ export class ConfigParser {
           } else if (entry[3] === 'number') {
             value = parseInt(envValue);
           } else if (entry[3] === 'array') {
-            value = envValue.split(/[,\s]+/).filter(v => v.length > 0);
+            const sep = envValue.indexOf(';') > 0 ? ';' : ',';
+            value = envValue
+              .split(new RegExp(`[${sep}\\s]+`))
+              .map(v => v.trim())
+              .filter(v => v.length > 0);
           } else if (entry[3] === 'json') {
             try {
               value = JSON.parse(envValue) as Record<string, AttributeValue>;
