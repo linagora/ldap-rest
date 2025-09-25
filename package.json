@@ -48,6 +48,10 @@
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
     },
+    "plugin-weblogs": {
+      "import": "./dist/plugins/weblogs.js",
+      "types": "./dist/src/plugins/weblogs.d.ts"
+    },
     "schema-groups": {
       "import": "./static/schemas/groups.json",
       "require": "./static/schemas/groups.json"
