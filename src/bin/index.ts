@@ -45,8 +45,8 @@ export class DM {
     this.app = express();
     this.app.use(bodyParser.json());
     this.app.use(bodyParser.urlencoded({ extended: true }));
-    this.ldap = new ldapActions(this);
     this.logger = buildLogger(this.config);
+    this.ldap = new ldapActions(this);
     setLogger(this.logger);
     this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
