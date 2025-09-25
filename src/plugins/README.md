@@ -12,14 +12,17 @@ This guide explains how to create a plugin using the API and hooks.
 See [abstract class](../abstract/plugin.ts) for more
 
 - A plugin is a class with optional **api** methods and/or **hooks** property.
-- It should also have a uniq property "**name**".
-- It may inherit from [plugin abstract class](../abstract/plugin.ts)
+- It should also have a uniq property "**name**" _(which can be overridden, example: `npx mini-dm --plugin core/hello:myhello`)_.
+- It should use the `this.config.api_prefix` else it can't be loaded more than one time.
+- It may inherit from [plugin abstract class](../abstract/plugin.ts).
 - Its constructor receives one argument _(the server)_ which exposes
   - hooks: an object `{ [K in keyof Hooks]?: Function[] }` where plugin
     can find functions to launch if it exposes hooks
   - ldap: a [LDAP object](../lib/ldapActions.ts)
-  - config: the [config](../config/args.ts) given by command-line arguments and environment variables
-- It may have a **dependencies** property: _`Record<uniqname, path>`_ of plugins that needs to be loaded before this one
+  - config: the [config](../config/args.ts) given by command-line arguments and environment variables.
+    Note that this config maybe a modified config. Example:
+    `npx mini-dm --plugin core/hello:myhello:{"api_prefix":"/myapi"}`
+- It may have a **dependencies** property: _`Record<uniqname, path>`_ of plugins that needs to be loaded before this one.
 
 ### Expose an API _(or any [express](https://www.npmjs.com/package/express) hook)_
 
