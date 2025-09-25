@@ -32,6 +32,7 @@ ENV NODE_ENV=production \
  DM_LDAP_USER_ATTRIBUTE="uid" \
  DM_SCHEMAS_PATH="/app/node_modules/mini-dm/static/schemas" \
  DM_MAIL_ATTRIBUTE="mail" \
+ DM_QUOTA_ATTRIBUTE="mailQuota" \
  DM_USER_CLASSES=top,inetOrgPerson \
  DM_LDAP_GROUP_BASE= \
  DM_LDAP_GROUPS_MAIN_ATTRIBUTE="cn" \
@@ -42,6 +43,7 @@ ENV NODE_ENV=production \
  DM_EXTERNAL_MEMBERS_BRANCH="ou=contacts,dc=example,dc=com" \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
  DM_STATIC_NAME="static" \
+ DM_JAMES_WEBADMIN_URL="http://localhost:8000" \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
 
 EXPOSE 8081

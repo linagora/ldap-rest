@@ -9,6 +9,7 @@ import { readdir } from 'fs/promises';
 import { extname } from 'path';
 import sort from 'sort-package-json';
 import { writeFileSync } from 'fs';
+import fg from 'fast-glob';
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
@@ -69,15 +70,14 @@ const external = [
   ...(pkg.optionalDependencies ? Object.keys(pkg.optionalDependencies) : []),
 ];
 
-const corePlugins = [];
 async function getPluginEntries() {
-  const files = await readdir(PLUGINS_SRC_DIR);
-  return files.filter(file => extname(file) === '.ts');
+  return (await fg('src/plugins/**/*.ts'))
+  .map(file => file.replace(/^src\/plugins\//,''));
 }
 
 async function getSpecs() {
-  const files = await readdir('static/schemas');
-  return files.filter(file => extname(file) === '.json');
+  return (await fg('static/schemas/**/*.json'))
+  .map(file => file.replace(/^static\/schemas\//,''));
 }
 
 pkg.exports = {
@@ -98,7 +98,7 @@ export default async () => {
   const p = await getPluginEntries();
   p.forEach(plugin => {
     const name = plugin.replace(/\.ts$/, '');
-    pkg.exports[`plugin-${name.toLowerCase()}`] = {
+    pkg.exports[`plugin-${name.toLowerCase().replace(/\//g, '-')}`] = {
       import: `./dist/plugins/${name}.js`,
       types: `./dist/src/plugins/${name}.d.ts`,
     };

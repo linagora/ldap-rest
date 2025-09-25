@@ -28,10 +28,6 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
-    "plugin-authllng": {
-      "import": "./dist/plugins/authLlng.js",
-      "types": "./dist/src/plugins/authLlng.d.ts"
-    },
     "plugin-externalusersingroups": {
       "import": "./dist/plugins/externalUsersInGroups.js",
       "types": "./dist/src/plugins/externalUsersInGroups.d.ts"
@@ -59,6 +55,10 @@
     "plugin-weblogs": {
       "import": "./dist/plugins/weblogs.js",
       "types": "./dist/src/plugins/weblogs.d.ts"
+    },
+    "plugin-auth-llng": {
+      "import": "./dist/plugins/auth/Llng.js",
+      "types": "./dist/src/plugins/auth/Llng.d.ts"
     },
     "schema-groups": {
       "import": "./static/schemas/groups.json",
@@ -125,6 +125,7 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.5.4",
+    "fast-glob": "^3.3.3",
     "mocha": "^11.7.2",
     "nock": "^14.0.10",
     "prettier": "^3.6.2",
