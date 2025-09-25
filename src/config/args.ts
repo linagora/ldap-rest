@@ -55,6 +55,9 @@ export interface Config {
   // Special attributes
   mail_attribute?: string;
 
+  // James plugin
+  james_webadmin_url?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -157,6 +160,9 @@ const configArgs: ConfigTemplate = [
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'static'),
   ],
   ['--static-name', 'DM_STATIC_NAME', 'static'],
+
+  // James plugin
+  ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],
 
   /* Access control plugins */
 
