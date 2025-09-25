@@ -28,14 +28,6 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
-    "plugin-static": {
-      "import": "./dist/plugins/static.js",
-      "types": "./dist/src/plugins/static.d.ts"
-    },
-    "plugin-weblogs": {
-      "import": "./dist/plugins/weblogs.js",
-      "types": "./dist/src/plugins/weblogs.d.ts"
-    },
     "plugin-auth-llng": {
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
@@ -60,9 +52,17 @@
       "import": "./dist/plugins/ldap/onChange.js",
       "types": "./dist/src/plugins/ldap/onChange.d.ts"
     },
+    "plugin-static": {
+      "import": "./dist/plugins/static.js",
+      "types": "./dist/src/plugins/static.d.ts"
+    },
     "plugin-twake-james": {
       "import": "./dist/plugins/twake/james.js",
       "types": "./dist/src/plugins/twake/james.d.ts"
+    },
+    "plugin-weblogs": {
+      "import": "./dist/plugins/weblogs.js",
+      "types": "./dist/src/plugins/weblogs.d.ts"
     },
     "schema-groups": {
       "import": "./static/schemas/groups.json",
