@@ -4,6 +4,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express } from 'express';
+import type winston from 'winston';
 
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
@@ -15,8 +16,10 @@ export default abstract class DmPlugin {
 
   /* parent object (DM server) */
   server: DM;
-  /*/ Global configuration */
+  /* Global configuration */
   config: Config;
+  /* Logger */
+  logger: winston.Logger;
 
   /* Hooks registered into DM */
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -45,6 +48,7 @@ export default abstract class DmPlugin {
   constructor(server: DM) {
     this.server = server;
     this.config = server.config;
+    this.logger = server.logger;
     this.registeredHooks = server.hooks;
   }
 

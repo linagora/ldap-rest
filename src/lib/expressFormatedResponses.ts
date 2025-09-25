@@ -4,6 +4,15 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Request, Response } from 'express';
+import type winston from 'winston';
+
+let _logger: winston.Logger;
+
+export const setLogger = (logger: winston.Logger): void => {
+  _logger = logger;
+};
+
+export const getLogger = (): winston.Logger => _logger;
 
 // Utility that generates standard responses depending on the success of the method
 export const tryMethod = async (
@@ -68,7 +77,7 @@ export const tooManyRequests = (
 
 // We don't want to publish the real error in server responses
 export const serverError = (res: Response, err: unknown): void => {
-  console.error(err);
+  _logger.error(err);
   res.status(500).json({ error: 'check logs' });
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>

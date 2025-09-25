@@ -31,7 +31,7 @@ class OnLdapChange extends DmPlugin {
       if (tmp.searchEntries.length == 1) {
         this.stack[op] = tmp.searchEntries[0];
       } else {
-        console.warn(
+        this.logger.warn(
           `Could not find unique entry ${dn} before modification, got ${tmp.searchEntries.length} entries`
         );
       }
@@ -42,7 +42,7 @@ class OnLdapChange extends DmPlugin {
       const prev = this.stack[op];
       if (!prev) {
         delete this.stack[op];
-        console.warn(
+        this.logger.warn(
           `Received a ldapmodifydone for an unknown operation (${op})`
         );
         return;
@@ -95,7 +95,7 @@ class OnLdapChange extends DmPlugin {
     const [oldValue, newValue] = changes[attribute] || [];
     if (oldValue === undefined && newValue === undefined) return;
     if (stringOnly && (Array.isArray(oldValue) || Array.isArray(newValue))) {
-      console.error(
+      this.logger.error(
         `Attribute ${attribute} change detected but one of the values is an array, cannot handle that`
       );
       return;

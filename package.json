@@ -90,7 +90,8 @@
   "dependencies": {
     "body-parser": "^2.2.0",
     "express": "^5.1.0",
-    "ldapts": "^8.0.9"
+    "ldapts": "^8.0.9",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",

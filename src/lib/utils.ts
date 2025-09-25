@@ -9,6 +9,10 @@
 
 import type { Config } from '../bin';
 
+import { getLogger } from './expressFormatedResponses';
+
+const logger = getLogger();
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored
 export const launchHooks = async (
   hooks: Function[] | undefined,
@@ -18,7 +22,7 @@ export const launchHooks = async (
     for (const hook of hooks) {
       if (hook)
         await hook(...args).catch((e: unknown) =>
-          console.error('Hook error', e)
+          logger.error('Hook error', e)
         );
     }
   }

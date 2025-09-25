@@ -50,7 +50,7 @@ export default class LdapGroups extends DmPlugin {
     this.cn = this.config.ldap_groups_main_attribute as string;
     if (!this.base) {
       this.base = this.config.ldap_base;
-      console.warn(`LDAP group base is not defined, using "${this.base}"`);
+      this.logger.warn(`LDAP group base is not defined, using "${this.base}"`);
     }
     if (!this.base) {
       throw new Error('LDAP base is not defined, please set --ldap-group-base');
@@ -69,7 +69,7 @@ export default class LdapGroups extends DmPlugin {
       // Use async to delete user from groups, don't block the main deletion
       Promise.all(_dn.map(dnEntry => this.deleteMemberFromAll(dnEntry))).catch(
         err => {
-          console.error('Failed to process user deletion in groups:', err);
+          this.logger.error('Failed to process user deletion in groups:', err);
         }
       );
       return dn;
@@ -347,7 +347,7 @@ export default class LdapGroups extends DmPlugin {
             delete: { member: memberDn },
           })
           .catch(err =>
-            console.error(
+            this.logger.error(
               `Failed to remove ${memberDn} from group ${entry.dn}:`,
               err
             )

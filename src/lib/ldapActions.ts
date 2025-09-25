@@ -5,6 +5,7 @@
  */
 import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
+import type winston from 'winston';
 
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
@@ -47,9 +48,11 @@ class ldapActions {
   pwd: string;
   base: string;
   parent: DM;
+  logger: winston.Logger;
 
   constructor(server: DM) {
     this.parent = server;
+    this.logger = server.logger;
     this.config = server.config;
     if (!server.config.ldap_url) {
       throw new Error('LDAP URL is not defined');
@@ -62,7 +65,7 @@ class ldapActions {
     }
     if (!server.config.ldap_base) {
       this.base = server.config.ldap_dn.split(',', 2)[1];
-      console.warn(`LDAP base is not defined, using "${this.base}"`);
+      this.logger.warn(`LDAP base is not defined, using "${this.base}"`);
     } else {
       this.base = server.config.ldap_base;
     }
@@ -93,7 +96,7 @@ class ldapActions {
     try {
       await client.bind(this.dn, this.pwd);
     } catch (error) {
-      console.error('LDAP bind error:', error);
+      this.logger.error('LDAP bind error:', error);
       throw new Error('LDAP bind error');
     }
     if (!client) throw new Error('LDAP connection error');
@@ -244,7 +247,7 @@ class ldapActions {
         throw new Error(`LDAP modify error: ${error}`);
       }
     } else {
-      console.error('No changes to apply');
+      this.logger.error('No changes to apply');
       void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]);
       return false;
     }

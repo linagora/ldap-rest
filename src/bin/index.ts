@@ -13,12 +13,15 @@ import { dirname, join } from 'path';
 
 import express from 'express';
 import bodyParser from 'body-parser';
+import type winston from 'winston';
 
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
 import type { Hooks } from '../hooks';
 import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
+import { buildLogger } from '../logger/winston';
+import { setLogger } from '../lib/expressFormatedResponses';
 
 export type { Config };
 
@@ -34,6 +37,7 @@ export class DM {
   loadedPlugins: { [key: string]: DmPlugin } = {};
   ldap: ldapActions;
   operationSequence: number;
+  logger: winston.Logger;
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -42,6 +46,8 @@ export class DM {
     this.app.use(bodyParser.json());
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.ldap = new ldapActions(this);
+    this.logger = buildLogger(this.config);
+    setLogger(this.logger);
     this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
@@ -64,7 +70,7 @@ export class DM {
   run(): Promise<void> {
     return new Promise(resolve => {
       this.server = this.app.listen(this.config.port, () => {
-        console.debug(`Listening on port ${this.config.port}`);
+        this.logger.debug(`Listening on port ${this.config.port}`);
         resolve();
       });
     });
@@ -73,11 +79,11 @@ export class DM {
   stop(): void {
     this.app.removeAllListeners();
     this.server?.close();
-    console.debug('Server stopped');
+    this.logger.debug('Server stopped');
   }
 
   loadPlugin(pluginName: string): Promise<boolean> {
-    console.debug('Loading plugin', pluginName);
+    this.logger.debug('Loading plugin', pluginName);
     if (pluginName.startsWith('core/')) {
       pluginName = pluginName
         .replace(
@@ -107,7 +113,7 @@ export class DM {
   async registerPlugin(pluginName: string, obj: DmPlugin): Promise<boolean> {
     if (!obj.name) obj.name = pluginName;
     if (this.loadedPlugins[obj.name]) {
-      console.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
+      this.logger.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
       return false;
     }
     if (obj.dependencies) {

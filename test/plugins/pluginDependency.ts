@@ -32,7 +32,6 @@ describe('External users in groups', function () {
   });
 
   it('should load externalUsersInGroups', () => {
-    console.error('OK', plugin);
     expect(plugin.constructor.name).to.equal('LdapGroups');
     expect(plugin.server.loadedPlugins).to.have.key('externalUsersInGroups');
   });
