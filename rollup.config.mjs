@@ -71,13 +71,15 @@ const external = [
 ];
 
 async function getPluginEntries() {
-  return (await fg('src/plugins/**/*.ts'))
-  .map(file => file.replace(/^src\/plugins\//,''));
+  return (await fg('src/plugins/**/*.ts')).map(file =>
+    file.replace(/^src\/plugins\//, '')
+  ).sort();
 }
 
 async function getSpecs() {
-  return (await fg('static/schemas/**/*.json'))
-  .map(file => file.replace(/^static\/schemas\//,''));
+  return (await fg('static/schemas/**/*.json')).map(file =>
+    file.replace(/^static\/schemas\//, '')
+  ).sort();
 }
 
 pkg.exports = {

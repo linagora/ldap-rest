@@ -40,6 +40,14 @@
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
     },
+    "plugin-auth-token": {
+      "import": "./dist/plugins/auth/token.js",
+      "types": "./dist/src/plugins/auth/token.d.ts"
+    },
+    "plugin-demo-helloworld": {
+      "import": "./dist/plugins/demo/helloworld.js",
+      "types": "./dist/src/plugins/demo/helloworld.d.ts"
+    },
     "plugin-ldap-externalusersingroups": {
       "import": "./dist/plugins/ldap/externalUsersInGroups.js",
       "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts"
@@ -51,10 +59,6 @@
     "plugin-ldap-onchange": {
       "import": "./dist/plugins/ldap/onChange.js",
       "types": "./dist/src/plugins/ldap/onChange.d.ts"
-    },
-    "plugin-demo-helloworld": {
-      "import": "./dist/plugins/demo/helloworld.js",
-      "types": "./dist/src/plugins/demo/helloworld.d.ts"
     },
     "plugin-twake-james": {
       "import": "./dist/plugins/twake/james.js",

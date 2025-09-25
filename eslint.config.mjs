@@ -96,7 +96,6 @@ export default [
   // Fichiers à ignorer (remplace .eslintignore)
   {
     ignores: [
-      'bin/**',
       'dist/**',
       'build/**',
       'node_modules/**',

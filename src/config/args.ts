@@ -19,7 +19,6 @@ import type { ConfigTemplate } from '../lib/parseConfig';
 export interface Config {
   port: number;
   plugin?: string[];
-  plugins?: string;
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   logger?: 'console';
@@ -31,7 +30,6 @@ export interface Config {
   ldap_url?: string;
   ldap_user_main_attribute?: string;
   user_class?: string[];
-  user_classes?: string;
 
   // LDAP groups plugin
   ldap_group_base?: string;
@@ -51,6 +49,9 @@ export interface Config {
 
   // AuthLlng
   llng_ini?: string;
+
+  // auth/token
+  auth_token?: string[];
 
   // Special attributes
   mail_attribute?: string;
@@ -169,8 +170,10 @@ const configArgs: ConfigTemplate = [
   /* Access control plugins */
 
   // Lemonldap options
-
   ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
+
+  // Auth token plugin
+  ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
 ];
 
 export default configArgs;
