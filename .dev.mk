@@ -23,7 +23,7 @@ Dockerfile: scripts/buildDockerfile.ts $(SRCFILES) bin rollup.config.mjs tsconfi
 	npx tsx scripts/buildDockerfile.ts
 
 start: $(DSTFILES)
-	node bin/index.mjs $(ALLPLUGINS)
+	node bin/index.mjs --log-level debug $(ALLPLUGINS)
 
 test: $(DSTFILES)
 	npm run test

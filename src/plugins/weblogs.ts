@@ -9,9 +9,12 @@ export default class WebLogs extends DmPlugin {
       const start = Date.now();
       res.on('finish', () => {
         const duration = Date.now() - start;
-        this.logger.info(
-          `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`
-        );
+        this.logger.info({
+          method: req.method,
+          url: req.originalUrl,
+          status: res.statusCode,
+          duration,
+        });
       });
       next();
     });

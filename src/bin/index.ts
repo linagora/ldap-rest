@@ -83,7 +83,7 @@ export class DM {
   }
 
   loadPlugin(pluginName: string): Promise<boolean> {
-    this.logger.debug('Loading plugin', pluginName);
+    this.logger.debug(`Loading plugin ${pluginName}`);
     if (pluginName.startsWith('core/')) {
       pluginName = pluginName
         .replace(
@@ -103,6 +103,7 @@ export class DM {
           const obj = new pluginModule(this);
           if (!obj) return reject(new Error(`Unable to load ${pluginName}`));
           resolve(await this.registerPlugin(pluginName, obj as DmPlugin));
+          this.logger.debug(`Plugin ${obj.name} loaded`);
         })
         .catch(err =>
           reject(new Error(`Failed to load plugin ${pluginName}: ${err}`))
@@ -116,18 +117,26 @@ export class DM {
       this.logger.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
       return false;
     }
+    this.logger.debug(`Registering plugin ${pluginName} as ${obj.name}`);
     if (obj.dependencies) {
       for (const dependency in obj.dependencies) {
         if (!this.loadedPlugins[dependency]) {
+          this.logger.debug(
+            `Plugin ${obj.name} depends on ${dependency}, loading it first`
+          );
           await this.loadPlugin(obj.dependencies[dependency]);
         }
       }
     }
     if (obj.api) {
+      this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
     }
     if (obj.hooks as Hooks) {
       for (const hookName in obj.hooks as Hooks) {
+        this.logger.debug(
+          `Plugin ${obj.name} has hook ${hookName}, registering it`
+        );
         const hook = (obj.hooks as Hooks)[hookName as keyof Hooks];
         if (!this.hooks[hookName as keyof Hooks]) {
           this.hooks[hookName as keyof Hooks] = [];
@@ -137,7 +146,7 @@ export class DM {
           // @ts-ignore: object is defined
           this.hooks[hookName as keyof Hooks].push(hook);
         } else {
-          throw new Error(`Plugin ${pluginName}: hook ${hookName} is invalid`);
+          throw new Error(`Plugin ${obj.name}: hook ${hookName} is invalid`);
         }
       }
     }

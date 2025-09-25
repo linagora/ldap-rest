@@ -21,7 +21,7 @@ export interface Config {
   plugin?: string[];
   plugins?: string;
   schemas_path: string;
-  logLevel: 'error' | 'warn' | 'notice' | 'info' | 'debug';
+  log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   logger?: 'console';
   // LDAP
   ldap_base?: string;

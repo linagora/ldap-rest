@@ -4,9 +4,8 @@ import { Config } from '../bin';
 
 export const buildLogger = (config: Config): winston.Logger => {
   return winston.createLogger({
-    level: config.logLevel,
+    level: config.log_level,
     format: winston.format.combine(
-      winston.format.colorize(),
       winston.format.timestamp(),
       winston.format.printf(({ timestamp, level, message }) => {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -15,7 +14,10 @@ export const buildLogger = (config: Config): winston.Logger => {
     ),
     transports: [
       config.logger === 'console'
-        ? new winston.transports.Console()
+        ? new winston.transports.Console({
+            stderrLevels: ['error', 'warn'],
+            format: winston.format.json(),
+          })
         : new winston.transports.File({ filename: 'error.log' }),
     ],
   });
