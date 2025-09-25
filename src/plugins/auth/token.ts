@@ -20,7 +20,8 @@ export default class AuthToken extends DmPlugin {
         return unauthorized(res);
       }
       // @ts-expect-error new property
-      res.user = 'token number ' + (this.config.auth_token as string[]).indexOf(token);
+      res.user =
+        'token number ' + (this.config.auth_token as string[]).indexOf(token);
       next();
     });
   }

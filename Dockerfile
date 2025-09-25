@@ -44,7 +44,9 @@ ENV NODE_ENV=production \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
  DM_STATIC_NAME="static" \
  DM_JAMES_WEBADMIN_URL="http://localhost:8000" \
- DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
+ DM_JAMES_WEBADMIN_TOKEN= \
+ DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \
+ DM_AUTH_TOKENS=
 
 EXPOSE 8081
 CMD ["npx", "mini-dm"]

@@ -44,25 +44,43 @@ export default class James extends DmPlugin {
     body: string | null,
     fields: object
   ): Promise<void> {
+    // Prepare log
+    const log = {
+      plugin: this.name,
+      event: `${hookname}`,
+      result: 'error',
+      dn,
+      ...fields,
+    };
     try {
-      const opts = { method };
+      const opts: {
+        method: string;
+        body?: string | null;
+        headers?: { Authorization?: string };
+      } = { method };
       if (body) Object.assign(opts, { body });
-      await fetch(url, opts);
-      this.logger.info({
-        plugin: this.name,
-        event: hookname,
-        result: 'success',
-        dn,
-        ...fields,
-      });
+      if (this.config.james_webadmin_token) {
+        if (!opts.headers) opts.headers = {};
+        opts.headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
+      }
+      const res = await fetch(url, opts);
+      if (!res.ok) {
+        this.logger.error({
+          ...log,
+          http_status: res.status,
+          http_status_text: res.statusText,
+        });
+      } else {
+        this.logger.info({
+          ...log,
+          result: 'success',
+          http_status: res.status,
+        });
+      }
     } catch (err) {
       this.logger.error({
-        plugin: this.name,
-        event: `${hookname} failure`,
-        result: 'error',
-        dn,
+        ...log,
         error: err,
-        ...fields,
       });
     }
   }
