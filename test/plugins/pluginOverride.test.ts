@@ -8,7 +8,7 @@ describe('Plugin Override', () => {
     process.env.NODE_ENV = 'test';
     process.env.DM_PORT = '64321';
     process.env.DM_PLUGINS =
-      '../../dist/plugins/helloworld.js;../../dist/plugins/helloworld.js:myHello:{"api_prefix":"/myapi"}';
+      '../../dist/plugins/demo/helloworld.js;../../dist/plugins/demo/helloworld.js:myHello:{"api_prefix":"/myapi"}';
     server = new DM();
     await server.ready;
     await server.run();

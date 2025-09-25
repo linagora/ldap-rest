@@ -1,12 +1,12 @@
 import fetch from 'node-fetch';
 
-import DmPlugin from '../abstract/plugin';
-import { Hooks } from '../hooks';
+import DmPlugin from '../../abstract/plugin';
+import { Hooks } from '../../hooks';
 
 export default class James extends DmPlugin {
   name = 'james';
 
-  dependencies = { onLdapChange: 'core/onLdapChange' };
+  dependencies = { onLdapChange: 'core/ldap/onChange' };
 
   hooks: Hooks = {
     onLdapMailChange: (dn: string, oldmail: string, newmail: string) => {

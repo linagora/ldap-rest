@@ -6,7 +6,7 @@
 import type { SearchOptions, SearchResult } from 'ldapts';
 
 import type { ModifyRequest, AttributesList } from './lib/ldapActions';
-import type { ChangesToNotify } from './plugins/onLdapChange';
+import type { ChangesToNotify } from './plugins/ldap/onChange';
 import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;

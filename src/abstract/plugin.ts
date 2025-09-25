@@ -55,7 +55,7 @@ export default abstract class DmPlugin {
   /**
    * Uniq ID, to be used when calling hooks
    *
-   * Example: ldapGroups has 2 events for some operations,
+   * Example: plugin/ldap/groups has 2 events for some operations,
    * it uses opNumber to permit to plugin to link the 2 calls
    *
    * @returns uniq operation number

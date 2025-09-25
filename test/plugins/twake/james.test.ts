@@ -1,9 +1,9 @@
 import nock from 'nock';
 
-import { DM } from '../../src/bin';
-import James from '../../src/plugins/james';
+import { DM } from '../../../src/bin';
+import James from '../../../src/plugins/twake/james';
 import { expect } from 'chai';
-import OnLdapChange from '../../src/plugins/onLdapChange';
+import OnLdapChange from '../../../src/plugins/ldap/onChange';
 
 describe('James Plugin', () => {
   const testDN = `uid=testusermail,${process.env.DM_LDAP_BASE}`;

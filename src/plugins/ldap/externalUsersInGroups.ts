@@ -4,16 +4,16 @@
  * This permits to add external users into mailing lists
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import { Hooks } from '../hooks';
-import ldapActions, { AttributesList } from '../lib/ldapActions';
-import { launchHooks, launchHooksChained } from '../lib/utils';
+import DmPlugin from '../../abstract/plugin';
+import type { DM } from '../../bin';
+import { Hooks } from '../../hooks';
+import ldapActions, { AttributesList } from '../../lib/ldapActions';
+import { launchHooks, launchHooksChained } from '../../lib/utils';
 
 export default class ExternalUsersInGroups extends DmPlugin {
   name = 'externalUsersInGroups';
 
-  dependencies = { ldapGroups: 'core/ldapGroups' };
+  dependencies = { ldapGroups: 'core/ldap/ldapGroups' };
 
   ldap: ldapActions;
 

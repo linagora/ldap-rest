@@ -7,11 +7,11 @@
  */
 import { Entry } from 'ldapts';
 
-import DmPlugin from '../abstract/plugin';
-import type { Hooks } from '../hooks';
-import type { AttributeValue, SearchResult } from '../lib/ldapActions';
-import { launchHooks } from '../lib/utils';
-import type { Config } from '../bin';
+import DmPlugin from '../../abstract/plugin';
+import type { Hooks } from '../../hooks';
+import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
+import { launchHooks } from '../../lib/utils';
+import type { Config } from '../../bin';
 
 export type ChangesToNotify = Record<
   string,

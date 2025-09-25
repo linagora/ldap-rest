@@ -28,26 +28,6 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
-    "plugin-externalusersingroups": {
-      "import": "./dist/plugins/externalUsersInGroups.js",
-      "types": "./dist/src/plugins/externalUsersInGroups.d.ts"
-    },
-    "plugin-helloworld": {
-      "import": "./dist/plugins/helloworld.js",
-      "types": "./dist/src/plugins/helloworld.d.ts"
-    },
-    "plugin-james": {
-      "import": "./dist/plugins/james.js",
-      "types": "./dist/src/plugins/james.d.ts"
-    },
-    "plugin-ldapgroups": {
-      "import": "./dist/plugins/ldapGroups.js",
-      "types": "./dist/src/plugins/ldapGroups.d.ts"
-    },
-    "plugin-onldapchange": {
-      "import": "./dist/plugins/onLdapChange.js",
-      "types": "./dist/src/plugins/onLdapChange.d.ts"
-    },
     "plugin-static": {
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
@@ -57,8 +37,28 @@
       "types": "./dist/src/plugins/weblogs.d.ts"
     },
     "plugin-auth-llng": {
-      "import": "./dist/plugins/auth/Llng.js",
-      "types": "./dist/src/plugins/auth/Llng.d.ts"
+      "import": "./dist/plugins/auth/llng.js",
+      "types": "./dist/src/plugins/auth/llng.d.ts"
+    },
+    "plugin-ldap-externalusersingroups": {
+      "import": "./dist/plugins/ldap/externalUsersInGroups.js",
+      "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts"
+    },
+    "plugin-ldap-groups": {
+      "import": "./dist/plugins/ldap/groups.js",
+      "types": "./dist/src/plugins/ldap/groups.d.ts"
+    },
+    "plugin-ldap-onchange": {
+      "import": "./dist/plugins/ldap/onChange.js",
+      "types": "./dist/src/plugins/ldap/onChange.d.ts"
+    },
+    "plugin-demo-helloworld": {
+      "import": "./dist/plugins/demo/helloworld.js",
+      "types": "./dist/src/plugins/demo/helloworld.d.ts"
+    },
+    "plugin-twake-james": {
+      "import": "./dist/plugins/twake/james.js",
+      "types": "./dist/src/plugins/twake/james.d.ts"
     },
     "schema-groups": {
       "import": "./static/schemas/groups.json",

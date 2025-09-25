@@ -1,5 +1,5 @@
 /**
- * @plugin core/authLlng
+ * @plugin core/auth/llng
  * @description Lemonldap::NG authentication plugin
  * @author Xavier Guimard <xguimard@linagora.com>
  * This plugin enables authentication and authorization using Lemonldap::NG.

@@ -11,8 +11,8 @@ Example:
 npx mini-dm --ldap-base 'ou=users,o=comp,c=fr' \
     --ldap-dn 'cn-admin,o=comp,c=fr' --ldap-pwd adm \
     --ldap-url ldap://localhost \
-    --plugin core/ldapGroups --ldap-group-base 'ou=groups,o=comp,c=fr' \
-    --plugin core/externalUsersInGroups
+    --plugin core/ldap/groups --ldap-group-base 'ou=groups,o=comp,c=fr' \
+    --plugin core/ldap/externalUsersInGroups
 ```
 
 ## Command-line options and environment variables

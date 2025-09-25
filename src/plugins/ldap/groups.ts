@@ -10,17 +10,17 @@
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../abstract/plugin';
-import type { DM } from '../bin';
-import type { Hooks } from '../hooks';
-import type ldapActions from '../lib/ldapActions';
+import DmPlugin from '../../abstract/plugin';
+import type { DM } from '../../bin';
+import type { Hooks } from '../../hooks';
+import type ldapActions from '../../lib/ldapActions';
 import type {
   AttributesList,
   AttributeValue,
   LdapList,
   ModifyRequest,
   SearchResult,
-} from '../lib/ldapActions';
+} from '../../lib/ldapActions';
 import {
   badRequest,
   jsonBody,
@@ -28,8 +28,8 @@ import {
   serverError,
   tryMethod,
   wantJson,
-} from '../lib/expressFormatedResponses';
-import { launchHooks, launchHooksChained } from '../lib/utils';
+} from '../../lib/expressFormatedResponses';
+import { launchHooks, launchHooksChained } from '../../lib/utils';
 
 export interface postAdd {
   cn?: string;

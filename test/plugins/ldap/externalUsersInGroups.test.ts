@@ -1,7 +1,7 @@
 import { expect } from 'chai';
-import LdapGroups from '../../src/plugins/ldapGroups';
-import { DM } from '../../src/bin';
-import ExternalUsersInGroups from '../../src/plugins/externalUsersInGroups';
+import LdapGroups from '../../../src/plugins/ldap/groups';
+import { DM } from '../../../src/bin';
+import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import { SearchResult } from 'ldapts';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
@@ -15,7 +15,7 @@ describe('External users in groups', function () {
   ) {
     // eslint-disable-next-line no-console
     console.warn(
-      'Skipping ldapGroups tests: DM_GROUP_BASE and LDAP_LIB env vars are required'
+      'Skipping ldap/groups tests: DM_GROUP_BASE and LDAP_LIB env vars are required'
     );
     // @ts-ignore
     this.skip?.();

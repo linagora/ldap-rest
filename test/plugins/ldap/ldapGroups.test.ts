@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import LdapGroups from '../../src/plugins/ldapGroups';
-import { DM } from '../../src/bin';
+import LdapGroups from '../../../src/plugins/ldap/groups';
+import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
@@ -28,7 +28,6 @@ describe('LdapGroups Plugin', function () {
   const user2 = `uid=user2,${process.env.DM_LDAP_BASE}`;
 
   before(async () => {
-    //process.env.DM_PLUGINS = 'core/ldapGroups';
     server = new DM();
     plugin = new LdapGroups(server);
     const entry = {

@@ -6,7 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin from '../../abstract/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';

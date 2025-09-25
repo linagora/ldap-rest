@@ -2,7 +2,7 @@
 
 SRCFILES=$(shell find src/*/ -name '*.ts')
 DSTFILES=$(subst .ts,.js,$(subst src/,dist/,$(SRCFILES)))
-PLUGINFILES=$(shell find dist/plugins -name '*.js' -a ! -name 'auth*')
+PLUGINFILES=$(shell find dist/plugins -name '*.js' | grep -v auth/)
 ALLPLUGINS=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
 
 all: $(DSTFILES)
