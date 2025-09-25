@@ -40,6 +40,10 @@
       "import": "./dist/plugins/helloworld.js",
       "types": "./dist/src/plugins/helloworld.d.ts"
     },
+    "plugin-james": {
+      "import": "./dist/plugins/james.js",
+      "types": "./dist/src/plugins/james.d.ts"
+    },
     "plugin-ldapgroups": {
       "import": "./dist/plugins/ldapGroups.js",
       "types": "./dist/src/plugins/ldapGroups.d.ts"

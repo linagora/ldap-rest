@@ -9,30 +9,61 @@ export default class James extends DmPlugin {
   dependencies = { onLdapChange: 'core/onLdapChange' };
 
   hooks: Hooks = {
-    onLdapMailChange: async (dn: string, oldmail: string, newmail: string) => {
-      try {
-        const res = await fetch(
-          `${this.config.james_webadmin_url}/users/${oldmail}/rename/${newmail}?action=rename`,
-          {
-            method: 'POST',
-          }
-        );
-        this.logger.info({
-          plugin: this.name,
-          action: 'onLdapMailChange',
-          oldmail,
-          newmail,
-          response: await res.json(),
-        });
-      } catch (err) {
-        this.logger.error({
-          plugin: this.name,
-          action: 'onLdapMailChange failure',
-          error: err,
-          oldmail,
-          newmail,
-        });
-      }
+    onLdapMailChange: (dn: string, oldmail: string, newmail: string) => {
+      return this._try(
+        'onLdapMailChange',
+        `${this.config.james_webadmin_url}/users/${oldmail}/rename/${newmail}?action=rename`,
+        'POST',
+        dn,
+        null,
+        { oldmail, newmail }
+      );
+    },
+    onLdapQuotaChange: (
+      dn: string,
+      mail: string,
+      oldQuota: number,
+      newQuota: number
+    ) => {
+      return this._try(
+        'onLdapQuotaChange',
+        `${this.config.james_webadmin_url}/quota/users/${mail}/size`,
+        'PUT',
+        dn,
+        newQuota.toString(),
+        { oldQuota, newQuota }
+      );
     },
   };
+
+  async _try(
+    hookname: string,
+    url: string,
+    method: string,
+    dn: string,
+    body: string | null,
+    fields: object
+  ): Promise<void> {
+    try {
+      const opts = { method };
+      if (body) Object.assign(opts, { body });
+      await fetch(url, opts);
+      this.logger.info({
+        plugin: this.name,
+        event: hookname,
+        result: 'success',
+        dn,
+        ...fields,
+      });
+    } catch (err) {
+      this.logger.error({
+        plugin: this.name,
+        event: `${hookname} failure`,
+        result: 'error',
+        dn,
+        error: err,
+        ...fields,
+      });
+    }
+  }
 }

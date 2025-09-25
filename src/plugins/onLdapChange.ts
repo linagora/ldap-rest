@@ -11,11 +11,19 @@ import DmPlugin from '../abstract/plugin';
 import type { Hooks } from '../hooks';
 import type { AttributeValue, SearchResult } from '../lib/ldapActions';
 import { launchHooks } from '../lib/utils';
+import type { Config } from '../bin';
 
 export type ChangesToNotify = Record<
   string,
   [AttributeValue | null, AttributeValue | null]
 >;
+
+const events: {
+  [configParam: keyof Config]: keyof Hooks;
+} = {
+  mail_attribute: 'onLdapMailChange',
+  quota_attribute: 'onLdapQuotaChange',
+};
 
 class OnLdapChange extends DmPlugin {
   name = 'onLdapChange';
@@ -75,13 +83,18 @@ class OnLdapChange extends DmPlugin {
 
   notify(dn: string, changes: ChangesToNotify): void {
     void launchHooks(this.server.hooks.onLdapChange, dn, changes);
-    if (changes[this.config.mail_attribute as string]) {
-      this.notifyAttributeChange(
-        this.config.mail_attribute as string,
-        'onLdapMailChange',
-        dn,
-        changes
-      );
+    for (const [configParam, hookName] of Object.entries(events)) {
+      if (
+        this.config[configParam] &&
+        changes[this.config[configParam] as string]
+      ) {
+        this.notifyAttributeChange(
+          this.config[configParam] as string,
+          hookName,
+          dn,
+          changes
+        );
+      }
     }
   }
 

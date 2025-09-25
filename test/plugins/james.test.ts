@@ -33,6 +33,11 @@ describe('James Plugin', () => {
     nock.disableNetConnect();
   });
 
+  after(function () {
+    nock.cleanAll();
+    nock.enableNetConnect();
+  });
+
   beforeEach(async () => {
     dm = new DM();
     await dm.ready;
