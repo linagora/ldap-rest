@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
+import fs from 'fs';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
@@ -9,7 +10,7 @@ import { extname } from 'path';
 import sort from 'sort-package-json';
 import { writeFileSync } from 'fs';
 
-import pkg from './package.json' with { type: 'json' };
+const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
 const PLUGINS_SRC_DIR = 'src/plugins';
 
@@ -86,6 +87,10 @@ pkg.exports = {
   },
   hooks: {
     types: './dist/src/hooks.d.ts',
+  },
+  expressformatedresponses: {
+    import: './dist/lib/expressFormatedResponses.js',
+    types: './dist/src/lib/expressFormatedResponses.d.ts',
   },
 };
 

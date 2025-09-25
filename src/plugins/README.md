@@ -24,7 +24,7 @@ See [abstract class](../abstract/plugin.ts) for more
     `npx mini-dm --plugin core/hello:myhello:{"api_prefix":"/myapi"}`
 - It may have a **dependencies** property: _`Record<uniqname, path>`_ of plugins that needs to be loaded before this one.
 
-### Expose an API _(or any [express](https://www.npmjs.com/package/express) hook)_
+### Examples to expose an API _(or any [express](https://www.npmjs.com/package/express) hook)_
 
 #### Simple
 

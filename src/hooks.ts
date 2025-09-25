@@ -7,12 +7,18 @@ import type { SearchOptions, SearchResult } from 'ldapts';
 
 import type { ModifyRequest, AttributesList } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/onLdapChange';
+import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;
 export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
 export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export type OtherHook = Function;
+export { utils };
+
+/**
+ * All available hooks
+ */
 
 export interface Hooks {
   /**

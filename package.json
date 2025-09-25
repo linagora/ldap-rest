@@ -24,6 +24,10 @@
     "hooks": {
       "types": "./dist/src/hooks.d.ts"
     },
+    "expressformatedresponses": {
+      "import": "./dist/lib/expressFormatedResponses.js",
+      "types": "./dist/src/lib/expressFormatedResponses.d.ts"
+    },
     "plugin-authllng": {
       "import": "./dist/plugins/authLlng.js",
       "types": "./dist/src/plugins/authLlng.d.ts"
