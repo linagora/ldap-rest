@@ -1,6 +1,6 @@
 /**
- * @plugin core/static
- * @description Serve static files and JSON schemas
+ * @module core/static
+ * Serve static files and JSON schemas
  *
  * This plugin serves static files from a specified directory.
  * It provides access to JSON schemas if stored in a "schemas" subdirectory

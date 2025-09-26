@@ -1,6 +1,5 @@
 /**
- * @file src/config/args.ts
- * @description command-line options, corresponding environment variables, default values and types
+ * command-line options, corresponding environment variables, default values and types
  * Contains also the typescript declaration of config
  * @author Xavier Guimard <xguimard@linagora.com>
  */

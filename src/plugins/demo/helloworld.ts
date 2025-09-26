@@ -1,6 +1,6 @@
 /**
- * @plugin core/helloworld
- * @description Demo plugin, add /hello API + consumes 'hello' hook
+ * @module core/helloworld
+ * Demo plugin, add /hello API + consumes 'hello' hook
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 

@@ -1,8 +1,9 @@
 /**
- * @plugin core/externalUsersInGroups
- * @description Creates on-the-fly missing group users into a branch
- * This permits to add external users into mailing lists
+ * @module plugins/ldap/externalUsersInGroups
  * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * Creates on-the-fly missing group users into a branch
+ * This permits to add external users into mailing lists
  */
 import DmPlugin from '../../abstract/plugin';
 import type { DM } from '../../bin';

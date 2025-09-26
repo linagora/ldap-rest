@@ -1,3 +1,10 @@
+/**
+ * @module plugins/auth/token
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * Token-based authentication plugin
+ * @category Plugins
+ */
 import type { Express } from 'express';
 
 import DmPlugin from '../../abstract/plugin';

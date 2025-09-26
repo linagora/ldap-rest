@@ -1,8 +1,8 @@
 /**
- * @plugin core/ldapGroups
- * @description Plugin to manage groups into LDAP server
+ * @module plugins/ldap/groups
  * @author Xavier Guimard <xguimard@linagora.com>
  *
+ * Plugin to manage groups into LDAP server
  * - add/delete groups
  * - add/delete members of groups
  * - detect user deletion to remove them from groups (hook)
@@ -365,7 +365,7 @@ export default class LdapGroups extends DmPlugin {
 
   /**
    * List groups from LDAP
-   * @param param0? {filter, attributes}:
+   * @param param0 {filter, attributes}:
    * - filter: LDAP filter (default '(objectClass=*)')
    * - attributes: attributes to fetch (default ['cn','member'])
    * @returns LdapList (Record<string, AttributesList>)
@@ -414,8 +414,8 @@ export default class LdapGroups extends DmPlugin {
   /**
    * Simple formatter for listGroups()
    * @param cn main attribute value (partial or full)
-   * @param partial? boolean, true for partial search (default false)
-   * @param attributes? array of attributes to return
+   * @param partial boolean, true for partial search (default false)
+   * @param attributes array of attributes to return
    * @returns LdapList (means Record<string, AttributesList> where key is the --ldap-user-main-attribute value [default: cn])
    */
   async searchGroupsByName(

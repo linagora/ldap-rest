@@ -1,6 +1,5 @@
 /**
- * @file src/lib/expressFormatedResponses.ts
- * @description Standard express responses and express utilities
+ * Standard express responses and express utilities
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Request, Response } from 'express';

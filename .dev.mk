@@ -25,6 +25,9 @@ builddocker: Dockerfile
 Dockerfile: scripts/buildDockerfile.ts $(SRCFILES) bin rollup.config.mjs tsconfig.json static
 	npx tsx scripts/buildDockerfile.ts
 
+doc: $(SRCFILES)
+	typedoc --entryPoints src/bin/index.ts $(shell find src -name '*.ts' | grep -v bin/index) --out docs
+
 start: $(DSTFILES)
 	node bin/index.mjs --log-level debug $(ALLPLUGINS)
 

@@ -1,6 +1,5 @@
 /**
- * @file src/lib/parseConfig.ts
- * @description Configuration parser
+ * Configuration parser
  * Order: default < env < cli
  * @author Xavier Guimard <xguimard@linagora.com>
  */

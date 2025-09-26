@@ -1,9 +1,15 @@
 /**
- * @file src/bin/index.ts
- * @description Main server file
+ * @packageDocumentation mini-dm
  * @author Xavier Guimard <xguimard@linagora.com>
  *
+ * Main server file
  * It loads plugins, setup express app,... and start the server
+ *
+ * @example
+ * const server = new DM();
+ *
+ * await server.ready;
+ * await server.run();
  */
 
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -27,6 +33,9 @@ export type { Config };
 
 //export const build = () => {
 
+/**
+ * @class DM
+ */
 export class DM {
   app: express.Express;
   config: Config;
