@@ -46,11 +46,8 @@
       "required": true
     },
     "twakeDepartmentPath": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "test": "^[\\w\\s/,]+$"
-      },
+      "type": "string",
+      "test": "^[\\w\\s/,]+$",
       "required": true
     }
   }
