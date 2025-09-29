@@ -41,8 +41,8 @@ export interface Hooks {
   ldapdeleterequest?: ChainedHook<string | string[]>;
   ldapdeletedone?: (dn: string | string[]) => MaybePromise<void>;
   // rename
-  ldaprnrequest?: ChainedHook<[string, string]>;
-  ldaprndone?: (args: [string, string]) => MaybePromise<void>;
+  ldaprenamerequest?: ChainedHook<[string, string]>;
+  ldaprenamedone?: (args: [string, string]) => MaybePromise<void>;
 
   /**
    * Plugins

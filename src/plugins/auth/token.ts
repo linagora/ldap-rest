@@ -3,7 +3,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Token-based authentication plugin
- * @category Plugins
+ * @group Plugins
  */
 import type { Express } from 'express';
 

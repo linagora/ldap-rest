@@ -1,4 +1,5 @@
 {
+  "strict": true,
   "attributes": {
     "objectClass": {
       "type": "array",
@@ -16,7 +17,6 @@
     },
     "description": {
       "type": "string",
-      "test": "^[a-zA-Z][a-zA-Z0-9-]{0,254}$",
       "required": false
     },
     "mail": {
@@ -28,7 +28,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$"
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
       },
       "required": false
     },
@@ -42,14 +42,14 @@
     },
     "twakeDepartmentLink": {
       "type": "string",
-      "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,",
+      "test": "^.*,__LDAP_BASE__",
       "required": true
     },
     "twakeDepartmentPath": {
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+        "test": "^[\\w\\s/,]+$"
       },
       "required": true
     }

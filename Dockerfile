@@ -34,12 +34,17 @@ ENV NODE_ENV=production \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
  DM_USER_CLASSES=top,inetOrgPerson \
+ DM_LDAP_TOP_ORGANIZATION= \
+ DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \
+ DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE="twakeDepartmentPath" \
+ DM_LDAP_ORGANIZATION_PATH_SEPARATOR=" / " \
  DM_LDAP_GROUP_BASE= \
  DM_LDAP_GROUPS_MAIN_ATTRIBUTE="cn" \
  DM_GROUP_CLASSES=top,groupOfNames \
  DM_ALLOW_UNEXISTENT_MEMBERS=false \
  DM_GROUP_DEFAULT_ATTRIBUTES="{}" \
  DM_GROUP_DUMMY_USER="cn=fakeuser" \
+ DM_GROUP_SCHEMA="/app/node_modules/mini-dm/static/schemas/groups.json" \
  DM_EXTERNAL_MEMBERS_BRANCH="ou=contacts,dc=example,dc=com" \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
  DM_STATIC_NAME="static" \

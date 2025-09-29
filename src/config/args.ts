@@ -38,6 +38,7 @@ export interface Config {
   group_default_attributes?: AttributesList;
   groups_allow_unexistent_members?: boolean;
   group_dummy_user?: string;
+  group_schema?: string;
 
   // External users in groups
   external_members_branch?: string;
@@ -128,6 +129,26 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Plugins options
+  // LDAP organizations
+  ['--ldap-top-organization', 'DM_LDAP_TOP_ORGANIZATION', ''],
+  [
+    '--ldap-organization-class',
+    'DM_LDAP_ORGANIZATION_CLASSES',
+    ['top', 'organizationalUnit', 'twakeDepartment'],
+    'array',
+    '--ldap-organization-classes',
+  ],
+  [
+    '--ldap-organization-path-attribute',
+    'DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE',
+    'twakeDepartmentPath',
+  ],
+  [
+    '--ldap-organization-path-separator',
+    'DM_LDAP_ORGANIZATION_PATH_SEPARATOR',
+    ' / ',
+  ],
+
   // LDAP groups plugin
 
   ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
@@ -147,6 +168,18 @@ const configArgs: ConfigTemplate = [
   ],
   ['--group-default-attributes', 'DM_GROUP_DEFAULT_ATTRIBUTES', {}, 'json'],
   ['--group-dummy-user', 'DM_GROUP_DUMMY_USER', 'cn=fakeuser'],
+  [
+    '--group-schema',
+    'DM_GROUP_SCHEMA',
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      'static',
+      'schemas',
+      'groups.json'
+    ),
+  ],
 
   // externalUsersInGroups
 

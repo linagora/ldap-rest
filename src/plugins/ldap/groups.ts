@@ -7,6 +7,7 @@
  * - add/delete members of groups
  * - detect user deletion to remove them from groups (hook)
  */
+import fs from 'fs';
 
 import type { Express, Request, Response } from 'express';
 
@@ -29,7 +30,12 @@ import {
   tryMethod,
   wantJson,
 } from '../../lib/expressFormatedResponses';
-import { launchHooks, launchHooksChained } from '../../lib/utils';
+import {
+  launchHooks,
+  launchHooksChained,
+  transformSchemas,
+} from '../../lib/utils';
+import type { Schema } from '../../config/schema';
 
 export interface postAdd {
   cn?: string;
@@ -42,6 +48,7 @@ export default class LdapGroups extends DmPlugin {
   base?: string;
   ldap: ldapActions;
   cn: string;
+  schema?: Schema;
 
   constructor(server: DM) {
     super(server);
@@ -54,6 +61,28 @@ export default class LdapGroups extends DmPlugin {
     }
     if (!this.base) {
       throw new Error('LDAP base is not defined, please set --ldap-group-base');
+    }
+    if (this.config.group_schema) {
+      fs.readFile(this.config.group_schema, (err, data) => {
+        if (err) {
+          this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
+            `Failed to load group schema from ${this.config.group_schema}: ${err}`
+          );
+        } else {
+          try {
+            this.schema = JSON.parse(
+              transformSchemas(data.toString(), this.config)
+            ) as Schema;
+            this.logger.debug('Group schema loaded');
+          } catch (e) {
+            this.logger.error(
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+              `Failed to parse ${this.config.schemas_path}/group.json: ${e}`
+            );
+          }
+        }
+      });
     }
   }
 
@@ -200,6 +229,12 @@ export default class LdapGroups extends DmPlugin {
       dn = `${this.cn}=${cn},${this.base}`;
     }
     await this.validateMembers(dn, members);
+    await this.validateNewGroup(dn, {
+      objectClass: this.config.group_class as string[],
+      cn,
+      member: members,
+      ...additional,
+    });
 
     // Build entry
     let entry: AttributesList = {
@@ -270,6 +305,7 @@ export default class LdapGroups extends DmPlugin {
         throw new Error(`Use dedicated API to change ${this.cn} attribute`);
     }
 
+    await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes);
     void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
       dn,
@@ -464,5 +500,96 @@ export default class LdapGroups extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to find member(s): ${err}`);
     }
+  }
+
+  async validateNewGroup(dn: string, entry: AttributesList): Promise<boolean> {
+    if (!this.schema) return true;
+    [dn, entry] = await launchHooksChained(
+      this.server.hooks.ldapgroupvalidatenew,
+      [dn, entry]
+    );
+    // Check each field
+    for (const [field, value] of Object.entries(entry)) {
+      if (!this._validateOneChange(field, value)) {
+        throw new Error(`Invalid value for field ${field}`);
+      }
+    }
+    // Check required fields
+    for (const [field, test] of Object.entries(this.schema.attributes)) {
+      if (test.required && entry[field] === undefined)
+        throw new Error(`Missing required field ${field}`);
+    }
+    return true;
+  }
+
+  async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
+    if (!this.schema) return true;
+    [dn, changes] = await launchHooksChained(
+      this.server.hooks.ldapgroupvalidatechanges,
+      [dn, changes]
+    );
+    if (changes.add) {
+      for (const [field, value] of Object.entries(changes.add)) {
+        this._validateOneChange(field, value);
+      }
+    }
+    if (changes.replace) {
+      for (const [field, value] of Object.entries(changes.replace)) {
+        this._validateOneChange(field, value);
+      }
+    }
+    if (changes.delete && changes.delete instanceof Object) {
+      for (const v of Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete)) {
+        this._validateOneChange(v, null);
+      }
+    }
+    return true;
+  }
+
+  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+    if (!this.schema) return true;
+    const test = this.schema.attributes[field];
+    if (!test) {
+      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      return true;
+    }
+    if (value === null || value === undefined) {
+      if (test.required) throw new Error(`Field ${field} is required`);
+      return true;
+    }
+    if (test.type === 'array') {
+      if (!Array.isArray(value))
+        throw new Error(`Field ${field} must be an array`);
+      if (!test.items)
+        throw new Error(`Schema error: no item for array ${field}`);
+      if (test.items.type === 'array')
+        throw new Error(
+          `Schema error: array of array not supported for ${field}`
+        );
+      if (test.items.test) {
+        if (typeof test.items.test === 'string')
+          test.items.test = new RegExp(test.items.test);
+        for (let v of value) {
+          if (typeof v !== test.items.type)
+            throw new Error(
+              `Field ${field} must be of type ${test.items.type}`
+            );
+          if (typeof v !== 'string') v = v.toString();
+          if (test.items.test && !test.items.test.test(v))
+            throw new Error(`Field ${field} has invalid value ${v}`);
+        }
+      }
+    } else {
+      if (typeof value !== test.type) return false;
+      if (typeof value !== 'string') value = value.toString();
+      if (test.test) {
+        if (typeof test.test === 'string') test.test = new RegExp(test.test);
+        if (test.test && !test.test.test(value))
+          throw new Error(`Field ${field} has invalid value ${value}`);
+      }
+    }
+    return true;
   }
 }

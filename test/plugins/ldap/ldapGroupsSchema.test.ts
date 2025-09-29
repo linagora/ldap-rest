@@ -4,7 +4,6 @@ import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
-process.env.DM_GROUP_SCHEMA = '';
 
 describe('LdapGroups Plugin', function () {
   // Skip all tests if required env vars are not set
@@ -67,7 +66,10 @@ describe('LdapGroups Plugin', function () {
 
   describe('New group', () => {
     it('should add/delete group with members', async () => {
-      await plugin.addGroup('testgroup', [user1]);
+      await plugin.addGroup('testgroup', [user1], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       const listEntries = await plugin.listGroups();
       // @ts-ignore
       expect(listEntries).to.have.property('testgroup');
@@ -82,7 +84,10 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should add/delete group even if no members', async () => {
-      await plugin.addGroup('testgroup');
+      await plugin.addGroup('testgroup', [], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
@@ -96,6 +101,8 @@ describe('LdapGroups Plugin', function () {
     it('should add/modify/delete group with additional attributes', async () => {
       await plugin.addGroup('testgroup', [user1], {
         description: 'My test group',
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
       });
       expect(
         await plugin.searchGroupsByName('testgroup', false, [
@@ -142,7 +149,10 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should add/delete member to group', async () => {
-      await plugin.addGroup('testgroup');
+      await plugin.addGroup('testgroup', [], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       await plugin.addMember('testgroup', user2);
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
@@ -162,7 +172,10 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should not accept unexisting user as member', async () => {
-      await plugin.addGroup('testgroup');
+      await plugin.addGroup('testgroup', [], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       try {
         await plugin.addMember(
           'testgroup',
@@ -182,7 +195,10 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should rename group', async () => {
-      await plugin.addGroup('testgroup', [user1]);
+      await plugin.addGroup('testgroup', [user1], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
         testgroup: {
           dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
@@ -216,6 +232,8 @@ describe('LdapGroups Plugin', function () {
         .send({
           cn: 'testgroup',
           member: [user1],
+          twakeDepartmentPath: ['Test / SubTest'],
+          twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
         });
       expect(res.body).to.deep.equal({ success: true });
       expect(res.status).to.equal(200);
@@ -237,12 +255,17 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('should add/del member via API', async () => {
-      await plugin.addGroup('testgroup');
+      await plugin.addGroup('testgroup', [], {
+        twakeDepartmentPath: ['Test / SubTest'],
+        twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+      });
       let res = await request
         .post('/api/v1/ldap/groups/testgroup/members')
         .type('json')
         .send({
           member: user2,
+          twakeDepartmentPath: ['Test / SubTest'],
+          twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
         });
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ success: true });
@@ -276,6 +299,8 @@ describe('LdapGroups Plugin', function () {
         .send({
           cn: 'testgroup',
           member: [user1],
+          twakeDepartmentPath: ['Test / SubTest'],
+          twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
         });
       expect(res.body).to.deep.equal({ success: true });
       expect(res.status).to.equal(200);
