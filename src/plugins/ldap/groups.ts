@@ -516,7 +516,7 @@ export default class LdapGroups extends DmPlugin {
     }
     // Check required fields
     for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] === undefined)
+      if (test.required && entry[field] == undefined)
         throw new Error(`Missing required field ${field}`);
     }
     return true;

@@ -20,8 +20,8 @@ export interface Config {
   plugin?: string[];
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
-  logger?: 'console';
-  api_prefix?: string;
+  logger: 'console';
+  api_prefix: string;
   // LDAP
   ldap_base?: string;
   ldap_dn?: string;
@@ -39,6 +39,13 @@ export interface Config {
   groups_allow_unexistent_members?: boolean;
   group_dummy_user?: string;
   group_schema?: string;
+
+  // LDAP Organizations plugin
+  ldap_top_organization?: string;
+  ldap_organization_class?: string[];
+  ldap_organization_link_attribute?: string;
+  ldap_organization_path_attribute?: string;
+  ldap_organization_path_separator?: string;
 
   // External users in groups
   external_members_branch?: string;
@@ -137,6 +144,11 @@ const configArgs: ConfigTemplate = [
     ['top', 'organizationalUnit', 'twakeDepartment'],
     'array',
     '--ldap-organization-classes',
+  ],
+  [
+    '--ldap-organization-link-attribute',
+    'DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE',
+    'twakeDepartmentLink',
   ],
   [
     '--ldap-organization-path-attribute',

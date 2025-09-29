@@ -29,6 +29,22 @@ export const tryMethod = async (
   }
 };
 
+export const tryMethodData = async (
+  res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  method: Function,
+  ...args: unknown[]
+): Promise<void> => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const data = await method(...args);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    return ok(res, data);
+  } catch (err) {
+    return serverError(res, err);
+  }
+};
+
 /**
  * Standard API responses with default message
  */

@@ -34,6 +34,7 @@ describe('LdapGroups validation', function () {
 
   before(async () => {
     server = new DM();
+    process.env.DM_GROUP_SCHEMA = '../../static/schemas/groups.json';
     plugin = new LdapGroups(server);
     const entry = {
       objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
@@ -57,9 +58,10 @@ describe('LdapGroups validation', function () {
 
   afterEach(async () => {
     try {
-      await plugin.deleteGroup('testgroup');
+      await plugin.deleteGroup('testgroup4').catch(() => {});
+      await plugin.deleteGroup('testgroup3').catch(() => {});
     } catch (e) {
-      // ignore
+      console.error('After error', e);
     }
   });
 
@@ -71,27 +73,27 @@ describe('LdapGroups validation', function () {
 
   describe('New group', () => {
     it('should add/delete group with members', async () => {
-      await plugin.addGroup('testgroup', [user1], twakeAttr);
+      await plugin.addGroup('testgroup4', [user1], twakeAttr);
       const listEntries = await plugin.listGroups();
       // @ts-ignore
-      expect(listEntries).to.have.property('testgroup');
-      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({
-        testgroup: {
-          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
-          cn: 'testgroup',
+      expect(listEntries).to.have.property('testgroup4');
+      expect(await plugin.searchGroupsByName('testgroup4')).to.deep.equal({
+        testgroup4: {
+          dn: `cn=testgroup4,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup4',
           member: [user1],
         },
       });
-      expect(await plugin.deleteGroup('testgroup')).to.be.true;
+      expect(await plugin.deleteGroup('testgroup4')).to.be.true;
     });
 
     it('should not add group without required twake attributes', async () => {
       try {
-        await plugin.addGroup('testgroup', [user1], {});
+        await plugin.addGroup('testgroup3', [user1], {});
       } catch (e: any) {
         expect(e.message).to.match(/Missing required field/);
       }
-      expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
+      expect(await plugin.searchGroupsByName('testgroup3')).to.deep.equal({});
     });
   });
 });

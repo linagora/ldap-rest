@@ -1,7 +1,8 @@
 #!/usr/bin/make -f
 
 SRCFILES=$(shell find src/*/ -name '*.ts')
-DSTFILES=$(subst .ts,.js,$(subst src/,dist/,$(SRCFILES)))
+_SRCFILES=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema)
+DSTFILES=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
 PLUGINFILES=$(shell find dist/plugins -name '*.js' | grep -v auth/)
 ALLPLUGINS=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
 

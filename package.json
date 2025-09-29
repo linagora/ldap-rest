@@ -52,6 +52,10 @@
       "import": "./dist/plugins/ldap/onChange.js",
       "types": "./dist/src/plugins/ldap/onChange.d.ts"
     },
+    "plugin-ldap-organization": {
+      "import": "./dist/plugins/ldap/organization.js",
+      "types": "./dist/src/plugins/ldap/organization.d.ts"
+    },
     "plugin-static": {
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
