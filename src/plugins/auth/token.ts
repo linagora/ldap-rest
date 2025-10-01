@@ -5,15 +5,15 @@
  * Token-based authentication plugin
  * @group Plugins
  */
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 
 import { unauthorized } from '../../lib/expressFormatedResponses';
-import AuthBase from '../../lib/auth/base';
+import AuthBase, { type DmRequest } from '../../lib/auth/base';
 
 export default class AuthToken extends AuthBase {
   name = 'authToken';
 
-  authMethod(req: Request, res: Response, next: () => void): void {
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
     let token = req.headers['authorization'];
 
     if (!token || !/^Bearer .+/.test(token)) {
@@ -25,8 +25,7 @@ export default class AuthToken extends AuthBase {
       this.logger.warn(`Unauthorized token: ${token}`);
       return unauthorized(res);
     }
-    // @ts-expect-error new property
-    res.user =
+    req.user =
       'token number ' + (this.config.auth_token as string[]).indexOf(token);
     next();
   }

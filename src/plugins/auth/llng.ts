@@ -7,14 +7,17 @@
  * This plugin enables authentication and authorization using Lemonldap::NG.
  */
 import * as llng from 'lemonldap-ng-handler';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 
-import AuthBase from '../../lib/auth/base';
+import AuthBase, { DmRequest } from '../../lib/auth/base';
 
 export default class AuthLLNG extends AuthBase {
   name = 'authLemonldapNg';
 
-  authMethod(req: Request, res: Response, next: () => void): void {
-    llng.run(req, res, next);
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    llng.run(req, res, () => {
+      req.user = req.headers['Lm-Remote-User'] as string;
+      next();
+    });
   }
 }

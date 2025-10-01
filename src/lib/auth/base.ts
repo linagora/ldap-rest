@@ -1,5 +1,7 @@
 import type { Express, Request, Response } from 'express';
 
+export type DmRequest = Request & { user?: string };
+
 // eslint-disable-next-line import/order
 import DmPlugin from '../../abstract/plugin';
 
@@ -7,7 +9,7 @@ import { serverError } from '../../lib/expressFormatedResponses';
 import { launchHooksChained } from '../../lib/utils';
 
 export default abstract class AuthBase extends DmPlugin {
-  abstract authMethod(req: Request, res: Response, next: () => void): void;
+  abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
   api(app: Express): void {
     app.use(async (req, res, next) => {
       try {
