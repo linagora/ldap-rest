@@ -32,6 +32,10 @@
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
     },
+    "plugin-auth-openidconnect": {
+      "import": "./dist/plugins/auth/openidconnect.js",
+      "types": "./dist/src/plugins/auth/openidconnect.d.ts"
+    },
     "plugin-auth-token": {
       "import": "./dist/plugins/auth/token.js",
       "types": "./dist/src/plugins/auth/token.d.ts"
@@ -146,6 +150,7 @@
     "typescript": "^5.9.2"
   },
   "optionalDependencies": {
+    "express-openid-connect": "^2.19.2",
     "lemonldap-ng-handler": "^0.7.3",
     "re2": "^1.22.1"
   }

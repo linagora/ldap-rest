@@ -52,7 +52,11 @@ ENV NODE_ENV=production \
  DM_JAMES_WEBADMIN_URL="http://localhost:8000" \
  DM_JAMES_WEBADMIN_TOKEN= \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \
- DM_AUTH_TOKENS=
+ DM_AUTH_TOKENS= \
+ DM_OIDC_SERVER= \
+ DM_OIDC_CLIENT_ID= \
+ DM_OIDC_CLIENT_SECRET= \
+ DM_OIDC_REDIRECT_URI=
 
 EXPOSE 8081
 CMD ["npx", "mini-dm"]

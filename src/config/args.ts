@@ -54,11 +54,17 @@ export interface Config {
   static_path?: string;
   static_name?: string;
 
-  // AuthLlng
+  // auth/llng
   llng_ini?: string;
 
   // auth/token
   auth_token?: string[];
+
+  // auth/openidconnect
+  oidc_server?: string;
+  oidc_client_id?: string;
+  oidc_client_secret?: string;
+  oidc_redirect_uri?: string;
 
   // Special attributes
   mail_attribute?: string;
@@ -220,6 +226,12 @@ const configArgs: ConfigTemplate = [
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
+
+  // Auth OpenID Connect plugin
+  ['--oidc-server', 'DM_OIDC_SERVER', ''],
+  ['--oidc-client-id', 'DM_OIDC_CLIENT_ID', ''],
+  ['--oidc-client-secret', 'DM_OIDC_CLIENT_SECRET', ''],
+  ['--oidc-redirect-uri', 'DM_OIDC_REDIRECT_URI', ''],
 ];
 
 export default configArgs;
