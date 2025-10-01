@@ -1,12 +1,9 @@
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import fs from 'fs';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
-import { readdir } from 'fs/promises';
-import { extname } from 'path';
 import sort from 'sort-package-json';
 import { writeFileSync } from 'fs';
 import fg from 'fast-glob';

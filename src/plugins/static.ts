@@ -42,7 +42,7 @@ export default class Static extends DmPlugin {
           return notFound(res, 'Schema not found');
         }
         const str = transformSchemas(data, this.config);
-        return res.type('json').send(str);
+        res.type('json').send(str);
       });
     });
     app.use(`/${this.config.static_name}`, express.static(rep));

@@ -1,0 +1,5 @@
+[
+"core/weblogs",
+"core/ldap/groups",
+"core/ldap/externalUsersInGroups"
+]

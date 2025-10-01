@@ -28,6 +28,7 @@ import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
+import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
 
@@ -61,6 +62,13 @@ export class DM {
     const promises: Promise<void | boolean>[] = [];
 
     if (this.config.plugin) {
+      for (const p of pluginPriority as string[]) {
+        if (this.config.plugin.includes(p)) {
+          // ensure priority plugins are loaded first
+          this.config.plugin = this.config.plugin.filter(pl => pl !== p);
+          promises.push(this.loadPlugin(p));
+        }
+      }
       for (const pluginName of this.config.plugin) {
         promises.push(this.loadPlugin(pluginName));
       }
