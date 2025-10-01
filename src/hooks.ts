@@ -3,6 +3,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { SearchOptions, SearchResult } from 'ldapts';
+import type { Request, Response } from 'express';
 
 import type { ModifyRequest, AttributesList } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/ldap/onChange';
@@ -89,4 +90,8 @@ export interface Hooks {
     | VoidHook<unknown[]>
     | OtherHook
     | undefined;
+
+  /** Common authentication hooks */
+  beforeAuth?: ChainedHook<[Request, Response]>;
+  afterAuth?: ChainedHook<[Request, Response]>;
 }
