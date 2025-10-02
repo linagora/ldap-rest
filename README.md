@@ -1,6 +1,12 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/linagora/mini-dm)
+
 # Mini-dm
 
-Lite LinID directory manager
+Lite LinID directory manager is a lightweight directory manager that provides LDAP integration through a plugin-based architecture.
+This system enables directory management operations with configurable authentication, extensible functionality through events/hooks,
+and extensible REST API.
+
+Core plugins also provide plugins that ensure LDAP data consistency.
 
 ## How it works
 
