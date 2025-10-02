@@ -424,5 +424,102 @@ describe('LDAP Organizations Plugin', function () {
         expect(res.body).to.be.an('array').that.is.empty;
       });
     });
+
+    describe('POST /api/v1/ldap/organizations', () => {
+      it('should create a new organization', async () => {
+        const res = await request
+          .post('/api/v1/ldap/organizations')
+          .type('json')
+          .send({
+            ou: 'testorg',
+          });
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.deep.equal({ success: true });
+
+        // Verify organization was created
+        const org = await plugin.getOrganisationByDn(testOrgDn);
+        expect(org).to.have.property('ou', 'testorg');
+      });
+
+      it('should return error when ou is missing', async () => {
+        const res = await request
+          .post('/api/v1/ldap/organizations')
+          .type('json')
+          .send({});
+
+        expect(res.status).to.equal(400);
+      });
+    });
+
+    describe('PUT /api/v1/ldap/organizations/:dn', () => {
+      beforeEach(async () => {
+        await plugin.server.ldap.add(testOrgDn, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: 'testorg',
+        });
+      });
+
+      it('should modify an organization', async () => {
+        const res = await request
+          .put(`/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}`)
+          .type('json')
+          .send({
+            replace: { description: 'Test organization description' },
+          });
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.deep.equal({ success: true });
+
+        // Verify modification
+        const org = await plugin.getOrganisationByDn(testOrgDn);
+        expect(org).to.have.property('description', 'Test organization description');
+      });
+
+      it('should return error for invalid dn', async () => {
+        const res = await request
+          .put(`/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`)
+          .type('json')
+          .send({
+            replace: { description: 'Test' },
+          });
+
+        expect(res.status).to.equal(500);
+      });
+    });
+
+    describe('DELETE /api/v1/ldap/organizations/:dn', () => {
+      beforeEach(async () => {
+        await plugin.server.ldap.add(testOrgDn, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: 'testorg',
+        });
+      });
+
+      it('should delete an empty organization', async () => {
+        const res = await request
+          .delete(`/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}`)
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.deep.equal({ success: true });
+
+        // Verify organization was deleted
+        try {
+          await plugin.getOrganisationByDn(testOrgDn);
+          expect.fail('Organization should have been deleted');
+        } catch (e) {
+          expect((e as Error).message).to.match(/not found|Code: 0x20/);
+        }
+      });
+
+      it('should return error when deleting non-existent organization', async () => {
+        const res = await request
+          .delete(`/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`)
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(500);
+      });
+    });
   });
 });

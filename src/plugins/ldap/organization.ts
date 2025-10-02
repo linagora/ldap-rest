@@ -1,11 +1,17 @@
 import type { SearchResult } from 'ldapts';
-import type { Express } from 'express';
+import type { Express, Request, Response } from 'express';
 
 import DmPlugin from '../../abstract/plugin';
 import { DM } from '../../bin';
 import { Hooks } from '../../hooks';
-import { AttributesList } from '../../lib/ldapActions';
-import { tryMethodData } from '../../lib/expressFormatedResponses';
+import { AttributesList, ModifyRequest } from '../../lib/ldapActions';
+import {
+  tryMethodData,
+  tryMethod,
+  jsonBody,
+  wantJson,
+  badRequest,
+} from '../../lib/expressFormatedResponses';
 
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
@@ -52,6 +58,57 @@ export default class LdapOrganizations extends DmPlugin {
         await tryMethodData(res, this.getOrganisationSubnodes.bind(this), dn);
       }
     );
+
+    // Add organization
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/organizations`,
+      async (req, res) => this.apiAdd(req, res)
+    );
+
+    // Modify organization
+    app.put(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      async (req, res) => this.apiModify(req, res)
+    );
+
+    // Delete organization
+    app.delete(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      async (req, res) => this.apiDelete(req, res)
+    );
+  }
+
+  async apiAdd(req: Request, res: Response): Promise<void> {
+    const body = jsonBody(req, res, 'ou') as
+      | { ou: string; [key: string]: any }
+      | false;
+    if (!body) return;
+
+    const dn = `ou=${body.ou},${this.config.ldap_top_organization}`;
+    const entry: AttributesList = {
+      objectClass: this.config.ldap_organization_class as string[],
+      ou: body.ou,
+      ...Object.fromEntries(
+        Object.entries(body).filter(([key]) => key !== 'ou')
+      ),
+    };
+
+    await tryMethod(res, this.addOrganization.bind(this), dn, entry);
+  }
+
+  async apiModify(req: Request, res: Response): Promise<void> {
+    const body = jsonBody(req, res) as ModifyRequest | false;
+    if (!body) return;
+    const dn = decodeURIComponent(req.params.dn);
+    if (!dn) return badRequest(res, 'dn is required');
+    await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
+  }
+
+  async apiDelete(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+    const dn = decodeURIComponent(req.params.dn);
+    if (!dn) return badRequest(res, 'dn is required');
+    await tryMethod(res, this.deleteOrganization.bind(this), dn);
   }
 
   /**
@@ -262,5 +319,23 @@ export default class LdapOrganizations extends DmPlugin {
       res.push(...sub.searchEntries);
     }
     return res;
+  }
+
+  async addOrganization(dn: string, entry: AttributesList): Promise<boolean> {
+    // Hooks will validate the organization link and path
+    return await this.server.ldap.add(dn, entry);
+  }
+
+  async modifyOrganization(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<boolean> {
+    // Hooks will validate any changes to organization link and path
+    return await this.server.ldap.modify(dn, changes);
+  }
+
+  async deleteOrganization(dn: string): Promise<boolean> {
+    // Hook will check that organization is empty before deletion
+    return await this.server.ldap.delete(dn);
   }
 }

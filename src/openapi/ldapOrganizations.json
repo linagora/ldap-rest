@@ -1,0 +1,191 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "LDAP Organizations API",
+    "version": "1.0.0",
+    "description": "API for managing LDAP organizations"
+  },
+  "paths": {
+    "/api/v1/ldap/organizations/top": {
+      "get": {
+        "summary": "Get top organization",
+        "responses": {
+          "200": {
+            "description": "Top organization details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dn": { "type": "string" },
+                    "ou": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
+    "/api/v1/ldap/organizations/{dn}": {
+      "get": {
+        "summary": "Get organization by DN",
+        "parameters": [
+          {
+            "name": "dn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Organization DN"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organization details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dn": { "type": "string" },
+                    "ou": { "type": "string" },
+                    "description": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
+        }
+      },
+      "put": {
+        "summary": "Modify an organization",
+        "parameters": [
+          {
+            "name": "dn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Organization DN"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "add": {
+                    "type": "object",
+                    "description": "Attributes to add"
+                  },
+                  "replace": {
+                    "type": "object",
+                    "description": "Attributes to replace"
+                  },
+                  "delete": {
+                    "oneOf": [
+                      { "type": "array", "items": { "type": "string" } },
+                      { "type": "object" }
+                    ],
+                    "description": "Attributes to delete (cannot delete organization link or path)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Organization modified" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      },
+      "delete": {
+        "summary": "Delete an organization",
+        "description": "Delete an organization. The organization must be empty (no linked entries).",
+        "parameters": [
+          {
+            "name": "dn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Organization DN"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Organization deleted" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error - organization may not be empty" }
+        }
+      }
+    },
+    "/api/v1/ldap/organizations/{dn}/subnodes": {
+      "get": {
+        "summary": "Get organization subnodes",
+        "description": "Get all entries that link to this organization",
+        "parameters": [
+          {
+            "name": "dn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Organization DN"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of entries linked to this organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
+    "/api/v1/ldap/organizations": {
+      "post": {
+        "summary": "Add a new organization",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ou": {
+                    "type": "string",
+                    "description": "Organization unit name"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Organization description"
+                  }
+                },
+                "required": ["ou"],
+                "additionalProperties": true,
+                "description": "Additional LDAP attributes can be included"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Organization added" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      }
+    }
+  },
+  "components": {}
+}
