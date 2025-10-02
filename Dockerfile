@@ -33,7 +33,10 @@ ENV NODE_ENV=production \
  DM_SCHEMAS_PATH="/app/node_modules/mini-dm/static/schemas" \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
- DM_USER_CLASSES=top,inetOrgPerson \
+ DM_USER_CLASSES=top,twakeAccount,twakeWhitePages \
+ DM_LDAP_USER_BRANCH= \
+ DM_USER_DEFAULT_ATTRIBUTES="{}" \
+ DM_USER_SCHEMA="/app/node_modules/mini-dm/static/schemas/users.json" \
  DM_LDAP_TOP_ORGANIZATION= \
  DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \
  DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE="twakeDepartmentLink" \
@@ -47,6 +50,7 @@ ENV NODE_ENV=production \
  DM_GROUP_DUMMY_USER="cn=fakeuser" \
  DM_GROUP_SCHEMA="/app/node_modules/mini-dm/static/schemas/groups.json" \
  DM_EXTERNAL_MEMBERS_BRANCH="ou=contacts,dc=example,dc=com" \
+ DM_EXTERNAL_BRANCH_CLASSES=top,inetOrgPerson \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
  DM_STATIC_NAME="static" \
  DM_JAMES_WEBADMIN_URL="http://localhost:8000" \
