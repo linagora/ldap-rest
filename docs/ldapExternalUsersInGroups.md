@@ -24,11 +24,11 @@ This plugin intercepts group member validation and automatically creates missing
 
 ### Configuration Options
 
-| Argument | Environment Variable | Default | Description |
-|----------|---------------------|---------|-------------|
-| `--external-members-branch` | `DM_EXTERNAL_MEMBERS_BRANCH` | `ou=contacts,dc=example,dc=com` | Branch for external user entries |
-| `--external-branch-class` / `--external-branch-classes` | `DM_EXTERNAL_BRANCH_CLASSES` | `["top", "inetOrgPerson"]` | Object classes for external users |
-| `--mail-domain` / `--mail-domains` | `DM_MAIL_DOMAIN` | `[]` | Managed mail domains (cannot be used for external users) |
+| Argument                                                | Environment Variable         | Default                         | Description                                              |
+| ------------------------------------------------------- | ---------------------------- | ------------------------------- | -------------------------------------------------------- |
+| `--external-members-branch`                             | `DM_EXTERNAL_MEMBERS_BRANCH` | `ou=contacts,dc=example,dc=com` | Branch for external user entries                         |
+| `--external-branch-class` / `--external-branch-classes` | `DM_EXTERNAL_BRANCH_CLASSES` | `["top", "inetOrgPerson"]`      | Object classes for external users                        |
+| `--mail-domain` / `--mail-domains`                      | `DM_MAIL_DOMAIN`             | `[]`                            | Managed mail domains (cannot be used for external users) |
 
 ### Important Notes
 
@@ -80,6 +80,7 @@ curl -X POST http://localhost:8081/api/v1/ldap/groups \
 ```
 
 **What happens:**
+
 1. Group "newsletter" is created
 2. Internal user `john.doe` is validated (must exist)
 3. External user `external@partner.com` is checked:
@@ -138,7 +139,7 @@ hooks: {
     const newDn = dn; // or modify
 
     return [newDn, entry];
-  }
+  };
 }
 ```
 
@@ -153,7 +154,7 @@ hooks: {
     console.log('Attributes:', entry);
 
     // Send notification, update external system, etc.
-  }
+  };
 }
 ```
 
@@ -215,7 +216,7 @@ hooks: {
     entry.userType = 'external';
     entry.employeeType = 'contact';
     return [dn, entry];
-  }
+  };
 }
 ```
 
@@ -226,6 +227,7 @@ hooks: {
 **Problem:** Member addition fails but external user is not created
 
 **Solutions:**
+
 1. Verify DN format: `mail={email},{external_members_branch}`
 2. Check external branch exists in LDAP
 3. Ensure plugin is registered after groups plugin
@@ -236,6 +238,7 @@ hooks: {
 **Problem:** `Cannot create external user with managed domain: user@example.com`
 
 **Solutions:**
+
 1. Use the correct branch for internal users: `ou=users,dc=example,dc=com`
 2. Remove domain from `--mail-domain` if it should allow external users
 3. This is expected behavior for internal domains - create user in users branch instead
@@ -245,6 +248,7 @@ hooks: {
 **Problem:** `Malformed member mail=user,ou=contacts,dc=example,dc=com`
 
 **Solution:** Use correct format with email address:
+
 ```
 mail=user@domain.com,ou=contacts,dc=example,dc=com
 ```
@@ -264,7 +268,7 @@ hooks: {
     entry.displayName = localPart;
 
     return [dn, entry];
-  }
+  };
 }
 ```
 

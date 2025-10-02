@@ -139,9 +139,8 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Get group by cn or DN
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/groups/:cn`,
-      async (req, res) => this.apiGet(req, res)
+    app.get(`${this.config.api_prefix}/v1/ldap/groups/:cn`, async (req, res) =>
+      this.apiGet(req, res)
     );
 
     // Add group

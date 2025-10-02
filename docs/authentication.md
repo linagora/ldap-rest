@@ -22,6 +22,7 @@ Simple stateless authentication using bearer tokens.
 ```
 
 **Environment Variable:**
+
 ```bash
 DM_AUTH_TOKENS="token1,token2,token3"
 ```
@@ -92,6 +93,7 @@ Integration with [LemonLDAP::NG](https://lemonldap-ng.org/) (LLNG) Web SSO solut
 ```
 
 **Environment Variable:**
+
 ```bash
 DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
 ```
@@ -172,6 +174,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 ```
 
 **Environment Variables:**
+
 ```bash
 DM_OIDC_SERVER="https://auth.example.com"
 DM_OIDC_CLIENT_ID="mini-dm-client"
@@ -213,6 +216,7 @@ npm install express-openid-connect
 ```
 
 **Client Settings:**
+
 - Access Type: `confidential`
 - Valid Redirect URIs: `https://api.example.com/callback`
 - Standard Flow Enabled: `ON`
@@ -238,6 +242,7 @@ npm install express-openid-connect
 ### Scopes
 
 Default scopes requested:
+
 - `openid` - Basic OpenID Connect
 - `profile` - User profile information
 - `email` - User email address
@@ -256,7 +261,7 @@ hooks: {
     // Custom pre-authentication logic
     console.log('Authentication attempt from:', req.ip);
     return [req, res];
-  }
+  };
 }
 ```
 
@@ -278,7 +283,7 @@ hooks: {
     };
 
     return [req, res];
-  }
+  };
 }
 ```
 
@@ -291,15 +296,15 @@ hooks: {
 
 ## Choosing an Authentication Method
 
-| Feature | Token | LemonLDAP::NG | OpenID Connect |
-|---------|-------|---------------|----------------|
-| **Setup Complexity** | Simple | Medium | Medium |
-| **User Management** | None | External (LLNG) | External (Provider) |
-| **SSO Support** | No | Yes | Yes |
-| **MFA Support** | No | Yes (via LLNG) | Yes (via Provider) |
-| **Session Management** | Stateless | LLNG Sessions | OIDC Sessions |
-| **Best For** | APIs, Scripts | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
-| **Dependencies** | None | lemonldap-ng-handler | express-openid-connect |
+| Feature                | Token         | LemonLDAP::NG         | OpenID Connect                   |
+| ---------------------- | ------------- | --------------------- | -------------------------------- |
+| **Setup Complexity**   | Simple        | Medium                | Medium                           |
+| **User Management**    | None          | External (LLNG)       | External (Provider)              |
+| **SSO Support**        | No            | Yes                   | Yes                              |
+| **MFA Support**        | No            | Yes (via LLNG)        | Yes (via Provider)               |
+| **Session Management** | Stateless     | LLNG Sessions         | OIDC Sessions                    |
+| **Best For**           | APIs, Scripts | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
+| **Dependencies**       | None          | lemonldap-ng-handler  | express-openid-connect           |
 
 ## Combining with Authorization
 
@@ -313,7 +318,7 @@ hooks: {
       throw new Error('Forbidden: Admin access required');
     }
     return [req, res];
-  }
+  };
 }
 ```
 
@@ -351,6 +356,7 @@ Navigate to API in browser - will redirect to OIDC provider login page, then ret
 **Problem:** 401 Unauthorized despite correct token
 
 **Solutions:**
+
 1. Ensure `Authorization: Bearer {token}` format (not just the token)
 2. Check token is in configured list
 3. Verify no whitespace in token
@@ -361,6 +367,7 @@ Navigate to API in browser - will redirect to OIDC provider login page, then ret
 **Problem:** Handler not found
 
 **Solution:** Install optional dependency:
+
 ```bash
 npm install lemonldap-ng-handler
 ```
@@ -368,6 +375,7 @@ npm install lemonldap-ng-handler
 **Problem:** authentication refused
 
 **Solutions:**
+
 1. Verify LLNG handler is configured correctly
 2. Check virtual host configuration
 3. Review LLNG access logs
@@ -377,6 +385,7 @@ npm install lemonldap-ng-handler
 **Problem:** express-openid-connect not found
 
 **Solution:** Install optional dependency:
+
 ```bash
 npm install express-openid-connect
 ```
@@ -384,6 +393,7 @@ npm install express-openid-connect
 **Problem:** Missing config parameter
 
 **Solution:** Ensure all required parameters are set:
+
 - `--oidc-server`
 - `--oidc-client-id`
 - `--oidc-client-secret`
@@ -392,6 +402,7 @@ npm install express-openid-connect
 **Problem:** Redirect loop
 
 **Solutions:**
+
 1. Set a long secret, shorts are refused by `openid-client`
 2. Verify `--base-url` matches actual public URL
 3. Check redirect URI in provider matches `{base-url}/callback`

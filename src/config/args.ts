@@ -31,7 +31,6 @@ export interface Config {
   ldap_user_main_attribute?: string;
   user_class?: string[];
 
-
   // LDAP groups plugin
   ldap_group_base?: string;
   ldap_groups_main_attribute?: string;

@@ -80,7 +80,9 @@ describe('GET APIs for individual entities', function () {
       this.timeout(5000);
       // Find an existing group to use for testing
       const groups = await groupsPlugin.listGroups();
-      const groupNames = Object.keys(groups).filter((name) => name && name.length > 0);
+      const groupNames = Object.keys(groups).filter(
+        name => name && name.length > 0
+      );
       if (groupNames.length === 0) {
         throw new Error('No groups found in LDAP for testing');
       }
@@ -132,9 +134,7 @@ describe('GET APIs for individual entities', function () {
     it('should get organization by DN', async () => {
       const topOrg = process.env.DM_LDAP_TOP_ORGANIZATION as string;
       const encodedDn = encodeURIComponent(topOrg);
-      const res = await request.get(
-        `/api/v1/ldap/organizations/${encodedDn}`
-      );
+      const res = await request.get(`/api/v1/ldap/organizations/${encodedDn}`);
       expect(res.status).to.equal(200);
       expect(res.body).to.have.property('dn');
     });
@@ -153,9 +153,7 @@ describe('GET APIs for individual entities', function () {
     it('should return error for non-existent organization', async () => {
       const fakeDn = 'ou=nonexistent,dc=example,dc=com';
       const encodedDn = encodeURIComponent(fakeDn);
-      const res = await request.get(
-        `/api/v1/ldap/organizations/${encodedDn}`
-      );
+      const res = await request.get(`/api/v1/ldap/organizations/${encodedDn}`);
       expect(res.status).to.equal(500);
     });
   });
