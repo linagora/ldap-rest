@@ -6,29 +6,25 @@
     "description": "API for managing LDAP groups and their members"
   },
   "paths": {
-    "api/v1/ldap/groups": {
+    "/api/v1/ldap/groups": {
       "get": {
-        "summary": "List agroups",
+        "summary": "List groups",
         "parameters": [
           {
-            "name": "filter",
+            "name": "match",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "(objectClass=*)" },
-            "description": "LDAP filter to apply"
+            "schema": { "type": "string" },
+            "description": "Group name filter (can be a full name, wildcard pattern, or LDAP filter with '=')"
           },
           {
             "name": "attributes",
             "in": "query",
             "required": false,
             "schema": {
-              "oneOf": [
-                { "type": "string" },
-                { "type": "array", "items": { "type": "string" } }
-              ],
-              "default": ["cn", "description", "member"]
+              "type": "string"
             },
-            "description": "Attributes to retrieve"
+            "description": "Comma-separated list of attributes to retrieve"
           }
         ],
         "responses": {
@@ -73,7 +69,9 @@
                     ]
                   }
                 },
-                "required": ["cn"]
+                "required": ["cn"],
+                "additionalProperties": true,
+                "description": "Additional LDAP attributes can be included beyond cn and member"
               }
             }
           }
@@ -118,15 +116,19 @@
                 "type": "object",
                 "properties": {
                   "add": {
-                    "type": "array",
-                    "items": { "type": "object" }
+                    "type": "object",
+                    "description": "Attributes to add (cannot include 'member' or cn attribute)"
                   },
-                  "replace": { "type": "object" },
+                  "replace": {
+                    "type": "object",
+                    "description": "Attributes to replace (cannot include 'member' or cn attribute)"
+                  },
                   "delete": {
                     "oneOf": [
                       { "type": "array", "items": { "type": "string" } },
                       { "type": "object" }
-                    ]
+                    ],
+                    "description": "Attributes to delete (cannot include 'member' or cn attribute)"
                   }
                 }
               }
