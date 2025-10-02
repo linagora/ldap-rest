@@ -60,6 +60,10 @@
       "import": "./dist/plugins/ldap/organization.js",
       "types": "./dist/src/plugins/ldap/organization.d.ts"
     },
+    "plugin-ldap-usersflat": {
+      "import": "./dist/plugins/ldap/usersFlat.js",
+      "types": "./dist/src/plugins/ldap/usersFlat.d.ts"
+    },
     "plugin-static": {
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
@@ -75,6 +79,10 @@
     "schema-groups": {
       "import": "./static/schemas/groups.json",
       "require": "./static/schemas/groups.json"
+    },
+    "schema-users": {
+      "import": "./static/schemas/users.json",
+      "require": "./static/schemas/users.json"
     }
   },
   "main": "dist/bin/index.mjs",

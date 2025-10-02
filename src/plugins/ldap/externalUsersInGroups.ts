@@ -43,7 +43,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
                   const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
                   if (!mail) return reject(new Error(`Malformed member ${m}`));
                   let entry: AttributesList = {
-                    objectClass: this.config.user_class as string[],
+                    objectClass: (this.config.external_branch_class ||
+                      this.config.user_class) as string[],
                     mail,
                     [this.config.ldap_groups_main_attribute as string]: mail,
                     sn: mail,

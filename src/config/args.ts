@@ -30,6 +30,11 @@ export interface Config {
   ldap_user_main_attribute?: string;
   user_class?: string[];
 
+  // LDAP users plugin
+  ldap_user_branch?: string;
+  user_default_attributes?: AttributesList;
+  user_schema?: string;
+
   // LDAP groups plugin
   ldap_group_base?: string;
   ldap_groups_main_attribute?: string;
@@ -49,6 +54,7 @@ export interface Config {
 
   // External users in groups
   external_members_branch?: string;
+  external_branch_class?: string[];
 
   // Static
   static_path?: string;
@@ -136,12 +142,28 @@ const configArgs: ConfigTemplate = [
   [
     '--user-class',
     'DM_USER_CLASSES',
-    ['top', 'inetOrgPerson'],
+    ['top', 'twakeAccount', 'twakeWhitePages'],
     'array',
     '--user-classes',
   ],
 
   // Plugins options
+  // LDAP users plugin
+  ['--ldap-user-branch', 'DM_LDAP_USER_BRANCH', ''],
+  ['--user-default-attributes', 'DM_USER_DEFAULT_ATTRIBUTES', {}, 'json'],
+  [
+    '--user-schema',
+    'DM_USER_SCHEMA',
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      'static',
+      'schemas',
+      'users.json'
+    ),
+  ],
+
   // LDAP organizations
   ['--ldap-top-organization', 'DM_LDAP_TOP_ORGANIZATION', ''],
   [
@@ -205,6 +227,13 @@ const configArgs: ConfigTemplate = [
     '--external-members-branch',
     'DM_EXTERNAL_MEMBERS_BRANCH',
     'ou=contacts,dc=example,dc=com',
+  ],
+  [
+    '--external-branch-class',
+    'DM_EXTERNAL_BRANCH_CLASSES',
+    ['top', 'inetOrgPerson'],
+    'array',
+    '--external-branch-classes',
   ],
 
   // static
