@@ -42,6 +42,22 @@ export default class ExternalUsersInGroups extends DmPlugin {
                 .catch(async () => {
                   const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
                   if (!mail) return reject(new Error(`Malformed member ${m}`));
+
+                  // Check if mail domain is in managed domains
+                  if (
+                    this.config.mail_domain &&
+                    Array.isArray(this.config.mail_domain)
+                  ) {
+                    const domain = mail.split('@')[1];
+                    if (domain && this.config.mail_domain.includes(domain)) {
+                      return reject(
+                        new Error(
+                          `Cannot create external user with managed domain: ${mail}`
+                        )
+                      );
+                    }
+                  }
+
                   let entry: AttributesList = {
                     objectClass: (this.config.external_branch_class ||
                       this.config.user_class) as string[],

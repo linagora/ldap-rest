@@ -242,6 +242,9 @@ class ldapActions {
         void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
         return true;
       } catch (error) {
+        this.logger.warn(
+          `Changes that failed: ${dn}, ${JSON.stringify(ldapChanges)}`
+        );
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         throw new Error(`LDAP modify error: ${error}`);
       }

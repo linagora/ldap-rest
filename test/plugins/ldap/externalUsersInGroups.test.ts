@@ -5,6 +5,7 @@ import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGrou
 import { SearchResult } from 'ldapts';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
+process.env.DM_GROUP_SCHEMA = '';
 
 describe('External users in groups', function () {
   // Skip all tests if required env vars are not set
@@ -69,5 +70,71 @@ describe('External users in groups', function () {
     )
       .to.have.property('mail')
       .that.equals('toto@toto.org');
+  });
+
+  describe('Mail domain validation', function () {
+    // Skip if mail_domain is not configured
+    if (!process.env.DM_MAIL_DOMAIN) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'Skipping mail domain validation tests: DM_MAIL_DOMAIN not configured'
+      );
+      // @ts-ignore
+      this.skip?.();
+      return;
+    }
+
+    const managedDomain = process.env.DM_MAIL_DOMAIN.split(',')[0];
+    const managedUser = `mail=internal@${managedDomain},${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
+
+    afterEach(async () => {
+      try {
+        await plugin.deleteGroup('testgroup2');
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.ldap.delete(managedUser);
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    it('should reject external member with managed domain', async () => {
+      try {
+        await plugin.addGroup('testgroup2', [managedUser]);
+        expect.fail('Should reject managed domain');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /Cannot create external user with managed domain/
+        );
+      }
+    });
+
+    it('should accept external member with non-managed domain', async () => {
+      const externalUser = `mail=external@external-domain.org,${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
+      await plugin.addGroup('testgroup2', [externalUser]);
+      expect(await plugin.searchGroupsByName('testgroup2')).to.deep.equal({
+        testgroup2: {
+          dn: `cn=testgroup2,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup2',
+          member: [externalUser],
+        },
+      });
+      expect(
+        ((await plugin.ldap.search({ paged: false }, externalUser)) as SearchResult)
+          .searchEntries[0]
+      )
+        .to.have.property('mail')
+        .that.equals('external@external-domain.org');
+      await plugin.ldap.delete(externalUser);
+      expect(await plugin.searchGroupsByName('testgroup2')).to.deep.equal({
+        testgroup2: {
+          dn: `cn=testgroup2,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup2',
+          member: [],
+        },
+      });
+    });
   });
 });

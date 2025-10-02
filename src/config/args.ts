@@ -22,6 +22,7 @@ export interface Config {
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   logger: 'console';
   api_prefix: string;
+  mail_domain?: string[];
   // LDAP
   ldap_base?: string;
   ldap_dn?: string;
@@ -115,6 +116,7 @@ const configArgs: ConfigTemplate = [
   ['--log-level', 'DM_LOG_LEVEL', 'info'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
+  ['--mail-domain', 'DM_MAIL_DOMAIN', [], 'array', '--mail-domains'],
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],

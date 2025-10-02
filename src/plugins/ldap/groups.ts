@@ -95,6 +95,9 @@ export default class LdapGroups extends DmPlugin {
       if (!Array.isArray(_dn)) {
         _dn = [_dn];
       }
+      this.logger.debug(
+        `User deletion detected, removing from groups: ${_dn.join(', ')}`
+      );
       // Use async to delete user from groups, don't block the main deletion
       Promise.all(_dn.map(dnEntry => this.deleteMemberFromAll(dnEntry))).catch(
         err => {
