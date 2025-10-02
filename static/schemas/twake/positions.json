@@ -1,0 +1,23 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "twakePosition"],
+      "required": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9 &/,.-]+$",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}
