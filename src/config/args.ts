@@ -31,10 +31,6 @@ export interface Config {
   ldap_user_main_attribute?: string;
   user_class?: string[];
 
-  // LDAP users plugin
-  ldap_user_branch?: string;
-  user_default_attributes?: AttributesList;
-  user_schema?: string;
 
   // LDAP groups plugin
   ldap_group_base?: string;
@@ -74,7 +70,7 @@ export interface Config {
   oidc_server?: string;
   oidc_client_id?: string;
   oidc_client_secret?: string;
-  oidc_redirect_uri?: string;
+  base_url?: string;
 
   // Special attributes
   mail_attribute?: string;
@@ -153,22 +149,6 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Plugins options
-  // LDAP users plugin
-  ['--ldap-user-branch', 'DM_LDAP_USER_BRANCH', ''],
-  ['--user-default-attributes', 'DM_USER_DEFAULT_ATTRIBUTES', {}, 'json'],
-  [
-    '--user-schema',
-    'DM_USER_SCHEMA',
-    join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'static',
-      'schemas',
-      'twake',
-      'users.json'
-    ),
-  ],
 
   // LDAP organizations
   ['--ldap-top-organization', 'DM_LDAP_TOP_ORGANIZATION', ''],
@@ -276,7 +256,7 @@ const configArgs: ConfigTemplate = [
   ['--oidc-server', 'DM_OIDC_SERVER', ''],
   ['--oidc-client-id', 'DM_OIDC_CLIENT_ID', ''],
   ['--oidc-client-secret', 'DM_OIDC_CLIENT_SECRET', ''],
-  ['--oidc-redirect-uri', 'DM_OIDC_REDIRECT_URI', ''],
+  ['--base-url', 'DM_BASE_URL', ''],
 ];
 
 export default configArgs;

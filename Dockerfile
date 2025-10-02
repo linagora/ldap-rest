@@ -35,9 +35,6 @@ ENV NODE_ENV=production \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
  DM_USER_CLASSES=top,twakeAccount,twakeWhitePages \
- DM_LDAP_USER_BRANCH= \
- DM_USER_DEFAULT_ATTRIBUTES="{}" \
- DM_USER_SCHEMA="/app/node_modules/mini-dm/static/schemas/twake/users.json" \
  DM_LDAP_TOP_ORGANIZATION= \
  DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \
  DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE="twakeDepartmentLink" \
@@ -62,7 +59,7 @@ ENV NODE_ENV=production \
  DM_OIDC_SERVER= \
  DM_OIDC_CLIENT_ID= \
  DM_OIDC_CLIENT_SECRET= \
- DM_OIDC_REDIRECT_URI=
+ DM_BASE_URL=
 
 EXPOSE 8081
 CMD ["npx", "mini-dm"]
