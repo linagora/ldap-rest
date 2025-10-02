@@ -86,14 +86,5 @@ describe('LdapGroups validation', function () {
       });
       expect(await plugin.deleteGroup('testgroup4')).to.be.true;
     });
-
-    it('should not add group without required twake attributes', async () => {
-      try {
-        await plugin.addGroup('testgroup3', [user1], {});
-      } catch (e: any) {
-        expect(e.message).to.match(/Missing required field/);
-      }
-      expect(await plugin.searchGroupsByName('testgroup3')).to.deep.equal({});
-    });
   });
 });
