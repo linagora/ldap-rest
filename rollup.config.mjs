@@ -4,7 +4,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
-import sort from 'sort-package-json';
+import { sortPackageJson } from 'sort-package-json';
 import { writeFileSync } from 'fs';
 import fg from 'fast-glob';
 
@@ -103,13 +103,13 @@ export default async () => {
     };
   });
   (await getSpecs()).forEach(spec => {
-    const name = spec.replace(/\.json$/, '');
+    const name = spec.replace(/\.json$/, '').replace(/\//g, '-');
     pkg.exports[`schema-${name.toLowerCase()}`] = {
       import: `./static/schemas/${spec}`,
       require: `./static/schemas/${spec}`,
     };
   });
-  writeFileSync('package.json', sort(JSON.stringify(pkg, null, 2)));
+  writeFileSync('package.json', sortPackageJson(JSON.stringify(pkg, null, 2)));
   return [
     {
       input: [

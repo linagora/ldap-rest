@@ -34,7 +34,7 @@ describe('LdapGroups validation', function () {
 
   before(async () => {
     server = new DM();
-    process.env.DM_GROUP_SCHEMA = '../../static/schemas/groups.json';
+    process.env.DM_GROUP_SCHEMA = '../../static/schemas/twake/groups.json';
     plugin = new LdapGroups(server);
     const entry = {
       objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],

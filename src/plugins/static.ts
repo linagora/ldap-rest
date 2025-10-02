@@ -45,6 +45,18 @@ export default class Static extends DmPlugin {
         res.type('json').send(str);
       });
     });
+    app.get(`/${this.config.static_name}/schemas/:dir/:name`, (req, res) => {
+      if (!/^[\w-]+$/.test(req.params.dir) || !/^[\w-]+\.json$/.test(req.params.name)) {
+        return res.status(400).send('Invalid schema name');
+      }
+      fs.readFile(join(rep, 'schemas', req.params.dir, req.params.name), (err, data) => {
+        if (err) {
+          return notFound(res, 'Schema not found');
+        }
+        const str = transformSchemas(data, this.config);
+        res.type('json').send(str);
+      });
+    });
     app.use(`/${this.config.static_name}`, express.static(rep));
   }
 }

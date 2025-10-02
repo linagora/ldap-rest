@@ -25,6 +25,7 @@ ENV NODE_ENV=production \
  DM_LOG_LEVEL="info" \
  DM_LOGGER="console" \
  DM_API_PREFIX="/api" \
+ DM_MAIL_DOMAIN= \
  DM_LDAP_BASE= \
  DM_LDAP_DN="cn=admin,dc=example,dc=com" \
  DM_LDAP_PWD="admin" \
@@ -36,7 +37,7 @@ ENV NODE_ENV=production \
  DM_USER_CLASSES=top,twakeAccount,twakeWhitePages \
  DM_LDAP_USER_BRANCH= \
  DM_USER_DEFAULT_ATTRIBUTES="{}" \
- DM_USER_SCHEMA="/app/node_modules/mini-dm/static/schemas/users.json" \
+ DM_USER_SCHEMA="/app/node_modules/mini-dm/static/schemas/twake/users.json" \
  DM_LDAP_TOP_ORGANIZATION= \
  DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \
  DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE="twakeDepartmentLink" \
@@ -48,7 +49,7 @@ ENV NODE_ENV=production \
  DM_ALLOW_UNEXISTENT_MEMBERS=false \
  DM_GROUP_DEFAULT_ATTRIBUTES="{}" \
  DM_GROUP_DUMMY_USER="cn=fakeuser" \
- DM_GROUP_SCHEMA="/app/node_modules/mini-dm/static/schemas/groups.json" \
+ DM_GROUP_SCHEMA="/app/node_modules/mini-dm/static/schemas/twake/groups.json" \
  DM_EXTERNAL_MEMBERS_BRANCH="ou=contacts,dc=example,dc=com" \
  DM_EXTERNAL_BRANCH_CLASSES=top,inetOrgPerson \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \

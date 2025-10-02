@@ -30,7 +30,7 @@ describe('LdapUsersFlat validation', function () {
 
   before(async function () {
     this.timeout(5000); // Increase timeout to wait for schema loading
-    process.env.DM_USER_SCHEMA = './static/schemas/users.json';
+    process.env.DM_USER_SCHEMA = './static/schemas/twake/users.json';
     server = new DM();
     plugin = new LdapUsersFlat(server);
     // Wait for schema to load (async file read)

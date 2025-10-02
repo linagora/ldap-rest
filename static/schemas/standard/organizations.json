@@ -1,0 +1,48 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "organizationalUnit"],
+      "required": true
+    },
+    "ou": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "telephoneNumber": {
+      "type": "string",
+      "required": false
+    },
+    "facsimileTelephoneNumber": {
+      "type": "string",
+      "required": false
+    },
+    "l": {
+      "type": "string",
+      "required": false
+    },
+    "postalAddress": {
+      "type": "string",
+      "required": false
+    },
+    "businessCategory": {
+      "type": "string",
+      "test": "^.*,__LDAP_BASE__",
+      "required": false
+    },
+    "seeAlso": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

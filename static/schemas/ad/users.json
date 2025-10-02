@@ -1,0 +1,90 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "person", "organizationalPerson", "user"],
+      "required": true
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "sAMAccountName": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,20}$",
+      "required": true
+    },
+    "userPrincipalName": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "required": false
+    },
+    "sn": {
+      "type": "string",
+      "required": true
+    },
+    "givenName": {
+      "type": "string",
+      "required": false
+    },
+    "displayName": {
+      "type": "string",
+      "required": false
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "required": false
+    },
+    "telephoneNumber": {
+      "type": "string",
+      "required": false
+    },
+    "mobile": {
+      "type": "string",
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "department": {
+      "type": "string",
+      "required": false
+    },
+    "company": {
+      "type": "string",
+      "required": false
+    },
+    "title": {
+      "type": "string",
+      "required": false
+    },
+    "manager": {
+      "type": "string",
+      "test": "^CN=.*,__LDAP_BASE__",
+      "required": false
+    },
+    "userAccountControl": {
+      "type": "number",
+      "required": false
+    },
+    "unicodePwd": {
+      "type": "string",
+      "required": false
+    },
+    "accountExpires": {
+      "type": "number",
+      "required": false
+    },
+    "pwdLastSet": {
+      "type": "number",
+      "required": false
+    }
+  }
+}

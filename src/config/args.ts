@@ -162,6 +162,7 @@ const configArgs: ConfigTemplate = [
       '..',
       'static',
       'schemas',
+      'twake',
       'users.json'
     ),
   ],
@@ -219,6 +220,7 @@ const configArgs: ConfigTemplate = [
       '..',
       'static',
       'schemas',
+      'twake',
       'groups.json'
     ),
   ],

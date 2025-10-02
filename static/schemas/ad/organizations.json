@@ -1,0 +1,65 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "organizationalUnit"],
+      "required": true
+    },
+    "ou": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "managedBy": {
+      "type": "string",
+      "test": "^CN=.*,__LDAP_BASE__",
+      "required": false
+    },
+    "street": {
+      "type": "string",
+      "required": false
+    },
+    "l": {
+      "type": "string",
+      "required": false
+    },
+    "st": {
+      "type": "string",
+      "required": false
+    },
+    "postalCode": {
+      "type": "string",
+      "required": false
+    },
+    "c": {
+      "type": "string",
+      "test": "^[A-Z]{2}$",
+      "required": false
+    },
+    "co": {
+      "type": "string",
+      "required": false
+    },
+    "telephoneNumber": {
+      "type": "string",
+      "required": false
+    },
+    "facsimileTelephoneNumber": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "groupOfNames"],
+      "required": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-zA-Z][a-zA-Z0-9-]{0,254}$",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "required": false
+    },
+    "member": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
+      },
+      "required": false
+    },
+    "owner": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$"
+      },
+      "required": false
+    },
+    "businessCategory": {
+      "type": "string",
+      "test": "^.*,__LDAP_BASE__",
+      "required": false
+    },
+    "ou": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

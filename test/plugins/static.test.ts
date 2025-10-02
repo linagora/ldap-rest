@@ -79,7 +79,7 @@ describe('static', () => {
       plugin = new Static(dm);
       await dm.registerPlugin('static', plugin);
       const request = supertest(dm.app);
-      const res = await request.get('/static/schemas/groups.json');
+      const res = await request.get('/static/schemas/twake/groups.json');
       expect(res.status).to.equal(200);
       expect(res.type).to.equal('application/json');
       expect(JSON.stringify(res.body)).to.match(/dc=example/);
