@@ -93,7 +93,7 @@ describe('LdapFlatGeneric plugin', function () {
 
       const res = await request
         .put(
-          '/api/v1/ldap/titles/cn=TestTitle,ou=twakeTitle,ou=nomenclature,o=gov,c=mu'
+          `/api/v1/ldap/titles/cn=TestTitle,ou=twakeTitle,ou=nomenclature,${process.env.DM_LDAP_BASE}`
         )
         .send({ replace: { description: 'Updated' } });
       expect(res.status).to.equal(200);
@@ -110,7 +110,7 @@ describe('LdapFlatGeneric plugin', function () {
       await plugin.instances[0].addEntry('TestTitle');
 
       const res = await request.delete(
-        '/api/v1/ldap/titles/cn=TestTitle,ou=twakeTitle,ou=nomenclature,o=gov,c=mu'
+        `/api/v1/ldap/titles/cn=TestTitle,ou=twakeTitle,ou=nomenclature,${process.env.DM_LDAP_BASE}`
       );
       expect(res.status).to.equal(200);
 

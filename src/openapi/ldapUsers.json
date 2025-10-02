@@ -183,7 +183,9 @@
             }
           },
           "404": { "description": "User not found" },
-          "400": { "description": "Bad request - validation error or attempting to modify main attribute" },
+          "400": {
+            "description": "Bad request - validation error or attempting to modify main attribute"
+          },
           "500": { "description": "Server error" }
         }
       }

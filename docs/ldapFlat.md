@@ -5,6 +5,7 @@ The `ldapFlat` generic plugin allows you to manage LDAP entities in flat branche
 ## Overview
 
 The plugin automatically creates REST APIs for any flat LDAP structure by reading enriched JSON schemas. It's perfect for managing:
+
 - Users
 - Positions
 - Nomenclature items (titles, list types, delivery modes, etc.)
@@ -22,6 +23,7 @@ The plugin automatically creates REST APIs for any flat LDAP structure by readin
 ```
 
 Or using the plural alias:
+
 ```bash
 --ldap-flat-schemas ./static/schemas/twake/users.json,./static/schemas/twake/positions.json
 ```
@@ -48,13 +50,14 @@ Describes how the plugin should handle this entity:
     "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
     "singularName": "user",
     "pluralName": "users",
-    "base": "ou=users,{ldap_base}",
+    "base": "ou=users,__LDAP_BASE__",
     "defaultAttributes": {}
   }
 }
 ```
 
 **Fields:**
+
 - `name` (required): Unique name for this entity type, used as hook prefix (`ldap{name}`)
 - `mainAttribute` (required): The RDN attribute (e.g., `uid`, `cn`)
 - `objectClass` (required): Array of LDAP object classes to use
@@ -66,9 +69,10 @@ Describes how the plugin should handle this entity:
 **Base Path Placeholders:**
 
 The `base` field supports dynamic config value substitution:
-- `{ldap_base}` → Replaced by `--ldap-base` value
-- `{ldap_user_branch}` → Replaced by `--ldap-user-branch` value
-- `{any_config_key}` → Replaced by corresponding config value
+
+- `__LDAP_BASE__` → Replaced by `--ldap-base` value
+- `__LDAP_USER_BRANCH__` → Replaced by `--ldap-user-branch` value
+- `__ANY_CONFIG_KEY__` → Replaced by corresponding config value (uppercase with underscores)
 
 ### 2. Attribute Validation Schema
 
@@ -97,6 +101,7 @@ Standard JSON schema for validating LDAP attributes:
 ```
 
 **Validation Rules:**
+
 - `strict: true` → Reject attributes not defined in schema
 - `type`: `string`, `array`, `number`, `boolean`
 - `test`: Regular expression pattern for validation
@@ -108,25 +113,29 @@ Standard JSON schema for validating LDAP attributes:
 For each schema, the plugin automatically generates these REST endpoints:
 
 ### List Entities
+
 ```http
 GET /api/v1/ldap/{pluralName}
 ```
 
 **Query Parameters:**
+
 - `match` (optional): Filter pattern for the main attribute
 - `attribute` (optional): Attribute name to search (used with `match`)
 - `attributes` (optional): Comma-separated list of attributes to return
 
 **Example:**
+
 ```bash
 curl "http://localhost:8081/api/v1/ldap/users?match=john&attribute=uid&attributes=uid,mail,cn"
 ```
 
 **Response (200):**
+
 ```json
 {
   "john.doe": {
-    "dn": "uid=john.doe,ou=users,o=gov,c=mu",
+    "dn": "uid=john.doe,ou=users,dc=example,dc=com",
     "uid": "john.doe",
     "mail": "john.doe@example.com",
     "cn": "John Doe"
@@ -135,11 +144,13 @@ curl "http://localhost:8081/api/v1/ldap/users?match=john&attribute=uid&attribute
 ```
 
 ### Create Entity
+
 ```http
 POST /api/v1/ldap/{pluralName}
 ```
 
 **Request Body:**
+
 ```json
 {
   "uid": "john.doe",
@@ -150,9 +161,10 @@ POST /api/v1/ldap/{pluralName}
 ```
 
 **Response (201):**
+
 ```json
 {
-  "dn": "uid=john.doe,ou=users,o=gov,c=mu",
+  "dn": "uid=john.doe,ou=users,dc=example,dc=com",
   "uid": "john.doe",
   "cn": "John Doe",
   "sn": "Doe",
@@ -161,14 +173,17 @@ POST /api/v1/ldap/{pluralName}
 ```
 
 ### Modify Entity
+
 ```http
 PUT /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Path Parameter:**
+
 - `id`: Main attribute value OR full DN
 
 **Request Body:**
+
 ```json
 {
   "replace": {
@@ -183,6 +198,7 @@ PUT /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Response (200):**
+
 ```json
 {
   "success": true
@@ -190,14 +206,17 @@ PUT /api/v1/ldap/{pluralName}/{id}
 ```
 
 ### Delete Entity
+
 ```http
 DELETE /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Path Parameter:**
+
 - `id`: Main attribute value OR full DN
 
 **Response (200):**
+
 ```json
 {
   "success": true
@@ -218,7 +237,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
     "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
     "singularName": "user",
     "pluralName": "users",
-    "base": "{ldap_user_branch}"
+    "base": "__LDAP_USER_BRANCH__"
   },
   "strict": true,
   "attributes": {
@@ -247,6 +266,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Generated APIs:**
+
 - `GET /api/v1/ldap/users` - List all users
 - `POST /api/v1/ldap/users` - Create user
 - `PUT /api/v1/ldap/users/{uid}` - Modify user
@@ -264,7 +284,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
     "objectClass": ["top", "twakePosition"],
     "singularName": "position",
     "pluralName": "positions",
-    "base": "ou=positions,{ldap_base}"
+    "base": "ou=positions,__LDAP_BASE__"
   },
   "strict": true,
   "attributes": {
@@ -282,6 +302,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Generated APIs:**
+
 - `GET /api/v1/ldap/positions`
 - `POST /api/v1/ldap/positions`
 - `PUT /api/v1/ldap/positions/{cn}`
@@ -299,7 +320,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
     "objectClass": ["top", "applicationProcess"],
     "singularName": "title",
     "pluralName": "titles",
-    "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"
+    "base": "ou=twakeTitle,ou=nomenclature,__LDAP_BASE__"
   },
   "strict": true,
   "attributes": {
@@ -317,6 +338,7 @@ DELETE /api/v1/ldap/{pluralName}/{id}
 ```
 
 **Generated APIs:**
+
 - `GET /api/v1/ldap/titles`
 - `POST /api/v1/ldap/titles`
 - `PUT /api/v1/ldap/titles/{cn}`
@@ -335,13 +357,14 @@ The plugin emits lifecycle hooks for each entity type, using the format `ldap{na
 - `ldap{name}deletedone` - After successful deletion
 
 **Example:** For the `twakeUser` entity:
+
 ```javascript
 hooks: {
   ldaptwakeUseraddrequest: async ([dn, entry, op]) => {
     // Validate or modify entry before creation
     console.log('Creating user:', dn);
     return [dn, entry, op];
-  }
+  };
 }
 ```
 
@@ -350,16 +373,19 @@ hooks: {
 The repository includes three schema variants for common use cases:
 
 ### Twake Schemas (`static/schemas/twake/`)
+
 - Uses Twake-specific attributes (`twakeDepartmentLink`, `twakeDepartmentPath`)
 - Custom object classes (`twakeAccount`, `twakeWhitePages`)
 - Best for Twake deployments
 
 ### Standard Schemas (`static/schemas/standard/`)
+
 - Uses standard LDAP attributes (`departmentNumber`, `businessCategory`)
 - Standard object classes (`inetOrgPerson`, `organizationalPerson`)
 - Best for interoperability with other LDAP tools
 
 ### Active Directory Schemas (`static/schemas/ad/`)
+
 - Uses Microsoft AD conventions (`sAMAccountName`, `userPrincipalName`)
 - AD-specific attributes (`managedBy`, `memberOf`)
 - Best for Active Directory integration
@@ -367,13 +393,14 @@ The repository includes three schema variants for common use cases:
 ## Notes
 
 - All entities must be in **flat branches** (non-hierarchical)
-- For hierarchical structures (like organizations), use the dedicated `ldap/organization` plugin
+- For hierarchical structures (like organizations), use the dedicated
+  [core/ldap/organization](./ldapOrganizations.md) plugin
 - The plugin validates all inputs against the schema before performing LDAP operations
 - Multiple instances can be created by providing multiple schema files
 - Each instance operates independently with its own API endpoints
 
 ## See Also
 
-- [LDAP Organizations Plugin](./ldapOrganizations.md) - For hierarchical LDAP structures
-- [LDAP Groups Plugin](./ldapGroups.md) - For managing groups with member validation
-- [Schema Examples](../static/schemas/) - Complete schema examples
+- [LDAP Organizations Plugin](./ldapOrganizations.md) - For managing hierarchical organizational structures with automatic validation
+- [LDAP Groups Plugin](./ldapGroups.md) - For managing groups with members, automatic validation and cleanup
+- [Schema Examples](../static/schemas/) - Complete schema examples for Twake, Standard, and Active Directory
