@@ -1,26 +1,25 @@
 {
   "entity": {
-    "name": "twakePosition",
+    "name": "twakeListType",
     "mainAttribute": "cn",
-    "objectClass": ["top", "twakePosition"],
-    "singularName": "position",
-    "pluralName": "positions",
-    "base": "ou=positions,{ldap_base}"
+    "objectClass": ["top", "applicationProcess"],
+    "singularName": "listType",
+    "pluralName": "listTypes",
+    "base": "ou=twakeListType,ou=nomenclature,{ldap_base}"
   },
   "strict": true,
   "attributes": {
     "objectClass": {
       "type": "array",
       "items": {
-        "type": "string",
-        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+        "type": "string"
       },
-      "default": ["top", "twakePosition"],
+      "default": ["top", "applicationProcess"],
       "required": true
     },
     "cn": {
       "type": "string",
-      "test": "^[a-zA-Z0-9 &/,.-]+$",
+      "test": "^[a-zA-Z][a-zA-Z0-9]+$",
       "required": true
     },
     "description": {

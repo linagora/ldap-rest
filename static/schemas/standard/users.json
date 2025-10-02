@@ -1,4 +1,12 @@
 {
+  "entity": {
+    "name": "standardUser",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "inetOrgPerson", "organizationalPerson", "person"],
+    "singularName": "user",
+    "pluralName": "users",
+    "base": "{ldap_user_branch}"
+  },
   "strict": true,
   "attributes": {
     "objectClass": {

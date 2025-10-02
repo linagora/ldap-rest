@@ -54,6 +54,7 @@ ENV NODE_ENV=production \
  DM_EXTERNAL_BRANCH_CLASSES=top,inetOrgPerson \
  DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
  DM_STATIC_NAME="static" \
+ DM_LDAP_FLAT_SCHEMA= \
  DM_JAMES_WEBADMIN_URL="http://localhost:8000" \
  DM_JAMES_WEBADMIN_TOKEN= \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \

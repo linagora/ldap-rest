@@ -90,7 +90,9 @@ export default class LdapOrganizations extends DmPlugin {
       objectClass: this.config.ldap_organization_class as string[],
       ou: body.ou,
       ...Object.fromEntries(
-        Object.entries(body).filter(([key]) => key !== 'ou' && key !== 'parentDn')
+        Object.entries(body).filter(
+          ([key]) => key !== 'ou' && key !== 'parentDn'
+        )
       ),
     };
 

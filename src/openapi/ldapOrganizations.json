@@ -118,7 +118,9 @@
         "responses": {
           "200": { "description": "Organization deleted" },
           "400": { "description": "Bad request" },
-          "500": { "description": "Server error - organization may not be empty" }
+          "500": {
+            "description": "Server error - organization may not be empty"
+          }
         }
       }
     },

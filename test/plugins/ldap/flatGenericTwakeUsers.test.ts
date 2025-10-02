@@ -1,12 +1,16 @@
 import { expect } from 'chai';
-import LdapUsersFlat from '../../../src/plugins/ldap/usersFlat';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 
-const { DM_LDAP_USER_BRANCH } = process.env;
-process.env.DM_USER_SCHEMA = '';
+const { DM_LDAP_USER_BRANCH, DM_LDAP_BASE } = process.env;
 
-describe('LdapUsersFlat Plugin', function () {
+const twakeAttr = {
+  twakeDepartmentPath: 'Test / SubTest',
+  twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+};
+
+describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   // Skip all tests if required env vars are not set
   if (
     !process.env.DM_LDAP_DN ||
@@ -23,11 +27,21 @@ describe('LdapUsersFlat Plugin', function () {
   }
 
   let server: DM;
-  let plugin: LdapUsersFlat;
+  let genericPlugin: LdapFlatGeneric;
+  let plugin: any; // The users instance from flatGeneric
 
   before(async () => {
+    process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
     server = new DM();
-    plugin = new LdapUsersFlat(server);
+    genericPlugin = new LdapFlatGeneric(server);
+    plugin = genericPlugin.instances[0];
+    // Add backward compatibility aliases
+    plugin.addUser = plugin.addEntry.bind(plugin);
+    plugin.deleteUser = plugin.deleteEntry.bind(plugin);
+    plugin.modifyUser = plugin.modifyEntry.bind(plugin);
+    plugin.renameUser = plugin.renameEntry.bind(plugin);
+    plugin.listUsers = plugin.listEntries.bind(plugin);
+    plugin.searchUsersByName = plugin.searchEntriesByName.bind(plugin);
   });
 
   afterEach(async () => {
@@ -50,8 +64,9 @@ describe('LdapUsersFlat Plugin', function () {
         cn: 'Test User',
         sn: 'User',
         mail: 'testuser-flat@example.org',
+        ...twakeAttr,
       });
-      const listEntries = await plugin.listUsers();
+      const listEntries = await plugin.listUsers({});
       // @ts-ignore
       expect(listEntries).to.have.property('testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
@@ -70,6 +85,7 @@ describe('LdapUsersFlat Plugin', function () {
         mail: 'testuser-flat-2@example.org',
         givenName: 'Test',
         displayName: 'Test User',
+        ...twakeAttr,
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -100,6 +116,7 @@ describe('LdapUsersFlat Plugin', function () {
         sn: 'User',
         mail: 'testuser-flat-3@example.org',
         displayName: 'Test User',
+        ...twakeAttr,
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -146,6 +163,7 @@ describe('LdapUsersFlat Plugin', function () {
         cn: 'Test User',
         sn: 'User',
         mail: 'testuser-flat-rename@example.org',
+        ...twakeAttr,
       });
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
@@ -172,14 +190,18 @@ describe('LdapUsersFlat Plugin', function () {
     });
 
     it('should add/del user via API', async () => {
-      let res = await request.post('/api/v1/ldap/users').type('json').send({
-        uid: 'testuser',
-        cn: 'Test User',
-        sn: 'User',
-        mail: 'testuser-flat-api@example.org',
-      });
-      expect(res.body).to.deep.equal({ success: true });
-      expect(res.status).to.equal(200);
+      let res = await request
+        .post('/api/v1/ldap/users')
+        .type('json')
+        .send({
+          uid: 'testuser',
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-flat-api@example.org',
+          ...twakeAttr,
+        });
+      expect(res.status).to.equal(201);
+      expect(res.body).to.have.property('uid', 'testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
           dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
@@ -202,6 +224,7 @@ describe('LdapUsersFlat Plugin', function () {
         sn: 'User',
         mail: 'testuser-flat-api-modify@example.org',
         displayName: 'Test User',
+        ...twakeAttr,
       });
       let res = await request
         .put('/api/v1/ldap/users/testuser')
@@ -226,14 +249,18 @@ describe('LdapUsersFlat Plugin', function () {
     });
 
     it('should list via API', async () => {
-      let res = await request.post('/api/v1/ldap/users').type('json').send({
-        uid: 'testuser',
-        cn: 'Test User',
-        sn: 'User',
-        mail: 'testuser-flat-api-list@example.org',
-      });
-      expect(res.body).to.deep.equal({ success: true });
-      expect(res.status).to.equal(200);
+      let res = await request
+        .post('/api/v1/ldap/users')
+        .type('json')
+        .send({
+          uid: 'testuser',
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-flat-api-list@example.org',
+          ...twakeAttr,
+        });
+      expect(res.status).to.equal(201);
+      expect(res.body).to.have.property('uid', 'testuser');
       res = await request
         .get('/api/v1/ldap/users?match=uid=*estuse*&attributes=uid,mail')
         .set('Accept', 'application/json');

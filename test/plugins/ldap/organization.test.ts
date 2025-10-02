@@ -520,12 +520,17 @@ describe('LDAP Organizations Plugin', function () {
 
         // Verify modification
         const org = await plugin.getOrganisationByDn(testOrgDn);
-        expect(org).to.have.property('description', 'Test organization description');
+        expect(org).to.have.property(
+          'description',
+          'Test organization description'
+        );
       });
 
       it('should return error for invalid dn', async () => {
         const res = await request
-          .put(`/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`)
+          .put(
+            `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`
+          )
           .type('json')
           .send({
             replace: { description: 'Test' },
@@ -562,7 +567,9 @@ describe('LDAP Organizations Plugin', function () {
 
       it('should return error when deleting non-existent organization', async () => {
         const res = await request
-          .delete(`/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`)
+          .delete(
+            `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`
+          )
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(500);

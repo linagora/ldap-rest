@@ -48,6 +48,10 @@
       "import": "./dist/plugins/ldap/externalUsersInGroups.js",
       "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts"
     },
+    "plugin-ldap-flatgeneric": {
+      "import": "./dist/plugins/ldap/flatGeneric.js",
+      "types": "./dist/src/plugins/ldap/flatGeneric.d.ts"
+    },
     "plugin-ldap-groups": {
       "import": "./dist/plugins/ldap/groups.js",
       "types": "./dist/src/plugins/ldap/groups.d.ts"
@@ -59,10 +63,6 @@
     "plugin-ldap-organization": {
       "import": "./dist/plugins/ldap/organization.js",
       "types": "./dist/src/plugins/ldap/organization.d.ts"
-    },
-    "plugin-ldap-usersflat": {
-      "import": "./dist/plugins/ldap/usersFlat.js",
-      "types": "./dist/src/plugins/ldap/usersFlat.d.ts"
     },
     "plugin-static": {
       "import": "./dist/plugins/static.js",
@@ -104,9 +104,29 @@
       "import": "./static/schemas/twake/groups.json",
       "require": "./static/schemas/twake/groups.json"
     },
+    "schema-twake-nomenclature-twakeaccountstatus": {
+      "import": "./static/schemas/twake/nomenclature/twakeAccountStatus.json",
+      "require": "./static/schemas/twake/nomenclature/twakeAccountStatus.json"
+    },
+    "schema-twake-nomenclature-twakedeliverymode": {
+      "import": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json",
+      "require": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json"
+    },
+    "schema-twake-nomenclature-twakelisttype": {
+      "import": "./static/schemas/twake/nomenclature/twakeListType.json",
+      "require": "./static/schemas/twake/nomenclature/twakeListType.json"
+    },
+    "schema-twake-nomenclature-twaketitle": {
+      "import": "./static/schemas/twake/nomenclature/twakeTitle.json",
+      "require": "./static/schemas/twake/nomenclature/twakeTitle.json"
+    },
     "schema-twake-organizations": {
       "import": "./static/schemas/twake/organizations.json",
       "require": "./static/schemas/twake/organizations.json"
+    },
+    "schema-twake-positions": {
+      "import": "./static/schemas/twake/positions.json",
+      "require": "./static/schemas/twake/positions.json"
     },
     "schema-twake-users": {
       "import": "./static/schemas/twake/users.json",

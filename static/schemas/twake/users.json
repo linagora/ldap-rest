@@ -1,4 +1,12 @@
 {
+  "entity": {
+    "name": "twakeUser",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
+    "singularName": "user",
+    "pluralName": "users",
+    "base": "{ldap_user_branch}"
+  },
   "strict": true,
   "attributes": {
     "objectClass": {

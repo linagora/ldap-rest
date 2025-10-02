@@ -53,6 +53,9 @@ export interface Config {
   ldap_organization_path_attribute?: string;
   ldap_organization_path_separator?: string;
 
+  // LDAP Flat generic plugin
+  ldap_flat_schema?: string[];
+
   // External users in groups
   external_members_branch?: string;
   external_branch_class?: string[];
@@ -247,6 +250,15 @@ const configArgs: ConfigTemplate = [
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'static'),
   ],
   ['--static-name', 'DM_STATIC_NAME', 'static'],
+
+  // LDAP Flat generic plugin
+  [
+    '--ldap-flat-schema',
+    'DM_LDAP_FLAT_SCHEMA',
+    [],
+    'array',
+    '--ldap-flat-schemas',
+  ],
 
   // James plugin
   ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],

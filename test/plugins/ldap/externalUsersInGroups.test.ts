@@ -122,8 +122,12 @@ describe('External users in groups', function () {
         },
       });
       expect(
-        ((await plugin.ldap.search({ paged: false }, externalUser)) as SearchResult)
-          .searchEntries[0]
+        (
+          (await plugin.ldap.search(
+            { paged: false },
+            externalUser
+          )) as SearchResult
+        ).searchEntries[0]
       )
         .to.have.property('mail')
         .that.equals('external@external-domain.org');
