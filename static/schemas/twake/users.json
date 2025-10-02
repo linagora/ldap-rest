@@ -51,12 +51,12 @@
     "twakeDepartmentLink": {
       "type": "string",
       "test": "^.*,__LDAP_BASE__",
-      "required": false
+      "required": true
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[\\w\\s/,]+$",
-      "required": false
+      "required": true
     }
   }
 }

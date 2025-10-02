@@ -35,15 +35,10 @@
       "type": "string",
       "required": false
     },
-    "twakeDepartmentLink": {
-      "type": "string",
-      "test": "^.*,__LDAP_BASE__",
-      "required": false
-    },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[\\w\\s/,]+$",
-      "required": false
+      "required": true
     }
   }
 }
