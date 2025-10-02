@@ -1,0 +1,152 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "LDAP Users API",
+    "version": "1.0.0",
+    "description": "API for managing LDAP users in a flat branch"
+  },
+  "paths": {
+    "/api/v1/ldap/users": {
+      "get": {
+        "summary": "List users",
+        "parameters": [
+          {
+            "name": "match",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "User name filter (can be a full name, wildcard pattern, or LDAP filter with '=')"
+          },
+          {
+            "name": "attributes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated list of attributes to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        { "type": "string" },
+                        { "type": "array", "items": { "type": "string" } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      },
+      "post": {
+        "summary": "Add a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "uid": { "type": "string" },
+                  "cn": { "type": "string" },
+                  "sn": { "type": "string" },
+                  "mail": { "type": "string" },
+                  "givenName": { "type": "string" },
+                  "displayName": { "type": "string" },
+                  "telephoneNumber": { "type": "string" },
+                  "mobile": { "type": "string" },
+                  "userPassword": { "type": "string" }
+                },
+                "required": ["uid"],
+                "additionalProperties": true,
+                "description": "Additional LDAP attributes can be included beyond the standard fields"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "User added" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
+    "/api/v1/ldap/users/{uid}": {
+      "delete": {
+        "summary": "Delete a user",
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "User identifier"
+          }
+        ],
+        "responses": {
+          "200": { "description": "User deleted" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      },
+      "put": {
+        "summary": "Modify a user",
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "User identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "add": {
+                    "type": "object",
+                    "description": "Attributes to add (cannot include uid attribute)"
+                  },
+                  "replace": {
+                    "type": "object",
+                    "description": "Attributes to replace (cannot include uid attribute)"
+                  },
+                  "delete": {
+                    "oneOf": [
+                      { "type": "array", "items": { "type": "string" } },
+                      { "type": "object" }
+                    ],
+                    "description": "Attributes to delete (cannot include uid attribute)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "User modified" },
+          "400": { "description": "Bad request" },
+          "500": { "description": "Server error" }
+        }
+      }
+    }
+  },
+  "components": {}
+}
