@@ -70,34 +70,62 @@
                   "mobile": { "type": "string" },
                   "userPassword": { "type": "string" }
                 },
-                "required": ["uid"],
+                "required": ["uid", "cn", "sn"],
                 "additionalProperties": true,
-                "description": "Additional LDAP attributes can be included beyond the standard fields"
+                "description": "Additional LDAP attributes can be included beyond the standard fields. Required fields depend on the schema being used."
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "User added" },
-          "400": { "description": "Bad request" },
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dn": { "type": "string" },
+                    "uid": { "type": "string" }
+                  },
+                  "additionalProperties": true,
+                  "description": "The created user entry with DN and requested attributes"
+                }
+              }
+            }
+          },
+          "400": { "description": "Bad request - validation error" },
           "500": { "description": "Server error" }
         }
       }
     },
-    "/api/v1/ldap/users/{uid}": {
+    "/api/v1/ldap/users/{id}": {
       "delete": {
         "summary": "Delete a user",
         "parameters": [
           {
-            "name": "uid",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": { "type": "string" },
-            "description": "User identifier"
+            "description": "User identifier (uid value or full DN)"
           }
         ],
         "responses": {
-          "200": { "description": "User deleted" },
+          "200": {
+            "description": "User deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "User not found" },
           "400": { "description": "Bad request" },
           "500": { "description": "Server error" }
         }
@@ -106,11 +134,11 @@
         "summary": "Modify a user",
         "parameters": [
           {
-            "name": "uid",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": { "type": "string" },
-            "description": "User identifier"
+            "description": "User identifier (uid value or full DN)"
           }
         ],
         "requestBody": {
@@ -141,8 +169,21 @@
           }
         },
         "responses": {
-          "200": { "description": "User modified" },
-          "400": { "description": "Bad request" },
+          "200": {
+            "description": "User modified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "User not found" },
+          "400": { "description": "Bad request - validation error or attempting to modify main attribute" },
           "500": { "description": "Server error" }
         }
       }
