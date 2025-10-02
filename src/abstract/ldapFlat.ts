@@ -158,6 +158,12 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     );
 
+    // Get entry by id or DN
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
+      async (req, res) => this.apiGet(req, res)
+    );
+
     // Add entry
     app.post(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
@@ -175,6 +181,24 @@ export default abstract class LdapFlat extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       async (req, res) => this.apiModify(req, res)
     );
+  }
+
+  async apiGet(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+    const id = decodeURIComponent(req.params.id);
+    try {
+      const dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+      if (result.searchEntries.length === 0) {
+        return badRequest(res, `${this.singularName} not found`);
+      }
+      res.json(result.searchEntries[0]);
+    } catch (err) {
+      return serverError(res, err);
+    }
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {

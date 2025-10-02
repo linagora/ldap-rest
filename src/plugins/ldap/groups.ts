@@ -137,6 +137,12 @@ export default class LdapGroups extends DmPlugin {
       }
     });
 
+    // Get group by cn or DN
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn`,
+      async (req, res) => this.apiGet(req, res)
+    );
+
     // Add group
     app.post(`${this.config.api_prefix}/v1/ldap/groups`, async (req, res) =>
       this.apiAdd(req, res, this.cn)
@@ -180,6 +186,24 @@ export default class LdapGroups extends DmPlugin {
         await tryMethod(res, this.deleteMember.bind(this), cn, member);
       }
     );
+  }
+
+  async apiGet(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+    const cn = decodeURIComponent(req.params.cn);
+    try {
+      const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+      if (result.searchEntries.length === 0) {
+        return badRequest(res, 'Group not found');
+      }
+      res.json(result.searchEntries[0]);
+    } catch (err) {
+      return serverError(res, err);
+    }
   }
 
   async apiAdd(
