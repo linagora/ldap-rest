@@ -45,7 +45,7 @@ export default class LdapOrganizations extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       async (req, res) => {
-        const { dn } = req.params;
+        const dn = decodeURIComponent(req.params.dn);
         await tryMethodData(res, this.getOrganisationByDn.bind(this), dn);
       }
     );
@@ -54,7 +54,7 @@ export default class LdapOrganizations extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
       async (req, res) => {
-        const { dn } = req.params;
+        const dn = decodeURIComponent(req.params.dn);
         await tryMethodData(res, this.getOrganisationSubnodes.bind(this), dn);
       }
     );
