@@ -83,6 +83,54 @@
       }
     },
     "/api/v1/ldap/groups/{cn}": {
+      "get": {
+        "summary": "Get a group by cn or DN",
+        "parameters": [
+          {
+            "name": "cn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Group identifier (cn value or full DN - URL encoded if DN)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dn": { "type": "string" },
+                    "cn": { "type": "string" },
+                    "member": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "additionalProperties": true,
+                  "description": "The group entry with all attributes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Group not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
+        }
+      },
       "delete": {
         "summary": "Delete a group",
         "parameters": [

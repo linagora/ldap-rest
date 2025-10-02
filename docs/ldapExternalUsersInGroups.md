@@ -33,8 +33,8 @@ This plugin intercepts group member validation and automatically creates missing
 ### Important Notes
 
 - **Dependencies**: This plugin requires the `core/ldap/groups` plugin
-- **DN Format**: External members must use the format `mail={email},{external_members_branch}`
-- **Domain Protection**: External users cannot be created with managed domains (configured via `--mail-domain`)
+- **DN Format**: External members are in the format `mail={email},{external_members_branch}`
+- **Domain Protection**: External users cannot be created if their mail are in managed domains (configured via `--mail-domain`)
 - **Automatic Creation**: Users are created automatically when added to a group if they don't exist
 
 ## How It Works

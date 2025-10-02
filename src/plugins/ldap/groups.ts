@@ -25,6 +25,7 @@ import type {
 import {
   badRequest,
   jsonBody,
+  notFound,
   ok,
   serverError,
   tryMethod,
@@ -198,10 +199,14 @@ export default class LdapGroups extends DmPlugin {
         dn
       )) as SearchResult;
       if (result.searchEntries.length === 0) {
-        return badRequest(res, 'Group not found');
+        return notFound(res, 'Group not found');
       }
       res.json(result.searchEntries[0]);
     } catch (err) {
+      // LDAP NoSuchObjectError (code 32) means not found
+      if ((err as any).code === 32) {
+        return notFound(res, 'Group not found');
+      }
       return serverError(res, err);
     }
   }

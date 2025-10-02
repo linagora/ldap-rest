@@ -327,7 +327,11 @@ export default class LdapOrganizations extends DmPlugin {
 
   async getOrganisationByDn(dn: string): Promise<AttributesList> {
     const org = await this.server.ldap.search(
-      { paged: false, filter: '(objectClass=organizationalUnit)' },
+      {
+        paged: false,
+        scope: 'base',
+        filter: '(objectClass=organizationalUnit)',
+      },
       dn
     );
     if ((org as SearchResult).searchEntries.length !== 1)
@@ -339,12 +343,10 @@ export default class LdapOrganizations extends DmPlugin {
     const subs = await this.server.ldap.search(
       {
         paged: true,
-        sizeLimit: 1000,
         filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
       },
       this.config.ldap_top_organization as string
     );
-    //(subs as AsyncGenerator<SearchResult>);
     const res: AttributesList[] = [];
     for await (const sub of subs as AsyncGenerator<SearchResult>) {
       res.push(...sub.searchEntries);

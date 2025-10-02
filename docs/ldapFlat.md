@@ -143,6 +143,46 @@ curl "http://localhost:8081/api/v1/ldap/users?match=john&attribute=uid&attribute
 }
 ```
 
+### Get Entity by ID or DN
+
+```http
+GET /api/v1/ldap/{pluralName}/{id}
+```
+
+**Path Parameter:**
+
+- `id`: Main attribute value (e.g., `john.doe`) OR full DN (URL-encoded if DN contains special characters)
+
+**Examples:**
+
+```bash
+# Get by main attribute value
+curl "http://localhost:8081/api/v1/ldap/users/john.doe"
+
+# Get by full DN (URL-encoded)
+curl "http://localhost:8081/api/v1/ldap/users/uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexample%2Cdc%3Dcom"
+```
+
+**Response (200):**
+
+```json
+{
+  "dn": "uid=john.doe,ou=users,dc=example,dc=com",
+  "uid": "john.doe",
+  "cn": "John Doe",
+  "sn": "Doe",
+  "mail": "john.doe@example.com"
+}
+```
+
+**Response (404):**
+
+```json
+{
+  "error": "user not found"
+}
+```
+
 ### Create Entity
 
 ```http
@@ -303,10 +343,11 @@ DELETE /api/v1/ldap/{pluralName}/{id}
 
 **Generated APIs:**
 
-- `GET /api/v1/ldap/positions`
-- `POST /api/v1/ldap/positions`
-- `PUT /api/v1/ldap/positions/{cn}`
-- `DELETE /api/v1/ldap/positions/{cn}`
+- `GET /api/v1/ldap/positions` - List all positions
+- `GET /api/v1/ldap/positions/{cn}` - Get a position by cn or DN
+- `POST /api/v1/ldap/positions` - Create a new position
+- `PUT /api/v1/ldap/positions/{cn}` - Modify a position
+- `DELETE /api/v1/ldap/positions/{cn}` - Delete a position
 
 ### Example 3: Managing Nomenclature (Titles)
 

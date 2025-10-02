@@ -85,6 +85,48 @@ curl "http://localhost:8081/api/v1/ldap/groups?match=admin*&attributes=cn,member
 }
 ```
 
+### Get Group by cn or DN
+
+```http
+GET /api/v1/ldap/groups/{cn}
+```
+
+**Path Parameter:**
+
+- `cn`: Group cn value (e.g., `developers`) OR full DN (URL-encoded if DN)
+
+**Examples:**
+
+```bash
+# Get by cn
+curl "http://localhost:8081/api/v1/ldap/groups/developers"
+
+# Get by full DN (URL-encoded)
+curl "http://localhost:8081/api/v1/ldap/groups/cn%3Ddevelopers%2Cou%3Dgroups%2Cdc%3Dexample%2Cdc%3Dcom"
+```
+
+**Response (200):**
+
+```json
+{
+  "dn": "cn=developers,ou=groups,dc=example,dc=com",
+  "cn": "developers",
+  "description": "Development team",
+  "member": [
+    "uid=john.doe,ou=users,dc=example,dc=com",
+    "uid=jane.smith,ou=users,dc=example,dc=com"
+  ]
+}
+```
+
+**Response (404):**
+
+```json
+{
+  "error": "Group not found"
+}
+```
+
 ### Create Group
 
 ```http

@@ -128,7 +128,7 @@ curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu
 GET /api/v1/ldap/organizations/:dn/subnodes
 ```
 
-Returns all entries (users, groups, or sub-organizations) that reference this organization via their `twakeDepartmentLink` attribute.
+Returns all entries (users, groups, or sub-organizations) that reference this organization via their `twakeDepartmentLink` attribute. Results are automatically paginated to handle large numbers of entries.
 
 **Path Parameter:**
 

@@ -100,6 +100,50 @@
       }
     },
     "/api/v1/ldap/users/{id}": {
+      "get": {
+        "summary": "Get a user by ID or DN",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "User identifier (uid value or full DN - URL encoded if DN)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dn": { "type": "string" },
+                    "uid": { "type": "string" }
+                  },
+                  "additionalProperties": true,
+                  "description": "The user entry with all attributes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": { "description": "Server error" }
+        }
+      },
       "delete": {
         "summary": "Delete a user",
         "parameters": [

@@ -5,7 +5,7 @@
     "objectClass": ["top", "inetOrgPerson", "organizationalPerson", "person"],
     "singularName": "user",
     "pluralName": "users",
-    "base": "{ldap_user_branch}"
+    "base": "ou=users,__ldap_base__"
   },
   "strict": true,
   "attributes": {

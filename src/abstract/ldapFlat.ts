@@ -25,6 +25,7 @@ import {
   badRequest,
   created,
   jsonBody,
+  notFound,
   ok,
   serverError,
   tryMethod,
@@ -193,10 +194,14 @@ export default abstract class LdapFlat extends DmPlugin {
         dn
       )) as SearchResult;
       if (result.searchEntries.length === 0) {
-        return badRequest(res, `${this.singularName} not found`);
+        return notFound(res, `${this.singularName} not found`);
       }
       res.json(result.searchEntries[0]);
     } catch (err) {
+      // LDAP NoSuchObjectError (code 32) means not found
+      if ((err as any).code === 32) {
+        return notFound(res, `${this.singularName} not found`);
+      }
       return serverError(res, err);
     }
   }

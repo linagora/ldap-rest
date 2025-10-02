@@ -37,7 +37,7 @@
             "in": "path",
             "required": true,
             "schema": { "type": "string" },
-            "description": "Organization DN"
+            "description": "Organization DN (must be URL encoded)"
           }
         ],
         "responses": {
@@ -127,14 +127,14 @@
     "/api/v1/ldap/organizations/{dn}/subnodes": {
       "get": {
         "summary": "Get organization subnodes",
-        "description": "Get all entries that link to this organization",
+        "description": "Get all entries (users, groups, sub-organizations) whose organization link attribute points to this organization. Results are paginated automatically.",
         "parameters": [
           {
             "name": "dn",
             "in": "path",
             "required": true,
             "schema": { "type": "string" },
-            "description": "Organization DN"
+            "description": "Organization DN (must be URL encoded)"
           }
         ],
         "responses": {
