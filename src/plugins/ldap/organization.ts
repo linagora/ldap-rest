@@ -18,8 +18,8 @@ export default class LdapOrganizations extends DmPlugin {
       throw new Error('Missing --ldap-top-organization');
     }
 
-    this.pathAttr = this.config.ldap_organization_link_attribute as string;
-    this.linkAttr = this.config.ldap_organization_path_attribute as string;
+    this.pathAttr = this.config.ldap_organization_path_attribute as string;
+    this.linkAttr = this.config.ldap_organization_link_attribute as string;
   }
 
   /**
@@ -69,7 +69,8 @@ export default class LdapOrganizations extends DmPlugin {
      */
     ldapaddrequest: async ([dn, entry]) => {
       await this.checkDeptLink(entry);
-      await this.checkDeptPath(entry);
+      // Only check path for organizations, not for users/groups
+      if (this.isOu(entry)) await this.checkDeptPath(entry);
       return [dn, entry];
     },
 
@@ -107,8 +108,26 @@ export default class LdapOrganizations extends DmPlugin {
       }
       if (Object.keys(fakeEntryL).length > 0)
         await this.checkDeptLink(fakeEntryL);
-      if (Object.keys(fakeEntryP).length > 0)
-        await this.checkDeptPath(fakeEntryP);
+      if (Object.keys(fakeEntryP).length > 0) {
+        // Only check path for organizations
+        // If we have objectClass in the changes, check if it's an org
+        // Otherwise we need to fetch the entry to know
+        if (fakeEntryP.objectClass && this.isOu(fakeEntryP)) {
+          await this.checkDeptPath(fakeEntryP);
+        } else if (!fakeEntryP.objectClass) {
+          // Fetch the entry to check if it's an organization
+          const entry = await this.server.ldap.search(
+            { paged: false, scope: 'base' },
+            dn
+          );
+          if (
+            (entry as SearchResult).searchEntries.length > 0 &&
+            this.isOu((entry as SearchResult).searchEntries[0])
+          ) {
+            await this.checkDeptPath(fakeEntryP);
+          }
+        }
+      }
       return [dn, changes, op];
     },
 
@@ -130,11 +149,14 @@ export default class LdapOrganizations extends DmPlugin {
   async checkDeptLink(entry: AttributesList): Promise<void> {
     if (entry[this.linkAttr]) {
       const orgDn = entry[this.linkAttr][0] as string;
-      const res = await this.server.ldap.search({ paged: false }, orgDn);
+      const res = await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        orgDn
+      );
       if ((res as SearchResult).searchEntries.length === 0)
         throw new Error(`Organization ${orgDn} does not exist`);
       if (
-        new RegExp(`(.*,)?${this.config.ldap_top_organization}`).test(
+        !new RegExp(`(.*,)?${this.config.ldap_top_organization}`).test(
           (res as SearchResult).searchEntries[0].dn
         )
       )
@@ -197,6 +219,7 @@ export default class LdapOrganizations extends DmPlugin {
    * @returns True if entry is an organisation, false otherwise
    */
   isOu(entry: AttributesList): boolean {
+    if (!entry.objectClass) return false;
     return (this.config.ldap_organization_class as string[])
       .filter(c => c.toLowerCase() !== 'top')
       .some(c => (entry.objectClass as string[]).includes(c.toLowerCase()));
@@ -206,7 +229,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (!this.config.ldap_top_organization)
       throw new Error('No top organization configured');
     const top = await this.server.ldap.search(
-      { paged: false },
+      { paged: false, scope: 'base' },
       this.config.ldap_top_organization
     );
     if ((top as SearchResult).searchEntries.length !== 1)
@@ -229,7 +252,7 @@ export default class LdapOrganizations extends DmPlugin {
       {
         paged: true,
         sizeLimit: 1000,
-        filter: `( ${this.config.ldap_organization_link_attribute}=${dn} )`,
+        filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
       },
       this.config.ldap_top_organization as string
     );
