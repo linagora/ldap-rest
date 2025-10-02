@@ -167,6 +167,10 @@
                     "type": "string",
                     "description": "Organization unit name"
                   },
+                  "parentDn": {
+                    "type": "string",
+                    "description": "Parent organization DN. If not specified, the organization will be created under the top organization."
+                  },
                   "description": {
                     "type": "string",
                     "description": "Organization description"
@@ -174,7 +178,7 @@
                 },
                 "required": ["ou"],
                 "additionalProperties": true,
-                "description": "Additional LDAP attributes can be included"
+                "description": "Additional LDAP attributes can be included. Organizations can be nested by specifying parentDn."
               }
             }
           }

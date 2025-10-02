@@ -80,16 +80,17 @@ export default class LdapOrganizations extends DmPlugin {
 
   async apiAdd(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res, 'ou') as
-      | { ou: string; [key: string]: any }
+      | { ou: string; parentDn?: string; [key: string]: any }
       | false;
     if (!body) return;
 
-    const dn = `ou=${body.ou},${this.config.ldap_top_organization}`;
+    const parentDn = body.parentDn || this.config.ldap_top_organization;
+    const dn = `ou=${body.ou},${parentDn}`;
     const entry: AttributesList = {
       objectClass: this.config.ldap_organization_class as string[],
       ou: body.ou,
       ...Object.fromEntries(
-        Object.entries(body).filter(([key]) => key !== 'ou')
+        Object.entries(body).filter(([key]) => key !== 'ou' && key !== 'parentDn')
       ),
     };
 
@@ -125,7 +126,11 @@ export default class LdapOrganizations extends DmPlugin {
      * If an ou is going to be deleted, check that it is empty
      */
     ldapaddrequest: async ([dn, entry]) => {
-      await this.checkDeptLink(entry);
+      // Organizations use LDAP hierarchy (DN), not twakeDepartmentLink
+      // Only users/groups have twakeDepartmentLink
+      if (!this.isOu(entry)) {
+        await this.checkDeptLink(entry);
+      }
       // Only check path for organizations, not for users/groups
       if (this.isOu(entry)) await this.checkDeptPath(entry);
       return [dn, entry];
@@ -134,24 +139,55 @@ export default class LdapOrganizations extends DmPlugin {
     ldapmodifyrequest: async ([dn, changes, op]) => {
       let fakeEntryL: AttributesList = {};
       let fakeEntryP: AttributesList = {};
+      let isOrgEntry: boolean | undefined;
+
+      // Determine if this is an organization entry
+      const checkIsOu = async () => {
+        if (isOrgEntry !== undefined) return isOrgEntry;
+        if (changes.replace?.objectClass) {
+          isOrgEntry = this.isOu({ objectClass: changes.replace.objectClass });
+        } else if (changes.add?.objectClass) {
+          isOrgEntry = this.isOu({ objectClass: changes.add.objectClass });
+        } else {
+          const entry = await this.server.ldap.search(
+            { paged: false, scope: 'base' },
+            dn
+          );
+          isOrgEntry =
+            (entry as SearchResult).searchEntries.length > 0 &&
+            this.isOu((entry as SearchResult).searchEntries[0]);
+        }
+        return isOrgEntry;
+      };
+
       /**
        * Deletion of path/link attribute is forbidden
+       * - Organizations cannot delete path (they use LDAP hierarchy, not link)
+       * - Users/groups cannot delete link or path
        */
       if (changes.delete) {
-        if (Array.isArray(changes.delete)) {
-          if (changes.delete.includes(this.linkAttr))
+        const hasLinkDelete = Array.isArray(changes.delete)
+          ? changes.delete.includes(this.linkAttr)
+          : changes.delete[this.linkAttr];
+        const hasPathDelete = Array.isArray(changes.delete)
+          ? changes.delete.includes(this.pathAttr)
+          : changes.delete[this.pathAttr];
+
+        if (hasLinkDelete || hasPathDelete) {
+          const isOu = await checkIsOu();
+          if (!isOu && hasLinkDelete) {
             throw new Error(`An organization link cannot be deleted`);
-          if (changes.delete.includes(this.pathAttr))
+          }
+          if (hasPathDelete) {
             throw new Error(`An organization path cannot be deleted`);
-        } else {
-          if (changes.delete[this.linkAttr])
-            throw new Error(`An organization link cannot be deleted`);
-          if (this.pathAttr && changes.delete[this.pathAttr])
-            throw new Error(`An organization path cannot be deleted`);
+          }
         }
       }
+
       /**
        * If link/path attribute is modified, check its validity
+       * - Organizations: only validate path
+       * - Users/groups: validate both link and path
        */
       if (changes.replace) {
         if (changes.replace[this.linkAttr]) fakeEntryL = { ...changes.replace };
@@ -163,26 +199,19 @@ export default class LdapOrganizations extends DmPlugin {
         if (changes.add[this.pathAttr])
           fakeEntryP = { ...fakeEntryP, ...changes.add };
       }
-      if (Object.keys(fakeEntryL).length > 0)
-        await this.checkDeptLink(fakeEntryL);
+
+      // Organizations use LDAP hierarchy, not twakeDepartmentLink
+      if (Object.keys(fakeEntryL).length > 0) {
+        const isOu = await checkIsOu();
+        if (!isOu) {
+          await this.checkDeptLink(fakeEntryL);
+        }
+      }
+
       if (Object.keys(fakeEntryP).length > 0) {
-        // Only check path for organizations
-        // If we have objectClass in the changes, check if it's an org
-        // Otherwise we need to fetch the entry to know
-        if (fakeEntryP.objectClass && this.isOu(fakeEntryP)) {
+        const isOu = await checkIsOu();
+        if (isOu) {
           await this.checkDeptPath(fakeEntryP);
-        } else if (!fakeEntryP.objectClass) {
-          // Fetch the entry to check if it's an organization
-          const entry = await this.server.ldap.search(
-            { paged: false, scope: 'base' },
-            dn
-          );
-          if (
-            (entry as SearchResult).searchEntries.length > 0 &&
-            this.isOu((entry as SearchResult).searchEntries[0])
-          ) {
-            await this.checkDeptPath(fakeEntryP);
-          }
         }
       }
       return [dn, changes, op];

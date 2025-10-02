@@ -275,25 +275,42 @@ describe('LDAP Organizations Plugin', function () {
     });
 
     describe('ldapmodifyrequest', () => {
-      it('should prevent deletion of organization link attribute', async () => {
+      it('should prevent deletion of organization link attribute for users/groups', async () => {
+        // Create a test user first
+        const userDn = `uid=testuser,${process.env.DM_LDAP_BASE}`;
+        await plugin.server.ldap.add(userDn, {
+          objectClass: ['inetOrgPerson', 'person', 'top'],
+          uid: 'testuser',
+          cn: 'Test User',
+          sn: 'User',
+        });
+
         const linkAttr = server.config
           .ldap_organization_link_attribute as string;
-        const dn = testOrgDn;
         const changes = {
           delete: [linkAttr],
         };
 
         try {
-          await plugin.hooks.ldapmodifyrequest?.([dn, changes, 0]);
+          await plugin.hooks.ldapmodifyrequest?.([userDn, changes, 0]);
           expect.fail('Should have thrown error');
         } catch (e) {
           expect((e as Error).message).to.match(
             /organization link cannot be deleted/
           );
         }
+
+        // Clean up
+        await plugin.server.ldap.delete(userDn);
       });
 
       it('should prevent deletion of organization path attribute', async () => {
+        // Create organization first
+        await plugin.server.ldap.add(testOrgDn, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: 'testorg',
+        });
+
         const pathAttr = server.config
           .ldap_organization_path_attribute as string;
         const dn = testOrgDn;
@@ -309,6 +326,9 @@ describe('LDAP Organizations Plugin', function () {
             /organization path cannot be deleted/
           );
         }
+
+        // Clean up
+        await plugin.server.ldap.delete(testOrgDn);
       });
 
       it('should allow modification without organization attributes', async () => {
@@ -449,6 +469,33 @@ describe('LDAP Organizations Plugin', function () {
           .send({});
 
         expect(res.status).to.equal(400);
+      });
+
+      it('should create a sub-organization with parentDn', async () => {
+        // First create parent organization
+        await plugin.server.ldap.add(testOrgDn, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: 'testorg',
+        });
+
+        const subOrgRes = await request
+          .post('/api/v1/ldap/organizations')
+          .type('json')
+          .send({
+            ou: 'testsuborg',
+            parentDn: testOrgDn,
+          });
+
+        expect(subOrgRes.status).to.equal(200);
+        expect(subOrgRes.body).to.deep.equal({ success: true });
+
+        // Verify sub-organization was created under parent
+        const subOrgDn = `ou=testsuborg,${testOrgDn}`;
+        const subOrg = await plugin.getOrganisationByDn(subOrgDn);
+        expect(subOrg).to.have.property('ou', 'testsuborg');
+
+        // Clean up sub-org
+        await plugin.server.ldap.delete(subOrgDn);
       });
     });
 
