@@ -127,7 +127,11 @@ describe('External users in groups', function () {
       )
         .to.have.property('mail')
         .that.equals('external@external-domain.org');
+
+      // Delete user - the hook should automatically remove it from groups
       await plugin.ldap.delete(externalUser);
+
+      // Verify user was removed from group by the hook
       expect(await plugin.searchGroupsByName('testgroup2')).to.deep.equal({
         testgroup2: {
           dn: `cn=testgroup2,${DM_LDAP_GROUP_BASE}`,

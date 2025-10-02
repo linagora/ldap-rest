@@ -90,7 +90,7 @@ export default class LdapGroups extends DmPlugin {
    * Catch all deletion to remove deleted users from groups
    */
   hooks: Hooks = {
-    ldapdeleterequest: dn => {
+    ldapdeleterequest: async dn => {
       let _dn = dn;
       if (!Array.isArray(_dn)) {
         _dn = [_dn];
@@ -98,12 +98,12 @@ export default class LdapGroups extends DmPlugin {
       this.logger.debug(
         `User deletion detected, removing from groups: ${_dn.join(', ')}`
       );
-      // Use async to delete user from groups, don't block the main deletion
-      Promise.all(_dn.map(dnEntry => this.deleteMemberFromAll(dnEntry))).catch(
-        err => {
-          this.logger.error('Failed to process user deletion in groups:', err);
-        }
-      );
+      // Remove user from groups before actual deletion
+      await Promise.all(
+        _dn.map(dnEntry => this.deleteMemberFromAll(dnEntry))
+      ).catch(err => {
+        this.logger.error('Failed to process user deletion in groups:', err);
+      });
       return dn;
     },
   };
