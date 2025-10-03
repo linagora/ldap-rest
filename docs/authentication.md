@@ -7,6 +7,7 @@ Mini-DM provides multiple authentication plugins to secure API access. These plu
 1. **Token Authentication** (`core/auth/token`) - Simple bearer token authentication
 2. **LemonLDAP::NG** (`core/auth/llng`) - Integration with LemonLDAP::NG SSO
 3. **OpenID Connect** (`core/auth/openidconnect`) - OAuth 2.0 / OpenID Connect authentication
+4. **Authorization Per Branch** (`core/auth/authnPerBranch`) - Branch-level access control (see [authnPerBranch.md](authnPerBranch.md))
 
 ## Token Authentication
 

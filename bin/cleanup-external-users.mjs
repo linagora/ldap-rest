@@ -94,7 +94,9 @@ async function main() {
 
     // Get all external users
     if (!quiet) {
-      logger.info(`Searching for external users in ${config.external_members_branch}`);
+      logger.info(
+        `Searching for external users in ${config.external_members_branch}`
+      );
     }
     const externalUsersResult = await ldap.search(
       {
@@ -151,7 +153,9 @@ async function main() {
     }
 
     if (!quiet) {
-      logger.info(`Found ${referencedMembers.size} unique member references across all groups`);
+      logger.info(
+        `Found ${referencedMembers.size} unique member references across all groups`
+      );
     }
 
     // Check each external user
@@ -165,12 +169,16 @@ async function main() {
       if (isReferenced) {
         kept++;
         if (verbose) {
-          logger.info(`KEEP: ${user.dn} (${user.mail || 'no mail'}) - still referenced`);
+          logger.info(
+            `KEEP: ${user.dn} (${user.mail || 'no mail'}) - still referenced`
+          );
         }
       } else {
         toDelete++;
         if (dryRun) {
-          logger.info(`WOULD DELETE: ${user.dn} (${user.mail || 'no mail'}) - not referenced`);
+          logger.info(
+            `WOULD DELETE: ${user.dn} (${user.mail || 'no mail'}) - not referenced`
+          );
         } else {
           if (!quiet) {
             logger.info(`DELETING: ${user.dn} (${user.mail || 'no mail'})`);
@@ -197,7 +205,6 @@ async function main() {
         logger.info('Run without --dry-run to actually delete these users');
       }
     }
-
   } catch (err) {
     logger.error(`Error during cleanup: ${err}`);
     process.exit(1);
