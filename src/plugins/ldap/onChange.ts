@@ -237,12 +237,16 @@ class OnLdapChange extends DmPlugin {
    * @param index - 0 for old value, 1 for new value
    * @returns The reconstructed display name or null
    */
-  reconstructDisplayName(changes: ChangesToNotify, index: 0 | 1): string | null {
+  reconstructDisplayName(
+    changes: ChangesToNotify,
+    index: 0 | 1
+  ): string | null {
     const getValue = (attr: string): string | null => {
       if (!changes[attr]) return null;
       const value = changes[attr][index];
       if (!value) return null;
-      if (Array.isArray(value)) return value.length > 0 ? String(value[0]) : null;
+      if (Array.isArray(value))
+        return value.length > 0 ? String(value[0]) : null;
       return String(value);
     };
 
