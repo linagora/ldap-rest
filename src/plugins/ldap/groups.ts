@@ -618,28 +618,44 @@ export default class LdapGroups extends DmPlugin {
     } else if (test.type === 'pointer') {
       if (typeof value !== 'string')
         throw new Error(`Field ${field} must be a string (DN pointer)`);
+
+      const dnValue: string = value;
+
+      // Check branch restriction if provided
+      if (test.branch && test.branch.length > 0) {
+        const isInBranch = test.branch.some(branch => {
+          const branchPattern = new RegExp(`,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+          return branchPattern.test(dnValue);
+        });
+        if (!isInBranch) {
+          throw new Error(
+            `Field ${field} must point to a DN within allowed branches: ${test.branch.join(', ')}`
+          );
+        }
+      }
+
       // Verify that the DN exists in LDAP
       try {
         const result = (await this.ldap.search(
           { paged: false },
-          value
+          dnValue
         )) as SearchResult;
         if (
           !result ||
           !result.searchEntries ||
           result.searchEntries.length === 0
         )
-          throw new Error(`Field ${field} points to non-existent DN: ${value}`);
+          throw new Error(`Field ${field} points to non-existent DN: ${dnValue}`);
       } catch (err) {
         throw new Error(
-          `Field ${field} points to invalid or non-existent DN: ${value}`
+          `Field ${field} points to invalid or non-existent DN: ${dnValue}`
         );
       }
       // Also check test regex if provided
       if (test.test) {
         if (typeof test.test === 'string') test.test = new RegExp(test.test);
-        if (test.test && !test.test.test(value))
-          throw new Error(`Field ${field} has invalid value ${value}`);
+        if (test.test && !test.test.test(dnValue))
+          throw new Error(`Field ${field} has invalid value ${dnValue}`);
       }
     } else {
       if (typeof value !== test.type) return false;

@@ -12,6 +12,7 @@ export interface Schema {
       default?: AttributeValue;
       required?: boolean;
       test?: string | RegExp;
+      branch?: string[];
     };
   };
 }
