@@ -114,15 +114,17 @@ The plugin automatically adds the `Authorization: Bearer {token}` header to all 
 **Without token:**
 
 ```http
-POST /users/old@company.com/rename/new@company.com
+POST /users/old@company.com/rename/new@company.com?action=rename
 ```
 
 **With token:**
 
 ```http
-POST /users/old@company.com/rename/new@company.com
+POST /users/old@company.com/rename/new@company.com?action=rename
 Authorization: Bearer your-admin-token
 ```
+
+**Note:** The `action=rename` query parameter is required by James WebAdmin API.
 
 Alternative authentication methods (Basic Auth, JWT) can be configured via reverse proxy.
 
