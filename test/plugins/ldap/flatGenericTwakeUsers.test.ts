@@ -308,7 +308,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
-        expect(err.message).to.include('must point to a DN within allowed branches');
+        expect(err.message).to.include(
+          'must point to a DN within allowed branches'
+        );
       }
     });
 

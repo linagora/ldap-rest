@@ -29,6 +29,7 @@ export interface Hooks {
 
   // search
   ldapsearchopts?: ChainedHook<SearchOptions>;
+  ldapsearchrequest?: ChainedHook<[string, SearchOptions, Request?]>;
   ldapsearchresult?: ChainedHook<SearchResult>;
   // add
   ldapaddrequest?: ChainedHook<[string, AttributesList]>;
@@ -94,4 +95,9 @@ export interface Hooks {
   /** Common authentication hooks */
   beforeAuth?: ChainedHook<[Request, Response]>;
   afterAuth?: ChainedHook<[Request, Response]>;
+
+  /** Organization hooks */
+  getOrganisationTop?: ChainedHook<
+    [Request | undefined, AttributesList | null]
+  >;
 }

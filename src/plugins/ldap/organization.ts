@@ -12,6 +12,7 @@ import {
   wantJson,
   badRequest,
 } from '../../lib/expressFormatedResponses';
+import { launchHooksChained } from '../../lib/utils';
 
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
@@ -37,7 +38,7 @@ export default class LdapOrganizations extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/top`,
       async (req, res) => {
-        await tryMethodData(res, this.getOrganisationTop.bind(this));
+        await tryMethodData(res, this.getOrganisationTop.bind(this), req);
       }
     );
 
@@ -66,7 +67,12 @@ export default class LdapOrganizations extends DmPlugin {
         const dn = decodeURIComponent(req.params.dn);
         const query = req.query.q as string;
         if (!query) return badRequest(res, 'query parameter "q" is required');
-        await tryMethodData(res, this.searchOrganisationSubnodes.bind(this), dn, query);
+        await tryMethodData(
+          res,
+          this.searchOrganisationSubnodes.bind(this),
+          dn,
+          query
+        );
       }
     );
 
@@ -324,16 +330,28 @@ export default class LdapOrganizations extends DmPlugin {
       .some(c => (entry.objectClass as string[]).includes(c.toLowerCase()));
   }
 
-  async getOrganisationTop(): Promise<AttributesList> {
+  async getOrganisationTop(
+    req?: Request
+  ): Promise<AttributesList | AttributesList[]> {
     if (!this.config.ldap_top_organization)
       throw new Error('No top organization configured');
+
+    // Get default top organization
     const top = await this.server.ldap.search(
       { paged: false, scope: 'base' },
-      this.config.ldap_top_organization
+      this.config.ldap_top_organization,
+      req
     );
     if ((top as SearchResult).searchEntries.length !== 1)
       throw new Error('Top organization not found');
-    return (top as SearchResult).searchEntries[0];
+
+    // Call hook to allow plugins (like authnPerBranch) to modify the result
+    const [, result] = await launchHooksChained(
+      this.registeredHooks.getOrganisationTop,
+      [req, (top as SearchResult).searchEntries[0]]
+    );
+
+    return result;
   }
 
   async getOrganisationByDn(dn: string): Promise<AttributesList> {
@@ -352,7 +370,8 @@ export default class LdapOrganizations extends DmPlugin {
 
   async getOrganisationSubnodes(dn: string): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
-    const MAX_LINKED_ENTITIES = this.config.ldap_organization_max_subnodes || 50;
+    const MAX_LINKED_ENTITIES =
+      this.config.ldap_organization_max_subnodes || 50;
 
     // 1. Get direct sub-OUs (children organizational units)
     try {
@@ -437,7 +456,10 @@ export default class LdapOrganizations extends DmPlugin {
     return await this.server.ldap.delete(dn);
   }
 
-  async searchOrganisationSubnodes(dn: string, query: string): Promise<AttributesList[]> {
+  async searchOrganisationSubnodes(
+    dn: string,
+    query: string
+  ): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
 
     // Search for sub-OUs matching the query
@@ -455,7 +477,9 @@ export default class LdapOrganizations extends DmPlugin {
       );
       result.push(...subOUs.searchEntries);
     } catch (err) {
-      this.server.logger.debug(`No sub-OUs found matching "${query}" for ${dn}: ${err}`);
+      this.server.logger.debug(
+        `No sub-OUs found matching "${query}" for ${dn}: ${err}`
+      );
     }
 
     // Search for linked entities (users and groups) matching the query

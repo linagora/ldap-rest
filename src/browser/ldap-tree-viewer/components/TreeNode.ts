@@ -73,7 +73,7 @@ export class TreeNodeComponent {
       toggle.innerHTML = `<span class="material-icons">${
         isExpanded ? 'expand_more' : 'chevron_right'
       }</span>`;
-      toggle.addEventListener('click', (e) => {
+      toggle.addEventListener('click', e => {
         e.stopPropagation();
         this.onToggle(this.dn);
       });
@@ -113,7 +113,8 @@ export class TreeNodeComponent {
 
   private createSpinner(): HTMLElement {
     const spinner = document.createElement('div');
-    spinner.className = 'mdc-circular-progress mdc-circular-progress--small mdc-circular-progress--indeterminate';
+    spinner.className =
+      'mdc-circular-progress mdc-circular-progress--small mdc-circular-progress--indeterminate';
     spinner.setAttribute('role', 'progressbar');
     spinner.setAttribute('aria-label', 'Loading');
 
@@ -154,10 +155,7 @@ export class TreeNodeComponent {
     isSelected: boolean,
     isLoading: boolean
   ): string {
-    const classes = [
-      'mdc-tree-node',
-      `mdc-tree-node--${node.type}`
-    ];
+    const classes = ['mdc-tree-node', `mdc-tree-node--${node.type}`];
 
     if (isExpanded) classes.push('mdc-tree-node--expanded');
     if (isSelected) classes.push('mdc-tree-node--selected');
@@ -171,7 +169,7 @@ export class TreeNodeComponent {
       organization: 'folder',
       user: 'person',
       group: 'group',
-      more: 'more_horiz'
+      more: 'more_horiz',
     };
     return icons[type] || 'help';
   }

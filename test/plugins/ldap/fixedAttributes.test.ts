@@ -53,17 +53,25 @@ describe('Fixed attributes validation', function () {
       const dn = `${plugin.mainAttribute}=testfixed,${plugin.base}`;
 
       // Retrieve the created entry directly from LDAP
-      const searchResult = await plugin.ldap.search({
-        paged: false,
-        scope: 'base',
-        attributes: ['*']
-      }, dn);
+      const searchResult = await plugin.ldap.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: ['*'],
+        },
+        dn
+      );
 
       expect(searchResult.searchEntries).to.have.lengthOf(1);
       const user = searchResult.searchEntries[0];
 
       expect(user.objectClass).to.be.an('array');
-      expect(user.objectClass).to.include.members(['top', 'inetOrgPerson', 'organizationalPerson', 'person']);
+      expect(user.objectClass).to.include.members([
+        'top',
+        'inetOrgPerson',
+        'organizationalPerson',
+        'person',
+      ]);
 
       // Cleanup
       await plugin.deleteEntry('testfixed');
@@ -178,11 +186,14 @@ describe('Fixed attributes validation', function () {
       const dn = `${plugin.mainAttribute}=testfixed,${plugin.base}`;
 
       // Verify the modification via direct LDAP search
-      const searchResult = await plugin.ldap.search({
-        paged: false,
-        scope: 'base',
-        attributes: ['cn']
-      }, dn);
+      const searchResult = await plugin.ldap.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: ['cn'],
+        },
+        dn
+      );
 
       expect(searchResult.searchEntries).to.have.lengthOf(1);
       const user = searchResult.searchEntries[0];

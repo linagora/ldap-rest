@@ -107,7 +107,8 @@ class ldapActions {
    */
   async search(
     options: SearchOptions,
-    base: string = this.base
+    base: string = this.base,
+    req?: any
   ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
     const client = await this.connect();
     let opts = {
@@ -115,6 +116,10 @@ class ldapActions {
       ...options,
     };
     opts = await launchHooksChained(this.parent.hooks.ldapsearchopts, opts);
+    [base, opts] = await launchHooksChained(
+      this.parent.hooks.ldapsearchrequest,
+      [base, opts, req]
+    );
     let res = opts.paged
       ? client.searchPaginated(base, opts)
       : client.search(base, opts);

@@ -37,7 +37,10 @@ export const toggleExpanded = (dn: string): Action => ({
   payload: dn,
 });
 
-export const setLoading = (payload: { dn: string; loading: boolean }): Action => ({
+export const setLoading = (payload: {
+  dn: string;
+  loading: boolean;
+}): Action => ({
   type: Actions.SET_LOADING,
   payload,
 });
@@ -57,7 +60,9 @@ export const setSearch = (query: string): Action => ({
   payload: query,
 });
 
-export const setFilter = (filter: 'all' | 'organizations' | 'users' | 'groups'): Action => ({
+export const setFilter = (
+  filter: 'all' | 'organizations' | 'users' | 'groups'
+): Action => ({
   type: Actions.SET_FILTER,
   payload: filter,
 });

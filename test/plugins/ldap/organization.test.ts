@@ -106,10 +106,15 @@ describe('LDAP Organizations Plugin', function () {
   describe('getOrganisationTop', () => {
     it('should return top organization', async () => {
       const top = await plugin.getOrganisationTop();
-      expect(top).to.have.property('dn');
-      expect((top.dn as string).toLowerCase()).to.equal(
-        DM_LDAP_TOP_ORGANIZATION?.toLowerCase()
-      );
+      if (Array.isArray(top)) {
+        expect(top.length).to.be.greaterThan(0);
+        expect(top[0]).to.have.property('dn');
+      } else {
+        expect(top).to.have.property('dn');
+        expect((top.dn as string).toLowerCase()).to.equal(
+          DM_LDAP_TOP_ORGANIZATION?.toLowerCase()
+        );
+      }
     });
 
     it('should throw error when top organization not configured', async () => {

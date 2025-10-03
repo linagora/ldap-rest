@@ -1,300 +1,320 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LDAP Tree Viewer Demo</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP Tree Viewer Demo</title>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-  <!-- Library CSS -->
-  <link rel="stylesheet" href="/static/browser/ldap-tree-viewer.css">
+    <!-- Library CSS -->
+    <link rel="stylesheet" href="/static/browser/ldap-tree-viewer.css" />
 
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .demo-container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .demo-header {
-      background: white;
-      color: #333;
-      padding: 32px;
-      margin-bottom: 24px;
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .demo-header h1 {
-      font-size: 32px;
-      font-weight: 500;
-      margin-bottom: 8px;
-      color: #6200ee;
-    }
-
-    .demo-header p {
-      font-size: 16px;
-      color: #666;
-      margin-bottom: 16px;
-    }
-
-    .demo-controls {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    .demo-button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 4px;
-      background: #6200ee;
-      color: white;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .demo-button:hover {
-      background: #3700b3;
-    }
-
-    .demo-button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-
-    .demo-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-
-    @media (max-width: 900px) {
-      .demo-grid {
-        grid-template-columns: 1fr;
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-    }
 
-    .demo-panel {
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 24px;
+      }
 
-    .demo-panel h2 {
-      font-size: 20px;
-      font-weight: 500;
-      margin-bottom: 16px;
-      color: #333;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      .demo-container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
 
-    .demo-panel h2 .material-icons {
-      color: #6200ee;
-    }
+      .demo-header {
+        background: white;
+        color: #333;
+        padding: 32px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
 
-    #ldap-tree {
-      max-height: 600px;
-      overflow-y: auto;
-    }
+      .demo-header h1 {
+        font-size: 32px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #6200ee;
+      }
 
-    #node-details {
-      min-height: 200px;
-    }
+      .demo-header p {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 16px;
+      }
 
-    .details-empty {
-      color: #999;
-      font-style: italic;
-      padding: 48px 0;
-      text-align: center;
-    }
+      .demo-controls {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
 
-    .details-content {
-      animation: fadeIn 0.3s;
-    }
+      .demo-button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        background: #6200ee;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+      .demo-button:hover {
+        background: #3700b3;
+      }
 
-    .details-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #f0f0f0;
-    }
+      .demo-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
 
-    .details-header .material-icons {
-      font-size: 32px;
-    }
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
 
-    .details-header h3 {
-      font-size: 18px;
-      font-weight: 500;
-      color: #333;
-    }
+      @media (max-width: 900px) {
+        .demo-grid {
+          grid-template-columns: 1fr;
+        }
+      }
 
-    .details-info {
-      margin-bottom: 16px;
-    }
+      .demo-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
 
-    .details-row {
-      display: flex;
-      padding: 8px 0;
-      border-bottom: 1px solid #f5f5f5;
-    }
+      .demo-panel h2 {
+        font-size: 20px;
+        font-weight: 500;
+        margin-bottom: 16px;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
-    .details-label {
-      font-weight: 500;
-      color: #666;
-      min-width: 120px;
-    }
+      .demo-panel h2 .material-icons {
+        color: #6200ee;
+      }
 
-    .details-value {
-      color: #333;
-      word-break: break-all;
-    }
+      #ldap-tree {
+        max-height: 600px;
+        overflow-y: auto;
+      }
 
-    .details-attributes {
-      margin-top: 16px;
-    }
+      #node-details {
+        min-height: 200px;
+      }
 
-    .details-attributes h4 {
-      font-size: 14px;
-      font-weight: 500;
-      color: #666;
-      margin-bottom: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+      .details-empty {
+        color: #999;
+        font-style: italic;
+        padding: 48px 0;
+        text-align: center;
+      }
 
-    .details-attributes pre {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      overflow-x: auto;
-      max-height: 300px;
-    }
+      .details-content {
+        animation: fadeIn 0.3s;
+      }
 
-    .status-message {
-      padding: 12px 16px;
-      border-radius: 4px;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
-    .status-message.error {
-      background: #ffebee;
-      color: #c62828;
-    }
+      .details-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f0f0f0;
+      }
 
-    .status-message.success {
-      background: #e8f5e9;
-      color: #2e7d32;
-    }
-  </style>
-</head>
-<body>
-  <div class="demo-container">
-    <div class="demo-header">
-      <h1>📁 LDAP Tree Viewer</h1>
-      <p>Interactive visualization of LDAP directory structure</p>
+      .details-header .material-icons {
+        font-size: 32px;
+      }
 
-      <div class="demo-controls">
-        <button id="btn-refresh" class="demo-button">
-          <span class="material-icons" style="vertical-align: middle; font-size: 18px;">refresh</span>
-          Refresh
-        </button>
-        <button id="btn-expand" class="demo-button">Expand All</button>
-        <button id="btn-collapse" class="demo-button">Collapse All</button>
+      .details-header h3 {
+        font-size: 18px;
+        font-weight: 500;
+        color: #333;
+      }
+
+      .details-info {
+        margin-bottom: 16px;
+      }
+
+      .details-row {
+        display: flex;
+        padding: 8px 0;
+        border-bottom: 1px solid #f5f5f5;
+      }
+
+      .details-label {
+        font-weight: 500;
+        color: #666;
+        min-width: 120px;
+      }
+
+      .details-value {
+        color: #333;
+        word-break: break-all;
+      }
+
+      .details-attributes {
+        margin-top: 16px;
+      }
+
+      .details-attributes h4 {
+        font-size: 14px;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .details-attributes pre {
+        background: #f5f5f5;
+        padding: 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        overflow-x: auto;
+        max-height: 300px;
+      }
+
+      .status-message {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-message.error {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      .status-message.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>📁 LDAP Tree Viewer</h1>
+        <p>Interactive visualization of LDAP directory structure</p>
+
+        <div class="demo-controls">
+          <button id="btn-refresh" class="demo-button">
+            <span
+              class="material-icons"
+              style="vertical-align: middle; font-size: 18px"
+              >refresh</span
+            >
+            Refresh
+          </button>
+          <button id="btn-expand" class="demo-button">Expand All</button>
+          <button id="btn-collapse" class="demo-button">Collapse All</button>
+        </div>
       </div>
-    </div>
 
-    <div id="status-container"></div>
+      <div id="status-container"></div>
 
-    <div class="demo-grid">
-      <div class="demo-panel">
-        <h2>
-          <span class="material-icons">account_tree</span>
-          Directory Tree
-        </h2>
-        <div id="ldap-tree"></div>
-      </div>
+      <div class="demo-grid">
+        <div class="demo-panel">
+          <h2>
+            <span class="material-icons">account_tree</span>
+            Directory Tree
+          </h2>
+          <div id="ldap-tree"></div>
+        </div>
 
-      <div class="demo-panel">
-        <h2>
-          <span class="material-icons">info</span>
-          Node Details
-        </h2>
-        <div id="node-details">
-          <div class="details-empty">
-            <span class="material-icons" style="font-size: 48px; color: #ddd; margin-bottom: 8px;">touch_app</span>
-            <p>Click on a node to see details</p>
+        <div class="demo-panel">
+          <h2>
+            <span class="material-icons">info</span>
+            Node Details
+          </h2>
+          <div id="node-details">
+            <div class="details-empty">
+              <span
+                class="material-icons"
+                style="font-size: 48px; color: #ddd; margin-bottom: 8px"
+                >touch_app</span
+              >
+              <p>Click on a node to see details</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Library JS -->
-  <script src="/static/browser/ldap-tree-viewer.js"></script>
+    <!-- Library JS -->
+    <script src="/static/browser/ldap-tree-viewer.js"></script>
 
-  <script>
-    const { LdapTreeViewer } = window.LdapTreeViewer;
+    <script>
+      const { LdapTreeViewer } = window.LdapTreeViewer;
 
-    let viewer;
+      let viewer;
 
-    function showStatus(message, type = 'error') {
-      const container = document.getElementById('status-container');
-      container.innerHTML = `
+      function showStatus(message, type = 'error') {
+        const container = document.getElementById('status-container');
+        container.innerHTML = `
         <div class="status-message ${type}">
           <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
           <span>${message}</span>
         </div>
       `;
-      setTimeout(() => {
-        container.innerHTML = '';
-      }, 5000);
-    }
+        setTimeout(() => {
+          container.innerHTML = '';
+        }, 5000);
+      }
 
-    function renderNodeDetails(node) {
-      const detailsEl = document.getElementById('node-details');
+      function renderNodeDetails(node) {
+        const detailsEl = document.getElementById('node-details');
 
-      // Special handling for 'more' indicator
-      if (node.type === 'more') {
-        const totalCount = node.attributes?._totalCount || '?';
-        const displayedCount = node.attributes?._displayedCount || '?';
-        const parentDn = node.parentDn;
+        // Special handling for 'more' indicator
+        if (node.type === 'more') {
+          const totalCount = node.attributes?._totalCount || '?';
+          const displayedCount = node.attributes?._displayedCount || '?';
+          const parentDn = node.parentDn;
 
-        detailsEl.innerHTML = `
+          detailsEl.innerHTML = `
           <div class="details-content">
             <div class="details-header">
               <span class="material-icons" style="color: #ff9800">more_horiz</span>
@@ -344,18 +364,21 @@
             </div>
           </div>
         `;
-        return;
-      }
+          return;
+        }
 
-      const iconMap = {
-        organization: { icon: 'folder', color: '#ffa726' },
-        user: { icon: 'person', color: '#42a5f5' },
-        group: { icon: 'group', color: '#66bb6a' }
-      };
+        const iconMap = {
+          organization: { icon: 'folder', color: '#ffa726' },
+          user: { icon: 'person', color: '#42a5f5' },
+          group: { icon: 'group', color: '#66bb6a' },
+        };
 
-      const { icon, color } = iconMap[node.type] || { icon: 'help', color: '#999' };
+        const { icon, color } = iconMap[node.type] || {
+          icon: 'help',
+          color: '#999',
+        };
 
-      detailsEl.innerHTML = `
+        detailsEl.innerHTML = `
         <div class="details-content">
           <div class="details-header">
             <span class="material-icons" style="color: ${color}">${icon}</span>
@@ -375,57 +398,81 @@
               <span class="details-label">Has Children:</span>
               <span class="details-value">${node.hasChildren ? 'Yes' : 'No'}</span>
             </div>
-            ${node.parentDn ? `
+            ${
+              node.parentDn
+                ? `
               <div class="details-row">
                 <span class="details-label">Parent DN:</span>
                 <span class="details-value">${node.parentDn}</span>
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
 
-          ${node.attributes ? `
+          ${
+            node.attributes
+              ? `
             <div class="details-attributes">
               <h4>Attributes</h4>
               <pre>${JSON.stringify(node.attributes, null, 2)}</pre>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       `;
-    }
-
-    async function performSearch(parentDn, query) {
-      if (!query || query.trim().length === 0) {
-        document.getElementById('search-results').innerHTML =
-          '<p style="color: #f44336; font-size: 13px;">Please enter a search query</p>';
-        return;
       }
 
-      const resultsEl = document.getElementById('search-results');
-      resultsEl.innerHTML = '<p style="font-size: 13px; color: #666;">Searching...</p>';
-
-      try {
-        const response = await fetch(
-          `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(parentDn)}/subnodes/search?q=${encodeURIComponent(query.trim())}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Search failed: ${response.statusText}`);
-        }
-
-        const results = await response.json();
-
-        if (results.length === 0) {
-          resultsEl.innerHTML = '<p style="font-size: 13px; color: #999;">No results found</p>';
+      async function performSearch(parentDn, query) {
+        if (!query || query.trim().length === 0) {
+          document.getElementById('search-results').innerHTML =
+            '<p style="color: #f44336; font-size: 13px;">Please enter a search query</p>';
           return;
         }
 
-        const resultHtml = results.map(item => {
-          const name = (item.cn && item.cn[0]) || (item.uid && item.uid[0]) || (item.ou && item.ou[0]) || 'Unknown';
-          const type = item.objectClass?.includes('organizationalUnit') ? 'organization' :
-                       item.objectClass?.includes('posixGroup') || item.objectClass?.includes('groupOfNames') ? 'group' : 'user';
-          const icon = type === 'organization' ? 'folder' : type === 'group' ? 'group' : 'person';
+        const resultsEl = document.getElementById('search-results');
+        resultsEl.innerHTML =
+          '<p style="font-size: 13px; color: #666;">Searching...</p>';
 
-          return `
+        try {
+          const response = await fetch(
+            `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(parentDn)}/subnodes/search?q=${encodeURIComponent(query.trim())}`
+          );
+
+          if (!response.ok) {
+            throw new Error(`Search failed: ${response.statusText}`);
+          }
+
+          const results = await response.json();
+
+          if (results.length === 0) {
+            resultsEl.innerHTML =
+              '<p style="font-size: 13px; color: #999;">No results found</p>';
+            return;
+          }
+
+          const resultHtml = results
+            .map(item => {
+              const name =
+                (item.cn && item.cn[0]) ||
+                (item.uid && item.uid[0]) ||
+                (item.ou && item.ou[0]) ||
+                'Unknown';
+              const type = item.objectClass?.includes('organizationalUnit')
+                ? 'organization'
+                : item.objectClass?.includes('posixGroup') ||
+                    item.objectClass?.includes('groupOfNames')
+                  ? 'group'
+                  : 'user';
+              const icon =
+                type === 'organization'
+                  ? 'folder'
+                  : type === 'group'
+                    ? 'group'
+                    : 'person';
+
+              return `
             <div style="padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px;">
               <span class="material-icons" style="font-size: 18px; color: #666;">${icon}</span>
               <div style="flex: 1;">
@@ -434,9 +481,10 @@
               </div>
             </div>
           `;
-        }).join('');
+            })
+            .join('');
 
-        resultsEl.innerHTML = `
+          resultsEl.innerHTML = `
           <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;">
             <div style="padding: 8px; background: #f5f5f5; font-weight: 500; font-size: 13px; border-bottom: 2px solid #ddd;">
               Found ${results.length} result(s)
@@ -444,73 +492,77 @@
             ${resultHtml}
           </div>
         `;
-      } catch (error) {
-        console.error('Search error:', error);
-        resultsEl.innerHTML = `<p style="color: #f44336; font-size: 13px;">Error: ${error.message}</p>`;
-      }
-    }
-
-    async function initViewer() {
-      try {
-        viewer = new LdapTreeViewer({
-          containerId: 'ldap-tree',
-          apiBaseUrl: window.location.origin,
-          theme: 'light',
-          onNodeClick: (node) => {
-            console.log('Node clicked:', node);
-            renderNodeDetails(node);
-          },
-          onNodeExpand: (node) => {
-            console.log('Node expanded:', node.dn);
-          }
-        });
-
-        await viewer.init();
-        showStatus('LDAP tree loaded successfully!', 'success');
-      } catch (error) {
-        console.error('Failed to initialize viewer:', error);
-        showStatus(`Error: ${error.message}`, 'error');
-      }
-    }
-
-    // Button handlers
-    document.getElementById('btn-refresh').addEventListener('click', async () => {
-      if (viewer) {
-        try {
-          await viewer.refresh();
-          showStatus('Tree refreshed!', 'success');
         } catch (error) {
+          console.error('Search error:', error);
+          resultsEl.innerHTML = `<p style="color: #f44336; font-size: 13px;">Error: ${error.message}</p>`;
+        }
+      }
+
+      async function initViewer() {
+        try {
+          viewer = new LdapTreeViewer({
+            containerId: 'ldap-tree',
+            apiBaseUrl: window.location.origin,
+            theme: 'light',
+            onNodeClick: node => {
+              console.log('Node clicked:', node);
+              renderNodeDetails(node);
+            },
+            onNodeExpand: node => {
+              console.log('Node expanded:', node.dn);
+            },
+          });
+
+          await viewer.init();
+          showStatus('LDAP tree loaded successfully!', 'success');
+        } catch (error) {
+          console.error('Failed to initialize viewer:', error);
           showStatus(`Error: ${error.message}`, 'error');
         }
       }
-    });
 
-    document.getElementById('btn-expand').addEventListener('click', async () => {
-      if (viewer) {
-        const state = viewer.getState();
-        const promises = [];
-        state.nodes.forEach((node, dn) => {
-          if (node.hasChildren && !state.expandedNodes.has(dn)) {
-            promises.push(viewer.expandNode(dn));
+      // Button handlers
+      document
+        .getElementById('btn-refresh')
+        .addEventListener('click', async () => {
+          if (viewer) {
+            try {
+              await viewer.refresh();
+              showStatus('Tree refreshed!', 'success');
+            } catch (error) {
+              showStatus(`Error: ${error.message}`, 'error');
+            }
           }
         });
-        await Promise.all(promises);
-        showStatus('All nodes expanded!', 'success');
-      }
-    });
 
-    document.getElementById('btn-collapse').addEventListener('click', () => {
-      if (viewer) {
-        const state = viewer.getState();
-        state.expandedNodes.forEach(dn => {
-          viewer.collapseNode(dn);
+      document
+        .getElementById('btn-expand')
+        .addEventListener('click', async () => {
+          if (viewer) {
+            const state = viewer.getState();
+            const promises = [];
+            state.nodes.forEach((node, dn) => {
+              if (node.hasChildren && !state.expandedNodes.has(dn)) {
+                promises.push(viewer.expandNode(dn));
+              }
+            });
+            await Promise.all(promises);
+            showStatus('All nodes expanded!', 'success');
+          }
         });
-        showStatus('All nodes collapsed!', 'success');
-      }
-    });
 
-    // Initialize on load
-    initViewer();
-  </script>
-</body>
+      document.getElementById('btn-collapse').addEventListener('click', () => {
+        if (viewer) {
+          const state = viewer.getState();
+          state.expandedNodes.forEach(dn => {
+            viewer.collapseNode(dn);
+          });
+          showStatus('All nodes collapsed!', 'success');
+        }
+      });
+
+      // Initialize on load
+      initViewer();
+    </script>
+  </body>
 </html>

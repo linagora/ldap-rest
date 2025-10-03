@@ -64,7 +64,9 @@ export class LdapTreeViewer {
       // Initial render
       this.render();
     } catch (error: any) {
-      this.store.dispatch(setError(error.message || 'Failed to load LDAP tree'));
+      this.store.dispatch(
+        setError(error.message || 'Failed to load LDAP tree')
+      );
       throw error;
     }
   }
@@ -122,12 +124,14 @@ export class LdapTreeViewer {
       // Update parent node with children info
       const parentNode = this.store.getState().nodes.get(dn);
       if (parentNode) {
-        this.store.dispatch(updateNode({
-          ...parentNode,
-          hasLoadedChildren: true,
-          childrenDns: childDns,
-          hasChildren: childDns.length > 0,
-        }));
+        this.store.dispatch(
+          updateNode({
+            ...parentNode,
+            hasLoadedChildren: true,
+            childrenDns: childDns,
+            hasChildren: childDns.length > 0,
+          })
+        );
       }
     } catch (error: any) {
       this.store.dispatch(setError(error.message || 'Failed to load children'));
@@ -146,7 +150,10 @@ export class LdapTreeViewer {
     }
   }
 
-  private transformToTreeNode(data: any, parentDn: string | null = null): TreeNode {
+  private transformToTreeNode(
+    data: any,
+    parentDn: string | null = null
+  ): TreeNode {
     // Determine display name
     let displayName = data.ou || data.cn || data.uid || data.dn;
     if (Array.isArray(displayName)) {
@@ -168,14 +175,19 @@ export class LdapTreeViewer {
     };
   }
 
-  private detectNodeType(data: any): 'organization' | 'user' | 'group' | 'more' {
+  private detectNodeType(
+    data: any
+  ): 'organization' | 'user' | 'group' | 'more' {
     const objectClass = data.objectClass || [];
     const classes = Array.isArray(objectClass) ? objectClass : [objectClass];
 
     if (classes.includes('moreIndicator')) {
       return 'more';
     }
-    if (classes.includes('organizationalUnit') || classes.includes('organization')) {
+    if (
+      classes.includes('organizationalUnit') ||
+      classes.includes('organization')
+    ) {
       return 'organization';
     }
     if (classes.includes('posixGroup') || classes.includes('groupOfNames')) {
@@ -221,7 +233,9 @@ export class LdapTreeViewer {
     this.container.innerHTML = '';
     this.container.classList.remove('ldap-tree-viewer-container');
     if (this.options.theme) {
-      this.container.classList.remove(`ldap-tree-viewer--${this.options.theme}`);
+      this.container.classList.remove(
+        `ldap-tree-viewer--${this.options.theme}`
+      );
     }
   }
 }

@@ -55,7 +55,10 @@ export function treeReducer(state: TreeState, action: Action): TreeState {
     }
 
     case Actions.SET_LOADING: {
-      const { dn, loading } = action.payload as { dn: string; loading: boolean };
+      const { dn, loading } = action.payload as {
+        dn: string;
+        loading: boolean;
+      };
       const loadingNodes = new Set(state.loadingNodes);
       if (loading) {
         loadingNodes.add(dn);

@@ -6,4 +6,10 @@
 import './styles.css';
 
 export { LdapTreeViewer } from './LdapTreeViewer';
-export type { ViewerOptions, TreeNode, TreeState, NodeType, FilterType } from './types';
+export type {
+  ViewerOptions,
+  TreeNode,
+  TreeState,
+  NodeType,
+  FilterType,
+} from './types';

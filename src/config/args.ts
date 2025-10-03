@@ -9,6 +9,26 @@ import { dirname, join } from 'path';
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 
+export interface BranchPermissions {
+  read?: boolean;
+  write?: boolean;
+  delete?: boolean;
+}
+
+export interface AuthConfig {
+  default?: BranchPermissions;
+  users?: {
+    [uid: string]: {
+      [branch: string]: BranchPermissions;
+    };
+  };
+  groups?: {
+    [groupDn: string]: {
+      [branch: string]: BranchPermissions;
+    };
+  };
+}
+
 /**
  * Typescript declaration of config
  *
@@ -72,6 +92,10 @@ export interface Config {
   oidc_client_secret?: string;
   base_url?: string;
 
+  // auth/authnPerBranch
+  authn_per_branch_config?: AuthConfig;
+  authn_per_branch_cache_ttl?: number;
+
   // Special attributes
   mail_attribute?: string;
   quota_attribute?: string;
@@ -87,6 +111,7 @@ export interface Config {
     | boolean
     | number
     | AttributesList
+    | AuthConfig
     | undefined;
 }
 
@@ -257,6 +282,20 @@ const configArgs: ConfigTemplate = [
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
+
+  // Auth authnPerBranch plugin
+  [
+    '--authn-per-branch-config',
+    'DM_AUTHN_PER_BRANCH_CONFIG',
+    { default: { read: true, write: false, delete: false } } as AuthConfig,
+    'json',
+  ],
+  [
+    '--authn-per-branch-cache-ttl',
+    'DM_AUTHN_PER_BRANCH_CACHE_TTL',
+    60,
+    'number',
+  ],
 
   // Auth OpenID Connect plugin
   ['--oidc-server', 'DM_OIDC_SERVER', ''],

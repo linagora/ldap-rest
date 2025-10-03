@@ -624,7 +624,10 @@ export default class LdapGroups extends DmPlugin {
       // Check branch restriction if provided
       if (test.branch && test.branch.length > 0) {
         const isInBranch = test.branch.some(branch => {
-          const branchPattern = new RegExp(`,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+          const branchPattern = new RegExp(
+            `,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+            'i'
+          );
           return branchPattern.test(dnValue);
         });
         if (!isInBranch) {
@@ -645,7 +648,9 @@ export default class LdapGroups extends DmPlugin {
           !result.searchEntries ||
           result.searchEntries.length === 0
         )
-          throw new Error(`Field ${field} points to non-existent DN: ${dnValue}`);
+          throw new Error(
+            `Field ${field} points to non-existent DN: ${dnValue}`
+          );
       } catch (err) {
         throw new Error(
           `Field ${field} points to invalid or non-existent DN: ${dnValue}`

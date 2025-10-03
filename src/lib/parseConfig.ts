@@ -20,7 +20,8 @@ type ConfigResultValue =
 export type ConfigEntry = [
   string, // arg
   string, // env value
-  string | string[] | boolean | number | Record<string, AttributeValue>, // default value
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  string | string[] | boolean | number | Record<string, any>, // default value
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
 ];

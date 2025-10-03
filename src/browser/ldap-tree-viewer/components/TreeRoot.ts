@@ -76,7 +76,8 @@ export class TreeRoot {
     loading.setAttribute('aria-live', 'polite');
 
     const spinner = document.createElement('div');
-    spinner.className = 'mdc-circular-progress mdc-circular-progress--indeterminate';
+    spinner.className =
+      'mdc-circular-progress mdc-circular-progress--indeterminate';
     spinner.setAttribute('role', 'progressbar');
     spinner.setAttribute('aria-label', 'Loading tree');
 
