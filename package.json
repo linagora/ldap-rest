@@ -139,7 +139,8 @@
   },
   "main": "dist/bin/index.mjs",
   "bin": {
-    "mini-dm": "bin/index.mjs"
+    "mini-dm": "bin/index.mjs",
+    "cleanup-external-users": "bin/cleanup-external-users.mjs"
   },
   "files": [
     "bin",
