@@ -8,6 +8,8 @@ const { DM_LDAP_USER_BRANCH, DM_LDAP_BASE } = process.env;
 const twakeAttr = {
   twakeDepartmentPath: 'Test / SubTest',
   twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+  twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+  twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
 };
 
 describe('LdapUsersFlat Plugin (via flatGeneric)', function () {

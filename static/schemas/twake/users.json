@@ -65,6 +65,16 @@
       "type": "string",
       "test": "^[\\w\\s/,]+$",
       "required": true
+    },
+    "twakeAccountStatus": {
+      "type": "pointer",
+      "branch": ["ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__"],
+      "required": true
+    },
+    "twakeDeliveryMode": {
+      "type": "pointer",
+      "branch": ["ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"],
+      "required": true
     }
   }
 }
