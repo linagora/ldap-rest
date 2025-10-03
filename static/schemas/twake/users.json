@@ -76,6 +76,10 @@
       "type": "pointer",
       "branch": ["ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"],
       "required": true
+    },
+    "mailQuotaSize": {
+      "type": "integer",
+      "required": false
     }
   }
 }

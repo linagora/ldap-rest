@@ -15,7 +15,7 @@ export default class James extends DmPlugin {
       const [dn, attributes] = args;
       // Initialize quota when user is created
       const mailAttr = this.config.mail_attribute || 'mail';
-      const quotaAttr = this.config.quota_attribute || 'mailQuota';
+      const quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
 
       const mail = attributes[mailAttr];
       const quota = attributes[quotaAttr];
@@ -35,6 +35,7 @@ export default class James extends DmPlugin {
       }
 
       // Wait a bit to ensure James has created the user
+      // eslint-disable-next-line no-undef
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       return this._try(

@@ -82,17 +82,13 @@ describe('James Plugin', () => {
     expect(res).to.be.true;
   });
 
-  // Quota management tests require schema with mailQuota attribute
-  // These can be enabled when testing with appropriate LDAP schema
-  describe.skip('Quota management', () => {
+  describe('Quota management', () => {
     it('should initialize quota when user is created', async () => {
       const entry = {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'Quota User',
-        sn: 'User',
+        objectClass: ['top', 'twakeAccount'],
         uid: 'quotauser',
         mail: 'quotauser@test.org',
-        mailQuota: '75000000',
+        mailQuotaSize: '75000000',
       };
       const res = await dm.ldap.add(testDNQuota, entry);
       expect(res).to.be.true;
@@ -103,19 +99,17 @@ describe('James Plugin', () => {
 
     it('should update quota when modified in LDAP', async () => {
       const entry = {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'Test User',
-        sn: 'User',
+        objectClass: ['top', 'twakeAccount'],
         uid: 'testusermail',
         mail: 'testmail@test.org',
-        mailQuota: '50000000',
+        mailQuotaSize: '50000000',
       };
       let res = await dm.ldap.add(testDN, entry);
       expect(res).to.be.true;
 
       // Modify quota
       res = await dm.ldap.modify(testDN, {
-        replace: { mailQuota: '100000000' },
+        replace: { mailQuotaSize: '100000000' },
       });
       expect(res).to.be.true;
     });
