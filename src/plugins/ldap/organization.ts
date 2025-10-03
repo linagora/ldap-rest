@@ -4,7 +4,11 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin from '../../abstract/plugin';
 import { DM } from '../../bin';
 import { Hooks } from '../../hooks';
-import { AttributesList, ModifyRequest } from '../../lib/ldapActions';
+import {
+  AttributesList,
+  AttributeValue,
+  ModifyRequest,
+} from '../../lib/ldapActions';
 import {
   tryMethodData,
   tryMethod,
@@ -97,7 +101,11 @@ export default class LdapOrganizations extends DmPlugin {
 
   async apiAdd(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res, 'ou') as
-      | { ou: string; parentDn?: string; [key: string]: any }
+      | {
+          ou: string;
+          parentDn?: string;
+          [key: string]: AttributeValue | undefined;
+        }
       | false;
     if (!body) return;
 
@@ -161,7 +169,7 @@ export default class LdapOrganizations extends DmPlugin {
       let isOrgEntry: boolean | undefined;
 
       // Determine if this is an organization entry
-      const checkIsOu = async () => {
+      const checkIsOu = async (): Promise<boolean> => {
         if (isOrgEntry !== undefined) return isOrgEntry;
         if (changes.replace?.objectClass) {
           isOrgEntry = this.isOu({ objectClass: changes.replace.objectClass });
@@ -389,6 +397,7 @@ export default class LdapOrganizations extends DmPlugin {
       result.push(...subOUs.searchEntries);
     } catch (err) {
       // Ignore errors (e.g., if no children exist)
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
     }
 
@@ -478,6 +487,7 @@ export default class LdapOrganizations extends DmPlugin {
       result.push(...subOUs.searchEntries);
     } catch (err) {
       this.server.logger.debug(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         `No sub-OUs found matching "${query}" for ${dn}: ${err}`
       );
     }

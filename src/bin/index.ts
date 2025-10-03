@@ -62,7 +62,7 @@ export class DM {
     const promises: Promise<void | boolean>[] = [];
 
     if (this.config.plugin) {
-      for (const p of pluginPriority as string[]) {
+      for (const p of pluginPriority) {
         if (this.config.plugin.includes(p)) {
           // ensure priority plugins are loaded first
           this.config.plugin = this.config.plugin.filter(pl => pl !== p);

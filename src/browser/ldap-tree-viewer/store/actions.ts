@@ -3,6 +3,7 @@
  */
 
 import type { TreeNode } from '../types';
+
 import type { Action } from './Store';
 
 export const Actions = {

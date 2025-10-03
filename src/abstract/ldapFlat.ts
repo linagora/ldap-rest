@@ -11,7 +11,6 @@ import fs from 'fs';
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from './plugin';
 import type { DM } from '../bin';
 import type ldapActions from '../lib/ldapActions';
 import type {
@@ -22,11 +21,9 @@ import type {
   SearchResult,
 } from '../lib/ldapActions';
 import {
-  badRequest,
   created,
   jsonBody,
   notFound,
-  ok,
   serverError,
   tryMethod,
   wantJson,
@@ -37,6 +34,8 @@ import {
   transformSchemas,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
+
+import DmPlugin from './plugin';
 
 export interface LdapFlatConfig {
   /**
@@ -110,6 +109,7 @@ export default abstract class LdapFlat extends DmPlugin {
       fs.readFile(config.schemaPath, (err, data) => {
         if (err) {
           this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
             `Failed to load ${this.singularName} schema from ${config.schemaPath}: ${err}`
           );
         } else {
@@ -119,6 +119,7 @@ export default abstract class LdapFlat extends DmPlugin {
             ) as Schema;
             this.logger.debug(`${this.singularName} schema loaded`);
           } catch (e) {
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
             this.logger.error(`Failed to parse ${config.schemaPath}: ${e}`);
           }
         }
@@ -199,7 +200,10 @@ export default abstract class LdapFlat extends DmPlugin {
       res.json(result.searchEntries[0]);
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
-      if ((err as any).code === 32) {
+      if (
+        (err as { code?: number }).code &&
+        (err as { code?: number }).code === 32
+      ) {
         return notFound(res, `${this.singularName} not found`);
       }
       return serverError(res, err);
@@ -270,6 +274,7 @@ export default abstract class LdapFlat extends DmPlugin {
     try {
       res = await this.ldap.add(dn, entry);
     } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }
     void launchHooks(this.registeredHooks[`${this.hookPrefix}adddone`], [
@@ -449,7 +454,8 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!this.schema) return true;
 
     // Check for fixed attributes in add/replace operations
-    const checkFixed = (field: string, value: AttributeValue) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const checkFixed = (field: string, value: AttributeValue): void => {
       const attr = this.schema?.attributes[field];
       if (attr?.fixed) {
         throw new Error(`Attribute "${field}" is fixed and cannot be modified`);
@@ -538,6 +544,7 @@ export default abstract class LdapFlat extends DmPlugin {
           throw new Error(
             `Field ${field} points to non-existent DN: ${dnValue}`
           );
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         throw new Error(
           `Field ${field} points to invalid or non-existent DN: ${dnValue}`

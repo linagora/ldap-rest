@@ -203,7 +203,10 @@ export default class LdapGroups extends DmPlugin {
       res.json(result.searchEntries[0]);
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
-      if ((err as any).code === 32) {
+      if (
+        (err as { code?: number }).code &&
+        (err as { code?: number }).code === 32
+      ) {
         return notFound(res, 'Group not found');
       }
       return serverError(res, err);
@@ -653,7 +656,8 @@ export default class LdapGroups extends DmPlugin {
           );
       } catch (err) {
         throw new Error(
-          `Field ${field} points to invalid or non-existent DN: ${dnValue}`
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `Field ${field} points to invalid or non-existent DN: ${dnValue}: ${err}`
         );
       }
       // Also check test regex if provided

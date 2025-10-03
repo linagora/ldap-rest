@@ -2,6 +2,7 @@
  * LDAP low-level library
  * @author Xavier Guimard <xguimard@linagora.com>
  */
+import type { Request } from 'express';
 import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
@@ -108,7 +109,7 @@ class ldapActions {
   async search(
     options: SearchOptions,
     base: string = this.base,
-    req?: any
+    req?: Request
   ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
     const client = await this.connect();
     let opts = {

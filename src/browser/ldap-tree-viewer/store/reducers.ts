@@ -3,6 +3,7 @@
  */
 
 import type { TreeState, TreeNode } from '../types';
+
 import type { Action } from './Store';
 import { Actions } from './actions';
 

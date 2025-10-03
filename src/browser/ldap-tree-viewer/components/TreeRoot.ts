@@ -4,6 +4,7 @@
 
 import type { TreeState } from '../types';
 import type { Store } from '../store/Store';
+
 import { TreeNodeComponent } from './TreeNode';
 
 export class TreeRoot {

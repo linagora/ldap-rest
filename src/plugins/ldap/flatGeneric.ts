@@ -6,6 +6,7 @@
  * Automatically creates sub-plugins based on schema metadata
  */
 import fs from 'fs';
+
 import type { Express } from 'express';
 
 import DmPlugin from '../../abstract/plugin';
@@ -110,6 +111,7 @@ export default class LdapFlatGeneric extends DmPlugin {
           `Created ldapFlat instance for "${schema.entity.name}" (${schema.entity.pluralName})`
         );
       } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         this.logger.error(`Failed to load schema ${schemaPath}: ${err}`);
       }
     });

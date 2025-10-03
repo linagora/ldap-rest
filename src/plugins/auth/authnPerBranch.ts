@@ -340,7 +340,7 @@ export default class AuthnPerBranch extends DmPlugin {
       // Search for groups where user is a member, using wildcard pattern
       // This works regardless of where the user DN is located
       const memberAttr = this.config.ldap_group_member_attribute || 'member';
-      const filter = `(${memberAttr}=${this.config.ldap_user_main_attribute}=${uid},*)`;
+      const filter = `(${memberAttr as string}=${this.config.ldap_user_main_attribute}=${uid},*)`;
 
       const searchResult = (await this.server.ldap.search(
         {
