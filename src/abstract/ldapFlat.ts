@@ -399,6 +399,15 @@ export default abstract class LdapFlat extends DmPlugin {
 
   async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
     if (!this.schema) return true;
+
+    // First, enforce fixed attributes
+    for (const [field, attr] of Object.entries(this.schema.attributes)) {
+      if (attr.fixed && attr.default !== undefined) {
+        // Force the default value for fixed attributes
+        entry[field] = attr.default;
+      }
+    }
+
     for (const [field, value] of Object.entries(entry)) {
       if (!this.schema.attributes[field]) {
         if (this.schema.strict)
@@ -408,6 +417,18 @@ export default abstract class LdapFlat extends DmPlugin {
         continue;
       }
       const attr = this.schema.attributes[field];
+
+      // Check if trying to modify a fixed attribute
+      if (attr.fixed && attr.default !== undefined) {
+        const defaultStr = JSON.stringify(attr.default);
+        const valueStr = JSON.stringify(value);
+        if (defaultStr !== valueStr) {
+          throw new Error(
+            `Attribute "${field}" is fixed and cannot be modified. Expected: ${defaultStr}`
+          );
+        }
+      }
+
       if (!(await this._validateOneChange(field, value))) {
         throw new Error(`Invalid value for attribute "${field}"`);
       }
@@ -426,8 +447,20 @@ export default abstract class LdapFlat extends DmPlugin {
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
     if (!this.schema) return true;
+
+    // Check for fixed attributes in add/replace operations
+    const checkFixed = (field: string, value: AttributeValue) => {
+      const attr = this.schema?.attributes[field];
+      if (attr?.fixed) {
+        throw new Error(
+          `Attribute "${field}" is fixed and cannot be modified`
+        );
+      }
+    };
+
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
+        checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
           throw new Error(`Invalid value for attribute "${field}"`);
         }
@@ -435,8 +468,22 @@ export default abstract class LdapFlat extends DmPlugin {
     }
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
+        checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
           throw new Error(`Invalid value for attribute "${field}"`);
+        }
+      }
+    }
+    if (changes.delete) {
+      const deleteFields = Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete);
+      for (const field of deleteFields) {
+        const attr = this.schema.attributes[field];
+        if (attr?.fixed) {
+          throw new Error(
+            `Attribute "${field}" is fixed and cannot be deleted`
+          );
         }
       }
     }

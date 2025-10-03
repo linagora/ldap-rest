@@ -8,7 +8,8 @@
         "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
       },
       "default": ["top", "groupOfNames", "twakeStaticGroup"],
-      "required": true
+      "required": true,
+      "fixed": true
     },
     "cn": {
       "type": "string",

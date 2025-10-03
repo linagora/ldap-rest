@@ -13,6 +13,7 @@ export interface Schema {
       required?: boolean;
       test?: string | RegExp;
       branch?: string[];
+      fixed?: boolean;
     };
   };
 }

@@ -15,7 +15,8 @@
         "type": "string"
       },
       "default": ["top", "applicationProcess"],
-      "required": true
+      "required": true,
+      "fixed": true
     },
     "cn": {
       "type": "string",

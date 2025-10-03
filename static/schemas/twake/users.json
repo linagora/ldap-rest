@@ -16,7 +16,8 @@
         "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
       },
       "default": ["top", "twakeAccount", "twakeWhitePages"],
-      "required": true
+      "required": true,
+      "fixed": true
     },
     "uid": {
       "type": "string",
