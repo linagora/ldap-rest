@@ -19,6 +19,40 @@ import { buildLogger } from '../dist/logger/winston.js';
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
+
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+cleanup-external-users - Remove orphaned external users from LDAP
+
+Usage:
+  cleanup-external-users [OPTIONS]
+
+Description:
+  Removes external users from the contacts branch that are no longer
+  referenced in any group. Useful for maintaining a clean LDAP directory.
+
+Options:
+  --dry-run     Show what would be deleted without actually deleting
+  --verbose     Show detailed information about each user checked
+  --quiet       Only show errors and deletions (WOULD DELETE in dry-run mode)
+  --help, -h    Show this help message
+
+Examples:
+  # Preview what would be deleted
+  cleanup-external-users --dry-run
+
+  # Delete orphaned users with detailed output
+  cleanup-external-users --verbose
+
+  # Delete orphaned users silently (for cron)
+  cleanup-external-users --quiet
+
+  # Preview in quiet mode (only show what would be deleted)
+  cleanup-external-users --dry-run --quiet
+`);
+  process.exit(0);
+}
+
 const dryRun = args.includes('--dry-run');
 const verbose = args.includes('--verbose');
 const quiet = args.includes('--quiet');
