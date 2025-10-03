@@ -541,7 +541,7 @@ export default class LdapGroups extends DmPlugin {
     );
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
-      if (!this._validateOneChange(field, value)) {
+      if (!(await this._validateOneChange(field, value))) {
         throw new Error(`Invalid value for field ${field}`);
       }
     }
@@ -561,25 +561,28 @@ export default class LdapGroups extends DmPlugin {
     );
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
-        this._validateOneChange(field, value);
+        await this._validateOneChange(field, value);
       }
     }
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
-        this._validateOneChange(field, value);
+        await this._validateOneChange(field, value);
       }
     }
     if (changes.delete && changes.delete instanceof Object) {
       for (const v of Array.isArray(changes.delete)
         ? changes.delete
         : Object.keys(changes.delete)) {
-        this._validateOneChange(v, null);
+        await this._validateOneChange(v, null);
       }
     }
     return true;
   }
 
-  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+  async _validateOneChange(
+    field: string,
+    value: AttributeValue | null
+  ): Promise<boolean> {
     if (!this.schema) return true;
     const test = this.schema.attributes[field];
     if (!test) {
@@ -611,6 +614,32 @@ export default class LdapGroups extends DmPlugin {
           if (test.items.test && !test.items.test.test(v))
             throw new Error(`Field ${field} has invalid value ${v}`);
         }
+      }
+    } else if (test.type === 'pointer') {
+      if (typeof value !== 'string')
+        throw new Error(`Field ${field} must be a string (DN pointer)`);
+      // Verify that the DN exists in LDAP
+      try {
+        const result = (await this.ldap.search(
+          { paged: false },
+          value
+        )) as SearchResult;
+        if (
+          !result ||
+          !result.searchEntries ||
+          result.searchEntries.length === 0
+        )
+          throw new Error(`Field ${field} points to non-existent DN: ${value}`);
+      } catch (err) {
+        throw new Error(
+          `Field ${field} points to invalid or non-existent DN: ${value}`
+        );
+      }
+      // Also check test regex if provided
+      if (test.test) {
+        if (typeof test.test === 'string') test.test = new RegExp(test.test);
+        if (test.test && !test.test.test(value))
+          throw new Error(`Field ${field} has invalid value ${value}`);
       }
     } else {
       if (typeof value !== test.type) return false;
