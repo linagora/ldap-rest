@@ -22,7 +22,8 @@
     "uid": {
       "type": "string",
       "test": "^[a-zA-Z0-9._-]{1,255}$",
-      "required": true
+      "required": true,
+      "role": "identifier"
     },
     "cn": {
       "type": "string",
@@ -35,7 +36,22 @@
     "mail": {
       "type": "string",
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "required": false
+      "required": false,
+      "role": "primaryEmail"
+    },
+    "mailAlternateAddress": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      },
+      "required": false,
+      "role": "emailAliases"
+    },
+    "mailQuota": {
+      "type": "number",
+      "required": false,
+      "role": "emailQuota"
     },
     "givenName": {
       "type": "string",

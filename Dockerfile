@@ -34,6 +34,7 @@ ENV NODE_ENV=production \
  DM_SCHEMAS_PATH="/app/node_modules/mini-dm/static/schemas" \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
+ DM_ALIAS_ATTRIBUTE="mailAlternateAddress" \
  DM_USER_CLASSES=top,twakeAccount,twakeWhitePages \
  DM_LDAP_TOP_ORGANIZATION= \
  DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \
