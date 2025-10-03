@@ -2,14 +2,15 @@ import { expect } from 'chai';
 import AuthnPerBranch from '../../../src/plugins/auth/authnPerBranch';
 import { DM } from '../../../src/bin';
 
-const { DM_LDAP_USER_BRANCH, DM_LDAP_GROUP_BRANCH } = process.env;
+const { DM_LDAP_BASE, DM_LDAP_GROUP_BRANCH } = process.env;
+const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('AuthnPerBranch', function () {
   // Skip all tests if required env vars are not set
   if (
     !process.env.DM_LDAP_DN ||
     !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_USER_BRANCH
+    !process.env.DM_LDAP_BASE
   ) {
     console.warn(
       'Skipping authnPerBranch tests: LDAP credentials are required'
@@ -34,14 +35,14 @@ describe('AuthnPerBranch', function () {
       },
       users: {
         testuser1: {
-          [DM_LDAP_USER_BRANCH as string]: {
+          [USER_BRANCH as string]: {
             read: true,
             write: true,
             delete: false,
           },
         },
         testuser2: {
-          [DM_LDAP_USER_BRANCH as string]: {
+          [USER_BRANCH as string]: {
             read: true,
             write: false,
             delete: false,
@@ -83,7 +84,7 @@ describe('AuthnPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'unknownuser',
-        DM_LDAP_USER_BRANCH as string
+        USER_BRANCH as string
       );
       expect(permissions).to.deep.equal({
         read: false,
@@ -96,7 +97,7 @@ describe('AuthnPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'testuser1',
-        DM_LDAP_USER_BRANCH as string
+        USER_BRANCH as string
       );
       expect(permissions.read).to.be.true;
       expect(permissions.write).to.be.true;
@@ -107,7 +108,7 @@ describe('AuthnPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'testuser2',
-        DM_LDAP_USER_BRANCH as string
+        USER_BRANCH as string
       );
       expect(permissions.read).to.be.true;
       expect(permissions.write).to.be.false;
@@ -117,7 +118,7 @@ describe('AuthnPerBranch', function () {
     it('should support sub-branch permissions', async function () {
       this.timeout(5000);
       // Test that permissions apply to sub-branches
-      const subBranch = `ou=test,${DM_LDAP_USER_BRANCH}`;
+      const subBranch = `ou=test,${USER_BRANCH}`;
       const permissions = await plugin.getUserPermissions(
         'testuser1',
         subBranch
@@ -132,14 +133,14 @@ describe('AuthnPerBranch', function () {
       this.timeout(5000);
       const branches = await plugin.getAuthorizedBranches('testuser1', 'read');
       expect(branches).to.be.an('array');
-      expect(branches).to.include(DM_LDAP_USER_BRANCH);
+      expect(branches).to.include(USER_BRANCH);
     });
 
     it('should return authorized branches for write permission', async function () {
       this.timeout(5000);
       const branches = await plugin.getAuthorizedBranches('testuser1', 'write');
       expect(branches).to.be.an('array');
-      expect(branches).to.include(DM_LDAP_USER_BRANCH);
+      expect(branches).to.include(USER_BRANCH);
     });
 
     it('should return empty array for unauthorized permission', async function () {
@@ -212,7 +213,7 @@ describe('AuthnPerBranch', function () {
         const mockReq = { user: 'unknownuser' } as any;
         if (plugin.hooks?.ldapsearchrequest) {
           await plugin.hooks.ldapsearchrequest([
-            DM_LDAP_USER_BRANCH as string,
+            USER_BRANCH as string,
             { paged: false },
             mockReq,
           ]);
@@ -228,12 +229,12 @@ describe('AuthnPerBranch', function () {
       const mockReq = { user: 'testuser1' } as any;
       if (plugin.hooks?.ldapsearchrequest) {
         const result = await plugin.hooks.ldapsearchrequest([
-          DM_LDAP_USER_BRANCH as string,
+          USER_BRANCH as string,
           { paged: false },
           mockReq,
         ]);
 
-        expect(result[0]).to.equal(DM_LDAP_USER_BRANCH);
+        expect(result[0]).to.equal(USER_BRANCH);
         // When searching within authorized branch, filter should not be modified
         expect(result[1]).to.not.be.undefined;
       }
@@ -244,12 +245,12 @@ describe('AuthnPerBranch', function () {
       const mockReq = {} as any;
       if (plugin.hooks?.ldapsearchrequest) {
         const result = await plugin.hooks.ldapsearchrequest([
-          DM_LDAP_USER_BRANCH as string,
+          USER_BRANCH as string,
           { paged: false },
           mockReq,
         ]);
 
-        expect(result[0]).to.equal(DM_LDAP_USER_BRANCH);
+        expect(result[0]).to.equal(USER_BRANCH);
         expect(result[1]).to.deep.equal({ paged: false });
       }
     });

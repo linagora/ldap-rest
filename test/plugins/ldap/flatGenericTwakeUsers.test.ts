@@ -3,7 +3,8 @@ import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 
-const { DM_LDAP_USER_BRANCH, DM_LDAP_BASE } = process.env;
+const { DM_LDAP_BASE } = process.env;
+const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 const twakeAttr = {
   twakeDepartmentPath: 'Test / SubTest',
@@ -17,11 +18,11 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
   if (
     !process.env.DM_LDAP_DN ||
     !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_USER_BRANCH
+    !process.env.DM_LDAP_BASE
   ) {
     // eslint-disable-next-line no-console
     console.warn(
-      'Skipping ldapUsersFlat tests: DM_LDAP_USER_BRANCH and LDAP credentials are required'
+      'Skipping ldapUsersFlat tests: DM_LDAP_BASE and LDAP credentials are required'
     );
     // @ts-ignore
     this.skip?.();
@@ -56,7 +57,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
 
   describe('constructor', () => {
     it('should set base from config', () => {
-      expect(plugin.base).to.equal(DM_LDAP_USER_BRANCH);
+      expect(plugin.base).to.equal(USER_BRANCH);
     });
   });
 
@@ -73,7 +74,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(listEntries).to.have.property('testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
         },
       });
@@ -100,7 +101,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ])
       ).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
           cn: 'Test User',
           sn: 'User',
@@ -127,7 +128,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ])
       ).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
           displayName: 'Test User',
         },
@@ -142,7 +143,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ])
       ).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
           displayName: 'Modified Test User',
         },
@@ -169,7 +170,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       });
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
         },
       });
@@ -177,7 +178,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({});
       expect(await plugin.searchUsersByName('testuserbis')).to.deep.equal({
         testuserbis: {
-          dn: `uid=testuserbis,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuserbis,${USER_BRANCH}`,
           uid: 'testuserbis',
         },
       });
@@ -206,7 +207,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(res.body).to.have.property('uid', 'testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
         },
       });
@@ -243,7 +244,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         ])
       ).to.deep.equal({
         testuser: {
-          dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser,${USER_BRANCH}`,
           uid: 'testuser',
           displayName: 'Modified via API',
         },
@@ -269,7 +270,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(res.status).to.equal(200);
       expect(res.body).to.have.property('testuser');
       expect(res.body.testuser).to.deep.equal({
-        dn: `uid=testuser,${DM_LDAP_USER_BRANCH}`,
+        dn: `uid=testuser,${USER_BRANCH}`,
         uid: 'testuser',
         mail: 'testuser-flat-api-list@example.org',
       });

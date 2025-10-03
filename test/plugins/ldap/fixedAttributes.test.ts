@@ -2,17 +2,18 @@ import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 
-const { DM_LDAP_USER_BRANCH } = process.env;
+const { DM_LDAP_BASE } = process.env;
+const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('Fixed attributes validation', function () {
   // Skip all tests if required env vars are not set
   if (
     !process.env.DM_LDAP_DN ||
     !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_USER_BRANCH
+    !process.env.DM_LDAP_BASE
   ) {
     console.warn(
-      'Skipping fixed attributes tests: DM_LDAP_USER_BRANCH and LDAP credentials are required'
+      'Skipping fixed attributes tests: DM_LDAP_BASE and LDAP credentials are required'
     );
     // @ts-ignore
     this.skip?.();

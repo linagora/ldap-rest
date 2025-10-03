@@ -2,18 +2,19 @@ import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 
-const { DM_LDAP_USER_BRANCH } = process.env;
+const { DM_LDAP_BASE } = process.env;
+const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('LdapUsersFlat validation with standard schema (via flatGeneric)', function () {
   // Skip all tests if required env vars are not set
   if (
     !process.env.DM_LDAP_DN ||
     !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_USER_BRANCH
+    !process.env.DM_LDAP_BASE
   ) {
     // eslint-disable-next-line no-console
     console.warn(
-      'Skipping ldapUsersFlat standard schema validation tests: DM_LDAP_USER_BRANCH and LDAP credentials are required'
+      'Skipping ldapUsersFlat standard schema validation tests: DM_LDAP_BASE and LDAP credentials are required'
     );
     // @ts-ignore
     this.skip?.();
@@ -48,7 +49,7 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
 
   describe('constructor', () => {
     it('should set base from config', () => {
-      expect(plugin.base).to.equal(DM_LDAP_USER_BRANCH);
+      expect(plugin.base).to.equal(USER_BRANCH);
     });
   });
 
@@ -64,7 +65,7 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
       expect(listEntries).to.have.property('testuser2');
       expect(await plugin.searchUsersByName('testuser2')).to.deep.equal({
         testuser2: {
-          dn: `uid=testuser2,${DM_LDAP_USER_BRANCH}`,
+          dn: `uid=testuser2,${USER_BRANCH}`,
           uid: 'testuser2',
         },
       });
