@@ -59,6 +59,17 @@ export default class LdapOrganizations extends DmPlugin {
       }
     );
 
+    // Search in organization subnodes
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
+      async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn);
+        const query = req.query.q as string;
+        if (!query) return badRequest(res, 'query parameter "q" is required');
+        await tryMethodData(res, this.searchOrganisationSubnodes.bind(this), dn, query);
+      }
+    );
+
     // Add organization
     app.post(
       `${this.config.api_prefix}/v1/ldap/organizations`,
@@ -424,5 +435,54 @@ export default class LdapOrganizations extends DmPlugin {
   async deleteOrganization(dn: string): Promise<boolean> {
     // Hook will check that organization is empty before deletion
     return await this.server.ldap.delete(dn);
+  }
+
+  async searchOrganisationSubnodes(dn: string, query: string): Promise<AttributesList[]> {
+    const result: AttributesList[] = [];
+
+    // Search for sub-OUs matching the query
+    try {
+      const subOUs = (await this.server.ldap.search(
+        {
+          paged: false,
+          scope: 'one',
+          filter: `(&(objectClass=organizationalUnit)(|(ou=*${query}*)(description=*${query}*)))`,
+        },
+        dn
+      )) as SearchResult;
+      this.server.logger.debug(
+        `Found ${subOUs.searchEntries.length} sub-OUs matching "${query}" for ${dn}`
+      );
+      result.push(...subOUs.searchEntries);
+    } catch (err) {
+      this.server.logger.debug(`No sub-OUs found matching "${query}" for ${dn}: ${err}`);
+    }
+
+    // Search for linked entities (users and groups) matching the query
+    const topOrg = this.config.ldap_top_organization as string;
+    const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${dn})(|(uid=*${query}*)(cn=*${query}*)(mail=*${query}*)(sn=*${query}*)(givenName=*${query}*)))`;
+    this.server.logger.debug(
+      `Searching for linked entities with filter: ${filter} in ${baseDn}`
+    );
+
+    const subs = await this.server.ldap.search(
+      {
+        paged: true,
+        filter,
+      },
+      baseDn
+    );
+
+    let linkedCount = 0;
+    for await (const sub of subs as AsyncGenerator<SearchResult>) {
+      linkedCount += sub.searchEntries.length;
+      result.push(...sub.searchEntries);
+    }
+    this.server.logger.debug(
+      `Found ${linkedCount} linked entities matching "${query}" for ${dn}`
+    );
+
+    return result;
   }
 }

@@ -41,6 +41,12 @@ export class LdapApiClient {
     return this.fetch(`/api/v1/ldap/organizations/${encodedDn}/subnodes`);
   }
 
+  async searchOrganizationSubnodes(dn: string, query: string): Promise<any[]> {
+    const encodedDn = encodeURIComponent(dn);
+    const encodedQuery = encodeURIComponent(query);
+    return this.fetch(`/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`);
+  }
+
   async getUsers(filter?: string): Promise<any> {
     const query = filter ? `?filter=${encodeURIComponent(filter)}` : '';
     return this.fetch(`/api/v1/ldap/users${query}`);
