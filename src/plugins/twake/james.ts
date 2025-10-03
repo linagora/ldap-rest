@@ -10,8 +10,9 @@ export default class James extends DmPlugin {
   dependencies = { onLdapChange: 'core/ldap/onChange' };
 
   hooks: Hooks = {
-    ldapadddone: async (args) => {
-      const [dn, attributes] = args;
+    ldapadddone: async args => {
+      // const [dn, attributes] = args;
+      const [dn] = args;
       // Initialize James identity when user is created
       const mail = await this.getMailFromDN(dn);
       if (!mail) {
@@ -28,6 +29,7 @@ export default class James extends DmPlugin {
       }
 
       // Wait a bit to ensure James has created the user
+      // eslint-disable-next-line no-undef
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Update James identity via JMAP
@@ -98,6 +100,7 @@ export default class James extends DmPlugin {
         return mail ? String(mail) : null;
       }
     } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       this.logger.error(`Failed to get mail from DN ${dn}: ${err}`);
     }
     return null;
@@ -128,7 +131,7 @@ export default class James extends DmPlugin {
           if (Array.isArray(value)) {
             return value.length > 0 ? String(value[0]) : null;
           }
-          return String(value);
+          return String(value as string | Buffer);
         };
 
         // 1. Try displayName first
@@ -155,6 +158,7 @@ export default class James extends DmPlugin {
         if (mail) return mail;
       }
     } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       this.logger.error(`Failed to get display name from DN ${dn}: ${err}`);
     }
     return null;
