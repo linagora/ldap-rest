@@ -275,4 +275,77 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       });
     });
   });
+
+  describe('Pointer type validation', () => {
+    it('should reject user with non-existent pointer DN', async () => {
+      try {
+        await plugin.addUser('testuser', {
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-pointer@example.org',
+          twakeDepartmentPath: 'Test / SubTest',
+          twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+          twakeAccountStatus: `cn=nonexistent,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        });
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.include('points to invalid or non-existent DN');
+      }
+    });
+
+    it('should reject user with pointer DN outside allowed branch', async () => {
+      try {
+        await plugin.addUser('testuser', {
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-pointer@example.org',
+          twakeDepartmentPath: 'Test / SubTest',
+          twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+          // Using a DN from wrong branch
+          twakeAccountStatus: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        });
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.include('must point to a DN within allowed branches');
+      }
+    });
+
+    it('should accept user with valid pointer DNs', async () => {
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-pointer-valid@example.org',
+        twakeDepartmentPath: 'Test / SubTest',
+        twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+      const users = await plugin.searchUsersByName('testuser');
+      expect(users).to.have.property('testuser');
+      await plugin.deleteUser('testuser');
+    });
+
+    it('should reject modification with invalid pointer DN', async () => {
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-pointer-modify@example.org',
+        ...twakeAttr,
+      });
+      try {
+        await plugin.modifyUser('testuser', {
+          replace: {
+            twakeAccountStatus: `cn=invalid,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+          },
+        });
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.include('points to invalid or non-existent DN');
+      } finally {
+        await plugin.deleteUser('testuser');
+      }
+    });
+  });
 });

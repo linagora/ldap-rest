@@ -408,7 +408,7 @@ export default abstract class LdapFlat extends DmPlugin {
         continue;
       }
       const attr = this.schema.attributes[field];
-      if (!this._validateOneChange(field, value)) {
+      if (!(await this._validateOneChange(field, value))) {
         throw new Error(`Invalid value for attribute "${field}"`);
       }
       if (attr.required && !value) {
@@ -428,14 +428,14 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!this.schema) return true;
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
-        if (!this._validateOneChange(field, value)) {
+        if (!(await this._validateOneChange(field, value))) {
           throw new Error(`Invalid value for attribute "${field}"`);
         }
       }
     }
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
-        if (!this._validateOneChange(field, value)) {
+        if (!(await this._validateOneChange(field, value))) {
           throw new Error(`Invalid value for attribute "${field}"`);
         }
       }
@@ -443,7 +443,10 @@ export default abstract class LdapFlat extends DmPlugin {
     return true;
   }
 
-  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+  async _validateOneChange(
+    field: string,
+    value: AttributeValue | null
+  ): Promise<boolean> {
     if (!this.schema) return true;
     const attr = this.schema.attributes[field];
     if (!attr) {
@@ -451,6 +454,47 @@ export default abstract class LdapFlat extends DmPlugin {
       return true;
     }
     if (!value) return true;
+
+    // Handle pointer type
+    if (attr.type === 'pointer') {
+      if (typeof value !== 'string') {
+        throw new Error(`Field ${field} must be a string (DN pointer)`);
+      }
+
+      const dnValue: string = value;
+
+      // Check branch restriction if provided
+      if (attr.branch && attr.branch.length > 0) {
+        const isInBranch = attr.branch.some(branch => {
+          const branchPattern = new RegExp(`,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+          return branchPattern.test(dnValue);
+        });
+        if (!isInBranch) {
+          throw new Error(
+            `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
+          );
+        }
+      }
+
+      // Verify that the DN exists in LDAP
+      try {
+        const result = (await this.ldap.search(
+          { paged: false },
+          dnValue
+        )) as SearchResult;
+        if (
+          !result ||
+          !result.searchEntries ||
+          result.searchEntries.length === 0
+        )
+          throw new Error(`Field ${field} points to non-existent DN: ${dnValue}`);
+      } catch (err) {
+        throw new Error(
+          `Field ${field} points to invalid or non-existent DN: ${dnValue}`
+        );
+      }
+    }
+
     if (attr.test) {
       const regex = new RegExp(attr.test);
       if (Array.isArray(value)) {
