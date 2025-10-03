@@ -341,6 +341,7 @@ export default class LdapOrganizations extends DmPlugin {
 
   async getOrganisationSubnodes(dn: string): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
+    const MAX_LINKED_ENTITIES = this.config.ldap_organization_max_subnodes || 50;
 
     // 1. Get direct sub-OUs (children organizational units)
     try {
@@ -361,7 +362,7 @@ export default class LdapOrganizations extends DmPlugin {
       this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
     }
 
-    // 2. Get linked entities (users and groups)
+    // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
     // Need to search from LDAP base, not just organization tree
     // Extract base DN from top organization (e.g., "o=gov,c=mu" from "ou=organization,o=gov,c=mu")
     const topOrg = this.config.ldap_top_organization as string;
@@ -378,13 +379,31 @@ export default class LdapOrganizations extends DmPlugin {
       baseDn
     );
     let linkedCount = 0;
+    let totalCount = 0;
     for await (const sub of subs as AsyncGenerator<SearchResult>) {
-      linkedCount += sub.searchEntries.length;
-      result.push(...sub.searchEntries);
+      totalCount += sub.searchEntries.length;
+      const remaining = MAX_LINKED_ENTITIES - linkedCount;
+      if (remaining > 0) {
+        const entriesToAdd = sub.searchEntries.slice(0, remaining);
+        result.push(...entriesToAdd);
+        linkedCount += entriesToAdd.length;
+      }
     }
     this.server.logger.debug(
-      `Found ${linkedCount} linked entities for ${dn}`
+      `Found ${totalCount} linked entities for ${dn}, returning ${linkedCount}`
     );
+
+    // Add a special indicator entry if there are more elements
+    if (totalCount > MAX_LINKED_ENTITIES) {
+      result.push({
+        dn: `more-${dn}`,
+        cn: [`... ${totalCount - MAX_LINKED_ENTITIES} more elements`],
+        objectClass: ['moreIndicator'],
+        _isMoreIndicator: 'true',
+        _totalCount: totalCount.toString(),
+        _displayedCount: MAX_LINKED_ENTITIES.toString(),
+      });
+    }
 
     return result;
   }

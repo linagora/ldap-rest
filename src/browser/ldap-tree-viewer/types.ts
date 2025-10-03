@@ -16,7 +16,7 @@ export interface TreeState {
 export interface TreeNode {
   dn: string;
   displayName: string;
-  type: 'organization' | 'user' | 'group';
+  type: 'organization' | 'user' | 'group' | 'more';
   parentDn: string | null;
   childrenDns: string[];
   hasLoadedChildren: boolean;
@@ -34,5 +34,5 @@ export interface ViewerOptions {
   onNodeExpand?: (node: TreeNode) => void;
 }
 
-export type NodeType = 'organization' | 'user' | 'group';
+export type NodeType = 'organization' | 'user' | 'group' | 'more';
 export type FilterType = 'all' | 'organizations' | 'users' | 'groups';

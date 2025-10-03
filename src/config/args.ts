@@ -47,6 +47,7 @@ export interface Config {
   ldap_organization_link_attribute?: string;
   ldap_organization_path_attribute?: string;
   ldap_organization_path_separator?: string;
+  ldap_organization_max_subnodes?: number;
 
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
@@ -172,6 +173,12 @@ const configArgs: ConfigTemplate = [
     '--ldap-organization-path-separator',
     'DM_LDAP_ORGANIZATION_PATH_SEPARATOR',
     ' / ',
+  ],
+  [
+    '--ldap-organization-max-subnodes',
+    'DM_LDAP_ORGANIZATION_MAX_SUBNODES',
+    50,
+    'number',
   ],
 
   // LDAP groups plugin

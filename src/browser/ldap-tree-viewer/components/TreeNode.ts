@@ -170,7 +170,8 @@ export class TreeNodeComponent {
     const icons: Record<string, string> = {
       organization: 'folder',
       user: 'person',
-      group: 'group'
+      group: 'group',
+      more: 'more_horiz'
     };
     return icons[type] || 'help';
   }

@@ -162,16 +162,19 @@ export class LdapTreeViewer {
       parentDn,
       childrenDns: [],
       hasLoadedChildren: false,
-      // Only organizations can have children
+      // Only organizations can have children, 'more' indicator cannot be expanded
       hasChildren: nodeType === 'organization',
       attributes: data,
     };
   }
 
-  private detectNodeType(data: any): 'organization' | 'user' | 'group' {
+  private detectNodeType(data: any): 'organization' | 'user' | 'group' | 'more' {
     const objectClass = data.objectClass || [];
     const classes = Array.isArray(objectClass) ? objectClass : [objectClass];
 
+    if (classes.includes('moreIndicator')) {
+      return 'more';
+    }
     if (classes.includes('organizationalUnit') || classes.includes('organization')) {
       return 'organization';
     }
