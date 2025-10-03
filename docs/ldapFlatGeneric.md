@@ -113,7 +113,7 @@ Each schema file must include an `entity` metadata section and attribute definit
 {
   "manager": {
     "type": "pointer",
-    "branch": ["ou=users,o=gov,c=mu"],
+    "branch": ["ou=users,dc=example,dc=com"],
     "required": false
   }
 }
@@ -160,7 +160,7 @@ curl http://localhost:8081/api/v1/ldap/users?match=uid=*smith*&attributes=uid,cn
 ```json
 {
   "jsmith": {
-    "dn": "uid=jsmith,ou=users,o=gov,c=mu",
+    "dn": "uid=jsmith,ou=users,dc=example,dc=com",
     "uid": "jsmith",
     "cn": "John Smith",
     "mail": "jsmith@example.com"

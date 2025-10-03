@@ -25,7 +25,7 @@ The `authnPerBranch` plugin provides fine-grained access control by restricting 
   },
   "users": {
     "admin": {
-      "ou=users,o=gov,c=mu": {
+      "ou=users,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": true
@@ -33,8 +33,8 @@ The `authnPerBranch` plugin provides fine-grained access control by restricting 
     }
   },
   "groups": {
-    "cn=managers,ou=groups,o=gov,c=mu": {
-      "ou=organization,o=gov,c=mu": {
+    "cn=managers,ou=groups,dc=example,dc=com": {
+      "ou=organization,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
@@ -76,7 +76,7 @@ Branch-specific permissions for individual users:
 {
   "users": {
     "username": {
-      "ou=branch,o=gov,c=mu": {
+      "ou=branch,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
@@ -93,8 +93,8 @@ Permissions applied to all group members:
 ```json
 {
   "groups": {
-    "cn=groupname,ou=groups,o=gov,c=mu": {
-      "ou=branch,o=gov,c=mu": {
+    "cn=groupname,ou=groups,dc=example,dc=com": {
+      "ou=branch,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
@@ -150,7 +150,7 @@ Permissions apply recursively to all sub-branches:
 {
   "users": {
     "manager": {
-      "ou=organization,o=gov,c=mu": {
+      "ou=organization,dc=example,dc=com": {
         "read": true
       }
     }
@@ -160,9 +160,9 @@ Permissions apply recursively to all sub-branches:
 
 With this config, user `manager` can read:
 
-- `ou=organization,o=gov,c=mu`
-- `ou=dept1,ou=organization,o=gov,c=mu`
-- `ou=team1,ou=dept1,ou=organization,o=gov,c=mu`
+- `ou=organization,dc=example,dc=com`
+- `ou=dept1,ou=organization,dc=example,dc=com`
+- `ou=team1,ou=dept1,ou=organization,dc=example,dc=com`
 - ... all descendants
 
 ## Examples
@@ -180,14 +180,14 @@ Allow users to access only their department:
   },
   "users": {
     "hr_user": {
-      "ou=HR,ou=organization,o=gov,c=mu": {
+      "ou=HR,ou=organization,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
       }
     },
     "it_user": {
-      "ou=IT,ou=organization,o=gov,c=mu": {
+      "ou=IT,ou=organization,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
@@ -209,15 +209,15 @@ Use groups for team permissions:
     "delete": false
   },
   "groups": {
-    "cn=editors,ou=groups,o=gov,c=mu": {
-      "ou=content,o=gov,c=mu": {
+    "cn=editors,ou=groups,dc=example,dc=com": {
+      "ou=content,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
       }
     },
-    "cn=admins,ou=groups,o=gov,c=mu": {
-      "o=gov,c=mu": {
+    "cn=admins,ou=groups,dc=example,dc=com": {
+      "dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": true
@@ -240,7 +240,7 @@ Restrict write access to specific users:
   },
   "users": {
     "admin": {
-      "o=gov,c=mu": {
+      "dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": true
@@ -258,12 +258,12 @@ Grant access to multiple branches:
 {
   "users": {
     "coordinator": {
-      "ou=HR,ou=organization,o=gov,c=mu": {
+      "ou=HR,ou=organization,dc=example,dc=com": {
         "read": true,
         "write": true,
         "delete": false
       },
-      "ou=Finance,ou=organization,o=gov,c=mu": {
+      "ou=Finance,ou=organization,dc=example,dc=com": {
         "read": true,
         "write": false,
         "delete": false
@@ -283,7 +283,7 @@ The plugin automatically filters the organization tree API (`/api/v1/ldap/organi
 
 ```json
 {
-  "dn": "ou=organization,o=gov,c=mu",
+  "dn": "ou=organization,dc=example,dc=com",
   "ou": "organization"
 }
 ```
@@ -293,11 +293,11 @@ The plugin automatically filters the organization tree API (`/api/v1/ldap/organi
 ```json
 [
   {
-    "dn": "ou=HR,ou=organization,o=gov,c=mu",
+    "dn": "ou=HR,ou=organization,dc=example,dc=com",
     "ou": "HR"
   },
   {
-    "dn": "ou=IT,ou=organization,o=gov,c=mu",
+    "dn": "ou=IT,ou=organization,dc=example,dc=com",
     "ou": "IT"
   }
 ]
@@ -366,7 +366,7 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 ```json
 {
-  "error": "User jdoe does not have read permission for branch ou=users,o=gov,c=mu"
+  "error": "User jdoe does not have read permission for branch ou=users,dc=example,dc=com"
 }
 ```
 
@@ -378,7 +378,7 @@ This plugin only handles **authorization**. Combine with an authentication plugi
    {
      "users": {
        "jdoe": {
-         "ou=users,o=gov,c=mu": {
+         "ou=users,dc=example,dc=com": {
            "read": true
          }
        }
@@ -424,7 +424,7 @@ User should inherit group permissions but doesn't.
 1. Verify user is member of group:
 
    ```bash
-   ldapsearch -x -b "ou=groups,o=gov,c=mu" "(member=uid=jdoe,*)"
+   ldapsearch -x -b "ou=groups,dc=example,dc=com" "(member=uid=jdoe,*)"
    ```
 
 2. Check group DN in config matches LDAP exactly
@@ -461,7 +461,7 @@ User should inherit group permissions but doesn't.
 --authn-per-branch-config '{
   "users": {
     "user@example.com": {
-      "ou=organization,o=gov,c=mu": {"read": true, "write": true}
+      "ou=organization,dc=example,dc=com": {"read": true, "write": true}
     }
   }
 }'

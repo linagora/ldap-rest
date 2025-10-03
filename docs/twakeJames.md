@@ -112,11 +112,13 @@ James WebAdmin API can be secured with bearer token authentication:
 The plugin automatically adds the `Authorization: Bearer {token}` header to all requests.
 
 **Without token:**
+
 ```http
 POST /users/old@company.com/rename/new@company.com
 ```
 
 **With token:**
+
 ```http
 POST /users/old@company.com/rename/new@company.com
 Authorization: Bearer your-admin-token

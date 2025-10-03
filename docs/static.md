@@ -64,17 +64,17 @@ For JSON files in the `schemas/` subdirectory, performs on-the-fly placeholder r
 GET /static/schemas/users.json
 ```
 
-**Response (with `--ldap-base "o=gov,c=mu"`):**
+**Response (with `--ldap-base "dc=example,dc=com"`):**
 
 ```json
 {
   "entity": {
-    "base": "ou=users,o=gov,c=mu"
+    "base": "ou=users,dc=example,dc=com"
   },
   "attributes": {
     "twakeAccountStatus": {
       "type": "pointer",
-      "branch": ["ou=twakeAccountStatus,ou=nomenclature,o=gov,c=mu"]
+      "branch": ["ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com"]
     }
   }
 }
@@ -100,12 +100,12 @@ Configuration keys are transformed:
 
 ### Common Placeholders
 
-| Placeholder                 | CLI Argument              | Example Value                |
-| --------------------------- | ------------------------- | ---------------------------- |
-| `__LDAP_BASE__`             | `--ldap-base`             | `o=gov,c=mu`                 |
-| `__LDAP_TOP_ORGANIZATION__` | `--ldap-top-organization` | `ou=organization,o=gov,c=mu` |
-| `__API_PREFIX__`            | `--api-prefix`            | `/api`                       |
-| `__STATIC_PREFIX__`         | `--static-prefix`         | `/static`                    |
+| Placeholder                 | CLI Argument              | Example Value                       |
+| --------------------------- | ------------------------- | ----------------------------------- |
+| `__LDAP_BASE__`             | `--ldap-base`             | `dc=example,dc=com`                 |
+| `__LDAP_TOP_ORGANIZATION__` | `--ldap-top-organization` | `ou=organization,dc=example,dc=com` |
+| `__API_PREFIX__`            | `--api-prefix`            | `/api`                              |
+| `__STATIC_PREFIX__`         | `--static-prefix`         | `/static`                           |
 
 ## Use Cases
 
@@ -347,7 +347,7 @@ The viewer fetches schemas with resolved LDAP configuration:
 ```javascript
 const response = await fetch('/static/schemas/organizations.json');
 const schema = await response.json();
-// schema.entity.base = "ou=organization,o=gov,c=mu" (resolved)
+// schema.entity.base = "ou=organization,dc=example,dc=com" (resolved)
 ```
 
 ## Troubleshooting
@@ -390,7 +390,7 @@ Schema still contains `__LDAP_BASE__` after fetching.
 2. Check file extension is `.json`
 3. Verify config parameter is set:
    ```bash
-   --ldap-base "o=gov,c=mu"
+   --ldap-base "dc=example,dc=com"
    ```
 
 ### Problem: CORS Errors

@@ -108,7 +108,7 @@ PUT /api/v1/ldap/users/jdoe
 
 The `onLdapMailChange` hook fires with:
 
-- `dn`: `"uid=jdoe,ou=users,o=gov,c=mu"`
+- `dn`: `"uid=jdoe,ou=users,dc=example,dc=com"`
 - `oldMail`: `"jdoe@olddomain.com"`
 - `newMail`: `"john.doe@newdomain.com"`
 
@@ -226,7 +226,7 @@ export default class CustomSync extends DmPlugin {
     mail: 'new@example.com';
   }
 }
-// Triggers: onLdapMailChange("uid=user,ou=users,o=gov,c=mu", "old@example.com", "new@example.com")
+// Triggers: onLdapMailChange("uid=user,ou=users,dc=example,dc=com", "old@example.com", "new@example.com")
 ```
 
 ### Add Operations
@@ -238,7 +238,7 @@ export default class CustomSync extends DmPlugin {
     mail: 'new@example.com';
   }
 }
-// Triggers: onLdapMailChange("uid=user,ou=users,o=gov,c=mu", null, "new@example.com")
+// Triggers: onLdapMailChange("uid=user,ou=users,dc=example,dc=com", null, "new@example.com")
 ```
 
 ### Delete Operations
@@ -246,7 +246,7 @@ export default class CustomSync extends DmPlugin {
 ```javascript
 // Before: mail = "old@example.com"
 { delete: ["mail"] }
-// Triggers: onLdapMailChange("uid=user,ou=users,o=gov,c=mu", "old@example.com", null)
+// Triggers: onLdapMailChange("uid=user,ou=users,dc=example,dc=com", "old@example.com", null)
 ```
 
 ## Performance Considerations
@@ -299,7 +299,7 @@ Enable debug logging to see change detection:
 Output:
 
 ```
-[debug] Detected mail change for uid=jdoe,ou=users,o=gov,c=mu: old@domain.com → new@domain.com
+[debug] Detected mail change for uid=jdoe,ou=users,dc=example,dc=com: old@domain.com → new@domain.com
 [debug] Triggering onLdapMailChange hook
 [info] onLdapMailChange: Mail account renamed successfully
 ```

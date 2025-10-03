@@ -394,7 +394,7 @@ export default class LdapOrganizations extends DmPlugin {
 
     // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
     // Need to search from LDAP base, not just organization tree
-    // Extract base DN from top organization (e.g., "o=gov,c=mu" from "ou=organization,o=gov,c=mu")
+    // Extract base DN from top organization (e.g., "dc=example,dc=com" from "ou=organization,dc=example,dc=com")
     const topOrg = this.config.ldap_top_organization as string;
     const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
     const filter = `(${this.config.ldap_organization_link_attribute}=${dn})`;
