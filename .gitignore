@@ -1,3 +1,5 @@
 coverage/
 dist/
 node_modules/
+static/browser/
+static/ldap-tree-viewer.html

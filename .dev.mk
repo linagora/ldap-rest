@@ -1,14 +1,20 @@
 #!/usr/bin/make -f
 
-SRCFILES=$(shell find src/*/ -name '*.ts')
-_SRCFILES=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema)
-DSTFILES=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
-PLUGINFILES=$(shell find dist/plugins -name '*.js' | grep -v auth/)
-ALLPLUGINS=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
+SRCBROWSER:=$(shell find src/browser -name '*.ts')
+DSTBROWSER:=$(subst .ts,.js,$(subst src/,dist/,$(SRCBROWSER)))
+SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v browser/)
+_SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema | grep -v browser/)
+DSTFILES:=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
+PLUGINFILES:=$(shell find dist/plugins -name '*.js' | grep -v auth/ | grep -v json.js)
+ALLPLUGINS:=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
+
+zz:
+	echo $(PLUGINFILES)
 
 all: $(DSTFILES)
 
 dist/%.js: src/%.ts
+	echo $*
 	$(MAKE) -f .dev.mk _builddev
 
 build:

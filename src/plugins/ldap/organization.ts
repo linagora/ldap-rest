@@ -340,18 +340,53 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   async getOrganisationSubnodes(dn: string): Promise<AttributesList[]> {
+    const result: AttributesList[] = [];
+
+    // 1. Get direct sub-OUs (children organizational units)
+    try {
+      const subOUs = (await this.server.ldap.search(
+        {
+          paged: false,
+          scope: 'one',
+          filter: '(objectClass=organizationalUnit)',
+        },
+        dn
+      )) as SearchResult;
+      this.server.logger.debug(
+        `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
+      );
+      result.push(...subOUs.searchEntries);
+    } catch (err) {
+      // Ignore errors (e.g., if no children exist)
+      this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
+    }
+
+    // 2. Get linked entities (users and groups)
+    // Need to search from LDAP base, not just organization tree
+    // Extract base DN from top organization (e.g., "o=gov,c=mu" from "ou=organization,o=gov,c=mu")
+    const topOrg = this.config.ldap_top_organization as string;
+    const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
+    const filter = `(${this.config.ldap_organization_link_attribute}=${dn})`;
+    this.server.logger.debug(
+      `Searching for linked entities with filter: ${filter} in ${baseDn}`
+    );
     const subs = await this.server.ldap.search(
       {
         paged: true,
-        filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
+        filter,
       },
-      this.config.ldap_top_organization as string
+      baseDn
     );
-    const res: AttributesList[] = [];
+    let linkedCount = 0;
     for await (const sub of subs as AsyncGenerator<SearchResult>) {
-      res.push(...sub.searchEntries);
+      linkedCount += sub.searchEntries.length;
+      result.push(...sub.searchEntries);
     }
-    return res;
+    this.server.logger.debug(
+      `Found ${linkedCount} linked entities for ${dn}`
+    );
+
+    return result;
   }
 
   async addOrganization(dn: string, entry: AttributesList): Promise<boolean> {
