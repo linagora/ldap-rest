@@ -80,6 +80,17 @@ export interface Hooks {
     oldMail: string,
     newMail: string
   ) => MaybePromise<void>;
+  onLdapQuotaChange?: (
+    dn: string,
+    mail: string,
+    oldQuota: number,
+    newQuota: number
+  ) => MaybePromise<void>;
+  onLdapDisplayNameChange?: (
+    dn: string,
+    oldDisplayName: string | null,
+    newDisplayName: string | null
+  ) => MaybePromise<void>;
 
   /** externalUsersInGroup */
   externaluserentry?: ChainedHook<[string, AttributesList]>;

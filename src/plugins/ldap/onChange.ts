@@ -23,6 +23,7 @@ const events: {
 } = {
   mail_attribute: 'onLdapMailChange',
   quota_attribute: 'onLdapQuotaChange',
+  display_name_attribute: 'onLdapDisplayNameChange',
 };
 
 class OnLdapChange extends DmPlugin {
@@ -96,6 +97,15 @@ class OnLdapChange extends DmPlugin {
           changes
         );
       }
+    }
+    // Trigger onLdapDisplayNameChange if cn, givenName or sn changed
+    if (changes.cn || changes.givenName || changes.sn) {
+      void launchHooks(
+        this.server.hooks.onLdapDisplayNameChange,
+        dn,
+        null,
+        null
+      );
     }
   }
 

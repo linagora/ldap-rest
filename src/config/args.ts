@@ -108,6 +108,7 @@ export interface Config {
   // Special attributes
   mail_attribute?: string;
   quota_attribute?: string;
+  display_name_attribute?: string;
 
   // James plugin
   james_webadmin_url?: string;
@@ -172,6 +173,7 @@ const configArgs: ConfigTemplate = [
   // Special attributes
   ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],
   ['--quota-attribute', 'DM_QUOTA_ATTRIBUTE', 'mailQuota'],
+  ['--display-name-attribute', 'DM_DISPLAY_NAME_ATTRIBUTE', 'displayName'],
 
   // Default classes to insert into LDAP
   [

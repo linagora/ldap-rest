@@ -164,7 +164,7 @@ class ldapActions {
     ])) as [string, typeof entry];
     try {
       await client.add(dn, sanitizedEntry);
-      void launchHooks(this.parent.hooks.ldapadddone, dn, entry);
+      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
