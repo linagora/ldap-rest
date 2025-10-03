@@ -144,9 +144,6 @@ describe('James Plugin', () => {
         replace: { displayName: 'New Display Name' },
       });
       expect(res).to.be.true;
-
-      // Wait a bit for async hook to execute
-      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     it('should update James identity when cn changes', async () => {
@@ -165,9 +162,6 @@ describe('James Plugin', () => {
         replace: { cn: 'New CN' },
       });
       expect(res).to.be.true;
-
-      // Wait a bit for async hook to execute
-      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     it('should use cn as fallback when displayName is not present', async () => {
@@ -190,9 +184,6 @@ describe('James Plugin', () => {
         replace: { cn: 'Jane Doe' },
       });
       expect(res).to.be.true;
-
-      // Wait a bit for async hook to execute
-      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Test getDisplayNameFromDN method again after modify
       displayName = await james.getDisplayNameFromDN(testDN2);

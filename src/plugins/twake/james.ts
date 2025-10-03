@@ -217,7 +217,8 @@ export default class James extends DmPlugin {
       headers['Content-Type'] = 'application/json';
 
       const updateBody = JSON.stringify({
-        ...defaultIdentity,
+        id: defaultIdentity.id,
+        email: defaultIdentity.email,
         name: displayName,
       });
 

@@ -100,11 +100,14 @@ class OnLdapChange extends DmPlugin {
     }
     // Trigger onLdapDisplayNameChange if cn, givenName or sn changed
     if (changes.cn || changes.givenName || changes.sn) {
+      // Reconstruct old and new display names from changed attributes
+      const oldDisplayName = this.reconstructDisplayName(changes, 0);
+      const newDisplayName = this.reconstructDisplayName(changes, 1);
       void launchHooks(
         this.server.hooks.onLdapDisplayNameChange,
         dn,
-        null,
-        null
+        oldDisplayName,
+        newDisplayName
       );
     }
   }
@@ -127,6 +130,38 @@ class OnLdapChange extends DmPlugin {
     if (oldValue !== newValue) {
       void launchHooks(this.server.hooks[hookName], dn, oldValue, newValue);
     }
+  }
+
+  /**
+   * Reconstruct display name from cn, givenName, and sn attributes
+   * @param changes - The changes object
+   * @param index - 0 for old value, 1 for new value
+   * @returns The reconstructed display name or null
+   */
+  reconstructDisplayName(changes: ChangesToNotify, index: 0 | 1): string | null {
+    const getValue = (attr: string): string | null => {
+      if (!changes[attr]) return null;
+      const value = changes[attr][index];
+      if (!value) return null;
+      if (Array.isArray(value)) return value.length > 0 ? String(value[0]) : null;
+      return String(value);
+    };
+
+    // Try cn first
+    const cn = getValue('cn');
+    if (cn) return cn;
+
+    // Try givenName + sn
+    const givenName = getValue('givenName');
+    const sn = getValue('sn');
+    if (givenName || sn) {
+      const parts = [];
+      if (givenName) parts.push(givenName);
+      if (sn) parts.push(sn);
+      return parts.join(' ');
+    }
+
+    return null;
   }
 }
 
