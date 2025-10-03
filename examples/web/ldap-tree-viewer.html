@@ -288,6 +288,65 @@
     function renderNodeDetails(node) {
       const detailsEl = document.getElementById('node-details');
 
+      // Special handling for 'more' indicator
+      if (node.type === 'more') {
+        const totalCount = node.attributes?._totalCount || '?';
+        const displayedCount = node.attributes?._displayedCount || '?';
+        const parentDn = node.parentDn;
+
+        detailsEl.innerHTML = `
+          <div class="details-content">
+            <div class="details-header">
+              <span class="material-icons" style="color: #ff9800">more_horiz</span>
+              <h3>Additional Elements</h3>
+            </div>
+
+            <div class="details-info">
+              <div class="details-row">
+                <span class="details-label">Total elements:</span>
+                <span class="details-value">${totalCount}</span>
+              </div>
+              <div class="details-row">
+                <span class="details-label">Displayed:</span>
+                <span class="details-value">${displayedCount}</span>
+              </div>
+              <div class="details-row">
+                <span class="details-label">Hidden:</span>
+                <span class="details-value">${parseInt(totalCount) - parseInt(displayedCount)}</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 24px; padding: 16px; background: #fff3e0; border-radius: 4px;">
+              <h4 style="font-size: 14px; font-weight: 500; margin-bottom: 12px; color: #e65100;">
+                🔍 Search to find specific elements
+              </h4>
+              <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
+                There are too many elements to display at once. Use the search below to find specific users or groups.
+              </p>
+              <div style="display: flex; gap: 8px;">
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Search by name, uid, email..."
+                  style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                  onkeypress="if(event.key === 'Enter') document.getElementById('search-btn').click()"
+                />
+                <button
+                  id="search-btn"
+                  class="demo-button"
+                  style="margin: 0;"
+                  onclick="performSearch('${parentDn}', document.getElementById('search-input').value)"
+                >
+                  Search
+                </button>
+              </div>
+              <div id="search-results" style="margin-top: 12px;"></div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
       const iconMap = {
         organization: { icon: 'folder', color: '#ffa726' },
         user: { icon: 'person', color: '#42a5f5' },
@@ -334,22 +393,68 @@
       `;
     }
 
-    async function initViewer() {
-      try {
-        // Get auth token from localStorage or prompt
-        let authToken = localStorage.getItem('ldap_auth_token');
+    async function performSearch(parentDn, query) {
+      if (!query || query.trim().length === 0) {
+        document.getElementById('search-results').innerHTML =
+          '<p style="color: #f44336; font-size: 13px;">Please enter a search query</p>';
+        return;
+      }
 
-        if (!authToken) {
-          authToken = prompt('Enter authentication token (or leave empty for no auth):');
-          if (authToken) {
-            localStorage.setItem('ldap_auth_token', authToken);
-          }
+      const resultsEl = document.getElementById('search-results');
+      resultsEl.innerHTML = '<p style="font-size: 13px; color: #666;">Searching...</p>';
+
+      try {
+        const response = await fetch(
+          `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(parentDn)}/subnodes/search?q=${encodeURIComponent(query.trim())}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Search failed: ${response.statusText}`);
         }
 
+        const results = await response.json();
+
+        if (results.length === 0) {
+          resultsEl.innerHTML = '<p style="font-size: 13px; color: #999;">No results found</p>';
+          return;
+        }
+
+        const resultHtml = results.map(item => {
+          const name = (item.cn && item.cn[0]) || (item.uid && item.uid[0]) || (item.ou && item.ou[0]) || 'Unknown';
+          const type = item.objectClass?.includes('organizationalUnit') ? 'organization' :
+                       item.objectClass?.includes('posixGroup') || item.objectClass?.includes('groupOfNames') ? 'group' : 'user';
+          const icon = type === 'organization' ? 'folder' : type === 'group' ? 'group' : 'person';
+
+          return `
+            <div style="padding: 8px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons" style="font-size: 18px; color: #666;">${icon}</span>
+              <div style="flex: 1;">
+                <div style="font-weight: 500; font-size: 13px;">${name}</div>
+                <div style="font-size: 11px; color: #999;">${item.dn}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        resultsEl.innerHTML = `
+          <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 8px;">
+            <div style="padding: 8px; background: #f5f5f5; font-weight: 500; font-size: 13px; border-bottom: 2px solid #ddd;">
+              Found ${results.length} result(s)
+            </div>
+            ${resultHtml}
+          </div>
+        `;
+      } catch (error) {
+        console.error('Search error:', error);
+        resultsEl.innerHTML = `<p style="color: #f44336; font-size: 13px;">Error: ${error.message}</p>`;
+      }
+    }
+
+    async function initViewer() {
+      try {
         viewer = new LdapTreeViewer({
           containerId: 'ldap-tree',
           apiBaseUrl: window.location.origin,
-          authToken: authToken || undefined,
           theme: 'light',
           onNodeClick: (node) => {
             console.log('Node clicked:', node);
