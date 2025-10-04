@@ -7,12 +7,13 @@ import importPlugin from 'eslint-plugin-import';
 import nodePlugin from 'eslint-plugin-node';
 
 export default [
-  // Configuration de base pour JavaScript
+  // Node.js config
   js.configs.recommended,
 
-  // Configuration pour tous les fichiers TypeScript
+  // TypeScript config (except browser)
   {
     files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/browser/**'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -35,30 +36,29 @@ export default [
       node: nodePlugin,
     },
     rules: {
-      // Règles TypeScript recommandées
+      // TS rules
       ...tseslint.configs.recommended.rules,
       ...tseslint.configs['recommended-requiring-type-checking'].rules,
 
-      // Règles Prettier
+      // Prettier
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
 
-      // Règles personnalisées
+      // Custom
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
-      'prefer-const': 'error', // Règle ESLint de base, pas TypeScript
       '@typescript-eslint/no-var-requires': 'error',
 
-      // Règles Node.js
+      // Node.js rules
       'node/no-missing-import': 'off',
       'node/no-unsupported-features/es-syntax': 'off',
       'node/no-unpublished-import': 'off',
 
-      // Règles import
+      // Import rules
       'import/order': [
         'error',
         {
@@ -74,14 +74,52 @@ export default [
         },
       ],
 
-      // Règles générales
+      // General rules
       // 'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
     },
   },
 
-  // Configuration spécifique pour les fichiers JavaScript
+  // Browser-specific config
+  {
+    files: ['src/browser/**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+        project: './tsconfig.json',
+      },
+      globals: {
+        console: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        fetch: 'readonly',
+        HTMLElement: 'readonly',
+        CustomEvent: 'readonly',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      prettier: prettier,
+    },
+    rules: {
+      ...tseslint.configs.recommended.rules,
+      ...prettierConfig.rules,
+      'prettier/prettier': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'prefer-const': 'error',
+      'no-var': 'error',
+    },
+  },
+
+  // JavaScript-specific config
   {
     files: ['*.js', '*.mjs'],
     languageOptions: {
@@ -93,7 +131,7 @@ export default [
     },
   },
 
-  // Fichiers à ignorer (remplace .eslintignore)
+  // Ignored files
   {
     ignores: [
       'dist/**',
@@ -106,7 +144,7 @@ export default [
       '.nyc_output/**',
       'logs/**',
       '*.log',
-      'eslint.config.js', // S'ignorer lui-même si besoin
+      'eslint.config.js',
     ],
   },
 ];
