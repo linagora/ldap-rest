@@ -23,6 +23,7 @@ Plugin to automatically synchronize LDAP resources (meeting rooms, equipment, et
 ### Required Dependencies
 
 This plugin requires:
+
 - `ldapFlat` plugin with a schema configured for calendar resources
 - `onLdapChange` plugin to detect LDAP modifications
 
@@ -100,6 +101,7 @@ DM_LDAP_FLAT_SCHEMA="/path/to/calendar-resources-schema.json"
 1. Configure the environment variables
 2. Create an ldapFlat schema for calendar resources (see example above)
 3. Add the plugin to `DM_PLUGINS`:
+
    ```bash
    DM_PLUGINS="core/ldap/onChange,core/ldap/flatGeneric,twake/calendarResources"
    ```
@@ -109,12 +111,14 @@ DM_LDAP_FLAT_SCHEMA="/path/to/calendar-resources-schema.json"
 ## Logging
 
 The plugin logs all API calls with the following information:
+
 - Success/failure status
 - HTTP status code
 - Resource DN
 - Resource name/ID
 
 Example log:
+
 ```json
 {
   "plugin": "calendarResources",

@@ -34,7 +34,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourceadddone',
-        `${this.config.calendar_webadmin_url}/resources`,
+        `${this.config.calendar_webadmin_url as string}/resources`,
         'POST',
         dn,
         JSON.stringify(resourceData),
@@ -88,7 +88,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourcemodifydone',
-        `${this.config.calendar_webadmin_url}/resources/${resourceId}`,
+        `${this.config.calendar_webadmin_url as string}/resources/${resourceId}`,
         'PATCH',
         dn,
         JSON.stringify(updateData),
@@ -105,7 +105,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourcedeletedone',
-        `${this.config.calendar_webadmin_url}/resources/${resourceId}`,
+        `${this.config.calendar_webadmin_url as string}/resources/${resourceId}`,
         'DELETE',
         dn,
         null,
@@ -134,7 +134,7 @@ export default class CalendarResources extends DmPlugin {
       return classes.some(
         cls =>
           String(cls).toLowerCase() ===
-          this.config.calendar_resource_objectclass!.toLowerCase()
+          (this.config.calendar_resource_objectclass as string).toLowerCase()
       );
     }
 
