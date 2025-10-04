@@ -21,7 +21,7 @@ export interface TreeNode {
   childrenDns: string[];
   hasLoadedChildren: boolean;
   hasChildren: boolean;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
 }
 
 export interface ViewerOptions {

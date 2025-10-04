@@ -2,6 +2,23 @@
  * LDAP API Client for browser
  */
 
+interface LdapOrganization {
+  dn: string;
+  ou?: string;
+  [key: string]: unknown;
+}
+
+interface LdapSubnode {
+  dn: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface LdapListResponse {
+  entries: unknown[];
+  total?: number;
+}
+
 export class LdapApiClient {
   constructor(
     private baseUrl: string,
@@ -24,38 +41,45 @@ export class LdapApiClient {
       throw new Error(`API Error (${response.status}): ${errorText}`);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
-  async getTopOrganization(): Promise<any> {
-    return this.fetch('/api/v1/ldap/organizations/top');
+  async getTopOrganization(): Promise<LdapOrganization> {
+    return this.fetch<LdapOrganization>('/api/v1/ldap/organizations/top');
   }
 
-  async getOrganization(dn: string): Promise<any> {
+  async getOrganization(dn: string): Promise<LdapOrganization> {
     const encodedDn = encodeURIComponent(dn);
-    return this.fetch(`/api/v1/ldap/organizations/${encodedDn}`);
+    return this.fetch<LdapOrganization>(
+      `/api/v1/ldap/organizations/${encodedDn}`
+    );
   }
 
-  async getOrganizationSubnodes(dn: string): Promise<any[]> {
+  async getOrganizationSubnodes(dn: string): Promise<LdapSubnode[]> {
     const encodedDn = encodeURIComponent(dn);
-    return this.fetch(`/api/v1/ldap/organizations/${encodedDn}/subnodes`);
+    return this.fetch<LdapSubnode[]>(
+      `/api/v1/ldap/organizations/${encodedDn}/subnodes`
+    );
   }
 
-  async searchOrganizationSubnodes(dn: string, query: string): Promise<any[]> {
+  async searchOrganizationSubnodes(
+    dn: string,
+    query: string
+  ): Promise<LdapSubnode[]> {
     const encodedDn = encodeURIComponent(dn);
     const encodedQuery = encodeURIComponent(query);
-    return this.fetch(
+    return this.fetch<LdapSubnode[]>(
       `/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`
     );
   }
 
-  async getUsers(filter?: string): Promise<any> {
+  async getUsers(filter?: string): Promise<LdapListResponse> {
     const query = filter ? `?filter=${encodeURIComponent(filter)}` : '';
-    return this.fetch(`/api/v1/ldap/users${query}`);
+    return this.fetch<LdapListResponse>(`/api/v1/ldap/users${query}`);
   }
 
-  async getGroups(filter?: string): Promise<any> {
+  async getGroups(filter?: string): Promise<LdapListResponse> {
     const query = filter ? `?filter=${encodeURIComponent(filter)}` : '';
-    return this.fetch(`/api/v1/ldap/groups${query}`);
+    return this.fetch<LdapListResponse>(`/api/v1/ldap/groups${query}`);
   }
 }

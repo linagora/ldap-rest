@@ -63,10 +63,10 @@ export class LdapTreeViewer {
 
       // Initial render
       this.render();
-    } catch (error: any) {
-      this.store.dispatch(
-        setError(error.message || 'Failed to load LDAP tree')
-      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load LDAP tree';
+      this.store.dispatch(setError(errorMessage));
       throw error;
     }
   }
@@ -133,8 +133,10 @@ export class LdapTreeViewer {
           })
         );
       }
-    } catch (error: any) {
-      this.store.dispatch(setError(error.message || 'Failed to load children'));
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load children';
+      this.store.dispatch(setError(errorMessage));
       console.error('Failed to load children for', dn, error);
     } finally {
       this.store.dispatch(setLoading({ dn, loading: false }));
@@ -151,11 +153,14 @@ export class LdapTreeViewer {
   }
 
   private transformToTreeNode(
-    data: any,
+    data: Record<string, unknown>,
     parentDn: string | null = null
   ): TreeNode {
     // Determine display name
-    let displayName = data.ou || data.cn || data.uid || data.dn;
+    let displayName = (data.ou || data.cn || data.uid || data.dn) as
+      | string
+      | string[]
+      | undefined;
     if (Array.isArray(displayName)) {
       displayName = displayName[0];
     }
@@ -163,8 +168,8 @@ export class LdapTreeViewer {
     const nodeType = this.detectNodeType(data);
 
     return {
-      dn: data.dn,
-      displayName,
+      dn: String(data.dn),
+      displayName: displayName || String(data.dn),
       type: nodeType,
       parentDn,
       childrenDns: [],
@@ -176,9 +181,9 @@ export class LdapTreeViewer {
   }
 
   private detectNodeType(
-    data: any
+    data: Record<string, unknown>
   ): 'organization' | 'user' | 'group' | 'more' {
-    const objectClass = data.objectClass || [];
+    const objectClass = (data.objectClass || []) as string | string[];
     const classes = Array.isArray(objectClass) ? objectClass : [objectClass];
 
     if (classes.includes('moreIndicator')) {

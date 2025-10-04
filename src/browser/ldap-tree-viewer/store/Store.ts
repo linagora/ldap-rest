@@ -7,7 +7,7 @@ export type Reducer<S> = (state: S, action: Action) => S;
 
 export interface Action {
   type: string;
-  payload?: any;
+  payload?: unknown;
 }
 
 export class Store<S> {
