@@ -10,7 +10,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import fs from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 import type { Express } from 'express';
 import express from 'express';
@@ -37,7 +37,13 @@ export default class Static extends DmPlugin {
       if (!/^[\w-]+\.json$/.test(req.params.name)) {
         return res.status(400).send('Invalid schema name');
       }
-      fs.readFile(join(rep, 'schemas', req.params.name), (err, data) => {
+      const schemaPath = resolve(join(rep, 'schemas', req.params.name));
+      const schemasDir = resolve(join(rep, 'schemas'));
+      // Prevent path traversal by ensuring resolved path is within schemas directory
+      if (!schemaPath.startsWith(schemasDir + '/')) {
+        return res.status(403).send('Access denied');
+      }
+      fs.readFile(schemaPath, (err, data) => {
         if (err) {
           return notFound(res, 'Schema not found');
         }
@@ -52,16 +58,21 @@ export default class Static extends DmPlugin {
       ) {
         return res.status(400).send('Invalid schema name');
       }
-      fs.readFile(
-        join(rep, 'schemas', req.params.dir, req.params.name),
-        (err, data) => {
-          if (err) {
-            return notFound(res, 'Schema not found');
-          }
-          const str = transformSchemas(data, this.config);
-          res.type('json').send(str);
-        }
+      const schemaPath = resolve(
+        join(rep, 'schemas', req.params.dir, req.params.name)
       );
+      const schemasDir = resolve(join(rep, 'schemas'));
+      // Prevent path traversal by ensuring resolved path is within schemas directory
+      if (!schemaPath.startsWith(schemasDir + '/')) {
+        return res.status(403).send('Access denied');
+      }
+      fs.readFile(schemaPath, (err, data) => {
+        if (err) {
+          return notFound(res, 'Schema not found');
+        }
+        const str = transformSchemas(data, this.config);
+        res.type('json').send(str);
+      });
     });
     app.use(`/${this.config.static_name}`, express.static(rep));
   }
