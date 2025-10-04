@@ -34,6 +34,9 @@ describe('James Plugin', () => {
   });
 
   after(function () {
+    if (scope) {
+      scope.persist(false);
+    }
     nock.cleanAll();
     nock.enableNetConnect();
   });
@@ -94,8 +97,7 @@ describe('James Mailing Lists', () => {
       console.warn(
         'Skipping LDAP tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
       );
-      // @ts-ignore
-      this.skip();
+      (this as Mocha.Context).skip();
     }
 
     // Mock James API calls for mailing lists
@@ -119,6 +121,9 @@ describe('James Mailing Lists', () => {
   });
 
   after(function () {
+    if (scope) {
+      scope.persist(false);
+    }
     nock.cleanAll();
     nock.enableNetConnect();
   });

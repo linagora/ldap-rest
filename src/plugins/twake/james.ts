@@ -118,11 +118,7 @@ export default class James extends DmPlugin {
       }
 
       // Handle member deletions
-      if (
-        changes.delete &&
-        typeof changes.delete === 'object' &&
-        !Array.isArray(changes.delete)
-      ) {
+      if (this.isAttributesList(changes.delete)) {
         const deleteMember = changes.delete.member as
           | string
           | string[]
@@ -168,6 +164,17 @@ export default class James extends DmPlugin {
       );
     },
   };
+
+  /**
+   * Type guard to check if delete operation is an AttributesList
+   */
+  private isAttributesList(
+    value: string[] | AttributesList | undefined
+  ): value is AttributesList {
+    return (
+      value !== undefined && typeof value === 'object' && !Array.isArray(value)
+    );
+  }
 
   /**
    * Get email addresses for a list of member DNs
