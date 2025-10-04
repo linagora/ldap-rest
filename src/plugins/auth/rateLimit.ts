@@ -92,10 +92,14 @@ export default class RateLimit extends DmPlugin {
 
   private getClientIp(req: Request): string {
     // Support X-Forwarded-For header for proxied requests
+    // The header can be string | string[] | undefined
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
-      const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-      return ips.split(',')[0].trim();
+      // If it's an array, take the first element, otherwise use the string directly
+      const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+      // X-Forwarded-For can contain multiple IPs separated by commas (client, proxy1, proxy2...)
+      // The first IP is the original client
+      return forwardedStr.split(',')[0].trim();
     }
     return req.socket.remoteAddress || 'unknown';
   }
