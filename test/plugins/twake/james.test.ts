@@ -36,8 +36,8 @@ describe('James Plugin', () => {
   after(function () {
     if (scope) {
       scope.persist(false);
+      nock.removeInterceptor(scope);
     }
-    nock.cleanAll();
     nock.enableNetConnect();
   });
 
@@ -123,8 +123,8 @@ describe('James Mailing Lists', () => {
   after(function () {
     if (scope) {
       scope.persist(false);
+      nock.removeInterceptor(scope);
     }
-    nock.cleanAll();
     nock.enableNetConnect();
   });
 
