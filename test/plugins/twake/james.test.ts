@@ -22,8 +22,7 @@ describe('James Plugin', () => {
       console.warn(
         'Skipping LDAP tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
       );
-      // @ts-ignore
-      this.skip();
+      (this as Mocha.Context).skip();
     }
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       //.post(new RegExp('users/testmail@test.org/rename/t@t.org.*'))
