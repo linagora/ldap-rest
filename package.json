@@ -80,6 +80,10 @@
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
     },
+    "plugin-twake-calendarresources": {
+      "import": "./dist/plugins/twake/calendarResources.js",
+      "types": "./dist/src/plugins/twake/calendarResources.d.ts"
+    },
     "plugin-twake-james": {
       "import": "./dist/plugins/twake/james.js",
       "types": "./dist/src/plugins/twake/james.d.ts"

@@ -113,6 +113,14 @@ export interface Config {
   james_webadmin_url?: string;
   james_webadmin_token?: string;
 
+  // Calendar Resources plugin
+  calendar_webadmin_url?: string;
+  calendar_webadmin_token?: string;
+  calendar_resource_base?: string;
+  calendar_resource_objectclass?: string;
+  calendar_resource_creator?: string;
+  calendar_resource_domain?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -283,6 +291,18 @@ const configArgs: ConfigTemplate = [
   // James plugin
   ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],
   ['--james-webadmin-token', 'DM_JAMES_WEBADMIN_TOKEN', ''],
+
+  // Calendar Resources plugin
+  [
+    '--calendar-webadmin-url',
+    'DM_CALENDAR_WEBADMIN_URL',
+    'http://localhost:8080',
+  ],
+  ['--calendar-webadmin-token', 'DM_CALENDAR_WEBADMIN_TOKEN', ''],
+  ['--calendar-resource-base', 'DM_CALENDAR_RESOURCE_BASE', ''],
+  ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
+  ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
+  ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
 
   /* Access control plugins */
 
