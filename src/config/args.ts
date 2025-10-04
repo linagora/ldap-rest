@@ -96,6 +96,10 @@ export interface Config {
   authn_per_branch_config?: AuthConfig;
   authn_per_branch_cache_ttl?: number;
 
+  // auth/rateLimit
+  rate_limit_window_ms?: number;
+  rate_limit_max?: number;
+
   // Special attributes
   mail_attribute?: string;
   quota_attribute?: string;
@@ -302,6 +306,15 @@ const configArgs: ConfigTemplate = [
   ['--oidc-client-id', 'DM_OIDC_CLIENT_ID', ''],
   ['--oidc-client-secret', 'DM_OIDC_CLIENT_SECRET', ''],
   ['--base-url', 'DM_BASE_URL', ''],
+
+  // Rate limiting plugin
+  [
+    '--rate-limit-window-ms',
+    'DM_RATE_LIMIT_WINDOW_MS',
+    15 * 60 * 1000,
+    'number',
+  ],
+  ['--rate-limit-max', 'DM_RATE_LIMIT_MAX', 100, 'number'],
 ];
 
 export default configArgs;
