@@ -112,7 +112,22 @@ export default class CrowdSec extends DmPlugin {
       );
     }
 
-    const data = await response.json();
+    // Parse JSON response, handling edge cases
+    let data: unknown;
+    try {
+      const text = await response.text();
+      // CrowdSec may return string "null" instead of actual null
+      if (text === 'null' || text === '') {
+        data = null;
+      } else {
+        data = JSON.parse(text) as unknown;
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse CrowdSec API response: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw new Error(`Invalid JSON response from CrowdSec API`);
+    }
 
     // CrowdSec returns null if no decision, or an array of decisions
     let isBanned = false;
