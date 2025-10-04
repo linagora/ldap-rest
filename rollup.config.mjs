@@ -80,9 +80,11 @@ async function getSpecs() {
 }
 
 async function getBrowserLibraries() {
-  return (await fg('src/browser/**/*.ts', {
-    ignore: ['**/*.test.ts', '**/*.css'],
-  }))
+  return (
+    await fg('src/browser/**/*.ts', {
+      ignore: ['**/*.test.ts', '**/*.css'],
+    })
+  )
     .map(file => file.replace(/^src\/browser\//, '').replace(/\.ts$/, ''))
     .sort();
 }

@@ -6,9 +6,11 @@ import postcss from 'rollup-plugin-postcss';
 import fg from 'fast-glob';
 
 async function getBrowserLibraries() {
-  return (await fg('src/browser/**/*.ts', {
-    ignore: ['**/*.test.ts', '**/*.css'],
-  })).sort();
+  return (
+    await fg('src/browser/**/*.ts', {
+      ignore: ['**/*.test.ts', '**/*.css'],
+    })
+  ).sort();
 }
 
 export default async () => {
