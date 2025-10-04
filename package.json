@@ -84,6 +84,42 @@
       "import": "./dist/plugins/weblogs.js",
       "types": "./dist/src/plugins/weblogs.d.ts"
     },
+    "browser-ldap-tree-viewer-ldaptreeviewer": {
+      "import": "./static/browser/ldap-tree-viewer/LdapTreeViewer.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/LdapTreeViewer.d.ts"
+    },
+    "browser-ldap-tree-viewer-api-ldapapiclient": {
+      "import": "./static/browser/ldap-tree-viewer/api/LdapApiClient.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/api/LdapApiClient.d.ts"
+    },
+    "browser-ldap-tree-viewer-components-treenode": {
+      "import": "./static/browser/ldap-tree-viewer/components/TreeNode.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeNode.d.ts"
+    },
+    "browser-ldap-tree-viewer-components-treeroot": {
+      "import": "./static/browser/ldap-tree-viewer/components/TreeRoot.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeRoot.d.ts"
+    },
+    "browser-ldap-tree-viewer-index": {
+      "import": "./static/browser/ldap-tree-viewer/index.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/index.d.ts"
+    },
+    "browser-ldap-tree-viewer-store-store": {
+      "import": "./static/browser/ldap-tree-viewer/store/Store.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/store/Store.d.ts"
+    },
+    "browser-ldap-tree-viewer-store-actions": {
+      "import": "./static/browser/ldap-tree-viewer/store/actions.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/store/actions.d.ts"
+    },
+    "browser-ldap-tree-viewer-store-reducers": {
+      "import": "./static/browser/ldap-tree-viewer/store/reducers.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/store/reducers.d.ts"
+    },
+    "browser-ldap-tree-viewer-types": {
+      "import": "./static/browser/ldap-tree-viewer/types.js",
+      "types": "./dist/src/browser/ldap-tree-viewer/types.d.ts"
+    },
     "schema-ad-groups": {
       "import": "./static/schemas/ad/groups.json",
       "require": "./static/schemas/ad/groups.json"
@@ -159,10 +195,10 @@
     "build:dev": "./.dev.mk builddev",
     "build:docker": "./.dev.mk builddocker",
     "build:dockerfile": "./.dev.mk Dockerfile",
-    "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && npm run build:dockerfile",
+    "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
     "build:watch": "rollup -c --watch",
     "check": "npm run lint && npm run format:check",
-    "clean": "rimraf dist/*",
+    "clean": "rimraf dist/* static/browser/* coverage",
     "dev": "npm run build:dev && npm start",
     "fix": "npm run lint:fix && npm run format:fix",
     "format:check": "prettier --check .",

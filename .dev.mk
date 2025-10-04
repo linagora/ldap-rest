@@ -25,6 +25,8 @@ builddev: $(DSTFILES) Dockerfile
 _builddev:
 	npx rimraf dist
 	npx rollup -c
+	npx rollup -c rollup.browser.config.mjs
+	node scripts/moveBrowserLibs.mjs
 
 builddocker: Dockerfile
 	docker build -t mini-dm .

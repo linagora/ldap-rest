@@ -79,6 +79,14 @@ async function getSpecs() {
     .sort();
 }
 
+async function getBrowserLibraries() {
+  return (await fg('src/browser/**/*.ts', {
+    ignore: ['**/*.test.ts', '**/*.css'],
+  }))
+    .map(file => file.replace(/^src\/browser\//, '').replace(/\.ts$/, ''))
+    .sort();
+}
+
 pkg.exports = {
   '.': {
     import: './dist/bin/index.js',
@@ -102,6 +110,15 @@ export default async () => {
       types: `./dist/src/plugins/${name}.d.ts`,
     };
   });
+
+  (await getBrowserLibraries()).forEach(browserLib => {
+    const name = browserLib.toLowerCase().replace(/\//g, '-');
+    pkg.exports[`browser-${name}`] = {
+      import: `./static/browser/${browserLib}.js`,
+      types: `./dist/src/browser/${browserLib}.d.ts`,
+    };
+  });
+
   (await getSpecs()).forEach(spec => {
     const name = spec.replace(/\.json$/, '').replace(/\//g, '-');
     pkg.exports[`schema-${name.toLowerCase()}`] = {
@@ -110,6 +127,7 @@ export default async () => {
     };
   });
   writeFileSync('package.json', sortPackageJson(JSON.stringify(pkg, null, 2)));
+
   return [
     {
       input: [
