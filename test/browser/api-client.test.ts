@@ -18,7 +18,7 @@ describe('Browser LDAP API Client', () => {
   describe('getTopOrganization', () => {
     it('should fetch top organization', async () => {
       const mockResponse = {
-        dn: 'ou=organization,o=gov,c=mu',
+        dn: 'ou=organization,dc=example,dc=com',
         ou: 'organization',
       };
 
@@ -47,7 +47,7 @@ describe('Browser LDAP API Client', () => {
 
   describe('getOrganization', () => {
     it('should fetch organization by DN', async () => {
-      const dn = 'ou=test,ou=organization,o=gov,c=mu';
+      const dn = 'ou=test,ou=organization,dc=example,dc=com';
       const encodedDn = encodeURIComponent(dn);
       const mockResponse = {
         dn,
@@ -63,7 +63,7 @@ describe('Browser LDAP API Client', () => {
     });
 
     it('should properly encode DN with special characters', async () => {
-      const dn = 'ou=Test & Dev,ou=organization,o=gov,c=mu';
+      const dn = 'ou=Test & Dev,ou=organization,dc=example,dc=com';
       const encodedDn = encodeURIComponent(dn);
       const mockResponse = {
         dn,
@@ -81,14 +81,14 @@ describe('Browser LDAP API Client', () => {
 
   describe('getOrganizationSubnodes', () => {
     it('should fetch organization subnodes', async () => {
-      const dn = 'ou=test,ou=organization,o=gov,c=mu';
+      const dn = 'ou=test,ou=organization,dc=example,dc=com';
       const encodedDn = encodeURIComponent(dn);
       const mockResponse = [
         {
-          dn: 'ou=child1,ou=test,ou=organization,o=gov,c=mu',
+          dn: 'ou=child1,ou=test,ou=organization,dc=example,dc=com',
           type: 'organization',
         },
-        { dn: 'uid=user1,ou=test,ou=organization,o=gov,c=mu', type: 'user' },
+        { dn: 'uid=user1,ou=test,ou=organization,dc=example,dc=com', type: 'user' },
       ];
 
       nock(baseUrl)
@@ -100,7 +100,7 @@ describe('Browser LDAP API Client', () => {
     });
 
     it('should return empty array for organization with no subnodes', async () => {
-      const dn = 'ou=empty,ou=organization,o=gov,c=mu';
+      const dn = 'ou=empty,ou=organization,dc=example,dc=com';
       const encodedDn = encodeURIComponent(dn);
 
       nock(baseUrl)
@@ -114,12 +114,12 @@ describe('Browser LDAP API Client', () => {
 
   describe('searchOrganizationSubnodes', () => {
     it('should search organization subnodes', async () => {
-      const dn = 'ou=test,ou=organization,o=gov,c=mu';
+      const dn = 'ou=test,ou=organization,dc=example,dc=com';
       const query = 'john';
       const encodedDn = encodeURIComponent(dn);
       const encodedQuery = encodeURIComponent(query);
       const mockResponse = [
-        { dn: 'uid=john.doe,ou=test,ou=organization,o=gov,c=mu', type: 'user' },
+        { dn: 'uid=john.doe,ou=test,ou=organization,dc=example,dc=com', type: 'user' },
       ];
 
       nock(baseUrl)
@@ -133,7 +133,7 @@ describe('Browser LDAP API Client', () => {
     });
 
     it('should properly encode search query with special characters', async () => {
-      const dn = 'ou=test,ou=organization,o=gov,c=mu';
+      const dn = 'ou=test,ou=organization,dc=example,dc=com';
       const query = 'test & dev';
       const encodedDn = encodeURIComponent(dn);
       const encodedQuery = encodeURIComponent(query);
@@ -221,7 +221,7 @@ describe('Browser LDAP API Client', () => {
       nock(baseUrl)
         .get('/api/v1/ldap/organizations/top')
         .matchHeader('Authorization', `Bearer ${token}`)
-        .reply(200, { dn: 'ou=org,o=gov,c=mu' });
+        .reply(200, { dn: 'ou=org,dc=example,dc=com' });
 
       await clientWithAuth.getTopOrganization();
     });
@@ -230,7 +230,7 @@ describe('Browser LDAP API Client', () => {
       nock(baseUrl)
         .get('/api/v1/ldap/organizations/top')
         .matchHeader('Authorization', val => val === undefined)
-        .reply(200, { dn: 'ou=org,o=gov,c=mu' });
+        .reply(200, { dn: 'ou=org,dc=example,dc=com' });
 
       await client.getTopOrganization();
     });
