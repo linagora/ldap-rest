@@ -544,6 +544,47 @@ export default class James extends DmPlugin {
     return null;
   }
 
+  async generateSignature(dn: string): Promise<string | null> {
+    const template = this.config.james_signature_template;
+    if (!template) return null;
+
+    try {
+      // Get all attributes that might be used in the template
+      const result = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as import('../../lib/ldapActions').SearchResult;
+
+      if (!result.searchEntries || result.searchEntries.length === 0) {
+        return null;
+      }
+
+      const entry = result.searchEntries[0] as AttributesList;
+
+      // Helper to convert LDAP attribute value to string
+      const toString = (value: unknown): string => {
+        if (!value) return '';
+        if (Array.isArray(value)) {
+          return value.length > 0 ? String(value[0]) : '';
+        }
+        return String(value as string | Buffer);
+      };
+
+      // Replace all {attributeName} placeholders with LDAP values
+      let signature = template;
+      const placeholderRegex = /\{(\w+)\}/g;
+      signature = signature.replace(placeholderRegex, (match, attrName) => {
+        return toString(entry[attrName as keyof AttributesList]);
+      });
+
+      return signature;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error(`Failed to generate signature for DN ${dn}: ${err}`);
+      return null;
+    }
+  }
+
   async updateJamesIdentity(
     dn: string,
     mail: string,
@@ -596,15 +637,29 @@ export default class James extends DmPlugin {
         return;
       }
 
-      // Step 3: Update identity name
+      // Step 3: Generate signature if template is configured
+      const htmlSignature = await this.generateSignature(dn);
+
+      // Step 4: Update identity name and signature
       const updateUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}/${defaultIdentity.id}`;
       headers['Content-Type'] = 'application/json';
 
-      const updateBody = JSON.stringify({
+      const updatePayload: {
+        id: string;
+        email: string;
+        name: string;
+        htmlSignature?: string;
+      } = {
         id: defaultIdentity.id,
         email: defaultIdentity.email,
         name: displayName,
-      });
+      };
+
+      if (htmlSignature) {
+        updatePayload.htmlSignature = htmlSignature;
+      }
+
+      const updateBody = JSON.stringify(updatePayload);
 
       const updateRes = await fetch(updateUrl, {
         method: 'PUT',
