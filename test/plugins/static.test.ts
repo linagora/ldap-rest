@@ -8,8 +8,21 @@ import { expect } from 'chai';
 const dir = './test/__plugins__/static';
 let dm: DM;
 let plugin: Static;
+let savedLdapBase: string | undefined;
 
 describe('static', () => {
+  before(() => {
+    savedLdapBase = process.env.DM_LDAP_BASE;
+  });
+
+  after(() => {
+    if (savedLdapBase !== undefined) {
+      process.env.DM_LDAP_BASE = savedLdapBase;
+    } else {
+      delete process.env.DM_LDAP_BASE;
+    }
+  });
+
   describe('path configuration', () => {
     beforeEach(async () => {
       process.env.NODE_ENV = 'test';
