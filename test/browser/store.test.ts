@@ -1,6 +1,9 @@
 import { expect } from 'chai';
 
-import { Store, type Action } from '../../src/browser/ldap-tree-viewer/store/Store';
+import {
+  Store,
+  type Action,
+} from '../../src/browser/ldap-tree-viewer/store/Store';
 
 describe('Browser Store', () => {
   interface TestState {

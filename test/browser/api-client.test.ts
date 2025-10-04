@@ -31,7 +31,9 @@ describe('Browser LDAP API Client', () => {
     });
 
     it('should throw error on failed request', async () => {
-      nock(baseUrl).get('/api/v1/ldap/organizations/top').reply(404, 'Not Found');
+      nock(baseUrl)
+        .get('/api/v1/ldap/organizations/top')
+        .reply(404, 'Not Found');
 
       try {
         await client.getTopOrganization();
@@ -82,7 +84,10 @@ describe('Browser LDAP API Client', () => {
       const dn = 'ou=test,ou=organization,o=gov,c=mu';
       const encodedDn = encodeURIComponent(dn);
       const mockResponse = [
-        { dn: 'ou=child1,ou=test,ou=organization,o=gov,c=mu', type: 'organization' },
+        {
+          dn: 'ou=child1,ou=test,ou=organization,o=gov,c=mu',
+          type: 'organization',
+        },
         { dn: 'uid=user1,ou=test,ou=organization,o=gov,c=mu', type: 'user' },
       ];
 
@@ -118,7 +123,9 @@ describe('Browser LDAP API Client', () => {
       ];
 
       nock(baseUrl)
-        .get(`/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`)
+        .get(
+          `/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`
+        )
         .reply(200, mockResponse);
 
       const result = await client.searchOrganizationSubnodes(dn, query);
@@ -132,7 +139,9 @@ describe('Browser LDAP API Client', () => {
       const encodedQuery = encodeURIComponent(query);
 
       nock(baseUrl)
-        .get(`/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`)
+        .get(
+          `/api/v1/ldap/organizations/${encodedDn}/subnodes/search?q=${encodedQuery}`
+        )
         .reply(200, []);
 
       const result = await client.searchOrganizationSubnodes(dn, query);
@@ -220,7 +229,7 @@ describe('Browser LDAP API Client', () => {
     it('should not include Authorization header when no token', async () => {
       nock(baseUrl)
         .get('/api/v1/ldap/organizations/top')
-        .matchHeader('Authorization', (val) => val === undefined)
+        .matchHeader('Authorization', val => val === undefined)
         .reply(200, { dn: 'ou=org,o=gov,c=mu' });
 
       await client.getTopOrganization();
