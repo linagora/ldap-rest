@@ -23,6 +23,7 @@ const events: {
 } = {
   mail_attribute: 'onLdapMailChange',
   quota_attribute: 'onLdapQuotaChange',
+  forward_attribute: 'onLdapForwardChange',
 };
 
 class OnLdapChange extends DmPlugin {
@@ -89,12 +90,25 @@ class OnLdapChange extends DmPlugin {
         this.config[configParam] &&
         changes[this.config[configParam] as string]
       ) {
-        this.notifyAttributeChange(
-          this.config[configParam] as string,
-          hookName,
-          dn,
-          changes
-        );
+        // Special handling for hooks that need mail parameter
+        if (
+          hookName === 'onLdapQuotaChange' ||
+          hookName === 'onLdapForwardChange'
+        ) {
+          void this.notifyAttributeChangeWithMail(
+            this.config[configParam] as string,
+            hookName,
+            dn,
+            changes
+          );
+        } else {
+          this.notifyAttributeChange(
+            this.config[configParam] as string,
+            hookName,
+            dn,
+            changes
+          );
+        }
       }
     }
   }
@@ -116,6 +130,88 @@ class OnLdapChange extends DmPlugin {
     }
     if (oldValue !== newValue) {
       void launchHooks(this.server.hooks[hookName], dn, oldValue, newValue);
+    }
+  }
+
+  async notifyAttributeChangeWithMail(
+    attribute: string,
+    hookName: keyof Hooks,
+    dn: string,
+    changes: ChangesToNotify
+  ): Promise<void> {
+    const [oldValue, newValue] = changes[attribute] || [];
+    if (oldValue === undefined && newValue === undefined) return;
+
+    // Get current mail address (needed for hooks that require mail parameter)
+    const mailAttr = this.config.mail_attribute || 'mail';
+    const mailChange = changes[mailAttr];
+
+    let mail: string;
+    if (mailChange) {
+      // Mail is changing, use new mail
+      mail = Array.isArray(mailChange[1])
+        ? String(mailChange[1][0])
+        : String(mailChange[1]);
+    } else {
+      // Mail not changing, fetch from LDAP
+      try {
+        const result = (await this.server.ldap.search(
+          { paged: false, scope: 'base', attributes: [mailAttr] },
+          dn
+        )) as SearchResult;
+        if (result.searchEntries.length === 1) {
+          const mailValue = result.searchEntries[0][mailAttr];
+          mail = Array.isArray(mailValue)
+            ? String(mailValue[0])
+            : String(mailValue);
+        } else {
+          this.logger.warn(
+            `Could not find mail for ${dn}, skipping ${hookName} notification`
+          );
+          return;
+        }
+      } catch (err) {
+        this.logger.error(`Error fetching mail for ${dn}:`, err);
+        return;
+      }
+    }
+
+    // Handle different hook types
+    if (hookName === 'onLdapQuotaChange') {
+      // Quota change - expects numbers
+      const oldQuota = oldValue ? Number(oldValue) : 0;
+      const newQuota = newValue ? Number(newValue) : 0;
+      if (oldQuota !== newQuota) {
+        void launchHooks(
+          this.server.hooks[hookName],
+          dn,
+          mail,
+          oldQuota,
+          newQuota
+        );
+      }
+    } else if (hookName === 'onLdapForwardChange') {
+      // Forward change - expects arrays of strings
+      const oldForwards = oldValue
+        ? Array.isArray(oldValue)
+          ? (oldValue as string[])
+          : [oldValue as string]
+        : [];
+      const newForwards = newValue
+        ? Array.isArray(newValue)
+          ? (newValue as string[])
+          : [newValue as string]
+        : [];
+
+      if (oldForwards.length > 0 || newForwards.length > 0) {
+        void launchHooks(
+          this.server.hooks[hookName],
+          dn,
+          mail,
+          oldForwards,
+          newForwards
+        );
+      }
     }
   }
 }
