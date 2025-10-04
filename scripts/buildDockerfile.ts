@@ -40,10 +40,13 @@ for (const [arg, env, def, type] of configArgs) {
     const boolDef = def ? 'true' : 'false';
     content += ` \\\n ${env}=${boolDef}`;
   } else if (type === 'json') {
-    const jsonDef = JSON.stringify(def).replace(/"/g, '\\"');
+    const jsonDef = JSON.stringify(def)
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"');
     content += ` \\\n ${env}="${jsonDef}"`;
   } else {
     const envDef = ((typeof def !== 'string' ? def.toString() : def) as string)
+      .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
       .replace(new RegExp(moduleDir, 'g'), '/app/node_modules/mini-dm');
     content += envDef.length > 0 ? ` \\\n ${env}="${envDef}"` : ` \\\n ${env}=`;
