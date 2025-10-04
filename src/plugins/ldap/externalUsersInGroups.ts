@@ -5,7 +5,7 @@
  * Creates on-the-fly missing group users into a branch
  * This permits to add external users into mailing lists
  */
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import ldapActions, { AttributesList } from '../../lib/ldapActions';
@@ -13,6 +13,7 @@ import { launchHooks, launchHooksChained } from '../../lib/utils';
 
 export default class ExternalUsersInGroups extends DmPlugin {
   name = 'externalUsersInGroups';
+  roles: Role[] = ['consistency'] as const;
 
   dependencies = { ldapGroups: 'core/ldap/ldapGroups' };
 

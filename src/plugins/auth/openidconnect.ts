@@ -2,13 +2,14 @@ import type { Express, Response } from 'express';
 import { auth, ConfigParams } from 'express-openid-connect';
 
 import { DmRequest } from '../../lib/auth/base';
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import { launchHooksChained } from '../../lib/utils';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 
 export default class OpenIDConnect extends DmPlugin {
   name = 'openidconnect';
+  roles: Role[] = ['auth'] as const;
 
   constructor(server: DM) {
     super(server);

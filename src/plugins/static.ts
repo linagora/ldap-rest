@@ -15,12 +15,13 @@ import { join, resolve } from 'path';
 import type { Express } from 'express';
 import express from 'express';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin, { type Role } from '../abstract/plugin';
 import { notFound } from '../lib/expressFormatedResponses';
 import { transformSchemas } from '../lib/utils';
 
 export default class Static extends DmPlugin {
   name: string = 'static';
+  roles: Role[] = ['api'] as const;
 
   api(app: Express): void {
     const rep = this.config.static_path;

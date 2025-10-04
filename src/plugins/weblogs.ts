@@ -1,10 +1,11 @@
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../abstract/plugin';
+import DmPlugin, { type Role } from '../abstract/plugin';
 import { DmRequest } from '../lib/auth/base';
 
 export default class WebLogs extends DmPlugin {
   name = 'weblogs';
+  roles: Role[] = ['logging'] as const;
   api(app: Express): void {
     app.use((req: DmRequest, res, next) => {
       let nd = true;

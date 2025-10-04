@@ -7,7 +7,7 @@
  */
 import { Entry } from 'ldapts';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
 import { launchHooks } from '../../lib/utils';
@@ -27,6 +27,7 @@ const events: {
 
 class OnLdapChange extends DmPlugin {
   name = 'onLdapChange';
+  roles: Role[] = ['consistency'] as const;
 
   stack: Record<number, Entry> = {};
 

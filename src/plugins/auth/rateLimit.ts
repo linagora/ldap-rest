@@ -12,7 +12,7 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 
 interface RateLimitEntry {
   count: number;
@@ -21,6 +21,7 @@ interface RateLimitEntry {
 
 export default class RateLimit extends DmPlugin {
   name = 'rateLimit';
+  roles: Role[] = ['protect'] as const;
   private store: Map<string, RateLimitEntry> = new Map();
   private windowMs: number;
   private maxRequests: number;

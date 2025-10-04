@@ -1,7 +1,7 @@
 import type { SearchResult } from 'ldapts';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import {
@@ -20,6 +20,7 @@ import { launchHooksChained } from '../../lib/utils';
 
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
+  roles: Role[] = ['api', 'consistency'] as const;
   pathAttr: string;
   linkAttr: string;
 

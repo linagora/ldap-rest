@@ -16,7 +16,7 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import fetch from 'node-fetch';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { Role } from '../../abstract/plugin';
 
 interface CrowdSecDecision {
   duration: string;
@@ -35,6 +35,7 @@ interface DecisionCache {
 
 export default class CrowdSec extends DmPlugin {
   name = 'crowdsec';
+  roles: Role[] = ['protect'] as const;
   private apiUrl: string;
   private apiKey: string;
   private cacheTtl: number;

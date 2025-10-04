@@ -11,7 +11,7 @@ import fs from 'fs';
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type ldapActions from '../../lib/ldapActions';
@@ -46,6 +46,7 @@ export type postModify = ModifyRequest;
 
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
+  roles: Role[] = ['api'] as const;
   base?: string;
   ldap: ldapActions;
   cn: string;

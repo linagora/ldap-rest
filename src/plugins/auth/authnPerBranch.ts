@@ -9,7 +9,7 @@
  */
 import type { SearchOptions } from 'ldapts';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { DmRequest } from '../../lib/auth/base';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
@@ -22,6 +22,7 @@ interface CachedGroups {
 
 export default class AuthnPerBranch extends DmPlugin {
   name = 'authnPerBranch';
+  roles: Role[] = ['authn'] as const;
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
   cacheTTL: number;

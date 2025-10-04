@@ -9,9 +9,11 @@ import type { Response } from 'express';
 
 import { unauthorized } from '../../lib/expressFormatedResponses';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
+import type { Role } from '../../abstract/plugin';
 
 export default class AuthToken extends AuthBase {
   name = 'authToken';
+  roles: Role[] = ['auth'] as const;
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
     let token = req.headers['authorization'];

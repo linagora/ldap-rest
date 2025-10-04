@@ -6,10 +6,11 @@
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';
+  roles: Role[] = ['demo'] as const;
 
   api(app: Express): void {
     app.get(

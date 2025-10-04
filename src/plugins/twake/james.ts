@@ -1,10 +1,11 @@
 import fetch from 'node-fetch';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import { Hooks } from '../../hooks';
 
 export default class James extends DmPlugin {
   name = 'james';
+  roles: Role[] = ['consistency'] as const;
 
   dependencies = { onLdapChange: 'core/ldap/onChange' };
 

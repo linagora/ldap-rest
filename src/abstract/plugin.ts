@@ -8,6 +8,15 @@ import type winston from 'winston';
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
 
+export type Role =
+  | 'auth'
+  | 'authn'
+  | 'protect'
+  | 'api'
+  | 'logging'
+  | 'demo'
+  | 'consistency';
+
 export default abstract class DmPlugin {
   /**
    * Properties inherited from parent (DM)
@@ -33,6 +42,9 @@ export default abstract class DmPlugin {
 
   /* Needed plugins */
   dependencies?: Record<string, string>;
+
+  /* Plugin roles for categorization */
+  roles?: Role[] | undefined;
 
   /* Function to register API */
   api?(app: Express): MaybePromise<void>;

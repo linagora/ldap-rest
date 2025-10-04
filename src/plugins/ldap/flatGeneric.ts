@@ -9,7 +9,7 @@ import fs from 'fs';
 
 import type { Express } from 'express';
 
-import DmPlugin from '../../abstract/plugin';
+import DmPlugin, { type Role } from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
 import { transformSchemas } from '../../lib/utils';
@@ -33,6 +33,7 @@ interface EnrichedSchema extends Schema {
  */
 class LdapFlatInstance extends LdapFlat {
   name: string = 'ldapFlatInstance';
+  roles: Role[] = ['api'] as const;
 
   constructor(server: DM, config: ConstructorParameters<typeof LdapFlat>[1]) {
     super(server, config);
