@@ -40,6 +40,10 @@
       "import": "./dist/plugins/auth/openidconnect.js",
       "types": "./dist/src/plugins/auth/openidconnect.d.ts"
     },
+    "plugin-auth-ratelimit": {
+      "import": "./dist/plugins/auth/rateLimit.js",
+      "types": "./dist/src/plugins/auth/rateLimit.d.ts"
+    },
     "plugin-auth-token": {
       "import": "./dist/plugins/auth/token.js",
       "types": "./dist/src/plugins/auth/token.d.ts"
@@ -175,6 +179,7 @@
   "dependencies": {
     "body-parser": "^2.2.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
     "ldapts": "^8.0.9",
     "node-fetch": "^3.3.2",
     "winston": "^3.17.0"
