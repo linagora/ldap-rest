@@ -76,7 +76,6 @@ describe('James Plugin', () => {
     const assistant1DN = `uid=assistant1,${process.env.DM_LDAP_BASE}`;
     const assistant2DN = `uid=assistant2,${process.env.DM_LDAP_BASE}`;
     let delegateAddScope: nock.Scope;
-    let delegateRemoveScope: nock.Scope;
 
     beforeEach(async () => {
       // Create assistant user
