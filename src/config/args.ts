@@ -100,6 +100,11 @@ export interface Config {
   rate_limit_window_ms?: number;
   rate_limit_max?: number;
 
+  // auth/crowdsec
+  crowdsec_url?: string;
+  crowdsec_api_key?: string;
+  crowdsec_cache_ttl?: number;
+
   // Special attributes
   mail_attribute?: string;
   quota_attribute?: string;
@@ -315,6 +320,11 @@ const configArgs: ConfigTemplate = [
     'number',
   ],
   ['--rate-limit-max', 'DM_RATE_LIMIT_MAX', 100, 'number'],
+
+  // CrowdSec plugin
+  ['--crowdsec-url', 'DM_CROWDSEC_URL', 'http://localhost:8080/v1/decisions'],
+  ['--crowdsec-api-key', 'DM_CROWDSEC_API_KEY', ''],
+  ['--crowdsec-cache-ttl', 'DM_CROWDSEC_CACHE_TTL', 60, 'number'],
 ];
 
 export default configArgs;

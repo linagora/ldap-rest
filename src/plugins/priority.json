@@ -1,5 +1,6 @@
 [
   "core/weblogs",
+  "core/auth/crowdsec",
   "core/auth/rateLimit",
   "core/auth/token",
   "core/auth/llng",

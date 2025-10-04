@@ -32,6 +32,10 @@
       "import": "./dist/plugins/auth/authnPerBranch.js",
       "types": "./dist/src/plugins/auth/authnPerBranch.d.ts"
     },
+    "plugin-auth-crowdsec": {
+      "import": "./dist/plugins/auth/crowdsec.js",
+      "types": "./dist/src/plugins/auth/crowdsec.d.ts"
+    },
     "plugin-auth-llng": {
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
