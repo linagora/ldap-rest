@@ -63,34 +63,28 @@ export default class RateLimit extends DmPlugin {
         });
       }
 
-      // Intercept res.status to track failed auth attempts
-      const originalStatus = res.status.bind(res);
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      const self = this; // Capture plugin context
-      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-      res.status = function (code: number) {
-        if (code === 401 || code === 403) {
-          // Track failed authentication
-          const entry = self.store.get(ip);
+      // Track failed auth attempts using the 'finish' event
+      res.on('finish', () => {
+        if (res.statusCode === 401 || res.statusCode === 403) {
+          const entry = this.store.get(ip);
           const now = Date.now();
 
           if (!entry || now > entry.resetTime) {
             // Create new entry
-            self.store.set(ip, {
+            this.store.set(ip, {
               count: 1,
-              resetTime: now + self.windowMs,
+              resetTime: now + this.windowMs,
             });
           } else {
             // Increment existing entry
             entry.count++;
           }
 
-          self.logger.debug(
-            `Failed auth from ${ip}: ${self.store.get(ip)?.count}/${self.maxRequests}`
+          this.logger.debug(
+            `Failed auth from ${ip}: ${this.store.get(ip)?.count}/${this.maxRequests}`
           );
         }
-        return originalStatus(code);
-      };
+      });
 
       next();
     });

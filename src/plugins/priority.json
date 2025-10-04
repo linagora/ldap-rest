@@ -1,1 +1,7 @@
-["core/weblogs", "core/auth/token", "core/auth/llng", "core/auth/openidconnect"]
+[
+  "core/weblogs",
+  "core/auth/rateLimit",
+  "core/auth/token",
+  "core/auth/llng",
+  "core/auth/openidconnect"
+]
