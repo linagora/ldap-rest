@@ -1,6 +1,41 @@
 import { expect } from 'chai';
 import AuthnPerBranch from '../../../src/plugins/auth/authnPerBranch';
 import { DM } from '../../../src/bin';
+import LdapOrganization from '../../../src/plugins/ldap/organization';
+import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
+import type { Response } from 'express';
+import type { Role } from '../../../src/abstract/plugin';
+import supertest from 'supertest';
+
+// Simple auth plugin for testing that sets user from X-Test-User header
+class TestAuthPlugin extends AuthBase {
+  name = 'testAuth';
+  roles: Role[] = ['auth'] as const;
+
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    // Use X-Test-User header to identify user, or fall back to token-based auth
+    const testUser = req.headers['x-test-user'];
+    if (testUser && typeof testUser === 'string') {
+      req.user = testUser;
+      return next();
+    }
+
+    // Otherwise, require a valid token
+    let token = req.headers['authorization'];
+    if (!token || !/^Bearer .+/.test(token)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    token = token.split(' ')[1];
+    if (!(this.config.auth_token as string[]).includes(token)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    req.user =
+      'token number ' + (this.config.auth_token as string[]).indexOf(token);
+    next();
+  }
+}
 
 const { DM_LDAP_BASE, DM_LDAP_GROUP_BRANCH } = process.env;
 const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
@@ -253,6 +288,343 @@ describe('AuthnPerBranch', function () {
         expect(result[0]).to.equal(USER_BRANCH);
         expect(result[1]).to.deep.equal({ paged: false });
       }
+    });
+  });
+
+  describe('API access control', () => {
+    const testOrgDn = `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const testOrg2Dn = `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
+    const testSubOrg2Dn = `ou=SubOrg2,${testOrg2Dn}`;
+    const testUser1Dn = `uid=testuser1,ou=users,${DM_LDAP_BASE}`;
+    const testUser2Dn = `uid=testuser2,ou=users,${DM_LDAP_BASE}`;
+    const adminToken = 'test-admin-token';
+    let request: ReturnType<typeof supertest>;
+    let orgPlugin: LdapOrganization;
+    let authPlugin: TestAuthPlugin;
+    let apiServer: DM;
+
+    before(async function () {
+      this.timeout(10000);
+
+      // Create test config for API tests
+      const testConfig = {
+        default: {
+          read: false,
+          write: false,
+          delete: false,
+        },
+        users: {
+          testuser1: {
+            [testOrgDn]: {
+              read: true,
+              write: true,
+              delete: false,
+            },
+          },
+        },
+        groups: {},
+      };
+
+      // Setup DM with auth and organization plugins
+      process.env.DM_AUTH_TOKENS = adminToken;
+      process.env.DM_AUTHN_PER_BRANCH_CONFIG = JSON.stringify(testConfig);
+      apiServer = new DM();
+      await apiServer.ready;
+
+      // Register plugins
+      const authnPerBranch = new AuthnPerBranch(apiServer);
+      authPlugin = new TestAuthPlugin(apiServer);
+      orgPlugin = new LdapOrganization(apiServer);
+
+      await apiServer.registerPlugin('testAuth', authPlugin);
+      await apiServer.registerPlugin('authnPerBranch', authnPerBranch);
+      await apiServer.registerPlugin('ldapOrganizations', orgPlugin);
+
+      orgPlugin.api(apiServer.app);
+      request = supertest(apiServer.app);
+    });
+
+    afterEach(async function () {
+      this.timeout(5000);
+      // Clean up test entries
+      try {
+        await apiServer.ldap.delete(testUser1Dn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await apiServer.ldap.delete(testUser2Dn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await apiServer.ldap.delete(testSubOrg1Dn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await apiServer.ldap.delete(testSubOrg2Dn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await apiServer.ldap.delete(testOrgDn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await apiServer.ldap.delete(testOrg2Dn);
+      } catch (err) {
+        // Ignore
+      }
+    });
+
+    describe('READ - Search outside authorized scope', () => {
+      it('should not allow search in unauthorized branch', async function () {
+        this.timeout(5000);
+
+        // Create organization 1 (authorized for testuser1)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Create organization 2 (NOT authorized)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        };
+        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+
+        // Try to get unauthorized org via API - should fail
+        const res = await request
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrg2Dn)}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testuser1')
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(500);
+        expect(res.body).to.have.property('error');
+        expect(res.body.error).to.equal('check logs');
+      });
+
+      it('should allow search in authorized branch', async function () {
+        this.timeout(5000);
+
+        // Create organization 1 (authorized for testuser1)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Try to get authorized org via API - should succeed
+        const res = await request
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testuser1')
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('dn', testOrgDn);
+        expect(res.body).to.have.property('ou', 'TestOrg');
+      });
+    });
+
+    describe('WRITE - Add organizational unit outside scope', () => {
+      it('should reject adding a sub-organization in an unauthorized branch', async function () {
+        this.timeout(5000);
+
+        // Create organization 1 (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Create organization 2 (unauthorized)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        };
+        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+
+        // Try to add a sub-org under unauthorized org2 via API
+        const res = await request
+          .post('/api/v1/ldap/organizations')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testuser1')
+          .type('json')
+          .send({
+            ou: 'SubOrg2',
+            parentDn: testOrg2Dn,
+          });
+
+        // Should be rejected
+        expect(res.status).to.not.equal(200);
+
+        // Verify nothing was written to LDAP
+        try {
+          await apiServer.ldap.search(
+            {
+              paged: false,
+              scope: 'base',
+              filter: '(objectClass=*)',
+            },
+            testSubOrg2Dn
+          );
+          expect.fail('SubOrg2 should not have been created');
+        } catch (err) {
+          expect(err).to.be.instanceOf(Error);
+          expect((err as any).code).to.equal(32); // NoSuchObject
+        }
+      });
+
+      it('should allow adding a sub-organization in an authorized branch', async function () {
+        this.timeout(5000);
+
+        // Create organization 1 (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Try to add a sub-org under authorized org1 via API
+        const res = await request
+          .post('/api/v1/ldap/organizations')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testuser1')
+          .type('json')
+          .send({
+            ou: 'SubOrg1',
+            parentDn: testOrgDn,
+          });
+
+        // Should succeed
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('success', true);
+
+        // Verify it was written to LDAP
+        const searchResult = await apiServer.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+          },
+          testSubOrg1Dn
+        );
+        expect((searchResult as any).searchEntries).to.have.lengthOf(1);
+        expect((searchResult as any).searchEntries[0].ou).to.equal('SubOrg1');
+      });
+    });
+
+    describe('WRITE - Add user with twakeDepartmentLink', () => {
+      it('should allow adding a user if twakeDepartmentLink points to authorized org', async function () {
+        this.timeout(5000);
+
+        // Create organization (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Create user with twakeDepartmentLink pointing to authorized org
+        const newUserEntry = {
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'testuser1',
+          sn: 'User1',
+          cn: 'Test User 1',
+          twakeDepartmentLink: [testOrgDn],
+        };
+
+        const mockReq = { user: 'testuser1' } as any;
+
+        // This should succeed
+        await apiServer.ldap.add(testUser1Dn, newUserEntry, mockReq);
+
+        // Verify it was written
+        const searchResult = await apiServer.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+          },
+          testUser1Dn
+        );
+        expect((searchResult as any).searchEntries).to.have.lengthOf(1);
+        expect((searchResult as any).searchEntries[0].uid).to.equal(
+          'testuser1'
+        );
+      });
+
+      it('should reject adding a user if twakeDepartmentLink points to unauthorized org', async function () {
+        this.timeout(5000);
+
+        // Create organization 1 (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await apiServer.ldap.add(testOrgDn, org1Entry);
+
+        // Create organization 2 (unauthorized)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        };
+        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+
+        // Try to create user with twakeDepartmentLink pointing to unauthorized org
+        const newUserEntry = {
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'testuser2',
+          sn: 'User2',
+          cn: 'Test User 2',
+          twakeDepartmentLink: [testOrg2Dn], // UNAUTHORIZED
+        };
+
+        const mockReq = { user: 'testuser1' } as any;
+
+        // This should be rejected
+        try {
+          await apiServer.ldap.add(testUser2Dn, newUserEntry, mockReq);
+          expect.fail('Should have thrown an error for unauthorized write');
+        } catch (err) {
+          expect(err).to.be.instanceOf(Error);
+          expect((err as Error).message).to.include(
+            'does not have write permission'
+          );
+        }
+
+        // Verify nothing was written
+        try {
+          await apiServer.ldap.search(
+            {
+              paged: false,
+              scope: 'base',
+              filter: '(objectClass=*)',
+            },
+            testUser2Dn
+          );
+          expect.fail('User should not have been created');
+        } catch (err) {
+          expect(err).to.be.instanceOf(Error);
+          expect((err as any).code).to.equal(32); // NoSuchObject
+        }
+      });
     });
   });
 });
