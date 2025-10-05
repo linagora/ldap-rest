@@ -45,7 +45,8 @@ describe('AuthnPerBranch', function () {
   if (
     !process.env.DM_LDAP_DN ||
     !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
+    !process.env.DM_LDAP_BASE ||
+    !process.env.DM_LDAP_TOP_ORGANIZATION
   ) {
     console.warn(
       'Skipping authnPerBranch tests: LDAP credentials are required'
@@ -166,28 +167,37 @@ describe('AuthnPerBranch', function () {
   describe('Authorized branches', () => {
     it('should return authorized branches for read permission', async function () {
       this.timeout(5000);
-      const branches = await plugin.getAuthorizedBranches('testuser1', 'read');
+      const branches = await plugin.getAuthorizedBranchesForPermission(
+        'testuser1',
+        'read'
+      );
       expect(branches).to.be.an('array');
       expect(branches).to.include(USER_BRANCH);
     });
 
     it('should return authorized branches for write permission', async function () {
       this.timeout(5000);
-      const branches = await plugin.getAuthorizedBranches('testuser1', 'write');
+      const branches = await plugin.getAuthorizedBranchesForPermission(
+        'testuser1',
+        'write'
+      );
       expect(branches).to.be.an('array');
       expect(branches).to.include(USER_BRANCH);
     });
 
     it('should return empty array for unauthorized permission', async function () {
       this.timeout(5000);
-      const branches = await plugin.getAuthorizedBranches('testuser2', 'write');
+      const branches = await plugin.getAuthorizedBranchesForPermission(
+        'testuser2',
+        'write'
+      );
       expect(branches).to.be.an('array');
       expect(branches).to.have.lengthOf(0);
     });
 
     it('should return empty array for unknown user', async function () {
       this.timeout(5000);
-      const branches = await plugin.getAuthorizedBranches(
+      const branches = await plugin.getAuthorizedBranchesForPermission(
         'unknownuser',
         'read'
       );

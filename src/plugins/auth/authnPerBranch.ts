@@ -9,23 +9,21 @@
 import type { SearchOptions } from 'ldapts';
 import type { Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { DmRequest } from '../../lib/auth/base';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
+import AuthnBase from '../../lib/authn/base';
 
 interface CachedGroups {
   groups: string[];
   timestamp: number;
 }
 
-export default class AuthnPerBranch extends DmPlugin {
+export default class AuthnPerBranch extends AuthnBase {
   name = 'authnPerBranch';
-  roles: Role[] = ['authn'] as const;
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
-  cacheTTL: number;
 
   constructor(server: DM) {
     super(server);
@@ -99,7 +97,7 @@ export default class AuthnPerBranch extends DmPlugin {
 
       // For write operations (add/modify), we'll need to check in separate hooks
       // For now, we only modify the search filter to restrict to authorized branches
-      const authorizedBranches = await this.getAuthorizedBranches(
+      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
         req.user,
         'read'
       );
@@ -126,7 +124,7 @@ export default class AuthnPerBranch extends DmPlugin {
       }
 
       // Get authorized branches for this user
-      const authorizedBranches = await this.getAuthorizedBranches(
+      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
         dmReq.user,
         'read'
       );
@@ -165,20 +163,6 @@ export default class AuthnPerBranch extends DmPlugin {
       return [req, defaultTop];
     },
   };
-
-  /**
-   * Extract the branch DN to check permissions against
-   * For a DN like "uid=user,ou=users,ou=org,dc=example,dc=com"
-   * we need to check permissions on the parent branch
-   */
-  extractBranchDn(dn: string): string {
-    // Remove the first RDN component to get the parent branch
-    const parts = dn.split(',');
-    if (parts.length <= 1) {
-      return dn;
-    }
-    return parts.slice(1).join(',');
-  }
 
   /**
    * Get user's permissions for a specific branch
@@ -227,9 +211,16 @@ export default class AuthnPerBranch extends DmPlugin {
   }
 
   /**
+   * Get list of branches user has read access to (base class implementation)
+   */
+  async getAuthorizedBranches(uid: string): Promise<string[]> {
+    return this.getAuthorizedBranchesForPermission(uid, 'read');
+  }
+
+  /**
    * Get list of branches user has access to for a given permission type
    */
-  async getAuthorizedBranches(
+  async getAuthorizedBranchesForPermission(
     uid: string,
     permissionType: 'read' | 'write' | 'delete'
   ): Promise<string[]> {

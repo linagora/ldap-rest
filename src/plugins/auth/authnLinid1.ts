@@ -8,22 +8,20 @@
  */
 import type { SearchOptions } from 'ldapts';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
-import type { DmRequest } from '../../lib/auth/base';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
+import type { DmRequest } from '../../lib/auth/base';
+import AuthnBase from '../../lib/authn/base';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
   timestamp: number;
 }
 
-export default class AuthnLinid1 extends DmPlugin {
+export default class AuthnLinid1 extends AuthnBase {
   name = 'authnLinid1';
-  roles: Role[] = ['authn'] as const;
   permissionsCache: Map<string, CachedPermissions> = new Map();
-  cacheTTL: number;
 
   constructor(server: DM) {
     super(server);
@@ -296,20 +294,6 @@ export default class AuthnLinid1 extends DmPlugin {
     }
 
     return [];
-  }
-
-  /**
-   * Extract the branch DN to check permissions against
-   * For a DN like "uid=user,ou=users,ou=org,dc=example,dc=com"
-   * we need to check permissions on the parent branch
-   */
-  extractBranchDn(dn: string): string {
-    // Remove the first RDN component to get the parent branch
-    const parts = dn.split(',');
-    if (parts.length <= 1) {
-      return dn;
-    }
-    return parts.slice(1).join(',');
   }
 
   /**

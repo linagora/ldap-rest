@@ -166,7 +166,9 @@ export default class LdapOrganizations extends DmPlugin {
       }
       // Only check path for organizations, not for users/groups
       if (this.isOu(entry)) await this.checkDeptPath(entry);
-      return [dn, entry, req];
+      return req !== undefined
+        ? [dn, entry, req]
+        : ([dn, entry] as [string, AttributesList, Request?]);
     },
 
     ldapmodifyrequest: async ([dn, changes, op]) => {
