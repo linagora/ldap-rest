@@ -40,6 +40,13 @@
       "type": "string",
       "test": "^[\\w\\s/,]+$",
       "required": true
+    },
+    "twakeLocalAdminLink": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
     }
   }
 }

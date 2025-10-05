@@ -29,8 +29,10 @@ export default class AuthzLinid1 extends AuthzBase {
     // Cache TTL in milliseconds (default: 5 minutes)
     this.cacheTTL = 5 * 60 * 1000;
 
+    const adminAttr =
+      this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
     this.logger.info(
-      'AuthzLinid1: Authorization based on twakeLocalAdminLink enabled'
+      `AuthzLinid1: Authorization based on ${adminAttr} attribute enabled`
     );
   }
 
@@ -96,11 +98,13 @@ export default class AuthzLinid1 extends AuthzBase {
         return [base, opts, req];
       }
 
-      // Allow searches for refreshing permissions (filter contains twakeLocalAdminLink)
+      // Allow searches for refreshing permissions (filter contains local admin attribute)
+      const adminAttr =
+        this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
       if (
         opts.filter &&
         typeof opts.filter === 'string' &&
-        opts.filter.includes('twakeLocalAdminLink')
+        opts.filter.includes(adminAttr)
       ) {
         return [base, opts, req];
       }
@@ -240,8 +244,10 @@ export default class AuthzLinid1 extends AuthzBase {
     const branches = new Map<string, BranchPermissions>();
 
     try {
-      // Search for all organizations where this user is in twakeLocalAdminLink
-      const filter = `(twakeLocalAdminLink=${userDn})`;
+      // Search for all organizations where this user is in local admin attribute
+      const adminAttr =
+        this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
+      const filter = `(${adminAttr}=${userDn})`;
       const orgBase =
         this.config.ldap_top_organization || this.config.ldap_base || '';
 

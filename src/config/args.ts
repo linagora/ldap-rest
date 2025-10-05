@@ -96,6 +96,9 @@ export interface Config {
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
+  // auth/authzLinid1
+  authz_local_admin_attribute?: string;
+
   // auth/rateLimit
   rate_limit_window_ms?: number;
   rate_limit_max?: number;
@@ -304,6 +307,13 @@ const configArgs: ConfigTemplate = [
     'DM_AUTHZ_PER_BRANCH_CACHE_TTL',
     60,
     'number',
+  ],
+
+  // Auth authzLinid1 plugin
+  [
+    '--authz-local-admin-attribute',
+    'DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE',
+    'twakeLocalAdminLink',
   ],
 
   // Auth OpenID Connect plugin
