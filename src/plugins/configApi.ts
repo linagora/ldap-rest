@@ -1,0 +1,240 @@
+/**
+ * @module plugins/configApi
+ * @author Xavier Guimard <xguimard@linagora.com>
+ *
+ * Plugin that exposes API configuration for LDAP editor applications
+ * Provides information about available resources, schemas, and endpoints
+ */
+import fs from 'fs';
+
+import type { Express, Request, Response } from 'express';
+
+import DmPlugin, { type Role } from '../abstract/plugin';
+import { transformSchemas } from '../lib/utils';
+import { wantJson } from '../lib/expressFormatedResponses';
+import type { Schema } from '../config/schema';
+
+import type LdapFlatGeneric from './ldap/flatGeneric';
+import type LdapGroups from './ldap/groups';
+import type LdapOrganization from './ldap/organization';
+
+interface FlatResourceConfig {
+  name: string;
+  singularName: string;
+  pluralName: string;
+  mainAttribute: string;
+  objectClass: string[];
+  base: string;
+  schema: Schema;
+  endpoints: {
+    list: string;
+    get: string;
+    create: string;
+    update: string;
+    delete: string;
+  };
+}
+
+interface GroupsConfig {
+  enabled: boolean;
+  base: string;
+  mainAttribute: string;
+  objectClass: string[];
+  schema?: Schema;
+  endpoints: {
+    list: string;
+    get: string;
+    create: string;
+    update: string;
+    delete: string;
+    addMember: string;
+    removeMember: string;
+  };
+}
+
+interface OrganizationsConfig {
+  enabled: boolean;
+  topOrganization: string;
+  organizationClass: string[];
+  linkAttribute: string;
+  pathAttribute: string;
+  pathSeparator: string;
+  maxSubnodes: number;
+  endpoints: {
+    getTop: string;
+    get: string;
+    getSubnodes: string;
+    searchSubnodes: string;
+  };
+}
+
+interface ConfigApiResponse {
+  apiPrefix: string;
+  ldapBase: string;
+  features: {
+    groups?: GroupsConfig;
+    organizations?: OrganizationsConfig;
+    flatResources: FlatResourceConfig[];
+  };
+}
+
+export default class ConfigApi extends DmPlugin {
+  name = 'configApi';
+  roles: Role[] = ['api'] as const;
+
+  /**
+   * API routes
+   */
+
+  api(app: Express): void {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    app.get(`${apiPrefix}/v1/config`, (req: Request, res: Response) => {
+      if (!wantJson(req, res)) return;
+
+      const config: ConfigApiResponse = {
+        apiPrefix: apiPrefix,
+        ldapBase: this.config.ldap_base || '',
+        features: {
+          flatResources: this.getFlatResourcesConfig(),
+        },
+      };
+
+      // Add groups if available
+      const groupsConfig = this.getGroupsConfig();
+      if (groupsConfig) {
+        config.features.groups = groupsConfig;
+      }
+
+      // Add organizations if available
+      const orgsConfig = this.getOrganizationsConfig();
+      if (orgsConfig) {
+        config.features.organizations = orgsConfig;
+      }
+
+      res.json(config);
+    });
+
+    this.logger.info(`Configuration API registered at ${apiPrefix}/v1/config`);
+  }
+
+  /**
+   * Get configuration for ldapFlat instances
+   */
+  private getFlatResourcesConfig(): FlatResourceConfig[] {
+    const flatPlugin = this.server.loadedPlugins[
+      'ldapFlatGeneric'
+    ] as LdapFlatGeneric;
+    if (!flatPlugin || !flatPlugin.instances) {
+      return [];
+    }
+
+    const resources: FlatResourceConfig[] = [];
+
+    flatPlugin.instances.forEach(instance => {
+      // Load and parse schema
+      let schema: Schema | undefined;
+      if (instance.schema) {
+        schema = instance.schema;
+      }
+
+      const apiPrefix = this.config.api_prefix || '/api';
+      const resourceName = instance.pluralName;
+
+      resources.push({
+        name: instance.name.replace('ldapFlat:', ''),
+        singularName: instance.singularName,
+        pluralName: instance.pluralName,
+        mainAttribute: instance.mainAttribute,
+        objectClass: instance.objectClass,
+        base: instance.base,
+        schema: schema || { strict: false, attributes: {} },
+        endpoints: {
+          list: `${apiPrefix}/v1/ldap/${resourceName}`,
+          get: `${apiPrefix}/v1/ldap/${resourceName}/:id`,
+          create: `${apiPrefix}/v1/ldap/${resourceName}`,
+          update: `${apiPrefix}/v1/ldap/${resourceName}/:id`,
+          delete: `${apiPrefix}/v1/ldap/${resourceName}/:id`,
+        },
+      });
+    });
+
+    return resources;
+  }
+
+  /**
+   * Get configuration for groups plugin
+   */
+  private getGroupsConfig(): GroupsConfig | undefined {
+    const groupsPlugin = this.server.loadedPlugins['ldapGroups'] as LdapGroups;
+    if (!groupsPlugin) {
+      return undefined;
+    }
+
+    const apiPrefix = this.config.api_prefix || '/api';
+    let schema: Schema | undefined;
+
+    // Load group schema if available
+    if (this.config.group_schema) {
+      try {
+        const schemaData = fs.readFileSync(this.config.group_schema, 'utf8');
+        schema = JSON.parse(
+          transformSchemas(schemaData, this.config)
+        ) as Schema;
+      } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.logger.warn(`Failed to load group schema: ${err}`);
+      }
+    }
+
+    return {
+      enabled: true,
+      base: this.config.ldap_group_base || '',
+      mainAttribute: this.config.ldap_groups_main_attribute || 'cn',
+      objectClass: this.config.group_class || ['top', 'groupOfNames'],
+      schema,
+      endpoints: {
+        list: `${apiPrefix}/v1/ldap/groups`,
+        get: `${apiPrefix}/v1/ldap/groups/:id`,
+        create: `${apiPrefix}/v1/ldap/groups`,
+        update: `${apiPrefix}/v1/ldap/groups/:id`,
+        delete: `${apiPrefix}/v1/ldap/groups/:id`,
+        addMember: `${apiPrefix}/v1/ldap/groups/:id/members`,
+        removeMember: `${apiPrefix}/v1/ldap/groups/:id/members/:memberId`,
+      },
+    };
+  }
+
+  /**
+   * Get configuration for organizations plugin
+   */
+  private getOrganizationsConfig(): OrganizationsConfig | undefined {
+    const orgPlugin = this.server.loadedPlugins[
+      'ldapOrganizations'
+    ] as LdapOrganization;
+    if (!orgPlugin) {
+      return undefined;
+    }
+
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    return {
+      enabled: true,
+      topOrganization: this.config.ldap_top_organization || '',
+      organizationClass: this.config.ldap_organization_class || [
+        'top',
+        'organizationalUnit',
+      ],
+      linkAttribute: this.config.ldap_organization_link_attribute || '',
+      pathAttribute: this.config.ldap_organization_path_attribute || '',
+      pathSeparator: this.config.ldap_organization_path_separator || ' / ',
+      maxSubnodes: this.config.ldap_organization_max_subnodes || 50,
+      endpoints: {
+        getTop: `${apiPrefix}/v1/ldap/organizations`,
+        get: `${apiPrefix}/v1/ldap/organizations/:dn`,
+        getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
+        searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
+      },
+    };
+  }
+}

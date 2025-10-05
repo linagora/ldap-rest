@@ -52,6 +52,10 @@
       "import": "./dist/plugins/auth/token.js",
       "types": "./dist/src/plugins/auth/token.d.ts"
     },
+    "plugin-configapi": {
+      "import": "./dist/plugins/configApi.js",
+      "types": "./dist/src/plugins/configApi.d.ts"
+    },
     "plugin-demo-helloworld": {
       "import": "./dist/plugins/demo/helloworld.js",
       "types": "./dist/src/plugins/demo/helloworld.d.ts"
