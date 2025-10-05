@@ -42,8 +42,8 @@ export default async () => {
           compilerOptions: {
             outDir: 'dist',
             declarationDir: 'dist',
+            declaration: true,
           },
-          declaration: true,
           declarationMap: false,
           sourceMap: true,
         }),
@@ -81,7 +81,10 @@ export default async () => {
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
-          declaration: false, // No types for bundles
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
           sourceMap: true,
         }),
         postcss({
