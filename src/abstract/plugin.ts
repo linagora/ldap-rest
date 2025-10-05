@@ -10,7 +10,7 @@ import type { Hooks, MaybePromise } from '../hooks';
 
 export type Role =
   | 'auth'
-  | 'authn'
+  | 'authz'
   | 'protect'
   | 'api'
   | 'logging'

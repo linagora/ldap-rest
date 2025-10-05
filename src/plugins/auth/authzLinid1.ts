@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authnLinid1
+ * @module plugins/auth/authzLinid1
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Authorization plugin based on twakeLocalAdminLink LDAP attribute
@@ -12,15 +12,15 @@ import type { DM } from '../../bin';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
-import AuthnBase from '../../lib/authn/base';
+import AuthzBase from '../../lib/authz/base';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
   timestamp: number;
 }
 
-export default class AuthnLinid1 extends AuthnBase {
-  name = 'authnLinid1';
+export default class AuthzLinid1 extends AuthzBase {
+  name = 'authzLinid1';
   permissionsCache: Map<string, CachedPermissions> = new Map();
 
   constructor(server: DM) {
@@ -30,7 +30,7 @@ export default class AuthnLinid1 extends AuthnBase {
     this.cacheTTL = 5 * 60 * 1000;
 
     this.logger.info(
-      'AuthnLinid1: Authorization based on twakeLocalAdminLink enabled'
+      'AuthzLinid1: Authorization based on twakeLocalAdminLink enabled'
     );
   }
 

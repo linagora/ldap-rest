@@ -148,7 +148,7 @@ Logs include authenticated user:
 
 ```bash
 --plugin core/auth/token \
---plugin core/auth/authnPerBranch \
+--plugin core/auth/authzPerBranch \
 --plugin core/weblogs
 ```
 

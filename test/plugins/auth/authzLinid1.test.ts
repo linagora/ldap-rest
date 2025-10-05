@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { DM } from '../../../src/bin';
-import AuthnLinid1 from '../../../src/plugins/auth/authnLinid1';
+import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import LdapOrganization from '../../../src/plugins/ldap/organization';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
@@ -37,9 +37,9 @@ class TestAuthPlugin extends AuthBase {
   }
 }
 
-describe('AuthnLinid1 Plugin', () => {
+describe('AuthzLinid1 Plugin', () => {
   let dm: DM;
-  let authn: AuthnLinid1;
+  let authz: AuthzLinid1;
 
   const testOrgDn = `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
   const testUserDn = `uid=testadmin,${process.env.DM_LDAP_BASE}`;
@@ -52,7 +52,7 @@ describe('AuthnLinid1 Plugin', () => {
       !process.env.DM_LDAP_TOP_ORGANIZATION
     ) {
       // eslint-disable-next-line no-console
-      console.warn('Skipping AuthnLinid1 tests: Required env vars not set');
+      console.warn('Skipping AuthzLinid1 tests: Required env vars not set');
       (this as Mocha.Context).skip();
     }
   });
@@ -60,8 +60,8 @@ describe('AuthnLinid1 Plugin', () => {
   beforeEach(async () => {
     dm = new DM();
     await dm.ready;
-    authn = new AuthnLinid1(dm);
-    dm.registerPlugin('authnLinid1', authn);
+    authz = new AuthzLinid1(dm);
+    dm.registerPlugin('authzLinid1', authz);
   });
 
   afterEach(async () => {
@@ -89,12 +89,12 @@ describe('AuthnLinid1 Plugin', () => {
       };
       await dm.ldap.add(testUserDn, entry);
 
-      const dn = await authn.getUserDn('testadmin');
+      const dn = await authz.getUserDn('testadmin');
       expect(dn).to.equal(testUserDn);
     });
 
     it('should return null for non-existent user', async () => {
-      const dn = await authn.getUserDn('nonexistent');
+      const dn = await authz.getUserDn('nonexistent');
       expect(dn).to.be.null;
     });
   });
@@ -120,7 +120,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testOrgDn, orgEntry);
 
       // Get permissions
-      const perms = await authn.getUserPermissions(testUserDn, testOrgDn);
+      const perms = await authz.getUserPermissions(testUserDn, testOrgDn);
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -146,7 +146,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testOrgDn, orgEntry);
 
       // Get permissions
-      const perms = await authn.getUserPermissions(testUserDn, testOrgDn);
+      const perms = await authz.getUserPermissions(testUserDn, testOrgDn);
 
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
@@ -174,7 +174,7 @@ describe('AuthnLinid1 Plugin', () => {
 
       // Check permissions for a sub-branch
       const subBranchDn = `ou=SubOrg,${testOrgDn}`;
-      const perms = await authn.getUserPermissions(testUserDn, subBranchDn);
+      const perms = await authz.getUserPermissions(testUserDn, subBranchDn);
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -203,7 +203,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testOrgDn, orgEntry);
 
       // Get authorized branches
-      const branches = await authn.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(testUserDn);
 
       expect(branches).to.be.an('array');
       expect(branches).to.include(testOrgDn);
@@ -220,7 +220,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testUserDn, userEntry);
 
       // Get authorized branches (no org with this user as admin)
-      const branches = await authn.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(testUserDn);
 
       expect(branches).to.be.an('array');
       expect(branches).to.have.lengthOf(0);
@@ -248,15 +248,15 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testOrgDn, orgEntry);
 
       // First call - should fetch from LDAP
-      const perms1 = await authn.getUserPermissions(testUserDn, testOrgDn);
+      const perms1 = await authz.getUserPermissions(testUserDn, testOrgDn);
       expect(perms1.read).to.be.true;
 
       // Second call - should use cache
-      const perms2 = await authn.getUserPermissions(testUserDn, testOrgDn);
+      const perms2 = await authz.getUserPermissions(testUserDn, testOrgDn);
       expect(perms2.read).to.be.true;
 
       // Verify cache was used
-      const cached = authn.permissionsCache.get(testUserDn);
+      const cached = authz.permissionsCache.get(testUserDn);
       expect(cached).to.exist;
       expect(cached?.branches.size).to.be.greaterThan(0);
     });
@@ -316,7 +316,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testUserInOrgDn, userEntry);
 
       // Admin should have permissions to read the users branch
-      const perms = await authn.getUserPermissions(
+      const perms = await authz.getUserPermissions(
         testUserDn,
         `ou=users,${process.env.DM_LDAP_BASE}`
       );
@@ -347,7 +347,7 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testOrgDn, orgEntry);
 
       // Get authorized branches
-      const branches = await authn.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(testUserDn);
 
       // Should include the organization
       expect(branches).to.include(testOrgDn);
@@ -384,7 +384,7 @@ describe('AuthnLinid1 Plugin', () => {
       const req = { user: 'testadmin' } as any;
 
       // First verify that the user has been granted permissions
-      const branches = await authn.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(testUserDn);
       expect(branches).to.include(testOrgDn);
 
       // Call getOrganisationTop - should return the sub-org, not the top org
@@ -437,12 +437,12 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ldap.add(testUser2InOrgDn, user2Entry);
 
       // Get authorized branches - should only include org1, not org2
-      const branches = await authn.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(testUserDn);
       expect(branches).to.include(testOrgDn);
       expect(branches).to.not.include(testOrg2Dn);
 
       // Admin should not have permissions on org2
-      const perms = await authn.getUserPermissions(testUserDn, testOrg2Dn);
+      const perms = await authz.getUserPermissions(testUserDn, testOrg2Dn);
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
       expect(perms.delete).to.be.false;
@@ -465,12 +465,12 @@ describe('AuthnLinid1 Plugin', () => {
       await dm.ready;
 
       // Register plugins
-      authn = new AuthnLinid1(dm);
+      authz = new AuthzLinid1(dm);
       authPlugin = new TestAuthPlugin(dm);
       orgPlugin = new LdapOrganization(dm);
 
       await dm.registerPlugin('testAuth', authPlugin);
-      await dm.registerPlugin('authnLinid1', authn);
+      await dm.registerPlugin('authzLinid1', authz);
       await dm.registerPlugin('ldapOrganizations', orgPlugin);
 
       orgPlugin.api(dm.app);
@@ -756,7 +756,7 @@ describe('AuthnLinid1 Plugin', () => {
 
         // Admin should NOT have direct write permission on ou=users
         const usersBranchDn = `ou=users,${process.env.DM_LDAP_BASE}`;
-        const usersBranchPerms = await authn.getUserPermissions(
+        const usersBranchPerms = await authz.getUserPermissions(
           testUserDn,
           usersBranchDn
         );

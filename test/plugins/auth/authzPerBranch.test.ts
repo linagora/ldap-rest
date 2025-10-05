@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import AuthnPerBranch from '../../../src/plugins/auth/authnPerBranch';
+import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
 import LdapOrganization from '../../../src/plugins/ldap/organization';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
@@ -40,7 +40,7 @@ class TestAuthPlugin extends AuthBase {
 const { DM_LDAP_BASE, DM_LDAP_GROUP_BRANCH } = process.env;
 const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
-describe('AuthnPerBranch', function () {
+describe('AuthzPerBranch', function () {
   // Skip all tests if required env vars are not set
   if (
     !process.env.DM_LDAP_DN ||
@@ -49,7 +49,7 @@ describe('AuthnPerBranch', function () {
     !process.env.DM_LDAP_TOP_ORGANIZATION
   ) {
     console.warn(
-      'Skipping authnPerBranch tests: LDAP credentials are required'
+      'Skipping authzPerBranch tests: LDAP credentials are required'
     );
     // @ts-ignore
     this.skip?.();
@@ -57,7 +57,7 @@ describe('AuthnPerBranch', function () {
   }
 
   let server: DM;
-  let plugin: AuthnPerBranch;
+  let plugin: AuthzPerBranch;
 
   before(async function () {
     this.timeout(5000);
@@ -89,13 +89,13 @@ describe('AuthnPerBranch', function () {
     };
 
     // Set environment variables BEFORE creating DM
-    process.env.DM_AUTHN_PER_BRANCH_CONFIG = JSON.stringify(testConfig);
-    process.env.DM_AUTHN_PER_BRANCH_CACHE_TTL = '60';
+    process.env.DM_AUTHZ_PER_BRANCH_CONFIG = JSON.stringify(testConfig);
+    process.env.DM_AUTHZ_PER_BRANCH_CACHE_TTL = '60';
 
     // Initialize server with config
     server = new DM();
-    plugin = new AuthnPerBranch(server);
-    await server.registerPlugin('authnPerBranch', plugin);
+    plugin = new AuthzPerBranch(server);
+    await server.registerPlugin('authzPerBranch', plugin);
   });
 
   describe('Config loading', () => {
@@ -338,17 +338,17 @@ describe('AuthnPerBranch', function () {
 
       // Setup DM with auth and organization plugins
       process.env.DM_AUTH_TOKENS = adminToken;
-      process.env.DM_AUTHN_PER_BRANCH_CONFIG = JSON.stringify(testConfig);
+      process.env.DM_AUTHZ_PER_BRANCH_CONFIG = JSON.stringify(testConfig);
       apiServer = new DM();
       await apiServer.ready;
 
       // Register plugins
-      const authnPerBranch = new AuthnPerBranch(apiServer);
+      const authzPerBranch = new AuthzPerBranch(apiServer);
       authPlugin = new TestAuthPlugin(apiServer);
       orgPlugin = new LdapOrganization(apiServer);
 
       await apiServer.registerPlugin('testAuth', authPlugin);
-      await apiServer.registerPlugin('authnPerBranch', authnPerBranch);
+      await apiServer.registerPlugin('authzPerBranch', authzPerBranch);
       await apiServer.registerPlugin('ldapOrganizations', orgPlugin);
 
       orgPlugin.api(apiServer.app);

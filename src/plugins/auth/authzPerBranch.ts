@@ -1,5 +1,5 @@
 /**
- * @module plugins/auth/authnPerBranch
+ * @module plugins/auth/authzPerBranch
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Authorization plugin that restricts LDAP access by branch
@@ -13,15 +13,15 @@ import type { DM } from '../../bin';
 import type { DmRequest } from '../../lib/auth/base';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
-import AuthnBase from '../../lib/authn/base';
+import AuthzBase from '../../lib/authz/base';
 
 interface CachedGroups {
   groups: string[];
   timestamp: number;
 }
 
-export default class AuthnPerBranch extends AuthnBase {
-  name = 'authnPerBranch';
+export default class AuthzPerBranch extends AuthzBase {
+  name = 'authzPerBranch';
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
 
@@ -29,10 +29,10 @@ export default class AuthnPerBranch extends AuthnBase {
     super(server);
 
     // Cache TTL in milliseconds (default: 1 minute, configurable)
-    this.cacheTTL = (this.config.authn_per_branch_cache_ttl || 60) * 1000;
+    this.cacheTTL = (this.config.authz_per_branch_cache_ttl || 60) * 1000;
 
     // Load authorization config from config object
-    this.authConfig = this.config.authn_per_branch_config;
+    this.authConfig = this.config.authz_per_branch_config;
     if (this.authConfig) {
       this.logger.info('Authorization config loaded');
     }

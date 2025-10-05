@@ -361,7 +361,7 @@ export default class LdapOrganizations extends DmPlugin {
     if ((top as SearchResult).searchEntries.length !== 1)
       throw new Error('Top organization not found');
 
-    // Call hook to allow plugins (like authnPerBranch) to modify the result
+    // Call hook to allow plugins (like authzPerBranch) to modify the result
     const [, result] = await launchHooksChained(
       this.registeredHooks.getOrganisationTop,
       [req, (top as SearchResult).searchEntries[0]]

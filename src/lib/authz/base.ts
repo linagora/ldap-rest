@@ -1,5 +1,5 @@
 /**
- * @module lib/authn/base
+ * @module lib/authz/base
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Base class for authorization plugins
@@ -13,8 +13,8 @@ import type { BranchPermissions } from '../../config/args';
  * Abstract base class for authorization plugins
  * Provides common utility methods and interface for LDAP-based authorization
  */
-export default abstract class AuthnBase extends DmPlugin {
-  roles: Role[] = ['authn'] as const;
+export default abstract class AuthzBase extends DmPlugin {
+  roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
 
   /**
