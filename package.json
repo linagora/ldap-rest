@@ -28,6 +28,10 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
+    "plugin-auth-authnlinid1": {
+      "import": "./dist/plugins/auth/authnLinid1.js",
+      "types": "./dist/src/plugins/auth/authnLinid1.d.ts"
+    },
     "plugin-auth-authnperbranch": {
       "import": "./dist/plugins/auth/authnPerBranch.js",
       "types": "./dist/src/plugins/auth/authnPerBranch.d.ts"

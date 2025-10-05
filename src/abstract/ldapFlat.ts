@@ -221,7 +221,7 @@ export default abstract class LdapFlat extends DmPlugin {
     delete additional[this.mainAttribute];
 
     try {
-      await this.addEntry(id, additional);
+      await this.addEntry(id, additional, req);
       const entry = await this.searchEntriesByName(id, false);
       return created(res, entry[id]);
     } catch (err) {
@@ -244,7 +244,8 @@ export default abstract class LdapFlat extends DmPlugin {
 
   async addEntry(
     id: string,
-    additional: AttributesList = {}
+    additional: AttributesList = {},
+    req?: Request
   ): Promise<boolean> {
     let dn: string;
     if (new RegExp(`^${this.mainAttribute}=`).test(id)) {
@@ -272,7 +273,7 @@ export default abstract class LdapFlat extends DmPlugin {
     );
     let res;
     try {
-      res = await this.ldap.add(dn, entry);
+      res = await this.ldap.add(dn, entry, req);
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
