@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 import type { SearchResult } from 'ldapts';
 import type { Express, Request, Response } from 'express';
 
@@ -16,13 +18,15 @@ import {
   wantJson,
   badRequest,
 } from '../../lib/expressFormatedResponses';
-import { launchHooksChained } from '../../lib/utils';
+import { launchHooksChained, transformSchemas } from '../../lib/utils';
+import type { Schema } from '../../config/schema';
 
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
   roles: Role[] = ['api', 'consistency'] as const;
   pathAttr: string;
   linkAttr: string;
+  schema?: Schema;
 
   constructor(dm: DM) {
     super(dm);
@@ -32,6 +36,30 @@ export default class LdapOrganizations extends DmPlugin {
 
     this.pathAttr = this.config.ldap_organization_path_attribute as string;
     this.linkAttr = this.config.ldap_organization_link_attribute as string;
+
+    // Load organization schema if provided
+    if (this.config.organization_schema) {
+      fs.readFile(this.config.organization_schema, (err, data) => {
+        if (err) {
+          this.logger.error(
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
+            `Failed to load organization schema from ${this.config.organization_schema}: ${err}`
+          );
+        } else {
+          try {
+            this.schema = JSON.parse(
+              transformSchemas(data.toString(), this.config)
+            ) as Schema;
+            this.logger.debug('Organization schema loaded');
+          } catch (e) {
+            this.logger.error(
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+              `Failed to parse organization schema: ${e}`
+            );
+          }
+        }
+      });
+    }
   }
 
   /**
@@ -469,6 +497,8 @@ export default class LdapOrganizations extends DmPlugin {
     entry: AttributesList,
     req?: Request
   ): Promise<boolean> {
+    // Validate with schema if available
+    this.validateNewOrganization(dn, entry);
     // Hooks will validate the organization link and path
     return await this.server.ldap.add(dn, entry, req);
   }
@@ -477,8 +507,93 @@ export default class LdapOrganizations extends DmPlugin {
     dn: string,
     changes: ModifyRequest
   ): Promise<boolean> {
+    // Validate with schema if available
+    this.validateChanges(dn, changes);
     // Hooks will validate any changes to organization link and path
     return await this.server.ldap.modify(dn, changes);
+  }
+
+  validateNewOrganization(dn: string, entry: AttributesList): boolean {
+    if (!this.schema) return true;
+
+    // Check each field
+    for (const [field, value] of Object.entries(entry)) {
+      if (!this._validateOneChange(field, value)) {
+        throw new Error(`Invalid value for field ${field}`);
+      }
+    }
+
+    // Check required fields
+    for (const [field, test] of Object.entries(this.schema.attributes)) {
+      if (test.required && entry[field] == undefined)
+        throw new Error(`Missing required field ${field}`);
+    }
+    return true;
+  }
+
+  validateChanges(dn: string, changes: ModifyRequest): boolean {
+    if (!this.schema) return true;
+
+    if (changes.add) {
+      for (const [field, value] of Object.entries(changes.add)) {
+        if (!this._validateOneChange(field, value)) {
+          throw new Error(`Invalid value for field ${field}`);
+        }
+      }
+    }
+
+    if (changes.replace) {
+      for (const [field, value] of Object.entries(changes.replace)) {
+        if (!this._validateOneChange(field, value)) {
+          throw new Error(`Invalid value for field ${field}`);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+    if (!this.schema) return true;
+    const fieldTest = this.schema.attributes[field];
+    if (!fieldTest) {
+      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      return true;
+    }
+    if (value === null || value === undefined) {
+      if (fieldTest.required) throw new Error(`Field ${field} is required`);
+      return true;
+    }
+
+    // Type validation
+    if (fieldTest.type) {
+      switch (fieldTest.type) {
+        case 'string':
+          if (Array.isArray(value))
+            throw new Error(`Field ${field} must be a single value`);
+          break;
+        case 'array':
+          if (!Array.isArray(value))
+            throw new Error(`Field ${field} must be an array`);
+          break;
+        case 'pointer':
+          // Pointer validation is handled by other hooks
+          break;
+      }
+    }
+
+    // Test/pattern validation
+    if (fieldTest.test) {
+      const valueStr = Array.isArray(value) ? value[0] : value;
+      const regex =
+        typeof fieldTest.test === 'string'
+          ? new RegExp(fieldTest.test)
+          : fieldTest.test;
+      if (!regex.test(String(valueStr)))
+        throw new Error(`Field ${field} does not match required pattern`);
+    }
+
+    return true;
   }
 
   async deleteOrganization(dn: string): Promise<boolean> {

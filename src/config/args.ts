@@ -68,6 +68,7 @@ export interface Config {
   ldap_organization_path_attribute?: string;
   ldap_organization_path_separator?: string;
   ldap_organization_max_subnodes?: number;
+  organization_schema?: string;
 
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
