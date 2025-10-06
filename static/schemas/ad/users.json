@@ -18,7 +18,8 @@
     "sAMAccountName": {
       "type": "string",
       "test": "^[a-zA-Z0-9._-]{1,20}$",
-      "required": true
+      "required": true,
+      "role": "identifier"
     },
     "userPrincipalName": {
       "type": "string",
@@ -40,7 +41,22 @@
     "mail": {
       "type": "string",
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "required": false
+      "required": false,
+      "role": "primaryEmail"
+    },
+    "proxyAddresses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^(smtp|SMTP):[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      },
+      "required": false,
+      "role": "emailAliases"
+    },
+    "mailQuota": {
+      "type": "number",
+      "required": false,
+      "role": "emailQuota"
     },
     "telephoneNumber": {
       "type": "string",

@@ -38,6 +38,7 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--james-webadmin-token`: Bearer token for James WebAdmin authentication (optional)
 - `--mail-attribute`: LDAP attribute for email (default: `mail`)
 - `--quota-attribute`: LDAP attribute for quota (default: `mailQuota`)
+- `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
 
 ## How It Works
 
@@ -144,6 +145,103 @@ When a user's quota changes:
    5000000000
    ```
 
+### Email Aliases Management
+
+The plugin automatically manages email aliases stored in LDAP and syncs them to James.
+
+#### Creating a User with Aliases
+
+When a user is created with aliases:
+
+1. **LDAP add operation**
+
+   ```bash
+   POST /api/v1/ldap/users
+   {
+     "uid": "jdoe",
+     "mail": "john.doe@company.com",
+     "mailAlternateAddress": [
+       "john@company.com",
+       "j.doe@company.com"
+     ]
+   }
+   ```
+
+2. **James plugin** creates all aliases in James:
+
+   ```http
+   PUT /address/aliases/john.doe@company.com/sources/john@company.com
+   PUT /address/aliases/john.doe@company.com/sources/j.doe@company.com
+   ```
+
+Emails sent to any alias address will be delivered to `john.doe@company.com`.
+
+#### Modifying Aliases
+
+When aliases are added or removed:
+
+1. **LDAP modify operation**
+
+   ```bash
+   PUT /api/v1/ldap/users/jdoe
+   {
+     "replace": {
+       "mailAlternateAddress": [
+         "john@company.com",
+         "jdoe@company.com"
+       ]
+     }
+   }
+   ```
+
+2. **onChange plugin** detects alias changes and triggers `onLdapAliasChange` hook
+
+3. **James plugin** performs diff and updates only changed aliases:
+
+   ```http
+   DELETE /address/aliases/john.doe@company.com/sources/j.doe@company.com
+   PUT /address/aliases/john.doe@company.com/sources/jdoe@company.com
+   ```
+
+#### Aliases and Mail Changes
+
+When the primary email address changes, all aliases are automatically updated:
+
+1. **LDAP modify operation**
+
+   ```bash
+   PUT /api/v1/ldap/users/jdoe
+   {
+     "replace": {
+       "mail": "john.smith@company.com"
+     }
+   }
+   ```
+
+2. **James plugin** renames the account and updates alias destinations:
+
+   ```http
+   POST /users/john.doe@company.com/rename/john.smith@company.com?action=rename
+   DELETE /address/aliases/john.doe@company.com/sources/john@company.com
+   PUT /address/aliases/john.smith@company.com/sources/john@company.com
+   DELETE /address/aliases/john.doe@company.com/sources/jdoe@company.com
+   PUT /address/aliases/john.smith@company.com/sources/jdoe@company.com
+   ```
+
+   **Note:** James automatically creates an alias from the old address when renaming a user. The plugin attempts to create this alias explicitly, but handles the 409 Conflict response gracefully if it already exists.
+
+#### Active Directory Format Support
+
+The plugin supports Active Directory's `proxyAddresses` format:
+
+```ldap
+proxyAddresses: smtp:john@company.com
+proxyAddresses: smtp:j.doe@company.com
+proxyAddresses: SMTP:john.doe@company.com
+```
+
+The `smtp:` prefix is automatically stripped. The capitalization (SMTP vs smtp) is ignored - only the email address after the colon is used.
+
 ## James WebAdmin API
 
 ### Endpoints Used
@@ -152,6 +250,10 @@ When a user's quota changes:
 | ------------------- | ----------------------------------------- | ------ |
 | Rename account      | `/users/{old}/rename/{new}?action=rename` | POST   |
 | Update quota        | `/quota/users/{mail}/size`                | PUT    |
+| Add delegation      | `/users/{mail}/authorizedUsers/{delegate}`| PUT    |
+| Remove delegation   | `/users/{mail}/authorizedUsers/{delegate}`| DELETE |
+| Add alias           | `/address/aliases/{mail}/sources/{alias}` | PUT    |
+| Remove alias        | `/address/aliases/{mail}/sources/{alias}` | DELETE |
 | Add group member    | `/address/groups/{group}/{member}`        | PUT    |
 | Remove group member | `/address/groups/{group}/{member}`        | DELETE |
 | Delete group        | `/address/groups/{group}`                 | DELETE |

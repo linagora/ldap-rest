@@ -23,6 +23,7 @@ const events: {
 } = {
   mail_attribute: 'onLdapMailChange',
   quota_attribute: 'onLdapQuotaChange',
+  alias_attribute: 'onLdapAliasChange',
 };
 
 class OnLdapChange extends DmPlugin {
@@ -89,12 +90,21 @@ class OnLdapChange extends DmPlugin {
         this.config[configParam] &&
         changes[this.config[configParam] as string]
       ) {
-        this.notifyAttributeChange(
-          this.config[configParam] as string,
-          hookName,
-          dn,
-          changes
-        );
+        // Special handling for alias changes - needs mail parameter
+        if (hookName === 'onLdapAliasChange') {
+          void this.notifyAliasChange(
+            this.config[configParam] as string,
+            dn,
+            changes
+          );
+        } else {
+          this.notifyAttributeChange(
+            this.config[configParam] as string,
+            hookName,
+            dn,
+            changes
+          );
+        }
       }
     }
   }
@@ -116,6 +126,71 @@ class OnLdapChange extends DmPlugin {
     }
     if (oldValue !== newValue) {
       void launchHooks(this.server.hooks[hookName], dn, oldValue, newValue);
+    }
+  }
+
+  async notifyAliasChange(
+    attribute: string,
+    dn: string,
+    changes: ChangesToNotify
+  ): Promise<void> {
+    const [oldValue, newValue] = changes[attribute] || [];
+    if (oldValue === undefined && newValue === undefined) return;
+
+    // Get current mail address (needed for James alias API)
+    const mailAttr = this.config.mail_attribute || 'mail';
+    const mailChange = changes[mailAttr];
+
+    let mail: string;
+    if (mailChange) {
+      // Mail is changing, use new mail
+      mail = Array.isArray(mailChange[1])
+        ? String(mailChange[1][0])
+        : String(mailChange[1]);
+    } else {
+      // Mail not changing, fetch from LDAP
+      try {
+        const result = (await this.server.ldap.search(
+          { paged: false, scope: 'base', attributes: [mailAttr] },
+          dn
+        )) as SearchResult;
+        if (result.searchEntries.length === 1) {
+          const mailValue = result.searchEntries[0][mailAttr];
+          mail = Array.isArray(mailValue)
+            ? String(mailValue[0])
+            : String(mailValue);
+        } else {
+          this.logger.warn(
+            `Could not find mail for ${dn}, skipping alias notification`
+          );
+          return;
+        }
+      } catch (err) {
+        this.logger.error(`Error fetching mail for ${dn}:`, err);
+        return;
+      }
+    }
+
+    // Normalize old and new aliases to arrays
+    const oldAliases = oldValue
+      ? Array.isArray(oldValue)
+        ? (oldValue as string[])
+        : [oldValue as string]
+      : [];
+    const newAliases = newValue
+      ? Array.isArray(newValue)
+        ? (newValue as string[])
+        : [newValue as string]
+      : [];
+
+    if (oldAliases.length > 0 || newAliases.length > 0) {
+      void launchHooks(
+        this.server.hooks.onLdapAliasChange,
+        dn,
+        mail,
+        oldAliases,
+        newAliases
+      );
     }
   }
 }
