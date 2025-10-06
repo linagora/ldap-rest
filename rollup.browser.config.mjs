@@ -49,7 +49,7 @@ export default async () => {
         }),
       ],
     },
-    // UMD/ESM bundles for direct browser use
+    // UMD/ESM bundles for ldap-tree-viewer
     {
       input: 'src/browser/ldap-tree-viewer/index.ts',
       output: [
@@ -89,6 +89,51 @@ export default async () => {
         }),
         postcss({
           extract: 'ldap-tree-viewer.css',
+          minimize: true,
+          sourceMap: true,
+        }),
+      ],
+    },
+    // UMD/ESM bundles for ldap-user-editor
+    {
+      input: 'src/browser/ldap-user-editor/index.ts',
+      output: [
+        {
+          file: 'static/browser/ldap-user-editor.js',
+          format: 'umd',
+          name: 'LdapUserEditor',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/ldap-user-editor.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/ldap-user-editor.min.js',
+          format: 'umd',
+          name: 'LdapUserEditor',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
+          sourceMap: true,
+        }),
+        postcss({
+          extract: 'ldap-user-editor.css',
           minimize: true,
           sourceMap: true,
         }),

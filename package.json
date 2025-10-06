@@ -136,6 +136,34 @@
       "import": "./static/browser/ldap-tree-viewer/types.js",
       "types": "./dist/src/browser/ldap-tree-viewer/types.d.ts"
     },
+    "browser-ldap-user-editor-ldapusereditor": {
+      "import": "./static/browser/ldap-user-editor/LdapUserEditor.js",
+      "types": "./dist/src/browser/ldap-user-editor/LdapUserEditor.d.ts"
+    },
+    "browser-ldap-user-editor-api-userapiclient": {
+      "import": "./static/browser/ldap-user-editor/api/UserApiClient.js",
+      "types": "./dist/src/browser/ldap-user-editor/api/UserApiClient.d.ts"
+    },
+    "browser-ldap-user-editor-components-pointerfield": {
+      "import": "./static/browser/ldap-user-editor/components/PointerField.js",
+      "types": "./dist/src/browser/ldap-user-editor/components/PointerField.d.ts"
+    },
+    "browser-ldap-user-editor-components-usereditor": {
+      "import": "./static/browser/ldap-user-editor/components/UserEditor.js",
+      "types": "./dist/src/browser/ldap-user-editor/components/UserEditor.d.ts"
+    },
+    "browser-ldap-user-editor-components-usertree": {
+      "import": "./static/browser/ldap-user-editor/components/UserTree.js",
+      "types": "./dist/src/browser/ldap-user-editor/components/UserTree.d.ts"
+    },
+    "browser-ldap-user-editor-index": {
+      "import": "./static/browser/ldap-user-editor/index.js",
+      "types": "./dist/src/browser/ldap-user-editor/index.d.ts"
+    },
+    "browser-ldap-user-editor-types": {
+      "import": "./static/browser/ldap-user-editor/types.js",
+      "types": "./dist/src/browser/ldap-user-editor/types.d.ts"
+    },
     "schema-ad-groups": {
       "import": "./static/schemas/ad/groups.json",
       "require": "./static/schemas/ad/groups.json"

@@ -1,4 +1,12 @@
 {
+  "entity": {
+    "name": "twakeGroup",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
+    "singularName": "group",
+    "pluralName": "groups",
+    "base": "ou=groups,__ldap_base__"
+  },
   "strict": true,
   "attributes": {
     "objectClass": {

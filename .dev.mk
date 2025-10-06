@@ -8,8 +8,7 @@ DSTFILES:=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))
 PLUGINFILES:=$(shell find dist/plugins -name '*.js' | grep -v auth/ | grep -v json.js)
 ALLPLUGINS:=$(subst dist/plugins/,--plugin core/,$(subst .js,,$(PLUGINFILES)))
 
-zz:
-	echo $(PLUGINFILES)
+LDAPFLATSCHEMAS := $(shell find static/schemas/twake -name '*.json'|grep -v organization|grep -v groups|sed -e 's/^/--ldap-flat-schema /')
 
 all: $(DSTFILES)
 
@@ -38,7 +37,7 @@ doc: $(SRCFILES)
 	typedoc --entryPoints src/bin/index.ts $(shell find src -name '*.ts' | grep -v bin/index) --out docs
 
 start: $(DSTFILES)
-	node bin/index.mjs --log-level debug $(ALLPLUGINS)
+	node bin/index.mjs --log-level debug $(ALLPLUGINS) $(LDAPFLATSCHEMAS)
 
 test: $(DSTFILES)
 	npm run test

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP User Editor Demo</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Library CSS -->
+    <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .demo-container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .demo-header {
+        background: white;
+        color: #333;
+        padding: 32px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .demo-header h1 {
+        font-size: 32px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #6200ee;
+      }
+
+      .demo-header p {
+        font-size: 16px;
+        color: #666;
+      }
+
+      #ldap-user-editor {
+        /* The editor library will add its own styling */
+      }
+
+      .status-message {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-message.error {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      .status-message.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>✏️ LDAP User Editor</h1>
+        <p>Browse and edit LDAP users with schema-driven forms</p>
+      </div>
+
+      <div id="status-container"></div>
+
+      <div id="ldap-user-editor"></div>
+    </div>
+
+    <!-- Library JS -->
+    <script src="/static/browser/ldap-user-editor.js"></script>
+
+    <script>
+      const { LdapUserEditor } = window.LdapUserEditor;
+
+      let editor;
+
+      function showStatus(message, type = 'error') {
+        const container = document.getElementById('status-container');
+        container.innerHTML = `
+        <div class="status-message ${type}">
+          <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
+          <span>${message}</span>
+        </div>
+      `;
+        setTimeout(() => {
+          container.innerHTML = '';
+        }, 5000);
+      }
+
+      async function initEditor() {
+        try {
+          editor = new LdapUserEditor({
+            containerId: 'ldap-user-editor',
+            apiBaseUrl: window.location.origin,
+            onUserSaved: userDn => {
+              console.log('User saved:', userDn);
+              showStatus('User saved successfully!', 'success');
+            },
+            onError: error => {
+              console.error('Editor error:', error);
+              showStatus(`Error: ${error.message}`, 'error');
+            },
+          });
+
+          await editor.init();
+          showStatus('LDAP User Editor loaded successfully!', 'success');
+        } catch (error) {
+          console.error('Failed to initialize editor:', error);
+          showStatus(`Error: ${error.message}`, 'error');
+        }
+      }
+
+      // Initialize on load
+      initEditor();
+    </script>
+  </body>
+</html>
