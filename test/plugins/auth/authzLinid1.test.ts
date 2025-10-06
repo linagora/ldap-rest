@@ -6,6 +6,7 @@ import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
 import supertest from 'supertest';
+import { skipIfMissingEnvVars } from '../../helpers/env';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {
@@ -45,16 +46,11 @@ describe('AuthzLinid1 Plugin', () => {
   const testUserDn = `uid=testadmin,${process.env.DM_LDAP_BASE}`;
 
   before(function () {
-    // Skip tests if env vars are not set
-    if (
-      !process.env.DM_LDAP_DN ||
-      !process.env.DM_LDAP_PWD ||
-      !process.env.DM_LDAP_TOP_ORGANIZATION
-    ) {
-      // eslint-disable-next-line no-console
-      console.warn('Skipping AuthzLinid1 tests: Required env vars not set');
-      (this as Mocha.Context).skip();
-    }
+    skipIfMissingEnvVars(this, [
+      'DM_LDAP_DN',
+      'DM_LDAP_PWD',
+      'DM_LDAP_TOP_ORGANIZATION',
+    ]);
   });
 
   beforeEach(async () => {

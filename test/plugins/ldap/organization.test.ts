@@ -3,6 +3,10 @@ import LdapOrganizations from '../../../src/plugins/ldap/organization';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import {
+  skipIfMissingEnvVars,
+  LDAP_ENV_VARS_WITH_ORG,
+} from '../../helpers/env';
 
 const {
   DM_LDAP_TOP_ORGANIZATION,
@@ -11,20 +15,9 @@ const {
 } = process.env;
 
 describe('LDAP Organizations Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_TOP_ORGANIZATION
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldap/organization tests: DM_LDAP_DN, DM_LDAP_PWD, and DM_LDAP_TOP_ORGANIZATION env vars are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
+  });
 
   let server: DM;
   let plugin: LdapOrganizations;

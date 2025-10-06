@@ -2,18 +2,12 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('LdapFlatGeneric plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (!process.env.DM_LDAP_DN || !process.env.DM_LDAP_PWD) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapFlatGeneric tests: LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
 
   let server: DM;
   let plugin: LdapFlatGeneric;

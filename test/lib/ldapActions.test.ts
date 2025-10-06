@@ -4,18 +4,13 @@ import { Client, SearchResult } from 'ldapts';
 import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 let ldapActions: LdapActions;
 
 describe('ldapActions', function () {
   before(function () {
-    // Skip tests if env vars are not set
-    if (!process.env.DM_LDAP_DN || !process.env.DM_LDAP_PWD) {
-      // eslint-disable-next-line no-console
-      console.warn('Skipping LDAP tests: DM_LDAP_DN or DM_LDAP_PWD not set');
-      // @ts-ignore
-      this.skip();
-    }
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
   });
 
   beforeEach(() => {

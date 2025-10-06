@@ -6,6 +6,10 @@ import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
 import supertest from 'supertest';
+import {
+  skipIfMissingEnvVars,
+  LDAP_ENV_VARS_WITH_ORG,
+} from '../../helpers/env';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {
@@ -41,20 +45,9 @@ const { DM_LDAP_BASE, DM_LDAP_GROUP_BRANCH } = process.env;
 const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('AuthzPerBranch', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE ||
-    !process.env.DM_LDAP_TOP_ORGANIZATION
-  ) {
-    console.warn(
-      'Skipping authzPerBranch tests: LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
+  });
 
   let server: DM;
   let plugin: AuthzPerBranch;

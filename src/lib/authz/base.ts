@@ -8,6 +8,7 @@
  */
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { BranchPermissions } from '../../config/args';
+import { getParentDn } from '../utils';
 
 /**
  * Abstract base class for authorization plugins
@@ -21,14 +22,11 @@ export default abstract class AuthzBase extends DmPlugin {
    * Extract the branch DN to check permissions against
    * For a DN like "uid=user,ou=users,ou=org,dc=example,dc=com"
    * we need to check permissions on the parent branch
+   *
+   * Handles escaped commas in DN values (e.g., "cn=Smith\, John")
    */
   extractBranchDn(dn: string): string {
-    // Remove the first RDN component to get the parent branch
-    const parts = dn.split(',');
-    if (parts.length <= 1) {
-      return dn;
-    }
-    return parts.slice(1).join(',');
+    return getParentDn(dn);
   }
 
   /**
