@@ -112,14 +112,24 @@ describe('Calendar Resources Plugin', function () {
   });
 
   it('should update resource in Calendar when modified in LDAP', async () => {
+    // Mock both create and update API calls
+    const createScope = nock(
+      process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+    )
+      .post('/resources')
+      .reply(201);
+
     // First create the resource
     await resourceInstance.addEntry('Conference Room A', {
       description: 'Large meeting room',
     });
 
+    // Wait for create hook to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Track update API call
     let calendarApiCalled = false;
-    const apiScope = nock(
+    const updateScope = nock(
       process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
     )
       .patch('/resources/Conference%20Room%20A', body => {
@@ -140,19 +150,30 @@ describe('Calendar Resources Plugin', function () {
 
     expect(calendarApiCalled).to.be.true;
 
-    apiScope.persist(false);
+    createScope.persist(false);
+    updateScope.persist(false);
     nock.cleanAll();
   });
 
   it('should delete resource from Calendar when deleted from LDAP', async () => {
+    // Mock create API call
+    const createScope = nock(
+      process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+    )
+      .post('/resources')
+      .reply(201);
+
     // First create the resource
     await resourceInstance.addEntry('Conference Room A', {
       description: 'Large meeting room',
     });
 
+    // Wait for create hook to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Track delete API call
     let calendarApiCalled = false;
-    const apiScope = nock(
+    const deleteScope = nock(
       process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
     )
       .delete('/resources/Conference%20Room%20A')
@@ -170,7 +191,8 @@ describe('Calendar Resources Plugin', function () {
 
     expect(calendarApiCalled).to.be.true;
 
-    apiScope.persist(false);
+    createScope.persist(false);
+    deleteScope.persist(false);
     nock.cleanAll();
   });
 });
