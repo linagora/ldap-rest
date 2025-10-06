@@ -115,6 +115,7 @@ export interface Config {
   delegation_attribute?: string;
   alias_attribute?: string;
   forward_attribute?: string;
+  display_name_attribute?: string;
 
   // James plugin
   james_webadmin_url?: string;
@@ -190,6 +191,7 @@ const configArgs: ConfigTemplate = [
   ['--delegation-attribute', 'DM_DELEGATION_ATTRIBUTE', 'twakeDelegatedUsers'],
   ['--alias-attribute', 'DM_ALIAS_ATTRIBUTE', 'mailAlternateAddress'],
   ['--forward-attribute', 'DM_FORWARD_ATTRIBUTE', 'mailForwardingAddress'],
+  ['--display-name-attribute', 'DM_DISPLAY_NAME_ATTRIBUTE', 'displayName'],
 
   // Default classes to insert into LDAP
   [

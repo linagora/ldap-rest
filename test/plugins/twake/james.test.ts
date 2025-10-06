@@ -51,7 +51,18 @@ describe('James Plugin', () => {
       .put('/address/aliases/newprimary@test.org/sources/alias1@test.org')
       .reply(204)
       .put('/address/aliases/newprimary@test.org/sources/alias2@test.org')
-      .reply(204);
+      .reply(204)
+      // Identity
+      .get('/jmap/identities/testmail@test.org')
+      .reply(200, [
+        {
+          id: 'testmail-identity-id',
+          name: 'Test User',
+          email: 'testmail@test.org',
+        },
+      ])
+      .put('/jmap/identities/testmail@test.org/testmail-identity-id')
+      .reply(200, { success: true });
     nock.disableNetConnect();
   });
 
@@ -496,6 +507,138 @@ describe('James Plugin', () => {
 
       expect(multiAddScope1.isDone()).to.be.true;
       expect(multiAddScope2.isDone()).to.be.true;
+    });
+  });
+
+  describe('Identity synchronization', () => {
+    const timestamp = Date.now();
+    const testUser1 = `testidentity${timestamp}`;
+    const testUser2 = `newuser${timestamp}`;
+    const testDN2 = `uid=${testUser1},${process.env.DM_LDAP_BASE}`;
+    const testDN3 = `uid=${testUser2},${process.env.DM_LDAP_BASE}`;
+    const testMail1 = `${testUser1}@test.org`;
+    const testMail2 = `${testUser2}@test.org`;
+    let identityScope: nock.Scope;
+
+    before(function () {
+      // Mock JMAP identity endpoints
+      identityScope = nock(
+        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+      )
+        .persist()
+        .get(`/jmap/identities/${testMail1}`)
+        .reply(200, [
+          {
+            id: 'identity-id-1',
+            name: 'Old Name',
+            email: testMail1,
+          },
+        ])
+        .put(`/jmap/identities/${testMail1}/identity-id-1`)
+        .reply(200, { success: true })
+        .get(`/jmap/identities/${testMail2}`)
+        .reply(200, [
+          {
+            id: 'newuser-identity-id',
+            name: '',
+            email: testMail2,
+          },
+        ])
+        .put(`/jmap/identities/${testMail2}/newuser-identity-id`)
+        .reply(200, { success: true });
+    });
+
+    afterEach(async () => {
+      // Clean up: delete the test entries if they exist
+      try {
+        await dm.ldap.delete(testDN2);
+      } catch (err) {
+        // Ignore errors if the entry does not exist
+      }
+      try {
+        await dm.ldap.delete(testDN3);
+      } catch (err) {
+        // Ignore errors if the entry does not exist
+      }
+    });
+
+    it('should update James identity when displayName changes', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Identity Test',
+        sn: 'Test',
+        uid: testUser1,
+        mail: testMail1,
+        displayName: 'Old Name',
+      };
+      let res = await dm.ldap.add(testDN2, entry);
+      expect(res).to.be.true;
+
+      // Modify displayName
+      res = await dm.ldap.modify(testDN2, {
+        replace: { displayName: 'New Display Name' },
+      });
+      expect(res).to.be.true;
+    });
+
+    it('should update James identity when cn changes', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Old CN',
+        sn: 'Test',
+        uid: testUser1,
+        mail: testMail1,
+      };
+      let res = await dm.ldap.add(testDN2, entry);
+      expect(res).to.be.true;
+
+      // Modify cn
+      res = await dm.ldap.modify(testDN2, {
+        replace: { cn: 'New CN' },
+      });
+      expect(res).to.be.true;
+    });
+
+    it('should use cn as fallback when displayName is not present', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'John Doe',
+        sn: 'Doe',
+        uid: testUser1,
+        mail: testMail1,
+      };
+      let res = await dm.ldap.add(testDN2, entry);
+      expect(res).to.be.true;
+
+      // Test getDisplayNameFromDN method directly before modify
+      let displayName = await james.getDisplayNameFromDN(testDN2);
+      expect(displayName).to.equal('John Doe');
+
+      // Modify cn - this should trigger identity update using cn
+      res = await dm.ldap.modify(testDN2, {
+        replace: { cn: 'Jane Doe' },
+      });
+      expect(res).to.be.true;
+
+      // Test getDisplayNameFromDN method again after modify
+      displayName = await james.getDisplayNameFromDN(testDN2);
+      expect(displayName).to.equal('Jane Doe');
+    });
+
+    it('should initialize James identity when user is created', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'New User',
+        sn: 'User',
+        uid: testUser2,
+        mail: testMail2,
+        displayName: 'New User Display',
+      };
+      let res = await dm.ldap.add(testDN3, entry);
+      expect(res).to.be.true;
+
+      // Wait for the ldapadddone hook to execute (with 1s delay in hook)
+      await new Promise(resolve => setTimeout(resolve, 1200));
     });
   });
 });

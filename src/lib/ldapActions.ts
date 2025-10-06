@@ -169,7 +169,8 @@ class ldapActions {
     ])) as [string, typeof entry, Request?];
     try {
       await client.add(dn, sanitizedEntry);
-      void launchHooks(this.parent.hooks.ldapadddone, dn, entry);
+      void client.unbind();
+      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -250,6 +251,7 @@ class ldapActions {
       const client = await this.connect();
       try {
         await client.modify(dn, ldapChanges);
+        void client.unbind();
         void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
         return true;
       } catch (error) {
@@ -276,6 +278,7 @@ class ldapActions {
     const client = await this.connect();
     try {
       await client.modifyDN(dn, newRdn);
+      void client.unbind();
       void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
       return true;
     } catch (error) {
@@ -302,6 +305,7 @@ class ldapActions {
     for (const entry of dn) {
       try {
         await client.del(entry);
+        void client.unbind();
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         throw new Error(`LDAP delete error: ${error}`);

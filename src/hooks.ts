@@ -98,6 +98,11 @@ export interface Hooks {
     oldForwards: string[],
     newForwards: string[]
   ) => MaybePromise<void>;
+  onLdapDisplayNameChange?: (
+    dn: string,
+    oldDisplayName: string | null,
+    newDisplayName: string | null
+  ) => MaybePromise<void>;
 
   /** externalUsersInGroup */
   externaluserentry?: ChainedHook<[string, AttributesList]>;
