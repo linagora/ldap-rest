@@ -41,6 +41,58 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 
 ## How It Works
 
+### Mailing Lists
+
+When a group with a `mail` attribute is created or modified:
+
+1. **Create mailing list**
+
+   ```bash
+   POST /api/v1/ldap/groups
+   {
+     "cn": "engineering",
+     "mail": "engineering@company.com",
+     "member": [
+       "uid=alice,ou=users,dc=example,dc=com",
+       "uid=bob,ou=users,dc=example,dc=com"
+     ]
+   }
+   ```
+
+2. **James plugin** creates address group and adds all members:
+
+   ```http
+   PUT /address/groups/engineering@company.com/alice@company.com
+   PUT /address/groups/engineering@company.com/bob@company.com
+   ```
+
+3. **Add/remove members** - when group members change:
+
+   ```bash
+   POST /api/v1/ldap/groups/engineering/members
+   {"member": "uid=charlie,ou=users,dc=example,dc=com"}
+   ```
+
+   James plugin automatically syncs:
+
+   ```http
+   PUT /address/groups/engineering@company.com/charlie@company.com
+   ```
+
+4. **Delete mailing list** - when group is deleted:
+
+   ```http
+   DELETE /address/groups/engineering@company.com
+   ```
+
+**Notes:**
+
+- Only groups with a `mail` attribute are synchronized to James
+- Groups without `mail` are ignored (regular LDAP groups)
+- James Address Groups are simple distribution lists
+- All group members receive emails sent to the group address
+- List type attributes (open/restricted) are stored in LDAP but not enforced by James
+
 ### Mail Address Changes
 
 When a user's mail attribute changes:
@@ -96,10 +148,13 @@ When a user's quota changes:
 
 ### Endpoints Used
 
-| Operation      | Endpoint                                  | Method |
-| -------------- | ----------------------------------------- | ------ |
-| Rename account | `/users/{old}/rename/{new}?action=rename` | POST   |
-| Update quota   | `/quota/users/{mail}/size`                | PUT    |
+| Operation           | Endpoint                                  | Method |
+| ------------------- | ----------------------------------------- | ------ |
+| Rename account      | `/users/{old}/rename/{new}?action=rename` | POST   |
+| Update quota        | `/quota/users/{mail}/size`                | PUT    |
+| Add group member    | `/address/groups/{group}/{member}`        | PUT    |
+| Remove group member | `/address/groups/{group}/{member}`        | DELETE |
+| Delete group        | `/address/groups/{group}`                 | DELETE |
 
 ### Authentication
 
@@ -331,12 +386,68 @@ Quota values are in **bytes**:
 3. If user is over new quota, James may block incoming mail
 4. User must delete mail to get under quota
 
+## Mailing List Examples
+
+### Creating a Mailing List
+
+```bash
+# Create a group with mail attribute
+curl -X POST http://localhost:8081/api/v1/ldap/groups \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cn": "engineering",
+    "mail": "engineering@company.com",
+    "member": [
+      "uid=alice,ou=users,dc=example,dc=com",
+      "uid=bob,ou=users,dc=example,dc=com"
+    ],
+    "twakeDepartmentLink": "ou=organization,dc=example,dc=com",
+    "twakeDepartmentPath": "Engineering"
+  }'
+```
+
+The James plugin automatically creates the mailing list and adds all members.
+
+### Adding a Member
+
+```bash
+# Add member to existing group
+curl -X POST http://localhost:8081/api/v1/ldap/groups/engineering/members \
+  -H "Authorization: Bearer admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{"member": "uid=charlie,ou=users,dc=example,dc=com"}'
+```
+
+James is automatically updated to include charlie@company.com in the distribution list.
+
+### Removing a Member
+
+```bash
+# Remove member from group
+curl -X DELETE http://localhost:8081/api/v1/ldap/groups/engineering/members/uid=alice,ou=users,dc=example,dc=com \
+  -H "Authorization: Bearer admin-token"
+```
+
+James removes alice@company.com from the mailing list.
+
+### Deleting a Mailing List
+
+```bash
+# Delete the entire group
+curl -X DELETE http://localhost:8081/api/v1/ldap/groups/engineering \
+  -H "Authorization: Bearer admin-token"
+```
+
+James deletes the entire address group.
+
 ## Limitations
 
 1. **One-way sync**: LDAP → James only. James changes don't sync back to LDAP.
 2. **No account creation**: Plugin doesn't create James accounts, only updates existing ones.
-3. **No deletion**: Plugin doesn't delete James accounts when LDAP users are deleted.
+3. **No user deletion**: Plugin doesn't delete James accounts when LDAP users are deleted.
 4. **Synchronous**: James API calls block LDAP response. Slow James = slow LDAP.
+5. **No send restrictions**: James doesn't enforce list type restrictions (open/member/owner-only). These are metadata in LDAP only.
 
 ## Advanced Configuration
 
