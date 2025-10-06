@@ -101,7 +101,8 @@ class OnLdapChange extends DmPlugin {
             dn,
             changes
           );
-        } else {
+        } else if (hookName === 'onLdapMailChange') {
+          // Only mail change uses the simple notification
           this.notifyAttributeChange(
             this.config[configParam] as string,
             hookName,
