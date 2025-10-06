@@ -65,6 +65,7 @@ ENV NODE_ENV=production \
  DM_AUTH_TOKENS= \
  DM_AUTHZ_PER_BRANCH_CONFIG="{\"default\":{\"read\":true,\"write\":false,\"delete\":false}}" \
  DM_AUTHZ_PER_BRANCH_CACHE_TTL="60" \
+ DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE="twakeLocalAdminLink" \
  DM_OIDC_SERVER= \
  DM_OIDC_CLIENT_ID= \
  DM_OIDC_CLIENT_SECRET= \
