@@ -36,6 +36,7 @@ ENV NODE_ENV=production \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
  DM_DELEGATION_ATTRIBUTE="twakeDelegatedUsers" \
  DM_ALIAS_ATTRIBUTE="mailAlternateAddress" \
+ DM_FORWARD_ATTRIBUTE="mailForwardingAddress" \
  DM_USER_CLASSES=top,twakeAccount,twakeWhitePages \
  DM_LDAP_TOP_ORGANIZATION= \
  DM_LDAP_ORGANIZATION_CLASSES=top,organizationalUnit,twakeDepartment \

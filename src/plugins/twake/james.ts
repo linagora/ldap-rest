@@ -41,6 +41,14 @@ export default class James extends DmPlugin {
       .map(a => this.normalizeAlias(a));
   }
 
+  /**
+   * Extract domain from email address
+   */
+  private extractDomain(email: string): string | null {
+    const parts = email.split('@');
+    return parts.length === 2 ? parts[1] : null;
+  }
+
   hooks: Hooks = {
     ldapadddone: async (args: [string, AttributesList]) => {
       const [dn, attributes] = args;
@@ -202,6 +210,50 @@ export default class James extends DmPlugin {
         newQuota.toString(),
         { oldQuota, newQuota }
       );
+    },
+    onLdapForwardChange: async (
+      dn: string,
+      mail: string,
+      oldForwards: string[],
+      newForwards: string[]
+    ) => {
+      const domain = this.extractDomain(mail);
+      if (!domain) {
+        this.logger.error(
+          `Cannot extract domain from mail ${mail} for forward management`
+        );
+        return;
+      }
+
+      // Find forwards to delete (in old but not in new)
+      const toDelete = oldForwards.filter(f => !newForwards.includes(f));
+
+      // Find forwards to add (in new but not in old)
+      const toAdd = newForwards.filter(f => !oldForwards.includes(f));
+
+      // Delete removed forwards
+      for (const forward of toDelete) {
+        await this._try(
+          'onLdapForwardChange-delete',
+          `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+          'DELETE',
+          dn,
+          null,
+          { mail, forward, domain, action: 'delete' }
+        );
+      }
+
+      // Add new forwards
+      for (const forward of toAdd) {
+        await this._try(
+          'onLdapForwardChange-add',
+          `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+          'PUT',
+          dn,
+          null,
+          { mail, forward, domain, action: 'add' }
+        );
+      }
     },
 
     onLdapChange: async (dn: string, changes: ChangesToNotify) => {

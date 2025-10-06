@@ -92,6 +92,12 @@ export interface Hooks {
     oldQuota: number,
     newQuota: number
   ) => MaybePromise<void>;
+  onLdapForwardChange?: (
+    dn: string,
+    mail: string,
+    oldForwards: string[],
+    newForwards: string[]
+  ) => MaybePromise<void>;
 
   /** externalUsersInGroup */
   externaluserentry?: ChainedHook<[string, AttributesList]>;

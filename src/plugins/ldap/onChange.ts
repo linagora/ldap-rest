@@ -24,6 +24,7 @@ const events: {
   mail_attribute: 'onLdapMailChange',
   quota_attribute: 'onLdapQuotaChange',
   alias_attribute: 'onLdapAliasChange',
+  forward_attribute: 'onLdapForwardChange',
 };
 
 class OnLdapChange extends DmPlugin {
@@ -90,14 +91,20 @@ class OnLdapChange extends DmPlugin {
         this.config[configParam] &&
         changes[this.config[configParam] as string]
       ) {
-        // Special handling for alias changes - needs mail parameter
-        if (hookName === 'onLdapAliasChange') {
-          void this.notifyAliasChange(
+        // Special handling for hooks that need mail parameter
+        if (
+          hookName === 'onLdapQuotaChange' ||
+          hookName === 'onLdapForwardChange' ||
+          hookName === 'onLdapAliasChange'
+        ) {
+          void this.notifyAttributeChangeWithMail(
             this.config[configParam] as string,
+            hookName,
             dn,
             changes
           );
-        } else {
+        } else if (hookName === 'onLdapMailChange') {
+          // Only mail change uses the simple notification
           this.notifyAttributeChange(
             this.config[configParam] as string,
             hookName,
@@ -129,15 +136,16 @@ class OnLdapChange extends DmPlugin {
     }
   }
 
-  async notifyAliasChange(
+  async notifyAttributeChangeWithMail(
     attribute: string,
+    hookName: keyof Hooks,
     dn: string,
     changes: ChangesToNotify
   ): Promise<void> {
     const [oldValue, newValue] = changes[attribute] || [];
     if (oldValue === undefined && newValue === undefined) return;
 
-    // Get current mail address (needed for James alias API)
+    // Get current mail address (needed for hooks that require mail parameter)
     const mailAttr = this.config.mail_attribute || 'mail';
     const mailChange = changes[mailAttr];
 
@@ -161,7 +169,7 @@ class OnLdapChange extends DmPlugin {
             : String(mailValue);
         } else {
           this.logger.warn(
-            `Could not find mail for ${dn}, skipping alias notification`
+            `Could not find mail for ${dn}, skipping ${hookName} notification`
           );
           return;
         }
@@ -171,26 +179,42 @@ class OnLdapChange extends DmPlugin {
       }
     }
 
-    // Normalize old and new aliases to arrays
-    const oldAliases = oldValue
-      ? Array.isArray(oldValue)
-        ? (oldValue as string[])
-        : [oldValue as string]
-      : [];
-    const newAliases = newValue
-      ? Array.isArray(newValue)
-        ? (newValue as string[])
-        : [newValue as string]
-      : [];
+    // Handle different hook types
+    if (hookName === 'onLdapQuotaChange') {
+      // Quota change - expects numbers
+      const oldQuota = oldValue ? Number(oldValue) : 0;
+      const newQuota = newValue ? Number(newValue) : 0;
+      if (oldQuota !== newQuota) {
+        void launchHooks(
+          this.server.hooks[hookName],
+          dn,
+          mail,
+          oldQuota,
+          newQuota
+        );
+      }
+    } else if (hookName === 'onLdapForwardChange' || hookName === 'onLdapAliasChange') {
+      // Forward/Alias change - expects arrays of strings
+      const oldArray = oldValue
+        ? Array.isArray(oldValue)
+          ? (oldValue as string[])
+          : [oldValue as string]
+        : [];
+      const newArray = newValue
+        ? Array.isArray(newValue)
+          ? (newValue as string[])
+          : [newValue as string]
+        : [];
 
-    if (oldAliases.length > 0 || newAliases.length > 0) {
-      void launchHooks(
-        this.server.hooks.onLdapAliasChange,
-        dn,
-        mail,
-        oldAliases,
-        newAliases
-      );
+      if (oldArray.length > 0 || newArray.length > 0) {
+        void launchHooks(
+          this.server.hooks[hookName],
+          dn,
+          mail,
+          oldArray,
+          newArray
+        );
+      }
     }
   }
 }
