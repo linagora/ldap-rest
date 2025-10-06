@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
 /**
- * @module plugins/auth/authnPerBranch
+ * @module plugins/auth/authzPerBranch
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Authorization plugin that restricts LDAP access by branch
@@ -8,88 +7,83 @@
  * @group Plugins
  */
 import type { SearchOptions } from 'ldapts';
+import type { Request } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { DmRequest } from '../../lib/auth/base';
 import type { SearchResult, AttributesList } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
+import AuthzBase from '../../lib/authz/base';
 
 interface CachedGroups {
   groups: string[];
   timestamp: number;
 }
 
-export default class AuthnPerBranch extends DmPlugin {
-  name = 'authnPerBranch';
-  roles: Role[] = ['authn'] as const;
+export default class AuthzPerBranch extends AuthzBase {
+  name = 'authzPerBranch';
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
-  cacheTTL: number;
 
   constructor(server: DM) {
     super(server);
 
-    // Initialize hooks object
-    this.hooks = {};
-
     // Cache TTL in milliseconds (default: 1 minute, configurable)
-    this.cacheTTL = (this.config.authn_per_branch_cache_ttl || 60) * 1000;
+    this.cacheTTL = (this.config.authz_per_branch_cache_ttl || 60) * 1000;
 
     // Load authorization config from config object
-    this.authConfig = this.config.authn_per_branch_config;
+    this.authConfig = this.config.authz_per_branch_config;
     if (this.authConfig) {
       this.logger.info('Authorization config loaded');
     }
+  }
 
-    // Register hook for LDAP search requests
-    this.hooks.ldapsearchrequest = async ([base, opts, req]: [
+  hooks = {
+    ldapaddrequest: async ([dn, entry, req]: [
       string,
-      SearchOptions,
+      AttributesList,
       DmRequest?,
-    ]) => {
+    ]): Promise<[string, AttributesList, DmRequest?]> => {
       if (!req?.user || !this.authConfig) {
-        return [base, opts];
+        return [dn, entry, req];
       }
 
-      const permissions = await this.getUserPermissions(req.user, base);
+      // Determine which branch to check permissions for
+      let branchToCheck: string;
 
-      // Check read permission
-      if (!permissions.read) {
+      // If the entry has a link attribute (like twakeDepartmentLink), check permissions for that branch
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      if (linkAttr && entry[linkAttr]) {
+        const linkValue = entry[linkAttr];
+        branchToCheck = Array.isArray(linkValue)
+          ? String(linkValue[0])
+          : String(linkValue);
+      } else {
+        // For other entries, check the parent DN
+        branchToCheck = this.extractBranchDn(dn);
+      }
+
+      const permissions = await this.getUserPermissions(
+        req.user,
+        branchToCheck
+      );
+
+      // Check write permission
+      if (!permissions.write) {
         throw new Error(
-          `User ${req.user} does not have read permission for branch ${base}`
+          `User ${req.user} does not have write permission for branch ${branchToCheck}`
         );
       }
 
-      // For write operations (add/modify), we'll need to check in separate hooks
-      // For now, we only modify the search filter to restrict to authorized branches
-      const authorizedBranches = await this.getAuthorizedBranches(
-        req.user,
-        'read'
-      );
-
-      if (authorizedBranches.length > 0) {
-        // Modify filter to only search within authorized branches
-        const branchFilter = this.buildBranchFilter(base, authorizedBranches);
-        if (branchFilter) {
-          const originalFilter = opts.filter || '(objectClass=*)';
-          opts.filter = `(&${originalFilter as string}${branchFilter})`;
-        }
-      }
-
-      return [base, opts];
-    };
-  }
-
-  // Register hook for getOrganisationTop
-  Hooks = {
+      return [dn, entry, req];
+    },
     ldapsearchrequest: async ([base, opts, req]: [
       string,
       SearchOptions,
       DmRequest?,
-    ]) => {
+    ]): Promise<[string, SearchOptions, DmRequest?]> => {
       if (!req?.user || !this.authConfig) {
-        return [base, opts];
+        return [base, opts, req];
       }
 
       const permissions = await this.getUserPermissions(req.user, base);
@@ -103,7 +97,7 @@ export default class AuthnPerBranch extends DmPlugin {
 
       // For write operations (add/modify), we'll need to check in separate hooks
       // For now, we only modify the search filter to restrict to authorized branches
-      const authorizedBranches = await this.getAuthorizedBranches(
+      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
         req.user,
         'read'
       );
@@ -117,20 +111,21 @@ export default class AuthnPerBranch extends DmPlugin {
         }
       }
 
-      return [base, opts];
+      return [base, opts, req];
     },
     getOrganisationTop: async ([req, defaultTop]: [
-      DmRequest,
+      Request | undefined,
       AttributesList | null,
-    ]) => {
+    ]): Promise<[Request | undefined, AttributesList | null]> => {
       // If no user or no config, return default
-      if (!req?.user || !this.authConfig) {
+      const dmReq = req as DmRequest | undefined;
+      if (!dmReq?.user || !this.authConfig) {
         return [req, defaultTop];
       }
 
       // Get authorized branches for this user
-      const authorizedBranches = await this.getAuthorizedBranches(
-        req.user,
+      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
+        dmReq.user,
         'read'
       );
 
@@ -142,7 +137,7 @@ export default class AuthnPerBranch extends DmPlugin {
             const result = await this.server.ldap.search(
               { paged: false, scope: 'base' },
               branch,
-              req
+              dmReq
             );
             if ((result as SearchResult).searchEntries.length === 1) {
               orgs.push((result as SearchResult).searchEntries[0]);
@@ -216,9 +211,16 @@ export default class AuthnPerBranch extends DmPlugin {
   }
 
   /**
+   * Get list of branches user has read access to (base class implementation)
+   */
+  async getAuthorizedBranches(uid: string): Promise<string[]> {
+    return this.getAuthorizedBranchesForPermission(uid, 'read');
+  }
+
+  /**
    * Get list of branches user has access to for a given permission type
    */
-  async getAuthorizedBranches(
+  async getAuthorizedBranchesForPermission(
     uid: string,
     permissionType: 'read' | 'write' | 'delete'
   ): Promise<string[]> {

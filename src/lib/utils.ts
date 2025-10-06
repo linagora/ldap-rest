@@ -58,3 +58,133 @@ export const transformSchemas = (
   });
   return str;
 };
+
+// LDAP DN utilities
+
+/**
+ * Parse a Distinguished Name (DN) into its component parts (RDNs)
+ * Handles escaped commas and other special characters
+ *
+ * @param dn - The DN to parse
+ * @returns Array of RDN components
+ *
+ * @example
+ * ```typescript
+ * parseDn('uid=user,ou=users,dc=example,dc=com')
+ * // => ['uid=user', 'ou=users', 'dc=example', 'dc=com']
+ *
+ * parseDn('cn=Smith\\, John,ou=users,dc=example,dc=com')
+ * // => ['cn=Smith\\, John', 'ou=users', 'dc=example', 'dc=com']
+ * ```
+ */
+export function parseDn(dn: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let escaped = false;
+
+  for (let i = 0; i < dn.length; i++) {
+    const char = dn[i];
+
+    if (escaped) {
+      current += char;
+      escaped = false;
+    } else if (char === '\\') {
+      current += char;
+      escaped = true;
+    } else if (char === ',') {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  // Don't forget the last part
+  if (current) {
+    parts.push(current.trim());
+  }
+
+  return parts;
+}
+
+/**
+ * Extract the parent DN from a DN
+ * Removes the first RDN component to get the parent branch
+ *
+ * @param dn - The DN to extract parent from
+ * @returns The parent DN, or the original DN if it has no parent
+ *
+ * @example
+ * ```typescript
+ * getParentDn('uid=user,ou=users,dc=example,dc=com')
+ * // => 'ou=users,dc=example,dc=com'
+ *
+ * getParentDn('dc=com')
+ * // => 'dc=com'
+ * ```
+ */
+export function getParentDn(dn: string): string {
+  const parts = parseDn(dn);
+
+  if (parts.length <= 1) {
+    return dn;
+  }
+
+  return parts.slice(1).join(',');
+}
+
+/**
+ * Extract the RDN (Relative Distinguished Name) from a DN
+ * Returns the first component of the DN
+ *
+ * @param dn - The DN to extract RDN from
+ * @returns The RDN component
+ *
+ * @example
+ * ```typescript
+ * getRdn('uid=user,ou=users,dc=example,dc=com')
+ * // => 'uid=user'
+ * ```
+ */
+export function getRdn(dn: string): string {
+  const parts = parseDn(dn);
+  return parts[0] || '';
+}
+
+/**
+ * Check if a DN is a child of another DN
+ *
+ * @param dn - The DN to check
+ * @param parentDn - The potential parent DN
+ * @returns True if dn is a child of parentDn
+ *
+ * @example
+ * ```typescript
+ * isChildOf('uid=user,ou=users,dc=example,dc=com', 'ou=users,dc=example,dc=com')
+ * // => true
+ *
+ * isChildOf('uid=user,ou=users,dc=example,dc=com', 'ou=groups,dc=example,dc=com')
+ * // => false
+ * ```
+ */
+export function isChildOf(dn: string, parentDn: string): boolean {
+  const dnLower = dn.toLowerCase();
+  const parentLower = parentDn.toLowerCase();
+
+  // DN must end with parent DN
+  if (!dnLower.endsWith(parentLower)) {
+    return false;
+  }
+
+  // DN must be longer than parent (it's a child, not the same)
+  if (dnLower.length === parentLower.length) {
+    return false;
+  }
+
+  // Check that there's a comma separator before the parent DN part
+  const beforeParent = dnLower.substring(
+    0,
+    dnLower.length - parentLower.length
+  );
+  return beforeParent.endsWith(',');
+}

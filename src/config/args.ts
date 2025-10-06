@@ -92,9 +92,12 @@ export interface Config {
   oidc_client_secret?: string;
   base_url?: string;
 
-  // auth/authnPerBranch
-  authn_per_branch_config?: AuthConfig;
-  authn_per_branch_cache_ttl?: number;
+  // auth/authzPerBranch
+  authz_per_branch_config?: AuthConfig;
+  authz_per_branch_cache_ttl?: number;
+
+  // auth/authzLinid1
+  authz_local_admin_attribute?: string;
 
   // auth/rateLimit
   rate_limit_window_ms?: number;
@@ -292,18 +295,25 @@ const configArgs: ConfigTemplate = [
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
 
-  // Auth authnPerBranch plugin
+  // Auth authzPerBranch plugin
   [
-    '--authn-per-branch-config',
-    'DM_AUTHN_PER_BRANCH_CONFIG',
+    '--authz-per-branch-config',
+    'DM_AUTHZ_PER_BRANCH_CONFIG',
     { default: { read: true, write: false, delete: false } } as AuthConfig,
     'json',
   ],
   [
-    '--authn-per-branch-cache-ttl',
-    'DM_AUTHN_PER_BRANCH_CACHE_TTL',
+    '--authz-per-branch-cache-ttl',
+    'DM_AUTHZ_PER_BRANCH_CACHE_TTL',
     60,
     'number',
+  ],
+
+  // Auth authzLinid1 plugin
+  [
+    '--authz-local-admin-attribute',
+    'DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE',
+    'twakeLocalAdminLink',
   ],
 
   // Auth OpenID Connect plugin

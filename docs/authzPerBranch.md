@@ -1,10 +1,10 @@
-# Authorization Plugin: authnPerBranch
+# Authorization Plugin: authzPerBranch
 
 Branch-level authorization plugin that restricts LDAP access based on user and group permissions.
 
 ## Overview
 
-The `authnPerBranch` plugin provides fine-grained access control by restricting which LDAP branches users can access. It supports:
+The `authzPerBranch` plugin provides fine-grained access control by restricting which LDAP branches users can access. It supports:
 
 - **Default permissions** - Applied when no specific rules match
 - **User-based permissions** - Per-user branch access rules
@@ -16,8 +16,8 @@ The `authnPerBranch` plugin provides fine-grained access control by restricting 
 ## Configuration
 
 ```bash
---plugin core/auth/authnPerBranch \
---authn-per-branch-config '{
+--plugin core/auth/authzPerBranch \
+--authz-per-branch-config '{
   "default": {
     "read": true,
     "write": false,
@@ -42,14 +42,14 @@ The `authnPerBranch` plugin provides fine-grained access control by restricting 
     }
   }
 }' \
---authn-per-branch-cache-ttl 60
+--authz-per-branch-cache-ttl 60
 ```
 
 **Environment Variables:**
 
 ```bash
-DM_AUTHN_PER_BRANCH_CONFIG='{"default":{"read":true,"write":false,"delete":false},...}'
-DM_AUTHN_PER_BRANCH_CACHE_TTL=60
+DM_AUTHZ_PER_BRANCH_CONFIG='{"default":{"read":true,"write":false,"delete":false},...}'
+DM_AUTHZ_PER_BRANCH_CACHE_TTL=60
 ```
 
 ## Configuration Structure
@@ -279,7 +279,7 @@ Grant access to multiple branches:
 
 The plugin automatically filters the organization tree API (`/api/v1/ldap/organizations/top`):
 
-**Without authnPerBranch:**
+**Without authzPerBranch:**
 
 ```json
 {
@@ -288,7 +288,7 @@ The plugin automatically filters the organization tree API (`/api/v1/ldap/organi
 }
 ```
 
-**With authnPerBranch (user has access to specific branches):**
+**With authzPerBranch (user has access to specific branches):**
 
 ```json
 [
@@ -310,7 +310,7 @@ The plugin automatically filters the organization tree API (`/api/v1/ldap/organi
 Group memberships are cached to reduce LDAP queries:
 
 - **Default TTL**: 60 seconds
-- **Configurable**: `--authn-per-branch-cache-ttl`
+- **Configurable**: `--authz-per-branch-cache-ttl`
 - **Per-user cache**: Each user's groups cached separately
 - **Automatic expiry**: Cache entries expire after TTL
 
@@ -354,7 +354,7 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 ```bash
 --plugin core/auth/token \
---plugin core/auth/authnPerBranch \
+--plugin core/auth/authzPerBranch \
 --auth-token "secret-token"
 ```
 
@@ -412,7 +412,7 @@ Changed permissions don't take effect immediately.
 
 1. Wait for group cache TTL to expire
 2. Restart server to clear all caches
-3. Reduce `--authn-per-branch-cache-ttl` for testing
+3. Reduce `--authz-per-branch-cache-ttl` for testing
 
 ### Problem: Group Permissions Not Working
 
@@ -442,9 +442,9 @@ User should inherit group permissions but doesn't.
 
 ```bash
 --plugin core/auth/token \
---plugin core/auth/authnPerBranch \
+--plugin core/auth/authzPerBranch \
 --auth-token "admin-token" \
---authn-per-branch-config '{
+--authz-per-branch-config '{
   "default": {"read": false, "write": false, "delete": false}
 }'
 ```
@@ -453,12 +453,12 @@ User should inherit group permissions but doesn't.
 
 ```bash
 --plugin core/auth/openidconnect \
---plugin core/auth/authnPerBranch \
+--plugin core/auth/authzPerBranch \
 --oidc-server "https://auth.example.com" \
 --oidc-client-id "mini-dm" \
 --oidc-client-secret "secret" \
 --base-url "https://api.example.com" \
---authn-per-branch-config '{
+--authz-per-branch-config '{
   "users": {
     "user@example.com": {
       "ou=organization,dc=example,dc=com": {"read": true, "write": true}
@@ -471,9 +471,9 @@ User should inherit group permissions but doesn't.
 
 ```bash
 --plugin core/auth/llng \
---plugin core/auth/authnPerBranch \
+--plugin core/auth/authzPerBranch \
 --llng-ini /etc/lemonldap-ng/lemonldap-ng.ini \
---authn-per-branch-config '{"default": {"read": true}}'
+--authz-per-branch-config '{"default": {"read": true}}'
 ```
 
 ## See Also

@@ -88,7 +88,10 @@ describe('Browser LDAP API Client', () => {
           dn: 'ou=child1,ou=test,ou=organization,dc=example,dc=com',
           type: 'organization',
         },
-        { dn: 'uid=user1,ou=test,ou=organization,dc=example,dc=com', type: 'user' },
+        {
+          dn: 'uid=user1,ou=test,ou=organization,dc=example,dc=com',
+          type: 'user',
+        },
       ];
 
       nock(baseUrl)
@@ -119,7 +122,10 @@ describe('Browser LDAP API Client', () => {
       const encodedDn = encodeURIComponent(dn);
       const encodedQuery = encodeURIComponent(query);
       const mockResponse = [
-        { dn: 'uid=john.doe,ou=test,ou=organization,dc=example,dc=com', type: 'user' },
+        {
+          dn: 'uid=john.doe,ou=test,ou=organization,dc=example,dc=com',
+          type: 'user',
+        },
       ];
 
       nock(baseUrl)

@@ -6,19 +6,13 @@ import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganization from '../../src/plugins/ldap/organization';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 describe('ConfigApi Plugin', () => {
   let dm: DM;
 
   before(function () {
-    // Skip tests if env vars are not set
-    if (!process.env.DM_LDAP_DN || !process.env.DM_LDAP_PWD) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Skipping ConfigApi tests: DM_LDAP_DN or DM_LDAP_PWD not set'
-      );
-      (this as Mocha.Context).skip();
-    }
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
   });
 
   beforeEach(async () => {

@@ -134,7 +134,11 @@ class ldapActions {
   /*
     LDAP add
    */
-  async add(dn: string, entry: AttributesList): Promise<boolean> {
+  async add(
+    dn: string,
+    entry: AttributesList,
+    req?: Request
+  ): Promise<boolean> {
     dn = this.setDn(dn);
     if (
       (!entry.objectClass || entry.objectClass.length === 0) &&
@@ -161,7 +165,8 @@ class ldapActions {
     [dn, entry] = (await launchHooksChained(this.parent.hooks.ldapaddrequest, [
       dn,
       sanitizedEntry,
-    ])) as [string, typeof entry];
+      req,
+    ])) as [string, typeof entry, Request?];
     try {
       await client.add(dn, sanitizedEntry);
       void launchHooks(this.parent.hooks.ldapadddone, dn, entry);

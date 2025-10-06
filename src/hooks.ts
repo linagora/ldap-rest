@@ -32,7 +32,7 @@ export interface Hooks {
   ldapsearchrequest?: ChainedHook<[string, SearchOptions, Request?]>;
   ldapsearchresult?: ChainedHook<SearchResult>;
   // add
-  ldapaddrequest?: ChainedHook<[string, AttributesList]>;
+  ldapaddrequest?: ChainedHook<[string, AttributesList, Request?]>;
   ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
   // modify
   ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number]>;

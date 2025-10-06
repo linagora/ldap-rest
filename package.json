@@ -28,9 +28,13 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
-    "plugin-auth-authnperbranch": {
-      "import": "./dist/plugins/auth/authnPerBranch.js",
-      "types": "./dist/src/plugins/auth/authnPerBranch.d.ts"
+    "plugin-auth-authzlinid1": {
+      "import": "./dist/plugins/auth/authzLinid1.js",
+      "types": "./dist/src/plugins/auth/authzLinid1.d.ts"
+    },
+    "plugin-auth-authzperbranch": {
+      "import": "./dist/plugins/auth/authzPerBranch.js",
+      "types": "./dist/src/plugins/auth/authzPerBranch.d.ts"
     },
     "plugin-auth-crowdsec": {
       "import": "./dist/plugins/auth/crowdsec.js",

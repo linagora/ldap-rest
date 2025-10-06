@@ -18,7 +18,7 @@ Complete documentation for mini-dm plugins and features.
 #### Authentication & Authorization
 
 - **[authentication](authentication.md)** - Complete authentication guide (Token, LLNG, OpenID Connect)
-- **[authnPerBranch](authnPerBranch.md)** - Branch-level authorization and access control
+- **[authzPerBranch](authzPerBranch.md)** - Branch-level authorization and access control
 
 #### Utilities
 
@@ -100,7 +100,7 @@ Secure API access:
 | token          | Bearer tokens | Development, APIs, Scripts   |
 | llng           | LemonLDAP::NG | Enterprise SSO               |
 | openidconnect  | OAuth2/OIDC   | Cloud identity, Social login |
-| authnPerBranch | Authorization | Branch-level access control  |
+| authzPerBranch | Authorization | Branch-level access control  |
 
 ### Integration
 
@@ -132,7 +132,7 @@ twake/james
 core/ldap/externalUsersInGroups
   └─ requires: core/ldap/groups
 
-core/auth/authnPerBranch
+core/auth/authzPerBranch
   └─ requires: Any authentication plugin (token, llng, openidconnect)
 ```
 
@@ -335,7 +335,7 @@ Some plugins must load before others. See `src/plugins/priority.json`:
   "core/auth/token",
   "core/auth/llng",
   "core/auth/openidconnect",
-  "core/auth/authnPerBranch"
+  "core/auth/authzPerBranch"
 ]
 ```
 

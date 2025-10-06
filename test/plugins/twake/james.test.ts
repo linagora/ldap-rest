@@ -4,6 +4,7 @@ import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('James Plugin', () => {
   const testDN = `uid=testusermail,${process.env.DM_LDAP_BASE}`;
@@ -12,18 +13,7 @@ describe('James Plugin', () => {
   let scope: nock.Scope;
 
   before(function () {
-    // Skip tests if env vars are not set
-    if (
-      !process.env.DM_LDAP_DN ||
-      !process.env.DM_LDAP_PWD ||
-      !process.env.DM_LDAP_BASE
-    ) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Skipping LDAP tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
-      );
-      (this as Mocha.Context).skip();
-    }
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       //.post(new RegExp('users/testmail@test.org/rename/t@t.org.*'))
       .persist()

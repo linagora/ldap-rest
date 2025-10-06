@@ -52,7 +52,7 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       async (req, res) => {
         const dn = decodeURIComponent(req.params.dn);
-        await tryMethodData(res, this.getOrganisationByDn.bind(this), dn);
+        await tryMethodData(res, this.getOrganisationByDn.bind(this), dn, req);
       }
     );
 
@@ -61,7 +61,12 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
       async (req, res) => {
         const dn = decodeURIComponent(req.params.dn);
-        await tryMethodData(res, this.getOrganisationSubnodes.bind(this), dn);
+        await tryMethodData(
+          res,
+          this.getOrganisationSubnodes.bind(this),
+          dn,
+          req
+        );
       }
     );
 
@@ -122,7 +127,7 @@ export default class LdapOrganizations extends DmPlugin {
       ),
     };
 
-    await tryMethod(res, this.addOrganization.bind(this), dn, entry);
+    await tryMethod(res, this.addOrganization.bind(this), dn, entry, req);
   }
 
   async apiModify(req: Request, res: Response): Promise<void> {
@@ -153,7 +158,7 @@ export default class LdapOrganizations extends DmPlugin {
      *
      * If an ou is going to be deleted, check that it is empty
      */
-    ldapaddrequest: async ([dn, entry]) => {
+    ldapaddrequest: async ([dn, entry, req]) => {
       // Organizations use LDAP hierarchy (DN), not twakeDepartmentLink
       // Only users/groups have twakeDepartmentLink
       if (!this.isOu(entry)) {
@@ -161,7 +166,9 @@ export default class LdapOrganizations extends DmPlugin {
       }
       // Only check path for organizations, not for users/groups
       if (this.isOu(entry)) await this.checkDeptPath(entry);
-      return [dn, entry];
+      return req !== undefined
+        ? [dn, entry, req]
+        : ([dn, entry] as [string, AttributesList, Request?]);
     },
 
     ldapmodifyrequest: async ([dn, changes, op]) => {
@@ -354,7 +361,7 @@ export default class LdapOrganizations extends DmPlugin {
     if ((top as SearchResult).searchEntries.length !== 1)
       throw new Error('Top organization not found');
 
-    // Call hook to allow plugins (like authnPerBranch) to modify the result
+    // Call hook to allow plugins (like authzPerBranch) to modify the result
     const [, result] = await launchHooksChained(
       this.registeredHooks.getOrganisationTop,
       [req, (top as SearchResult).searchEntries[0]]
@@ -363,21 +370,28 @@ export default class LdapOrganizations extends DmPlugin {
     return result;
   }
 
-  async getOrganisationByDn(dn: string): Promise<AttributesList> {
+  async getOrganisationByDn(
+    dn: string,
+    req?: Request
+  ): Promise<AttributesList> {
     const org = await this.server.ldap.search(
       {
         paged: false,
         scope: 'base',
         filter: '(objectClass=organizationalUnit)',
       },
-      dn
+      dn,
+      req
     );
     if ((org as SearchResult).searchEntries.length !== 1)
       throw new Error(`Organization ${dn} not found`);
     return (org as SearchResult).searchEntries[0];
   }
 
-  async getOrganisationSubnodes(dn: string): Promise<AttributesList[]> {
+  async getOrganisationSubnodes(
+    dn: string,
+    req?: Request
+  ): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
     const MAX_LINKED_ENTITIES =
       this.config.ldap_organization_max_subnodes || 50;
@@ -390,7 +404,8 @@ export default class LdapOrganizations extends DmPlugin {
           scope: 'one',
           filter: '(objectClass=organizationalUnit)',
         },
-        dn
+        dn,
+        req
       )) as SearchResult;
       this.server.logger.debug(
         `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
@@ -416,7 +431,8 @@ export default class LdapOrganizations extends DmPlugin {
         paged: true,
         filter,
       },
-      baseDn
+      baseDn,
+      req
     );
     let linkedCount = 0;
     let totalCount = 0;
@@ -448,9 +464,13 @@ export default class LdapOrganizations extends DmPlugin {
     return result;
   }
 
-  async addOrganization(dn: string, entry: AttributesList): Promise<boolean> {
+  async addOrganization(
+    dn: string,
+    entry: AttributesList,
+    req?: Request
+  ): Promise<boolean> {
     // Hooks will validate the organization link and path
-    return await this.server.ldap.add(dn, entry);
+    return await this.server.ldap.add(dn, entry, req);
   }
 
   async modifyOrganization(
