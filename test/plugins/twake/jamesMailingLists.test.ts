@@ -34,19 +34,31 @@ describe('James Mailing Lists', () => {
     // Mock James API calls for mailing lists
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       .persist()
+      // Mock identity sync for all emails (uses regex to match dynamic timestamps)
+      .get(/\/jmap\/identities\/.*@test\.org$/)
+      .reply(200, (uri) => {
+        const email = uri.replace('/jmap/identities/', '');
+        return [
+          {
+            id: `${email}-identity-id`,
+            name: 'Test User',
+            email: email,
+          },
+        ];
+      })
+      .put(/\/jmap\/identities\/.*@test\.org\/.*-identity-id$/)
+      .reply(200, { success: true })
       // Create group members
-      .put('/address/groups/list@test.org/member1@test.org')
-      .reply(204)
-      .put('/address/groups/list@test.org/member2@test.org')
+      .put(/\/address\/groups\/list.*@test\.org\/member.*@test\.org$/)
       .reply(204)
       // Add new member
-      .put('/address/groups/list@test.org/newmember@test.org')
+      .put(/\/address\/groups\/list.*@test\.org\/newmember.*@test\.org$/)
       .reply(204)
       // Delete member
-      .delete('/address/groups/list@test.org/member1@test.org')
+      .delete(/\/address\/groups\/list.*@test\.org\/member.*@test\.org$/)
       .reply(204)
       // Delete entire group
-      .delete('/address/groups/list@test.org')
+      .delete(/\/address\/groups\/list.*@test\.org$/)
       .reply(204);
   });
 

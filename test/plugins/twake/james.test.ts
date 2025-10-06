@@ -52,7 +52,7 @@ describe('James Plugin', () => {
       .reply(204)
       .put('/address/aliases/newprimary@test.org/sources/alias2@test.org')
       .reply(204)
-      // Identity
+      // Identity - testmail@test.org
       .get('/jmap/identities/testmail@test.org')
       .reply(200, [
         {
@@ -62,6 +62,94 @@ describe('James Plugin', () => {
         },
       ])
       .put('/jmap/identities/testmail@test.org/testmail-identity-id')
+      .reply(200, { success: true })
+      // Identity - quotauser@test.org (created in quota test)
+      .get('/jmap/identities/quotauser@test.org')
+      .reply(200, [
+        {
+          id: 'quotauser-identity-id',
+          name: 'Quota User',
+          email: 'quotauser@test.org',
+        },
+      ])
+      .put('/jmap/identities/quotauser@test.org/quotauser-identity-id')
+      .reply(200, { success: true })
+      // Identity - aliasuser@test.org (created in alias tests)
+      .get('/jmap/identities/aliasuser@test.org')
+      .reply(200, [
+        {
+          id: 'aliasuser-identity-id',
+          name: 'Alias User',
+          email: 'aliasuser@test.org',
+        },
+      ])
+      .put('/jmap/identities/aliasuser@test.org/aliasuser-identity-id')
+      .reply(200, { success: true })
+      // Identity - primary@test.org (created in mail change test)
+      .get('/jmap/identities/primary@test.org')
+      .reply(200, [
+        {
+          id: 'primary-identity-id',
+          name: 'Primary User',
+          email: 'primary@test.org',
+        },
+      ])
+      .put('/jmap/identities/primary@test.org/primary-identity-id')
+      .reply(200, { success: true })
+      // Identity - forward@test.org (created in forward tests)
+      .get('/jmap/identities/forward@test.org')
+      .reply(200, [
+        {
+          id: 'forward-identity-id',
+          name: 'Forward User',
+          email: 'forward@test.org',
+        },
+      ])
+      .put('/jmap/identities/forward@test.org/forward-identity-id')
+      .reply(200, { success: true })
+      // Identity - delegate@test.org (created in delegation tests)
+      .get('/jmap/identities/delegate@test.org')
+      .reply(200, [
+        {
+          id: 'delegate-identity-id',
+          name: 'Delegate User',
+          email: 'delegate@test.org',
+        },
+      ])
+      .put('/jmap/identities/delegate@test.org/delegate-identity-id')
+      .reply(200, { success: true })
+      // Identity - assistant@test.org (created in delegation tests)
+      .get('/jmap/identities/assistant@test.org')
+      .reply(200, [
+        {
+          id: 'assistant-identity-id',
+          name: 'Assistant User',
+          email: 'assistant@test.org',
+        },
+      ])
+      .put('/jmap/identities/assistant@test.org/assistant-identity-id')
+      .reply(200, { success: true })
+      // Identity - assistant1@test.org (created in delegation tests)
+      .get('/jmap/identities/assistant1@test.org')
+      .reply(200, [
+        {
+          id: 'assistant1-identity-id',
+          name: 'Assistant 1',
+          email: 'assistant1@test.org',
+        },
+      ])
+      .put('/jmap/identities/assistant1@test.org/assistant1-identity-id')
+      .reply(200, { success: true })
+      // Identity - assistant2@test.org (created in delegation tests)
+      .get('/jmap/identities/assistant2@test.org')
+      .reply(200, [
+        {
+          id: 'assistant2-identity-id',
+          name: 'Assistant 2',
+          email: 'assistant2@test.org',
+        },
+      ])
+      .put('/jmap/identities/assistant2@test.org/assistant2-identity-id')
       .reply(200, { success: true });
     nock.disableNetConnect();
   });
