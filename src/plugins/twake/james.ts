@@ -58,7 +58,7 @@ export default class James extends DmPlugin {
 
       const mail = attributes[mailAttr];
       const quota = attributes[quotaAttr];
-      const aliases = attributes[aliasAttr];
+      const aliases = attributes[aliasAttr] as AttributeValue;
 
       if (!mail) {
         // Not a user with mail, skip
@@ -129,6 +129,7 @@ export default class James extends DmPlugin {
         )) as SearchResult;
 
         if (entry.searchEntries && entry.searchEntries.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const aliases = this.getAliases(entry.searchEntries[0][aliasAttr]);
 
           // Only process if user has aliases
@@ -440,7 +441,7 @@ export default class James extends DmPlugin {
       if (Array.isArray(value)) {
         return value.length > 0 ? String(value[0]) : null;
       }
-      return String(value);
+      return String(value as string | Buffer);
     };
 
     // 1. Try displayName first
@@ -560,7 +561,7 @@ export default class James extends DmPlugin {
         return null;
       }
 
-      const entry = result.searchEntries[0] as AttributesList;
+      const entry: AttributesList = result.searchEntries[0] as AttributesList;
 
       // Helper to convert LDAP attribute value to string
       const toString = (value: unknown): string => {
@@ -575,9 +576,21 @@ export default class James extends DmPlugin {
       // Replace all {attributeName} placeholders with LDAP values
       let signature = template;
       const placeholderRegex = /\{(\w+)\}/g;
-      signature = signature.replace(placeholderRegex, (match, attrName) => {
-        return toString(entry[attrName as keyof AttributesList]);
-      });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      signature = signature.replace(
+        placeholderRegex,
+        (_match: string, attrName: string): string => {
+          if (
+            typeof attrName === 'string' &&
+            entry &&
+            typeof entry === 'object' &&
+            Object.prototype.hasOwnProperty.call(entry, attrName)
+          ) {
+            return toString((entry as Record<string, unknown>)[attrName]);
+          }
+          return '';
+        }
+      );
 
       return signature;
     } catch (err) {
@@ -792,11 +805,12 @@ export default class James extends DmPlugin {
     const delegationAttr = this.config.delegation_attribute;
     if (!delegationAttr) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const [oldDelegated, newDelegated] = changes[delegationAttr] || [];
 
     // Normalize values to arrays of DNs
-    const oldDNs = this._normalizeToArray(oldDelegated);
-    const newDNs = this._normalizeToArray(newDelegated);
+    const oldDNs = this._normalizeToArray(oldDelegated as string);
+    const newDNs = this._normalizeToArray(newDelegated as string);
 
     // Find added and removed delegations
     const addedDNs = newDNs.filter(delegateDN => !oldDNs.includes(delegateDN));

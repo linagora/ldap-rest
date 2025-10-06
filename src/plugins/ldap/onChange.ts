@@ -206,7 +206,10 @@ class OnLdapChange extends DmPlugin {
           newQuota
         );
       }
-    } else if (hookName === 'onLdapForwardChange' || hookName === 'onLdapAliasChange') {
+    } else if (
+      hookName === 'onLdapForwardChange' ||
+      hookName === 'onLdapAliasChange'
+    ) {
       // Forward/Alias change - expects arrays of strings
       const oldArray = oldValue
         ? Array.isArray(oldValue)
