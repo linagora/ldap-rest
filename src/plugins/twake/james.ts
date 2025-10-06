@@ -68,7 +68,7 @@ export default class James extends DmPlugin {
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
       // Wait a bit to ensure James has created the user
-      // eslint-disable-next-line no-undef
+      // eslint-disable-next-line no-undef -- setTimeout is a Node.js global
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Initialize quota if present
@@ -511,6 +511,7 @@ export default class James extends DmPlugin {
           if (Array.isArray(value)) {
             return value.length > 0 ? String(value[0]) : null;
           }
+          // LDAP values are typically strings or Buffers
           return String(value as string | Buffer);
         };
 
@@ -567,6 +568,7 @@ export default class James extends DmPlugin {
         if (Array.isArray(value)) {
           return value.length > 0 ? String(value[0]) : '';
         }
+        // LDAP values are typically strings or Buffers
         return String(value as string | Buffer);
       };
 
