@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "name": "calendarResource",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "device"],
+    "singularName": "resource",
+    "pluralName": "resources",
+    "base": "ou=resources,__ldap_base__"
+  },
+  "strict": false,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["top", "device"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}
