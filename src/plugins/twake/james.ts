@@ -294,7 +294,9 @@ export default class James extends DmPlugin {
         )) as import('../../lib/ldapActions').SearchResult;
 
         if (!result.searchEntries || result.searchEntries.length === 0) {
-          this.logger.warn(`Cannot update James identity: entry not found for ${dn}`);
+          this.logger.warn(
+            `Cannot update James identity: entry not found for ${dn}`
+          );
           return;
         }
 
@@ -303,21 +305,27 @@ export default class James extends DmPlugin {
         const mail = this.attributeToString(entry[mailAttr]);
 
         if (!mail) {
-          this.logger.warn(`Cannot update James identity: no mail found for ${dn}`);
+          this.logger.warn(
+            `Cannot update James identity: no mail found for ${dn}`
+          );
           return;
         }
 
         const displayName = this.getDisplayNameFromAttributes(entry);
         if (!displayName) {
-          this.logger.warn(`Cannot update James identity: no display name found for ${dn}`);
+          this.logger.warn(
+            `Cannot update James identity: no display name found for ${dn}`
+          );
           return;
         }
 
         // Update James identity via JMAP
         return this.updateJamesIdentity(dn, mail, displayName);
       } catch (err) {
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        this.logger.error(`Failed to process display name change for ${dn}: ${err}`);
+        this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `Failed to process display name change for ${dn}: ${err}`
+        );
       }
     },
 
@@ -574,7 +582,11 @@ export default class James extends DmPlugin {
             typeof entry === 'object' &&
             Object.prototype.hasOwnProperty.call(entry, attrName)
           ) {
-            return this.attributeToString((entry as Record<string, unknown>)[attrName]) || '';
+            return (
+              this.attributeToString(
+                (entry as Record<string, unknown>)[attrName]
+              ) || ''
+            );
           }
           return '';
         }
