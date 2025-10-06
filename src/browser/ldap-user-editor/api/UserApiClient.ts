@@ -88,13 +88,31 @@ export class UserApiClient {
         // Convert from object format {key: entry} to array
         const items = Array.isArray(data) ? data : Object.values(data);
 
+        // Load schema to get displayName field
+        let displayNameField = 'cn'; // Default fallback
+        let identifierField = resource.mainAttribute;
+
+        if (resource.schemaUrl) {
+          try {
+            const schema = await this.getSchema(resource.schemaUrl);
+            // Find field with displayName role
+            const displayField = Object.entries(schema.attributes).find(
+              ([, attr]) => attr.role === 'displayName'
+            );
+            if (displayField) {
+              displayNameField = displayField[0];
+            }
+          } catch (e) {
+            // Use defaults if schema fails
+          }
+        }
+
         return items.map((item: any) => {
-          const cn = this.getFirstValue(item.cn);
-          const ou = this.getFirstValue(item.ou);
-          const uid = this.getFirstValue(item.uid);
+          const displayName = this.getFirstValue(item[displayNameField]);
+          const identifier = this.getFirstValue(item[identifierField]);
           return {
             dn: item.dn,
-            label: cn || ou || uid || item.dn,
+            label: displayName || identifier || item.dn,
           };
         });
       }

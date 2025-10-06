@@ -3,7 +3,7 @@
  * Shows users in a selected organization
  */
 
-import type { LdapUser } from '../types';
+import type { LdapUser, Schema, Config } from '../types';
 import type { UserApiClient } from '../api/UserApiClient';
 
 export class UserList {
@@ -13,6 +13,8 @@ export class UserList {
   private orgDn: string;
   private searchQuery = '';
   private onSelectUser: (dn: string) => void;
+  private schema: Schema | null = null;
+  private config: Config | null = null;
 
   constructor(
     container: HTMLElement,
@@ -27,6 +29,15 @@ export class UserList {
   }
 
   async init(): Promise<void> {
+    // Load config and schema first
+    this.config = await this.api.getConfig();
+    const usersResource = this.config.features?.flatResources?.find(
+      r => r.pluralName === 'users' || r.name === 'users'
+    );
+    if (usersResource?.schemaUrl) {
+      this.schema = await this.api.getSchema(usersResource.schemaUrl);
+    }
+
     this.render();
     await this.loadUsers();
   }
@@ -80,12 +91,24 @@ export class UserList {
       if (!res.ok) throw new Error('Failed to fetch organization users');
 
       const items = (await res.json()) as LdapUser[];
-      // Filter only user entries
+
+      // Filter only user entries using schema objectClass
+      // An item is a user if it has ALL the expected objectClasses
+      const expectedObjectClasses = this.schema?.entity?.objectClass || [];
+      const mainAttribute = this.schema?.entity?.mainAttribute || '';
+
       this.users = items.filter(item => {
-        const objectClass = item.objectClass as string[];
-        return objectClass?.includes('twakeAccount') ||
-               objectClass?.includes('inetOrgPerson') ||
-               item.dn.includes('uid=');
+        const objectClass = Array.isArray(item.objectClass)
+          ? item.objectClass
+          : [item.objectClass];
+
+        // Must have the mainAttribute field (uid, sAMAccountName, etc.)
+        if (!item[mainAttribute]) return false;
+
+        // Check if item has ALL the expected objectClasses
+        return expectedObjectClasses.every(expected =>
+          objectClass.includes(expected)
+        );
       });
 
       this.renderUserList();
@@ -102,18 +125,39 @@ export class UserList {
     return String(value);
   }
 
+  private getFieldNameByRole(role: string): string | null {
+    if (!this.schema) return null;
+
+    const field = Object.entries(this.schema.attributes).find(
+      ([, attr]) => attr.role === role
+    );
+
+    return field ? field[0] : null;
+  }
+
+  private getFieldValueByRole(user: LdapUser, role: string): string {
+    const fieldName = this.getFieldNameByRole(role);
+    if (!fieldName) return '';
+    return this.getFirstValue(user[fieldName]);
+  }
+
   private renderUserList(): void {
     const listEl = this.container.querySelector('#user-list-items');
     if (!listEl) return;
 
+    // Get field names from schema roles
+    const displayNameField = this.getFieldNameByRole('displayName');
+    const identifierField = this.schema?.entity?.mainAttribute || '';
+    const emailField = this.getFieldNameByRole('primaryEmail');
+
     // Filter users by search query
     const filteredUsers = this.searchQuery
       ? this.users.filter(user => {
-          const cn = this.getFirstValue(user.cn).toLowerCase();
-          const uid = this.getFirstValue(user.uid).toLowerCase();
-          const mail = this.getFirstValue(user.mail).toLowerCase();
+          const displayName = displayNameField ? this.getFirstValue(user[displayNameField]).toLowerCase() : '';
+          const identifier = this.getFirstValue(user[identifierField]).toLowerCase();
+          const email = emailField ? this.getFirstValue(user[emailField]).toLowerCase() : '';
           const query = this.searchQuery.toLowerCase();
-          return cn.includes(query) || uid.includes(query) || mail.includes(query);
+          return displayName.includes(query) || identifier.includes(query) || email.includes(query);
         })
       : this.users;
 
@@ -125,10 +169,10 @@ export class UserList {
 
     listEl.innerHTML = filteredUsers
       .map(user => {
-        const cn = this.getFirstValue(user.cn);
-        const uid = this.getFirstValue(user.uid);
-        const mail = this.getFirstValue(user.mail);
-        const displayName = cn || uid || 'Unknown';
+        const displayName = displayNameField ? this.getFirstValue(user[displayNameField]) : '';
+        const identifier = this.getFirstValue(user[identifierField]);
+        const email = emailField ? this.getFirstValue(user[emailField]) : '';
+        const name = displayName || identifier || 'Unknown';
 
         return `
       <div
@@ -138,9 +182,9 @@ export class UserList {
         <span class="material-icons">person</span>
         <div class="tree-node-content">
           <div class="tree-node-name">
-            ${displayName}
+            ${name}
           </div>
-          ${mail ? `<div class="tree-node-email">${mail}</div>` : ''}
+          ${email ? `<div class="tree-node-email">${email}</div>` : ''}
         </div>
       </div>
     `;

@@ -1,4 +1,12 @@
 {
+  "entity": {
+    "name": "adUser",
+    "mainAttribute": "sAMAccountName",
+    "objectClass": ["top", "person", "organizationalPerson", "user"],
+    "singularName": "user",
+    "pluralName": "users",
+    "base": "ou=users,__ldap_base__"
+  },
   "strict": true,
   "attributes": {
     "objectClass": {
@@ -13,7 +21,8 @@
     },
     "cn": {
       "type": "string",
-      "required": true
+      "required": true,
+      "role": "displayName"
     },
     "sAMAccountName": {
       "type": "string",

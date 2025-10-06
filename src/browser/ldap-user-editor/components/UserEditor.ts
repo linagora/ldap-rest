@@ -104,13 +104,24 @@ export class UserEditor {
     return String(value);
   }
 
+  private getFieldByRole(role: string): string {
+    if (!this.schema || !this.user) return '';
+
+    const field = Object.entries(this.schema.attributes).find(
+      ([, attr]) => attr.role === role
+    );
+
+    if (!field) return '';
+    const [fieldName] = field;
+    return this.getFirstValue(this.user[fieldName]);
+  }
+
   private render(): void {
     if (!this.user || !this.schema) return;
 
-    const userName =
-      this.getFirstValue(this.user.cn) ||
-      this.getFirstValue(this.user.uid) ||
-      'User';
+    const displayName = this.getFieldByRole('displayName');
+    const identifier = this.getFirstValue(this.user[this.schema.entity.mainAttribute]);
+    const userName = displayName || identifier || 'User';
 
     this.container.innerHTML = `
       <div class="editor-container">
@@ -141,35 +152,51 @@ export class UserEditor {
   private renderFormSections(): string {
     if (!this.schema) return '';
 
-    const sections = {
-      'Basic Information': ['uid', 'cn', 'sn', 'givenName', 'displayName'],
-      'Contact Information': [
-        'mail',
-        'mailAlternateAddress',
-        'telephoneNumber',
-        'mobile',
-      ],
-      'Email Settings': ['mailQuota', 'mailQuotaSize'],
-      Organization: ['twakeDepartmentLink', 'twakeDepartmentPath'],
-      'Advanced Settings': [
-        'twakeAccountStatus',
-        'twakeDeliveryMode',
-        'twakeDelegatedUsers',
-      ],
-    };
+    // Group fields by the 'group' attribute from schema
+    const groupedFields: Record<string, string[]> = {};
+    const ungroupedFields: string[] = [];
 
-    return Object.entries(sections)
+    for (const [fieldName, attr] of Object.entries(this.schema.attributes)) {
+      // Skip objectClass (it's fixed)
+      if (fieldName === 'objectClass') continue;
+
+      if (attr.group) {
+        if (!groupedFields[attr.group]) {
+          groupedFields[attr.group] = [];
+        }
+        groupedFields[attr.group].push(fieldName);
+      } else {
+        ungroupedFields.push(fieldName);
+      }
+    }
+
+    // Render grouped sections
+    let html = Object.entries(groupedFields)
       .map(
         ([title, fields]) => `
       <div class="form-section">
         <div class="form-section-title">${title}</div>
         <div class="form-row">
-          ${fields.map(field => this.renderField(field)).join('')}
+          ${fields.map(field => this.renderField(field)).filter(f => f).join('')}
         </div>
       </div>
     `
       )
       .join('');
+
+    // Render ungrouped fields in a default section if any
+    if (ungroupedFields.length > 0) {
+      html += `
+      <div class="form-section">
+        <div class="form-section-title">Other Fields</div>
+        <div class="form-row">
+          ${ungroupedFields.map(field => this.renderField(field)).filter(f => f).join('')}
+        </div>
+      </div>
+    `;
+    }
+
+    return html;
   }
 
   private renderField(fieldName: string): string {

@@ -27,7 +27,8 @@
     },
     "cn": {
       "type": "string",
-      "required": true
+      "required": true,
+      "role": "displayName"
     },
     "sn": {
       "type": "string",

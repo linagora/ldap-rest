@@ -3,7 +3,7 @@
  * @author Xavier Guimard
  */
 
-import type { EditorOptions } from './types';
+import type { EditorOptions, Config } from './types';
 import { UserApiClient } from './api/UserApiClient';
 import { UserTree } from './components/UserTree';
 import { UserEditor } from './components/UserEditor';
@@ -18,6 +18,7 @@ export class LdapUserEditor {
   private userList: UserList | null = null;
   private currentUserDn: string | null = null;
   private currentOrgDn: string | null = null;
+  private config: Config | null = null;
 
   constructor(options: EditorOptions) {
     this.options = {
@@ -33,6 +34,9 @@ export class LdapUserEditor {
     if (!this.container) {
       throw new Error(`Container #${this.options.containerId} not found`);
     }
+
+    // Load config first
+    this.config = await this.api.getConfig();
 
     this.render();
     await this.initComponents();

@@ -24,6 +24,7 @@ export interface SchemaAttribute {
   items?: SchemaAttribute;
   default?: unknown;
   ui?: 'select' | 'search'; // For pointer fields: select (load all) or search (autocomplete)
+  group?: string; // Group name for organizing fields in the UI
 }
 
 export interface Schema {
