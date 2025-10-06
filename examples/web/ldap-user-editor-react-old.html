@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP User Editor</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- React & ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel Standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary-color: #6366f1;
+        --primary-dark: #4f46e5;
+        --primary-light: #818cf8;
+        --success-color: #10b981;
+        --error-color: #ef4444;
+        --warning-color: #f59e0b;
+        --bg-color: #f8fafc;
+        --surface-color: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+      }
+
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: var(--text-primary);
+        line-height: 1.6;
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      #root {
+        min-height: 100vh;
+      }
+
+      /* Layout */
+      .app-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .app-header {
+        background: white;
+        color: #333;
+        padding: 32px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .app-header h1 {
+        font-size: 32px;
+        font-weight: 500;
+        color: #6200ee;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 8px;
+      }
+
+      .app-header p {
+        font-size: 16px;
+        color: #666;
+      }
+
+      .app-main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      @media (max-width: 900px) {
+        .app-main {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .demo-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow-y: auto;
+        max-height: 800px;
+      }
+
+      .demo-panel h2 {
+        font-size: 20px;
+        font-weight: 500;
+        margin-bottom: 16px;
+        color: #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .demo-panel h2 .material-icons {
+        color: #6200ee;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        background: var(--surface-color);
+        border-radius: 8px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sidebar-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background: var(--bg-color);
+      }
+
+      .sidebar-header h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .search-box {
+        position: relative;
+      }
+
+      .search-box input {
+        width: 100%;
+        padding: 0.625rem 0.75rem 0.625rem 2.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+      }
+
+      .search-box input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .search-box .material-icons {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+      }
+
+      .user-tree {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+      }
+
+      .tree-node {
+        padding: 0.75rem;
+        margin: 0.25rem 0;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .tree-node:hover {
+        background: var(--bg-color);
+      }
+
+      .tree-node.active {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      .tree-node .material-icons {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+      }
+
+      .tree-node.active .material-icons {
+        color: var(--primary-color);
+      }
+
+      .tree-node-content {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .tree-node-name {
+        font-size: 0.875rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .tree-node-email {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Main content */
+      .content {
+        background: white;
+        border-radius: 8px;
+        overflow-y: auto;
+        padding: 24px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        color: #999;
+        text-align: center;
+      }
+
+      .empty-state .material-icons {
+        font-size: 48px;
+        color: #ddd;
+        margin-bottom: 8px;
+      }
+
+      .empty-state p {
+        font-size: 1rem;
+        font-style: italic;
+      }
+
+      /* Editor */
+      .editor-container {
+        width: 100%;
+      }
+
+      .editor-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f0f0f0;
+      }
+
+      .editor-header .material-icons {
+        font-size: 32px;
+        color: #42a5f5;
+      }
+
+      .editor-title h3 {
+        font-size: 18px;
+        font-weight: 500;
+        color: #333;
+      }
+
+      .editor-title .dn {
+        font-size: 11px;
+        color: #999;
+        margin-top: 4px;
+      }
+
+      .editor-actions {
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        background: #6200ee;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .btn:hover:not(:disabled) {
+        background: #3700b3;
+      }
+
+      .btn-secondary {
+        background: #ccc;
+        color: #333;
+      }
+
+      .btn-secondary:hover:not(:disabled) {
+        background: #aaa;
+      }
+
+      .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .editor-form {
+        background: var(--surface-color);
+        padding: 2rem;
+        border-radius: 0.75rem;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .form-section {
+        margin-bottom: 2rem;
+      }
+
+      .form-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .form-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .form-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      .form-label .required {
+        color: var(--error-color);
+      }
+
+      .form-input,
+      .form-select,
+      .form-textarea {
+        padding: 0.625rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition: all 0.2s;
+      }
+
+      .form-input:focus,
+      .form-select:focus,
+      .form-textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .form-input:disabled,
+      .form-select:disabled,
+      .form-textarea:disabled {
+        background: var(--bg-color);
+        color: var(--text-secondary);
+        cursor: not-allowed;
+      }
+
+      .form-textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      .form-hint {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 0.25rem;
+      }
+
+      .form-error {
+        font-size: 0.75rem;
+        color: var(--error-color);
+        margin-top: 0.25rem;
+      }
+
+      /* Alert */
+      .alert {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .alert-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+
+      .alert-error {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      .alert .material-icons {
+        font-size: 20px;
+      }
+
+      /* Loading */
+      .loading {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-secondary);
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 2rem;
+        height: 2rem;
+        border: 3px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Array field */
+      .array-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .array-item {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .array-item input,
+      .array-item select {
+        flex: 1;
+      }
+
+      .btn-icon {
+        padding: 0.5rem;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .btn-icon .material-icons {
+        font-size: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useCallback } = React;
+
+      // API Client
+      const API_BASE = window.location.origin + '/api/v1';
+
+      const api = {
+        async getConfig() {
+          const res = await fetch(`${API_BASE}/config`);
+          if (!res.ok) throw new Error('Failed to fetch config');
+          return res.json();
+        },
+
+        async getSchema(schemaUrl) {
+          const res = await fetch(schemaUrl);
+          if (!res.ok) throw new Error('Failed to fetch schema');
+          return res.json();
+        },
+
+        async getUsers(base, search = '') {
+          const url = search
+            ? `${API_BASE}/ldap/flat/users/list?q=${encodeURIComponent(search)}`
+            : `${API_BASE}/ldap/flat/users/list`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Failed to fetch users');
+          return res.json();
+        },
+
+        async getUser(dn) {
+          const res = await fetch(
+            `${API_BASE}/ldap/flat/users/${encodeURIComponent(dn)}`
+          );
+          if (!res.ok) throw new Error('Failed to fetch user');
+          return res.json();
+        },
+
+        async updateUser(dn, data) {
+          const res = await fetch(
+            `${API_BASE}/ldap/flat/users/${encodeURIComponent(dn)}`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data),
+            }
+          );
+          if (!res.ok) {
+            const error = await res.text();
+            throw new Error(error || 'Failed to update user');
+          }
+          return res.json();
+        },
+
+        async getPointerOptions(branch) {
+          // Extract the resource type from branch (e.g., "ou=twakeAccountStatus,ou=nomenclature,...")
+          const match = branch.match(/^ou=([^,]+)/);
+          if (!match) throw new Error('Invalid branch format');
+
+          const resourceType = match[1];
+          const res = await fetch(`${API_BASE}/ldap/flat/${resourceType}/list`);
+          if (!res.ok) throw new Error(`Failed to fetch ${resourceType} options`);
+          return res.json();
+        },
+
+        async getUsersForPointer(branch) {
+          // For user pointers (delegation)
+          const res = await fetch(`${API_BASE}/ldap/flat/users/list`);
+          if (!res.ok) throw new Error('Failed to fetch users');
+          return res.json();
+        },
+      };
+
+      // UserTree Component
+      function UserTree({ onSelectUser, selectedDn }) {
+        const [users, setUsers] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [searchQuery, setSearchQuery] = useState('');
+
+        useEffect(() => {
+          loadUsers();
+        }, [searchQuery]);
+
+        const loadUsers = async () => {
+          try {
+            setLoading(true);
+            const data = await api.getUsers('', searchQuery);
+            setUsers(data);
+          } catch (error) {
+            console.error('Failed to load users:', error);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        return (
+          <div className="sidebar">
+            <div className="sidebar-header">
+              <h2>
+                <span className="material-icons">people</span>
+                Users
+              </h2>
+              <div className="search-box">
+                <span className="material-icons">search</span>
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="user-tree">
+              {loading ? (
+                <div className="loading">
+                  <div className="spinner"></div>
+                </div>
+              ) : users.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  No users found
+                </div>
+              ) : (
+                users.map((user) => (
+                  <div
+                    key={user.dn}
+                    className={`tree-node ${selectedDn === user.dn ? 'active' : ''}`}
+                    onClick={() => onSelectUser(user.dn)}
+                  >
+                    <span className="material-icons">person</span>
+                    <div className="tree-node-content">
+                      <div className="tree-node-name">
+                        {user.cn?.[0] || user.uid?.[0] || 'Unknown'}
+                      </div>
+                      {user.mail?.[0] && (
+                        <div className="tree-node-email">{user.mail[0]}</div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // PointerField Component
+      function PointerField({ label, value, onChange, required, branch, isArray = false }) {
+        const [options, setOptions] = useState([]);
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+          loadOptions();
+        }, [branch]);
+
+        const loadOptions = async () => {
+          try {
+            setLoading(true);
+            // Check if it's a user pointer (for delegation)
+            if (branch.includes('ou=users')) {
+              const users = await api.getUsersForPointer(branch);
+              setOptions(users.map(u => ({
+                dn: u.dn,
+                label: `${u.cn?.[0] || u.uid?.[0]} (${u.mail?.[0] || u.dn})`,
+              })));
+            } else {
+              const items = await api.getPointerOptions(branch);
+              setOptions(items.map(item => ({
+                dn: item.dn,
+                label: item.cn?.[0] || item.ou?.[0] || item.dn,
+              })));
+            }
+          } catch (error) {
+            console.error('Failed to load options:', error);
+            setOptions([]);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        if (isArray) {
+          const values = Array.isArray(value) ? value : [];
+
+          const addValue = () => {
+            onChange([...values, '']);
+          };
+
+          const removeValue = (index) => {
+            onChange(values.filter((_, i) => i !== index));
+          };
+
+          const updateValue = (index, newValue) => {
+            const newValues = [...values];
+            newValues[index] = newValue;
+            onChange(newValues);
+          };
+
+          return (
+            <div className="form-group">
+              <label className="form-label">
+                {label}
+                {required && <span className="required">*</span>}
+              </label>
+              <div className="array-field">
+                {values.map((val, index) => (
+                  <div key={index} className="array-item">
+                    <select
+                      className="form-select"
+                      value={val || ''}
+                      onChange={(e) => updateValue(index, e.target.value)}
+                      disabled={loading}
+                    >
+                      <option value="">Select...</option>
+                      {options.map((opt) => (
+                        <option key={opt.dn} value={opt.dn}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-icon"
+                      onClick={() => removeValue(index)}
+                    >
+                      <span className="material-icons">remove</span>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={addValue}
+                  style={{ width: 'fit-content' }}
+                >
+                  <span className="material-icons">add</span>
+                  Add {label}
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="form-group">
+            <label className="form-label">
+              {label}
+              {required && <span className="required">*</span>}
+            </label>
+            <select
+              className="form-select"
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              required={required}
+              disabled={loading}
+            >
+              <option value="">Select...</option>
+              {options.map((opt) => (
+                <option key={opt.dn} value={opt.dn}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {loading && <span className="form-hint">Loading options...</span>}
+          </div>
+        );
+      }
+
+      // UserEditor Component
+      function UserEditor({ userDn, onSaved, onCancel }) {
+        const [user, setUser] = useState(null);
+        const [schema, setSchema] = useState(null);
+        const [formData, setFormData] = useState({});
+        const [loading, setLoading] = useState(true);
+        const [saving, setSaving] = useState(false);
+        const [error, setError] = useState(null);
+        const [success, setSuccess] = useState(false);
+
+        useEffect(() => {
+          loadUserAndSchema();
+        }, [userDn]);
+
+        const loadUserAndSchema = async () => {
+          try {
+            setLoading(true);
+            setError(null);
+
+            // Load config to get schema URL
+            const config = await api.getConfig();
+            const schemaUrl = config.flatResources?.users?.schemaUrl;
+
+            if (!schemaUrl) {
+              throw new Error('Users schema not configured');
+            }
+
+            // Load schema and user in parallel
+            const [schemaData, userData] = await Promise.all([
+              api.getSchema(schemaUrl),
+              api.getUser(userDn),
+            ]);
+
+            setSchema(schemaData);
+            setUser(userData);
+            setFormData(userData);
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setError(null);
+          setSuccess(false);
+          setSaving(true);
+
+          try {
+            await api.updateUser(userDn, formData);
+            setSuccess(true);
+            if (onSaved) onSaved();
+          } catch (err) {
+            setError(err.message);
+          } finally {
+            setSaving(false);
+          }
+        };
+
+        const updateField = (field, value) => {
+          setFormData((prev) => ({ ...prev, [field]: value }));
+        };
+
+        if (loading) {
+          return (
+            <div className="loading">
+              <div className="spinner"></div>
+              <p style={{ marginTop: '1rem' }}>Loading user data...</p>
+            </div>
+          );
+        }
+
+        if (!user || !schema) {
+          return (
+            <div className="alert alert-error">
+              <span className="material-icons">error</span>
+              <div>Failed to load user data</div>
+            </div>
+          );
+        }
+
+        const { attributes } = schema;
+
+        // Group attributes by section
+        const basicFields = ['uid', 'cn', 'sn', 'givenName', 'displayName'];
+        const contactFields = ['mail', 'mailAlternateAddress', 'telephoneNumber', 'mobile'];
+        const emailFields = ['mailQuota', 'mailQuotaSize'];
+        const organizationFields = ['twakeDepartmentLink', 'twakeDepartmentPath'];
+        const advancedFields = ['twakeAccountStatus', 'twakeDeliveryMode', 'twakeDelegatedUsers'];
+
+        const renderField = (fieldName) => {
+          const attr = attributes[fieldName];
+          if (!attr) return null;
+
+          // Skip fixed fields - they cannot be edited
+          if (attr.fixed) {
+            return null;
+          }
+
+          // Show identifier fields as disabled
+          if (attr.role === 'identifier') {
+            return (
+              <div key={fieldName} className="form-group">
+                <label className="form-label">{fieldName}</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={Array.isArray(formData[fieldName]) ? formData[fieldName][0] : formData[fieldName] || ''}
+                  disabled
+                />
+              </div>
+            );
+          }
+
+          // Pointer fields
+          if (attr.type === 'pointer') {
+            const branch = attr.branch?.[0];
+            if (!branch) return null;
+
+            return (
+              <PointerField
+                key={fieldName}
+                label={fieldName}
+                value={formData[fieldName] || ''}
+                onChange={(val) => updateField(fieldName, val)}
+                required={attr.required}
+                branch={branch}
+              />
+            );
+          }
+
+          // Array fields
+          if (attr.type === 'array') {
+            // Array of pointers
+            if (attr.items?.type === 'pointer') {
+              const branch = attr.items.branch?.[0];
+              if (!branch) return null;
+
+              return (
+                <PointerField
+                  key={fieldName}
+                  label={fieldName}
+                  value={formData[fieldName] || []}
+                  onChange={(val) => updateField(fieldName, val)}
+                  required={attr.required}
+                  branch={branch}
+                  isArray={true}
+                />
+              );
+            }
+
+            // Array of strings
+            const values = Array.isArray(formData[fieldName]) ? formData[fieldName] : [];
+
+            return (
+              <div key={fieldName} className="form-group">
+                <label className="form-label">
+                  {fieldName}
+                  {attr.required && <span className="required">*</span>}
+                </label>
+                <div className="array-field">
+                  {values.map((val, index) => (
+                    <div key={index} className="array-item">
+                      <input
+                        type={attr.items?.type === 'string' && attr.items?.test?.includes('@') ? 'email' : 'text'}
+                        className="form-input"
+                        value={val}
+                        onChange={(e) => {
+                          const newValues = [...values];
+                          newValues[index] = e.target.value;
+                          updateField(fieldName, newValues);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-icon"
+                        onClick={() => {
+                          updateField(fieldName, values.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <span className="material-icons">remove</span>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => updateField(fieldName, [...values, ''])}
+                    style={{ width: 'fit-content' }}
+                  >
+                    <span className="material-icons">add</span>
+                    Add {fieldName}
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          // Number fields
+          if (attr.type === 'number' || attr.type === 'integer') {
+            return (
+              <div key={fieldName} className="form-group">
+                <label className="form-label">
+                  {fieldName}
+                  {attr.required && <span className="required">*</span>}
+                </label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={formData[fieldName] || ''}
+                  onChange={(e) => updateField(fieldName, e.target.value ? parseInt(e.target.value) : '')}
+                  required={attr.required}
+                />
+              </div>
+            );
+          }
+
+          // String fields
+          return (
+            <div key={fieldName} className="form-group">
+              <label className="form-label">
+                {fieldName}
+                {attr.required && <span className="required">*</span>}
+              </label>
+              <input
+                type={attr.test?.includes('@') ? 'email' : fieldName === 'userPassword' ? 'password' : 'text'}
+                className="form-input"
+                value={formData[fieldName] || ''}
+                onChange={(e) => updateField(fieldName, e.target.value)}
+                required={attr.required}
+              />
+            </div>
+          );
+        };
+
+        return (
+          <div className="editor-container">
+            <div className="editor-header">
+              <span className="material-icons">person</span>
+              <div className="editor-title">
+                <h3>{user.cn?.[0] || user.uid?.[0] || 'User'}</h3>
+                <div className="dn">{userDn}</div>
+              </div>
+            </div>
+
+            {success && (
+              <div className="alert alert-success">
+                <span className="material-icons">check_circle</span>
+                <div>User updated successfully!</div>
+              </div>
+            )}
+
+            {error && (
+              <div className="alert alert-error">
+                <span className="material-icons">error</span>
+                <div>{error}</div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="editor-form">
+              <div className="form-section">
+                <div className="form-section-title">Basic Information</div>
+                <div className="form-row">
+                  {basicFields.map(renderField)}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Contact Information</div>
+                <div className="form-row">
+                  {contactFields.map(renderField)}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Email Settings</div>
+                <div className="form-row">
+                  {emailFields.map(renderField)}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Organization</div>
+                <div className="form-row">
+                  {organizationFields.map(renderField)}
+                </div>
+              </div>
+
+              <div className="form-section">
+                <div className="form-section-title">Advanced Settings</div>
+                <div className="form-row">
+                  {advancedFields.map(renderField)}
+                </div>
+              </div>
+
+              <div className="editor-actions" style={{ marginTop: '2rem', justifyContent: 'flex-end' }}>
+                {onCancel && (
+                  <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                    Cancel
+                  </button>
+                )}
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <div className="spinner" style={{ width: '1rem', height: '1rem', borderWidth: '2px' }}></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-icons">save</span>
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      }
+
+      // Main App Component
+      function App() {
+        const [selectedUserDn, setSelectedUserDn] = useState(null);
+
+        return (
+          <div className="app-container">
+            <div className="app-header">
+              <h1>
+                <span className="material-icons">admin_panel_settings</span>
+                LDAP User Editor
+              </h1>
+              <p>Manage and edit LDAP users</p>
+            </div>
+            <div className="app-main">
+              <UserTree
+                onSelectUser={setSelectedUserDn}
+                selectedDn={selectedUserDn}
+              />
+              <div className="content">
+                {selectedUserDn ? (
+                  <UserEditor
+                    key={selectedUserDn}
+                    userDn={selectedUserDn}
+                    onSaved={() => {}}
+                  />
+                ) : (
+                  <div className="empty-state">
+                    <span className="material-icons">person_search</span>
+                    <p>Select a user from the list to edit</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Render App
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
