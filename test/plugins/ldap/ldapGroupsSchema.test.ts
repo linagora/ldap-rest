@@ -2,6 +2,8 @@ import { expect } from 'chai';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 
@@ -34,7 +36,16 @@ describe('LdapGroups validation', function () {
 
   before(async () => {
     server = new DM();
-    process.env.DM_GROUP_SCHEMA = '../../static/schemas/twake/groups.json';
+    process.env.DM_GROUP_SCHEMA = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      '..',
+      'static',
+      'schemas',
+      'twake',
+      'groups.json'
+    );
     plugin = new LdapGroups(server);
     const entry = {
       objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],

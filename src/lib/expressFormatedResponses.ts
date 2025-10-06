@@ -92,7 +92,13 @@ export const tooManyRequests = (
 
 // We don't want to publish the real error in server responses
 export const serverError = (res: Response, err: unknown): void => {
-  _logger.error(err);
+  if (err instanceof Error) {
+    _logger.error(err.message, err);
+  } else if (typeof err === 'string') {
+    _logger.error(err);
+  } else {
+    _logger.error('Server error', err);
+  }
   res.status(500).json({ error: 'check logs' });
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>
