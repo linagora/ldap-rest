@@ -76,6 +76,14 @@
       "type": "pointer",
       "branch": ["ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"],
       "required": true
+    },
+    "twakeDelegatedUsers": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      },
+      "required": false
     }
   }
 }
