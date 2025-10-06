@@ -88,19 +88,21 @@ export default class James extends DmPlugin {
         }
       }
 
-      // Create aliases if present
+      // Create aliases if present (parallelize API calls)
       if (aliases) {
         const aliasList = this.getAliases(aliases);
-        for (const alias of aliasList) {
-          await this._try(
-            'ldapadddone:alias',
-            `${this.config.james_webadmin_url}/address/aliases/${mailStr}/sources/${alias}`,
-            'PUT',
-            dn,
-            null,
-            { mail: mailStr, alias }
-          );
-        }
+        await Promise.all(
+          aliasList.map(alias =>
+            this._try(
+              'ldapadddone:alias',
+              `${this.config.james_webadmin_url}/address/aliases/${mailStr}/sources/${alias}`,
+              'PUT',
+              dn,
+              null,
+              { mail: mailStr, alias }
+            )
+          )
+        );
       }
 
       // Initialize James identity
@@ -179,29 +181,29 @@ export default class James extends DmPlugin {
       // Find aliases to add (in new but not in old)
       const toAdd = newNormalized.filter(a => !oldNormalized.includes(a));
 
-      // Delete removed aliases
-      for (const alias of toDelete) {
-        await this._try(
-          'onLdapAliasChange-delete',
-          `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
-          'DELETE',
-          dn,
-          null,
-          { mail, alias, action: 'delete' }
-        );
-      }
-
-      // Add new aliases
-      for (const alias of toAdd) {
-        await this._try(
-          'onLdapAliasChange-add',
-          `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
-          'PUT',
-          dn,
-          null,
-          { mail, alias, action: 'add' }
-        );
-      }
+      // Delete and add aliases in parallel
+      await Promise.all([
+        ...toDelete.map(alias =>
+          this._try(
+            'onLdapAliasChange-delete',
+            `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
+            'DELETE',
+            dn,
+            null,
+            { mail, alias, action: 'delete' }
+          )
+        ),
+        ...toAdd.map(alias =>
+          this._try(
+            'onLdapAliasChange-add',
+            `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
+            'PUT',
+            dn,
+            null,
+            { mail, alias, action: 'add' }
+          )
+        ),
+      ]);
     },
     onLdapQuotaChange: (
       dn: string,
@@ -238,29 +240,29 @@ export default class James extends DmPlugin {
       // Find forwards to add (in new but not in old)
       const toAdd = newForwards.filter(f => !oldForwards.includes(f));
 
-      // Delete removed forwards
-      for (const forward of toDelete) {
-        await this._try(
-          'onLdapForwardChange-delete',
-          `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
-          'DELETE',
-          dn,
-          null,
-          { mail, forward, domain, action: 'delete' }
-        );
-      }
-
-      // Add new forwards
-      for (const forward of toAdd) {
-        await this._try(
-          'onLdapForwardChange-add',
-          `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
-          'PUT',
-          dn,
-          null,
-          { mail, forward, domain, action: 'add' }
-        );
-      }
+      // Delete and add forwards in parallel
+      await Promise.all([
+        ...toDelete.map(forward =>
+          this._try(
+            'onLdapForwardChange-delete',
+            `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+            'DELETE',
+            dn,
+            null,
+            { mail, forward, domain, action: 'delete' }
+          )
+        ),
+        ...toAdd.map(forward =>
+          this._try(
+            'onLdapForwardChange-add',
+            `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+            'PUT',
+            dn,
+            null,
+            { mail, forward, domain, action: 'add' }
+          )
+        ),
+      ]);
     },
 
     onLdapChange: async (dn: string, changes: ChangesToNotify) => {
@@ -277,26 +279,46 @@ export default class James extends DmPlugin {
       oldDisplayName: string | null,
       newDisplayName: string | null
     ) => {
-      // Get mail address from DN
-      const mail = await this.getMailFromDN(dn);
-      if (!mail) {
-        this.logger.warn(
-          `Cannot update James identity: no mail found for ${dn}`
-        );
-        return;
-      }
+      // Get mail and display name in a single LDAP query
+      try {
+        const attrs = [
+          this.config.mail_attribute || 'mail',
+          this.config.display_name_attribute || 'displayName',
+          'cn',
+          'givenName',
+          'sn',
+        ];
+        const result = (await this.server.ldap.search(
+          { paged: false, scope: 'base', attributes: attrs },
+          dn
+        )) as import('../../lib/ldapActions').SearchResult;
 
-      // Get display name with fallback logic
-      const displayName = await this.getDisplayNameFromDN(dn);
-      if (!displayName) {
-        this.logger.warn(
-          `Cannot update James identity: no display name found for ${dn}`
-        );
-        return;
-      }
+        if (!result.searchEntries || result.searchEntries.length === 0) {
+          this.logger.warn(`Cannot update James identity: entry not found for ${dn}`);
+          return;
+        }
 
-      // Update James identity via JMAP
-      return this.updateJamesIdentity(dn, mail, displayName);
+        const entry = result.searchEntries[0];
+        const mailAttr = this.config.mail_attribute || 'mail';
+        const mail = this.attributeToString(entry[mailAttr]);
+
+        if (!mail) {
+          this.logger.warn(`Cannot update James identity: no mail found for ${dn}`);
+          return;
+        }
+
+        const displayName = this.getDisplayNameFromAttributes(entry);
+        if (!displayName) {
+          this.logger.warn(`Cannot update James identity: no display name found for ${dn}`);
+          return;
+        }
+
+        // Update James identity via JMAP
+        return this.updateJamesIdentity(dn, mail, displayName);
+      } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.logger.error(`Failed to process display name change for ${dn}: ${err}`);
+      }
     },
 
     // Group/mailing list hooks
@@ -324,17 +346,19 @@ export default class James extends DmPlugin {
       // Get email addresses for all members
       const memberMails = await this.getMemberEmails(memberList);
 
-      // Add each member to the James address group
-      for (const memberMail of memberMails) {
-        await this._try(
-          'ldapgroupadddone',
-          `${this.config.james_webadmin_url}/address/groups/${mailStr}/${memberMail}`,
-          'PUT',
-          dn,
-          null,
-          { groupMail: mailStr, memberMail }
-        );
-      }
+      // Add each member to the James address group (parallelize)
+      await Promise.all(
+        memberMails.map(memberMail =>
+          this._try(
+            'ldapgroupadddone',
+            `${this.config.james_webadmin_url}/address/groups/${mailStr}/${memberMail}`,
+            'PUT',
+            dn,
+            null,
+            { groupMail: mailStr, memberMail }
+          )
+        )
+      );
     },
 
     ldapgroupmodifydone: async (
@@ -359,25 +383,28 @@ export default class James extends DmPlugin {
         return;
       }
 
-      // Handle member additions
+      // Handle member additions and deletions in parallel
+      const operations: Promise<void>[] = [];
+
       if (changes.add?.member) {
         const addMember = changes.add.member as string | string[];
         const membersToAdd = Array.isArray(addMember) ? addMember : [addMember];
         const memberMails = await this.getMemberEmails(membersToAdd);
 
-        for (const memberMail of memberMails) {
-          await this._try(
-            'ldapgroupmodifydone',
-            `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
-            'PUT',
-            dn,
-            null,
-            { groupMail, memberMail, action: 'add' }
-          );
-        }
+        operations.push(
+          ...memberMails.map(memberMail =>
+            this._try(
+              'ldapgroupmodifydone',
+              `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
+              'PUT',
+              dn,
+              null,
+              { groupMail, memberMail, action: 'add' }
+            )
+          )
+        );
       }
 
-      // Handle member deletions
       if (this.isAttributesList(changes.delete)) {
         const deleteMember = changes.delete.member as
           | string
@@ -389,18 +416,22 @@ export default class James extends DmPlugin {
             : [deleteMember];
           const memberMails = await this.getMemberEmails(membersToDelete);
 
-          for (const memberMail of memberMails) {
-            await this._try(
-              'ldapgroupmodifydone',
-              `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
-              'DELETE',
-              dn,
-              null,
-              { groupMail, memberMail, action: 'delete' }
-            );
-          }
+          operations.push(
+            ...memberMails.map(memberMail =>
+              this._try(
+                'ldapgroupmodifydone',
+                `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
+                'DELETE',
+                dn,
+                null,
+                { groupMail, memberMail, action: 'delete' }
+              )
+            )
+          );
         }
       }
+
+      await Promise.all(operations);
     },
 
     ldapgroupdeletedone: async (dn: string) => {
@@ -426,6 +457,17 @@ export default class James extends DmPlugin {
   };
 
   /**
+   * Helper to convert LDAP attribute value to string
+   */
+  private attributeToString(value: unknown): string | null {
+    if (!value) return null;
+    if (Array.isArray(value)) {
+      return value.length > 0 ? String(value[0]) : null;
+    }
+    return String(value as string | Buffer);
+  }
+
+  /**
    * Extract display name from LDAP attributes
    * Fallback logic: displayName → cn → givenName+sn → mail
    */
@@ -435,26 +477,17 @@ export default class James extends DmPlugin {
     const displayNameAttr = this.config.display_name_attribute || 'displayName';
     const mailAttr = this.config.mail_attribute || 'mail';
 
-    // Helper to convert LDAP attribute value to string
-    const toString = (value: unknown): string | null => {
-      if (!value) return null;
-      if (Array.isArray(value)) {
-        return value.length > 0 ? String(value[0]) : null;
-      }
-      return String(value as string | Buffer);
-    };
-
     // 1. Try displayName first
-    const displayName = toString(attributes[displayNameAttr]);
+    const displayName = this.attributeToString(attributes[displayNameAttr]);
     if (displayName) return displayName;
 
     // 2. Try cn
-    const cn = toString(attributes.cn);
+    const cn = this.attributeToString(attributes.cn);
     if (cn) return cn;
 
     // 3. Try givenName + sn
-    const givenName = toString(attributes.givenName);
-    const sn = toString(attributes.sn);
+    const givenName = this.attributeToString(attributes.givenName);
+    const sn = this.attributeToString(attributes.sn);
     if (givenName || sn) {
       const parts = [];
       if (givenName) parts.push(givenName);
@@ -463,7 +496,7 @@ export default class James extends DmPlugin {
     }
 
     // 4. Fallback to mail
-    const mail = toString(attributes[mailAttr]);
+    const mail = this.attributeToString(attributes[mailAttr]);
     if (mail) return mail;
 
     return null;
@@ -502,42 +535,7 @@ export default class James extends DmPlugin {
       )) as import('../../lib/ldapActions').SearchResult;
 
       if (result.searchEntries && result.searchEntries.length > 0) {
-        const entry = result.searchEntries[0];
-        const displayNameAttr =
-          this.config.display_name_attribute || 'displayName';
-
-        // Helper to convert LDAP attribute value to string
-        const toString = (value: unknown): string | null => {
-          if (!value) return null;
-          if (Array.isArray(value)) {
-            return value.length > 0 ? String(value[0]) : null;
-          }
-          // LDAP values are typically strings or Buffers
-          return String(value as string | Buffer);
-        };
-
-        // 1. Try displayName first
-        const displayName = toString(entry[displayNameAttr]);
-        if (displayName) return displayName;
-
-        // 2. Try cn
-        const cn = toString(entry.cn);
-        if (cn) return cn;
-
-        // 3. Try givenName + sn
-        const givenName = toString(entry.givenName);
-        const sn = toString(entry.sn);
-        if (givenName || sn) {
-          const parts = [];
-          if (givenName) parts.push(givenName);
-          if (sn) parts.push(sn);
-          return parts.join(' ');
-        }
-
-        // 4. Fallback to mail
-        const mailAttr = this.config.mail_attribute || 'mail';
-        const mail = toString(entry[mailAttr]);
-        if (mail) return mail;
+        return this.getDisplayNameFromAttributes(result.searchEntries[0]);
       }
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -563,16 +561,6 @@ export default class James extends DmPlugin {
 
       const entry: AttributesList = result.searchEntries[0] as AttributesList;
 
-      // Helper to convert LDAP attribute value to string
-      const toString = (value: unknown): string => {
-        if (!value) return '';
-        if (Array.isArray(value)) {
-          return value.length > 0 ? String(value[0]) : '';
-        }
-        // LDAP values are typically strings or Buffers
-        return String(value as string | Buffer);
-      };
-
       // Replace all {attributeName} placeholders with LDAP values
       let signature = template;
       const placeholderRegex = /\{(\w+)\}/g;
@@ -586,7 +574,7 @@ export default class James extends DmPlugin {
             typeof entry === 'object' &&
             Object.prototype.hasOwnProperty.call(entry, attrName)
           ) {
-            return toString((entry as Record<string, unknown>)[attrName]);
+            return this.attributeToString((entry as Record<string, unknown>)[attrName]) || '';
           }
           return '';
         }
@@ -776,9 +764,10 @@ export default class James extends DmPlugin {
     dn: string,
     changes: ChangesToNotify
   ): Promise<void> {
-    // Get the user's mail attribute from LDAP
+    // Get the user's mail attribute from LDAP (only fetch mail attribute)
+    const mailAttr = this.config.mail_attribute || 'mail';
     const entry = (await this.server.ldap.search(
-      { paged: false },
+      { paged: false, scope: 'base', attributes: [mailAttr] },
       dn
     )) as SearchResult;
     if (!entry.searchEntries || entry.searchEntries.length !== 1) {
@@ -791,7 +780,7 @@ export default class James extends DmPlugin {
       return;
     }
 
-    const userMail = entry.searchEntries[0].mail;
+    const userMail = entry.searchEntries[0][mailAttr];
     if (!userMail || typeof userMail !== 'string') {
       this.logger.warn({
         plugin: this.name,
@@ -818,35 +807,42 @@ export default class James extends DmPlugin {
       delegateDN => !newDNs.includes(delegateDN)
     );
 
-    // Process additions
+    // Process additions and removals in parallel
+    const operations: Promise<void>[] = [];
+
     for (const delegateDN of addedDNs) {
       const delegateEmail = await this._getDelegateEmail(delegateDN);
       if (delegateEmail) {
-        await this._try(
-          'onLdapChange:addDelegation',
-          `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
-          'PUT',
-          dn,
-          null,
-          { userMail, delegateEmail, delegateDN, action: 'add' }
+        operations.push(
+          this._try(
+            'onLdapChange:addDelegation',
+            `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            'PUT',
+            dn,
+            null,
+            { userMail, delegateEmail, delegateDN, action: 'add' }
+          )
         );
       }
     }
 
-    // Process removals
     for (const delegateDN of removedDNs) {
       const delegateEmail = await this._getDelegateEmail(delegateDN);
       if (delegateEmail) {
-        await this._try(
-          'onLdapChange:removeDelegation',
-          `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
-          'DELETE',
-          dn,
-          null,
-          { userMail, delegateEmail, delegateDN, action: 'remove' }
+        operations.push(
+          this._try(
+            'onLdapChange:removeDelegation',
+            `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            'DELETE',
+            dn,
+            null,
+            { userMail, delegateEmail, delegateDN, action: 'remove' }
+          )
         );
       }
     }
+
+    await Promise.all(operations);
   }
 
   async _getDelegateEmail(dn: string): Promise<string | null> {
