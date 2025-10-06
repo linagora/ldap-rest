@@ -19,6 +19,42 @@ export default class James extends DmPlugin {
   };
 
   hooks: Hooks = {
+    ldapadddone: async (args: [string, AttributesList]) => {
+      const [dn, attributes] = args;
+      // Initialize quota when user is created
+      const mailAttr = this.config.mail_attribute || 'mail';
+      const quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
+
+      const mail = attributes[mailAttr];
+      const quota = attributes[quotaAttr];
+
+      if (!mail || !quota) {
+        // Not a user with mail/quota, skip
+        return;
+      }
+
+      const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+      // Handle both string and number values (LDAP stores as string, but accepts both)
+      const quotaNum = Array.isArray(quota) ? Number(quota[0]) : Number(quota);
+
+      if (isNaN(quotaNum) || quotaNum <= 0) {
+        // Invalid quota, skip
+        return;
+      }
+
+      // Wait a bit to ensure James has created the user
+      // eslint-disable-next-line no-undef
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      return this._try(
+        'ldapadddone',
+        `${this.config.james_webadmin_url}/quota/users/${mailStr}/size`,
+        'PUT',
+        dn,
+        quotaNum.toString(),
+        { mail: mailStr, quota: quotaNum }
+      );
+    },
     onLdapMailChange: (dn: string, oldmail: string, newmail: string) => {
       return this._try(
         'onLdapMailChange',

@@ -9,6 +9,7 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 
 describe('James Plugin', () => {
   const testDN = `uid=testusermail,${process.env.DM_LDAP_BASE}`;
+  const testDNQuota = `uid=quotauser,${process.env.DM_LDAP_BASE}`;
   let dm: DM;
   let james: James;
   let ldapGroups: LdapGroups;
@@ -20,7 +21,13 @@ describe('James Plugin', () => {
       //.post(new RegExp('users/testmail@test.org/rename/t@t.org.*'))
       .persist()
       .post('/users/testmail@test.org/rename/t@t.org?action=rename')
-      .reply(200, { success: true });
+      .reply(200, { success: true })
+      .put('/quota/users/testmail@test.org/size', '50000000')
+      .reply(204)
+      .put('/quota/users/testmail@test.org/size', '100000000')
+      .reply(204)
+      .put('/quota/users/quotauser@test.org/size', '75000000')
+      .reply(204);
     nock.disableNetConnect();
   });
 
@@ -44,9 +51,14 @@ describe('James Plugin', () => {
   });
 
   afterEach(async () => {
-    // Clean up: delete the test entry if it exists
+    // Clean up: delete the test entries if they exist
     try {
       await dm.ldap.delete(testDN);
+    } catch (err) {
+      // Ignore errors if the entry does not exist
+    }
+    try {
+      await dm.ldap.delete(testDNQuota);
     } catch (err) {
       // Ignore errors if the entry does not exist
     }
@@ -66,6 +78,39 @@ describe('James Plugin', () => {
       replace: { mail: 't@t.org' },
     });
     expect(res).to.be.true;
+  });
+
+  describe('Quota management', () => {
+    it('should initialize quota when user is created', async () => {
+      const entry = {
+        objectClass: ['top', 'twakeAccount'],
+        uid: 'quotauser',
+        mail: 'quotauser@test.org',
+        mailQuotaSize: '75000000',
+      };
+      const res = await dm.ldap.add(testDNQuota, entry);
+      expect(res).to.be.true;
+
+      // Wait for ldapadddone hook to execute
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    });
+
+    it('should update quota when modified in LDAP', async () => {
+      const entry = {
+        objectClass: ['top', 'twakeAccount'],
+        uid: 'testusermail',
+        mail: 'testmail@test.org',
+        mailQuotaSize: '50000000',
+      };
+      let res = await dm.ldap.add(testDN, entry);
+      expect(res).to.be.true;
+
+      // Modify quota
+      res = await dm.ldap.modify(testDN, {
+        replace: { mailQuotaSize: '100000000' },
+      });
+      expect(res).to.be.true;
+    });
   });
 
   describe('Delegation', () => {
