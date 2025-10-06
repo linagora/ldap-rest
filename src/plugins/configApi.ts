@@ -26,6 +26,7 @@ interface FlatResourceConfig {
   objectClass: string[];
   base: string;
   schema: Schema;
+  schemaUrl?: string;
   endpoints: {
     list: string;
     get: string;
@@ -41,6 +42,7 @@ interface GroupsConfig {
   mainAttribute: string;
   objectClass: string[];
   schema?: Schema;
+  schemaUrl?: string;
   endpoints: {
     list: string;
     get: string;
@@ -60,6 +62,8 @@ interface OrganizationsConfig {
   pathAttribute: string;
   pathSeparator: string;
   maxSubnodes: number;
+  schema?: Schema;
+  schemaUrl?: string;
   endpoints: {
     getTop: string;
     get: string;
@@ -119,6 +123,34 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * Generate schema URL if static plugin is loaded
+   */
+  private getSchemaUrl(schemaPath: string): string | undefined {
+    // Check if static plugin is loaded
+    if (!this.server.loadedPlugins['static']) {
+      return undefined;
+    }
+
+    const staticName = this.config.static_name || 'static';
+    const staticPath = this.config.static_path;
+
+    if (!staticPath || !schemaPath) {
+      return undefined;
+    }
+
+    // Extract relative path from schema file path
+    // Schema path format: /path/to/static/schemas/dir/file.json
+    // We need: /static/schemas/dir/file.json
+    const schemasIndex = schemaPath.indexOf('/schemas/');
+    if (schemasIndex === -1) {
+      return undefined;
+    }
+
+    const relativePath = schemaPath.substring(schemasIndex);
+    return `/${staticName}${relativePath}`;
+  }
+
+  /**
    * Get configuration for ldapFlat instances
    */
   private getFlatResourcesConfig(): FlatResourceConfig[] {
@@ -131,6 +163,9 @@ export default class ConfigApi extends DmPlugin {
 
     const resources: FlatResourceConfig[] = [];
 
+    const schemas = this.config.ldap_flat_schema || [];
+    let schemaIndex = 0;
+
     flatPlugin.instances.forEach(instance => {
       // Load and parse schema
       let schema: Schema | undefined;
@@ -141,6 +176,11 @@ export default class ConfigApi extends DmPlugin {
       const apiPrefix = this.config.api_prefix || '/api';
       const resourceName = instance.pluralName;
 
+      // Generate schema URL if static plugin is loaded
+      const schemaPath = schemas[schemaIndex];
+      const schemaUrl = schemaPath ? this.getSchemaUrl(schemaPath) : undefined;
+      schemaIndex++;
+
       resources.push({
         name: instance.name.replace('ldapFlat:', ''),
         singularName: instance.singularName,
@@ -149,6 +189,7 @@ export default class ConfigApi extends DmPlugin {
         objectClass: instance.objectClass,
         base: instance.base,
         schema: schema || { strict: false, attributes: {} },
+        schemaUrl,
         endpoints: {
           list: `${apiPrefix}/v1/ldap/${resourceName}`,
           get: `${apiPrefix}/v1/ldap/${resourceName}/:id`,
@@ -187,12 +228,18 @@ export default class ConfigApi extends DmPlugin {
       }
     }
 
+    // Generate schema URL if static plugin is loaded
+    const schemaUrl = this.config.group_schema
+      ? this.getSchemaUrl(this.config.group_schema)
+      : undefined;
+
     return {
       enabled: true,
       base: this.config.ldap_group_base || '',
       mainAttribute: this.config.ldap_groups_main_attribute || 'cn',
       objectClass: this.config.group_class || ['top', 'groupOfNames'],
       schema,
+      schemaUrl,
       endpoints: {
         list: `${apiPrefix}/v1/ldap/groups`,
         get: `${apiPrefix}/v1/ldap/groups/:id`,
@@ -218,6 +265,28 @@ export default class ConfigApi extends DmPlugin {
 
     const apiPrefix = this.config.api_prefix || '/api';
 
+    // Load organization schema if available
+    let schema: Schema | undefined;
+    if (this.config.organization_schema) {
+      try {
+        const schemaData = fs.readFileSync(
+          this.config.organization_schema,
+          'utf8'
+        );
+        schema = JSON.parse(
+          transformSchemas(schemaData, this.config)
+        ) as Schema;
+      } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.logger.warn(`Failed to load organization schema: ${err}`);
+      }
+    }
+
+    // Generate schema URL if static plugin is loaded
+    const schemaUrl = this.config.organization_schema
+      ? this.getSchemaUrl(this.config.organization_schema)
+      : undefined;
+
     return {
       enabled: true,
       topOrganization: this.config.ldap_top_organization || '',
@@ -229,6 +298,8 @@ export default class ConfigApi extends DmPlugin {
       pathAttribute: this.config.ldap_organization_path_attribute || '',
       pathSeparator: this.config.ldap_organization_path_separator || ' / ',
       maxSubnodes: this.config.ldap_organization_max_subnodes || 50,
+      schema,
+      schemaUrl,
       endpoints: {
         getTop: `${apiPrefix}/v1/ldap/organizations`,
         get: `${apiPrefix}/v1/ldap/organizations/:dn`,
