@@ -19,7 +19,7 @@ dist/%.js: src/%.ts
 build:
 	npm run build:prod
 
-builddev: $(DSTFILES) Dockerfile
+builddev: $(DSTFILES) $(DSTBROWSER) Dockerfile
 
 _builddev:
 	npx rimraf dist
