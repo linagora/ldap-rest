@@ -796,4 +796,4 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 
 ## License
 
-AGPL-3.0 - Copyright 2025-present Linagora
+AGPL-3.0 - Copyright 2025-present LINAGORA

@@ -41,8 +41,8 @@ See also [Typescript declarations](./src/config/args.ts).
 
 ## Copyright and license
 
-[![Powered by Linagora](./docs/linagora.png)](https://linagora.com)
+[![Powered by LINAGORA](./docs/linagora.png)](https://linagora.com)
 
-Copyright 2025-present [Linagora](https://linagora.com)
+Copyright 2025-present [LINAGORA](https://linagora.com)
 
 Licensed under [GNU AGPL-3.0](./LICENSE])

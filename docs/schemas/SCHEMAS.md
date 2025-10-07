@@ -1209,4 +1209,4 @@ npx mini-dm --log-level debug ...
 
 ## License
 
-AGPL-3.0 - Copyright 2025-present Linagora
+AGPL-3.0 - Copyright 2025-present LINAGORA

@@ -397,6 +397,6 @@ See `DEVELOPMENT.md` for more testing information.
 
 ## License
 
-[![Powered by Linagora](./linagora.png)](https://linagora.com)
+[![Powered by LINAGORA](./linagora.png)](https://linagora.com)
 
-AGPL-3.0 - See LICENSE file for details.
+License: [AGPL-3.0](../LICENSE), copyright 2025-present LINAGORA.

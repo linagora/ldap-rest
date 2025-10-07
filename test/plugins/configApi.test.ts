@@ -27,7 +27,9 @@ describe('ConfigApi Plugin', () => {
     dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
-    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
+    const response = await request
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
 
     expect(response.status).to.equal(200);
     expect(response.body).to.have.property('apiPrefix');
@@ -57,7 +59,9 @@ describe('ConfigApi Plugin', () => {
     dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
-    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
+    const response = await request
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
 
     expect(response.status).to.equal(200);
 
@@ -87,7 +91,9 @@ describe('ConfigApi Plugin', () => {
     dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
-    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
+    const response = await request
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
 
     expect(response.status).to.equal(200);
 
@@ -96,7 +102,9 @@ describe('ConfigApi Plugin', () => {
     expect(response.body.features.groups).to.have.property('base');
     expect(response.body.features.groups).to.have.property('endpoints');
     expect(response.body.features.groups.endpoints).to.have.property('list');
-    expect(response.body.features.groups.endpoints).to.have.property('addMember');
+    expect(response.body.features.groups.endpoints).to.have.property(
+      'addMember'
+    );
   });
 
   it('should include organizations configuration when ldapOrganization is loaded', async function () {
@@ -111,15 +119,21 @@ describe('ConfigApi Plugin', () => {
     dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
-    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
+    const response = await request
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
 
     expect(response.status).to.equal(200);
 
     expect(response.body.features.organizations).to.exist;
     expect(response.body.features.organizations.enabled).to.be.true;
-    expect(response.body.features.organizations).to.have.property('topOrganization');
+    expect(response.body.features.organizations).to.have.property(
+      'topOrganization'
+    );
     expect(response.body.features.organizations).to.have.property('endpoints');
-    expect(response.body.features.organizations.endpoints).to.have.property('getTop');
+    expect(response.body.features.organizations.endpoints).to.have.property(
+      'getTop'
+    );
     expect(response.body.features.organizations.endpoints).to.have.property(
       'getSubnodes'
     );
@@ -159,7 +173,9 @@ describe('ConfigApi Plugin', () => {
     dm.registerPlugin('configApi', configApi);
 
     const request = supertest(dm.app);
-    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
+    const response = await request
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
 
     expect(response.status).to.equal(200);
 
