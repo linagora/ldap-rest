@@ -246,7 +246,7 @@ Provided by `ldapOrganizations`:
 
 ```
 GET    /api/v1/ldap/organizations/top                        # Get top organization(s)
-GET    /api/v1/ldap/organizations/{dn}/subnodes             # List sub-organizations
+GET    /api/v1/ldap/organizations/{dn}/subnodes             # List sub-organizations and linked entities
 GET    /api/v1/ldap/organizations/{dn}/subnodes/search      # Search in organization
 POST   /api/v1/ldap/organizations                           # Create organization
 PUT    /api/v1/ldap/organizations/{dn}                      # Modify organization

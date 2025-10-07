@@ -305,19 +305,29 @@ curl -H "Accept: application/json" \
 
 Retrieve all child organizational units and linked entities (users/groups) for an organization.
 
-**Endpoint:** `GET /api/v1/ldap/organizations/:dn/subnodes`
+**Endpoint:** `GET /api/v1/ldap/organizations/:dn/subnodes?objectClass={class}`
 
 **Parameters:**
 
 - `:dn` - URL-encoded Distinguished Name
+- `objectClass` (optional) - Filter results by LDAP objectClass (e.g., `twakeAccount`, `groupOfNames`, `organizationalUnit`)
 
 **Response Limit:** Returns up to 50 linked entities by default (configurable via `--ldap-organization-max-subnodes`)
 
-**Example Request:**
+**Example Requests:**
 
 ```bash
+# Get all subnodes (users, groups, and sub-OUs)
 curl -H "Accept: application/json" \
      http://localhost:8081/api/v1/ldap/organizations/ou%3Dit%2Cou%3Dorganization%2Cdc%3Dexample%2Cdc%3Dcom/subnodes
+
+# Get only users
+curl -H "Accept: application/json" \
+     "http://localhost:8081/api/v1/ldap/organizations/ou%3Dit%2Cou%3Dorganization%2Cdc%3Dexample%2Cdc%3Dcom/subnodes?objectClass=twakeAccount"
+
+# Get only groups
+curl -H "Accept: application/json" \
+     "http://localhost:8081/api/v1/ldap/organizations/ou%3Dit%2Cou%3Dorganization%2Cdc%3Dexample%2Cdc%3Dcom/subnodes?objectClass=groupOfNames"
 ```
 
 **Example Response:**

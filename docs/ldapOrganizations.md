@@ -125,7 +125,7 @@ curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu
 ### Get Organization Subnodes
 
 ```http
-GET /api/v1/ldap/organizations/:dn/subnodes
+GET /api/v1/ldap/organizations/:dn/subnodes?objectClass={class}
 ```
 
 Returns all entries (users, groups, or sub-organizations) that reference this organization via their `twakeDepartmentLink` attribute. Results are automatically paginated to handle large numbers of entries.
@@ -134,10 +134,24 @@ Returns all entries (users, groups, or sub-organizations) that reference this or
 
 - `dn`: Organization DN (URL-encoded)
 
-**Example:**
+**Query Parameters:**
+
+- `objectClass` (optional): Filter results by LDAP objectClass (e.g., `twakeAccount`, `groupOfNames`, `organizationalUnit`)
+
+**Examples:**
 
 ```bash
+# Get all subnodes (users, groups, and sub-OUs)
 curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu/subnodes"
+
+# Get only users
+curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu/subnodes?objectClass=twakeAccount"
+
+# Get only groups
+curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu/subnodes?objectClass=groupOfNames"
+
+# Get only sub-organizations
+curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu/subnodes?objectClass=organizationalUnit"
 ```
 
 **Response (200):**
@@ -360,8 +374,11 @@ curl "http://localhost:8081/api/v1/ldap/organizations/top"
 # Get specific organization
 curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DHR%2Co%3Dgov%2Cc%3Dmu"
 
-# Get all users/groups in HR department
+# Get all users/groups/sub-OUs in HR department
 curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DHR%2Co%3Dgov%2Cc%3Dmu/subnodes"
+
+# Get only users in HR department
+curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DHR%2Co%3Dgov%2Cc%3Dmu/subnodes?objectClass=twakeAccount"
 ```
 
 ### Example 4: Update Organization Description
