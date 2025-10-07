@@ -14,10 +14,10 @@ All configuration is done via command-line arguments and/or environment variable
 Example:
 
 ```shell
-npx mini-dm --ldap-base 'ou=users,o=comp,c=fr' \
-    --ldap-dn 'cn-admin,o=comp,c=fr' --ldap-pwd adm \
+npx mini-dm --ldap-base 'dc=example,dc=com' \
+    --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd admin \
     --ldap-url ldap://localhost \
-    --plugin core/ldap/groups --ldap-group-base 'ou=groups,o=comp,c=fr' \
+    --plugin core/ldap/groups --ldap-group-base 'ou=groups,dc=example,dc=com' \
     --plugin core/ldap/externalUsersInGroups
 ```
 
@@ -27,8 +27,15 @@ npx mini-dm --ldap-base 'ou=users,o=comp,c=fr' \
 
 See also [Typescript declarations](./src/config/args.ts).
 
-## Developers doc
+## Documentation
 
+### For Application Developers
+
+- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Complete guide for building web applications using Mini-DM APIs and browser libraries
+
+### For Plugin Developers
+
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute and develop plugins
 - [Plugins](./src/plugins/README.md)
 - [Hooks](./HOOKS.md)
 
