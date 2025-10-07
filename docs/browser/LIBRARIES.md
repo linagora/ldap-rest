@@ -36,6 +36,54 @@ Both libraries are:
 - **Material Design** - Clean, modern UI following Material Design principles
 - **Customizable** - CSS variables and configuration options
 
+### Usage Modes
+
+Mini-DM browser libraries can be used in two ways:
+
+#### 1. ES Module Imports (Recommended for bundlers)
+
+When using a bundler (Webpack, Vite, Rollup, etc.) or in modern Node.js applications, import the libraries using the package exports:
+
+```typescript
+// LDAP Tree Viewer - Main component
+import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+
+// LDAP User Editor - Main component
+import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+
+// Individual components (if needed)
+import LdapApiClient from 'mini-dm/browser-ldap-tree-viewer-api-ldapapiclient';
+import TreeNode from 'mini-dm/browser-ldap-tree-viewer-components-treenode';
+import UserApiClient from 'mini-dm/browser-ldap-user-editor-api-userapiclient';
+```
+
+**Available exports:**
+
+- **LdapTreeViewer:**
+  - `browser-ldap-tree-viewer-index` - Main entry point
+  - `browser-ldap-tree-viewer-ldaptreeviewer` - LdapTreeViewer class
+  - `browser-ldap-tree-viewer-api-ldapapiclient` - API client
+  - `browser-ldap-tree-viewer-components-treenode` - TreeNode component
+  - `browser-ldap-tree-viewer-components-treeroot` - TreeRoot component
+  - `browser-ldap-tree-viewer-store-store` - State store
+  - `browser-ldap-tree-viewer-store-actions` - Store actions
+  - `browser-ldap-tree-viewer-store-reducers` - Store reducers
+  - `browser-ldap-tree-viewer-types` - TypeScript types
+
+- **LdapUserEditor:**
+  - `browser-ldap-user-editor-index` - Main entry point
+  - `browser-ldap-user-editor-ldapusereditor` - LdapUserEditor class
+  - `browser-ldap-user-editor-api-userapiclient` - API client
+  - `browser-ldap-user-editor-components-usereditor` - UserEditor component
+  - `browser-ldap-user-editor-components-userlist` - UserList component
+  - `browser-ldap-user-editor-components-usertree` - UserTree component
+  - `browser-ldap-user-editor-components-pointerfield` - PointerField component
+  - `browser-ldap-user-editor-types` - TypeScript types
+
+#### 2. UMD/Direct Browser Usage
+
+For direct browser usage without a bundler, include the files via `<script>` tags (see installation sections below).
+
 ---
 
 ## LdapTreeViewer
@@ -45,6 +93,19 @@ An interactive tree component for displaying and navigating LDAP organizational 
 <a name="ldaptreeviewer-installation"></a>
 
 ### Installation
+
+#### With a Bundler (Webpack, Vite, Rollup, etc.)
+
+```bash
+npm install mini-dm
+```
+
+```typescript
+import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+// Don't forget to include Material Icons in your HTML
+```
+
+#### Direct Browser Usage
 
 Include the required files in your HTML:
 
@@ -76,6 +137,29 @@ Include the required files in your HTML:
 <a name="ldaptreeviewer-basic-usage"></a>
 
 ### Basic Usage
+
+#### With ES Modules
+
+```typescript
+import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+
+// Create and initialize the tree viewer
+const viewer = new LdapTreeViewer({
+  containerId: 'tree-container',
+  apiBaseUrl: 'http://localhost:8081',
+  onNodeClick: node => {
+    console.log('Node clicked:', node.dn);
+  },
+  onNodeExpand: node => {
+    console.log('Node expanded:', node.dn);
+  },
+});
+
+// Initialize the viewer
+await viewer.init();
+```
+
+#### With UMD (Direct Browser)
 
 ```javascript
 // Access the library from window
@@ -391,6 +475,19 @@ A complete user management interface with organization tree, user list, and edit
 
 ### Installation
 
+#### With a Bundler (Webpack, Vite, Rollup, etc.)
+
+```bash
+npm install mini-dm
+```
+
+```typescript
+import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+// Don't forget to include Roboto font and Material Icons in your HTML
+```
+
+#### Direct Browser Usage
+
 Include the required dependencies in your HTML:
 
 ```html
@@ -427,6 +524,29 @@ Include the required dependencies in your HTML:
 <a name="ldapusereditor-basic-usage"></a>
 
 ### Basic Usage
+
+#### With ES Modules
+
+```typescript
+import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+
+// Create and initialize the editor
+const editor = new LdapUserEditor({
+  containerId: 'editor-container',
+  apiBaseUrl: 'http://localhost:8081',
+  onUserSaved: userDn => {
+    console.log('User saved:', userDn);
+  },
+  onError: error => {
+    console.error('Editor error:', error);
+  },
+});
+
+// Initialize the editor
+await editor.init();
+```
+
+#### With UMD (Direct Browser)
 
 ```javascript
 // Access the library from window
