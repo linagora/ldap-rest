@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import supertest from 'supertest';
 import { DM } from '../../src/bin';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
@@ -8,8 +9,6 @@ import Static from '../../src/plugins/static';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
-
-process.env.DM_PORT = '64323';
 
 describe('ConfigApi Plugin', () => {
   let dm: DM;
@@ -21,26 +20,19 @@ describe('ConfigApi Plugin', () => {
   beforeEach(async () => {
     dm = new DM();
     await dm.ready;
-    await dm.run();
-  });
-
-  afterEach(() => {
-    dm.stop();
   });
 
   it('should expose configuration endpoint', async () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
-      headers: { Accept: 'application/json' },
-    });
+    const request = supertest(dm.app);
+    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
 
-    expect(response.ok).to.be.true;
-    const config = await response.json();
-    expect(config).to.have.property('apiPrefix');
-    expect(config).to.have.property('ldapBase');
-    expect(config).to.have.property('features');
+    expect(response.status).to.equal(200);
+    expect(response.body).to.have.property('apiPrefix');
+    expect(response.body).to.have.property('ldapBase');
+    expect(response.body).to.have.property('features');
   });
 
   it('should include flatResources when ldapFlatGeneric is loaded', async () => {
@@ -64,17 +56,15 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
-      headers: { Accept: 'application/json' },
-    });
+    const request = supertest(dm.app);
+    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
 
-    expect(response.ok).to.be.true;
-    const config = await response.json();
+    expect(response.status).to.equal(200);
 
-    expect(config.features.flatResources).to.be.an('array');
-    expect(config.features.flatResources.length).to.be.greaterThan(0);
+    expect(response.body.features.flatResources).to.be.an('array');
+    expect(response.body.features.flatResources.length).to.be.greaterThan(0);
 
-    const resource = config.features.flatResources[0];
+    const resource = response.body.features.flatResources[0];
     expect(resource).to.have.property('name');
     expect(resource).to.have.property('singularName');
     expect(resource).to.have.property('pluralName');
@@ -96,19 +86,17 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
-      headers: { Accept: 'application/json' },
-    });
+    const request = supertest(dm.app);
+    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
 
-    expect(response.ok).to.be.true;
-    const config = await response.json();
+    expect(response.status).to.equal(200);
 
-    expect(config.features.groups).to.exist;
-    expect(config.features.groups.enabled).to.be.true;
-    expect(config.features.groups).to.have.property('base');
-    expect(config.features.groups).to.have.property('endpoints');
-    expect(config.features.groups.endpoints).to.have.property('list');
-    expect(config.features.groups.endpoints).to.have.property('addMember');
+    expect(response.body.features.groups).to.exist;
+    expect(response.body.features.groups.enabled).to.be.true;
+    expect(response.body.features.groups).to.have.property('base');
+    expect(response.body.features.groups).to.have.property('endpoints');
+    expect(response.body.features.groups.endpoints).to.have.property('list');
+    expect(response.body.features.groups.endpoints).to.have.property('addMember');
   });
 
   it('should include organizations configuration when ldapOrganization is loaded', async function () {
@@ -122,19 +110,17 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
-      headers: { Accept: 'application/json' },
-    });
+    const request = supertest(dm.app);
+    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
 
-    expect(response.ok).to.be.true;
-    const config = await response.json();
+    expect(response.status).to.equal(200);
 
-    expect(config.features.organizations).to.exist;
-    expect(config.features.organizations.enabled).to.be.true;
-    expect(config.features.organizations).to.have.property('topOrganization');
-    expect(config.features.organizations).to.have.property('endpoints');
-    expect(config.features.organizations.endpoints).to.have.property('getTop');
-    expect(config.features.organizations.endpoints).to.have.property(
+    expect(response.body.features.organizations).to.exist;
+    expect(response.body.features.organizations.enabled).to.be.true;
+    expect(response.body.features.organizations).to.have.property('topOrganization');
+    expect(response.body.features.organizations).to.have.property('endpoints');
+    expect(response.body.features.organizations.endpoints).to.have.property('getTop');
+    expect(response.body.features.organizations.endpoints).to.have.property(
       'getSubnodes'
     );
   });
@@ -172,17 +158,15 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
-      headers: { Accept: 'application/json' },
-    });
+    const request = supertest(dm.app);
+    const response = await request.get('/api/v1/config').set('Accept', 'application/json');
 
-    expect(response.ok).to.be.true;
-    const config = await response.json();
+    expect(response.status).to.equal(200);
 
-    expect(config.features.flatResources).to.be.an('array');
-    expect(config.features.flatResources.length).to.be.greaterThan(0);
+    expect(response.body.features.flatResources).to.be.an('array');
+    expect(response.body.features.flatResources.length).to.be.greaterThan(0);
 
-    const resource = config.features.flatResources[0];
+    const resource = response.body.features.flatResources[0];
     expect(resource).to.have.property('schemaUrl');
     expect(resource.schemaUrl).to.equal(
       '/static/schemas/twake/nomenclature/twakeDeliveryMode.json'
