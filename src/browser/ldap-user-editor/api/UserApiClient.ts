@@ -15,7 +15,7 @@ export class UserApiClient {
     return `${this.baseUrl}/api/v1`;
   }
 
-  private getFirstValue(value: any): string {
+  private getFirstValue(value: unknown): string {
     if (!value) return '';
     if (Array.isArray(value)) return value[0] || '';
     return String(value);
@@ -68,6 +68,32 @@ export class UserApiClient {
     return res.json();
   }
 
+  async createUser(data: Partial<LdapUser>): Promise<LdapUser> {
+    const res = await fetch(`${this.getApiBase()}/ldap/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error || 'Failed to create user');
+    }
+    return res.json();
+  }
+
+  async deleteUser(dn: string): Promise<void> {
+    const res = await fetch(
+      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error || 'Failed to delete user');
+    }
+  }
+
   async getPointerOptions(branch: string): Promise<PointerOption[]> {
     try {
       // Load config to find the right endpoint by matching base
@@ -82,7 +108,10 @@ export class UserApiClient {
       if (resource && resource.endpoints?.list) {
         // Use the endpoint from config
         const res = await fetch(`${this.baseUrl}${resource.endpoints.list}`);
-        if (!res.ok) throw new Error(`Failed to fetch options from ${resource.endpoints.list}`);
+        if (!res.ok)
+          throw new Error(
+            `Failed to fetch options from ${resource.endpoints.list}`
+          );
         const data = await res.json();
 
         // Convert from object format {key: entry} to array
@@ -90,7 +119,7 @@ export class UserApiClient {
 
         // Load schema to get displayName field
         let displayNameField = 'cn'; // Default fallback
-        let identifierField = resource.mainAttribute;
+        const identifierField = resource.mainAttribute;
 
         if (resource.schemaUrl) {
           try {
@@ -102,12 +131,13 @@ export class UserApiClient {
             if (displayField) {
               displayNameField = displayField[0];
             }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           } catch (e) {
             // Use defaults if schema fails
           }
         }
 
-        return items.map((item: any) => {
+        return items.map((item: LdapUser) => {
           const displayName = this.getFirstValue(item[displayNameField]);
           const identifier = this.getFirstValue(item[identifierField]);
           return {
@@ -120,7 +150,11 @@ export class UserApiClient {
       // No matching resource found in config
       throw new Error(`No flatResource found in config for branch: ${branch}`);
     } catch (error) {
-      console.error('Failed to load pointer options for branch:', branch, error);
+      console.error(
+        'Failed to load pointer options for branch:',
+        branch,
+        error
+      );
       return [];
     }
   }

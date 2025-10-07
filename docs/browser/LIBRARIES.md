@@ -30,6 +30,7 @@ Mini-DM provides two ready-to-use browser libraries for building LDAP management
 - **LdapUserEditor** - Complete user management interface with organization tree, user list, and edit form
 
 Both libraries are:
+
 - **Framework-agnostic** - Work with vanilla JavaScript or any framework
 - **TypeScript-first** - Full type definitions included
 - **Material Design** - Clean, modern UI following Material Design principles
@@ -42,6 +43,7 @@ Both libraries are:
 An interactive tree component for displaying and navigating LDAP organizational structures.
 
 <a name="ldaptreeviewer-installation"></a>
+
 ### Installation
 
 Include the required files in your HTML:
@@ -49,23 +51,30 @@ Include the required files in your HTML:
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <!-- Material Icons (required for icons) -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <head>
+    <!-- Material Icons (required for icons) -->
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-  <!-- LdapTreeViewer CSS -->
-  <link rel="stylesheet" href="/static/browser/ldap-tree-viewer/LdapTreeViewer.css">
-</head>
-<body>
-  <div id="tree-container"></div>
+    <!-- LdapTreeViewer CSS -->
+    <link
+      rel="stylesheet"
+      href="/static/browser/ldap-tree-viewer/LdapTreeViewer.css"
+    />
+  </head>
+  <body>
+    <div id="tree-container"></div>
 
-  <!-- LdapTreeViewer JavaScript -->
-  <script src="/static/browser/ldap-tree-viewer/LdapTreeViewer.js"></script>
-</body>
+    <!-- LdapTreeViewer JavaScript -->
+    <script src="/static/browser/ldap-tree-viewer/LdapTreeViewer.js"></script>
+  </body>
 </html>
 ```
 
 <a name="ldaptreeviewer-basic-usage"></a>
+
 ### Basic Usage
 
 ```javascript
@@ -76,12 +85,12 @@ const { LdapTreeViewer } = window.LdapTreeViewer;
 const viewer = new LdapTreeViewer({
   containerId: 'tree-container',
   apiBaseUrl: 'http://localhost:8081',
-  onNodeClick: (node) => {
+  onNodeClick: node => {
     console.log('Node clicked:', node.dn);
   },
-  onNodeExpand: (node) => {
+  onNodeExpand: node => {
     console.log('Node expanded:', node.dn);
-  }
+  },
 });
 
 // Initialize the viewer
@@ -89,6 +98,7 @@ await viewer.init();
 ```
 
 <a name="ldaptreeviewer-configuration-options"></a>
+
 ### Configuration Options
 
 The `ViewerOptions` interface defines all available configuration options:
@@ -127,16 +137,19 @@ const viewer = new LdapTreeViewer({
   authToken: 'Bearer your-token-here',
   rootDn: 'ou=divisions,dc=example,dc=com',
   theme: 'dark',
-  onNodeClick: (node) => {
+  onNodeClick: node => {
     document.getElementById('selected-dn').textContent = node.dn;
   },
-  onNodeExpand: async (node) => {
-    console.log(`Expanded ${node.displayName} with ${node.childrenDns.length} children`);
-  }
+  onNodeExpand: async node => {
+    console.log(
+      `Expanded ${node.displayName} with ${node.childrenDns.length} children`
+    );
+  },
 });
 ```
 
 <a name="ldaptreeviewer-public-methods"></a>
+
 ### Public Methods
 
 #### `async init(): Promise<void>`
@@ -144,7 +157,10 @@ const viewer = new LdapTreeViewer({
 Initializes the tree viewer and loads the root organization.
 
 ```javascript
-const viewer = new LdapTreeViewer({ containerId: 'tree', apiBaseUrl: 'http://localhost:8081' });
+const viewer = new LdapTreeViewer({
+  containerId: 'tree',
+  apiBaseUrl: 'http://localhost:8081',
+});
 await viewer.init();
 ```
 
@@ -200,6 +216,7 @@ viewer.destroy();
 ```
 
 <a name="treenode-structure"></a>
+
 ### TreeNode Structure
 
 Each node in the tree follows this TypeScript interface:
@@ -255,6 +272,7 @@ interface TreeNode {
 ```
 
 <a name="ldaptreeviewer-advanced-examples"></a>
+
 ### Advanced Examples
 
 #### Expand All Nodes Recursively
@@ -283,7 +301,7 @@ async function expandAll(viewer) {
 // Usage
 const viewer = new LdapTreeViewer({
   containerId: 'tree-container',
-  apiBaseUrl: 'http://localhost:8081'
+  apiBaseUrl: 'http://localhost:8081',
 });
 
 await viewer.init();
@@ -310,20 +328,20 @@ function highlightNodes(viewer, searchTerm) {
 const viewer = new LdapTreeViewer({
   containerId: 'tree-container',
   apiBaseUrl: 'http://localhost:8081',
-  onNodeClick: (node) => {
+  onNodeClick: node => {
     document.getElementById('details').innerHTML = `
       <h3>${node.displayName}</h3>
       <p><strong>DN:</strong> ${node.dn}</p>
       <p><strong>Type:</strong> ${node.type}</p>
       <p><strong>Children:</strong> ${node.childrenDns.length}</p>
     `;
-  }
+  },
 });
 
 await viewer.init();
 
 // Search functionality
-document.getElementById('search').addEventListener('input', (e) => {
+document.getElementById('search').addEventListener('input', e => {
   const matches = highlightNodes(viewer, e.target.value);
   console.log(`Found ${matches.length} matches`);
 });
@@ -335,12 +353,14 @@ document.getElementById('search').addEventListener('input', (e) => {
 const viewer = new LdapTreeViewer({
   containerId: 'tree-container',
   apiBaseUrl: 'http://localhost:8081',
-  onNodeClick: async (node) => {
+  onNodeClick: async node => {
     // Show loading state
     document.getElementById('sidebar').classList.add('loading');
 
     // Fetch additional data
-    const response = await fetch(`${viewer.options.apiBaseUrl}/api/v1/ldap/organizations/${encodeURIComponent(node.dn)}`);
+    const response = await fetch(
+      `${viewer.options.apiBaseUrl}/api/v1/ldap/organizations/${encodeURIComponent(node.dn)}`
+    );
     const data = await response.json();
 
     // Update custom UI
@@ -349,13 +369,13 @@ const viewer = new LdapTreeViewer({
     // Hide loading state
     document.getElementById('sidebar').classList.remove('loading');
   },
-  onNodeExpand: (node) => {
+  onNodeExpand: node => {
     // Track analytics
     analytics.track('Organization Expanded', {
       dn: node.dn,
-      name: node.displayName
+      name: node.displayName,
     });
-  }
+  },
 });
 
 await viewer.init();
@@ -368,6 +388,7 @@ await viewer.init();
 A complete user management interface with organization tree, user list, and edit form.
 
 <a name="ldapusereditor-installation"></a>
+
 ### Installation
 
 Include the required dependencies in your HTML:
@@ -375,26 +396,36 @@ Include the required dependencies in your HTML:
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <!-- Google Fonts - Roboto (required) -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <head>
+    <!-- Google Fonts - Roboto (required) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Material Icons (required) -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Material Icons (required) -->
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-  <!-- LdapUserEditor CSS -->
-  <link rel="stylesheet" href="/static/browser/ldap-user-editor/LdapUserEditor.css">
-</head>
-<body>
-  <div id="editor-container"></div>
+    <!-- LdapUserEditor CSS -->
+    <link
+      rel="stylesheet"
+      href="/static/browser/ldap-user-editor/LdapUserEditor.css"
+    />
+  </head>
+  <body>
+    <div id="editor-container"></div>
 
-  <!-- LdapUserEditor JavaScript -->
-  <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
-</body>
+    <!-- LdapUserEditor JavaScript -->
+    <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
+  </body>
 </html>
 ```
 
 <a name="ldapusereditor-basic-usage"></a>
+
 ### Basic Usage
 
 ```javascript
@@ -405,12 +436,12 @@ const { LdapUserEditor } = window.LdapUserEditor;
 const editor = new LdapUserEditor({
   containerId: 'editor-container',
   apiBaseUrl: 'http://localhost:8081',
-  onUserSaved: (userDn) => {
+  onUserSaved: userDn => {
     console.log('User saved:', userDn);
   },
-  onError: (error) => {
+  onError: error => {
     console.error('Editor error:', error);
-  }
+  },
 });
 
 // Initialize the editor
@@ -418,6 +449,7 @@ await editor.init();
 ```
 
 <a name="ldapusereditor-configuration-options"></a>
+
 ### Configuration Options
 
 The `EditorOptions` interface defines all available configuration options:
@@ -444,7 +476,7 @@ interface EditorOptions {
 const editor = new LdapUserEditor({
   containerId: 'editor-container',
   apiBaseUrl: 'http://localhost:8081',
-  onUserSaved: (userDn) => {
+  onUserSaved: userDn => {
     // Show success notification
     showNotification('User saved successfully!', 'success');
 
@@ -454,19 +486,20 @@ const editor = new LdapUserEditor({
     // Log activity
     logActivity('user_updated', userDn);
   },
-  onError: (error) => {
+  onError: error => {
     // Show error notification
     showNotification(`Error: ${error.message}`, 'error');
 
     // Log error to monitoring service
     errorTracker.captureException(error);
-  }
+  },
 });
 
 await editor.init();
 ```
 
 <a name="ldapusereditor-public-methods"></a>
+
 ### Public Methods
 
 #### `async init(): Promise<void>`
@@ -476,7 +509,7 @@ Initializes the editor and loads the organization tree.
 ```javascript
 const editor = new LdapUserEditor({
   containerId: 'editor-container',
-  apiBaseUrl: 'http://localhost:8081'
+  apiBaseUrl: 'http://localhost:8081',
 });
 
 await editor.init();
@@ -499,6 +532,7 @@ editor.destroy();
 ```
 
 <a name="ldapusereditor-features"></a>
+
 ### Features
 
 The LdapUserEditor provides a complete user management interface with three main components:
@@ -531,71 +565,81 @@ The LdapUserEditor provides a complete user management interface with three main
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Management</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Management</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="/static/browser/ldap-user-editor/LdapUserEditor.css">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="/static/browser/ldap-user-editor/LdapUserEditor.css"
+    />
 
-  <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      background: #f5f5f5;
-      font-family: 'Roboto', sans-serif;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      color: #333;
-      margin-bottom: 20px;
-    }
-
-    #editor-container {
-      background: white;
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>User Management System</h1>
-    <div id="editor-container"></div>
-  </div>
-
-  <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
-  <script>
-    const { LdapUserEditor } = window.LdapUserEditor;
-
-    const editor = new LdapUserEditor({
-      containerId: 'editor-container',
-      apiBaseUrl: window.location.origin,
-      onUserSaved: (userDn) => {
-        console.log('User saved successfully:', userDn);
-      },
-      onError: (error) => {
-        console.error('Error:', error.message);
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #f5f5f5;
+        font-family: 'Roboto', sans-serif;
       }
-    });
 
-    editor.init().catch(error => {
-      console.error('Failed to initialize editor:', error);
-    });
-  </script>
-</body>
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      #editor-container {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>User Management System</h1>
+      <div id="editor-container"></div>
+    </div>
+
+    <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
+    <script>
+      const { LdapUserEditor } = window.LdapUserEditor;
+
+      const editor = new LdapUserEditor({
+        containerId: 'editor-container',
+        apiBaseUrl: window.location.origin,
+        onUserSaved: userDn => {
+          console.log('User saved successfully:', userDn);
+        },
+        onError: error => {
+          console.error('Error:', error.message);
+        },
+      });
+
+      editor.init().catch(error => {
+        console.error('Failed to initialize editor:', error);
+      });
+    </script>
+  </body>
 </html>
 ```
 
 <a name="ldapusereditor-css-customization"></a>
+
 ### CSS Customization
 
 The LdapUserEditor uses CSS variables for easy customization. Override these variables in your stylesheet:
@@ -646,7 +690,7 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 ```css
 /* Company branding */
 :root {
-  --primary-color: #ff6b35;      /* Your brand color */
+  --primary-color: #ff6b35; /* Your brand color */
   --primary-dark: #d45426;
   --success-color: #28a745;
   --error-color: #dc3545;
@@ -654,14 +698,14 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 
 /* Custom button styles */
 .btn {
-  border-radius: 20px;           /* Rounded buttons */
-  text-transform: none;          /* No uppercase */
+  border-radius: 20px; /* Rounded buttons */
+  text-transform: none; /* No uppercase */
   font-weight: 600;
 }
 
 /* Custom panel styles */
 .demo-panel {
-  border-radius: 12px;           /* More rounded */
+  border-radius: 12px; /* More rounded */
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
@@ -676,22 +720,22 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 ```css
 /* Smaller, more compact layout */
 .editor-layout {
-  gap: 16px;                      /* Less spacing */
+  gap: 16px; /* Less spacing */
 }
 
 .demo-panel {
-  padding: 16px;                  /* Less padding */
-  max-height: 600px;              /* Smaller height */
+  padding: 16px; /* Less padding */
+  max-height: 600px; /* Smaller height */
 }
 
 .form-row {
-  gap: 1rem;                      /* Tighter form spacing */
+  gap: 1rem; /* Tighter form spacing */
   margin-bottom: 1rem;
 }
 
 .form-input,
 .form-select {
-  padding: 0.5rem 0.625rem;      /* Smaller inputs */
+  padding: 0.5rem 0.625rem; /* Smaller inputs */
   font-size: 0.8125rem;
 }
 ```
@@ -716,11 +760,11 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 
 /* Larger text for accessibility */
 .ldap-user-editor {
-  font-size: 16px;                /* Larger base font */
+  font-size: 16px; /* Larger base font */
 }
 
 .form-label {
-  font-weight: 600;               /* Bolder labels */
+  font-weight: 600; /* Bolder labels */
 }
 
 /* Better focus indicators */

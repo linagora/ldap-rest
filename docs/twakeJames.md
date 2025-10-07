@@ -246,17 +246,17 @@ The `smtp:` prefix is automatically stripped. The capitalization (SMTP vs smtp) 
 
 ### Endpoints Used
 
-| Operation           | Endpoint                                  | Method |
-| ------------------- | ----------------------------------------- | ------ |
-| Rename account      | `/users/{old}/rename/{new}?action=rename` | POST   |
-| Update quota        | `/quota/users/{mail}/size`                | PUT    |
-| Add delegation      | `/users/{mail}/authorizedUsers/{delegate}`| PUT    |
-| Remove delegation   | `/users/{mail}/authorizedUsers/{delegate}`| DELETE |
-| Add alias           | `/address/aliases/{mail}/sources/{alias}` | PUT    |
-| Remove alias        | `/address/aliases/{mail}/sources/{alias}` | DELETE |
-| Add group member    | `/address/groups/{group}/{member}`        | PUT    |
-| Remove group member | `/address/groups/{group}/{member}`        | DELETE |
-| Delete group        | `/address/groups/{group}`                 | DELETE |
+| Operation           | Endpoint                                   | Method |
+| ------------------- | ------------------------------------------ | ------ |
+| Rename account      | `/users/{old}/rename/{new}?action=rename`  | POST   |
+| Update quota        | `/quota/users/{mail}/size`                 | PUT    |
+| Add delegation      | `/users/{mail}/authorizedUsers/{delegate}` | PUT    |
+| Remove delegation   | `/users/{mail}/authorizedUsers/{delegate}` | DELETE |
+| Add alias           | `/address/aliases/{mail}/sources/{alias}`  | PUT    |
+| Remove alias        | `/address/aliases/{mail}/sources/{alias}`  | DELETE |
+| Add group member    | `/address/groups/{group}/{member}`         | PUT    |
+| Remove group member | `/address/groups/{group}/{member}`         | DELETE |
+| Delete group        | `/address/groups/{group}`                  | DELETE |
 
 ### Authentication
 

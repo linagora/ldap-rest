@@ -61,7 +61,9 @@ export class PointerField {
   }
 
   private renderSingle(required: boolean): string {
-    const currentValue = Array.isArray(this.value) ? this.value[0] || '' : this.value || '';
+    const currentValue = Array.isArray(this.value)
+      ? this.value[0] || ''
+      : this.value || '';
 
     return `
       <div class="form-group">
@@ -156,22 +158,26 @@ export class PointerField {
     if (!arrayContainer) return;
 
     // Handle item change
-    arrayContainer.querySelectorAll('.pointer-array-item').forEach((select, idx) => {
-      select.addEventListener('change', () => {
-        const values = Array.isArray(this.value) ? [...this.value] : [];
-        values[idx] = (select as HTMLSelectElement).value;
-        this.onChange(values);
+    arrayContainer
+      .querySelectorAll('.pointer-array-item')
+      .forEach((select, idx) => {
+        select.addEventListener('change', () => {
+          const values = Array.isArray(this.value) ? [...this.value] : [];
+          values[idx] = (select as HTMLSelectElement).value;
+          this.onChange(values);
+        });
       });
-    });
 
     // Handle remove
-    arrayContainer.querySelectorAll('.remove-array-item').forEach((btn, idx) => {
-      btn.addEventListener('click', () => {
-        const values = Array.isArray(this.value) ? [...this.value] : [];
-        values.splice(idx, 1);
-        this.onChange(values);
+    arrayContainer
+      .querySelectorAll('.remove-array-item')
+      .forEach((btn, idx) => {
+        btn.addEventListener('click', () => {
+          const values = Array.isArray(this.value) ? [...this.value] : [];
+          values.splice(idx, 1);
+          this.onChange(values);
+        });
       });
-    });
 
     // Handle add
     const addBtn = arrayContainer.querySelector('.add-array-item');

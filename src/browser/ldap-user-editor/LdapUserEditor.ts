@@ -3,7 +3,7 @@
  * @author Xavier Guimard
  */
 
-import type { EditorOptions, Config } from './types';
+import type { EditorOptions, Config, LdapUser } from './types';
 import { UserApiClient } from './api/UserApiClient';
 import { UserTree } from './components/UserTree';
 import { UserEditor } from './components/UserEditor';
@@ -86,11 +86,8 @@ export class LdapUserEditor {
 
     try {
       // Show user list for this organization
-      this.userList = new UserList(
-        editorContainer,
-        this.api,
-        dn,
-        userDn => this.onUserSelected(userDn)
+      this.userList = new UserList(editorContainer, this.api, dn, userDn =>
+        this.onUserSelected(userDn)
       );
       await this.userList.init();
     } catch (error) {
@@ -148,5 +145,63 @@ export class LdapUserEditor {
     this.userTree = null;
     this.userEditor = null;
     this.currentUserDn = null;
+  }
+
+  async createUser(userData: Partial<LdapUser>): Promise<LdapUser> {
+    try {
+      const result = await this.api.createUser(userData);
+      // Refresh the user list if we have one
+      if (this.userList) {
+        await this.userList.refresh();
+      }
+      return result;
+    } catch (error) {
+      this.handleError(error as Error);
+      throw error;
+    }
+  }
+
+  async deleteUser(dn: string): Promise<void> {
+    try {
+      await this.api.deleteUser(dn);
+      // Clear current selection if we deleted the selected user
+      if (this.currentUserDn === dn) {
+        this.currentUserDn = null;
+        const editorContainer = document.getElementById(
+          'user-editor-container'
+        );
+        if (editorContainer) {
+          editorContainer.innerHTML = `
+            <div class="empty-state">
+              <span class="material-icons">person_search</span>
+              <p>Select a user from the list to edit</p>
+            </div>
+          `;
+        }
+      }
+      // Refresh the user list
+      if (this.userList) {
+        await this.userList.refresh();
+      }
+    } catch (error) {
+      this.handleError(error as Error);
+      throw error;
+    }
+  }
+
+  getConfig(): Config | null {
+    return this.config;
+  }
+
+  getApi(): UserApiClient {
+    return this.api;
+  }
+
+  getCurrentOrgDn(): string | null {
+    return this.currentOrgDn;
+  }
+
+  getCurrentUserDn(): string | null {
+    return this.currentUserDn;
   }
 }

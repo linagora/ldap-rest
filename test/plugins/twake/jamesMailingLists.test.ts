@@ -36,7 +36,7 @@ describe('James Mailing Lists', () => {
       .persist()
       // Mock identity sync for all emails (uses regex to match dynamic timestamps)
       .get(/\/jmap\/identities\/.*@test\.org$/)
-      .reply(200, (uri) => {
+      .reply(200, uri => {
         const email = uri.replace('/jmap/identities/', '');
         return [
           {
@@ -202,11 +202,15 @@ describe('James Mailing Lists', () => {
       });
 
       // Create the group with two members
-      await ldapGroups.addGroup(`mailinglist3-${timestamp}`, [testUser1DN, testUser2DN], {
-        mail: `list3-${timestamp}@test.org`,
-        twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-        twakeDepartmentPath: 'Test',
-      });
+      await ldapGroups.addGroup(
+        `mailinglist3-${timestamp}`,
+        [testUser1DN, testUser2DN],
+        {
+          mail: `list3-${timestamp}@test.org`,
+          twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
+          twakeDepartmentPath: 'Test',
+        }
+      );
 
       // Remove one member
       const res = await ldapGroups.deleteMember(testGroupDN, testUser1DN);
@@ -287,10 +291,14 @@ describe('James Mailing Lists', () => {
       });
 
       // Create group without mail attribute
-      const res = await ldapGroups.addGroup(`groupnomail5-${timestamp}`, [testUser1DN], {
-        twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-        twakeDepartmentPath: 'Test',
-      });
+      const res = await ldapGroups.addGroup(
+        `groupnomail5-${timestamp}`,
+        [testUser1DN],
+        {
+          twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
+          twakeDepartmentPath: 'Test',
+        }
+      );
       expect(res).to.be.true;
 
       // Verify James API was NOT called

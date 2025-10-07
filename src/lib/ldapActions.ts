@@ -3,7 +3,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Request } from 'express';
-import { Client, Attribute, Change, DN, RDN } from 'ldapts';
+import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
 

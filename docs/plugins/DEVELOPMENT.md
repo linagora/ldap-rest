@@ -41,8 +41,8 @@ import DmPlugin from '../../abstract/plugin';
 import type { Role } from '../../abstract/plugin';
 
 export default class MyPlugin extends DmPlugin {
-  name = 'myPlugin';  // Unique identifier for your plugin
-  roles: Role[] = ['api'] as const;  // Optional: categorize your plugin
+  name = 'myPlugin'; // Unique identifier for your plugin
+  roles: Role[] = ['api'] as const; // Optional: categorize your plugin
 }
 ```
 
@@ -107,7 +107,7 @@ export default class WebhookNotifier extends DmPlugin {
     app.get(`${this.config.api_prefix}/v1/webhook/status`, (req, res) => {
       res.json({
         status: 'active',
-        url: this.config.webhook_url
+        url: this.config.webhook_url,
       });
     });
   }
@@ -177,7 +177,7 @@ export default class ExternalAuditPlugin extends DmPlugin {
     app.get(`${this.config.api_prefix}/v1/audit/stats`, (req, res) => {
       res.json({
         message: 'External plugin API',
-        auditEnabled: true
+        auditEnabled: true,
       });
     });
   }
@@ -410,7 +410,7 @@ The `this.server.ldap` object provides access to all LDAP operations:
 const results = await this.server.ldap.search(
   {
     paged: false,
-    scope: 'sub',  // 'base', 'one', or 'sub'
+    scope: 'sub', // 'base', 'one', or 'sub'
     filter: '(objectClass=inetOrgPerson)',
     attributes: ['cn', 'mail', 'uid'],
   },
@@ -437,37 +437,31 @@ for await (const page of pagedResults) {
 #### Add
 
 ```typescript
-await this.server.ldap.add(
-  'uid=john,ou=users,dc=example,dc=com',
-  {
-    objectClass: ['inetOrgPerson', 'person', 'top'],
-    uid: 'john',
-    cn: 'John Doe',
-    sn: 'Doe',
-    mail: 'john@example.com',
-    userPassword: 'secret123',
-  }
-);
+await this.server.ldap.add('uid=john,ou=users,dc=example,dc=com', {
+  objectClass: ['inetOrgPerson', 'person', 'top'],
+  uid: 'john',
+  cn: 'John Doe',
+  sn: 'Doe',
+  mail: 'john@example.com',
+  userPassword: 'secret123',
+});
 ```
 
 #### Modify
 
 ```typescript
-await this.server.ldap.modify(
-  'uid=john,ou=users,dc=example,dc=com',
-  {
-    replace: {
-      mail: 'john.doe@example.com',
-      telephoneNumber: '+1234567890',
-    },
-    add: {
-      description: 'Senior Developer',
-    },
-    delete: {
-      oldAttribute: 'valueToRemove',
-    },
-  }
-);
+await this.server.ldap.modify('uid=john,ou=users,dc=example,dc=com', {
+  replace: {
+    mail: 'john.doe@example.com',
+    telephoneNumber: '+1234567890',
+  },
+  add: {
+    description: 'Senior Developer',
+  },
+  delete: {
+    oldAttribute: 'valueToRemove',
+  },
+});
 ```
 
 #### Delete
@@ -530,7 +524,7 @@ hooks: Hooks = {
   },
 
   // LDAP DELETE HOOKS
-  ldapdeleterequest: async (dn) => {
+  ldapdeleterequest: async dn => {
     // Called BEFORE deleting entry
     this.logger.debug(`Deleting entry: ${dn}`);
 
@@ -542,7 +536,7 @@ hooks: Hooks = {
     return dn;
   },
 
-  ldapdeletedone: async (dn) => {
+  ldapdeletedone: async dn => {
     // Called AFTER successful delete
     this.logger.info(`Entry deleted: ${dn}`);
   },
@@ -662,6 +656,7 @@ export default class MyPlugin extends DmPlugin {
 ```
 
 Available roles:
+
 - **auth** - Authentication plugins
 - **authz** - Authorization/access control plugins
 - **protect** - Security/rate limiting plugins
@@ -831,14 +826,14 @@ export default class NotificationPlugin extends DmPlugin {
     this.webhookUrl = this.config.webhook_url as string;
     this.webhookSecret = this.config.webhook_secret as string;
     this.webhookTimeout = parseInt(
-      this.config.webhook_timeout as string || '5000'
+      (this.config.webhook_timeout as string) || '5000'
     );
     this.retryCount = parseInt(
-      this.config.webhook_retry_count as string || '3'
+      (this.config.webhook_retry_count as string) || '3'
     );
 
     // Parse enabled events
-    const events = this.config.webhook_event as string[] || ['*'];
+    const events = (this.config.webhook_event as string[]) || ['*'];
     this.enabledEvents = new Set(events);
 
     // Initialize stats
@@ -851,7 +846,7 @@ export default class NotificationPlugin extends DmPlugin {
 
     this.logger.info(
       `NotificationPlugin initialized: ${this.webhookUrl} ` +
-      `(events: ${Array.from(this.enabledEvents).join(', ')})`
+        `(events: ${Array.from(this.enabledEvents).join(', ')})`
     );
   }
 
@@ -881,7 +876,7 @@ export default class NotificationPlugin extends DmPlugin {
         } catch (error) {
           res.status(500).json({
             success: false,
-            error: (error as Error).message
+            error: (error as Error).message,
           });
         }
       }
@@ -903,7 +898,7 @@ export default class NotificationPlugin extends DmPlugin {
       }
     },
 
-    ldapdeletedone: async (dn) => {
+    ldapdeletedone: async dn => {
       if (this.shouldSendEvent('ldap.delete')) {
         const dnStr = Array.isArray(dn) ? dn.join(', ') : dn;
         void this.sendWebhook('ldap.delete', dnStr, {});
@@ -944,7 +939,6 @@ export default class NotificationPlugin extends DmPlugin {
         this.stats.lastSent = payload.timestamp;
         this.logger.info(`Webhook sent: ${event} ${dn}`);
         return;
-
       } catch (error) {
         lastError = error as Error;
 
@@ -960,7 +954,10 @@ export default class NotificationPlugin extends DmPlugin {
     // All attempts failed
     this.stats.failed++;
     this.stats.lastError = lastError?.message || 'Unknown error';
-    this.logger.error(`Webhook failed after ${this.retryCount + 1} attempts:`, lastError);
+    this.logger.error(
+      `Webhook failed after ${this.retryCount + 1} attempts:`,
+      lastError
+    );
   }
 
   /**
@@ -988,7 +985,6 @@ export default class NotificationPlugin extends DmPlugin {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-
     } finally {
       clearTimeout(timeoutId);
     }
@@ -1055,7 +1051,7 @@ import request from 'supertest';
 import { DM } from '../../../src/bin/index';
 import NotificationPlugin from '../../../src/plugins/notification/webhook';
 
-describe('NotificationPlugin', function() {
+describe('NotificationPlugin', function () {
   let server: DM;
   let plugin: NotificationPlugin;
 
@@ -1075,10 +1071,14 @@ describe('NotificationPlugin', function() {
     process.argv = [
       'node',
       'test',
-      '--plugin', 'core/notification/webhook',
-      '--webhook-url', 'http://localhost:9999/webhook',
-      '--webhook-secret', 'test-secret',
-      '--webhook-event', 'ldap.add',
+      '--plugin',
+      'core/notification/webhook',
+      '--webhook-url',
+      'http://localhost:9999/webhook',
+      '--webhook-secret',
+      'test-secret',
+      '--webhook-event',
+      'ldap.add',
     ];
 
     await server.ready;
@@ -1090,7 +1090,7 @@ describe('NotificationPlugin', function() {
 
   after(async () => {
     if (server.server) {
-      await new Promise((resolve) => server.server!.close(resolve));
+      await new Promise(resolve => server.server!.close(resolve));
     }
   });
 

@@ -90,15 +90,19 @@ export class UserEditor {
   private replacePlaceholders(schema: Schema): void {
     for (const attr of Object.values(schema.attributes)) {
       if (attr.branch) {
-        attr.branch = attr.branch.map(b => b.replace(/__LDAP_BASE__/g, this.ldapBase));
+        attr.branch = attr.branch.map(b =>
+          b.replace(/__LDAP_BASE__/g, this.ldapBase)
+        );
       }
       if (attr.items?.branch) {
-        attr.items.branch = attr.items.branch.map(b => b.replace(/__LDAP_BASE__/g, this.ldapBase));
+        attr.items.branch = attr.items.branch.map(b =>
+          b.replace(/__LDAP_BASE__/g, this.ldapBase)
+        );
       }
     }
   }
 
-  private getFirstValue(value: any): string {
+  private getFirstValue(value: unknown): string {
     if (!value) return '';
     if (Array.isArray(value)) return value[0] || '';
     return String(value);
@@ -120,7 +124,9 @@ export class UserEditor {
     if (!this.user || !this.schema) return;
 
     const displayName = this.getFieldByRole('displayName');
-    const identifier = this.getFirstValue(this.user[this.schema.entity.mainAttribute]);
+    const identifier = this.getFirstValue(
+      this.user[this.schema.entity.mainAttribute]
+    );
     const userName = displayName || identifier || 'User';
 
     this.container.innerHTML = `
@@ -177,7 +183,10 @@ export class UserEditor {
       <div class="form-section">
         <div class="form-section-title">${title}</div>
         <div class="form-row">
-          ${fields.map(field => this.renderField(field)).filter(f => f).join('')}
+          ${fields
+            .map(field => this.renderField(field))
+            .filter(f => f)
+            .join('')}
         </div>
       </div>
     `
@@ -190,7 +199,10 @@ export class UserEditor {
       <div class="form-section">
         <div class="form-section-title">Other Fields</div>
         <div class="form-row">
-          ${ungroupedFields.map(field => this.renderField(field)).filter(f => f).join('')}
+          ${ungroupedFields
+            .map(field => this.renderField(field))
+            .filter(f => f)
+            .join('')}
         </div>
       </div>
     `;
@@ -210,7 +222,7 @@ export class UserEditor {
 
     // Show identifier fields as disabled
     if (attr.role === 'identifier') {
-      return this.renderIdentifierField(fieldName, attr);
+      return this.renderIdentifierField(fieldName);
     }
 
     // Pointer fields
@@ -232,10 +244,7 @@ export class UserEditor {
     return this.renderStringField(fieldName, attr);
   }
 
-  private renderIdentifierField(
-    fieldName: string,
-    attr: SchemaAttribute
-  ): string {
+  private renderIdentifierField(fieldName: string): string {
     const value = this.formData[fieldName];
     const displayValue = Array.isArray(value) ? value[0] : value || '';
 
@@ -393,18 +402,22 @@ export class UserEditor {
     form?.addEventListener('submit', e => this.handleSubmit(e));
 
     // String/number inputs
-    this.container.querySelectorAll<HTMLInputElement>('input[name]').forEach(input => {
-      input.addEventListener('input', () => {
-        const fieldName = input.name;
-        const attr = this.schema?.attributes[fieldName];
+    this.container
+      .querySelectorAll<HTMLInputElement>('input[name]')
+      .forEach(input => {
+        input.addEventListener('input', () => {
+          const fieldName = input.name;
+          const attr = this.schema?.attributes[fieldName];
 
-        if (attr?.type === 'number' || attr?.type === 'integer') {
-          this.formData[fieldName] = input.value ? parseInt(input.value, 10) : '';
-        } else {
-          this.formData[fieldName] = input.value;
-        }
+          if (attr?.type === 'number' || attr?.type === 'integer') {
+            this.formData[fieldName] = input.value
+              ? parseInt(input.value, 10)
+              : '';
+          } else {
+            this.formData[fieldName] = input.value;
+          }
+        });
       });
-    });
 
     // Array fields
     this.attachArrayFieldHandlers();
@@ -478,7 +491,9 @@ export class UserEditor {
 
       // Reattach handlers
       if (attr.type === 'pointer' || attr.items?.type === 'pointer') {
-        const placeholder = this.container.querySelector(`#pointer-${fieldName}`);
+        const placeholder = this.container.querySelector(
+          `#pointer-${fieldName}`
+        );
         if (placeholder) {
           const pointerField = this.pointerFields.get(fieldName);
           pointerField?.attachHandlers(placeholder as HTMLElement);

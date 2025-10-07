@@ -58,7 +58,7 @@ export default class James extends DmPlugin {
 
       const mail = attributes[mailAttr];
       const quota = attributes[quotaAttr];
-      const aliases = attributes[aliasAttr] as AttributeValue;
+      const aliases = attributes[aliasAttr];
 
       if (!mail) {
         // Not a user with mail, skip
@@ -131,7 +131,6 @@ export default class James extends DmPlugin {
         )) as SearchResult;
 
         if (entry.searchEntries && entry.searchEntries.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const aliases = this.getAliases(entry.searchEntries[0][aliasAttr]);
 
           // Only process if user has aliases
@@ -275,9 +274,9 @@ export default class James extends DmPlugin {
     },
 
     onLdapDisplayNameChange: async (
-      dn: string,
-      oldDisplayName: string | null,
-      newDisplayName: string | null
+      dn: string
+      // oldDisplayName: string | null,
+      // newDisplayName: string | null
     ) => {
       // Get mail and display name in a single LDAP query
       try {
@@ -572,7 +571,7 @@ export default class James extends DmPlugin {
       // Replace all {attributeName} placeholders with LDAP values
       let signature = template;
       const placeholderRegex = /\{(\w+)\}/g;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
       signature = signature.replace(
         placeholderRegex,
         (_match: string, attrName: string): string => {
@@ -806,7 +805,6 @@ export default class James extends DmPlugin {
     const delegationAttr = this.config.delegation_attribute;
     if (!delegationAttr) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const [oldDelegated, newDelegated] = changes[delegationAttr] || [];
 
     // Normalize values to arrays of DNs

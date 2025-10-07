@@ -87,6 +87,7 @@ curl -H "Authorization: Bearer secret-token-1" \
 ```
 
 **Use Cases:**
+
 - Development and testing
 - Service-to-service communication
 - CI/CD pipelines
@@ -160,7 +161,12 @@ curl -H "Accept: application/json" \
         "singularName": "user",
         "pluralName": "users",
         "mainAttribute": "uid",
-        "objectClass": ["top", "inetOrgPerson", "organizationalPerson", "person"],
+        "objectClass": [
+          "top",
+          "inetOrgPerson",
+          "organizationalPerson",
+          "person"
+        ],
         "base": "ou=users,dc=example,dc=com",
         "schema": {
           "strict": true,
@@ -618,6 +624,7 @@ Add a new user to the LDAP directory.
 ```
 
 **Required Fields:** Depends on your schema. Typically:
+
 - `uid` - User identifier
 - `cn` - Common name
 - `sn` - Surname
@@ -772,9 +779,7 @@ curl -H "Accept: application/json" \
   "developers": {
     "dn": "cn=developers,ou=groups,dc=example,dc=com",
     "cn": "developers",
-    "member": [
-      "uid=alice.johnson,ou=users,dc=example,dc=com"
-    ]
+    "member": ["uid=alice.johnson,ou=users,dc=example,dc=com"]
   }
 }
 ```
@@ -823,9 +828,7 @@ Add a new group to the LDAP directory.
 {
   "cn": "developers",
   "description": "Development Team",
-  "member": [
-    "uid=alice.johnson,ou=users,dc=example,dc=com"
-  ]
+  "member": ["uid=alice.johnson,ou=users,dc=example,dc=com"]
 }
 ```
 
@@ -1020,16 +1023,16 @@ curl -X DELETE \
 
 ### HTTP Status Codes
 
-| Status Code | Description |
-|-------------|-------------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request - Invalid input |
-| 401 | Unauthorized - Authentication required |
-| 403 | Forbidden - Insufficient permissions |
-| 404 | Not Found - Resource doesn't exist |
-| 409 | Conflict - Resource already exists |
-| 500 | Internal Server Error |
+| Status Code | Description                            |
+| ----------- | -------------------------------------- |
+| 200         | Success                                |
+| 201         | Created                                |
+| 400         | Bad Request - Invalid input            |
+| 401         | Unauthorized - Authentication required |
+| 403         | Forbidden - Insufficient permissions   |
+| 404         | Not Found - Resource doesn't exist     |
+| 409         | Conflict - Resource already exists     |
+| 500         | Internal Server Error                  |
 
 ### Error Response Format
 
@@ -1150,7 +1153,7 @@ All errors return a JSON object with an error message:
 Always URL-encode DNs when using them in URL paths:
 
 ```javascript
-const dn = "uid=john.doe,ou=users,dc=example,dc=com";
+const dn = 'uid=john.doe,ou=users,dc=example,dc=com';
 const encoded = encodeURIComponent(dn);
 // Result: uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexample%2Cdc%3Dcom
 ```
@@ -1161,9 +1164,9 @@ LDAP attributes are always returned as arrays, even for single-valued attributes
 
 ```json
 {
-  "uid": "john.doe",           // Actually stored as ["john.doe"]
-  "cn": "John Doe",            // Actually stored as ["John Doe"]
-  "mail": "john@example.com"   // Actually stored as ["john@example.com"]
+  "uid": "john.doe", // Actually stored as ["john.doe"]
+  "cn": "John Doe", // Actually stored as ["John Doe"]
+  "mail": "john@example.com" // Actually stored as ["john@example.com"]
 }
 ```
 
@@ -1192,6 +1195,7 @@ For large result sets, consider implementing client-side pagination or use LDAP 
 ### Schema Validation
 
 Always check the schema via `/api/v1/config` to understand:
+
 - Required attributes
 - Attribute types and formats
 - Allowed values and patterns

@@ -40,7 +40,7 @@ const UserManager = () => {
 
         // Discover users endpoint from config
         const userResource = configData.features?.flatResources?.find(
-          (r) => r.pluralName === 'users'
+          r => r.pluralName === 'users'
         );
 
         if (!userResource) {
@@ -130,7 +130,7 @@ const UserManager = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {users.map(user => (
                 <tr key={user.dn}>
                   <td className="username">{user.uid}</td>
                   <td>{user.cn}</td>
@@ -200,7 +200,9 @@ export default UserManager;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-container {
@@ -577,37 +579,46 @@ export default {
 ```html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LDAP User Editor - Vue.js</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP User Editor - Vue.js</title>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-  <!-- LdapUserEditor CSS -->
-  <link rel="stylesheet" href="/static/browser/ldap-user-editor/LdapUserEditor.css">
+    <!-- LdapUserEditor CSS -->
+    <link
+      rel="stylesheet"
+      href="/static/browser/ldap-user-editor/LdapUserEditor.css"
+    />
 
-  <!-- Vue.js (Development version) -->
-  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <!-- Vue.js (Development version) -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Roboto', sans-serif;
-    }
-  </style>
-</head>
-<body>
-  <div id="app"></div>
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Roboto', sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
 
-  <!-- LdapUserEditor JavaScript -->
-  <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
+    <!-- LdapUserEditor JavaScript -->
+    <script src="/static/browser/ldap-user-editor/LdapUserEditor.js"></script>
 
-  <!-- Your Vue App -->
-  <script src="./app.js"></script>
-</body>
+    <!-- Your Vue App -->
+    <script src="./app.js"></script>
+  </body>
 </html>
 ```
 
@@ -631,341 +642,361 @@ This example demonstrates a complete HTML page with sidebar tree navigation and 
 ```html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organization Browser - Mini-DM</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Organization Browser - Mini-DM</title>
 
-  <!-- Material Icons -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Material Icons -->
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
 
-  <!-- LdapTreeViewer CSS -->
-  <link rel="stylesheet" href="/static/browser/ldap-tree-viewer/LdapTreeViewer.css">
+    <!-- LdapTreeViewer CSS -->
+    <link
+      rel="stylesheet"
+      href="/static/browser/ldap-tree-viewer/LdapTreeViewer.css"
+    />
 
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #f5f5f5;
-      color: #333;
-    }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        background: #f5f5f5;
+        color: #333;
+      }
 
-    .app-container {
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
+      .app-container {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
 
-    /* Sidebar with Tree */
-    .sidebar {
-      width: 350px;
-      background: white;
-      border-right: 1px solid #e0e0e0;
-      display: flex;
-      flex-direction: column;
-    }
+      /* Sidebar with Tree */
+      .sidebar {
+        width: 350px;
+        background: white;
+        border-right: 1px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+      }
 
-    .sidebar-header {
-      padding: 1.5rem;
-      background: #6200ee;
-      color: white;
-    }
+      .sidebar-header {
+        padding: 1.5rem;
+        background: #6200ee;
+        color: white;
+      }
 
-    .sidebar-header h1 {
-      font-size: 1.25rem;
-      margin-bottom: 0.25rem;
-    }
+      .sidebar-header h1 {
+        font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+      }
 
-    .sidebar-header p {
-      font-size: 0.875rem;
-      opacity: 0.9;
-    }
+      .sidebar-header p {
+        font-size: 0.875rem;
+        opacity: 0.9;
+      }
 
-    .tree-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-    }
+      .tree-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+      }
 
-    /* Main Content Area */
-    .content-area {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+      /* Main Content Area */
+      .content-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
 
-    .content-header {
-      padding: 1.5rem 2rem;
-      background: white;
-      border-bottom: 1px solid #e0e0e0;
-    }
+      .content-header {
+        padding: 1.5rem 2rem;
+        background: white;
+        border-bottom: 1px solid #e0e0e0;
+      }
 
-    .content-header h2 {
-      font-size: 1.5rem;
-      color: #1e293b;
-    }
+      .content-header h2 {
+        font-size: 1.5rem;
+        color: #1e293b;
+      }
 
-    .content-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 2rem;
-    }
+      .content-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 2rem;
+      }
 
-    .node-details {
-      background: white;
-      border-radius: 8px;
-      padding: 2rem;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+      .node-details {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
 
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #64748b;
-      text-align: center;
-    }
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #64748b;
+        text-align: center;
+      }
 
-    .empty-state .material-icons {
-      font-size: 80px;
-      margin-bottom: 1rem;
-      opacity: 0.5;
-    }
+      .empty-state .material-icons {
+        font-size: 80px;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+      }
 
-    .node-type-badge {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
+      .node-type-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
 
-    .node-type-organization {
-      background: #e3f2fd;
-      color: #1976d2;
-    }
+      .node-type-organization {
+        background: #e3f2fd;
+        color: #1976d2;
+      }
 
-    .node-type-user {
-      background: #f3e5f5;
-      color: #7b1fa2;
-    }
+      .node-type-user {
+        background: #f3e5f5;
+        color: #7b1fa2;
+      }
 
-    .node-type-group {
-      background: #e8f5e9;
-      color: #388e3c;
-    }
+      .node-type-group {
+        background: #e8f5e9;
+        color: #388e3c;
+      }
 
-    .detail-section {
-      margin-bottom: 2rem;
-    }
+      .detail-section {
+        margin-bottom: 2rem;
+      }
 
-    .detail-section h3 {
-      font-size: 1rem;
-      color: #64748b;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 600;
-    }
+      .detail-section h3 {
+        font-size: 1rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+      }
 
-    .detail-row {
-      display: flex;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid #f1f5f9;
-    }
+      .detail-row {
+        display: flex;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f1f5f9;
+      }
 
-    .detail-row:last-child {
-      border-bottom: none;
-    }
+      .detail-row:last-child {
+        border-bottom: none;
+      }
 
-    .detail-label {
-      width: 200px;
-      font-weight: 600;
-      color: #475569;
-    }
+      .detail-label {
+        width: 200px;
+        font-weight: 600;
+        color: #475569;
+      }
 
-    .detail-value {
-      flex: 1;
-      color: #1e293b;
-      word-break: break-all;
-    }
+      .detail-value {
+        flex: 1;
+        color: #1e293b;
+        word-break: break-all;
+      }
 
-    .detail-value code {
-      background: #f1f5f9;
-      padding: 0.125rem 0.375rem;
-      border-radius: 3px;
-      font-family: 'Courier New', monospace;
-      font-size: 0.875rem;
-    }
+      .detail-value code {
+        background: #f1f5f9;
+        padding: 0.125rem 0.375rem;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+      }
 
-    .children-list {
-      list-style: none;
-    }
+      .children-list {
+        list-style: none;
+      }
 
-    .children-list li {
-      padding: 0.5rem 0;
-      color: #1e293b;
-    }
+      .children-list li {
+        padding: 0.5rem 0;
+        color: #1e293b;
+      }
 
-    .children-list li::before {
-      content: '→';
-      margin-right: 0.5rem;
-      color: #6200ee;
-      font-weight: bold;
-    }
+      .children-list li::before {
+        content: '→';
+        margin-right: 0.5rem;
+        color: #6200ee;
+        font-weight: bold;
+      }
 
-    .loading-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-    }
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+      }
 
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid #e0e0e0;
-      border-top-color: #6200ee;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e0e0e0;
+        border-top-color: #6200ee;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
-</head>
-<body>
-  <div class="app-container">
-    <!-- Sidebar with Tree -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <h1>Organizations</h1>
-        <p>Browse your LDAP directory</p>
-      </div>
-      <div id="tree" class="tree-container"></div>
-    </aside>
-
-    <!-- Main Content Area -->
-    <main class="content-area">
-      <div class="content-header">
-        <h2>Node Details</h2>
-      </div>
-      <div class="content-body">
-        <div id="details" class="empty-state">
-          <span class="material-icons">account_tree</span>
-          <p>Select a node from the tree to view details</p>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Sidebar with Tree -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>Organizations</h1>
+          <p>Browse your LDAP directory</p>
         </div>
-      </div>
-    </main>
-  </div>
+        <div id="tree" class="tree-container"></div>
+      </aside>
 
-  <!-- LdapTreeViewer JavaScript -->
-  <script src="/static/browser/ldap-tree-viewer/LdapTreeViewer.js"></script>
+      <!-- Main Content Area -->
+      <main class="content-area">
+        <div class="content-header">
+          <h2>Node Details</h2>
+        </div>
+        <div class="content-body">
+          <div id="details" class="empty-state">
+            <span class="material-icons">account_tree</span>
+            <p>Select a node from the tree to view details</p>
+          </div>
+        </div>
+      </main>
+    </div>
 
-  <script>
-    const { LdapTreeViewer } = window.LdapTreeViewer;
+    <!-- LdapTreeViewer JavaScript -->
+    <script src="/static/browser/ldap-tree-viewer/LdapTreeViewer.js"></script>
 
-    // Initialize the tree viewer
-    const viewer = new LdapTreeViewer({
-      containerId: 'tree',
-      apiBaseUrl: window.location.origin,
-      onNodeClick: handleNodeClick,
-      onNodeExpand: handleNodeExpand,
-    });
+    <script>
+      const { LdapTreeViewer } = window.LdapTreeViewer;
 
-    // Handle node clicks
-    async function handleNodeClick(node) {
-      const detailsContainer = document.getElementById('details');
+      // Initialize the tree viewer
+      const viewer = new LdapTreeViewer({
+        containerId: 'tree',
+        apiBaseUrl: window.location.origin,
+        onNodeClick: handleNodeClick,
+        onNodeExpand: handleNodeExpand,
+      });
 
-      // Show loading state
-      detailsContainer.innerHTML = `
+      // Handle node clicks
+      async function handleNodeClick(node) {
+        const detailsContainer = document.getElementById('details');
+
+        // Show loading state
+        detailsContainer.innerHTML = `
         <div class="loading-overlay">
           <div class="spinner"></div>
         </div>
       `;
 
-      try {
-        // Fetch full node details
-        const apiUrl = `${viewer.options.apiBaseUrl}/api/v1/ldap/organizations/${encodeURIComponent(node.dn)}`;
-        const response = await fetch(apiUrl);
+        try {
+          // Fetch full node details
+          const apiUrl = `${viewer.options.apiBaseUrl}/api/v1/ldap/organizations/${encodeURIComponent(node.dn)}`;
+          const response = await fetch(apiUrl);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-        const nodeData = await response.json();
+          const nodeData = await response.json();
 
-        // Display node details
-        displayNodeDetails(node, nodeData);
-      } catch (error) {
-        console.error('Failed to load node details:', error);
-        detailsContainer.innerHTML = `
+          // Display node details
+          displayNodeDetails(node, nodeData);
+        } catch (error) {
+          console.error('Failed to load node details:', error);
+          detailsContainer.innerHTML = `
           <div class="empty-state">
             <span class="material-icons">error_outline</span>
             <p>Failed to load node details</p>
             <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
           </div>
         `;
+        }
       }
-    }
 
-    // Handle node expansion
-    function handleNodeExpand(node) {
-      console.log('Node expanded:', node.displayName, '(', node.childrenDns.length, 'children)');
-    }
+      // Handle node expansion
+      function handleNodeExpand(node) {
+        console.log(
+          'Node expanded:',
+          node.displayName,
+          '(',
+          node.childrenDns.length,
+          'children)'
+        );
+      }
 
-    // Display node details in the content area
-    function displayNodeDetails(node, fullData) {
-      const detailsContainer = document.getElementById('details');
+      // Display node details in the content area
+      function displayNodeDetails(node, fullData) {
+        const detailsContainer = document.getElementById('details');
 
-      // Build attributes list
-      const attributesHtml = Object.entries(fullData)
-        .filter(([key]) => key !== 'dn')
-        .map(([key, value]) => {
-          const displayValue = Array.isArray(value)
-            ? value.join(', ')
-            : String(value);
+        // Build attributes list
+        const attributesHtml = Object.entries(fullData)
+          .filter(([key]) => key !== 'dn')
+          .map(([key, value]) => {
+            const displayValue = Array.isArray(value)
+              ? value.join(', ')
+              : String(value);
 
-          return `
+            return `
             <div class="detail-row">
               <div class="detail-label">${key}</div>
               <div class="detail-value"><code>${escapeHtml(displayValue)}</code></div>
             </div>
           `;
-        })
-        .join('');
+          })
+          .join('');
 
-      // Build children list
-      const childrenHtml = node.childrenDns.length > 0
-        ? `
+        // Build children list
+        const childrenHtml =
+          node.childrenDns.length > 0
+            ? `
           <div class="detail-section">
             <h3>Children (${node.childrenDns.length})</h3>
             <ul class="children-list">
-              ${node.childrenDns.slice(0, 10).map(dn => `<li>${escapeHtml(dn)}</li>`).join('')}
+              ${node.childrenDns
+                .slice(0, 10)
+                .map(dn => `<li>${escapeHtml(dn)}</li>`)
+                .join('')}
               ${node.childrenDns.length > 10 ? `<li>... and ${node.childrenDns.length - 10} more</li>` : ''}
             </ul>
           </div>
         `
-        : '';
+            : '';
 
-      detailsContainer.innerHTML = `
+        detailsContainer.innerHTML = `
         <div class="node-details">
           <span class="node-type-badge node-type-${node.type}">${node.type}</span>
           <h2 style="margin-bottom: 0.5rem;">${escapeHtml(node.displayName)}</h2>
@@ -981,27 +1012,27 @@ This example demonstrates a complete HTML page with sidebar tree navigation and 
           ${childrenHtml}
         </div>
       `;
-    }
+      }
 
-    // Utility function to escape HTML
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
+      // Utility function to escape HTML
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
 
-    // Initialize the viewer
-    viewer.init().catch(error => {
-      console.error('Failed to initialize tree viewer:', error);
-      document.getElementById('tree').innerHTML = `
+      // Initialize the viewer
+      viewer.init().catch(error => {
+        console.error('Failed to initialize tree viewer:', error);
+        document.getElementById('tree').innerHTML = `
         <div style="padding: 1rem; color: #c62828; text-align: center;">
           <p><strong>Failed to initialize</strong></p>
           <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
         </div>
       `;
-    });
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>
 ```
 
@@ -1042,7 +1073,9 @@ class GroupManager {
       // Discover groups endpoints from config
       const groupsConfig = this.config.features?.groups;
       if (!groupsConfig || !groupsConfig.enabled) {
-        throw new Error('Groups feature is not enabled in Mini-DM configuration');
+        throw new Error(
+          'Groups feature is not enabled in Mini-DM configuration'
+        );
       }
 
       this.groupsEndpoint = groupsConfig.endpoints;
@@ -1102,7 +1135,10 @@ class GroupManager {
     }
 
     try {
-      const url = this.groupsEndpoint.get.replace(':cn', encodeURIComponent(cn));
+      const url = this.groupsEndpoint.get.replace(
+        ':cn',
+        encodeURIComponent(cn)
+      );
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -1142,14 +1178,16 @@ class GroupManager {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify(groupData),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to create group: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to create group: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -1174,19 +1212,24 @@ class GroupManager {
     }
 
     try {
-      const url = this.groupsEndpoint.update.replace(':cn', encodeURIComponent(cn));
+      const url = this.groupsEndpoint.update.replace(
+        ':cn',
+        encodeURIComponent(cn)
+      );
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify(changes),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to update group: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to update group: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -1210,17 +1253,22 @@ class GroupManager {
     }
 
     try {
-      const url = this.groupsEndpoint.delete.replace(':cn', encodeURIComponent(cn));
+      const url = this.groupsEndpoint.delete.replace(
+        ':cn',
+        encodeURIComponent(cn)
+      );
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to delete group: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to delete group: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -1245,19 +1293,24 @@ class GroupManager {
     }
 
     try {
-      const url = this.groupsEndpoint.addMember.replace(':id', encodeURIComponent(groupCn));
+      const url = this.groupsEndpoint.addMember.replace(
+        ':id',
+        encodeURIComponent(groupCn)
+      );
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({ member: memberDn }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to add member: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to add member: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -1290,13 +1343,15 @@ class GroupManager {
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to remove member: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to remove member: ${response.status}`
+        );
       }
 
       const result = await response.json();
@@ -1424,7 +1479,6 @@ async function demonstrateGroupManagement() {
     console.log('\n--- Filtering groups ---');
     const filteredGroups = await manager.listGroups('dev*');
     console.log('Groups matching "dev*":', Object.keys(filteredGroups));
-
   } catch (error) {
     console.error('Error in demonstration:', error);
   }
@@ -1439,134 +1493,145 @@ demonstrateGroupManagement();
 ```html
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Group Management - Mini-DM</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 2rem;
-      background: #f5f5f5;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Group Management - Mini-DM</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: #f5f5f5;
+      }
 
-    .container {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+      .container {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
 
-    h1 {
-      margin-bottom: 2rem;
-    }
+      h1 {
+        margin-bottom: 2rem;
+      }
 
-    .button {
-      padding: 0.5rem 1rem;
-      margin: 0.25rem;
-      background: #6200ee;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+      .button {
+        padding: 0.5rem 1rem;
+        margin: 0.25rem;
+        background: #6200ee;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
 
-    .button:hover {
-      background: #3700b3;
-    }
+      .button:hover {
+        background: #3700b3;
+      }
 
-    #output {
-      margin-top: 2rem;
-      padding: 1rem;
-      background: #f8f9fa;
-      border-radius: 4px;
-      font-family: monospace;
-      white-space: pre-wrap;
-      max-height: 600px;
-      overflow-y: auto;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Group Management</h1>
+      #output {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        max-height: 600px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Group Management</h1>
 
-    <div>
-      <button class="button" onclick="listAllGroups()">List All Groups</button>
-      <button class="button" onclick="createTestGroup()">Create Test Group</button>
-      <button class="button" onclick="addTestMember()">Add Member</button>
-      <button class="button" onclick="removeTestMember()">Remove Member</button>
+      <div>
+        <button class="button" onclick="listAllGroups()">
+          List All Groups
+        </button>
+        <button class="button" onclick="createTestGroup()">
+          Create Test Group
+        </button>
+        <button class="button" onclick="addTestMember()">Add Member</button>
+        <button class="button" onclick="removeTestMember()">
+          Remove Member
+        </button>
+      </div>
+
+      <div id="output">Ready. Click a button to perform an operation.</div>
     </div>
 
-    <div id="output">Ready. Click a button to perform an operation.</div>
-  </div>
+    <script src="./GroupManager.js"></script>
+    <script>
+      const manager = new GroupManager();
+      const output = document.getElementById('output');
 
-  <script src="./GroupManager.js"></script>
-  <script>
-    const manager = new GroupManager();
-    const output = document.getElementById('output');
-
-    // Initialize on page load
-    manager.init()
-      .then(() => {
-        output.textContent = 'GroupManager initialized successfully!\n\nClick a button to perform an operation.';
-      })
-      .catch(error => {
-        output.textContent = 'Failed to initialize:\n' + error.message;
-      });
-
-    async function listAllGroups() {
-      try {
-        output.textContent = 'Loading groups...';
-        const groups = await manager.listGroups();
-        output.textContent = 'Groups:\n\n' + JSON.stringify(groups, null, 2);
-      } catch (error) {
-        output.textContent = 'Error:\n' + error.message;
-      }
-    }
-
-    async function createTestGroup() {
-      try {
-        output.textContent = 'Creating test group...';
-        const result = await manager.createGroup('test-group', {
-          description: 'Test Group',
-          member: ['uid=testuser,ou=users,dc=example,dc=com'],
+      // Initialize on page load
+      manager
+        .init()
+        .then(() => {
+          output.textContent =
+            'GroupManager initialized successfully!\n\nClick a button to perform an operation.';
+        })
+        .catch(error => {
+          output.textContent = 'Failed to initialize:\n' + error.message;
         });
-        output.textContent = 'Group created:\n\n' + JSON.stringify(result, null, 2);
-      } catch (error) {
-        output.textContent = 'Error:\n' + error.message;
-      }
-    }
 
-    async function addTestMember() {
-      try {
-        output.textContent = 'Adding member...';
-        const result = await manager.addMember(
-          'test-group',
-          'uid=newuser,ou=users,dc=example,dc=com'
-        );
-        output.textContent = 'Member added:\n\n' + JSON.stringify(result, null, 2);
-      } catch (error) {
-        output.textContent = 'Error:\n' + error.message;
+      async function listAllGroups() {
+        try {
+          output.textContent = 'Loading groups...';
+          const groups = await manager.listGroups();
+          output.textContent = 'Groups:\n\n' + JSON.stringify(groups, null, 2);
+        } catch (error) {
+          output.textContent = 'Error:\n' + error.message;
+        }
       }
-    }
 
-    async function removeTestMember() {
-      try {
-        output.textContent = 'Removing member...';
-        const result = await manager.removeMember(
-          'test-group',
-          'uid=newuser,ou=users,dc=example,dc=com'
-        );
-        output.textContent = 'Member removed:\n\n' + JSON.stringify(result, null, 2);
-      } catch (error) {
-        output.textContent = 'Error:\n' + error.message;
+      async function createTestGroup() {
+        try {
+          output.textContent = 'Creating test group...';
+          const result = await manager.createGroup('test-group', {
+            description: 'Test Group',
+            member: ['uid=testuser,ou=users,dc=example,dc=com'],
+          });
+          output.textContent =
+            'Group created:\n\n' + JSON.stringify(result, null, 2);
+        } catch (error) {
+          output.textContent = 'Error:\n' + error.message;
+        }
       }
-    }
-  </script>
-</body>
+
+      async function addTestMember() {
+        try {
+          output.textContent = 'Adding member...';
+          const result = await manager.addMember(
+            'test-group',
+            'uid=newuser,ou=users,dc=example,dc=com'
+          );
+          output.textContent =
+            'Member added:\n\n' + JSON.stringify(result, null, 2);
+        } catch (error) {
+          output.textContent = 'Error:\n' + error.message;
+        }
+      }
+
+      async function removeTestMember() {
+        try {
+          output.textContent = 'Removing member...';
+          const result = await manager.removeMember(
+            'test-group',
+            'uid=newuser,ou=users,dc=example,dc=com'
+          );
+          output.textContent =
+            'Member removed:\n\n' + JSON.stringify(result, null, 2);
+        } catch (error) {
+          output.textContent = 'Error:\n' + error.message;
+        }
+      }
+    </script>
+  </body>
 </html>
 ```
 

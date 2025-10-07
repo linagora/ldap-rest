@@ -7,6 +7,7 @@ Complete documentation for mini-dm plugins and features.
 If you want to build a web application that uses Mini-DM's APIs and browser libraries:
 
 📖 **[Developer Guide](./DEVELOPER_GUIDE.md)** - Complete guide covering:
+
 - REST API reference (Config, Users, Groups, Organizations)
 - Browser libraries (LdapTreeViewer, LdapUserEditor)
 - JSON schemas and roles

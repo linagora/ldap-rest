@@ -298,7 +298,9 @@ export default class LdapOrganizations extends DmPlugin {
   async checkDeptLink(entry: AttributesList): Promise<void> {
     if (entry[this.linkAttr]) {
       const linkValue = entry[this.linkAttr];
-      const orgDn = (Array.isArray(linkValue) ? linkValue[0] : linkValue) as string;
+      const orgDn = (
+        Array.isArray(linkValue) ? linkValue[0] : linkValue
+      ) as string;
       const res = await this.server.ldap.search(
         { paged: false, scope: 'base' },
         orgDn
@@ -426,9 +428,7 @@ export default class LdapOrganizations extends DmPlugin {
       this.config.ldap_organization_max_subnodes || 50;
 
     // Check if objectClass filter is requested via query parameter
-    const objectClassFilter = (req as any)?.query?.objectClass as
-      | string
-      | undefined;
+    const objectClassFilter = req?.query?.objectClass as string | undefined;
 
     // 1. Get direct sub-OUs (children organizational units)
     if (!objectClassFilter || objectClassFilter === 'organizationalUnit') {

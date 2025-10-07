@@ -106,24 +106,18 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     if (config.schemaPath) {
-      fs.readFile(config.schemaPath, (err, data) => {
-        if (err) {
-          this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
-            `Failed to load ${this.singularName} schema from ${config.schemaPath}: ${err}`
-          );
-        } else {
-          try {
-            this.schema = JSON.parse(
-              transformSchemas(data.toString(), this.config)
-            ) as Schema;
-            this.logger.debug(`${this.singularName} schema loaded`);
-          } catch (e) {
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            this.logger.error(`Failed to parse ${config.schemaPath}: ${e}`);
-          }
-        }
-      });
+      try {
+        const data = fs.readFileSync(config.schemaPath, 'utf8');
+        this.schema = JSON.parse(transformSchemas(data, this.config)) as Schema;
+        this.logger.info(
+          `${this.singularName} schema loaded from ${config.schemaPath}`
+        );
+      } catch (err) {
+        this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `Failed to load ${this.singularName} schema from ${config.schemaPath}: ${err}`
+        );
+      }
     }
   }
 
@@ -219,6 +213,8 @@ export default abstract class LdapFlat extends DmPlugin {
     const id = body[this.mainAttribute] as string;
     const additional = { ...body };
     delete additional[this.mainAttribute];
+    // Remove dn if provided - it will be constructed by addEntry
+    delete additional.dn;
 
     try {
       await this.addEntry(id, additional, req);
@@ -249,7 +245,15 @@ export default abstract class LdapFlat extends DmPlugin {
   ): Promise<boolean> {
     let dn: string;
     if (new RegExp(`^${this.mainAttribute}=`).test(id)) {
+      // DN provided - validate it's in the correct flat branch
       dn = id;
+      const expectedSuffix = `,${this.base}`;
+      if (!dn.endsWith(expectedSuffix)) {
+        throw new Error(
+          `DN must be in the flat branch "${this.base}". ` +
+            `Provided DN "${dn}" does not end with "${expectedSuffix}"`
+        );
+      }
       id = id.replace(new RegExp(`^${this.mainAttribute}=([^,]+).*`), '$1');
     } else {
       dn = `${this.mainAttribute}=${id},${this.base}`;
@@ -267,14 +271,46 @@ export default abstract class LdapFlat extends DmPlugin {
       [this.mainAttribute]: id,
       ...additional,
     };
+
+    // Note: LDAP attribute values with DNs do NOT need escaping
+    // ldapts handles this automatically
+    // Only the main DN of the entry itself needs proper formatting
+    if (this.schema) {
+      this.logger.debug(
+        'Schema loaded, attributes:',
+        Object.keys(this.schema.attributes)
+      );
+    } else {
+      this.logger.warn('No schema available');
+    }
+
     [dn, entry] = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}add`],
       [dn, entry]
     );
+
+    // Debug log entry before sending to LDAP
+    this.logger.debug('Adding LDAP entry:', {
+      dn,
+      entry: JSON.stringify(entry, null, 2),
+    });
+
+    // Log each attribute to see exact values
+    this.logger.debug('Entry attributes breakdown:');
+    for (const [key, value] of Object.entries(entry)) {
+      this.logger.debug(`  ${key}: ${typeof value} = ${JSON.stringify(value)}`);
+    }
+
     let res;
     try {
       res = await this.ldap.add(dn, entry, req);
     } catch (err) {
+      // Log detailed error information
+      this.logger.error('LDAP add failed:', {
+        dn,
+        entry: JSON.stringify(entry, null, 2),
+        error: err,
+      });
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }
@@ -534,7 +570,7 @@ export default abstract class LdapFlat extends DmPlugin {
       // Verify that the DN exists in LDAP
       try {
         const result = (await this.ldap.search(
-          { paged: false },
+          { paged: false, scope: 'base' },
           dnValue
         )) as SearchResult;
         if (
@@ -561,5 +597,40 @@ export default abstract class LdapFlat extends DmPlugin {
       return regex.test(value as string);
     }
     return true;
+  }
+
+  /**
+   * Escape special characters in DN values for LDAP attributes
+   * Escape spaces and special characters with backslashes
+   */
+  private escapeDnValue(dn: string): string {
+    if (!dn) return dn;
+
+    // Split DN into RDN components
+    const parts = dn.split(',').map(part => {
+      const trimmed = part.trim();
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) return trimmed;
+
+      const key = trimmed.substring(0, eqIndex);
+      let value = trimmed.substring(eqIndex + 1);
+
+      // Escape special characters according to RFC 4514
+      // Characters that must be escaped: space, #, +, ,, ;, <, >, \
+      // Also escape leading # and space
+      value = value
+        .replace(/\\/g, '\\\\') // Backslash first
+        .replace(/ /g, '\\ ') // Spaces (all of them, not just leading/trailing)
+        .replace(/#/g, '\\#')
+        .replace(/\+/g, '\\+')
+        .replace(/,/g, '\\,')
+        .replace(/;/g, '\\;')
+        .replace(/</g, '\\<')
+        .replace(/>/g, '\\>');
+
+      return `${key}=${value}`;
+    });
+
+    return parts.join(',');
   }
 }

@@ -3,6 +3,8 @@
  * Shows only LDAP organization tree (filters out users/groups)
  */
 
+import type { LdapUser } from '../types';
+
 export class UserTree {
   private container: HTMLElement;
   private baseUrl: string;
@@ -47,7 +49,8 @@ export class UserTree {
       console.error('Failed to init tree:', error);
       const treeEl = this.container.querySelector('#org-tree-viewer');
       if (treeEl) {
-        treeEl.innerHTML = '<div class="empty-state"><span class="material-icons">error</span><p>Failed to load organization tree</p></div>';
+        treeEl.innerHTML =
+          '<div class="empty-state"><span class="material-icons">error</span><p>Failed to load organization tree</p></div>';
       }
     }
   }
@@ -62,7 +65,8 @@ export class UserTree {
       this.attachEventListeners();
     } catch (error) {
       console.error('Failed to render tree:', error);
-      treeEl.innerHTML = '<div class="empty-state"><span class="material-icons">error</span><p>Error rendering tree</p></div>';
+      treeEl.innerHTML =
+        '<div class="empty-state"><span class="material-icons">error</span><p>Error rendering tree</p></div>';
     }
   }
 
@@ -104,9 +108,16 @@ export class UserTree {
         );
         if (subRes.ok) {
           const subnodes = await subRes.json();
-          const orgs = subnodes.filter((n: any) => {
-            const classes = n.objectClass || [];
-            return classes.includes('organizationalUnit') || classes.includes('organization');
+          const orgs = subnodes.filter((n: LdapUser) => {
+            const classes = Array.isArray(n.objectClass)
+              ? n.objectClass
+              : n.objectClass
+                ? [n.objectClass]
+                : [];
+            return (
+              classes.includes('organizationalUnit') ||
+              classes.includes('organization')
+            );
           });
 
           for (const subnode of orgs) {

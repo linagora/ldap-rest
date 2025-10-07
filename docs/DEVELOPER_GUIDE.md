@@ -98,8 +98,9 @@ npx mini-dm \
 ### 2. Access the Configuration API
 
 ```javascript
-const config = await fetch('http://localhost:8081/api/v1/config')
-  .then(r => r.json());
+const config = await fetch('http://localhost:8081/api/v1/config').then(r =>
+  r.json()
+);
 
 console.log(config);
 // {
@@ -114,27 +115,33 @@ console.log(config);
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
-</head>
-<body>
-  <div id="editor"></div>
+  <head>
+    <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="editor"></div>
 
-  <script src="/static/browser/ldap-user-editor.js"></script>
-  <script>
-    const { LdapUserEditor } = window.LdapUserEditor;
+    <script src="/static/browser/ldap-user-editor.js"></script>
+    <script>
+      const { LdapUserEditor } = window.LdapUserEditor;
 
-    const editor = new LdapUserEditor({
-      containerId: 'editor',
-      apiBaseUrl: window.location.origin,
-      onUserSaved: (dn) => console.log('Saved:', dn),
-    });
+      const editor = new LdapUserEditor({
+        containerId: 'editor',
+        apiBaseUrl: window.location.origin,
+        onUserSaved: dn => console.log('Saved:', dn),
+      });
 
-    editor.init();
-  </script>
-</body>
+      editor.init();
+    </script>
+  </body>
 </html>
 ```
 
@@ -236,9 +243,9 @@ The `/api/v1/config` endpoint exposes all available features, endpoints, and sch
 const config = await fetch('/api/v1/config').then(r => r.json());
 
 // Find users endpoint
-const usersEndpoint = config.features.flatResources
-  .find(r => r.pluralName === 'users')
-  ?.endpoints.list;
+const usersEndpoint = config.features.flatResources.find(
+  r => r.pluralName === 'users'
+)?.endpoints.list;
 
 // Use it
 const users = await fetch(usersEndpoint).then(r => r.json());
@@ -249,6 +256,7 @@ See [REST API Guide](./api/REST_API.md) for details.
 ### Plugin-Based Extensibility
 
 Extend Mini-DM with custom plugins that:
+
 - Add REST API endpoints
 - Hook into LDAP operations
 - Integrate external systems

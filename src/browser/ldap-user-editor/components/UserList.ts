@@ -81,7 +81,8 @@ export class UserList {
     if (!listEl) return;
 
     try {
-      listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      listEl.innerHTML =
+        '<div class="loading"><div class="spinner"></div></div>';
 
       // Use organization subnodes API to get users in this org
       // Filter by the first objectClass from schema to get only users (not groups/OUs)
@@ -122,7 +123,7 @@ export class UserList {
     }
   }
 
-  private getFirstValue(value: any): string {
+  private getFirstValue(value: unknown): string {
     if (!value) return '';
     if (Array.isArray(value)) return value[0] || '';
     return String(value);
@@ -156,11 +157,21 @@ export class UserList {
     // Filter users by search query
     const filteredUsers = this.searchQuery
       ? this.users.filter(user => {
-          const displayName = displayNameField ? this.getFirstValue(user[displayNameField]).toLowerCase() : '';
-          const identifier = this.getFirstValue(user[identifierField]).toLowerCase();
-          const email = emailField ? this.getFirstValue(user[emailField]).toLowerCase() : '';
+          const displayName = displayNameField
+            ? this.getFirstValue(user[displayNameField]).toLowerCase()
+            : '';
+          const identifier = this.getFirstValue(
+            user[identifierField]
+          ).toLowerCase();
+          const email = emailField
+            ? this.getFirstValue(user[emailField]).toLowerCase()
+            : '';
           const query = this.searchQuery.toLowerCase();
-          return displayName.includes(query) || identifier.includes(query) || email.includes(query);
+          return (
+            displayName.includes(query) ||
+            identifier.includes(query) ||
+            email.includes(query)
+          );
         })
       : this.users;
 
@@ -172,7 +183,9 @@ export class UserList {
 
     listEl.innerHTML = filteredUsers
       .map(user => {
-        const displayName = displayNameField ? this.getFirstValue(user[displayNameField]) : '';
+        const displayName = displayNameField
+          ? this.getFirstValue(user[displayNameField])
+          : '';
         const identifier = this.getFirstValue(user[identifierField]);
         const email = emailField ? this.getFirstValue(user[emailField]) : '';
         const name = displayName || identifier || 'Unknown';

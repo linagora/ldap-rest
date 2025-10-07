@@ -19,10 +19,10 @@ Complete technical reference for the Mini-DM REST API including detailed specifi
 
 ### Success Codes
 
-| Code | Status | Description | Use Case |
-|------|--------|-------------|----------|
-| 200 | OK | Request succeeded | GET, PUT, DELETE operations |
-| 201 | Created | Resource created successfully | POST operations |
+| Code | Status  | Description                   | Use Case                    |
+| ---- | ------- | ----------------------------- | --------------------------- |
+| 200  | OK      | Request succeeded             | GET, PUT, DELETE operations |
+| 201  | Created | Resource created successfully | POST operations             |
 
 **Example 200 Response:**
 
@@ -45,14 +45,14 @@ Complete technical reference for the Mini-DM REST API including detailed specifi
 
 ### Client Error Codes
 
-| Code | Status | Description | Common Causes |
-|------|--------|-------------|---------------|
-| 400 | Bad Request | Invalid request format or data | Missing required fields, invalid attribute values, malformed JSON |
-| 401 | Unauthorized | Authentication required or failed | Missing/invalid token, expired credentials |
-| 403 | Forbidden | Insufficient permissions | User lacks required LDAP permissions |
-| 404 | Not Found | Resource doesn't exist | Invalid DN, deleted resource |
-| 409 | Conflict | Resource already exists or state conflict | Duplicate entry, non-empty organization deletion |
-| 415 | Unsupported Media Type | Wrong Content-Type header | Missing `application/json` header |
+| Code | Status                 | Description                               | Common Causes                                                     |
+| ---- | ---------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| 400  | Bad Request            | Invalid request format or data            | Missing required fields, invalid attribute values, malformed JSON |
+| 401  | Unauthorized           | Authentication required or failed         | Missing/invalid token, expired credentials                        |
+| 403  | Forbidden              | Insufficient permissions                  | User lacks required LDAP permissions                              |
+| 404  | Not Found              | Resource doesn't exist                    | Invalid DN, deleted resource                                      |
+| 409  | Conflict               | Resource already exists or state conflict | Duplicate entry, non-empty organization deletion                  |
+| 415  | Unsupported Media Type | Wrong Content-Type header                 | Missing `application/json` header                                 |
 
 **Example 400 Response:**
 
@@ -88,10 +88,10 @@ Complete technical reference for the Mini-DM REST API including detailed specifi
 
 ### Server Error Codes
 
-| Code | Status | Description | Common Causes |
-|------|--------|-------------|---------------|
-| 500 | Internal Server Error | Server-side failure | LDAP connection issues, database errors, plugin failures |
-| 503 | Service Unavailable | Server temporarily unavailable | LDAP server down, maintenance mode |
+| Code | Status                | Description                    | Common Causes                                            |
+| ---- | --------------------- | ------------------------------ | -------------------------------------------------------- |
+| 500  | Internal Server Error | Server-side failure            | LDAP connection issues, database errors, plugin failures |
+| 503  | Service Unavailable   | Server temporarily unavailable | LDAP server down, maintenance mode                       |
 
 **Example 500 Response:**
 
@@ -228,6 +228,7 @@ Replaces the entire attribute value. Creates the attribute if it doesn't exist.
 ```
 
 **LDAP Effect:**
+
 - Old value: `mail: oldemail@example.com`
 - New value: `mail: newemail@example.com`
 
@@ -249,6 +250,7 @@ Adds new values to an attribute. For multi-valued attributes, appends to existin
 ```
 
 **LDAP Effect:**
+
 - Before: `mailAlternateAddress: [primary@example.com]`
 - After: `mailAlternateAddress: [primary@example.com, alias@example.com]`
 
@@ -275,10 +277,12 @@ Removes attributes or specific values.
 ```
 
 **LDAP Effect (entire attribute):**
+
 - Before: `mobile: +1-555-0123`
 - After: `mobile: <removed>`
 
 **LDAP Effect (specific value):**
+
 - Before: `mailAlternateAddress: [alias1@example.com, alias2@example.com]`
 - After: `mailAlternateAddress: [alias1@example.com]`
 
@@ -446,39 +450,39 @@ Or:
 
 #### User Attributes
 
-| Attribute | Type | Required | Format | Description |
-|-----------|------|----------|--------|-------------|
-| uid | string | Yes | `^[a-zA-Z0-9._-]{1,255}$` | User identifier |
-| cn | string | Yes | Any | Common name (full name) |
-| sn | string | Yes | Any | Surname (last name) |
-| givenName | string | No | Any | First name |
-| mail | string | No | Email format | Primary email address |
-| mailAlternateAddress | array | No | Email format | Additional email addresses |
-| telephoneNumber | string | No | Any | Primary phone number |
-| mobile | string | No | Any | Mobile phone number |
-| displayName | string | No | Any | Display name |
-| userPassword | string | No | Hashed | User password (SSHA, MD5, etc.) |
-| departmentNumber | string | No | DN format | Department/organization link |
-| objectClass | array | Yes | Fixed | LDAP object classes |
+| Attribute            | Type   | Required | Format                    | Description                     |
+| -------------------- | ------ | -------- | ------------------------- | ------------------------------- |
+| uid                  | string | Yes      | `^[a-zA-Z0-9._-]{1,255}$` | User identifier                 |
+| cn                   | string | Yes      | Any                       | Common name (full name)         |
+| sn                   | string | Yes      | Any                       | Surname (last name)             |
+| givenName            | string | No       | Any                       | First name                      |
+| mail                 | string | No       | Email format              | Primary email address           |
+| mailAlternateAddress | array  | No       | Email format              | Additional email addresses      |
+| telephoneNumber      | string | No       | Any                       | Primary phone number            |
+| mobile               | string | No       | Any                       | Mobile phone number             |
+| displayName          | string | No       | Any                       | Display name                    |
+| userPassword         | string | No       | Hashed                    | User password (SSHA, MD5, etc.) |
+| departmentNumber     | string | No       | DN format                 | Department/organization link    |
+| objectClass          | array  | Yes      | Fixed                     | LDAP object classes             |
 
 #### Group Attributes
 
-| Attribute | Type | Required | Format | Description |
-|-----------|------|----------|--------|-------------|
-| cn | string | Yes | Any | Group name |
-| description | string | No | Any | Group description |
-| member | array | Auto | DN format | Group members (DNs) |
-| objectClass | array | Yes | Fixed | LDAP object classes |
+| Attribute   | Type   | Required | Format    | Description         |
+| ----------- | ------ | -------- | --------- | ------------------- |
+| cn          | string | Yes      | Any       | Group name          |
+| description | string | No       | Any       | Group description   |
+| member      | array  | Auto     | DN format | Group members (DNs) |
+| objectClass | array  | Yes      | Fixed     | LDAP object classes |
 
 **Note:** The `member` attribute requires at least one value. If not provided, a dummy member is automatically added.
 
 #### Organization Attributes
 
-| Attribute | Type | Required | Format | Description |
-|-----------|------|----------|--------|-------------|
-| ou | string | Yes | Any | Organizational unit name |
-| description | string | No | Any | Organization description |
-| objectClass | array | Yes | Fixed | LDAP object classes |
+| Attribute   | Type   | Required | Format | Description              |
+| ----------- | ------ | -------- | ------ | ------------------------ |
+| ou          | string | Yes      | Any    | Organizational unit name |
+| description | string | No       | Any    | Organization description |
+| objectClass | array  | Yes      | Fixed  | LDAP object classes      |
 
 ### Distinguished Names (DN)
 
@@ -518,24 +522,24 @@ Always URL-encode DNs and special characters when using them in URL paths or que
 
 ### Characters Requiring Encoding
 
-| Character | Encoding | Usage |
-|-----------|----------|-------|
-| Space | `%20` | Names with spaces |
-| Comma `,` | `%2C` | DN separators |
-| Equals `=` | `%3D` | DN attribute assignments |
-| Plus `+` | `%2B` | Multi-valued RDNs |
-| Forward slash `/` | `%2F` | Path separators |
-| Colon `:` | `%3A` | Port separators |
-| Question mark `?` | `%3F` | Query string start |
-| Ampersand `&` | `%26` | Query parameter separator |
-| Hash `#` | `%23` | Fragment identifier |
+| Character         | Encoding | Usage                     |
+| ----------------- | -------- | ------------------------- |
+| Space             | `%20`    | Names with spaces         |
+| Comma `,`         | `%2C`    | DN separators             |
+| Equals `=`        | `%3D`    | DN attribute assignments  |
+| Plus `+`          | `%2B`    | Multi-valued RDNs         |
+| Forward slash `/` | `%2F`    | Path separators           |
+| Colon `:`         | `%3A`    | Port separators           |
+| Question mark `?` | `%3F`    | Query string start        |
+| Ampersand `&`     | `%26`    | Query parameter separator |
+| Hash `#`          | `%23`    | Fragment identifier       |
 
 ### Encoding Examples
 
 #### Simple UID
 
 ```javascript
-const uid = "john.doe";
+const uid = 'john.doe';
 const encoded = encodeURIComponent(uid);
 // Result: john.doe (no encoding needed)
 ```
@@ -543,7 +547,7 @@ const encoded = encodeURIComponent(uid);
 #### Full DN
 
 ```javascript
-const dn = "uid=john.doe,ou=users,dc=example,dc=com";
+const dn = 'uid=john.doe,ou=users,dc=example,dc=com';
 const encoded = encodeURIComponent(dn);
 // Result: uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexample%2Cdc%3Dcom
 ```
@@ -551,7 +555,7 @@ const encoded = encodeURIComponent(dn);
 #### DN with Spaces
 
 ```javascript
-const dn = "cn=John Doe,ou=users,dc=example,dc=com";
+const dn = 'cn=John Doe,ou=users,dc=example,dc=com';
 const encoded = encodeURIComponent(dn);
 // Result: cn%3DJohn%20Doe%2Cou%3Dusers%2Cdc%3Dexample%2Cdc%3Dcom
 ```
@@ -562,13 +566,13 @@ const encoded = encodeURIComponent(dn);
 
 ```javascript
 // Get user by DN
-const dn = "uid=john.doe,ou=users,dc=example,dc=com";
+const dn = 'uid=john.doe,ou=users,dc=example,dc=com';
 const url = `http://localhost:8081/api/v1/ldap/users/${encodeURIComponent(dn)}`;
 
 const response = await fetch(url, {
   headers: {
-    'Accept': 'application/json'
-  }
+    Accept: 'application/json',
+  },
 });
 
 const user = await response.json();
@@ -606,12 +610,12 @@ curl -H "Accept: application/json" \
 
 ### Overview
 
-| Method | Security | Use Case | Session | User Identification |
-|--------|----------|----------|---------|---------------------|
-| None | Low | Development only | No | None |
-| Token | Medium | Services, APIs | No | Token index |
-| OpenID Connect | High | Web applications | Yes | User claims |
-| LemonLDAP::NG | High | Enterprise SSO | Yes | LDAP user |
+| Method         | Security | Use Case         | Session | User Identification |
+| -------------- | -------- | ---------------- | ------- | ------------------- |
+| None           | Low      | Development only | No      | None                |
+| Token          | Medium   | Services, APIs   | No      | Token index         |
+| OpenID Connect | High     | Web applications | Yes     | User claims         |
+| LemonLDAP::NG  | High     | Enterprise SSO   | Yes     | LDAP user           |
 
 ### Configuration Comparison
 
@@ -740,12 +744,14 @@ if (req.method === 'OPTIONS') {
 **Checklist:**
 
 1. **Check Authorization Header:**
+
    ```bash
    curl -v -H "Authorization: Bearer your-token" \
      http://localhost:8081/api/v1/config
    ```
 
 2. **Verify Token Configuration:**
+
    ```bash
    echo $DM_AUTH_TOKENS
    # Should include your token
@@ -775,16 +781,19 @@ Failed to fetch
 **Checklist:**
 
 1. **Verify Server is Running:**
+
    ```bash
    curl http://localhost:8081/api/v1/config
    ```
 
 2. **Check Port Configuration:**
+
    ```bash
    --port 8081  # Default
    ```
 
 3. **Check Firewall:**
+
    ```bash
    sudo ufw allow 8081
    ```
@@ -807,17 +816,20 @@ Failed to fetch
 **Checklist:**
 
 1. **Verify LDAP Server:**
+
    ```bash
    ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin -b "dc=example,dc=com"
    ```
 
 2. **Check LDAP Credentials:**
+
    ```bash
    --ldap-dn "cn=admin,dc=example,dc=com" \
    --ldap-pwd "admin"
    ```
 
 3. **Check LDAP URL:**
+
    ```bash
    --ldap-url "ldap://localhost:389"  # Not ldaps:// if using plain LDAP
    ```
@@ -853,7 +865,7 @@ Ensure all required fields are included:
 {
   "uid": "john.doe",
   "cn": "John Doe",
-  "sn": "Doe"  // Required!
+  "sn": "Doe" // Required!
 }
 ```
 
@@ -873,7 +885,7 @@ Follow the attribute format specified in the schema:
 
 ```json
 {
-  "mail": "valid.email@example.com"  // Not "invalid-email"
+  "mail": "valid.email@example.com" // Not "invalid-email"
 }
 ```
 
@@ -922,29 +934,32 @@ npx mini-dm \
 
 ### Common Issues Summary
 
-| Issue | Symptom | Solution |
-|-------|---------|----------|
-| CORS blocked | Browser console error | Configure `--cors-origin` |
-| 401 Unauthorized | Authentication failed | Check token/credentials |
-| 404 Not Found | Entry doesn't exist | Verify DN is correct |
-| 409 Conflict | Entry already exists | Use unique identifier |
-| 500 Server Error | LDAP connection failed | Check LDAP server status |
-| Invalid format | Validation error | Check schema requirements |
-| Cannot modify DN | Identifier change error | Create new entry instead |
+| Issue            | Symptom                 | Solution                  |
+| ---------------- | ----------------------- | ------------------------- |
+| CORS blocked     | Browser console error   | Configure `--cors-origin` |
+| 401 Unauthorized | Authentication failed   | Check token/credentials   |
+| 404 Not Found    | Entry doesn't exist     | Verify DN is correct      |
+| 409 Conflict     | Entry already exists    | Use unique identifier     |
+| 500 Server Error | LDAP connection failed  | Check LDAP server status  |
+| Invalid format   | Validation error        | Check schema requirements |
+| Cannot modify DN | Identifier change error | Create new entry instead  |
 
 ### Getting Help
 
 1. **Check Logs:**
+
    ```bash
    npx mini-dm --log-level debug
    ```
 
 2. **Test LDAP Connection:**
+
    ```bash
    ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin
    ```
 
 3. **Verify Configuration:**
+
    ```bash
    curl http://localhost:8081/api/v1/config
    ```

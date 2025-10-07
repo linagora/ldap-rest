@@ -152,6 +152,10 @@
       "import": "./static/browser/ldap-user-editor/components/UserEditor.js",
       "types": "./dist/src/browser/ldap-user-editor/components/UserEditor.d.ts"
     },
+    "browser-ldap-user-editor-components-userlist": {
+      "import": "./static/browser/ldap-user-editor/components/UserList.js",
+      "types": "./dist/src/browser/ldap-user-editor/components/UserList.d.ts"
+    },
     "browser-ldap-user-editor-components-usertree": {
       "import": "./static/browser/ldap-user-editor/components/UserTree.js",
       "types": "./dist/src/browser/ldap-user-editor/components/UserTree.d.ts"

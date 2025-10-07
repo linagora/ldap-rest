@@ -9,6 +9,8 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
+process.env.DM_PORT = '64323';
+
 describe('ConfigApi Plugin', () => {
   let dm: DM;
 
@@ -30,7 +32,7 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch('http://localhost:8081/api/v1/config', {
+    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
       headers: { Accept: 'application/json' },
     });
 
@@ -62,7 +64,7 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch('http://localhost:8081/api/v1/config', {
+    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
       headers: { Accept: 'application/json' },
     });
 
@@ -94,7 +96,7 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch('http://localhost:8081/api/v1/config', {
+    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
       headers: { Accept: 'application/json' },
     });
 
@@ -120,7 +122,7 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch('http://localhost:8081/api/v1/config', {
+    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
       headers: { Accept: 'application/json' },
     });
 
@@ -170,7 +172,7 @@ describe('ConfigApi Plugin', () => {
     const configApi = new ConfigApi(dm);
     dm.registerPlugin('configApi', configApi);
 
-    const response = await fetch('http://localhost:8081/api/v1/config', {
+    const response = await fetch(`http://localhost:${process.env.DM_PORT}/api/v1/config`, {
       headers: { Accept: 'application/json' },
     });
 

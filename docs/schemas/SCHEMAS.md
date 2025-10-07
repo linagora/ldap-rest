@@ -120,15 +120,15 @@ The `entity` section defines metadata about the LDAP entity type.
 
 ### Entity Properties Table
 
-| Property | Type | Required | Description | Example |
-|----------|------|----------|-------------|---------|
-| `name` | string | Yes | Internal entity identifier | `"standardUser"`, `"twakeGroup"` |
-| `mainAttribute` | string | Yes | Primary identifier attribute (RDN) | `"uid"`, `"cn"`, `"sAMAccountName"` |
-| `objectClass` | string[] | Yes | LDAP objectClass values for new entries | `["top", "inetOrgPerson"]` |
-| `singularName` | string | Yes | Singular name for API routes | `"user"`, `"group"`, `"position"` |
-| `pluralName` | string | Yes | Plural name for API routes | `"users"`, `"groups"`, `"positions"` |
-| `base` | string | Yes | LDAP base DN for this entity type | `"ou=users,dc=example,dc=com"` |
-| `defaultAttributes` | object | No | Default attribute values for new entries | `{"cn": "New User", "sn": "User"}` |
+| Property            | Type     | Required | Description                              | Example                              |
+| ------------------- | -------- | -------- | ---------------------------------------- | ------------------------------------ |
+| `name`              | string   | Yes      | Internal entity identifier               | `"standardUser"`, `"twakeGroup"`     |
+| `mainAttribute`     | string   | Yes      | Primary identifier attribute (RDN)       | `"uid"`, `"cn"`, `"sAMAccountName"`  |
+| `objectClass`       | string[] | Yes      | LDAP objectClass values for new entries  | `["top", "inetOrgPerson"]`           |
+| `singularName`      | string   | Yes      | Singular name for API routes             | `"user"`, `"group"`, `"position"`    |
+| `pluralName`        | string   | Yes      | Plural name for API routes               | `"users"`, `"groups"`, `"positions"` |
+| `base`              | string   | Yes      | LDAP base DN for this entity type        | `"ou=users,dc=example,dc=com"`       |
+| `defaultAttributes` | object   | No       | Default attribute values for new entries | `{"cn": "New User", "sn": "User"}`   |
 
 ### Entity Metadata Example
 
@@ -175,6 +175,7 @@ Mini-DM supports three main attribute types: `string`, `array`, and `pointer`.
 Simple text values.
 
 **Properties:**
+
 - `type`: `"string"`
 - `test`: Optional regex pattern for validation
 - `required`: Whether the attribute is mandatory
@@ -208,6 +209,7 @@ Simple text values.
 Multi-valued attributes containing multiple items of the same type.
 
 **Properties:**
+
 - `type`: `"array"`
 - `items`: Object defining the type and validation for array elements
 - `required`: Whether the attribute is mandatory
@@ -252,6 +254,7 @@ Multi-valued attributes containing multiple items of the same type.
 References to other LDAP entries (DN pointers). Used for relationships like group membership, organizational units, or nomenclature references.
 
 **Properties:**
+
 - `type`: `"pointer"`
 - `branch`: Array of LDAP base DNs where referenced entries can be found
 - `ui`: Optional UI configuration for pointer selection (not yet implemented)
@@ -331,18 +334,18 @@ Complete reference for all attribute properties.
 
 ### Attribute Properties Table
 
-| Property | Type | Applies To | Description | Example |
-|----------|------|------------|-------------|---------|
-| `type` | string | All | Attribute data type: `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"` | `"string"` |
-| `required` | boolean | All | Whether the attribute must be present | `true` |
-| `fixed` | boolean | All | Whether the attribute value cannot be changed after creation | `true` |
-| `role` | string | String | Semantic role for special handling (see [Semantic Roles](#semantic-roles)) | `"identifier"` |
-| `test` | string/regex | String, Array items | Regular expression for validation | `"^[a-zA-Z0-9._-]{1,255}$"` |
-| `branch` | string[] | Pointer | LDAP branches where referenced entries exist | `["ou=users,dc=example,dc=com"]` |
-| `ui` | object | Pointer | UI configuration for pointer selection (future feature) | `{}` |
-| `group` | string | All | UI grouping for form organization (future feature) | `"contact"` |
-| `default` | any | All | Default value for new entries | `["top", "person"]` |
-| `items` | object | Array | Schema for array element validation | `{"type": "string", "test": "..."}` |
+| Property   | Type         | Applies To          | Description                                                                      | Example                             |
+| ---------- | ------------ | ------------------- | -------------------------------------------------------------------------------- | ----------------------------------- |
+| `type`     | string       | All                 | Attribute data type: `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"` | `"string"`                          |
+| `required` | boolean      | All                 | Whether the attribute must be present                                            | `true`                              |
+| `fixed`    | boolean      | All                 | Whether the attribute value cannot be changed after creation                     | `true`                              |
+| `role`     | string       | String              | Semantic role for special handling (see [Semantic Roles](#semantic-roles))       | `"identifier"`                      |
+| `test`     | string/regex | String, Array items | Regular expression for validation                                                | `"^[a-zA-Z0-9._-]{1,255}$"`         |
+| `branch`   | string[]     | Pointer             | LDAP branches where referenced entries exist                                     | `["ou=users,dc=example,dc=com"]`    |
+| `ui`       | object       | Pointer             | UI configuration for pointer selection (future feature)                          | `{}`                                |
+| `group`    | string       | All                 | UI grouping for form organization (future feature)                               | `"contact"`                         |
+| `default`  | any          | All                 | Default value for new entries                                                    | `["top", "person"]`                 |
+| `items`    | object       | Array               | Schema for array element validation                                              | `{"type": "string", "test": "..."}` |
 
 ### Property Details
 
@@ -505,13 +508,13 @@ Semantic roles assign special meaning to attributes for UI and business logic ha
 
 ### Available Roles
 
-| Role | Description | Example Attribute | Usage |
-|------|-------------|-------------------|-------|
-| `identifier` | Primary identifier (RDN attribute) | `uid`, `cn`, `sAMAccountName` | Used as the entry's unique identifier |
-| `displayName` | Human-readable display name | `cn`, `displayName` | Shown in lists and UI elements |
-| `primaryEmail` | Main email address | `mail`, `userPrincipalName` | Primary contact email |
-| `emailAliases` | Additional email addresses | `mailAlternateAddress`, `proxyAddresses` | Alternative email addresses |
-| `emailQuota` | Email storage quota | `mailQuota`, `mailQuotaSize` | Storage limit for mailbox |
+| Role           | Description                        | Example Attribute                        | Usage                                 |
+| -------------- | ---------------------------------- | ---------------------------------------- | ------------------------------------- |
+| `identifier`   | Primary identifier (RDN attribute) | `uid`, `cn`, `sAMAccountName`            | Used as the entry's unique identifier |
+| `displayName`  | Human-readable display name        | `cn`, `displayName`                      | Shown in lists and UI elements        |
+| `primaryEmail` | Main email address                 | `mail`, `userPrincipalName`              | Primary contact email                 |
+| `emailAliases` | Additional email addresses         | `mailAlternateAddress`, `proxyAddresses` | Alternative email addresses           |
+| `emailQuota`   | Email storage quota                | `mailQuota`, `mailQuotaSize`             | Storage limit for mailbox             |
 
 ### Role Usage Examples
 
@@ -640,21 +643,25 @@ The `test` property enforces regular expression validation:
 Common validation patterns:
 
 **Username/UID:**
+
 ```regex
 ^[a-zA-Z0-9._-]{1,255}$
 ```
 
 **Email:**
+
 ```regex
 ^[^@\s]+@[^@\s]+\.[^@\s]+$
 ```
 
 **DN (Distinguished Name):**
+
 ```regex
 ^[a-zA-Z]+=.*,dc=example,dc=com$
 ```
 
 **ObjectClass name:**
+
 ```regex
 ^[a-zA-Z][a-zA-Z0-9-]*$
 ```
@@ -911,25 +918,25 @@ npx mini-dm \
 
 ### User Schemas Comparison
 
-| Feature | Twake | Active Directory | Standard LDAP |
-|---------|-------|------------------|---------------|
-| Main Attribute | `uid` | `sAMAccountName` | `uid` |
-| Display Name Role | `cn` | `cn` | `cn` |
-| ObjectClasses | twakeAccount, twakeWhitePages | user, person | inetOrgPerson, person |
-| Primary Email | `mail` | `mail` | `mail` |
-| Email Aliases | `mailAlternateAddress` | `proxyAddresses` | `mailAlternateAddress` |
-| Department Link | `twakeDepartmentLink` (DN) | `manager` (DN) | `departmentNumber` (DN) |
-| Special Features | Nomenclature pointers, delegation | AD-specific (UPN, account control) | Standard attributes only |
+| Feature           | Twake                             | Active Directory                   | Standard LDAP            |
+| ----------------- | --------------------------------- | ---------------------------------- | ------------------------ |
+| Main Attribute    | `uid`                             | `sAMAccountName`                   | `uid`                    |
+| Display Name Role | `cn`                              | `cn`                               | `cn`                     |
+| ObjectClasses     | twakeAccount, twakeWhitePages     | user, person                       | inetOrgPerson, person    |
+| Primary Email     | `mail`                            | `mail`                             | `mail`                   |
+| Email Aliases     | `mailAlternateAddress`            | `proxyAddresses`                   | `mailAlternateAddress`   |
+| Department Link   | `twakeDepartmentLink` (DN)        | `manager` (DN)                     | `departmentNumber` (DN)  |
+| Special Features  | Nomenclature pointers, delegation | AD-specific (UPN, account control) | Standard attributes only |
 
 ### Group Schemas Comparison
 
-| Feature | Twake | Active Directory | Standard LDAP |
-|---------|-------|------------------|---------------|
-| Main Attribute | `cn` | `cn` | `cn` |
-| ObjectClasses | groupOfNames, twakeStaticGroup | group | groupOfNames |
-| Member Attribute | `member` (DN array) | `member` (DN array) | `member` (DN array) |
-| Owner Attribute | `owner` (DN array) | `managedBy` (single DN) | `owner` (DN array) |
-| Special Features | Department links | groupType, sAMAccountName | Business category |
+| Feature          | Twake                          | Active Directory          | Standard LDAP       |
+| ---------------- | ------------------------------ | ------------------------- | ------------------- |
+| Main Attribute   | `cn`                           | `cn`                      | `cn`                |
+| ObjectClasses    | groupOfNames, twakeStaticGroup | group                     | groupOfNames        |
+| Member Attribute | `member` (DN array)            | `member` (DN array)       | `member` (DN array) |
+| Owner Attribute  | `owner` (DN array)             | `managedBy` (single DN)   | `owner` (DN array)  |
+| Special Features | Department links               | groupType, sAMAccountName | Business category   |
 
 ---
 
@@ -1147,6 +1154,7 @@ Add comments in your schema documentation (not in JSON) explaining custom attrib
 **Problem**: Schema file not found or fails to parse.
 
 **Solution**:
+
 - Verify the file path is correct
 - Check JSON syntax with a validator
 - Review server logs for detailed error messages
@@ -1160,6 +1168,7 @@ npx mini-dm --log-level debug ...
 **Problem**: Entries fail validation when creating or updating.
 
 **Solution**:
+
 - Check that required attributes are provided
 - Verify attribute values match `test` patterns
 - Ensure DN pointers reference valid entries
@@ -1170,6 +1179,7 @@ npx mini-dm --log-level debug ...
 **Problem**: Pointer attributes don't reference entries correctly.
 
 **Solution**:
+
 - Verify the `branch` DN is correct
 - Ensure referenced entries exist in LDAP
 - Check that DN format matches the `test` pattern
@@ -1180,6 +1190,7 @@ npx mini-dm --log-level debug ...
 **Problem**: Custom attribute doesn't appear in API responses.
 
 **Solution**:
+
 - Verify the attribute is in the schema
 - Check that `strict` mode isn't preventing it
 - Ensure the attribute exists in LDAP entries

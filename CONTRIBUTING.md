@@ -113,6 +113,7 @@ mini-dm/
 #### 1. Plugins
 
 Plugins are the building blocks of Mini-DM. Each plugin:
+
 - Extends `DmPlugin` abstract class
 - Has a unique `name` property
 - Can expose REST API endpoints via `api()` method
@@ -123,6 +124,7 @@ Plugins are the building blocks of Mini-DM. Each plugin:
 #### 2. Hooks
 
 Hooks enable plugins to intercept and modify LDAP operations. Common hooks:
+
 - `ldapaddrequest` / `ldapadddone` - Before/after adding entries
 - `ldapmodifyrequest` / `ldapmodifydone` - Before/after modifying entries
 - `ldapdeleterequest` / `ldapdeletedone` - Before/after deleting entries
@@ -134,6 +136,7 @@ See [HOOKS.md](./HOOKS.md) for complete documentation.
 #### 3. Configuration
 
 Configuration follows a priority order:
+
 1. **Default values** - Defined in `src/config/args.ts`
 2. **Environment variables** - Prefixed with `DM_`
 3. **Command-line arguments** - Use `--option-name` format
@@ -143,6 +146,7 @@ The parser accepts unknown options and stores them in config for custom plugins.
 #### 4. Schemas
 
 JSON schemas define the structure and validation rules for LDAP entities. They include:
+
 - Entity metadata (objectClass, mainAttribute, base DN)
 - Attribute definitions with types and validation
 - Semantic roles (identifier, displayName, primaryEmail)
@@ -343,6 +347,7 @@ npx mini-dm \
 ```
 
 **Note:** Unknown options are automatically parsed and stored in `config`:
+
 - `--option-name value` becomes `config.option_name = "value"`
 - Multiple `--option value` become `config.option = ["value1", "value2"]`
 - Environment variable format: `DM_OPTION_NAME`
@@ -375,15 +380,12 @@ const results = await this.server.ldap.search(
 );
 
 // Add
-await this.server.ldap.add(
-  'uid=john,ou=users,dc=example,dc=com',
-  {
-    objectClass: ['inetOrgPerson'],
-    uid: 'john',
-    cn: 'John Doe',
-    sn: 'Doe',
-  }
-);
+await this.server.ldap.add('uid=john,ou=users,dc=example,dc=com', {
+  objectClass: ['inetOrgPerson'],
+  uid: 'john',
+  cn: 'John Doe',
+  sn: 'Doe',
+});
 
 // Modify
 await this.server.ldap.modify('uid=john,ou=users,dc=example,dc=com', {
@@ -464,7 +466,7 @@ describe('MyPlugin', () => {
 
   after(async () => {
     if (server.server) {
-      await new Promise((resolve) => server.server!.close(resolve));
+      await new Promise(resolve => server.server!.close(resolve));
     }
   });
 
@@ -481,6 +483,7 @@ describe('MyPlugin', () => {
 ### Test Helpers
 
 Use helpers from `test/helpers/`:
+
 - `ldap.ts` - LDAP setup/reset functions
 - `server.ts` - Server creation utilities
 
@@ -576,6 +579,7 @@ git commit -m "feat: add new feature"
 ```
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `docs:` - Documentation changes
