@@ -293,4 +293,6 @@ See [Plugin Development Guide](./plugins/DEVELOPMENT.md) for details.
 
 ## License
 
+[![Powered by Linagora](./linagora.png)](https://linagora.com)
+
 AGPL-3.0 - Copyright 2025-present Linagora

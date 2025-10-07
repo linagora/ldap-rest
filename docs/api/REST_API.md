@@ -106,9 +106,11 @@ OAuth 2.0 / OpenID Connect authentication for modern web applications.
 --oidc-client-secret your-secret
 ```
 
+> **NB**: the `redirect_uri` is `https://mini-dm-server/callback`
+
 **Usage:**
 
-After obtaining an access token from your OIDC provider:
+After authentication you can access to the whole API:
 
 ```bash
 curl -H "Authorization: Bearer oidc-access-token" \
@@ -116,9 +118,9 @@ curl -H "Authorization: Bearer oidc-access-token" \
      http://localhost:8081/api/v1/ldap/users
 ```
 
-### 4. LemonLDAP::NG
+### 4. LemonLDAP::NG _(Native)_
 
-Integration with LemonLDAP::NG Web SSO solution.
+Integration with LemonLDAP::NG Web SSO solution if not using OpenID-Connect.
 
 **Configuration:**
 
