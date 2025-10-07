@@ -297,7 +297,8 @@ export default class LdapOrganizations extends DmPlugin {
    */
   async checkDeptLink(entry: AttributesList): Promise<void> {
     if (entry[this.linkAttr]) {
-      const orgDn = entry[this.linkAttr][0] as string;
+      const linkValue = entry[this.linkAttr];
+      const orgDn = (Array.isArray(linkValue) ? linkValue[0] : linkValue) as string;
       const res = await this.server.ldap.search(
         { paged: false, scope: 'base' },
         orgDn
@@ -424,25 +425,32 @@ export default class LdapOrganizations extends DmPlugin {
     const MAX_LINKED_ENTITIES =
       this.config.ldap_organization_max_subnodes || 50;
 
+    // Check if objectClass filter is requested via query parameter
+    const objectClassFilter = (req as any)?.query?.objectClass as
+      | string
+      | undefined;
+
     // 1. Get direct sub-OUs (children organizational units)
-    try {
-      const subOUs = (await this.server.ldap.search(
-        {
-          paged: false,
-          scope: 'one',
-          filter: '(objectClass=organizationalUnit)',
-        },
-        dn,
-        req
-      )) as SearchResult;
-      this.server.logger.debug(
-        `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
-      );
-      result.push(...subOUs.searchEntries);
-    } catch (err) {
-      // Ignore errors (e.g., if no children exist)
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
+    if (!objectClassFilter || objectClassFilter === 'organizationalUnit') {
+      try {
+        const subOUs = (await this.server.ldap.search(
+          {
+            paged: false,
+            scope: 'one',
+            filter: '(objectClass=organizationalUnit)',
+          },
+          dn,
+          req
+        )) as SearchResult;
+        this.server.logger.debug(
+          `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
+        );
+        result.push(...subOUs.searchEntries);
+      } catch (err) {
+        // Ignore errors (e.g., if no children exist)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
+      }
     }
 
     // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
@@ -450,7 +458,13 @@ export default class LdapOrganizations extends DmPlugin {
     // Extract base DN from top organization (e.g., "dc=example,dc=com" from "ou=organization,dc=example,dc=com")
     const topOrg = this.config.ldap_top_organization as string;
     const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
-    const filter = `(${this.config.ldap_organization_link_attribute}=${dn})`;
+    let filter = `(${this.config.ldap_organization_link_attribute}=${dn})`;
+
+    // Add objectClass filter if specified
+    if (objectClassFilter) {
+      filter = `(&${filter}(objectClass=${objectClassFilter}))`;
+    }
+
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );

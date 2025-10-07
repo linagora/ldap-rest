@@ -3,7 +3,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Request } from 'express';
-import { Client, Attribute, Change } from 'ldapts';
+import { Client, Attribute, Change, DN, RDN } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
 
@@ -73,7 +73,7 @@ class ldapActions {
       url: server.config.ldap_url,
       timeout: 0,
       connectTimeout: 0,
-      strictDN: true,
+      strictDN: false,
     };
     if (server.config.ldap_url.startsWith('ldaps://')) {
       this.options.tlsOptions = {
@@ -167,8 +167,21 @@ class ldapActions {
       sanitizedEntry,
       req,
     ])) as [string, typeof entry, Request?];
+
+    // Convert to Attribute objects
+    const attributes: Attribute[] = [];
+    for (const [key, value] of Object.entries(sanitizedEntry)) {
+      const values = Array.isArray(value) ? value : [value];
+      attributes.push(
+        new Attribute({
+          type: key,
+          values,
+        })
+      );
+    }
+
     try {
-      await client.add(dn, sanitizedEntry);
+      await client.add(dn, attributes);
       void client.unbind();
       void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
       return true;

@@ -84,9 +84,12 @@ export class UserList {
       listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
       // Use organization subnodes API to get users in this org
+      // Filter by the first objectClass from schema to get only users (not groups/OUs)
       const baseUrl = this.api['baseUrl'] || window.location.origin;
+      const objectClass =
+        this.schema?.entity?.objectClass?.[1] || 'twakeAccount'; // Use second objectClass (not 'top')
       const res = await fetch(
-        `${baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(this.orgDn)}/subnodes`
+        `${baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(this.orgDn)}/subnodes?objectClass=${encodeURIComponent(objectClass)}`
       );
       if (!res.ok) throw new Error('Failed to fetch organization users');
 
