@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import request from 'supertest';
 import nock from 'nock';
-import type { Express } from 'express';
+import type { Express, Request, Response } from 'express';
 import { DM } from '../../../src/bin';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import DmPlugin from '../../../src/abstract/plugin';
@@ -233,10 +233,10 @@ describe('OpenID Connect Plugin', () => {
       const dm = new DM();
       await dm.ready;
 
-      dm.config.oidc_server = null;
-      dm.config.oidc_client_id = null;
-      dm.config.oidc_client_secret = null;
-      dm.config.base_url = null;
+      dm.config.oidc_server = undefined;
+      dm.config.oidc_client_id = undefined;
+      dm.config.oidc_client_secret = undefined;
+      dm.config.base_url = undefined;
 
       expect(() => new OpenIDConnect(dm)).to.throw('Missing config parameter');
     });
@@ -593,14 +593,14 @@ describe('OpenID Connect Plugin', () => {
 
       // Add hooks
       dm.hooks.beforeAuth = [
-        async (req, res) => {
+        async (req: Request, res: Response) => {
           beforeAuthCalled = true;
           return [req, res];
         },
       ];
 
       dm.hooks.afterAuth = [
-        async (req, res) => {
+        async (req: Request, res: Response) => {
           afterAuthCalled = true;
           return [req, res];
         },
