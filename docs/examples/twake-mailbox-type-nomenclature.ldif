@@ -1,0 +1,37 @@
+# Nomenclature LDIF for twakeMailboxType
+#
+# This file contains the nomenclature entries for mailbox types:
+# - group: Simple group without mail functionality
+# - mailingList: Mailing list (email redistribution)
+# - teamMailbox: Team mailbox (shared mailbox with IMAP access)
+#
+# Installation:
+#   1. Replace {ldap_base} with your actual LDAP base (e.g., o=gov,c=mu)
+#   2. ldapadd -x -D "cn=admin,{ldap_base}" -W -f twake-mailbox-type-nomenclature.ldif
+
+# Create nomenclature base OU
+dn: ou=twakeMailboxType,ou=nomenclature,{ldap_base}
+objectClass: organizationalUnit
+ou: twakeMailboxType
+description: Mailbox type nomenclature
+
+# Group (no mailbox)
+dn: cn=group,ou=twakeMailboxType,ou=nomenclature,{ldap_base}
+objectClass: top
+objectClass: applicationProcess
+cn: group
+description: Simple group without mail functionality
+
+# Mailing list
+dn: cn=mailingList,ou=twakeMailboxType,ou=nomenclature,{ldap_base}
+objectClass: top
+objectClass: applicationProcess
+cn: mailingList
+description: Mailing list (email redistribution)
+
+# Team mailbox
+dn: cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,{ldap_base}
+objectClass: top
+objectClass: applicationProcess
+cn: teamMailbox
+description: Team mailbox (shared mailbox with IMAP access)

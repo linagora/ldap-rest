@@ -1,0 +1,30 @@
+# LDAP Schema Amendment for twakeMailboxType
+#
+# This file contains the schema amendments needed to support mailbox type
+# classification for groups (group, mailingList, teamMailbox).
+#
+# Installation:
+#   ldapmodify -Y EXTERNAL -H ldapi:/// -f twake-mailbox-type-schema-amendment.ldif
+#
+# Or add these lines to your existing twake.ldif schema file
+
+# Add new attribute type for mailbox type
+# Insert after line 18 (after twakeListType)
+dn: cn={3}twake,cn=schema,cn=config
+changetype: modify
+add: olcAttributeTypes
+olcAttributeTypes: {15} ( TwakeAttributType:14 NAME 'twakeMailboxType' DESC 'Type of mailbox for groups' SUP distinguishedName SINGLE-VALUE )
+
+# Modify twakeStaticGroup to include twakeMailboxType
+# Update line 27
+dn: cn={3}twake,cn=schema,cn=config
+changetype: modify
+replace: olcObjectClasses
+olcObjectClasses: {5}( TwakeObjectClass:5 NAME 'twakeStaticGroup' DESC 'Twake: static group' SUP groupOfNames STRUCTURAL MAY ( twakeDepartmentLink $ twakeDepartmentPath $ twakeListType $ mail $ twakeMailboxType ) )
+
+# Modify twakeDynamicGroup to include twakeMailboxType
+# Update line 28
+dn: cn={3}twake,cn=schema,cn=config
+changetype: modify
+replace: olcObjectClasses
+olcObjectClasses: {6}( TwakeObjectClass:6 NAME 'twakeDynamicGroup' DESC 'Twake: dynamic group' SUP groupOfURLs STRUCTURAL MAY ( twakeDepartmentLink $ twakeDepartmentPath $ mail $ twakeMailboxType ) )
