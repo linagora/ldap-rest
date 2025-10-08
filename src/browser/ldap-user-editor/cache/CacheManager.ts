@@ -39,7 +39,7 @@ export class CacheManager {
     if (!entry) return null;
 
     // Check if expired
-    if (Date.now() - entry.timestamp > this.ttl) {
+    if (Date.now() - entry.timestamp >= this.ttl) {
       this.cache.delete(key);
       return null;
     }
@@ -154,7 +154,7 @@ export class CacheManager {
     let cleaned = 0;
 
     for (const [key, entry] of this.cache.entries()) {
-      if (now - entry.timestamp > this.ttl) {
+      if (now - entry.timestamp >= this.ttl) {
         this.cache.delete(key);
         cleaned++;
       }
