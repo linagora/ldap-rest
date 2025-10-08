@@ -49,9 +49,7 @@
           },
           "400": { "description": "Bad request" }
         }
-      }
-    },
-    "/api/v1/ldap/groups": {
+      },
       "post": {
         "summary": "Add a new group",
         "requestBody": {

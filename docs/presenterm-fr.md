@@ -1,14 +1,13 @@
 ---
 title: Mini-DM
-sub_title: Gestionnaire d'annuaire léger
-author: LINAGORA
+sub_title: Gestionnaire d'annuaire léger avec architecture à plugins
 ---
 
 # Mini-DM
 
 ## Gestionnaire d'annuaire léger avec architecture à plugins
 
-![Mini-DM Logo](docs/linagora.png)
+![Mini-DM Logo](./linagora.png)
 
 <!-- end_slide -->
 
@@ -529,16 +528,16 @@ export default class CustomPlugin extends DmPlugin {
 ## Ressources disponibles
 
 📚 **Guides**
-* [Developer Guide](docs/DEVELOPER_GUIDE.md)
-* [Browser Libraries](docs/browser/LIBRARIES.md)
-* [REST API Reference](docs/api/REST_API.md)
+* [Developer Guide](./DEVELOPER_GUIDE.md)
+* [Browser Libraries](./browser/LIBRARIES.md)
+* [REST API Reference](./api/REST_API.md)
 
 🔌 **Plugins**
-* [Plugin Development](docs/plugins/DEVELOPMENT.md)
+* [Plugin Development](./plugins/DEVELOPMENT.md)
 * [Hooks Reference](HOOKS.md)
 
 📦 **Schémas**
-* [JSON Schemas Guide](docs/schemas/SCHEMAS.md)
+* [JSON Schemas Guide](./schemas/SCHEMAS.md)
 
 <!-- end_slide -->
 
@@ -695,7 +694,7 @@ Ouvrez http://localhost:8081
 
 ## Mini-DM - Gestionnaire d'annuaire léger
 
-[![Powered by LINAGORA](docs/linagora.png)](https://linagora.com)
+[![Powered by LINAGORA](./linagora.png)](https://linagora.com)
 
 **GitHub**: https://github.com/linagora/mini-dm
 

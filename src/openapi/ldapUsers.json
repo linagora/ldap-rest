@@ -15,7 +15,14 @@
             "in": "query",
             "required": false,
             "schema": { "type": "string" },
-            "description": "User name filter (can be a full name, wildcard pattern, or LDAP filter with '=')"
+            "description": "User search filter value. When used with 'attribute', performs a wildcard search on the specified attribute (e.g., match=john&attribute=cn searches for cn=*john*)"
+          },
+          {
+            "name": "attribute",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "LDAP attribute to search on when using 'match' parameter. Required if 'match' is specified (e.g., uid, cn, mail)"
           },
           {
             "name": "attributes",

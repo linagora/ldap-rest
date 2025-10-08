@@ -155,6 +155,47 @@
         }
       }
     },
+    "/api/v1/ldap/organizations/{dn}/subnodes/search": {
+      "get": {
+        "summary": "Search in organization subnodes",
+        "description": "Search for sub-organizations, users, and groups within this organization matching the query string. Searches in fields: ou, description, uid, cn, mail, sn, givenName.",
+        "parameters": [
+          {
+            "name": "dn",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Organization DN (must be URL encoded)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Search query string (partial match)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of matching entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing query parameter"
+          },
+          "500": { "description": "Server error" }
+        }
+      }
+    },
     "/api/v1/ldap/organizations": {
       "post": {
         "summary": "Add a new organization",
