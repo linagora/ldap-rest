@@ -84,6 +84,10 @@
       "import": "./dist/plugins/ldap/organization.js",
       "types": "./dist/src/plugins/ldap/organization.d.ts"
     },
+    "plugin-ldap-trash": {
+      "import": "./dist/plugins/ldap/trash.js",
+      "types": "./dist/src/plugins/ldap/trash.d.ts"
+    },
     "plugin-static": {
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"

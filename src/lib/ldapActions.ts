@@ -300,6 +300,34 @@ class ldapActions {
     }
   }
 
+  /**
+   * Move an entry to a new location (different parent)
+   * Uses LDAP modifyDN with full DN to change both RDN and parent
+   *
+   * Note: ldapts provides a high-level API that accepts a full DN as the second parameter,
+   * unlike the standard LDAP modifyDN which expects (newRDN, deleteOldRDN, newSuperior).
+   * ldapts automatically parses the full DN and extracts the newRDN and newSuperior components
+   * before sending the proper LDAP modifyDN request to the server.
+   *
+   * @param dn - Current DN (e.g., "uid=user1,ou=users,dc=example,dc=com")
+   * @param newDn - Full new DN (e.g., "uid=user1,ou=trash,dc=example,dc=com")
+   *                ldapts will extract newRDN="uid=user1" and newSuperior="ou=trash,dc=example,dc=com"
+   */
+  async move(dn: string, newDn: string): Promise<boolean> {
+    dn = this.setDn(dn);
+    newDn = this.setDn(newDn);
+    const client = await this.connect();
+    try {
+      await client.modifyDN(dn, newDn);
+      void client.unbind();
+      this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`LDAP move error: ${error}`);
+    }
+  }
+
   /*
     LDAP delete
    */
