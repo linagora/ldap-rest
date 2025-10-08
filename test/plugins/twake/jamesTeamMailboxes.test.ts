@@ -156,9 +156,7 @@ describe('James Team Mailboxes', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      // Wait a bit to ensure hooks have run
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
+      // Hooks are awaited by ldap.add, no need for artificial timeout
       // Verify team mailbox was created (checked by nock)
       expect(scope.isDone()).to.be.false; // nock doesn't mark as done for persistent
     } finally {
@@ -211,16 +209,10 @@ describe('James Team Mailboxes', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      // Wait for initial creation
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Add second member
+      // Add second member (hooks are awaited automatically)
       await dm.ldap.modify(testGroupDN, {
         add: { member: testUser2DN },
       });
-
-      // Wait for modification to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify member was added (checked by nock)
       expect(scope.isDone()).to.be.false;
@@ -274,16 +266,10 @@ describe('James Team Mailboxes', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      // Wait for initial creation
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Remove first member
+      // Remove first member (hooks are awaited automatically)
       await dm.ldap.modify(testGroupDN, {
         delete: { member: testUser1DN },
       });
-
-      // Wait for modification to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify member was removed from team mailbox (checked by nock)
       expect(scope.isDone()).to.be.false;
@@ -328,14 +314,8 @@ describe('James Team Mailboxes', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      // Wait for creation
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Delete the team mailbox group
+      // Delete the team mailbox group (hooks are awaited automatically)
       await dm.ldap.delete(testGroupDN);
-
-      // Wait for deletion to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify team mailbox was deleted (checked by nock)
       expect(scope.isDone()).to.be.false;
