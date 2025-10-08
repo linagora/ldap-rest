@@ -313,15 +313,14 @@ describe('James Mailbox Type Transitions', () => {
     }
   });
 
-  it('should remove all members when deleting a teamMailbox group', async function () {
+  it('should transition from group to mailingList (add mail attribute)', async function () {
     this.timeout(10000);
     const testGroupDN = `cn=transition5-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=transuser5-${timestamp},${userBase}`;
-    const testUser2DN = `uid=transuser6-${timestamp},${userBase}`;
+    const testUserDN = `uid=transuser5-${timestamp},${userBase}`;
 
     try {
-      // Create test users
-      await dm.ldap.add(testUser1DN, {
+      // Create test user
+      await dm.ldap.add(testUserDN, {
         objectClass: ['top', 'inetOrgPerson'],
         cn: 'Trans User 5',
         sn: 'User5',
@@ -329,7 +328,55 @@ describe('James Mailbox Type Transitions', () => {
         mail: `transuser5-${timestamp}@test.org`,
       });
 
-      await dm.ldap.add(testUser2DN, {
+      // Create simple group without mail
+      await dm.ldap.add(testGroupDN, {
+        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+        cn: `transition5-${timestamp}`,
+        twakeMailboxType: `cn=group,${mailboxTypeBase}`,
+        member: testUserDN,
+        twakeDepartmentLink: groupBase,
+        twakeDepartmentPath: 'Test',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Add mail and change to mailing list
+      await dm.ldap.modify(testGroupDN, {
+        add: {
+          mail: `transition5-${timestamp}@test.org`,
+        },
+        replace: {
+          twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
+        },
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify mailing list was created
+      expect(scope.isDone()).to.be.false;
+    } finally {
+      // Cleanup
+      try {
+        await dm.ldap.delete(testGroupDN);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await dm.ldap.delete(testUserDN);
+      } catch (err) {
+        // Ignore
+      }
+    }
+  });
+
+  it('should transition from mailingList to group (disable mail functionality)', async function () {
+    this.timeout(10000);
+    const testGroupDN = `cn=transition6-${timestamp},${groupBase}`;
+    const testUserDN = `uid=transuser6-${timestamp},${userBase}`;
+
+    try {
+      // Create test user
+      await dm.ldap.add(testUserDN, {
         objectClass: ['top', 'inetOrgPerson'],
         cn: 'Trans User 6',
         sn: 'User6',
@@ -337,11 +384,74 @@ describe('James Mailbox Type Transitions', () => {
         mail: `transuser6-${timestamp}@test.org`,
       });
 
+      // Create mailing list
+      await dm.ldap.add(testGroupDN, {
+        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+        cn: `transition6-${timestamp}`,
+        mail: `transition6-${timestamp}@test.org`,
+        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
+        member: testUserDN,
+        twakeDepartmentLink: groupBase,
+        twakeDepartmentPath: 'Test',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Change to simple group
+      await dm.ldap.modify(testGroupDN, {
+        replace: {
+          twakeMailboxType: `cn=group,${mailboxTypeBase}`,
+        },
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify mailing list was deleted
+      expect(scope.isDone()).to.be.false;
+    } finally {
+      // Cleanup
+      try {
+        await dm.ldap.delete(testGroupDN);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await dm.ldap.delete(testUserDN);
+      } catch (err) {
+        // Ignore
+      }
+    }
+  });
+
+  it('should remove all members when deleting a teamMailbox group', async function () {
+    this.timeout(10000);
+    const testGroupDN = `cn=transition7-${timestamp},${groupBase}`;
+    const testUser1DN = `uid=transuser7-${timestamp},${userBase}`;
+    const testUser2DN = `uid=transuser8-${timestamp},${userBase}`;
+
+    try {
+      // Create test users
+      await dm.ldap.add(testUser1DN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Trans User 7',
+        sn: 'User7',
+        uid: `transuser7-${timestamp}`,
+        mail: `transuser7-${timestamp}@test.org`,
+      });
+
+      await dm.ldap.add(testUser2DN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Trans User 8',
+        sn: 'User8',
+        uid: `transuser8-${timestamp}`,
+        mail: `transuser8-${timestamp}@test.org`,
+      });
+
       // Create team mailbox with 2 members
       await dm.ldap.add(testGroupDN, {
         objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `transition5-${timestamp}`,
-        mail: `transition5-${timestamp}@test.org`,
+        cn: `transition7-${timestamp}`,
+        mail: `transition7-${timestamp}@test.org`,
         twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
         member: [testUser1DN, testUser2DN],
         twakeDepartmentLink: groupBase,

@@ -314,11 +314,13 @@ npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
   - Remove member from team mailbox
   - Delete team mailbox group (removes members, preserves mailbox)
 
-- **jamesMailboxTypeTransitions.test.ts** (5 tests):
+- **jamesMailboxTypeTransitions.test.ts** (7 tests):
   - Transition from mailingList to teamMailbox
   - Transition from teamMailbox to mailingList
   - Transition from group to teamMailbox
   - Transition from teamMailbox to group
+  - Transition from group to mailingList
+  - Transition from mailingList to group
   - Delete group with teamMailbox (removes members only)
 
 - **jamesBranchValidation.test.ts** (6 tests):
