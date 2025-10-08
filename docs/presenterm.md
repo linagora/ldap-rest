@@ -17,13 +17,13 @@ A **lightweight** and **extensible** directory manager for LDAP
 
 ## Key Features
 
-* 🔌 **Plugin Architecture** - Modular and extensible functionality
-* 🔄 **Automatic LDAP Consistency** - Data consistency plugins
-* 🌐 **Complete REST API** - LDAP management via HTTP
-* 🎨 **Browser Libraries** - Ready-to-use UI components
-* 🔐 **Configurable Authentication** - Token, OIDC, LLNG, etc.
-* ⚡ **Lightweight and Fast** - Minimal memory footprint
-* 📦 **TypeScript** - Strict typing and safety
+- 🔌 **Plugin Architecture** - Modular and extensible functionality
+- 🔄 **Automatic LDAP Consistency** - Data consistency plugins
+- 🌐 **Complete REST API** - LDAP management via HTTP
+- 🎨 **Browser Libraries** - Ready-to-use UI components
+- 🔐 **Configurable Authentication** - Token, OIDC, LLNG, etc.
+- ⚡ **Lightweight and Fast** - Minimal memory footprint
+- 📦 **TypeScript** - Strict typing and safety
 
 <!-- end_slide -->
 
@@ -44,10 +44,10 @@ A **lightweight** and **extensible** directory manager for LDAP
 └─────────────────────────────────────┘
 ```
 
-* **Runtime**: Node.js + TypeScript (ES Modules)
-* **Build**: Rollup (dual config: server + browser)
-* **Test**: Mocha + Chai
-* **LDAP**: ldapts (modern client)
+- **Runtime**: Node.js + TypeScript (ES Modules)
+- **Build**: Rollup (dual config: server + browser)
+- **Test**: Mocha + Chai
+- **LDAP**: ldapts (modern client)
 
 <!-- end_slide -->
 
@@ -66,7 +66,7 @@ export default class MyPlugin extends DmPlugin {
     },
     onBeforeResponse: async (req, res, data) => {
       // Modify API responses
-    }
+    },
   };
 }
 ```
@@ -77,13 +77,13 @@ export default class MyPlugin extends DmPlugin {
 
 ## Authentication
 
-* **token** - Bearer Token Authentication
-* **openidconnect** - OpenID Connect / OAuth2
-* **llng** - LemonLDAP::NG SSO
-* **crowdsec** - Abuse Protection
-* **rateLimit** - Rate Limiting
-* **authzPerBranch** - Authorization per LDAP Branch
-* **authzLinid1** - LinID v1 Authorization
+- **token** - Bearer Token Authentication
+- **openidconnect** - OpenID Connect / OAuth2
+- **llng** - LemonLDAP::NG SSO
+- **crowdsec** - Abuse Protection
+- **rateLimit** - Rate Limiting
+- **authzPerBranch** - Authorization per LDAP Branch
+- **authzLinid1** - LinID v1 Authorization
 
 <!-- end_slide -->
 
@@ -91,16 +91,16 @@ export default class MyPlugin extends DmPlugin {
 
 ## LDAP Core
 
-* **onChange** - Change Detection and Notification
-* **flatGeneric** - Schema-Driven Generic Management
-* **groups** - LDAP Group Management
-* **organization** - Organizational Hierarchy
-* **externalUsersInGroups** - External Users in Groups
+- **onChange** - Change Detection and Notification
+- **flatGeneric** - Schema-Driven Generic Management
+- **groups** - LDAP Group Management
+- **organization** - Organizational Hierarchy
+- **externalUsersInGroups** - External Users in Groups
 
 ## Integrations
 
-* **twake/james** - Apache James Synchronization (mail)
-* **twake/calendarResources** - Calendar Resources
+- **twake/james** - Apache James Synchronization (mail)
+- **twake/calendarResources** - Calendar Resources
 
 <!-- end_slide -->
 
@@ -112,19 +112,20 @@ export default class MyPlugin extends DmPlugin {
 
 ### Plugin Features
 
-* 📧 **Automatic LDAP → James Sync**
-* 🔄 **Mail Address Changes** - Account renaming + data
-* 💾 **Quota Management** - Automatic updates
-* 👥 **Mailing Lists** - LDAP Groups → Address Groups
-* 📨 **Mail Aliases** - mailAlternateAddress → James aliases
-* 🎯 **WebAdmin API** - REST Communication
+- 📧 **Automatic LDAP → James Sync**
+- 🔄 **Mail Address Changes** - Account renaming + data
+- 💾 **Quota Management** - Automatic updates
+- 👥 **Mailing Lists** - LDAP Groups → Address Groups
+- 📨 **Mail Aliases** - mailAlternateAddress → James aliases
+- 🎯 **WebAdmin API** - REST Communication
 
 ### 🔐 Consistency Guarantee
 
 **All LDAP modifications are automatically propagated to James**
-* ✅ No desynchronization
-* ✅ No manual intervention
-* ✅ Real-time consistency
+
+- ✅ No desynchronization
+- ✅ No manual intervention
+- ✅ Real-time consistency
 
 <!-- end_slide -->
 
@@ -200,15 +201,15 @@ Mini-DM automatically maintains **consistency** between LDAP and external system
 
 ### Examples - LDAP Consistency
 
-* **User Deletion** → Automatic removal from groups
-* **DN Change** → Reference updates
-* **External Users** → Maintained in groups
+- **User Deletion** → Automatic removal from groups
+- **DN Change** → Reference updates
+- **External Users** → Maintained in groups
 
 ### Examples - LDAP ↔ James Consistency
 
-* **Mail Change** → Account renaming + James alias
-* **Quota Modification** → Immediate propagation
-* **Alias Management** → Bidirectional LDAP/James sync
+- **Mail Change** → Account renaming + James alias
+- **Quota Modification** → Immediate propagation
+- **Alias Management** → Bidirectional LDAP/James sync
 
 <!-- end_slide -->
 
@@ -241,10 +242,11 @@ POST   /api/v1/ldap/groups
 ## Schema-Driven Architecture
 
 Schemas define:
-* LDAP object structure
-* Data validation
-* Auto-generated UI (browser)
-* Automatic documentation
+
+- LDAP object structure
+- Data validation
+- Auto-generated UI (browser)
+- Automatic documentation
 
 ```json
 {
@@ -263,20 +265,20 @@ Schemas define:
 
 ## Standard LDAP
 
-* **users** - Users (inetOrgPerson)
-* **groups** - Groups (groupOfNames)
-* **organizations** - Organizations (organizationalUnit)
+- **users** - Users (inetOrgPerson)
+- **groups** - Groups (groupOfNames)
+- **organizations** - Organizations (organizationalUnit)
 
 ## Active Directory
 
-* **ad/users** - AD Users
-* **ad/groups** - AD Groups
+- **ad/users** - AD Users
+- **ad/groups** - AD Groups
 
 ## Twake
 
-* **twake/users** - Twake Extensions
-* **twake/groups** - Twake Groups
-* **twake/positions** - Positions/Functions
+- **twake/users** - Twake Extensions
+- **twake/groups** - Twake Groups
+- **twake/positions** - Positions/Functions
 
 <!-- end_slide -->
 
@@ -285,13 +287,16 @@ Schemas define:
 ## Ready-to-Use UI Components
 
 ### LdapTreeViewer
+
 Interactive tree for navigating LDAP organizations
 
 ### LdapUserEditor
+
 Complete user management interface
-* Organizational tree
-* User list
-* Edit form
+
+- Organizational tree
+- User list
+- Edit form
 
 <!-- end_slide -->
 
@@ -307,7 +312,7 @@ const viewer = new LdapTreeViewer({
   apiBaseUrl: 'http://localhost:8081',
   onNodeClick: node => {
     console.log('Selection:', node.dn);
-  }
+  },
 });
 
 await viewer.init();
@@ -327,7 +332,7 @@ const editor = new LdapUserEditor({
   apiBaseUrl: 'http://localhost:8081',
   onUserSaved: userDn => {
     console.log('User saved:', userDn);
-  }
+  },
 });
 
 await editor.init();
@@ -417,9 +422,9 @@ docker run -p 8081:8081 mini-dm
 
 ## Distribution
 
-* NPM package with TypeScript exports
-* CLI binaries: `mini-dm`, `sync-james`, `cleanup-external-users`
-* Static files ready for CDN
+- NPM package with TypeScript exports
+- CLI binaries: `mini-dm`, `sync-james`, `cleanup-external-users`
+- Static files ready for CDN
 
 <!-- end_slide -->
 
@@ -428,22 +433,25 @@ docker run -p 8081:8081 mini-dm
 ## Usage Scenarios
 
 ✅ **Enterprise Directory**
-* Centralized user management
-* **Mail synchronization (Apache James)**
-* Web management interface
-* **Automatic data consistency**
+
+- Centralized user management
+- **Mail synchronization (Apache James)**
+- Web management interface
+- **Automatic data consistency**
 
 ✅ **Collaborative Platform (Twake)**
-* Multi-tenant with authzPerBranch
-* **Mail, calendar, mailing lists**
-* Reusable UI components
-* **Guaranteed referential integrity**
+
+- Multi-tenant with authzPerBranch
+- **Mail, calendar, mailing lists**
+- Reusable UI components
+- **Guaranteed referential integrity**
 
 ✅ **Provisioning Service**
-* **Hooks for external synchronization (James, etc.)**
-* **Automatic LDAP consistency**
-* Change auditing
-* **Automatic inconsistency cleanup**
+
+- **Hooks for external synchronization (James, etc.)**
+- **Automatic LDAP consistency**
+- Change auditing
+- **Automatic inconsistency cleanup**
 
 <!-- end_slide -->
 
@@ -462,17 +470,19 @@ export default class CustomPlugin extends DmPlugin {
     onLdapChange: async (dn, changes) => {
       // Your business logic
       await this.syncToExternalSystem(dn, changes);
-    }
+    },
   };
 
   routes() {
-    return [{
-      method: 'get',
-      path: '/api/v1/custom/stats',
-      handler: async (req, res) => {
-        res.json({ stats: await this.getStats() });
-      }
-    }];
+    return [
+      {
+        method: 'get',
+        path: '/api/v1/custom/stats',
+        handler: async (req, res) => {
+          res.json({ stats: await this.getStats() });
+        },
+      },
+    ];
   }
 }
 ```
@@ -483,12 +493,12 @@ export default class CustomPlugin extends DmPlugin {
 
 ## Security Mechanisms
 
-* 🔐 **Multi-Method Authentication** (Token, OIDC, LLNG)
-* 🛡️ **Granular Authorization** (per branch, per user)
-* 🚦 **Rate Limiting** (DoS protection)
-* 🔒 **CrowdSec** (intrusion detection)
-* 📝 **Change Auditing** (via onChange)
-* 🔑 **Secure LDAP Bind** (TLS supported)
+- 🔐 **Multi-Method Authentication** (Token, OIDC, LLNG)
+- 🛡️ **Granular Authorization** (per branch, per user)
+- 🚦 **Rate Limiting** (DoS protection)
+- 🔒 **CrowdSec** (intrusion detection)
+- 📝 **Change Auditing** (via onChange)
+- 🔑 **Secure LDAP Bind** (TLS supported)
 
 <!-- end_slide -->
 
@@ -496,17 +506,17 @@ export default class CustomPlugin extends DmPlugin {
 
 ## Optimizations
 
-* ⚡ **Lazy Loading** - On-demand loading
-* 🎯 **Smart Cache** - Reduced LDAP queries
-* 📦 **Optimized Bundle** - Tree-shaking, minification
-* 🔄 **Persistent Connections** - LDAP pool
-* 🎨 **Efficient Rendering** - Virtual DOM (browser libs)
+- ⚡ **Lazy Loading** - On-demand loading
+- 🎯 **Smart Cache** - Reduced LDAP queries
+- 📦 **Optimized Bundle** - Tree-shaking, minification
+- 🔄 **Persistent Connections** - LDAP pool
+- 🎨 **Efficient Rendering** - Virtual DOM (browser libs)
 
 ## Typical Metrics
 
-* Startup: < 500ms
-* API Request: < 50ms
-* Memory Footprint: ~50MB
+- Startup: < 500ms
+- API Request: < 50ms
+- Memory Footprint: ~50MB
 
 <!-- end_slide -->
 
@@ -514,12 +524,12 @@ export default class CustomPlugin extends DmPlugin {
 
 ## Upcoming Features
 
-* 🔍 **Advanced Search** - Complex LDAP filters
-* 📊 **Admin Dashboard** - Monitoring and statistics
-* 🌍 **i18n** - Complete internationalization
-* 🔔 **Webhooks** - External notifications
-* 📱 **Mobile-First UI** - Improved responsive design
-* 🧪 **Interactive Playground** - Online demo
+- 🔍 **Advanced Search** - Complex LDAP filters
+- 📊 **Admin Dashboard** - Monitoring and statistics
+- 🌍 **i18n** - Complete internationalization
+- 🔔 **Webhooks** - External notifications
+- 📱 **Mobile-First UI** - Improved responsive design
+- 🧪 **Interactive Playground** - Online demo
 
 <!-- end_slide -->
 
@@ -528,16 +538,19 @@ export default class CustomPlugin extends DmPlugin {
 ## Available Resources
 
 📚 **Guides**
-* [Developer Guide](./DEVELOPER_GUIDE.md)
-* [Browser Libraries](./browser/LIBRARIES.md)
-* [REST API Reference](./api/REST_API.md)
+
+- [Developer Guide](./DEVELOPER_GUIDE.md)
+- [Browser Libraries](./browser/LIBRARIES.md)
+- [REST API Reference](./api/REST_API.md)
 
 🔌 **Plugins**
-* [Plugin Development](./plugins/DEVELOPMENT.md)
-* [Hooks Reference](HOOKS.md)
+
+- [Plugin Development](./plugins/DEVELOPMENT.md)
+- [Hooks Reference](HOOKS.md)
 
 📦 **Schemas**
-* [JSON Schemas Guide](./schemas/SCHEMAS.md)
+
+- [JSON Schemas Guide](./schemas/SCHEMAS.md)
 
 <!-- end_slide -->
 
@@ -545,10 +558,10 @@ export default class CustomPlugin extends DmPlugin {
 
 ## Contributing
 
-* 🐛 **Issues**: https://github.com/linagora/mini-dm/issues
-* 💡 **Discussions**: GitHub Discussions
-* 📖 **Wiki**: https://deepwiki.com/linagora/mini-dm
-* 🤝 **Contributions**: See [CONTRIBUTING.md](CONTRIBUTING.md)
+- 🐛 **Issues**: https://github.com/linagora/mini-dm/issues
+- 💡 **Discussions**: GitHub Discussions
+- 📖 **Wiki**: https://deepwiki.com/linagora/mini-dm
+- 🤝 **Contributions**: See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
@@ -618,13 +631,13 @@ import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
 const editor = new LdapUserEditor({
   containerId: 'users',
   apiBaseUrl: process.env.API_URL,
-  onUserSaved: (dn) => {
+  onUserSaved: dn => {
     analytics.track('user_updated', { dn });
     notifications.success('User saved');
   },
-  onError: (err) => {
+  onError: err => {
     errorTracker.capture(err);
-  }
+  },
 });
 ```
 
@@ -634,16 +647,16 @@ const editor = new LdapUserEditor({
 
 ## Mini-DM vs Alternatives
 
-| Feature | Mini-DM | LDAP Account Manager | phpLDAPadmin |
-|---------|---------|---------------------|--------------|
-| TypeScript | ✅ | ❌ | ❌ |
-| Plugin Architecture | ✅ | ⚠️ | ❌ |
-| REST API | ✅ | ⚠️ | ❌ |
-| Browser Libraries | ✅ | ❌ | ❌ |
-| Modern Stack | ✅ | ⚠️ | ❌ |
-| Extensibility | ✅✅ | ⚠️ | ⚠️ |
-| James Sync | ✅ | ❌ | ❌ |
-| Auto Consistency | ✅ | ❌ | ❌ |
+| Feature             | Mini-DM | LDAP Account Manager | phpLDAPadmin |
+| ------------------- | ------- | -------------------- | ------------ |
+| TypeScript          | ✅      | ❌                   | ❌           |
+| Plugin Architecture | ✅      | ⚠️                   | ❌           |
+| REST API            | ✅      | ⚠️                   | ❌           |
+| Browser Libraries   | ✅      | ❌                   | ❌           |
+| Modern Stack        | ✅      | ⚠️                   | ❌           |
+| Extensibility       | ✅✅    | ⚠️                   | ⚠️           |
+| James Sync          | ✅      | ❌                   | ❌           |
+| Auto Consistency    | ✅      | ❌                   | ❌           |
 
 <!-- end_slide -->
 
@@ -652,19 +665,22 @@ const editor = new LdapUserEditor({
 ## Key Benefits
 
 🎯 **Modern**
-* Modern JavaScript stack
-* TypeScript first
-* Native ES Modules
+
+- Modern JavaScript stack
+- TypeScript first
+- Native ES Modules
 
 🔧 **Flexible**
-* Customizable plugins
-* Extensible hooks
-* Configurable schemas
+
+- Customizable plugins
+- Extensible hooks
+- Configurable schemas
 
 🚀 **Productive**
-* Complete REST API
-* Ready-to-use UI components
-* Rich documentation
+
+- Complete REST API
+- Ready-to-use UI components
+- Rich documentation
 
 <!-- end_slide -->
 
@@ -672,9 +688,9 @@ const editor = new LdapUserEditor({
 
 ## Contact
 
-* 📧 Email: yadd@debian.org
-* 🐙 GitHub: https://github.com/linagora/mini-dm
-* 🏢 LINAGORA: https://linagora.com
+- 📧 Email: yadd@debian.org
+- 🐙 GitHub: https://github.com/linagora/mini-dm
+- 🏢 LINAGORA: https://linagora.com
 
 ## Live Demo
 
@@ -702,4 +718,4 @@ Open http://localhost:8081
 
 ---
 
-*Questions?*
+_Questions?_

@@ -3,12 +3,21 @@
  */
 
 import type { Config, LdapUser, PointerOption, Schema } from '../types';
+import { CacheManager } from '../cache/CacheManager';
 
 export class UserApiClient {
   private baseUrl: string;
+  private cache: CacheManager;
 
-  constructor(baseUrl: string = '') {
+  constructor(
+    baseUrl: string = '',
+    cacheOptions?: { ttl?: number; maxEntries?: number }
+  ) {
     this.baseUrl = baseUrl || window.location.origin;
+    this.cache = new CacheManager(cacheOptions);
+
+    // Clean expired entries every 5 minutes
+    window.setInterval(() => this.cache.cleanExpired(), 5 * 60 * 1000);
   }
 
   private getApiBase(): string {
@@ -21,35 +30,57 @@ export class UserApiClient {
     return String(value);
   }
 
+  /**
+   * Fetch with cache support for GET requests
+   */
+  private async cachedFetch<T>(url: string, options?: RequestInit): Promise<T> {
+    const method = options?.method || 'GET';
+
+    // Only cache GET requests
+    if (method === 'GET') {
+      const cached = this.cache.get<T>(url);
+      if (cached !== null) {
+        return cached;
+      }
+    }
+
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as T;
+
+    // Cache GET responses
+    if (method === 'GET') {
+      this.cache.set(url, data);
+    }
+
+    return data;
+  }
+
   async getConfig(): Promise<Config> {
-    const res = await fetch(`${this.getApiBase()}/config`);
-    if (!res.ok) throw new Error('Failed to fetch config');
-    return res.json();
+    return this.cachedFetch<Config>(`${this.getApiBase()}/config`);
   }
 
   async getSchema(schemaUrl: string): Promise<Schema> {
-    const res = await fetch(schemaUrl);
-    if (!res.ok) throw new Error('Failed to fetch schema');
-    return res.json();
+    return this.cachedFetch<Schema>(schemaUrl);
   }
 
   async getUsers(search = ''): Promise<LdapUser[]> {
     const url = search
       ? `${this.getApiBase()}/ldap/users?match=${encodeURIComponent(search)}&attribute=uid`
       : `${this.getApiBase()}/ldap/users`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch users');
-    const data = await res.json();
+    const data = await this.cachedFetch<LdapUser[] | Record<string, LdapUser>>(
+      url
+    );
     // Convert from object format {uid: entry} to array format
     return Array.isArray(data) ? data : Object.values(data);
   }
 
   async getUser(dn: string): Promise<LdapUser> {
-    const res = await fetch(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
-    );
-    if (!res.ok) throw new Error('Failed to fetch user');
-    return res.json();
+    const url = `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`;
+    return this.cachedFetch<LdapUser>(url);
   }
 
   async updateUser(dn: string, data: Partial<LdapUser>): Promise<LdapUser> {
@@ -65,7 +96,15 @@ export class UserApiClient {
       const error = await res.text();
       throw new Error(error || 'Failed to update user');
     }
-    return res.json();
+    const result = await res.json();
+
+    // Invalidate cache for this user and user lists
+    this.cache.invalidate(
+      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
+    );
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+
+    return result;
   }
 
   async createUser(data: Partial<LdapUser>): Promise<LdapUser> {
@@ -78,7 +117,12 @@ export class UserApiClient {
       const error = await res.text();
       throw new Error(error || 'Failed to create user');
     }
-    return res.json();
+    const result = await res.json();
+
+    // Invalidate cache for user lists
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+
+    return result;
   }
 
   async deleteUser(dn: string): Promise<void> {
@@ -92,6 +136,12 @@ export class UserApiClient {
       const error = await res.text();
       throw new Error(error || 'Failed to delete user');
     }
+
+    // Invalidate cache for this user and user lists
+    this.cache.invalidate(
+      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
+    );
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
   }
 
   async getPointerOptions(branch: string): Promise<PointerOption[]> {
@@ -107,12 +157,10 @@ export class UserApiClient {
 
       if (resource && resource.endpoints?.list) {
         // Use the endpoint from config
-        const res = await fetch(`${this.baseUrl}${resource.endpoints.list}`);
-        if (!res.ok)
-          throw new Error(
-            `Failed to fetch options from ${resource.endpoints.list}`
-          );
-        const data = await res.json();
+        const url = `${this.baseUrl}${resource.endpoints.list}`;
+        const data = await this.cachedFetch<
+          LdapUser[] | Record<string, LdapUser>
+        >(url);
 
         // Convert from object format {key: entry} to array
         const items = Array.isArray(data) ? data : Object.values(data);
@@ -157,5 +205,42 @@ export class UserApiClient {
       );
       return [];
     }
+  }
+
+  /**
+   * Cache management methods
+   */
+
+  /**
+   * Clear all cache
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Invalidate cache for a specific URL pattern
+   */
+  invalidateCache(pattern: string): void {
+    this.cache.invalidatePattern(pattern);
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats(): {
+    size: number;
+    maxSize: number;
+    ttl: number;
+    keys: string[];
+  } {
+    return this.cache.getStats();
+  }
+
+  /**
+   * Get cache instance (for advanced usage)
+   */
+  getCache(): CacheManager {
+    return this.cache;
   }
 }

@@ -4,6 +4,7 @@
  */
 
 import type { LdapUser } from '../types';
+import { CacheManager } from '../cache/CacheManager';
 
 export class UserTree {
   private container: HTMLElement;
@@ -12,6 +13,7 @@ export class UserTree {
   private expandedNodes: Set<string> = new Set();
   private selectedDn: string | null = null;
   private rootDn: string | null = null;
+  private cache: CacheManager;
 
   constructor(
     container: HTMLElement,
@@ -21,6 +23,29 @@ export class UserTree {
     this.container = container;
     this.baseUrl = baseUrl;
     this.onSelectOrg = onSelectOrg;
+    this.cache = new CacheManager();
+
+    // Clean expired entries every 5 minutes
+    window.setInterval(() => this.cache.cleanExpired(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Fetch with cache support
+   */
+  private async cachedFetch<T>(url: string): Promise<T> {
+    const cached = this.cache.get<T>(url);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as T;
+    this.cache.set(url, data);
+    return data;
   }
 
   async init(): Promise<void> {
@@ -40,9 +65,9 @@ export class UserTree {
 
     try {
       // Load top organization
-      const res = await fetch(`${this.baseUrl}/api/v1/ldap/organizations/top`);
-      if (!res.ok) throw new Error('Failed to load top organization');
-      const topOrg = await res.json();
+      const topOrg = await this.cachedFetch<{ dn: string }>(
+        `${this.baseUrl}/api/v1/ldap/organizations/top`
+      );
       this.rootDn = topOrg.dn;
       await this.renderTree();
     } catch (error) {
@@ -76,11 +101,9 @@ export class UserTree {
     const indent = level * 20;
 
     // Get node info
-    const res = await fetch(
+    const node = await this.cachedFetch<LdapUser>(
       `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`
     );
-    if (!res.ok) throw new Error('Failed to load organization');
-    const node = await res.json();
 
     // Extract display name - handle both string and array
     let displayName = dn;
@@ -103,26 +126,23 @@ export class UserTree {
     if (isExpanded) {
       try {
         // Load subnodes and filter only organizations
-        const subRes = await fetch(
+        const subnodes = await this.cachedFetch<LdapUser[]>(
           `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`
         );
-        if (subRes.ok) {
-          const subnodes = await subRes.json();
-          const orgs = subnodes.filter((n: LdapUser) => {
-            const classes = Array.isArray(n.objectClass)
-              ? n.objectClass
-              : n.objectClass
-                ? [n.objectClass]
-                : [];
-            return (
-              classes.includes('organizationalUnit') ||
-              classes.includes('organization')
-            );
-          });
+        const orgs = subnodes.filter((n: LdapUser) => {
+          const classes = Array.isArray(n.objectClass)
+            ? n.objectClass
+            : n.objectClass
+              ? [n.objectClass]
+              : [];
+          return (
+            classes.includes('organizationalUnit') ||
+            classes.includes('organization')
+          );
+        });
 
-          for (const subnode of orgs) {
-            html += await this.renderNode(subnode.dn, level + 1);
-          }
+        for (const subnode of orgs) {
+          html += await this.renderNode(subnode.dn, level + 1);
         }
       } catch (error) {
         console.error('Failed to load subnodes for', dn, error);

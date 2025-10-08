@@ -144,6 +144,10 @@
       "import": "./static/browser/ldap-user-editor/api/UserApiClient.js",
       "types": "./dist/src/browser/ldap-user-editor/api/UserApiClient.d.ts"
     },
+    "browser-ldap-user-editor-cache-cachemanager": {
+      "import": "./static/browser/ldap-user-editor/cache/CacheManager.js",
+      "types": "./dist/src/browser/ldap-user-editor/cache/CacheManager.d.ts"
+    },
     "browser-ldap-user-editor-components-pointerfield": {
       "import": "./static/browser/ldap-user-editor/components/PointerField.js",
       "types": "./dist/src/browser/ldap-user-editor/components/PointerField.d.ts"

@@ -6,16 +6,18 @@ Complete documentation for mini-dm plugins and features.
 
 Interactive slide presentations about Mini-DM (using [presenterm](https://github.com/mfontanini/presenterm)):
 
-* **[presenterm.md](./presenterm.md)** - English presentation
-* **[presenterm-fr.md](./presenterm-fr.md)** - Présentation en français
+- **[presenterm.md](./presenterm.md)** - English presentation
+- **[presenterm-fr.md](./presenterm-fr.md)** - Présentation en français
 
 To view:
+
 ```bash
 presenterm docs/presenterm.md      # English
 presenterm docs/presenterm-fr.md   # French
 ```
 
 Topics covered:
+
 - Architecture and plugin system
 - LDAP consistency mechanisms
 - Apache James integration
