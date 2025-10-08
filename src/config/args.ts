@@ -124,6 +124,7 @@ export interface Config {
   james_webadmin_token?: string;
   james_signature_template?: string;
   ldap_concurrency?: number;
+  james_mailing_list_branch?: string[];
 
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
@@ -317,6 +318,13 @@ const configArgs: ConfigTemplate = [
   ['--james-webadmin-token', 'DM_JAMES_WEBADMIN_TOKEN', ''],
   ['--james-signature-template', 'DM_JAMES_SIGNATURE_TEMPLATE', ''],
   ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
+  [
+    '--james-mailing-list-branch',
+    'DM_JAMES_MAILING_LIST_BRANCHES',
+    [],
+    'array',
+    '--james-mailing-list-branches',
+  ],
 
   // Calendar Resources plugin
   [
