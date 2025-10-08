@@ -369,14 +369,12 @@ describe('OpenID Connect Plugin', () => {
 
     it('should handle token exchange with OIDC server', async () => {
       // Mock token endpoint
-      const tokenScope = nock(oidcServer)
-        .post('/token')
-        .reply(200, {
-          access_token: 'test-access-token',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          id_token: 'test-id-token',
-        });
+      const tokenScope = nock(oidcServer).post('/token').reply(200, {
+        access_token: 'test-access-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+        id_token: 'test-id-token',
+      });
 
       // This test verifies that the configuration is correct
       // The actual token exchange is handled by express-openid-connect
@@ -414,12 +412,10 @@ describe('OpenID Connect Plugin', () => {
 
     it('should handle invalid token responses', async () => {
       // Mock token endpoint with invalid response
-      nock(oidcServer)
-        .post('/token')
-        .reply(401, {
-          error: 'invalid_client',
-          error_description: 'Client authentication failed',
-        });
+      nock(oidcServer).post('/token').reply(401, {
+        error: 'invalid_client',
+        error_description: 'Client authentication failed',
+      });
 
       // The plugin should handle this via express-openid-connect
       const plugin = new OpenIDConnect(dm);
@@ -461,7 +457,7 @@ describe('OpenID Connect Plugin', () => {
       nock(oidcServer)
         .get('/authorize')
         .query(true) // Match any query parameters
-        .reply((uri) => {
+        .reply(uri => {
           const url = new URL(uri, oidcServer);
           capturedState = url.searchParams.get('state') || '';
 
@@ -477,7 +473,7 @@ describe('OpenID Connect Plugin', () => {
 
       // Mock token endpoint that validates the code
       nock(oidcServer)
-        .post('/token', (body) => {
+        .post('/token', body => {
           // Verify the token request includes the authorization code
           return (
             typeof body === 'object' &&
@@ -510,12 +506,10 @@ describe('OpenID Connect Plugin', () => {
 
     it('should reject callback with mismatched state parameter', async () => {
       // Mock callback endpoint with wrong state
-      nock(oidcServer)
-        .post('/token')
-        .reply(400, {
-          error: 'invalid_request',
-          error_description: 'State parameter mismatch',
-        });
+      nock(oidcServer).post('/token').reply(400, {
+        error: 'invalid_request',
+        error_description: 'State parameter mismatch',
+      });
 
       // The plugin/express-openid-connect should reject this
       const plugin = new OpenIDConnect(dm);
@@ -529,7 +523,7 @@ describe('OpenID Connect Plugin', () => {
       // Mock the complete authorization code flow
       nock(oidcServer)
         .get('/authorize')
-        .query((query) => {
+        .query(query => {
           // Verify state is present in authorization request
           return query.state !== undefined;
         })
@@ -538,7 +532,7 @@ describe('OpenID Connect Plugin', () => {
         });
 
       nock(oidcServer)
-        .post('/token', (body) => {
+        .post('/token', body => {
           return (
             typeof body === 'object' &&
             body !== null &&
