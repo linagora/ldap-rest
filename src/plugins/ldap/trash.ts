@@ -266,7 +266,7 @@ class TrashPlugin extends DmPlugin {
       // Return the list of DNs that should still be deleted normally
       // If input was an array, return array; if single string, return string or undefined
       // Returning undefined indicates no deletion should occur (all handled by trash)
-      return Array.isArray(dn) ? dnsToDelete : dnsToDelete[0] ?? undefined;
+      return Array.isArray(dn) ? dnsToDelete : (dnsToDelete[0] ?? undefined);
     },
   };
 }
