@@ -239,14 +239,15 @@ describe('James Team Mailboxes', () => {
     }
   });
 
-  it('should delete team mailbox from James when group is deleted', async function () {
+  it('should remove member from team mailbox when member is deleted from group', async function () {
     this.timeout(10000);
     const testGroupDN = `cn=team3-${timestamp},${groupBase}`;
-    const testUserDN = `uid=tmuser5-${timestamp},${userBase}`;
+    const testUser1DN = `uid=tmuser5-${timestamp},${userBase}`;
+    const testUser2DN = `uid=tmuser6-${timestamp},${userBase}`;
 
     try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
+      // Create test users
+      await dm.ldap.add(testUser1DN, {
         objectClass: ['top', 'inetOrgPerson'],
         cn: 'TM User 5',
         sn: 'User5',
@@ -254,11 +255,73 @@ describe('James Team Mailboxes', () => {
         mail: `tmmember5-${timestamp}@test.org`,
       });
 
-      // Create team mailbox
+      await dm.ldap.add(testUser2DN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'TM User 6',
+        sn: 'User6',
+        uid: `tmuser6-${timestamp}`,
+        mail: `tmmember6-${timestamp}@test.org`,
+      });
+
+      // Create team mailbox with two members
       await dm.ldap.add(testGroupDN, {
         objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
         cn: `team3-${timestamp}`,
         mail: `team3-${timestamp}@test.org`,
+        twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
+        member: [testUser1DN, testUser2DN],
+        twakeDepartmentLink: groupBase,
+        twakeDepartmentPath: 'Test',
+      });
+
+      // Wait for initial creation
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Remove first member
+      await dm.ldap.modify(testGroupDN, {
+        delete: { member: testUser1DN },
+      });
+
+      // Wait for modification to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify member was removed from team mailbox (checked by nock)
+      expect(scope.isDone()).to.be.false;
+    } finally {
+      // Cleanup
+      try {
+        await dm.ldap.delete(testGroupDN);
+      } catch (err) {
+        // Ignore cleanup errors
+      }
+      try {
+        await dm.ldap.delete([testUser1DN, testUser2DN]);
+      } catch (err) {
+        // Ignore cleanup errors
+      }
+    }
+  });
+
+  it('should delete team mailbox from James when group is deleted', async function () {
+    this.timeout(10000);
+    const testGroupDN = `cn=team4-${timestamp},${groupBase}`;
+    const testUserDN = `uid=tmuser7-${timestamp},${userBase}`;
+
+    try {
+      // Create test user
+      await dm.ldap.add(testUserDN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'TM User 7',
+        sn: 'User7',
+        uid: `tmuser7-${timestamp}`,
+        mail: `tmmember7-${timestamp}@test.org`,
+      });
+
+      // Create team mailbox
+      await dm.ldap.add(testGroupDN, {
+        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+        cn: `team4-${timestamp}`,
+        mail: `team4-${timestamp}@test.org`,
         twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
         member: testUserDN,
         twakeDepartmentLink: groupBase,

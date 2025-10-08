@@ -308,9 +308,10 @@ npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
 
 ### Test Coverage
 
-- **jamesTeamMailboxes.test.ts** (3 tests):
+- **jamesTeamMailboxes.test.ts** (4 tests):
   - Create team mailbox
   - Add member to team mailbox
+  - Remove member from team mailbox
   - Delete team mailbox group (removes members, preserves mailbox)
 
 - **jamesMailboxTypeTransitions.test.ts** (5 tests):
