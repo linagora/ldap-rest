@@ -340,14 +340,23 @@ export default class James extends DmPlugin {
 
       // Dispatch based on mailbox type
       if (mailboxType === 'teamMailbox') {
+        // Validate team mailbox is NOT in mailing list branches
+        const branches = this.config.james_mailing_list_branch || [];
+        if (branches.length > 0 && this.isInAllowedBranches(dn, branches)) {
+          this.logger.error({
+            plugin: this.name,
+            event: 'ldapgroupadddone',
+            dn,
+            mailboxType: 'teamMailbox',
+            error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
+          });
+          return;
+        }
         await this.createTeamMailbox(dn, attributes, mailStr);
       } else if (mailboxType === 'mailingList' || mailboxType === null) {
         // Validate mailing list is in allowed branches
         const branches = this.config.james_mailing_list_branch || [];
-        if (
-          branches.length > 0 &&
-          !this.isInAllowedBranches(dn, branches)
-        ) {
+        if (branches.length > 0 && !this.isInAllowedBranches(dn, branches)) {
           this.logger.error({
             plugin: this.name,
             event: 'ldapgroupadddone',
@@ -374,6 +383,12 @@ export default class James extends DmPlugin {
       ]
     ) => {
       const [dn, changes] = args;
+
+      // Check if mailboxType is being changed
+      if (changes.replace?.twakeMailboxType || changes.add?.twakeMailboxType) {
+        await this.handleMailboxTypeTransition(dn, changes);
+        return; // Transition handles everything including members
+      }
 
       // Get the group's mail address and mailbox type
       const groupMail = await this.getGroupMail(dn);
@@ -476,7 +491,8 @@ export default class James extends DmPlugin {
       const mailboxType = await this.getGroupMailboxType(dn);
 
       if (mailboxType === 'teamMailbox') {
-        await this.deleteTeamMailbox(dn, groupMail);
+        // For team mailboxes, remove all members but preserve the mailbox
+        await this.removeAllTeamMailboxMembers(dn, groupMail);
       } else {
         // Delete the entire address group from James (mailing list)
         await this._try(
@@ -490,6 +506,116 @@ export default class James extends DmPlugin {
       }
     },
   };
+
+  /**
+   * Handle mailbox type transitions when twakeMailboxType changes
+   */
+  private async handleMailboxTypeTransition(
+    dn: string,
+    changes: {
+      add?: AttributesList;
+      replace?: AttributesList;
+      delete?: string[] | AttributesList;
+    }
+  ): Promise<void> {
+    // Get current group attributes
+    const result = (await this.server.ldap.search(
+      {
+        paged: false,
+        scope: 'base',
+        attributes: ['mail', 'member', 'twakeMailboxType'],
+      },
+      dn
+    )) as SearchResult;
+
+    if (!result.searchEntries || result.searchEntries.length === 0) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'handleMailboxTypeTransition',
+        dn,
+        error: 'Could not fetch group attributes',
+      });
+      return;
+    }
+
+    const attributes = result.searchEntries[0];
+    const mail = attributes.mail;
+    if (!mail) {
+      this.logger.debug(
+        `Group ${dn} has no mail attribute, skipping mailbox type transition`
+      );
+      return;
+    }
+
+    const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+
+    // Determine old and new mailbox types
+    const newMailboxTypeDn =
+      changes.replace?.twakeMailboxType || changes.add?.twakeMailboxType;
+    const newMailboxTypeStr = Array.isArray(newMailboxTypeDn)
+      ? String(newMailboxTypeDn[0])
+      : String(newMailboxTypeDn);
+
+    const newType = this.getMailboxType({
+      twakeMailboxType: newMailboxTypeStr,
+    });
+    const oldType = this.getMailboxType(attributes);
+
+    this.logger.info({
+      plugin: this.name,
+      event: 'handleMailboxTypeTransition',
+      dn,
+      mail: mailStr,
+      oldType: oldType || 'none',
+      newType: newType || 'none',
+    });
+
+    // Handle transition based on old and new types
+    if (oldType === newType) {
+      // No actual change
+      return;
+    }
+
+    // Cleanup old mailbox type
+    if (oldType === 'mailingList') {
+      await this.deleteMailingList(dn, mailStr);
+    } else if (oldType === 'teamMailbox') {
+      // Remove all members but preserve the mailbox
+      await this.removeAllTeamMailboxMembers(dn, mailStr);
+    }
+
+    // Setup new mailbox type with validation
+    if (newType === 'mailingList') {
+      // Validate mailing list is in allowed branches
+      const branches = this.config.james_mailing_list_branch || [];
+      if (branches.length > 0 && !this.isInAllowedBranches(dn, branches)) {
+        this.logger.error({
+          plugin: this.name,
+          event: 'handleMailboxTypeTransition',
+          dn,
+          newType,
+          error: `Mailing list must be in allowed branches: ${branches.join(', ')}`,
+        });
+        return;
+      }
+      await this.createMailingList(dn, attributes, mailStr);
+    } else if (newType === 'teamMailbox') {
+      // Validate team mailbox is NOT in mailing list branches
+      const branches = this.config.james_mailing_list_branch || [];
+      if (branches.length > 0 && this.isInAllowedBranches(dn, branches)) {
+        this.logger.error({
+          plugin: this.name,
+          event: 'handleMailboxTypeTransition',
+          dn,
+          newType,
+          error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
+        });
+        return;
+      }
+      await this.createTeamMailbox(dn, attributes, mailStr);
+    }
+    // If newType === 'group', nothing to create (simple group)
+  }
 
   /**
    * Helper to convert LDAP attribute value to string
@@ -753,11 +879,7 @@ export default class James extends DmPlugin {
     if (!match) return null;
 
     const type = match[1];
-    if (
-      type === 'group' ||
-      type === 'mailingList' ||
-      type === 'teamMailbox'
-    ) {
+    if (type === 'group' || type === 'mailingList' || type === 'teamMailbox') {
       return type;
     }
 
@@ -769,9 +891,7 @@ export default class James extends DmPlugin {
    */
   private isInAllowedBranches(dn: string, branches: string[]): boolean {
     if (!branches || branches.length === 0) return true; // No restriction
-    return branches.some(
-      branch => dn === branch || dn.endsWith(',' + branch)
-    );
+    return branches.some(branch => dn === branch || dn.endsWith(',' + branch));
   }
 
   /**
@@ -790,8 +910,7 @@ export default class James extends DmPlugin {
     attributes: AttributesList,
     mailStr: string
   ): Promise<void> {
-    const members =
-      (attributes.member as string | string[] | undefined) || [];
+    const members = (attributes.member as string | string[] | undefined) || [];
     const memberList: string[] = Array.isArray(members) ? members : [members];
 
     this.logger.debug(
@@ -836,8 +955,7 @@ export default class James extends DmPlugin {
       return;
     }
 
-    const members =
-      (attributes.member as string | string[] | undefined) || [];
+    const members = (attributes.member as string | string[] | undefined) || [];
     const memberList: string[] = Array.isArray(members) ? members : [members];
 
     this.logger.debug(
@@ -902,6 +1020,87 @@ export default class James extends DmPlugin {
       dn,
       null,
       { domain, teamMailbox: mailStr }
+    );
+  }
+
+  /**
+   * Remove all members from a team mailbox (without deleting it)
+   * This preserves the mailbox for potential future use
+   */
+  private async removeAllTeamMailboxMembers(
+    dn: string,
+    mailStr: string
+  ): Promise<void> {
+    const domain = this.extractMailDomain(mailStr);
+    if (!domain) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'removeAllTeamMailboxMembers',
+        dn,
+        mail: mailStr,
+        error: 'Cannot extract domain from mail address',
+      });
+      return;
+    }
+
+    // Get current members from LDAP
+    try {
+      const result = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['member'] },
+        dn
+      )) as SearchResult;
+
+      if (result.searchEntries && result.searchEntries.length > 0) {
+        const members =
+          (result.searchEntries[0].member as string | string[] | undefined) ||
+          [];
+        const memberList: string[] = Array.isArray(members)
+          ? members
+          : [members];
+        const memberMails = await this.getMemberEmails(memberList);
+
+        // Remove each member
+        await Promise.all(
+          memberMails.map(memberMail =>
+            this._try(
+              'removeAllTeamMailboxMembers',
+              `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
+              'DELETE',
+              dn,
+              null,
+              { domain, teamMailbox: mailStr, memberMail }
+            )
+          )
+        );
+
+        this.logger.info({
+          plugin: this.name,
+          event: 'removeAllTeamMailboxMembers',
+          dn,
+          teamMailbox: mailStr,
+          membersRemoved: memberMails.length,
+          message: 'All members removed from team mailbox (mailbox preserved)',
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error(
+        `Failed to remove members from team mailbox ${mailStr}: ${err}`
+      );
+    }
+  }
+
+  /**
+   * Delete a mailing list from James
+   */
+  private async deleteMailingList(dn: string, mailStr: string): Promise<void> {
+    await this._try(
+      'deleteMailingList',
+      `${this.config.james_webadmin_url}/address/groups/${mailStr}`,
+      'DELETE',
+      dn,
+      null,
+      { groupMail: mailStr }
     );
   }
 
