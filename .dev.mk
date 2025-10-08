@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 SRCBROWSER:=$(shell find src/browser -name '*.ts')
-DSTBROWSER:=$(subst .ts,.js,$(subst src/,dist/,$(SRCBROWSER)))
+DSTBROWSER:=$(subst .ts,.js,$(subst src/,static/,$(SRCBROWSER)))
 SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v browser/)
 _SRCFILES:=$(shell find src/*/ -name '*.ts' | grep -v src/config/schema | grep -v browser/)
 DSTFILES:=$(subst .ts,.js,$(subst src/,dist/,$(_SRCFILES)))

@@ -176,6 +176,10 @@
       "import": "./static/browser/ldap-user-editor/types.js",
       "types": "./dist/src/browser/ldap-user-editor/types.d.ts"
     },
+    "schema-ad-computers": {
+      "import": "./static/schemas/ad/computers.json",
+      "require": "./static/schemas/ad/computers.json"
+    },
     "schema-ad-groups": {
       "import": "./static/schemas/ad/groups.json",
       "require": "./static/schemas/ad/groups.json"
@@ -188,6 +192,10 @@
       "import": "./static/schemas/ad/users.json",
       "require": "./static/schemas/ad/users.json"
     },
+    "schema-standard-devices": {
+      "import": "./static/schemas/standard/devices.json",
+      "require": "./static/schemas/standard/devices.json"
+    },
     "schema-standard-groups": {
       "import": "./static/schemas/standard/groups.json",
       "require": "./static/schemas/standard/groups.json"
@@ -199,6 +207,10 @@
     "schema-standard-users": {
       "import": "./static/schemas/standard/users.json",
       "require": "./static/schemas/standard/users.json"
+    },
+    "schema-twake-devices": {
+      "import": "./static/schemas/twake/devices.json",
+      "require": "./static/schemas/twake/devices.json"
     },
     "schema-twake-groups": {
       "import": "./static/schemas/twake/groups.json",

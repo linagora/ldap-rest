@@ -17,7 +17,7 @@ COPY static ./static
 RUN npm ci && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
 
 WORKDIR /app
-RUN npm install --no-optional --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /app-build && npm cache clean --force
+RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /app-build && npm cache clean --force
 
 ENV NODE_ENV=production \
  DM_PORT="8081" \
@@ -66,6 +66,10 @@ ENV NODE_ENV=production \
  DM_CALENDAR_RESOURCE_OBJECTCLASS= \
  DM_CALENDAR_RESOURCE_CREATOR= \
  DM_CALENDAR_RESOURCE_DOMAIN= \
+ DM_TRASH_BASE= \
+ DM_TRASH_WATCHED_BASES= \
+ DM_TRASH_ADD_METADATA="true" \
+ DM_TRASH_AUTO_CREATE="true" \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \
  DM_AUTH_TOKENS= \
  DM_AUTHZ_PER_BRANCH_CONFIG="{\"default\":{\"read\":true,\"write\":false,\"delete\":false}}" \
