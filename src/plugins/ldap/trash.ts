@@ -55,7 +55,9 @@ class TrashPlugin extends DmPlugin {
    */
   private isWatched(dn: string): boolean {
     // NEVER intercept deletes from trash itself (prevent infinite loop)
-    if (dn.includes(this.trashBase)) {
+    // Use proper DN suffix matching to avoid false positives
+    // (e.g., "uid=trash-user,ou=people" should not match "ou=trash")
+    if (dn === this.trashBase || dn.endsWith(',' + this.trashBase)) {
       return false;
     }
 
@@ -64,7 +66,11 @@ class TrashPlugin extends DmPlugin {
       return true;
     }
 
-    return this.watchedBases.some(base => dn.includes(base));
+    // Use proper DN suffix matching to avoid false positives
+    // (e.g., "ou=users" should not match "uid=users-admin,ou=people")
+    return this.watchedBases.some(
+      base => dn === base || dn.endsWith(',' + base)
+    );
   }
 
   /**
@@ -258,8 +264,9 @@ class TrashPlugin extends DmPlugin {
       }
 
       // Return the list of DNs that should still be deleted normally
-      // (empty list means nothing to delete - all handled by trash)
-      return Array.isArray(dn) ? dnsToDelete : dnsToDelete[0] || '';
+      // If input was an array, return array; if single string, return string or undefined
+      // Returning undefined indicates no deletion should occur (all handled by trash)
+      return Array.isArray(dn) ? dnsToDelete : dnsToDelete[0] ?? undefined;
     },
   };
 }

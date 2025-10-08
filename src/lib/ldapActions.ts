@@ -303,8 +303,16 @@ class ldapActions {
   /**
    * Move an entry to a new location (different parent)
    * Uses LDAP modifyDN with full DN to change both RDN and parent
+   *
+   * Note: The ldapts library automatically detects if this is a "new superior"
+   * request (moving to a different part of the tree) based on the newDn parameter.
+   * When newDn includes a different parent DN, ldapts will set the newSuperior
+   * parameter in the underlying LDAP modifyDN operation.
+   *
    * @param dn - Current DN
-   * @param newDn - Full new DN (including new parent)
+   * @param newDn - Full new DN (including new parent). Can be either:
+   *                - Simple RDN for rename: "cn=newname"
+   *                - Full DN for move: "cn=newname,ou=trash,dc=example,dc=com"
    */
   async move(dn: string, newDn: string): Promise<boolean> {
     dn = this.setDn(dn);
