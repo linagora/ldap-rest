@@ -6,7 +6,7 @@
 # - teamMailbox: Team mailbox (shared mailbox with IMAP access)
 #
 # Installation:
-#   1. Replace {ldap_base} with your actual LDAP base (e.g., o=gov,c=mu)
+#   1. Replace {ldap_base} with your actual LDAP base (e.g., dc=example,dc=com)
 #   2. ldapadd -x -D "cn=admin,{ldap_base}" -W -f twake-mailbox-type-nomenclature.ldif
 
 # Create nomenclature base OU
