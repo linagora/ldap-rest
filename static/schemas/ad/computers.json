@@ -2,7 +2,13 @@
   "entity": {
     "name": "adComputer",
     "mainAttribute": "sAMAccountName",
-    "objectClass": ["top", "person", "organizationalPerson", "user", "computer"],
+    "objectClass": [
+      "top",
+      "person",
+      "organizationalPerson",
+      "user",
+      "computer"
+    ],
     "singularName": "computer",
     "pluralName": "computers",
     "base": "ou=computers,__ldap_base__"
