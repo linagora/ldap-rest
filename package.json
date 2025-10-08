@@ -104,6 +104,26 @@
       "import": "./dist/plugins/weblogs.js",
       "types": "./dist/src/plugins/weblogs.d.ts"
     },
+    "browser-ldap-group-editor-index": {
+      "import": "./static/browser/ldap-group-editor/index.js",
+      "types": "./dist/src/browser/ldap-group-editor/index.d.ts"
+    },
+    "browser-ldap-resource-editor-api-resourceapiclient": {
+      "import": "./static/browser/ldap-resource-editor/api/ResourceApiClient.js",
+      "types": "./dist/src/browser/ldap-resource-editor/api/ResourceApiClient.d.ts"
+    },
+    "browser-ldap-resource-editor-cache-cachemanager": {
+      "import": "./static/browser/ldap-resource-editor/cache/CacheManager.js",
+      "types": "./dist/src/browser/ldap-resource-editor/cache/CacheManager.d.ts"
+    },
+    "browser-ldap-resource-editor-index": {
+      "import": "./static/browser/ldap-resource-editor/index.js",
+      "types": "./dist/src/browser/ldap-resource-editor/index.d.ts"
+    },
+    "browser-ldap-resource-editor-types": {
+      "import": "./static/browser/ldap-resource-editor/types.js",
+      "types": "./dist/src/browser/ldap-resource-editor/types.d.ts"
+    },
     "browser-ldap-tree-viewer-ldaptreeviewer": {
       "import": "./static/browser/ldap-tree-viewer/LdapTreeViewer.js",
       "types": "./dist/src/browser/ldap-tree-viewer/LdapTreeViewer.d.ts"
@@ -139,6 +159,10 @@
     "browser-ldap-tree-viewer-types": {
       "import": "./static/browser/ldap-tree-viewer/types.js",
       "types": "./dist/src/browser/ldap-tree-viewer/types.d.ts"
+    },
+    "browser-ldap-unit-editor-index": {
+      "import": "./static/browser/ldap-unit-editor/index.js",
+      "types": "./dist/src/browser/ldap-unit-editor/index.d.ts"
     },
     "browser-ldap-user-editor-ldapusereditor": {
       "import": "./static/browser/ldap-user-editor/LdapUserEditor.js",

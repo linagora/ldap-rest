@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP Group Editor Demo</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Library CSS -->
+    <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Roboto', sans-serif;
+        background: linear-gradient(135deg, #43cea2 0%, #185a9d 100%);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .demo-container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .demo-header {
+        background: white;
+        color: #333;
+        padding: 32px;
+        margin-bottom: 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .demo-header h1 {
+        font-size: 32px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #185a9d;
+      }
+
+      .demo-header p {
+        font-size: 16px;
+        color: #666;
+      }
+
+      #ldap-group-editor {
+        /* The editor library will add its own styling */
+      }
+
+      .status-message {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-message.error {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      .status-message.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .action-button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        background: #185a9d;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.2s;
+      }
+
+      .action-button:hover {
+        background: #0d3a6b;
+      }
+
+      .action-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .action-button.danger {
+        background: #d32f2f;
+      }
+
+      .action-button.danger:hover {
+        background: #b71c1c;
+      }
+
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      .modal {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+
+      .modal-header h2 {
+        font-size: 24px;
+        font-weight: 500;
+        color: #333;
+        margin: 0;
+      }
+
+      .close-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 24px;
+        color: #666;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+
+      .close-button:hover {
+        background: #f0f0f0;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #333;
+      }
+
+      .form-group label.required::after {
+        content: ' *';
+        color: #d32f2f;
+      }
+
+      .form-group input,
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: 'Roboto', sans-serif;
+      }
+
+      .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #185a9d;
+      }
+
+      .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: 'Roboto', sans-serif;
+        background-color: white;
+        cursor: pointer;
+      }
+
+      .form-select:focus {
+        outline: none;
+        border-color: #185a9d;
+      }
+
+      .array-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .array-item {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: background 0.2s;
+      }
+
+      .btn-secondary {
+        background: #f0f0f0;
+        color: #333;
+      }
+
+      .btn-secondary:hover {
+        background: #e0e0e0;
+      }
+
+      .btn-icon {
+        padding: 8px;
+        min-width: auto;
+      }
+
+      .btn .material-icons {
+        font-size: 18px;
+      }
+
+      .form-group .help-text {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+
+      .modal-footer {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+
+      .modal-footer button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .modal-footer button.primary {
+        background: #185a9d;
+        color: white;
+      }
+
+      .modal-footer button.primary:hover {
+        background: #0d3a6b;
+      }
+
+      .modal-footer button.secondary {
+        background: #f0f0f0;
+        color: #333;
+      }
+
+      .modal-footer button.secondary:hover {
+        background: #e0e0e0;
+      }
+
+      .field-group {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 16px;
+        margin-bottom: 16px;
+        background: #f9f9f9;
+      }
+
+      .field-group-title {
+        font-weight: 500;
+        color: #185a9d;
+        margin-bottom: 12px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>👥 LDAP Group Editor</h1>
+        <p>Browse and manage LDAP groups with support for mailing lists and team mailboxes</p>
+        <div class="action-buttons">
+          <button class="action-button" id="create-group-btn" disabled>
+            <span class="material-icons">group_add</span>
+            Create Group
+          </button>
+          <button class="action-button danger" id="delete-group-btn" disabled>
+            <span class="material-icons">group_remove</span>
+            Delete Group
+          </button>
+        </div>
+      </div>
+
+      <div id="status-container"></div>
+
+      <div id="ldap-group-editor"></div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div class="modal-overlay" id="create-group-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Create New Group</h2>
+          <button class="close-button" id="close-modal-btn">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <form id="create-group-form">
+          <div id="form-fields"></div>
+          <div class="modal-footer">
+            <button type="button" class="secondary" id="cancel-btn">
+              Cancel
+            </button>
+            <button type="submit" class="primary">Create Group</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Library JS -->
+    <script src="/static/browser/ldap-group-editor.js"></script>
+
+    <script>
+      const { LdapGroupEditor } = window.LdapGroupEditor;
+
+      let editor;
+      let groupSchema;
+      let pointerOptionsCache = {};
+
+      function escapeHtml(text) {
+        if (text == null) return '';
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#x27;',
+          '/': '&#x2F;',
+        };
+        return String(text).replace(/[&<>"'/]/g, m => map[m]);
+      }
+
+      function showStatus(message, type = 'error') {
+        const container = document.getElementById('status-container');
+        container.innerHTML = `
+        <div class="status-message ${escapeHtml(type)}">
+          <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
+          <span>${escapeHtml(message)}</span>
+        </div>
+      `;
+        setTimeout(() => {
+          container.innerHTML = '';
+        }, 5000);
+      }
+
+      function getFieldLabel(fieldName, attribute) {
+        const label = fieldName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      }
+
+      async function loadPointerOptions(branch) {
+        if (pointerOptionsCache[branch]) {
+          return pointerOptionsCache[branch];
+        }
+
+        try {
+          const api = editor.getApi();
+          const options = await api.getPointerOptions(branch);
+          pointerOptionsCache[branch] = options;
+          return options;
+        } catch (error) {
+          console.error(
+            'Failed to load pointer options for branch:',
+            branch,
+            error
+          );
+          return [];
+        }
+      }
+
+      async function generateFormField(fieldName, attribute) {
+        const label = getFieldLabel(fieldName, attribute);
+        const required = attribute.required ? 'required' : '';
+        const labelClass = attribute.required ? 'required' : '';
+
+        let fieldHtml = '';
+
+        if (attribute.type === 'pointer') {
+          const branch = attribute.branch?.[0];
+          if (branch) {
+            const options = await loadPointerOptions(branch);
+            fieldHtml = `
+              <div class="form-group">
+                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+                <select id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" class="form-select" ${required}>
+                  <option value="">Select...</option>
+                  ${options
+                    .map(
+                      opt => `
+                    <option value="${escapeHtml(opt.dn)}">${escapeHtml(opt.label)}</option>
+                  `
+                    )
+                    .join('')}
+                </select>
+                ${fieldName === 'twakeMailboxType' ? '<div class="help-text">Select "mailingList" or "teamMailbox" to enable mail functionality</div>' : ''}
+              </div>
+            `;
+          }
+        } else if (
+          attribute.type === 'array' &&
+          attribute.items?.type === 'string'
+        ) {
+          fieldHtml = `
+            <div class="form-group">
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
+              <div class="help-text">Enter one DN per line</div>
+            </div>
+          `;
+        } else if (
+          attribute.type === 'number' ||
+          attribute.type === 'integer'
+        ) {
+          fieldHtml = `
+            <div class="form-group">
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <input type="number" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
+            </div>
+          `;
+        } else if (attribute.type === 'string') {
+          const type =
+            fieldName.toLowerCase().includes('mail')
+              ? 'email'
+              : 'text';
+          fieldHtml = `
+            <div class="form-group">
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <input type="${escapeHtml(type)}" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
+            </div>
+          `;
+        }
+
+        return fieldHtml;
+      }
+
+      async function getOrganizationPath(orgDn) {
+        try {
+          const response = await fetch(
+            `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(orgDn)}`
+          );
+          if (!response.ok) {
+            console.error('Failed to fetch organization:', response.status);
+            return orgDn;
+          }
+          const org = await response.json();
+
+          if (org.twakeDepartmentPath) {
+            const pathValue = Array.isArray(org.twakeDepartmentPath)
+              ? org.twakeDepartmentPath[0]
+              : org.twakeDepartmentPath;
+            return pathValue;
+          }
+
+          if (org.ou) {
+            const ouValue = Array.isArray(org.ou) ? org.ou[0] : org.ou;
+            return ouValue;
+          }
+
+          return orgDn;
+        } catch (error) {
+          console.error('Failed to get organization info:', error);
+          return orgDn;
+        }
+      }
+
+      async function generateCreateGroupForm() {
+        const config = editor.getConfig();
+        if (!config || !config.features?.flatResources) {
+          throw new Error('Configuration not loaded');
+        }
+
+        const currentOrgDn = editor.getCurrentOrgDn();
+        if (!currentOrgDn) {
+          throw new Error('No organization selected');
+        }
+
+        const groupsResource = config.features.flatResources.find(
+          r => r.pluralName === 'groups' || r.name === 'groups'
+        );
+
+        if (!groupsResource) {
+          throw new Error('Groups resource not found in configuration');
+        }
+
+        if (groupsResource.schemaUrl) {
+          const response = await fetch(groupsResource.schemaUrl);
+          if (!response.ok) throw new Error('Failed to load schema');
+          groupSchema = await response.json();
+        } else if (groupsResource.schema) {
+          groupSchema = groupsResource.schema;
+        } else {
+          throw new Error('No schema available for groups');
+        }
+
+        const orgPath = await getOrganizationPath(currentOrgDn);
+
+        const ldapBase = editor.getConfig().ldapBase;
+        for (const attr of Object.values(groupSchema.attributes)) {
+          if (attr.branch) {
+            attr.branch = attr.branch.map(b =>
+              b
+                .replace(/__LDAP_BASE__/g, ldapBase)
+                .replace(/__ldap_base__/g, ldapBase)
+            );
+          }
+        }
+
+        const formFields = document.getElementById('form-fields');
+        let fieldsHtml = '';
+
+        const objectClasses = groupSchema.entity.objectClass || [];
+        fieldsHtml += objectClasses
+          .map(oc => `<input type="hidden" name="objectClass" value="${oc}" />`)
+          .join('');
+
+        // Group fields by category
+        const basicFields = [];
+        const mailboxFields = [];
+        const memberFields = [];
+
+        for (const [fieldName, attribute] of Object.entries(
+          groupSchema.attributes
+        )) {
+          if (attribute.fixed) continue;
+          if (fieldName === 'objectClass') continue;
+
+          if (fieldName === 'twakeDepartmentLink') {
+            fieldsHtml += `
+              <input type="hidden" name="twakeDepartmentLink" value="${escapeHtml(currentOrgDn)}" />
+            `;
+            continue;
+          }
+
+          if (fieldName === 'twakeDepartmentPath') {
+            fieldsHtml += `
+              <input type="hidden" name="twakeDepartmentPath" value="${escapeHtml(orgPath)}" />
+            `;
+            continue;
+          }
+
+          if (attribute.group === 'Mailbox Settings' || fieldName === 'mail' || fieldName === 'twakeMailboxType') {
+            mailboxFields.push([fieldName, attribute]);
+          } else if (fieldName === 'member' || fieldName === 'owner') {
+            memberFields.push([fieldName, attribute]);
+          } else {
+            basicFields.push([fieldName, attribute]);
+          }
+        }
+
+        // Basic fields
+        if (basicFields.length > 0) {
+          fieldsHtml += '<div class="field-group"><div class="field-group-title">Basic Information</div>';
+          for (const [fieldName, attribute] of basicFields) {
+            fieldsHtml += await generateFormField(fieldName, attribute);
+          }
+          fieldsHtml += '</div>';
+        }
+
+        // Mailbox fields
+        if (mailboxFields.length > 0) {
+          fieldsHtml += '<div class="field-group"><div class="field-group-title">Mailbox Configuration</div>';
+          fieldsHtml += '<div class="help-text" style="margin-bottom: 12px;">Configure mailing list or team mailbox settings</div>';
+          for (const [fieldName, attribute] of mailboxFields) {
+            fieldsHtml += await generateFormField(fieldName, attribute);
+          }
+          fieldsHtml += '</div>';
+        }
+
+        // Member fields
+        if (memberFields.length > 0) {
+          fieldsHtml += '<div class="field-group"><div class="field-group-title">Members & Owners</div>';
+          for (const [fieldName, attribute] of memberFields) {
+            fieldsHtml += await generateFormField(fieldName, attribute);
+          }
+          fieldsHtml += '</div>';
+        }
+
+        formFields.innerHTML = fieldsHtml;
+      }
+
+      function openCreateGroupModal() {
+        const modal = document.getElementById('create-group-modal');
+        generateCreateGroupForm()
+          .then(() => {
+            modal.classList.add('active');
+          })
+          .catch(error => {
+            console.error('Failed to generate form:', error);
+            showStatus(`Error: ${error.message}`, 'error');
+          });
+      }
+
+      function closeCreateGroupModal() {
+        const modal = document.getElementById('create-group-modal');
+        modal.classList.remove('active');
+        document.getElementById('create-group-form').reset();
+        pointerOptionsCache = {};
+      }
+
+      async function handleCreateGroup(event) {
+        event.preventDefault();
+
+        const form = event.target;
+        const formData = new FormData(form);
+        const groupData = {};
+
+        for (const [key, value] of formData.entries()) {
+          if (groupData[key]) {
+            if (!Array.isArray(groupData[key])) {
+              groupData[key] = [groupData[key]];
+            }
+            groupData[key].push(value);
+          } else {
+            groupData[key] = value;
+          }
+        }
+
+        for (const [fieldName, attribute] of Object.entries(
+          groupSchema.attributes
+        )) {
+          if (!groupData[fieldName]) continue;
+
+          if (
+            attribute.type === 'array' &&
+            typeof groupData[fieldName] === 'string'
+          ) {
+            groupData[fieldName] = groupData[fieldName]
+              .split('\n')
+              .map(line => line.trim())
+              .filter(line => line.length > 0);
+          } else if (
+            attribute.type === 'number' ||
+            attribute.type === 'integer'
+          ) {
+            groupData[fieldName] =
+              attribute.type === 'integer'
+                ? parseInt(groupData[fieldName], 10)
+                : parseFloat(groupData[fieldName]);
+          }
+        }
+
+        const cleanedData = {};
+        for (const [key, value] of Object.entries(groupData)) {
+          if (value === '' || value === null || value === undefined) {
+            continue;
+          }
+          if (Array.isArray(value) && value.length === 0) {
+            continue;
+          }
+          cleanedData[key] = value;
+        }
+
+        console.log('Creating group with data:', cleanedData);
+
+        try {
+          const api = editor.getApi();
+          const groupsBase = groupSchema.entity.base.replace(/__ldap_base__/g, editor.getConfig().ldapBase);
+          const dn = `cn=${cleanedData.cn},${groupsBase}`;
+
+          await api.createEntry(dn, cleanedData);
+          showStatus('Group created successfully!', 'success');
+          closeCreateGroupModal();
+
+          // Refresh the editor
+          await editor.init();
+        } catch (error) {
+          console.error('Failed to create group:', error);
+          const errorMessage = error.message || error.toString();
+          showStatus(`Error: ${errorMessage}`, 'error');
+        }
+      }
+
+      async function handleDeleteGroup() {
+        const currentUserDn = editor.getCurrentUserDn();
+        if (!currentUserDn) {
+          showStatus('No group selected', 'error');
+          return;
+        }
+
+        if (
+          !confirm(`Are you sure you want to delete this group?\n\n${currentUserDn}`)
+        ) {
+          return;
+        }
+
+        try {
+          await editor.deleteUser(currentUserDn);
+          showStatus('Group deleted successfully!', 'success');
+
+          document.getElementById('delete-group-btn').disabled = true;
+        } catch (error) {
+          console.error('Failed to delete group:', error);
+          showStatus(`Error: ${error.message}`, 'error');
+        }
+      }
+
+      async function initEditor() {
+        try {
+          editor = new LdapGroupEditor({
+            containerId: 'ldap-group-editor',
+            apiBaseUrl: window.location.origin,
+            onGroupSaved: groupDn => {
+              console.log('Group saved:', groupDn);
+              showStatus('Group saved successfully!', 'success');
+            },
+            onError: error => {
+              console.error('Editor error:', error);
+              showStatus(`Error: ${error.message}`, 'error');
+            },
+          });
+
+          await editor.init();
+          showStatus('LDAP Group Editor loaded successfully!', 'success');
+
+          setInterval(() => {
+            const createBtn = document.getElementById('create-group-btn');
+            const deleteBtn = document.getElementById('delete-group-btn');
+            const currentOrgDn = editor.getCurrentOrgDn();
+            const currentGroupDn = editor.getCurrentUserDn();
+
+            createBtn.disabled = !currentOrgDn;
+            deleteBtn.disabled = !currentGroupDn;
+          }, 500);
+        } catch (error) {
+          console.error('Failed to initialize editor:', error);
+          showStatus(`Error: ${error.message}`, 'error');
+        }
+      }
+
+      document
+        .getElementById('create-group-btn')
+        .addEventListener('click', openCreateGroupModal);
+      document
+        .getElementById('delete-group-btn')
+        .addEventListener('click', handleDeleteGroup);
+      document
+        .getElementById('close-modal-btn')
+        .addEventListener('click', closeCreateGroupModal);
+      document
+        .getElementById('cancel-btn')
+        .addEventListener('click', closeCreateGroupModal);
+      document
+        .getElementById('create-group-form')
+        .addEventListener('submit', handleCreateGroup);
+
+      document
+        .getElementById('create-group-modal')
+        .addEventListener('click', e => {
+          if (e.target.id === 'create-group-modal') {
+            closeCreateGroupModal();
+          }
+        });
+
+      initEditor();
+    </script>
+  </body>
+</html>

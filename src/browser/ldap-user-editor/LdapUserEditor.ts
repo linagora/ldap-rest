@@ -22,7 +22,8 @@ export class LdapUserEditor {
 
   constructor(options: EditorOptions) {
     this.options = {
-      apiBaseUrl: window.location.origin,
+      apiBaseUrl:
+        typeof window !== 'undefined' ? window.location.origin : '',
       ...options,
     };
 

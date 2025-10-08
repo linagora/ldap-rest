@@ -139,5 +139,95 @@ export default async () => {
         }),
       ],
     },
+    // UMD/ESM bundles for ldap-group-editor
+    {
+      input: 'src/browser/ldap-group-editor/index.ts',
+      output: [
+        {
+          file: 'static/browser/ldap-group-editor.js',
+          format: 'umd',
+          name: 'LdapGroupEditor',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/ldap-group-editor.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/ldap-group-editor.min.js',
+          format: 'umd',
+          name: 'LdapGroupEditor',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
+          sourceMap: true,
+        }),
+        postcss({
+          extract: false, // Reuse ldap-user-editor.css
+          minimize: false,
+          sourceMap: false,
+        }),
+      ],
+    },
+    // UMD/ESM bundles for ldap-unit-editor
+    {
+      input: 'src/browser/ldap-unit-editor/index.ts',
+      output: [
+        {
+          file: 'static/browser/ldap-unit-editor.js',
+          format: 'umd',
+          name: 'LdapUnitEditor',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/ldap-unit-editor.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/ldap-unit-editor.min.js',
+          format: 'umd',
+          name: 'LdapUnitEditor',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
+          sourceMap: true,
+        }),
+        postcss({
+          extract: false, // Reuse ldap-user-editor.css
+          minimize: false,
+          sourceMap: false,
+        }),
+      ],
+    },
   ];
 };
