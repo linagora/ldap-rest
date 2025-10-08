@@ -117,6 +117,15 @@ export default class James extends DmPlugin {
       }
     },
     onLdapMailChange: async (dn: string, oldmail: string, newmail: string) => {
+      // Skip if oldmail is empty/undefined (this is an add, not a change)
+      // The mailbox will be created by ldapadddone
+      if (!oldmail || oldmail === 'undefined') {
+        this.logger.debug(
+          `Skipping mail rename for ${dn}: oldmail is empty (mail attribute was added, not changed)`
+        );
+        return;
+      }
+
       // Rename the mailbox
       await this._try(
         'onLdapMailChange',
