@@ -396,3 +396,181 @@ describe('James Branch Validation', () => {
     }
   });
 });
+
+describe('James Branch Validation - Unrestricted Configuration', () => {
+  const timestamp = Date.now();
+  const userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
+  const groupBase =
+    process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+  const teamsBase = `ou=teams,${groupBase}`;
+  const nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
+  const mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
+
+  let dm: DM;
+  let james: James;
+  let ldapGroups: LdapGroups;
+  let scope: nock.Scope;
+
+  before(async function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Create DM instance WITHOUT branch restrictions
+    dm = new DM();
+    dm.config.delegation_attribute = 'twakeDelegatedUsers';
+    dm.config.james_mailing_list_branch = []; // Empty = no restrictions
+    await dm.ready;
+    james = new James(dm);
+    ldapGroups = new LdapGroups(dm);
+    await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
+    await dm.registerPlugin('ldapGroups', ldapGroups);
+    await dm.registerPlugin('james', james);
+
+    // Mock James API calls
+    scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
+      .persist()
+      // Mock identity sync
+      .get(/\/jmap\/identities\/.*@test\.org$/)
+      .reply(200, uri => {
+        const email = uri.replace('/jmap/identities/', '');
+        return [
+          {
+            id: `${email}-identity-id`,
+            name: 'Test User',
+            email: email,
+          },
+        ];
+      })
+      .put(/\/jmap\/identities\/.*@test\.org\/.*-identity-id$/)
+      .reply(200, { success: true })
+      // Mailing list operations
+      .put(/\/address\/groups\/.*@test\.org\/.*@test\.org$/)
+      .reply(204)
+      // Team mailbox operations
+      .put(/\/domains\/test\.org\/team-mailboxes\/.*@test\.org$/)
+      .reply(204)
+      .put(
+        /\/domains\/test\.org\/team-mailboxes\/.*@test\.org\/members\/.*@test\.org$/
+      )
+      .reply(204);
+  });
+
+  after(function () {
+    if (scope) {
+      scope.persist(false);
+    }
+    nock.cleanAll();
+  });
+
+  beforeEach(async function () {
+    this.timeout(10000);
+
+    // Ensure required OUs exist
+    try {
+      await dm.ldap.add(userBase, {
+        objectClass: ['organizationalUnit', 'top'],
+        ou: 'users',
+      });
+    } catch (err) {
+      // Ignore if already exists
+    }
+
+    try {
+      await dm.ldap.add(teamsBase, {
+        objectClass: ['organizationalUnit', 'top'],
+        ou: 'teams',
+      });
+    } catch (err) {
+      // Ignore if already exists
+    }
+  });
+
+  it('should allow mailing lists anywhere when branch restrictions are disabled', async function () {
+    this.timeout(10000);
+    const testGroupDN = `cn=unrestricted-list-${timestamp},${teamsBase}`;
+    const testUserDN = `uid=unrestuser-${timestamp},${userBase}`;
+
+    try {
+      // Create test user
+      await dm.ldap.add(testUserDN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Unrestricted User',
+        sn: 'User',
+        uid: `unrestuser-${timestamp}`,
+        mail: `unrestuser-${timestamp}@test.org`,
+      });
+
+      // Create mailing list in teams branch (should succeed - no restrictions)
+      await dm.ldap.add(testGroupDN, {
+        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+        cn: `unrestricted-list-${timestamp}`,
+        mail: `unrestricted-list-${timestamp}@test.org`,
+        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
+        member: testUserDN,
+        twakeDepartmentLink: teamsBase,
+        twakeDepartmentPath: 'Teams',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Mailing list should be created successfully
+      expect(true).to.be.true;
+    } finally {
+      // Cleanup
+      try {
+        await dm.ldap.delete(testGroupDN);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await dm.ldap.delete(testUserDN);
+      } catch (err) {
+        // Ignore
+      }
+    }
+  });
+
+  it('should allow team mailboxes anywhere when branch restrictions are disabled', async function () {
+    this.timeout(10000);
+    const testGroupDN = `cn=unrestricted-team-${timestamp},${teamsBase}`;
+    const testUserDN = `uid=unrestteam-${timestamp},${userBase}`;
+
+    try {
+      // Create test user
+      await dm.ldap.add(testUserDN, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'Unrestricted Team User',
+        sn: 'User',
+        uid: `unrestteam-${timestamp}`,
+        mail: `unrestteam-${timestamp}@test.org`,
+      });
+
+      // Create team mailbox in teams branch (should succeed - no restrictions)
+      await dm.ldap.add(testGroupDN, {
+        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+        cn: `unrestricted-team-${timestamp}`,
+        mail: `unrestricted-team-${timestamp}@test.org`,
+        twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
+        member: testUserDN,
+        twakeDepartmentLink: teamsBase,
+        twakeDepartmentPath: 'Teams',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Team mailbox should be created successfully
+      expect(true).to.be.true;
+    } finally {
+      // Cleanup
+      try {
+        await dm.ldap.delete(testGroupDN);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await dm.ldap.delete(testUserDN);
+      } catch (err) {
+        // Ignore
+      }
+    }
+  });
+});

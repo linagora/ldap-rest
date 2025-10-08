@@ -323,13 +323,15 @@ npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
   - Transition from mailingList to group
   - Delete group with teamMailbox (removes members only)
 
-- **jamesBranchValidation.test.ts** (6 tests):
+- **jamesBranchValidation.test.ts** (8 tests):
   - Allow mailing list in allowed branch
   - Reject mailing list outside allowed branch
   - Allow team mailbox outside mailing list branch
   - Reject team mailbox inside mailing list branch
   - Reject transition to mailing list outside allowed branch
   - Reject transition to team mailbox inside mailing list branch
+  - Allow mailing lists anywhere when restrictions disabled
+  - Allow team mailboxes anywhere when restrictions disabled
 
 ## References
 
