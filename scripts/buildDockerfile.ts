@@ -27,7 +27,7 @@ COPY static ./static
 RUN npm ci && NODE_ENV=production node_modules/.bin/rollup -c && npm pack && mv *.tgz /tmp/app.tgz
 
 WORKDIR /app
-RUN npm install --no-optional --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /app-build && npm cache clean --force
+RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /app-build && npm cache clean --force
 
 ENV NODE_ENV=production`;
 

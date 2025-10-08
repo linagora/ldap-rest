@@ -300,6 +300,27 @@ class ldapActions {
     }
   }
 
+  /**
+   * Move an entry to a new location (different parent)
+   * Uses LDAP modifyDN with full DN to change both RDN and parent
+   * @param dn - Current DN
+   * @param newDn - Full new DN (including new parent)
+   */
+  async move(dn: string, newDn: string): Promise<boolean> {
+    dn = this.setDn(dn);
+    newDn = this.setDn(newDn);
+    const client = await this.connect();
+    try {
+      await client.modifyDN(dn, newDn);
+      void client.unbind();
+      this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
+      return true;
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`LDAP move error: ${error}`);
+    }
+  }
+
   /*
     LDAP delete
    */

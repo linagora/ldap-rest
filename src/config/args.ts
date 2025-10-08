@@ -130,6 +130,12 @@ export interface Config {
   calendar_resource_creator?: string;
   calendar_resource_domain?: string;
 
+  // Trash plugin
+  trash_base?: string;
+  trash_watched_bases?: string;
+  trash_add_metadata?: string;
+  trash_auto_create?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -317,6 +323,12 @@ const configArgs: ConfigTemplate = [
   ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
   ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
   ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
+
+  // Trash plugin
+  ['--trash-base', 'DM_TRASH_BASE', ''],
+  ['--trash-watched-bases', 'DM_TRASH_WATCHED_BASES', ''],
+  ['--trash-add-metadata', 'DM_TRASH_ADD_METADATA', 'true'],
+  ['--trash-auto-create', 'DM_TRASH_AUTO_CREATE', 'true'],
 
   /* Access control plugins */
 
