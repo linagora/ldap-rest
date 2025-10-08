@@ -1,0 +1,86 @@
+{
+  "entity": {
+    "name": "adComputer",
+    "mainAttribute": "sAMAccountName",
+    "objectClass": ["top", "person", "organizationalPerson", "user", "computer"],
+    "singularName": "computer",
+    "pluralName": "computers",
+    "base": "ou=computers,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "person", "organizationalPerson", "user", "computer"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "required": true,
+      "role": "displayName"
+    },
+    "sAMAccountName": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,15}\\$$",
+      "required": true,
+      "role": "identifier"
+    },
+    "dNSHostName": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "required": false,
+      "role": "hostname"
+    },
+    "servicePrincipalName": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[^/]+/[^/]+$"
+      },
+      "required": false,
+      "role": "kerberosPrincipals"
+    },
+    "userAccountControl": {
+      "type": "number",
+      "required": false
+    },
+    "operatingSystem": {
+      "type": "string",
+      "required": false
+    },
+    "operatingSystemVersion": {
+      "type": "string",
+      "required": false
+    },
+    "operatingSystemServicePack": {
+      "type": "string",
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "location": {
+      "type": "string",
+      "required": false
+    },
+    "managedBy": {
+      "type": "pointer",
+      "branch": ["ou=users,__LDAP_BASE__"],
+      "required": false
+    },
+    "lastLogonTimestamp": {
+      "type": "number",
+      "required": false
+    },
+    "pwdLastSet": {
+      "type": "number",
+      "required": false
+    }
+  }
+}
