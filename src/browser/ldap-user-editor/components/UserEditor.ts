@@ -17,6 +17,23 @@ export class UserEditor {
   private onSaved?: () => void;
   private ldapBase: string = '';
 
+  /**
+   * Escape HTML special characters to prevent XSS attacks
+   * Reference: https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
+   */
+  private static escapeHtml(text: unknown): string {
+    if (text == null) return '';
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+    };
+    return String(text).replace(/[&<>"'/]/g, m => map[m]);
+  }
+
   constructor(
     container: HTMLElement,
     api: UserApiClient,
@@ -54,7 +71,7 @@ export class UserEditor {
     this.container.innerHTML = `
       <div class="alert alert-error">
         <span class="material-icons">error</span>
-        <div>${message}</div>
+        <div>${UserEditor.escapeHtml(message)}</div>
       </div>
     `;
   }
@@ -134,8 +151,8 @@ export class UserEditor {
         <div class="editor-header">
           <span class="material-icons">person</span>
           <div class="editor-title">
-            <h3>${userName}</h3>
-            <div class="dn">${this.userDn}</div>
+            <h3>${UserEditor.escapeHtml(userName)}</h3>
+            <div class="dn">${UserEditor.escapeHtml(this.userDn)}</div>
           </div>
         </div>
 
@@ -181,7 +198,7 @@ export class UserEditor {
       .map(
         ([title, fields]) => `
       <div class="form-section">
-        <div class="form-section-title">${title}</div>
+        <div class="form-section-title">${UserEditor.escapeHtml(title)}</div>
         <div class="form-row">
           ${fields
             .map(field => this.renderField(field))
@@ -227,7 +244,7 @@ export class UserEditor {
 
     // Pointer fields
     if (attr.type === 'pointer' || attr.items?.type === 'pointer') {
-      return `<div id="pointer-${fieldName}"></div>`;
+      return `<div id="pointer-${UserEditor.escapeHtml(fieldName)}"></div>`;
     }
 
     // Array fields
@@ -250,11 +267,11 @@ export class UserEditor {
 
     return `
       <div class="form-group">
-        <label class="form-label">${fieldName}</label>
+        <label class="form-label">${UserEditor.escapeHtml(fieldName)}</label>
         <input
           type="text"
           class="form-input"
-          value="${displayValue}"
+          value="${UserEditor.escapeHtml(displayValue)}"
           disabled
         />
       </div>
@@ -272,14 +289,14 @@ export class UserEditor {
     return `
       <div class="form-group">
         <label class="form-label">
-          ${fieldName}
+          ${UserEditor.escapeHtml(fieldName)}
           ${attr.required ? '<span class="required">*</span>' : ''}
         </label>
         <input
-          type="${inputType}"
+          type="${UserEditor.escapeHtml(inputType)}"
           class="form-input"
-          name="${fieldName}"
-          value="${value}"
+          name="${UserEditor.escapeHtml(fieldName)}"
+          value="${UserEditor.escapeHtml(value)}"
           ${attr.required ? 'required' : ''}
         />
       </div>
@@ -292,14 +309,14 @@ export class UserEditor {
     return `
       <div class="form-group">
         <label class="form-label">
-          ${fieldName}
+          ${UserEditor.escapeHtml(fieldName)}
           ${attr.required ? '<span class="required">*</span>' : ''}
         </label>
         <input
           type="number"
           class="form-input"
-          name="${fieldName}"
-          value="${value}"
+          name="${UserEditor.escapeHtml(fieldName)}"
+          value="${UserEditor.escapeHtml(value)}"
           ${attr.required ? 'required' : ''}
         />
       </div>
@@ -319,18 +336,18 @@ export class UserEditor {
     return `
       <div class="form-group">
         <label class="form-label">
-          ${fieldName}
+          ${UserEditor.escapeHtml(fieldName)}
           ${attr.required ? '<span class="required">*</span>' : ''}
         </label>
-        <div class="array-field" data-field="${fieldName}">
+        <div class="array-field" data-field="${UserEditor.escapeHtml(fieldName)}">
           ${values
             .map(
               (val, idx) => `
             <div class="array-item" data-index="${idx}">
               <input
-                type="${inputType}"
+                type="${UserEditor.escapeHtml(inputType)}"
                 class="form-input array-string-item"
-                value="${val}"
+                value="${UserEditor.escapeHtml(val)}"
               />
               <button type="button" class="btn btn-secondary btn-icon remove-array-item">
                 <span class="material-icons">remove</span>
@@ -339,9 +356,9 @@ export class UserEditor {
           `
             )
             .join('')}
-          <button type="button" class="btn btn-secondary add-array-item" data-field="${fieldName}">
+          <button type="button" class="btn btn-secondary add-array-item" data-field="${UserEditor.escapeHtml(fieldName)}">
             <span class="material-icons">add</span>
-            Add ${fieldName}
+            Add ${UserEditor.escapeHtml(fieldName)}
           </button>
         </div>
       </div>
@@ -533,7 +550,7 @@ export class UserEditor {
         alertContainer.innerHTML = `
           <div class="alert alert-error">
             <span class="material-icons">error</span>
-            <div>${(error as Error).message}</div>
+            <div>${UserEditor.escapeHtml((error as Error).message)}</div>
           </div>
         `;
       }

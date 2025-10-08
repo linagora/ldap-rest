@@ -374,12 +374,29 @@
       let userSchema;
       let pointerOptionsCache = {};
 
+      /**
+       * Escape HTML special characters to prevent XSS attacks
+       * Reference: https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
+       */
+      function escapeHtml(text) {
+        if (text == null) return '';
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#x27;',
+          '/': '&#x2F;',
+        };
+        return String(text).replace(/[&<>"'/]/g, m => map[m]);
+      }
+
       function showStatus(message, type = 'error') {
         const container = document.getElementById('status-container');
         container.innerHTML = `
-        <div class="status-message ${type}">
+        <div class="status-message ${escapeHtml(type)}">
           <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
-          <span>${message}</span>
+          <span>${escapeHtml(message)}</span>
         </div>
       `;
         setTimeout(() => {
@@ -427,13 +444,13 @@
             const options = await loadPointerOptions(branch);
             fieldHtml = `
               <div class="form-group">
-                <label for="${fieldName}" class="${labelClass}">${label}</label>
-                <select id="${fieldName}" name="${fieldName}" class="form-select" ${required}>
+                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+                <select id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" class="form-select" ${required}>
                   <option value="">Select...</option>
                   ${options
                     .map(
                       opt => `
-                    <option value="${opt.dn}">${opt.label}</option>
+                    <option value="${escapeHtml(opt.dn)}">${escapeHtml(opt.label)}</option>
                   `
                     )
                     .join('')}
@@ -444,8 +461,8 @@
             // Fallback if no branch defined
             fieldHtml = `
               <div class="form-group">
-                <label for="${fieldName}" class="${labelClass}">${label}</label>
-                <input type="text" id="${fieldName}" name="${fieldName}" ${required} />
+                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+                <input type="text" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
                 <div class="help-text">Enter DN (Distinguished Name)</div>
               </div>
             `;
@@ -460,22 +477,22 @@
             const options = await loadPointerOptions(branch);
             fieldHtml = `
               <div class="form-group">
-                <label class="${labelClass}">${label}</label>
-                <div class="array-field pointer-array-field" data-field="${fieldName}" data-branch="${branch}">
-                  <button type="button" class="btn btn-secondary add-pointer-item" data-field="${fieldName}">
+                <label class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+                <div class="array-field pointer-array-field" data-field="${escapeHtml(fieldName)}" data-branch="${escapeHtml(branch)}">
+                  <button type="button" class="btn btn-secondary add-pointer-item" data-field="${escapeHtml(fieldName)}">
                     <span class="material-icons">add</span>
-                    Add ${label}
+                    Add ${escapeHtml(label)}
                   </button>
                 </div>
-                <input type="hidden" name="${fieldName}" id="${fieldName}-hidden" value="" />
+                <input type="hidden" name="${escapeHtml(fieldName)}" id="${escapeHtml(fieldName)}-hidden" value="" />
               </div>
             `;
           } else {
             // Fallback
             fieldHtml = `
               <div class="form-group">
-                <label for="${fieldName}" class="${labelClass}">${label}</label>
-                <textarea id="${fieldName}" name="${fieldName}" ${required}></textarea>
+                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+                <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
                 <div class="help-text">Enter one DN per line</div>
               </div>
             `;
@@ -487,8 +504,8 @@
           // Array field - use textarea
           fieldHtml = `
             <div class="form-group">
-              <label for="${fieldName}" class="${labelClass}">${label}</label>
-              <textarea id="${fieldName}" name="${fieldName}" ${required}></textarea>
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
               <div class="help-text">Enter one value per line</div>
             </div>
           `;
@@ -499,8 +516,8 @@
           // Number field
           fieldHtml = `
             <div class="form-group">
-              <label for="${fieldName}" class="${labelClass}">${label}</label>
-              <input type="number" id="${fieldName}" name="${fieldName}" ${required} />
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <input type="number" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
             </div>
           `;
         } else if (attribute.type === 'string') {
@@ -514,8 +531,8 @@
                 : 'text';
           fieldHtml = `
             <div class="form-group">
-              <label for="${fieldName}" class="${labelClass}">${label}</label>
-              <input type="${type}" id="${fieldName}" name="${fieldName}" ${required} />
+              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
+              <input type="${escapeHtml(type)}" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
             </div>
           `;
         }
@@ -630,14 +647,14 @@
           // Auto-fill twakeDepartmentLink and twakeDepartmentPath
           if (fieldName === 'twakeDepartmentLink') {
             fieldsHtml += `
-              <input type="hidden" name="twakeDepartmentLink" value="${currentOrgDn}" />
+              <input type="hidden" name="twakeDepartmentLink" value="${escapeHtml(currentOrgDn)}" />
             `;
             continue;
           }
 
           if (fieldName === 'twakeDepartmentPath') {
             fieldsHtml += `
-              <input type="hidden" name="twakeDepartmentPath" value="${orgPath}" />
+              <input type="hidden" name="twakeDepartmentPath" value="${escapeHtml(orgPath)}" />
             `;
             continue;
           }
@@ -669,12 +686,12 @@
             // Create new select element
             const itemHtml = `
               <div class="array-item" style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <select class="form-select pointer-array-select" data-field="${fieldName}" style="flex: 1;">
+                <select class="form-select pointer-array-select" data-field="${escapeHtml(fieldName)}" style="flex: 1;">
                   <option value="">Select...</option>
                   ${options
                     .map(
                       opt => `
-                    <option value="${opt.dn}">${opt.label}</option>
+                    <option value="${escapeHtml(opt.dn)}">${escapeHtml(opt.label)}</option>
                   `
                     )
                     .join('')}
@@ -685,7 +702,7 @@
               </div>
             `;
 
-            // Insert before the add button
+            // Insert before the add button (XSS-safe: all user data escaped via escapeHtml)
             btn.insertAdjacentHTML('beforebegin', itemHtml);
 
             // Reattach handlers
