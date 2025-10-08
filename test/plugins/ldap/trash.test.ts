@@ -180,16 +180,37 @@ describe('Trash Plugin', function () {
   });
 
   describe('Watched branches', () => {
-    it('should only intercept deletes from watched branches', async function () {
+    it('should not intercept deletes within trash itself', async function () {
       this.timeout(10000);
 
-      // Test with a non-watched branch
-      // For this test, we'd need to create an entry in a non-watched location
-      // and verify it's deleted normally, not moved to trash
-      // This would require additional test setup
+      // Create a user and move it to trash
+      await server.ldap.add(userDn, {
+        objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+        cn: 'Test Trash User',
+        sn: 'Trash',
+        uid: testUser,
+        mail: `${testUser}@test.org`,
+      });
 
-      // For now, we can at least verify watched branches work (already tested above)
-      // A complete test would require a more complex LDAP structure
+      // Delete user (moves to trash)
+      await server.ldap.delete(userDn);
+
+      // Verify it's in trash
+      let trashResult = await server.ldap.search({ paged: false }, trashDn);
+      // @ts-ignore
+      expect(trashResult.searchEntries).to.have.lengthOf(1);
+
+      // Now delete directly from trash - should REALLY delete, not move again
+      await server.ldap.delete(trashDn);
+
+      // Verify it's really gone from trash
+      try {
+        trashResult = await server.ldap.search({ paged: false }, trashDn);
+        // @ts-ignore
+        expect(trashResult.searchEntries).to.have.lengthOf(0);
+      } catch (error) {
+        // Expected: entry not found
+      }
     });
   });
 
