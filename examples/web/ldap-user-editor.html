@@ -331,10 +331,6 @@
             <span class="material-icons">person_add</span>
             Create User
           </button>
-          <button class="action-button danger" id="delete-user-btn" disabled>
-            <span class="material-icons">person_remove</span>
-            Delete User
-          </button>
         </div>
       </div>
 
@@ -870,12 +866,9 @@
           // Enable/disable buttons based on selection
           setInterval(() => {
             const createBtn = document.getElementById('create-user-btn');
-            const deleteBtn = document.getElementById('delete-user-btn');
             const currentOrgDn = editor.getCurrentOrgDn();
-            const currentUserDn = editor.getCurrentUserDn();
 
             createBtn.disabled = !currentOrgDn;
-            deleteBtn.disabled = !currentUserDn;
           }, 500);
         } catch (error) {
           console.error('Failed to initialize editor:', error);
@@ -887,9 +880,6 @@
       document
         .getElementById('create-user-btn')
         .addEventListener('click', openCreateUserModal);
-      document
-        .getElementById('delete-user-btn')
-        .addEventListener('click', handleDeleteUser);
       document
         .getElementById('close-modal-btn')
         .addEventListener('click', closeCreateUserModal);

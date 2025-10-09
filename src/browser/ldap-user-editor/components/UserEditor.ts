@@ -15,6 +15,7 @@ export class UserEditor {
   private formData: Partial<LdapUser> = {};
   private pointerFields: Map<string, PointerField> = new Map();
   private onSaved?: () => void;
+  private onDeleted?: () => void;
   private ldapBase: string = '';
 
   /**
@@ -38,12 +39,14 @@ export class UserEditor {
     container: HTMLElement,
     api: UserApiClient,
     userDn: string,
-    onSaved?: () => void
+    onSaved?: () => void,
+    onDeleted?: () => void
   ) {
     this.container = container;
     this.api = api;
     this.userDn = userDn;
     this.onSaved = onSaved;
+    this.onDeleted = onDeleted;
   }
 
   async init(): Promise<void> {
@@ -161,7 +164,11 @@ export class UserEditor {
         <form id="user-edit-form" class="editor-form">
           ${this.renderFormSections()}
 
-          <div class="editor-actions" style="margin-top: 2rem; justify-content: flex-end">
+          <div class="editor-actions" style="margin-top: 2rem; justify-content: space-between">
+            <button type="button" class="btn btn-secondary" id="delete-user-btn" style="background: #d32f2f; color: white;">
+              <span class="material-icons">person_remove</span>
+              Delete User
+            </button>
             <button type="submit" class="btn btn-primary">
               <span class="material-icons">save</span>
               Save Changes
@@ -418,6 +425,10 @@ export class UserEditor {
     const form = this.container.querySelector('#user-edit-form');
     form?.addEventListener('submit', e => this.handleSubmit(e));
 
+    // Delete button
+    const deleteBtn = this.container.querySelector('#delete-user-btn');
+    deleteBtn?.addEventListener('click', () => this.handleDelete());
+
     // String/number inputs
     this.container
       .querySelectorAll<HTMLInputElement>('input[name]')
@@ -556,6 +567,49 @@ export class UserEditor {
       }
     } finally {
       if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  private async handleDelete(): Promise<void> {
+    if (
+      !confirm(
+        `Are you sure you want to delete this user?\n\n${this.userDn}`
+      )
+    ) {
+      return;
+    }
+
+    const alertContainer = this.container.querySelector('#alert-container');
+    const deleteBtn = this.container.querySelector(
+      '#delete-user-btn'
+    ) as HTMLButtonElement;
+
+    if (alertContainer) alertContainer.innerHTML = '';
+    if (deleteBtn) deleteBtn.disabled = true;
+
+    try {
+      await this.api.deleteUser(this.userDn);
+
+      if (alertContainer) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-success">
+            <span class="material-icons">check_circle</span>
+            <div>User deleted successfully!</div>
+          </div>
+        `;
+      }
+
+      if (this.onDeleted) this.onDeleted();
+    } catch (error) {
+      if (alertContainer) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-error">
+            <span class="material-icons">error</span>
+            <div>${UserEditor.escapeHtml((error as Error).message)}</div>
+          </div>
+        `;
+      }
+      if (deleteBtn) deleteBtn.disabled = false;
     }
   }
 

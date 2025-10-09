@@ -107,15 +107,24 @@ export class LdapUserEditor {
     const editorContainer = document.getElementById('user-editor-container');
     if (!editorContainer) return;
 
-    this.userEditor = new UserEditor(editorContainer, this.api, dn, () => {
-      if (this.options.onUserSaved) {
-        this.options.onUserSaved(dn);
+    this.userEditor = new UserEditor(
+      editorContainer,
+      this.api,
+      dn,
+      () => {
+        if (this.options.onUserSaved) {
+          this.options.onUserSaved(dn);
+        }
+        // Refresh the user list if we have one
+        if (this.currentOrgDn && this.userList) {
+          this.userList.refresh();
+        }
+      },
+      () => {
+        // On user deleted
+        this.deleteUser(dn);
       }
-      // Refresh the user list if we have one
-      if (this.currentOrgDn && this.userList) {
-        this.userList.refresh();
-      }
-    });
+    );
 
     try {
       await this.userEditor.init();
