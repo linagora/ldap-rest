@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
+import pLimit from 'p-limit';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
+import type { DM } from '../../bin';
 import type {
   AttributesList,
   AttributeValue,
@@ -17,6 +19,17 @@ export default class James extends DmPlugin {
     onLdapChange: 'core/ldap/onChange',
     ldapGroups: 'core/ldap/groups',
   };
+
+  // Limit concurrent LDAP queries to avoid overwhelming the server
+  private ldapQueryLimit!: ReturnType<typeof pLimit>;
+
+  constructor(server: DM) {
+    super(server);
+    // Initialize concurrency limiter with config value
+    const concurrency = this.config.ldap_concurrency || 10;
+    this.ldapQueryLimit = pLimit(concurrency);
+    this.logger.debug(`LDAP query concurrency limit set to ${concurrency}`);
+  }
 
   /**
    * Normalize email alias - handle AD format (smtp:alias@domain.com)
@@ -714,37 +727,44 @@ export default class James extends DmPlugin {
 
   /**
    * Get email addresses for a list of member DNs
+   * Uses p-limit to parallelize LDAP queries while limiting concurrency
    */
   async getMemberEmails(memberDns: string[]): Promise<string[]> {
     const mailAttr = this.config.mail_attribute || 'mail';
-    const emails: string[] = [];
 
-    for (const memberDn of memberDns) {
-      // Skip dummy members
-      if (memberDn === this.config.group_dummy_user) continue;
+    // Create promises for each member DN, with concurrency limit
+    const emailPromises = memberDns
+      .filter(memberDn => memberDn !== this.config.group_dummy_user)
+      .map(memberDn =>
+        this.ldapQueryLimit(async () => {
+          try {
+            const result = (await this.server.ldap.search(
+              { paged: false, scope: 'base', attributes: [mailAttr] },
+              memberDn
+            )) as SearchResult;
 
-      try {
-        const result = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: [mailAttr] },
-          memberDn
-        )) as SearchResult;
-
-        if (result.searchEntries && result.searchEntries.length > 0) {
-          const mail = result.searchEntries[0][mailAttr];
-          if (mail) {
-            const mailStr = Array.isArray(mail)
-              ? String(mail[0])
-              : String(mail);
-            emails.push(mailStr);
+            if (result.searchEntries && result.searchEntries.length > 0) {
+              const mail = result.searchEntries[0][mailAttr];
+              if (mail) {
+                const mailStr = Array.isArray(mail)
+                  ? String(mail[0])
+                  : String(mail);
+                return mailStr;
+              }
+            }
+            return null;
+          } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+            this.logger.debug(
+              `Could not get email for member ${memberDn}: ${err}`
+            );
+            return null;
           }
-        }
-      } catch (err) {
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        this.logger.debug(`Could not get email for member ${memberDn}: ${err}`);
-      }
-    }
+        })
+      );
 
-    return emails;
+    const results = await Promise.all(emailPromises);
+    return results.filter((email): email is string => email !== null);
   }
 
   /**
