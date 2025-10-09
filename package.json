@@ -268,7 +268,7 @@
     "build:watch": "rollup -c --watch",
     "check": "npm run lint && npm run format:check",
     "clean": "rimraf dist/* static/browser/* coverage",
-    "dev": "npm run build:dev && npm start",
+    "dev": "npm run start:dev",
     "fix": "npm run lint:fix && npm run format:fix",
     "format:check": "prettier --check .",
     "format:check-diff": "prettier --check $(git diff $(git rev-parse --abbrev-ref --symbolic-full-name @{u}) --name-status|grep -E '^M|A'|cut -f2)",

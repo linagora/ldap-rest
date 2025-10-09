@@ -291,54 +291,43 @@ export default class James extends DmPlugin {
       // oldDisplayName: string | null,
       // newDisplayName: string | null
     ) => {
-      // Get mail and display name in a single LDAP query
-      try {
-        const attrs = [
-          this.config.mail_attribute || 'mail',
-          this.config.display_name_attribute || 'displayName',
-          'cn',
-          'givenName',
-          'sn',
-        ];
-        const result = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: attrs },
-          dn
-        )) as import('../../lib/ldapActions').SearchResult;
+      // Get mail and display name attributes using cached ldapGetAttributes
+      const attrs = [
+        this.config.mail_attribute || 'mail',
+        this.config.display_name_attribute || 'displayName',
+        'cn',
+        'givenName',
+        'sn',
+      ];
 
-        if (!result.searchEntries || result.searchEntries.length === 0) {
-          this.logger.warn(
-            `Cannot update James identity: entry not found for ${dn}`
-          );
-          return;
-        }
-
-        const entry = result.searchEntries[0];
-        const mailAttr = this.config.mail_attribute || 'mail';
-        const mail = this.attributeToString(entry[mailAttr]);
-
-        if (!mail) {
-          this.logger.warn(
-            `Cannot update James identity: no mail found for ${dn}`
-          );
-          return;
-        }
-
-        const displayName = this.getDisplayNameFromAttributes(entry);
-        if (!displayName) {
-          this.logger.warn(
-            `Cannot update James identity: no display name found for ${dn}`
-          );
-          return;
-        }
-
-        // Update James identity via JMAP
-        return this.updateJamesIdentity(dn, mail, displayName);
-      } catch (err) {
-        this.logger.error(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `Failed to process display name change for ${dn}: ${err}`
+      const entry = await this.ldapGetAttributes(dn, attrs);
+      if (!entry) {
+        this.logger.warn(
+          `Cannot update James identity: entry not found for ${dn}`
         );
+        return;
       }
+
+      const mailAttr = this.config.mail_attribute || 'mail';
+      const mail = this.attributeToString(entry[mailAttr]);
+
+      if (!mail) {
+        this.logger.warn(
+          `Cannot update James identity: no mail found for ${dn}`
+        );
+        return;
+      }
+
+      const displayName = this.getDisplayNameFromAttributes(entry);
+      if (!displayName) {
+        this.logger.warn(
+          `Cannot update James identity: no display name found for ${dn}`
+        );
+        return;
+      }
+
+      // Update James identity via JMAP
+      return this.updateJamesIdentity(dn, mail, displayName);
     },
 
     // Group/mailing list hooks
