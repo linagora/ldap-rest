@@ -787,11 +787,30 @@ export default class James extends DmPlugin {
       delegateDN => !newDNs.includes(delegateDN)
     );
 
+    // Fetch all delegate emails in parallel with concurrency limit
+    const addedEmailsPromises = addedDNs.map(delegateDN =>
+      this.ldapQueryLimit(async () => {
+        const email = await this._getDelegateEmail(delegateDN);
+        return { dn: delegateDN, email };
+      })
+    );
+
+    const removedEmailsPromises = removedDNs.map(delegateDN =>
+      this.ldapQueryLimit(async () => {
+        const email = await this._getDelegateEmail(delegateDN);
+        return { dn: delegateDN, email };
+      })
+    );
+
+    const [addedResults, removedResults] = await Promise.all([
+      Promise.all(addedEmailsPromises),
+      Promise.all(removedEmailsPromises),
+    ]);
+
     // Process additions and removals in parallel
     const operations: Promise<void>[] = [];
 
-    for (const delegateDN of addedDNs) {
-      const delegateEmail = await this._getDelegateEmail(delegateDN);
+    for (const { dn: delegateDN, email: delegateEmail } of addedResults) {
       if (delegateEmail) {
         operations.push(
           this._try(
@@ -806,8 +825,7 @@ export default class James extends DmPlugin {
       }
     }
 
-    for (const delegateDN of removedDNs) {
-      const delegateEmail = await this._getDelegateEmail(delegateDN);
+    for (const { dn: delegateDN, email: delegateEmail } of removedResults) {
       if (delegateEmail) {
         operations.push(
           this._try(
