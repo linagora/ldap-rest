@@ -6,6 +6,7 @@ import type { Request } from 'express';
 import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
+import { LRUCache } from 'lru-cache';
 
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
@@ -49,11 +50,25 @@ class ldapActions {
   base: string;
   parent: DM;
   logger: winston.Logger;
+  private searchCache: LRUCache<string, SearchResult>;
 
   constructor(server: DM) {
     this.parent = server;
     this.logger = server.logger;
     this.config = server.config;
+
+    // Initialize LRU cache for search results
+    const cacheMax = this.config.ldap_cache_max || 1000;
+    const cacheTtl = (this.config.ldap_cache_ttl || 300) * 1000; // Convert seconds to ms
+    this.searchCache = new LRUCache<string, SearchResult>({
+      max: cacheMax,
+      ttl: cacheTtl,
+      updateAgeOnGet: false,
+      updateAgeOnHas: false,
+    });
+    this.logger.info(
+      `LDAP search cache initialized: max=${cacheMax}, ttl=${cacheTtl / 1000}s`
+    );
     if (!server.config.ldap_url) {
       throw new Error('LDAP URL is not defined');
     }
@@ -103,6 +118,31 @@ class ldapActions {
     return client;
   }
 
+  /**
+   * Generate cache key for LDAP search
+   */
+  private getCacheKey(base: string, opts: SearchOptions): string {
+    // Create a deterministic cache key from base DN and search options
+    // Sort attributes to ensure consistent key generation
+    const sortedAttrs = opts.attributes
+      ? [...opts.attributes].sort().join(',')
+      : '*';
+    return `${base}:${opts.scope || 'sub'}:${opts.filter || '(objectClass=*)'}:${sortedAttrs}`;
+  }
+
+  /**
+   * Invalidate cache entries for a specific DN
+   * Called after modifications to ensure cache consistency
+   */
+  invalidateCache(dn: string): void {
+    // Remove all cache entries that match this DN
+    for (const key of this.searchCache.keys()) {
+      if (key.startsWith(dn)) {
+        this.searchCache.delete(key);
+      }
+    }
+  }
+
   /*
     LDAP search
    */
@@ -121,6 +161,18 @@ class ldapActions {
       this.parent.hooks.ldapsearchrequest,
       [base, opts, req]
     );
+
+    // Check cache for non-paginated, base-scope searches only
+    // These are the most common for attribute lookups
+    if (!opts.paged && opts.scope === 'base') {
+      const cacheKey = this.getCacheKey(base, opts);
+      const cached = this.searchCache.get(cacheKey);
+      if (cached) {
+        this.logger.debug(`LDAP search cache hit: ${cacheKey}`);
+        return cached;
+      }
+    }
+
     let res = opts.paged
       ? client.searchPaginated(base, opts)
       : client.search(base, opts);
@@ -128,6 +180,16 @@ class ldapActions {
       this.parent.hooks.ldapsearchresult,
       res
     )) as typeof res;
+
+    // Cache non-paginated, base-scope search results
+    if (!opts.paged && opts.scope === 'base' && res instanceof Promise) {
+      const result = await res;
+      const cacheKey = this.getCacheKey(base, opts);
+      this.searchCache.set(cacheKey, result);
+      this.logger.debug(`LDAP search cached: ${cacheKey}`);
+      return result;
+    }
+
     return res;
   }
 
@@ -183,6 +245,8 @@ class ldapActions {
     try {
       await client.add(dn, attributes);
       void client.unbind();
+      // Invalidate cache for this DN
+      this.invalidateCache(dn);
       void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
       return true;
     } catch (error) {
@@ -265,6 +329,8 @@ class ldapActions {
       try {
         await client.modify(dn, ldapChanges);
         void client.unbind();
+        // Invalidate cache for this DN
+        this.invalidateCache(dn);
         void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
         return true;
       } catch (error) {
@@ -347,6 +413,8 @@ class ldapActions {
       try {
         await client.del(entry);
         void client.unbind();
+        // Invalidate cache for this DN
+        this.invalidateCache(entry);
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         throw new Error(`LDAP delete error: ${error}`);
