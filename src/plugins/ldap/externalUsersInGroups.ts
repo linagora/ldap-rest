@@ -26,66 +26,67 @@ export default class ExternalUsersInGroups extends DmPlugin {
 
   hooks: Hooks = {
     ldapgroupvalidatemembers: async ([dn, members]) => {
+      // Parallelize member validation/creation with global concurrency limit
       await Promise.all(
         members
           .map(m => m.replace(/\s/g, ''))
-          .map(m => {
-            return new Promise((resolve, reject) => {
+          .map(m =>
+            this.server.ldap.queryLimit(async () => {
               if (
                 !new RegExp(
                   `mail=([^,]+),${this.config.external_members_branch}$`
                 ).test(m)
               )
-                return resolve(false);
-              this.ldap
-                .search({ paged: false }, m)
-                .then(resolve)
-                .catch(async () => {
-                  const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
-                  if (!mail) return reject(new Error(`Malformed member ${m}`));
+                return false;
 
-                  // Check if mail domain is in managed domains
-                  if (
-                    this.config.mail_domain &&
-                    Array.isArray(this.config.mail_domain)
-                  ) {
-                    const domain = mail.split('@')[1];
-                    if (domain && this.config.mail_domain.includes(domain)) {
-                      return reject(
-                        new Error(
-                          `Cannot create external user with managed domain: ${mail}`
-                        )
-                      );
-                    }
-                  }
+              try {
+                // Check if member exists (will use cache with scope: 'base')
+                await this.ldap.search({ paged: false, scope: 'base' }, m);
+                return true;
+              } catch {
+                // Member doesn't exist, create it
+                const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
+                if (!mail) throw new Error(`Malformed member ${m}`);
 
-                  let entry: AttributesList = {
-                    objectClass: (this.config.external_branch_class ||
-                      this.config.user_class) as string[],
-                    mail,
-                    [this.config.ldap_groups_main_attribute as string]: mail,
-                    sn: mail,
-                  };
-                  [m, entry] = await launchHooksChained(
-                    this.registeredHooks.externaluserentry,
-                    [m, entry]
-                  );
-                  this.ldap
-                    .add(m, entry)
-                    .then(() => {
-                      void launchHooks(
-                        this.registeredHooks.externaluseradded,
-                        m,
-                        entry
-                      );
-                      resolve(true);
-                    })
-                    .catch(e =>
-                      reject(new Error(`Unable to insert ${m}: ${e}`))
+                // Check if mail domain is in managed domains
+                if (
+                  this.config.mail_domain &&
+                  Array.isArray(this.config.mail_domain)
+                ) {
+                  const domain = mail.split('@')[1];
+                  if (domain && this.config.mail_domain.includes(domain)) {
+                    throw new Error(
+                      `Cannot create external user with managed domain: ${mail}`
                     );
-                });
-            });
-          })
+                  }
+                }
+
+                let entry: AttributesList = {
+                  objectClass: (this.config.external_branch_class ||
+                    this.config.user_class) as string[],
+                  mail,
+                  [this.config.ldap_groups_main_attribute as string]: mail,
+                  sn: mail,
+                };
+                [m, entry] = await launchHooksChained(
+                  this.registeredHooks.externaluserentry,
+                  [m, entry]
+                );
+
+                try {
+                  await this.ldap.add(m, entry);
+                  void launchHooks(
+                    this.registeredHooks.externaluseradded,
+                    m,
+                    entry
+                  );
+                  return true;
+                } catch (e) {
+                  throw new Error(`Unable to insert ${m}: ${e}`);
+                }
+              }
+            })
+          )
       );
       return [dn, members];
     },

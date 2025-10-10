@@ -521,15 +521,18 @@ export default class LdapGroups extends DmPlugin {
     if (this.config.groups_allow_unexistent_members) return;
     if (!members || !members.length) return;
     try {
+      // Parallelize member validation with global concurrency limit
       await Promise.all(
-        members.map(async m => {
-          try {
-            await this.ldap.search({ paged: false }, m);
-          } catch (e) {
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            throw new Error(`Member ${m} not found: ${e}`);
-          }
-        })
+        members.map(m =>
+          this.server.ldap.queryLimit(async () => {
+            try {
+              await this.ldap.search({ paged: false, scope: 'base' }, m);
+            } catch (e) {
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+              throw new Error(`Member ${m} not found: ${e}`);
+            }
+          })
+        )
       );
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -641,10 +644,10 @@ export default class LdapGroups extends DmPlugin {
         }
       }
 
-      // Verify that the DN exists in LDAP
+      // Verify that the DN exists in LDAP (will use cache)
       try {
         const result = (await this.ldap.search(
-          { paged: false },
+          { paged: false, scope: 'base' },
           dnValue
         )) as SearchResult;
         if (

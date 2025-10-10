@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
+import type { DM } from '../../bin';
 import type {
   AttributesList,
   AttributeValue,
@@ -17,6 +18,10 @@ export default class James extends DmPlugin {
     onLdapChange: 'core/ldap/onChange',
     ldapGroups: 'core/ldap/groups',
   };
+
+  constructor(server: DM) {
+    super(server);
+  }
 
   /**
    * Normalize email alias - handle AD format (smtp:alias@domain.com)
@@ -278,54 +283,43 @@ export default class James extends DmPlugin {
       // oldDisplayName: string | null,
       // newDisplayName: string | null
     ) => {
-      // Get mail and display name in a single LDAP query
-      try {
-        const attrs = [
-          this.config.mail_attribute || 'mail',
-          this.config.display_name_attribute || 'displayName',
-          'cn',
-          'givenName',
-          'sn',
-        ];
-        const result = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: attrs },
-          dn
-        )) as import('../../lib/ldapActions').SearchResult;
+      // Get mail and display name attributes using cached ldapGetAttributes
+      const attrs = [
+        this.config.mail_attribute || 'mail',
+        this.config.display_name_attribute || 'displayName',
+        'cn',
+        'givenName',
+        'sn',
+      ];
 
-        if (!result.searchEntries || result.searchEntries.length === 0) {
-          this.logger.warn(
-            `Cannot update James identity: entry not found for ${dn}`
-          );
-          return;
-        }
-
-        const entry = result.searchEntries[0];
-        const mailAttr = this.config.mail_attribute || 'mail';
-        const mail = this.attributeToString(entry[mailAttr]);
-
-        if (!mail) {
-          this.logger.warn(
-            `Cannot update James identity: no mail found for ${dn}`
-          );
-          return;
-        }
-
-        const displayName = this.getDisplayNameFromAttributes(entry);
-        if (!displayName) {
-          this.logger.warn(
-            `Cannot update James identity: no display name found for ${dn}`
-          );
-          return;
-        }
-
-        // Update James identity via JMAP
-        return this.updateJamesIdentity(dn, mail, displayName);
-      } catch (err) {
-        this.logger.error(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `Failed to process display name change for ${dn}: ${err}`
+      const entry = await this.ldapGetAttributes(dn, attrs);
+      if (!entry) {
+        this.logger.warn(
+          `Cannot update James identity: entry not found for ${dn}`
         );
+        return;
       }
+
+      const mailAttr = this.config.mail_attribute || 'mail';
+      const mail = this.attributeToString(entry[mailAttr]);
+
+      if (!mail) {
+        this.logger.warn(
+          `Cannot update James identity: no mail found for ${dn}`
+        );
+        return;
+      }
+
+      const displayName = this.getDisplayNameFromAttributes(entry);
+      if (!displayName) {
+        this.logger.warn(
+          `Cannot update James identity: no display name found for ${dn}`
+        );
+        return;
+      }
+
+      // Update James identity via JMAP
+      return this.updateJamesIdentity(dn, mail, displayName);
     },
 
     // Group/mailing list hooks
@@ -475,6 +469,38 @@ export default class James extends DmPlugin {
   }
 
   /**
+   * Generic LDAP search utility to fetch specific attributes from a DN
+   * Reduces code duplication across multiple methods
+   * @param dn - The DN to fetch attributes from
+   * @param attributes - Optional array of attribute names to fetch.
+   *                     If undefined or empty, fetches all attributes (*)
+   */
+  private async ldapGetAttributes(
+    dn: string,
+    attributes?: string[]
+  ): Promise<AttributesList | null> {
+    try {
+      // If attributes is undefined or empty, fetch all attributes
+      const searchAttrs =
+        attributes && attributes.length > 0 ? attributes : undefined;
+
+      const result = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: searchAttrs },
+        dn
+      )) as SearchResult;
+
+      if (result.searchEntries && result.searchEntries.length > 0) {
+        return result.searchEntries[0] as AttributesList;
+      }
+      return null;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.debug(`Could not fetch attributes from DN ${dn}: ${err}`);
+      return null;
+    }
+  }
+
+  /**
    * Extract display name from LDAP attributes
    * Fallback logic: displayName → cn → givenName+sn → mail
    */
@@ -510,93 +536,55 @@ export default class James extends DmPlugin {
   }
 
   async getMailFromDN(dn: string): Promise<string | null> {
-    try {
-      const mailAttr = this.config.mail_attribute || 'mail';
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: [mailAttr] },
-        dn
-      )) as import('../../lib/ldapActions').SearchResult;
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        const mail = result.searchEntries[0][mailAttr];
-        return mail ? String(mail) : null;
-      }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to get mail from DN ${dn}: ${err}`);
-    }
-    return null;
+    const mailAttr = this.config.mail_attribute || 'mail';
+    const entry = await this.ldapGetAttributes(dn, [mailAttr]);
+    return entry ? this.attributeToString(entry[mailAttr]) : null;
   }
 
   async getDisplayNameFromDN(dn: string): Promise<string | null> {
-    try {
-      const attrs = [
-        this.config.display_name_attribute || 'displayName',
-        'cn',
-        'givenName',
-        'sn',
-        this.config.mail_attribute || 'mail',
-      ];
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: attrs },
-        dn
-      )) as import('../../lib/ldapActions').SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        return this.getDisplayNameFromAttributes(result.searchEntries[0]);
-      }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to get display name from DN ${dn}: ${err}`);
-    }
-    return null;
+    const attrs = [
+      this.config.display_name_attribute || 'displayName',
+      'cn',
+      'givenName',
+      'sn',
+      this.config.mail_attribute || 'mail',
+    ];
+    const entry = await this.ldapGetAttributes(dn, attrs);
+    return entry ? this.getDisplayNameFromAttributes(entry) : null;
   }
 
   async generateSignature(dn: string): Promise<string | null> {
     const template = this.config.james_signature_template;
     if (!template) return null;
 
-    try {
-      // Get all attributes that might be used in the template
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base' },
-        dn
-      )) as import('../../lib/ldapActions').SearchResult;
+    // Get all attributes (needed for template placeholders)
+    const entry = await this.ldapGetAttributes(dn);
+    if (!entry) return null;
 
-      if (!result.searchEntries || result.searchEntries.length === 0) {
-        return null;
-      }
+    // Replace all {attributeName} placeholders with LDAP values
+    let signature = template;
+    const placeholderRegex = /\{(\w+)\}/g;
 
-      const entry: AttributesList = result.searchEntries[0] as AttributesList;
-
-      // Replace all {attributeName} placeholders with LDAP values
-      let signature = template;
-      const placeholderRegex = /\{(\w+)\}/g;
-
-      signature = signature.replace(
-        placeholderRegex,
-        (_match: string, attrName: string): string => {
-          if (
-            typeof attrName === 'string' &&
-            entry &&
-            typeof entry === 'object' &&
-            Object.prototype.hasOwnProperty.call(entry, attrName)
-          ) {
-            return (
-              this.attributeToString(
-                (entry as Record<string, unknown>)[attrName]
-              ) || ''
-            );
-          }
-          return '';
+    signature = signature.replace(
+      placeholderRegex,
+      (_match: string, attrName: string): string => {
+        if (
+          typeof attrName === 'string' &&
+          entry &&
+          typeof entry === 'object' &&
+          Object.prototype.hasOwnProperty.call(entry, attrName)
+        ) {
+          return (
+            this.attributeToString(
+              (entry as Record<string, unknown>)[attrName]
+            ) || ''
+          );
         }
-      );
+        return '';
+      }
+    );
 
-      return signature;
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to generate signature for DN ${dn}: ${err}`);
-      return null;
-    }
+    return signature;
   }
 
   async updateJamesIdentity(
@@ -714,61 +702,31 @@ export default class James extends DmPlugin {
 
   /**
    * Get email addresses for a list of member DNs
+   * Uses p-limit to parallelize LDAP queries while limiting concurrency
    */
   async getMemberEmails(memberDns: string[]): Promise<string[]> {
     const mailAttr = this.config.mail_attribute || 'mail';
-    const emails: string[] = [];
 
-    for (const memberDn of memberDns) {
-      // Skip dummy members
-      if (memberDn === this.config.group_dummy_user) continue;
+    // Create promises for each member DN, with global concurrency limit
+    const emailPromises = memberDns
+      .filter(memberDn => memberDn !== this.config.group_dummy_user)
+      .map(memberDn =>
+        this.server.ldap.queryLimit(async () => {
+          const entry = await this.ldapGetAttributes(memberDn, [mailAttr]);
+          return entry ? this.attributeToString(entry[mailAttr]) : null;
+        })
+      );
 
-      try {
-        const result = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: [mailAttr] },
-          memberDn
-        )) as SearchResult;
-
-        if (result.searchEntries && result.searchEntries.length > 0) {
-          const mail = result.searchEntries[0][mailAttr];
-          if (mail) {
-            const mailStr = Array.isArray(mail)
-              ? String(mail[0])
-              : String(mail);
-            emails.push(mailStr);
-          }
-        }
-      } catch (err) {
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        this.logger.debug(`Could not get email for member ${memberDn}: ${err}`);
-      }
-    }
-
-    return emails;
+    const results = await Promise.all(emailPromises);
+    return results.filter((email): email is string => email !== null);
   }
 
   /**
    * Get the mail address for a group DN
    */
   async getGroupMail(groupDn: string): Promise<string | null> {
-    try {
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: ['mail'] },
-        groupDn
-      )) as SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        const mail = result.searchEntries[0].mail;
-        if (mail) {
-          return Array.isArray(mail) ? String(mail[0]) : String(mail);
-        }
-      }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.debug(`Could not get mail for group ${groupDn}: ${err}`);
-    }
-
-    return null;
+    const entry = await this.ldapGetAttributes(groupDn, ['mail']);
+    return entry ? this.attributeToString(entry.mail) : null;
   }
 
   async _handleDelegationChange(
@@ -817,11 +775,30 @@ export default class James extends DmPlugin {
       delegateDN => !newDNs.includes(delegateDN)
     );
 
+    // Fetch all delegate emails in parallel with global concurrency limit
+    const addedEmailsPromises = addedDNs.map(delegateDN =>
+      this.server.ldap.queryLimit(async () => {
+        const email = await this._getDelegateEmail(delegateDN);
+        return { dn: delegateDN, email };
+      })
+    );
+
+    const removedEmailsPromises = removedDNs.map(delegateDN =>
+      this.server.ldap.queryLimit(async () => {
+        const email = await this._getDelegateEmail(delegateDN);
+        return { dn: delegateDN, email };
+      })
+    );
+
+    const [addedResults, removedResults] = await Promise.all([
+      Promise.all(addedEmailsPromises),
+      Promise.all(removedEmailsPromises),
+    ]);
+
     // Process additions and removals in parallel
     const operations: Promise<void>[] = [];
 
-    for (const delegateDN of addedDNs) {
-      const delegateEmail = await this._getDelegateEmail(delegateDN);
+    for (const { dn: delegateDN, email: delegateEmail } of addedResults) {
       if (delegateEmail) {
         operations.push(
           this._try(
@@ -836,8 +813,7 @@ export default class James extends DmPlugin {
       }
     }
 
-    for (const delegateDN of removedDNs) {
-      const delegateEmail = await this._getDelegateEmail(delegateDN);
+    for (const { dn: delegateDN, email: delegateEmail } of removedResults) {
       if (delegateEmail) {
         operations.push(
           this._try(
@@ -856,27 +832,20 @@ export default class James extends DmPlugin {
   }
 
   async _getDelegateEmail(dn: string): Promise<string | null> {
-    try {
-      const result = (await this.server.ldap.search(
-        { paged: false },
-        dn
-      )) as SearchResult;
-      if (result.searchEntries && result.searchEntries.length === 1) {
-        const mail = result.searchEntries[0].mail;
-        if (mail && typeof mail === 'string') {
-          return mail;
-        }
-      }
-    } catch (err) {
+    const mailAttr = this.config.mail_attribute || 'mail';
+    const entry = await this.ldapGetAttributes(dn, [mailAttr]);
+
+    if (!entry) {
       this.logger.warn({
         plugin: this.name,
         event: 'getDelegateEmail',
         dn,
         message: 'Could not resolve delegate DN to email',
-        error: err,
       });
+      return null;
     }
-    return null;
+
+    return this.attributeToString(entry[mailAttr]);
   }
 
   _normalizeToArray(value: AttributeValue | null): string[] {

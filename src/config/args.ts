@@ -49,6 +49,8 @@ export interface Config {
   ldap_pwd?: string;
   ldap_url?: string;
   ldap_user_main_attribute?: string;
+  ldap_cache_max?: number;
+  ldap_cache_ttl?: number;
   user_class?: string[];
 
   // LDAP groups plugin
@@ -121,6 +123,7 @@ export interface Config {
   james_webadmin_url?: string;
   james_webadmin_token?: string;
   james_signature_template?: string;
+  ldap_concurrency?: number;
 
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
@@ -180,6 +183,8 @@ const configArgs: ConfigTemplate = [
   ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
   ['--ldap-url', 'DM_LDAP_URL', 'ldap://localhost'],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
+  ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
+  ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 300, 'number'], // seconds
   [
     '--schemas-path',
     'DM_SCHEMAS_PATH',
@@ -311,6 +316,7 @@ const configArgs: ConfigTemplate = [
   ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],
   ['--james-webadmin-token', 'DM_JAMES_WEBADMIN_TOKEN', ''],
   ['--james-signature-template', 'DM_JAMES_SIGNATURE_TEMPLATE', ''],
+  ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
 
   // Calendar Resources plugin
   [
