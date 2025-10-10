@@ -7,6 +7,7 @@ import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
 import { LRUCache } from 'lru-cache';
+import pLimit from 'p-limit';
 
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
@@ -51,11 +52,19 @@ class ldapActions {
   parent: DM;
   logger: winston.Logger;
   private searchCache: LRUCache<string, SearchResult>;
+  public queryLimit: ReturnType<typeof pLimit>;
 
   constructor(server: DM) {
     this.parent = server;
     this.logger = server.logger;
     this.config = server.config;
+
+    // Initialize global LDAP query concurrency limiter
+    const concurrency = this.config.ldap_concurrency || 10;
+    this.queryLimit = pLimit(concurrency);
+    this.logger.info(
+      `Global LDAP query concurrency limit set to ${concurrency}`
+    );
 
     // Initialize LRU cache for search results
     const cacheMax = this.config.ldap_cache_max || 1000;

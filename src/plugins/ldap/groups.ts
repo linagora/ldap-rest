@@ -8,7 +8,6 @@
  * - detect user deletion to remove them from groups (hook)
  */
 import fs from 'fs';
-import pLimit from 'p-limit';
 
 import type { Express, Request, Response } from 'express';
 
@@ -52,18 +51,12 @@ export default class LdapGroups extends DmPlugin {
   ldap: ldapActions;
   cn: string;
   schema?: Schema;
-  private ldapQueryLimit!: ReturnType<typeof pLimit>;
 
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
     this.base = this.config.ldap_group_base as string;
     this.cn = this.config.ldap_groups_main_attribute as string;
-
-    // Initialize concurrency limiter with config value
-    const concurrency = this.config.ldap_concurrency || 10;
-    this.ldapQueryLimit = pLimit(concurrency);
-    this.logger.debug(`LDAP query concurrency limit set to ${concurrency}`);
     if (!this.base) {
       this.base = this.config.ldap_base;
       this.logger.warn(`LDAP group base is not defined, using "${this.base}"`);
@@ -528,10 +521,10 @@ export default class LdapGroups extends DmPlugin {
     if (this.config.groups_allow_unexistent_members) return;
     if (!members || !members.length) return;
     try {
-      // Parallelize member validation with concurrency limit
+      // Parallelize member validation with global concurrency limit
       await Promise.all(
         members.map(m =>
-          this.ldapQueryLimit(async () => {
+          this.server.ldap.queryLimit(async () => {
             try {
               await this.ldap.search({ paged: false, scope: 'base' }, m);
             } catch (e) {

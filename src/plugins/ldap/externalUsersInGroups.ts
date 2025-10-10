@@ -5,8 +5,6 @@
  * Creates on-the-fly missing group users into a branch
  * This permits to add external users into mailing lists
  */
-import pLimit from 'p-limit';
-
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
@@ -20,28 +18,20 @@ export default class ExternalUsersInGroups extends DmPlugin {
   dependencies = { ldapGroups: 'core/ldap/ldapGroups' };
 
   ldap: ldapActions;
-  private ldapQueryLimit!: ReturnType<typeof pLimit>;
 
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
-
-    // Initialize concurrency limiter with config value
-    const concurrency = this.config.ldap_concurrency || 10;
-    this.ldapQueryLimit = pLimit(concurrency);
-    this.logger.debug(
-      `ExternalUsersInGroups: LDAP query concurrency limit set to ${concurrency}`
-    );
   }
 
   hooks: Hooks = {
     ldapgroupvalidatemembers: async ([dn, members]) => {
-      // Parallelize member validation/creation with concurrency limit
+      // Parallelize member validation/creation with global concurrency limit
       await Promise.all(
         members
           .map(m => m.replace(/\s/g, ''))
           .map(m =>
-            this.ldapQueryLimit(async () => {
+            this.server.ldap.queryLimit(async () => {
               if (
                 !new RegExp(
                   `mail=([^,]+),${this.config.external_members_branch}$`

@@ -1,5 +1,4 @@
 import fetch from 'node-fetch';
-import pLimit from 'p-limit';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
@@ -20,15 +19,8 @@ export default class James extends DmPlugin {
     ldapGroups: 'core/ldap/groups',
   };
 
-  // Limit concurrent LDAP queries to avoid overwhelming the server
-  private ldapQueryLimit!: ReturnType<typeof pLimit>;
-
   constructor(server: DM) {
     super(server);
-    // Initialize concurrency limiter with config value
-    const concurrency = this.config.ldap_concurrency || 10;
-    this.ldapQueryLimit = pLimit(concurrency);
-    this.logger.debug(`LDAP query concurrency limit set to ${concurrency}`);
   }
 
   /**
@@ -708,11 +700,11 @@ export default class James extends DmPlugin {
   async getMemberEmails(memberDns: string[]): Promise<string[]> {
     const mailAttr = this.config.mail_attribute || 'mail';
 
-    // Create promises for each member DN, with concurrency limit
+    // Create promises for each member DN, with global concurrency limit
     const emailPromises = memberDns
       .filter(memberDn => memberDn !== this.config.group_dummy_user)
       .map(memberDn =>
-        this.ldapQueryLimit(async () => {
+        this.server.ldap.queryLimit(async () => {
           const entry = await this.ldapGetAttributes(memberDn, [mailAttr]);
           return entry ? this.attributeToString(entry[mailAttr]) : null;
         })
@@ -776,16 +768,16 @@ export default class James extends DmPlugin {
       delegateDN => !newDNs.includes(delegateDN)
     );
 
-    // Fetch all delegate emails in parallel with concurrency limit
+    // Fetch all delegate emails in parallel with global concurrency limit
     const addedEmailsPromises = addedDNs.map(delegateDN =>
-      this.ldapQueryLimit(async () => {
+      this.server.ldap.queryLimit(async () => {
         const email = await this._getDelegateEmail(delegateDN);
         return { dn: delegateDN, email };
       })
     );
 
     const removedEmailsPromises = removedDNs.map(delegateDN =>
-      this.ldapQueryLimit(async () => {
+      this.server.ldap.queryLimit(async () => {
         const email = await this._getDelegateEmail(delegateDN);
         return { dn: delegateDN, email };
       })
