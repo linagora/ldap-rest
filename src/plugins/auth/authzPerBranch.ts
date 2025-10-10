@@ -6,16 +6,8 @@
  * Supports user and group-based permissions with configurable defaults
  * @group Plugins
  */
-import type { SearchOptions } from 'ldapts';
-import type { Request } from 'express';
-
 import type { DM } from '../../bin';
-import type { DmRequest } from '../../lib/auth/base';
-import type {
-  SearchResult,
-  AttributesList,
-  ModifyRequest,
-} from '../../lib/ldapActions';
+import type { SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import AuthzBase from '../../lib/authz/base';
 
@@ -42,170 +34,21 @@ export default class AuthzPerBranch extends AuthzBase {
     }
   }
 
-  hooks = {
-    ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
-      string,
-      ModifyRequest,
-      number,
-      DmRequest?,
-    ]): Promise<[string, ModifyRequest, number, DmRequest?]> => {
-      if (!req?.user || !this.authConfig) {
-        return [dn, changes, opNumber, req];
-      }
+  /**
+   * Resolve user - for authzPerBranch, we use uid directly
+   */
+  async resolveUser(uid: string): Promise<string | null> {
+    return uid;
+  }
 
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
+  /**
+   * Override to add authConfig check
+   */
+  protected shouldSkipAuthorization(req?: any): boolean {
+    return !req?.user || !this.authConfig;
+  }
 
-      // If modifying twakeDepartmentLink, check write permission for the new organization
-      const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && changes.replace?.[linkAttr]) {
-        const newLink = changes.replace[linkAttr];
-        branchToCheck = Array.isArray(newLink)
-          ? String(newLink[0])
-          : String(newLink);
-      } else {
-        // For other modifications, check the entry's current branch
-        branchToCheck = this.extractBranchDn(dn);
-      }
-
-      const permissions = await this.getUserPermissions(
-        req.user,
-        branchToCheck
-      );
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new Error(
-          `User ${req.user} does not have write permission for branch ${branchToCheck}`
-        );
-      }
-
-      return [dn, changes, opNumber, req];
-    },
-    ldapaddrequest: async ([dn, entry, req]: [
-      string,
-      AttributesList,
-      DmRequest?,
-    ]): Promise<[string, AttributesList, DmRequest?]> => {
-      if (!req?.user || !this.authConfig) {
-        return [dn, entry, req];
-      }
-
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
-
-      // If the entry has a link attribute (like twakeDepartmentLink), check permissions for that branch
-      const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && entry[linkAttr]) {
-        const linkValue = entry[linkAttr];
-        branchToCheck = Array.isArray(linkValue)
-          ? String(linkValue[0])
-          : String(linkValue);
-      } else {
-        // For other entries, check the parent DN
-        branchToCheck = this.extractBranchDn(dn);
-      }
-
-      const permissions = await this.getUserPermissions(
-        req.user,
-        branchToCheck
-      );
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new Error(
-          `User ${req.user} does not have write permission for branch ${branchToCheck}`
-        );
-      }
-
-      return [dn, entry, req];
-    },
-    ldapsearchrequest: async ([base, opts, req]: [
-      string,
-      SearchOptions,
-      DmRequest?,
-    ]): Promise<[string, SearchOptions, DmRequest?]> => {
-      if (!req?.user || !this.authConfig) {
-        return [base, opts, req];
-      }
-
-      const permissions = await this.getUserPermissions(req.user, base);
-
-      // Check read permission
-      if (!permissions.read) {
-        throw new Error(
-          `User ${req.user} does not have read permission for branch ${base}`
-        );
-      }
-
-      // For write operations (add/modify), we'll need to check in separate hooks
-      // For now, we only modify the search filter to restrict to authorized branches
-      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
-        req.user,
-        'read'
-      );
-
-      if (authorizedBranches.length > 0) {
-        // Modify filter to only search within authorized branches
-        const branchFilter = this.buildBranchFilter(base, authorizedBranches);
-        if (branchFilter) {
-          const originalFilter = opts.filter || '(objectClass=*)';
-          opts.filter = `(&${originalFilter as string}${branchFilter})`;
-        }
-      }
-
-      return [base, opts, req];
-    },
-    getOrganisationTop: async ([req, defaultTop]: [
-      Request | undefined,
-      AttributesList | null,
-    ]): Promise<[Request | undefined, AttributesList | null]> => {
-      // If no user or no config, return default
-      const dmReq = req as DmRequest | undefined;
-      if (!dmReq?.user || !this.authConfig) {
-        return [req, defaultTop];
-      }
-
-      // Get authorized branches for this user
-      const authorizedBranches = await this.getAuthorizedBranchesForPermission(
-        dmReq.user,
-        'read'
-      );
-
-      // If user has specific authorized branches, return them as top organizations
-      if (authorizedBranches.length > 0) {
-        const orgs: AttributesList[] = [];
-        for (const branch of authorizedBranches) {
-          try {
-            const result = await this.server.ldap.search(
-              { paged: false, scope: 'base' },
-              branch,
-              dmReq
-            );
-            if ((result as SearchResult).searchEntries.length === 1) {
-              orgs.push((result as SearchResult).searchEntries[0]);
-            }
-          } catch (err) {
-            this.logger.warn(
-              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-              `Failed to fetch authorized branch ${branch}: ${err}`
-            );
-          }
-        }
-
-        if (orgs.length === 1) {
-          return [req, orgs[0]];
-        } else if (orgs.length > 1) {
-          throw new Error(
-            'Multiple authorized top organizations found, but getOrganisationTop expects a single entry'
-          );
-        }
-      }
-
-      // Return default if no authorized branches
-      return [req, defaultTop];
-    },
-  };
+  // Note: hooks are inherited from AuthzBase
 
   /**
    * Get user's permissions for a specific branch

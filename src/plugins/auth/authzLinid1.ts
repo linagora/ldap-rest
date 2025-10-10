@@ -6,16 +6,9 @@
  * Grants permissions to users referenced in organization's twakeLocalAdminLink
  * @group Plugins
  */
-import type { SearchOptions } from 'ldapts';
-
 import type { DM } from '../../bin';
-import type {
-  SearchResult,
-  AttributesList,
-  ModifyRequest,
-} from '../../lib/ldapActions';
+import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
 
 interface CachedPermissions {
@@ -40,182 +33,14 @@ export default class AuthzLinid1 extends AuthzBase {
     );
   }
 
-  hooks = {
-    ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
-      string,
-      ModifyRequest,
-      number,
-      DmRequest?,
-    ]): Promise<[string, ModifyRequest, number, DmRequest?]> => {
-      if (!req?.user) {
-        return [dn, changes, opNumber, req];
-      }
+  /**
+   * Resolve user - for authzLinid1, convert uid to userDn via LDAP
+   */
+  async resolveUser(uid: string): Promise<string | null> {
+    return this.getUserDn(uid);
+  }
 
-      const userDn = await this.getUserDn(req.user);
-      if (!userDn) {
-        this.logger.warn(`User ${req.user} not found in LDAP`);
-        return [dn, changes, opNumber, req];
-      }
-
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
-
-      // If modifying twakeDepartmentLink, check write permission for the new organization
-      const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && changes.replace?.[linkAttr]) {
-        const newLink = changes.replace[linkAttr];
-        branchToCheck = Array.isArray(newLink)
-          ? String(newLink[0])
-          : String(newLink);
-      } else {
-        // For other modifications, check the entry's current branch
-        branchToCheck = this.extractBranchDn(dn);
-      }
-
-      const permissions = await this.getUserPermissions(userDn, branchToCheck);
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new Error(
-          `User ${req.user} does not have write permission for branch ${branchToCheck}`
-        );
-      }
-
-      return [dn, changes, opNumber, req];
-    },
-    ldapaddrequest: async ([dn, entry, req]: [
-      string,
-      AttributesList,
-      DmRequest?,
-    ]): Promise<[string, AttributesList, DmRequest?]> => {
-      if (!req?.user) {
-        return [dn, entry, req];
-      }
-
-      const userDn = await this.getUserDn(req.user);
-      if (!userDn) {
-        this.logger.warn(`User ${req.user} not found in LDAP`);
-        return [dn, entry, req];
-      }
-
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
-
-      // If the entry has a twakeDepartmentLink, check permissions for that organization
-      const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && entry[linkAttr]) {
-        const linkValue = entry[linkAttr];
-        branchToCheck = Array.isArray(linkValue)
-          ? String(linkValue[0])
-          : String(linkValue);
-      } else {
-        // For organizations (ou entries) or entries without link, check the parent DN
-        branchToCheck = this.extractBranchDn(dn);
-      }
-
-      const permissions = await this.getUserPermissions(userDn, branchToCheck);
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new Error(
-          `User ${req.user} does not have write permission for branch ${branchToCheck}`
-        );
-      }
-
-      return [dn, entry, req];
-    },
-    ldapsearchrequest: async ([base, opts, req]: [
-      string,
-      SearchOptions,
-      DmRequest?,
-    ]): Promise<[string, SearchOptions, DmRequest?]> => {
-      if (!req?.user) {
-        return [base, opts, req];
-      }
-
-      const userDn = await this.getUserDn(req.user);
-      if (!userDn) {
-        this.logger.warn(`User ${req.user} not found in LDAP`);
-        return [base, opts, req];
-      }
-
-      // Allow base scope search on top organization (for getOrganisationTop)
-      if (base === this.config.ldap_top_organization && opts.scope === 'base') {
-        return [base, opts, req];
-      }
-
-      // Allow searches for refreshing permissions (filter contains local admin attribute)
-      const adminAttr =
-        this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
-      if (
-        opts.filter &&
-        typeof opts.filter === 'string' &&
-        opts.filter.includes(adminAttr)
-      ) {
-        return [base, opts, req];
-      }
-
-      const permissions = await this.getUserPermissions(userDn, base);
-
-      // Check read permission
-      if (!permissions.read) {
-        throw new Error(
-          `User ${req.user} does not have read permission for branch ${base}`
-        );
-      }
-
-      return [base, opts, req];
-    },
-    getOrganisationTop: async ([req, defaultTop]: [
-      DmRequest | undefined,
-      AttributesList | null,
-    ]): Promise<[DmRequest | undefined, AttributesList | null]> => {
-      // If no user, return default
-      if (!req?.user) {
-        return [req, defaultTop];
-      }
-
-      const userDn = await this.getUserDn(req.user);
-      if (!userDn) {
-        return [req, defaultTop];
-      }
-
-      // Get authorized branches for this user
-      const authorizedBranches = await this.getAuthorizedBranches(userDn);
-
-      // If user has specific authorized branches, return them as top organizations
-      if (authorizedBranches.length > 0) {
-        const orgs: AttributesList[] = [];
-        for (const branch of authorizedBranches) {
-          try {
-            const result = await this.server.ldap.search(
-              { paged: false, scope: 'base' },
-              branch,
-              req
-            );
-            if ((result as SearchResult).searchEntries.length === 1) {
-              orgs.push((result as SearchResult).searchEntries[0]);
-            }
-          } catch (err) {
-            this.logger.warn(
-              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-              `Failed to fetch authorized branch ${branch}: ${err}`
-            );
-          }
-        }
-
-        if (orgs.length === 1) {
-          return [req, orgs[0]];
-        } else if (orgs.length > 1) {
-          // Return the first one or throw an error based on preference
-          return [req, orgs[0]];
-        }
-      }
-
-      // Return default if no authorized branches
-      return [req, defaultTop];
-    },
-  };
+  // Note: hooks are inherited from AuthzBase
 
   /**
    * Get user DN from uid
