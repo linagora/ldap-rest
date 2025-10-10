@@ -60,7 +60,7 @@
 
       <div id="status-container"></div>
 
-      <div id="ldap-group-editor" style="min-height: 600px;"></div>
+      <div id="ldap-group-editor" style="min-height: 600px"></div>
     </div>
 
     <!-- Shared utilities -->
@@ -79,16 +79,28 @@
             apiBaseUrl: window.location.origin,
             onGroupSaved: groupDn => {
               console.log('Group saved:', groupDn);
-              showStatus('status-container', 'Group saved successfully!', 'success');
+              showStatus(
+                'status-container',
+                'Group saved successfully!',
+                'success'
+              );
             },
             onError: error => {
               console.error('Editor error:', error);
-              showStatus('status-container', `Error: ${error.message}`, 'error');
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
             },
           });
 
           await editor.init();
-          showStatus('status-container', 'LDAP Group Editor loaded successfully!', 'success');
+          showStatus(
+            'status-container',
+            'LDAP Group Editor loaded successfully!',
+            'success'
+          );
         } catch (error) {
           console.error('Failed to initialize editor:', error);
           showStatus('status-container', `Error: ${error.message}`, 'error');

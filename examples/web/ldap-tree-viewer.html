@@ -306,7 +306,11 @@
           });
 
           await viewer.init();
-          showStatus('status-container', 'LDAP tree loaded successfully!', 'success');
+          showStatus(
+            'status-container',
+            'LDAP tree loaded successfully!',
+            'success'
+          );
         } catch (error) {
           console.error('Failed to initialize viewer:', error);
           showStatus('status-container', `Error: ${error.message}`, 'error');
@@ -322,7 +326,11 @@
               await viewer.refresh();
               showStatus('status-container', 'Tree refreshed!', 'success');
             } catch (error) {
-              showStatus('status-container', `Error: ${error.message}`, 'error');
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
             }
           }
         });

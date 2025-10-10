@@ -572,7 +572,6 @@ export class UserEditor {
 
   private async handleDelete(): Promise<void> {
     if (
-      // eslint-disable-next-line no-undef
       !confirm(`Are you sure you want to delete this user?\n\n${this.userDn}`)
     ) {
       return;

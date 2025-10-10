@@ -136,7 +136,10 @@
         }
 
         // Get organization path for twakeDepartmentPath
-        const orgPath = await getOrganizationPath(currentOrgDn, window.location.origin);
+        const orgPath = await getOrganizationPath(
+          currentOrgDn,
+          window.location.origin
+        );
 
         // Replace placeholders in schema branches
         const ldapBase = editor.getConfig().ldapBase;
@@ -156,7 +159,7 @@
           .join('');
 
         // API loader for pointer options
-        const pointerLoader = async (branch) => {
+        const pointerLoader = async branch => {
           const api = editor.getApi();
           return await api.getPointerOptions(branch);
         };
@@ -208,7 +211,7 @@
             if (!branch) return;
 
             // Load options using shared utility
-            const options = await loadPointerOptions(branch, async (b) => {
+            const options = await loadPointerOptions(branch, async b => {
               return await api.getPointerOptions(b);
             });
 
@@ -293,7 +296,11 @@
 
         try {
           await editor.createUser(userData);
-          showStatus('status-container', 'User created successfully!', 'success');
+          showStatus(
+            'status-container',
+            'User created successfully!',
+            'success'
+          );
           closeCreateUserModal();
         } catch (error) {
           console.error('Failed to create user:', error);
@@ -317,7 +324,11 @@
 
         try {
           await editor.deleteUser(userDn);
-          showStatus('status-container', 'User deleted successfully!', 'success');
+          showStatus(
+            'status-container',
+            'User deleted successfully!',
+            'success'
+          );
 
           // Disable delete button
           document.getElementById('delete-user-btn').disabled = true;
@@ -334,16 +345,28 @@
             apiBaseUrl: window.location.origin,
             onUserSaved: userDn => {
               console.log('User saved:', userDn);
-              showStatus('status-container', 'User saved successfully!', 'success');
+              showStatus(
+                'status-container',
+                'User saved successfully!',
+                'success'
+              );
             },
             onError: error => {
               console.error('Editor error:', error);
-              showStatus('status-container', `Error: ${error.message}`, 'error');
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
             },
           });
 
           await editor.init();
-          showStatus('status-container', 'LDAP User Editor loaded successfully!', 'success');
+          showStatus(
+            'status-container',
+            'LDAP User Editor loaded successfully!',
+            'success'
+          );
 
           // Enable/disable buttons based on selection
           setInterval(() => {

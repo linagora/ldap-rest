@@ -9,6 +9,7 @@
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
+import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
 
 interface CachedGroups {
@@ -37,14 +38,14 @@ export default class AuthzPerBranch extends AuthzBase {
   /**
    * Resolve user - for authzPerBranch, we use uid directly
    */
-  async resolveUser(uid: string): Promise<string | null> {
-    return uid;
+  resolveUser(uid: string): Promise<string | null> {
+    return Promise.resolve(uid);
   }
 
   /**
    * Override to add authConfig check
    */
-  protected shouldSkipAuthorization(req?: any): boolean {
+  protected shouldSkipAuthorization(req?: DmRequest): boolean {
     return !req?.user || !this.authConfig;
   }
 
