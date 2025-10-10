@@ -87,9 +87,7 @@ describe('Browser Resource API Client', () => {
         ...data,
       };
 
-      nock(baseUrl)
-        .post('/api/v1/ldap/users', data)
-        .reply(200, mockResponse);
+      nock(baseUrl).post('/api/v1/ldap/users', data).reply(200, mockResponse);
 
       const result = await client.createResource(data);
       expect(result).to.deep.equal(mockResponse);
@@ -150,9 +148,7 @@ describe('Browser Resource API Client', () => {
         { dn: 'ou=org1,ou=organization,o=gov,c=mu', ou: 'org1' },
       ];
 
-      nock(baseUrl)
-        .get('/api/v1/ldap/organizations')
-        .reply(200, mockResponse);
+      nock(baseUrl).get('/api/v1/ldap/organizations').reply(200, mockResponse);
 
       const result = await client.getResources();
       expect(result).to.deep.equal(mockResponse);
@@ -262,9 +258,7 @@ describe('Browser Resource API Client', () => {
       ];
 
       nock(baseUrl).get('/api/v1/config').reply(200, mockConfig);
-      nock(baseUrl)
-        .get('/static/schemas/users.json')
-        .reply(200, mockSchema);
+      nock(baseUrl).get('/static/schemas/users.json').reply(200, mockSchema);
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockUsers);
 
       const result = await client.getPointerOptions(branch);
@@ -393,9 +387,7 @@ describe('Browser Resource API Client', () => {
     it('should handle create errors', async () => {
       const data = { uid: 'newuser' };
 
-      nock(baseUrl)
-        .post('/api/v1/ldap/users')
-        .reply(400, 'Invalid data');
+      nock(baseUrl).post('/api/v1/ldap/users').reply(400, 'Invalid data');
 
       try {
         await client.createResource(data);

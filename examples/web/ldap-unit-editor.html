@@ -342,7 +342,9 @@
     <div class="demo-container">
       <div class="demo-header">
         <h1>🏢 LDAP Organization Unit Editor</h1>
-        <p>Manage organizational units and departments in your LDAP directory</p>
+        <p>
+          Manage organizational units and departments in your LDAP directory
+        </p>
         <div class="action-buttons">
           <button class="action-button" id="create-unit-btn" disabled>
             <span class="material-icons">add_business</span>
@@ -424,7 +426,7 @@
           facsimileTelephoneNumber: 'Fax Number',
           postalAddress: 'Postal Address',
           twakeDepartmentPath: 'Department Path',
-          twakeLocalAdminLink: 'Local Administrators'
+          twakeLocalAdminLink: 'Local Administrators',
         };
 
         if (labelMap[fieldName]) return labelMap[fieldName];
@@ -440,10 +442,7 @@
 
         let fieldHtml = '';
 
-        if (
-          attribute.type === 'array' &&
-          attribute.items?.type === 'string'
-        ) {
+        if (attribute.type === 'array' && attribute.items?.type === 'string') {
           fieldHtml = `
             <div class="form-group">
               <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
@@ -462,10 +461,9 @@
             </div>
           `;
         } else if (attribute.type === 'string') {
-          const type =
-            fieldName.toLowerCase().includes('mail')
-              ? 'email'
-              : fieldName.toLowerCase().includes('phone') ||
+          const type = fieldName.toLowerCase().includes('mail')
+            ? 'email'
+            : fieldName.toLowerCase().includes('phone') ||
                 fieldName.toLowerCase().includes('telephone')
               ? 'tel'
               : 'text';
@@ -573,8 +571,12 @@
             continue;
           }
 
-          if (fieldName === 'telephoneNumber' || fieldName === 'facsimileTelephoneNumber' ||
-              fieldName === 'l' || fieldName === 'postalAddress') {
+          if (
+            fieldName === 'telephoneNumber' ||
+            fieldName === 'facsimileTelephoneNumber' ||
+            fieldName === 'l' ||
+            fieldName === 'postalAddress'
+          ) {
             contactFields.push([fieldName, attribute]);
           } else if (fieldName === 'twakeLocalAdminLink') {
             adminFields.push([fieldName, attribute]);
@@ -585,7 +587,8 @@
 
         // Basic fields
         if (basicFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Basic Information</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Basic Information</div>';
           for (const [fieldName, attribute] of basicFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -594,7 +597,8 @@
 
         // Contact fields
         if (contactFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Contact Information</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Contact Information</div>';
           for (const [fieldName, attribute] of contactFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -603,7 +607,8 @@
 
         // Admin fields
         if (adminFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Administration</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Administration</div>';
           for (const [fieldName, attribute] of adminFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -719,7 +724,9 @@
         }
 
         if (
-          !confirm(`Are you sure you want to delete this organization unit?\n\n${currentOrgDn}\n\nWarning: All sub-units and resources will be deleted!`)
+          !confirm(
+            `Are you sure you want to delete this organization unit?\n\n${currentOrgDn}\n\nWarning: All sub-units and resources will be deleted!`
+          )
         ) {
           return;
         }
@@ -755,7 +762,10 @@
           });
 
           await editor.init();
-          showStatus('LDAP Organization Unit Editor loaded successfully!', 'success');
+          showStatus(
+            'LDAP Organization Unit Editor loaded successfully!',
+            'success'
+          );
 
           setInterval(() => {
             const createBtn = document.getElementById('create-unit-btn');

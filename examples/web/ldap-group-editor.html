@@ -342,7 +342,10 @@
     <div class="demo-container">
       <div class="demo-header">
         <h1>👥 LDAP Group Editor</h1>
-        <p>Browse and manage LDAP groups with support for mailing lists and team mailboxes</p>
+        <p>
+          Browse and manage LDAP groups with support for mailing lists and team
+          mailboxes
+        </p>
         <div class="action-buttons">
           <button class="action-button" id="create-group-btn" disabled>
             <span class="material-icons">group_add</span>
@@ -492,10 +495,9 @@
             </div>
           `;
         } else if (attribute.type === 'string') {
-          const type =
-            fieldName.toLowerCase().includes('mail')
-              ? 'email'
-              : 'text';
+          const type = fieldName.toLowerCase().includes('mail')
+            ? 'email'
+            : 'text';
           fieldHtml = `
             <div class="form-group">
               <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
@@ -612,7 +614,11 @@
             continue;
           }
 
-          if (attribute.group === 'Mailbox Settings' || fieldName === 'mail' || fieldName === 'twakeMailboxType') {
+          if (
+            attribute.group === 'Mailbox Settings' ||
+            fieldName === 'mail' ||
+            fieldName === 'twakeMailboxType'
+          ) {
             mailboxFields.push([fieldName, attribute]);
           } else if (fieldName === 'member' || fieldName === 'owner') {
             memberFields.push([fieldName, attribute]);
@@ -623,7 +629,8 @@
 
         // Basic fields
         if (basicFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Basic Information</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Basic Information</div>';
           for (const [fieldName, attribute] of basicFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -632,8 +639,10 @@
 
         // Mailbox fields
         if (mailboxFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Mailbox Configuration</div>';
-          fieldsHtml += '<div class="help-text" style="margin-bottom: 12px;">Configure mailing list or team mailbox settings</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Mailbox Configuration</div>';
+          fieldsHtml +=
+            '<div class="help-text" style="margin-bottom: 12px;">Configure mailing list or team mailbox settings</div>';
           for (const [fieldName, attribute] of mailboxFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -642,7 +651,8 @@
 
         // Member fields
         if (memberFields.length > 0) {
-          fieldsHtml += '<div class="field-group"><div class="field-group-title">Members & Owners</div>';
+          fieldsHtml +=
+            '<div class="field-group"><div class="field-group-title">Members & Owners</div>';
           for (const [fieldName, attribute] of memberFields) {
             fieldsHtml += await generateFormField(fieldName, attribute);
           }
@@ -728,7 +738,10 @@
 
         try {
           const api = editor.getApi();
-          const groupsBase = groupSchema.entity.base.replace(/__ldap_base__/g, editor.getConfig().ldapBase);
+          const groupsBase = groupSchema.entity.base.replace(
+            /__ldap_base__/g,
+            editor.getConfig().ldapBase
+          );
           const dn = `cn=${cleanedData.cn},${groupsBase}`;
 
           await api.createEntry(dn, cleanedData);
@@ -752,7 +765,9 @@
         }
 
         if (
-          !confirm(`Are you sure you want to delete this group?\n\n${currentUserDn}`)
+          !confirm(
+            `Are you sure you want to delete this group?\n\n${currentUserDn}`
+          )
         ) {
           return;
         }

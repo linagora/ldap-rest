@@ -23,8 +23,7 @@ export class ResourceApiClient {
   ) {
     this.resourceType = resourceType;
     this.baseUrl =
-      baseUrl ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
+      baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
     this.cache = new CacheManager(cacheOptions);
 
     // Clean expired entries every 5 minutes (only in browser context)
@@ -82,7 +81,9 @@ export class ResourceApiClient {
 
   async getSchema(schemaUrl: string): Promise<Schema> {
     // Handle relative URLs by prepending baseUrl
-    const url = schemaUrl.startsWith('http') ? schemaUrl : `${this.baseUrl}${schemaUrl}`;
+    const url = schemaUrl.startsWith('http')
+      ? schemaUrl
+      : `${this.baseUrl}${schemaUrl}`;
     return this.cachedFetch<Schema>(url);
   }
 
@@ -116,7 +117,9 @@ export class ResourceApiClient {
     );
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(`Failed to update ${this.resourceType}: ${error || 'Unknown error'}`);
+      throw new Error(
+        `Failed to update ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
     const result = await res.json();
 
@@ -137,7 +140,9 @@ export class ResourceApiClient {
     });
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(`Failed to create ${this.resourceType}: ${error || 'Unknown error'}`);
+      throw new Error(
+        `Failed to create ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
     const result = await res.json();
 
@@ -156,7 +161,9 @@ export class ResourceApiClient {
     );
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(`Failed to delete ${this.resourceType}: ${error || 'Unknown error'}`);
+      throw new Error(
+        `Failed to delete ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
 
     // Invalidate cache
@@ -169,7 +176,10 @@ export class ResourceApiClient {
   /**
    * Create a generic entry (for organizations tree navigation)
    */
-  async createEntry(dn: string, data: Partial<LdapResource>): Promise<LdapResource> {
+  async createEntry(
+    dn: string,
+    data: Partial<LdapResource>
+  ): Promise<LdapResource> {
     const res = await fetch(
       `${this.getApiBase()}/ldap/entry/${encodeURIComponent(dn)}`,
       {

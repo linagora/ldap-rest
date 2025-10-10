@@ -14,8 +14,7 @@ export class UserApiClient {
     cacheOptions?: { ttl?: number; maxEntries?: number }
   ) {
     this.baseUrl =
-      baseUrl ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
+      baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
     this.cache = new CacheManager(cacheOptions);
 
     // Clean expired entries every 5 minutes (only in browser context)
@@ -69,7 +68,9 @@ export class UserApiClient {
 
   async getSchema(schemaUrl: string): Promise<Schema> {
     // Handle relative URLs by prepending baseUrl
-    const url = schemaUrl.startsWith('http') ? schemaUrl : `${this.baseUrl}${schemaUrl}`;
+    const url = schemaUrl.startsWith('http')
+      ? schemaUrl
+      : `${this.baseUrl}${schemaUrl}`;
     return this.cachedFetch<Schema>(url);
   }
 
