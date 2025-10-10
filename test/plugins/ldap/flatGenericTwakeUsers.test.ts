@@ -277,6 +277,283 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     });
   });
 
+  describe('Move user between departments', () => {
+    const testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
+    const testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
+
+    beforeEach(async () => {
+      // Create test organizations
+      try {
+        await server.ldap.add(testOrgDn, {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        });
+      } catch (err) {
+        // Ignore if already exists
+      }
+
+      try {
+        await server.ldap.add(testOrg2Dn, {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        });
+      } catch (err) {
+        // Ignore if already exists
+      }
+    });
+
+    afterEach(async () => {
+      // Clean up test organizations
+      try {
+        await server.ldap.delete(testOrgDn);
+      } catch (err) {
+        // Ignore if doesn't exist
+      }
+      try {
+        await server.ldap.delete(testOrg2Dn);
+      } catch (err) {
+        // Ignore if doesn't exist
+      }
+    });
+
+    it('should move user to different organization', async () => {
+      // Create user in first organization
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+
+      // Move user to second organization
+      const result = await plugin.moveEntry('testuser', testOrg2Dn);
+
+      // Verify result
+      expect(result).to.have.property('departmentPath', 'Test / Org2');
+      expect(result).to.have.property('departmentLink', testOrg2Dn);
+
+      // Verify user was updated in LDAP
+      const userEntry = await plugin.searchUsersByName('testuser', false, [
+        'uid',
+        'twakeDepartmentPath',
+        'twakeDepartmentLink',
+      ]);
+
+      expect(userEntry.testuser).to.have.property(
+        'twakeDepartmentPath',
+        'Test / Org2'
+      );
+      expect(userEntry.testuser).to.have.property(
+        'twakeDepartmentLink',
+        testOrg2Dn
+      );
+    });
+
+    it('should move user using DN as identifier', async () => {
+      // Create user in first organization
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-dn@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+
+      const userDn = `uid=testuser,${USER_BRANCH}`;
+
+      // Move user using full DN
+      const result = await plugin.moveEntry(userDn, testOrg2Dn);
+
+      // Verify result
+      expect(result).to.have.property('departmentPath', 'Test / Org2');
+      expect(result).to.have.property('departmentLink', testOrg2Dn);
+    });
+
+    it('should fail when moving to non-existent organization', async () => {
+      // Create user
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-fail@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+
+      // Try to move to non-existent org
+      try {
+        await plugin.moveEntry('testuser', `ou=NonExistent,${DM_LDAP_BASE}`);
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.match(
+          /Organization.*not found|Failed to fetch organization/
+        );
+      }
+    });
+
+    it('should fail when moving non-existent user', async () => {
+      try {
+        await plugin.moveEntry('nonexistent', testOrg2Dn);
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.match(/Entry.*not found|Code: 0x20/);
+      }
+    });
+
+    it.skip('should call move hook before moving', async () => {
+      let moveHookCalled = false;
+      let capturedTargetOrg = '';
+
+      // Create test plugin to register hooks
+      const hookPlugin = {
+        name: 'test-move-hooks',
+        hooks: {
+          ldapusermove: async ([dn, targetOrgDn]: [string, string]) => {
+            moveHookCalled = true;
+            capturedTargetOrg = targetOrgDn;
+            return [dn, targetOrgDn];
+          },
+        },
+      };
+
+      // Register hooks via plugin
+      await server.registerPlugin('test-move-hooks', hookPlugin as any);
+
+      // Create user
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-hooks@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+
+      // Move user
+      await plugin.moveEntry('testuser', testOrg2Dn);
+
+      // Verify hook was called
+      expect(moveHookCalled).to.be.true;
+      expect(capturedTargetOrg).to.equal(testOrg2Dn);
+    });
+  });
+
+  describe('Move API endpoint', () => {
+    let request: any;
+    const testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
+    const testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
+
+    before(async () => {
+      plugin.api(server.app);
+      request = supertest(server.app);
+
+      // Create test organizations
+      try {
+        await server.ldap.add(testOrgDn, {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        });
+      } catch (err) {
+        // Ignore if already exists
+      }
+
+      try {
+        await server.ldap.add(testOrg2Dn, {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        });
+      } catch (err) {
+        // Ignore if already exists
+      }
+    });
+
+    after(async () => {
+      // Clean up test organizations
+      try {
+        await server.ldap.delete(testOrgDn);
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await server.ldap.delete(testOrg2Dn);
+      } catch (err) {
+        // Ignore
+      }
+    });
+
+    it('should move user via API', async () => {
+      // Create user
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-api@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      });
+
+      // Move user via API
+      const res = await request
+        .post('/api/v1/ldap/users/testuser/move')
+        .type('json')
+        .send({ targetOrgDn: testOrg2Dn });
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('success', true);
+      expect(res.body).to.have.property('departmentPath', 'Test / Org2');
+      expect(res.body).to.have.property('departmentLink', testOrg2Dn);
+
+      // Verify user was updated
+      const userEntry = await plugin.searchUsersByName('testuser', false, [
+        'uid',
+        'twakeDepartmentPath',
+        'twakeDepartmentLink',
+      ]);
+
+      expect(userEntry.testuser).to.have.property(
+        'twakeDepartmentPath',
+        'Test / Org2'
+      );
+      expect(userEntry.testuser).to.have.property(
+        'twakeDepartmentLink',
+        testOrg2Dn
+      );
+    });
+
+    it('should return 400 when targetOrgDn is missing', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users/testuser/move')
+        .type('json')
+        .send({});
+
+      expect(res.status).to.equal(400);
+      expect(res.body).to.have.property('error');
+      expect(res.body.error).to.match(/targetOrgDn|Bad content/);
+    });
+
+    it('should return 500 when user does not exist', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users/nonexistent/move')
+        .type('json')
+        .send({ targetOrgDn: testOrg2Dn });
+
+      expect(res.status).to.equal(500);
+      expect(res.body).to.have.property('error');
+    });
+  });
+
   describe('Pointer type validation', () => {
     it('should reject user with non-existent pointer DN', async () => {
       try {

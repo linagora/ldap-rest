@@ -9,7 +9,11 @@
 import type { SearchOptions } from 'ldapts';
 
 import type { DM } from '../../bin';
-import type { SearchResult, AttributesList } from '../../lib/ldapActions';
+import type {
+  SearchResult,
+  AttributesList,
+  ModifyRequest,
+} from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
@@ -37,6 +41,48 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   hooks = {
+    ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
+      string,
+      ModifyRequest,
+      number,
+      DmRequest?,
+    ]): Promise<[string, ModifyRequest, number, DmRequest?]> => {
+      if (!req?.user) {
+        return [dn, changes, opNumber, req];
+      }
+
+      const userDn = await this.getUserDn(req.user);
+      if (!userDn) {
+        this.logger.warn(`User ${req.user} not found in LDAP`);
+        return [dn, changes, opNumber, req];
+      }
+
+      // Determine which branch to check permissions for
+      let branchToCheck: string;
+
+      // If modifying twakeDepartmentLink, check write permission for the new organization
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      if (linkAttr && changes.replace?.[linkAttr]) {
+        const newLink = changes.replace[linkAttr];
+        branchToCheck = Array.isArray(newLink)
+          ? String(newLink[0])
+          : String(newLink);
+      } else {
+        // For other modifications, check the entry's current branch
+        branchToCheck = this.extractBranchDn(dn);
+      }
+
+      const permissions = await this.getUserPermissions(userDn, branchToCheck);
+
+      // Check write permission
+      if (!permissions.write) {
+        throw new Error(
+          `User ${req.user} does not have write permission for branch ${branchToCheck}`
+        );
+      }
+
+      return [dn, changes, opNumber, req];
+    },
     ldapaddrequest: async ([dn, entry, req]: [
       string,
       AttributesList,
