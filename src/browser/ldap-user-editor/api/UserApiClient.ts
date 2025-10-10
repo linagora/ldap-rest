@@ -151,6 +151,33 @@ export class UserApiClient {
     this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
   }
 
+  async moveUser(
+    dn: string,
+    targetOrgDn: string
+  ): Promise<{ success: boolean; newDn?: string }> {
+    const res = await fetch(
+      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}/move`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetOrgDn }),
+      }
+    );
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(error || 'Failed to move user');
+    }
+    const result = await res.json();
+
+    // Invalidate cache for this user and user lists
+    this.cache.invalidate(
+      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
+    );
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+
+    return result;
+  }
+
   async getPointerOptions(branch: string): Promise<PointerOption[]> {
     try {
       // Load config to find the right endpoint by matching base

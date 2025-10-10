@@ -50,7 +50,7 @@ class OnLdapChange extends DmPlugin {
       return [dn, attributes, op];
     },
 
-    ldapmodifydone: ([dn, changes, op]) => {
+    ldapmodifydone: async ([dn, changes, op]) => {
       const prev = this.stack[op];
       if (!prev) {
         delete this.stack[op];

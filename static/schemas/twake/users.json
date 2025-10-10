@@ -77,12 +77,14 @@
     "twakeDepartmentLink": {
       "type": "string",
       "test": "^.*,__LDAP_BASE__",
-      "required": true
+      "required": true,
+      "role": "organizationLink"
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[\\w\\s/,]+$",
-      "required": true
+      "required": true,
+      "role": "organizationPath"
     },
     "twakeAccountStatus": {
       "type": "pointer",

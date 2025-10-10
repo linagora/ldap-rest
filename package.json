@@ -216,6 +216,10 @@
       "import": "./static/browser/ldap-user-editor/cache/CacheManager.js",
       "types": "./dist/src/browser/ldap-user-editor/cache/CacheManager.d.ts"
     },
+    "browser-ldap-user-editor-components-moveusermodal": {
+      "import": "./static/browser/ldap-user-editor/components/MoveUserModal.js",
+      "types": "./dist/src/browser/ldap-user-editor/components/MoveUserModal.d.ts"
+    },
     "browser-ldap-user-editor-components-pointerfield": {
       "import": "./static/browser/ldap-user-editor/components/PointerField.js",
       "types": "./dist/src/browser/ldap-user-editor/components/PointerField.d.ts"
