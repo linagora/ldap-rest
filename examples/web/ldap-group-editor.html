@@ -56,42 +56,11 @@
           Browse and manage LDAP groups with support for mailing lists and team
           mailboxes
         </p>
-        <div class="action-buttons">
-          <button class="action-button" id="create-group-btn" disabled>
-            <span class="material-icons">group_add</span>
-            Create Group
-          </button>
-          <button class="action-button danger" id="delete-group-btn" disabled>
-            <span class="material-icons">group_remove</span>
-            Delete Group
-          </button>
-        </div>
       </div>
 
       <div id="status-container"></div>
 
-      <div id="ldap-group-editor"></div>
-    </div>
-
-    <!-- Create Group Modal -->
-    <div class="modal-overlay" id="create-group-modal">
-      <div class="modal">
-        <div class="modal-header">
-          <h2>Create New Group</h2>
-          <button class="close-button" id="close-modal-btn">
-            <span class="material-icons">close</span>
-          </button>
-        </div>
-        <form id="create-group-form">
-          <div id="form-fields"></div>
-          <div class="modal-footer">
-            <button type="button" class="secondary" id="cancel-btn">
-              Cancel
-            </button>
-            <button type="submit" class="primary">Create Group</button>
-          </div>
-        </form>
-      </div>
+      <div id="ldap-group-editor" style="min-height: 600px;"></div>
     </div>
 
     <!-- Shared utilities -->
@@ -101,198 +70,11 @@
 
     <script>
       const { LdapGroupEditor } = window.LdapGroupEditor;
-      const {
-        escapeHtml,
-        showStatus,
-        generateFormField,
-        processFormData,
-        loadPointerOptions,
-        replaceSchemaPlaceholders,
-        getOrganizationPath,
-        groupSchemaFields,
-      } = window.MiniDmShared;
-
-      let editor;
-      let groupSchema;
-
-      // Custom field categorizer for groups
-      function categorizeGroupField(fieldName, attribute) {
-        if (['cn', 'description', 'twakeMailboxType'].includes(fieldName)) {
-          return 'Basic Information';
-        }
-        if (['member', 'owner'].includes(fieldName)) {
-          return 'Members & Owners';
-        }
-        if (fieldName.startsWith('twake')) {
-          return 'Twake/Email Settings';
-        }
-        return null;
-      }
-
-      async function generateCreateGroupForm() {
-        const config = editor.getConfig();
-        if (!config || !config.features?.flatResources) {
-          throw new Error('Configuration not loaded');
-        }
-
-        const currentOrgDn = editor.getCurrentOrgDn();
-        if (!currentOrgDn) {
-          throw new Error('No organization selected');
-        }
-
-        const groupsResource = config.features.flatResources.find(
-          r => r.pluralName === 'groups' || r.name === 'groups'
-        );
-
-        if (!groupsResource) {
-          throw new Error('Groups resource not found in configuration');
-        }
-
-        if (groupsResource.schemaUrl) {
-          const response = await fetch(groupsResource.schemaUrl);
-          if (!response.ok) throw new Error('Failed to load schema');
-          groupSchema = await response.json();
-        } else if (groupsResource.schema) {
-          groupSchema = groupsResource.schema;
-        } else {
-          throw new Error('No schema available for groups');
-        }
-
-        const orgPath = await getOrganizationPath(currentOrgDn, window.location.origin);
-
-        const ldapBase = editor.getConfig().ldapBase;
-        groupSchema = replaceSchemaPlaceholders(groupSchema, {
-          __LDAP_BASE__: ldapBase,
-          __ldap_base__: ldapBase,
-        });
-
-        const formFields = document.getElementById('form-fields');
-        let fieldsHtml = '';
-
-        const objectClasses = groupSchema.entity.objectClass || [];
-        fieldsHtml += objectClasses
-          .map(oc => `<input type="hidden" name="objectClass" value="${oc}" />`)
-          .join('');
-
-        const pointerLoader = async (branch) => {
-          const api = editor.getApi();
-          return await api.getPointerOptions(branch);
-        };
-
-        // Group fields by category using shared utility
-        const groupedFields = groupSchemaFields(groupSchema.attributes, categorizeGroupField);
-
-        // Hidden auto-filled fields
-        if (groupSchema.attributes.twakeDepartmentLink) {
-          fieldsHtml += `<input type="hidden" name="twakeDepartmentLink" value="${escapeHtml(currentOrgDn)}" />`;
-        }
-        if (groupSchema.attributes.twakeDepartmentPath) {
-          fieldsHtml += `<input type="hidden" name="twakeDepartmentPath" value="${escapeHtml(orgPath)}" />`;
-        }
-
-        // Generate fields for each category
-        for (const [category, fields] of groupedFields) {
-          fieldsHtml += `<div class="field-group"><div class="field-group-title">${escapeHtml(category)}</div>`;
-          for (const [fieldName, attribute] of fields) {
-            if (attribute.fixed) continue;
-            if (fieldName === 'objectClass') continue;
-            if (fieldName === 'twakeDepartmentLink' || fieldName === 'twakeDepartmentPath') continue;
-
-            const customLabels = {};
-            if (fieldName === 'twakeMailboxType') {
-              customLabels[fieldName] = 'Mailbox Type';
-            }
-
-            fieldsHtml += await generateFormField(fieldName, attribute, {
-              pointerOptionsLoader: pointerLoader,
-              customLabels,
-            });
-          }
-          fieldsHtml += '</div>';
-        }
-
-        formFields.innerHTML = fieldsHtml;
-      }
-
-      function openCreateGroupModal() {
-        const modal = document.getElementById('create-group-modal');
-        generateCreateGroupForm()
-          .then(() => {
-            modal.classList.add('active');
-          })
-          .catch(error => {
-            console.error('Failed to generate form:', error);
-            showStatus('status-container', `Error: ${error.message}`, 'error');
-          });
-      }
-
-      function closeCreateGroupModal() {
-        const modal = document.getElementById('create-group-modal');
-        modal.classList.remove('active');
-        document.getElementById('create-group-form').reset();
-      }
-
-      async function handleCreateGroup(event) {
-        event.preventDefault();
-
-        const form = event.target;
-        const formData = new FormData(form);
-
-        // Use shared utility to process form data
-        const groupData = processFormData(formData, groupSchema.attributes);
-
-        console.log('Creating group with data:', groupData);
-
-        try {
-          const api = editor.getApi();
-          const groupsBase = groupSchema.entity.base.replace(
-            /__ldap_base__/g,
-            editor.getConfig().ldapBase
-          );
-          const dn = `cn=${groupData.cn},${groupsBase}`;
-
-          await api.createEntry(dn, groupData);
-          showStatus('status-container', 'Group created successfully!', 'success');
-          closeCreateGroupModal();
-
-          // Refresh the editor
-          await editor.init();
-        } catch (error) {
-          console.error('Failed to create group:', error);
-          const errorMessage = error.message || error.toString();
-          showStatus('status-container', `Error: ${errorMessage}`, 'error');
-        }
-      }
-
-      async function handleDeleteGroup() {
-        const currentUserDn = editor.getCurrentUserDn();
-        if (!currentUserDn) {
-          showStatus('status-container', 'No group selected', 'error');
-          return;
-        }
-
-        if (
-          !confirm(
-            `Are you sure you want to delete this group?\n\n${currentUserDn}`
-          )
-        ) {
-          return;
-        }
-
-        try {
-          await editor.deleteUser(currentUserDn);
-          showStatus('status-container', 'Group deleted successfully!', 'success');
-
-          document.getElementById('delete-group-btn').disabled = true;
-        } catch (error) {
-          console.error('Failed to delete group:', error);
-          showStatus('status-container', `Error: ${error.message}`, 'error');
-        }
-      }
+      const { showStatus } = window.MiniDmShared;
 
       async function initEditor() {
         try {
-          editor = new LdapGroupEditor({
+          const editor = new LdapGroupEditor({
             containerId: 'ldap-group-editor',
             apiBaseUrl: window.location.origin,
             onGroupSaved: groupDn => {
@@ -307,45 +89,11 @@
 
           await editor.init();
           showStatus('status-container', 'LDAP Group Editor loaded successfully!', 'success');
-
-          setInterval(() => {
-            const createBtn = document.getElementById('create-group-btn');
-            const deleteBtn = document.getElementById('delete-group-btn');
-            const currentOrgDn = editor.getCurrentOrgDn();
-            const currentGroupDn = editor.getCurrentUserDn();
-
-            createBtn.disabled = !currentOrgDn;
-            deleteBtn.disabled = !currentGroupDn;
-          }, 500);
         } catch (error) {
           console.error('Failed to initialize editor:', error);
           showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
-
-      document
-        .getElementById('create-group-btn')
-        .addEventListener('click', openCreateGroupModal);
-      document
-        .getElementById('delete-group-btn')
-        .addEventListener('click', handleDeleteGroup);
-      document
-        .getElementById('close-modal-btn')
-        .addEventListener('click', closeCreateGroupModal);
-      document
-        .getElementById('cancel-btn')
-        .addEventListener('click', closeCreateGroupModal);
-      document
-        .getElementById('create-group-form')
-        .addEventListener('submit', handleCreateGroup);
-
-      document
-        .getElementById('create-group-modal')
-        .addEventListener('click', e => {
-          if (e.target.id === 'create-group-modal') {
-            closeCreateGroupModal();
-          }
-        });
 
       initEditor();
     </script>

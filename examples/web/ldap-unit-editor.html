@@ -51,42 +51,11 @@
         <p>
           Manage organizational units and departments in your LDAP directory
         </p>
-        <div class="action-buttons">
-          <button class="action-button" id="create-unit-btn" disabled>
-            <span class="material-icons">add_business</span>
-            Create Unit
-          </button>
-          <button class="action-button danger" id="delete-unit-btn" disabled>
-            <span class="material-icons">domain_disabled</span>
-            Delete Unit
-          </button>
-        </div>
       </div>
 
       <div id="status-container"></div>
 
-      <div id="ldap-unit-editor"></div>
-    </div>
-
-    <!-- Create Unit Modal -->
-    <div class="modal-overlay" id="create-unit-modal">
-      <div class="modal">
-        <div class="modal-header">
-          <h2>Create New Organization Unit</h2>
-          <button class="close-button" id="close-modal-btn">
-            <span class="material-icons">close</span>
-          </button>
-        </div>
-        <form id="create-unit-form">
-          <div id="form-fields"></div>
-          <div class="modal-footer">
-            <button type="button" class="secondary" id="cancel-btn">
-              Cancel
-            </button>
-            <button type="submit" class="primary">Create Unit</button>
-          </div>
-        </form>
-      </div>
+      <div id="ldap-unit-editor" style="min-height: 600px;"></div>
     </div>
 
     <!-- Shared utilities -->
@@ -96,225 +65,11 @@
 
     <script>
       const { LdapUnitEditor } = window.LdapUnitEditor;
-      const {
-        escapeHtml,
-        showStatus,
-        generateFormField,
-        processFormData,
-        getOrganizationPath,
-      } = window.MiniDmShared;
-
-      let editor;
-      let unitSchema;
-
-      // Custom labels for unit editor
-      const customLabels = {
-        ou: 'Unit Name',
-        l: 'Location',
-        telephoneNumber: 'Phone Number',
-        facsimileTelephoneNumber: 'Fax Number',
-        postalAddress: 'Postal Address',
-        twakeDepartmentPath: 'Department Path',
-        twakeLocalAdminLink: 'Local Administrators',
-      };
-
-      async function generateCreateUnitForm() {
-        const config = editor.getConfig();
-        if (!config || !config.features?.flatResources) {
-          throw new Error('Configuration not loaded');
-        }
-
-        const currentOrgDn = editor.getCurrentOrgDn();
-        if (!currentOrgDn) {
-          throw new Error('No parent organization selected');
-        }
-
-        const orgsResource = config.features.flatResources.find(
-          r => r.pluralName === 'organizations' || r.name === 'organizations'
-        );
-
-        if (!orgsResource) {
-          throw new Error('Organizations resource not found in configuration');
-        }
-
-        if (orgsResource.schemaUrl) {
-          const response = await fetch(orgsResource.schemaUrl);
-          if (!response.ok) throw new Error('Failed to load schema');
-          unitSchema = await response.json();
-        } else if (orgsResource.schema) {
-          unitSchema = orgsResource.schema;
-        } else {
-          throw new Error('No schema available for organizations');
-        }
-
-        const parentPath = await getOrganizationPath(currentOrgDn, window.location.origin);
-
-        const formFields = document.getElementById('form-fields');
-        let fieldsHtml = '';
-
-        const objectClasses = unitSchema.attributes.objectClass.default || [];
-        fieldsHtml += objectClasses
-          .map(oc => `<input type="hidden" name="objectClass" value="${oc}" />`)
-          .join('');
-
-        // Group fields by category
-        const basicFields = [];
-        const contactFields = [];
-        const adminFields = [];
-
-        for (const [fieldName, attribute] of Object.entries(
-          unitSchema.attributes
-        )) {
-          if (attribute.fixed) continue;
-          if (fieldName === 'objectClass') continue;
-
-          if (fieldName === 'twakeDepartmentPath') {
-            // Pre-fill with parent path / new ou
-            fieldsHtml += `
-              <div class="form-group">
-                <label for="twakeDepartmentPath" class="required">Department Path</label>
-                <input type="text" id="twakeDepartmentPath" name="twakeDepartmentPath" required
-                       placeholder="${escapeHtml(parentPath)}/" />
-                <div class="help-text">Format: ${escapeHtml(parentPath)}/NewUnitName</div>
-              </div>
-            `;
-            continue;
-          }
-
-          if (
-            fieldName === 'telephoneNumber' ||
-            fieldName === 'facsimileTelephoneNumber' ||
-            fieldName === 'l' ||
-            fieldName === 'postalAddress'
-          ) {
-            contactFields.push([fieldName, attribute]);
-          } else if (fieldName === 'twakeLocalAdminLink') {
-            adminFields.push([fieldName, attribute]);
-          } else {
-            basicFields.push([fieldName, attribute]);
-          }
-        }
-
-        // Basic fields
-        if (basicFields.length > 0) {
-          fieldsHtml +=
-            '<div class="field-group"><div class="field-group-title">Basic Information</div>';
-          for (const [fieldName, attribute] of basicFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
-          }
-          fieldsHtml += '</div>';
-        }
-
-        // Contact fields
-        if (contactFields.length > 0) {
-          fieldsHtml +=
-            '<div class="field-group"><div class="field-group-title">Contact Information</div>';
-          for (const [fieldName, attribute] of contactFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
-          }
-          fieldsHtml += '</div>';
-        }
-
-        // Admin fields
-        if (adminFields.length > 0) {
-          fieldsHtml +=
-            '<div class="field-group"><div class="field-group-title">Administration</div>';
-          for (const [fieldName, attribute] of adminFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
-          }
-          fieldsHtml += '</div>';
-        }
-
-        formFields.innerHTML = fieldsHtml;
-      }
-
-      function openCreateUnitModal() {
-        const modal = document.getElementById('create-unit-modal');
-        generateCreateUnitForm()
-          .then(() => {
-            modal.classList.add('active');
-          })
-          .catch(error => {
-            console.error('Failed to generate form:', error);
-            showStatus('status-container', `Error: ${error.message}`, 'error');
-          });
-      }
-
-      function closeCreateUnitModal() {
-        const modal = document.getElementById('create-unit-modal');
-        modal.classList.remove('active');
-        document.getElementById('create-unit-form').reset();
-      }
-
-      async function handleCreateUnit(event) {
-        event.preventDefault();
-
-        const form = event.target;
-        const formData = new FormData(form);
-
-        // Use shared utility to process form data
-        const unitData = processFormData(formData, unitSchema.attributes);
-
-        console.log('Creating unit with data:', unitData);
-
-        try {
-          const api = editor.getApi();
-          const currentOrgDn = editor.getCurrentOrgDn();
-          const dn = `ou=${unitData.ou},${currentOrgDn}`;
-
-          await api.createEntry(dn, unitData);
-          showStatus('status-container', 'Organization unit created successfully!', 'success');
-          closeCreateUnitModal();
-
-          // Refresh the editor
-          await editor.init();
-        } catch (error) {
-          console.error('Failed to create unit:', error);
-          const errorMessage = error.message || error.toString();
-          showStatus('status-container', `Error: ${errorMessage}`, 'error');
-        }
-      }
-
-      async function handleDeleteUnit() {
-        const currentOrgDn = editor.getCurrentOrgDn();
-        if (!currentOrgDn) {
-          showStatus('status-container', 'No organization unit selected', 'error');
-          return;
-        }
-
-        // Check if it's the root organization
-        const ldapBase = editor.getConfig().ldapBase;
-        if (currentOrgDn === ldapBase) {
-          showStatus('status-container', 'Cannot delete the root organization', 'error');
-          return;
-        }
-
-        if (
-          !confirm(
-            `Are you sure you want to delete this organization unit?\n\n${currentOrgDn}\n\nWarning: All sub-units and resources will be deleted!`
-          )
-        ) {
-          return;
-        }
-
-        try {
-          const api = editor.getApi();
-          await api.deleteEntry(currentOrgDn);
-          showStatus('status-container', 'Organization unit deleted successfully!', 'success');
-
-          document.getElementById('delete-unit-btn').disabled = true;
-
-          // Refresh the editor
-          await editor.init();
-        } catch (error) {
-          console.error('Failed to delete unit:', error);
-          showStatus('status-container', `Error: ${error.message}`, 'error');
-        }
-      }
+      const { showStatus } = window.MiniDmShared;
 
       async function initEditor() {
         try {
-          editor = new LdapUnitEditor({
+          const editor = new LdapUnitEditor({
             containerId: 'ldap-unit-editor',
             apiBaseUrl: window.location.origin,
             onUnitSaved: unitDn => {
@@ -333,46 +88,11 @@
             'LDAP Organization Unit Editor loaded successfully!',
             'success'
           );
-
-          setInterval(() => {
-            const createBtn = document.getElementById('create-unit-btn');
-            const deleteBtn = document.getElementById('delete-unit-btn');
-            const currentOrgDn = editor.getCurrentOrgDn();
-            const ldapBase = editor.getConfig().ldapBase;
-
-            createBtn.disabled = !currentOrgDn;
-            // Don't allow deleting the root organization
-            deleteBtn.disabled = !currentOrgDn || currentOrgDn === ldapBase;
-          }, 500);
         } catch (error) {
           console.error('Failed to initialize editor:', error);
           showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
-
-      document
-        .getElementById('create-unit-btn')
-        .addEventListener('click', openCreateUnitModal);
-      document
-        .getElementById('delete-unit-btn')
-        .addEventListener('click', handleDeleteUnit);
-      document
-        .getElementById('close-modal-btn')
-        .addEventListener('click', closeCreateUnitModal);
-      document
-        .getElementById('cancel-btn')
-        .addEventListener('click', closeCreateUnitModal);
-      document
-        .getElementById('create-unit-form')
-        .addEventListener('submit', handleCreateUnit);
-
-      document
-        .getElementById('create-unit-modal')
-        .addEventListener('click', e => {
-          if (e.target.id === 'create-unit-modal') {
-            closeCreateUnitModal();
-          }
-        });
 
       initEditor();
     </script>
