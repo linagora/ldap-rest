@@ -301,6 +301,7 @@ export default class LdapOrganizations extends DmPlugin {
       const orgDn = (
         Array.isArray(linkValue) ? linkValue[0] : linkValue
       ) as string;
+      // Use scope: 'base' to benefit from LDAP cache
       const res = await this.server.ldap.search(
         { paged: false, scope: 'base' },
         orgDn
@@ -335,8 +336,9 @@ export default class LdapOrganizations extends DmPlugin {
       }
       const [ou, ouPath] = matchingPath.split(sep, 2);
       if (!ouPath) throw new Error(`Invalid organization path ${path}`);
+      // Search will benefit from cache for repeated validations
       const entries = await this.server.ldap.search(
-        { paged: false, filter: `(ou=${ou})` },
+        { paged: false, filter: `(ou=${ou})`, scope: 'sub' },
         this.config.ldap_top_organization
       );
       if ((entries as SearchResult).searchEntries.length === 0)

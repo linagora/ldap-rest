@@ -5,6 +5,8 @@
  * Creates on-the-fly missing group users into a branch
  * This permits to add external users into mailing lists
  */
+import pLimit from 'p-limit';
+
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
@@ -18,74 +20,83 @@ export default class ExternalUsersInGroups extends DmPlugin {
   dependencies = { ldapGroups: 'core/ldap/ldapGroups' };
 
   ldap: ldapActions;
+  private ldapQueryLimit!: ReturnType<typeof pLimit>;
 
   constructor(server: DM) {
     super(server);
     this.ldap = server.ldap;
+
+    // Initialize concurrency limiter with config value
+    const concurrency = this.config.ldap_concurrency || 10;
+    this.ldapQueryLimit = pLimit(concurrency);
+    this.logger.debug(
+      `ExternalUsersInGroups: LDAP query concurrency limit set to ${concurrency}`
+    );
   }
 
   hooks: Hooks = {
     ldapgroupvalidatemembers: async ([dn, members]) => {
+      // Parallelize member validation/creation with concurrency limit
       await Promise.all(
         members
           .map(m => m.replace(/\s/g, ''))
-          .map(m => {
-            return new Promise((resolve, reject) => {
+          .map(m =>
+            this.ldapQueryLimit(async () => {
               if (
                 !new RegExp(
                   `mail=([^,]+),${this.config.external_members_branch}$`
                 ).test(m)
               )
-                return resolve(false);
-              this.ldap
-                .search({ paged: false }, m)
-                .then(resolve)
-                .catch(async () => {
-                  const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
-                  if (!mail) return reject(new Error(`Malformed member ${m}`));
+                return false;
 
-                  // Check if mail domain is in managed domains
-                  if (
-                    this.config.mail_domain &&
-                    Array.isArray(this.config.mail_domain)
-                  ) {
-                    const domain = mail.split('@')[1];
-                    if (domain && this.config.mail_domain.includes(domain)) {
-                      return reject(
-                        new Error(
-                          `Cannot create external user with managed domain: ${mail}`
-                        )
-                      );
-                    }
-                  }
+              try {
+                // Check if member exists (will use cache with scope: 'base')
+                await this.ldap.search({ paged: false, scope: 'base' }, m);
+                return true;
+              } catch {
+                // Member doesn't exist, create it
+                const mail = m.replace(/^mail=([^,]+),.*$/, '$1');
+                if (!mail) throw new Error(`Malformed member ${m}`);
 
-                  let entry: AttributesList = {
-                    objectClass: (this.config.external_branch_class ||
-                      this.config.user_class) as string[],
-                    mail,
-                    [this.config.ldap_groups_main_attribute as string]: mail,
-                    sn: mail,
-                  };
-                  [m, entry] = await launchHooksChained(
-                    this.registeredHooks.externaluserentry,
-                    [m, entry]
-                  );
-                  this.ldap
-                    .add(m, entry)
-                    .then(() => {
-                      void launchHooks(
-                        this.registeredHooks.externaluseradded,
-                        m,
-                        entry
-                      );
-                      resolve(true);
-                    })
-                    .catch(e =>
-                      reject(new Error(`Unable to insert ${m}: ${e}`))
+                // Check if mail domain is in managed domains
+                if (
+                  this.config.mail_domain &&
+                  Array.isArray(this.config.mail_domain)
+                ) {
+                  const domain = mail.split('@')[1];
+                  if (domain && this.config.mail_domain.includes(domain)) {
+                    throw new Error(
+                      `Cannot create external user with managed domain: ${mail}`
                     );
-                });
-            });
-          })
+                  }
+                }
+
+                let entry: AttributesList = {
+                  objectClass: (this.config.external_branch_class ||
+                    this.config.user_class) as string[],
+                  mail,
+                  [this.config.ldap_groups_main_attribute as string]: mail,
+                  sn: mail,
+                };
+                [m, entry] = await launchHooksChained(
+                  this.registeredHooks.externaluserentry,
+                  [m, entry]
+                );
+
+                try {
+                  await this.ldap.add(m, entry);
+                  void launchHooks(
+                    this.registeredHooks.externaluseradded,
+                    m,
+                    entry
+                  );
+                  return true;
+                } catch (e) {
+                  throw new Error(`Unable to insert ${m}: ${e}`);
+                }
+              }
+            })
+          )
       );
       return [dn, members];
     },
