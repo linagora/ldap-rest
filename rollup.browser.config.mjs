@@ -49,6 +49,46 @@ export default async () => {
         }),
       ],
     },
+    // UMD/ESM bundles for shared utilities
+    {
+      input: 'src/browser/shared/index.ts',
+      output: [
+        {
+          file: 'static/browser/shared.js',
+          format: 'umd',
+          name: 'MiniDmShared',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/shared.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/shared.min.js',
+          format: 'umd',
+          name: 'MiniDmShared',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false,
+            declarationDir: undefined,
+          },
+          sourceMap: true,
+        }),
+      ],
+    },
     // UMD/ESM bundles for ldap-tree-viewer
     {
       input: 'src/browser/ldap-tree-viewer/index.ts',

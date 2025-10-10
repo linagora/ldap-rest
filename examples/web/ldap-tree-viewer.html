@@ -16,221 +16,23 @@
     />
 
     <!-- Library CSS -->
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
     <link rel="stylesheet" href="/static/browser/ldap-tree-viewer.css" />
 
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      :root {
+        --primary-color: #6200ee;
+        --primary-color-dark: #4a00b8;
       }
 
       body {
-        font-family: 'Roboto', sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        padding: 24px;
-      }
-
-      .demo-container {
-        max-width: 1400px;
-        margin: 0 auto;
-      }
-
-      .demo-header {
-        background: white;
-        color: #333;
-        padding: 32px;
-        margin-bottom: 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
 
       .demo-header h1 {
-        font-size: 32px;
-        font-weight: 500;
-        margin-bottom: 8px;
         color: #6200ee;
-      }
-
-      .demo-header p {
-        font-size: 16px;
-        color: #666;
-        margin-bottom: 16px;
-      }
-
-      .demo-controls {
-        display: flex;
-        gap: 12px;
-        margin-top: 16px;
-      }
-
-      .demo-button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        background: #6200ee;
-        color: white;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: background 0.2s;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .demo-button:hover {
-        background: #3700b3;
-      }
-
-      .demo-button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-
-      .demo-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-      }
-
-      @media (max-width: 900px) {
-        .demo-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .demo-panel {
-        background: white;
-        border-radius: 8px;
-        padding: 24px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-
-      .demo-panel h2 {
-        font-size: 20px;
-        font-weight: 500;
-        margin-bottom: 16px;
-        color: #333;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .demo-panel h2 .material-icons {
-        color: #6200ee;
-      }
-
-      #ldap-tree {
-        max-height: 600px;
-        overflow-y: auto;
-      }
-
-      #node-details {
-        min-height: 200px;
-      }
-
-      .details-empty {
-        color: #999;
-        font-style: italic;
-        padding: 48px 0;
-        text-align: center;
-      }
-
-      .details-content {
-        animation: fadeIn 0.3s;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .details-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid #f0f0f0;
-      }
-
-      .details-header .material-icons {
-        font-size: 32px;
-      }
-
-      .details-header h3 {
-        font-size: 18px;
-        font-weight: 500;
-        color: #333;
-      }
-
-      .details-info {
-        margin-bottom: 16px;
-      }
-
-      .details-row {
-        display: flex;
-        padding: 8px 0;
-        border-bottom: 1px solid #f5f5f5;
-      }
-
-      .details-label {
-        font-weight: 500;
-        color: #666;
-        min-width: 120px;
-      }
-
-      .details-value {
-        color: #333;
-        word-break: break-all;
-      }
-
-      .details-attributes {
-        margin-top: 16px;
-      }
-
-      .details-attributes h4 {
-        font-size: 14px;
-        font-weight: 500;
-        color: #666;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .details-attributes pre {
-        background: #f5f5f5;
-        padding: 12px;
-        border-radius: 4px;
-        font-size: 12px;
-        overflow-x: auto;
-        max-height: 300px;
-      }
-
-      .status-message {
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .status-message.error {
-        background: #ffebee;
-        color: #c62828;
-      }
-
-      .status-message.success {
-        background: #e8f5e9;
-        color: #2e7d32;
       }
     </style>
   </head>
@@ -285,25 +87,15 @@
     </div>
 
     <!-- Library JS -->
+    <!-- Shared utilities -->
+    <script src="/static/browser/shared.js"></script>
     <script src="/static/browser/ldap-tree-viewer.js"></script>
 
     <script>
       const { LdapTreeViewer } = window.LdapTreeViewer;
+      const { showStatus, escapeHtml } = window.MiniDmShared;
 
       let viewer;
-
-      function showStatus(message, type = 'error') {
-        const container = document.getElementById('status-container');
-        container.innerHTML = `
-        <div class="status-message ${type}">
-          <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
-          <span>${message}</span>
-        </div>
-      `;
-        setTimeout(() => {
-          container.innerHTML = '';
-        }, 5000);
-      }
 
       function renderNodeDetails(node) {
         const detailsEl = document.getElementById('node-details');
@@ -514,10 +306,10 @@
           });
 
           await viewer.init();
-          showStatus('LDAP tree loaded successfully!', 'success');
+          showStatus('status-container', 'LDAP tree loaded successfully!', 'success');
         } catch (error) {
           console.error('Failed to initialize viewer:', error);
-          showStatus(`Error: ${error.message}`, 'error');
+          showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
 
@@ -528,9 +320,9 @@
           if (viewer) {
             try {
               await viewer.refresh();
-              showStatus('Tree refreshed!', 'success');
+              showStatus('status-container', 'Tree refreshed!', 'success');
             } catch (error) {
-              showStatus(`Error: ${error.message}`, 'error');
+              showStatus('status-container', `Error: ${error.message}`, 'error');
             }
           }
         });
@@ -547,7 +339,7 @@
               }
             });
             await Promise.all(promises);
-            showStatus('All nodes expanded!', 'success');
+            showStatus('status-container', 'All nodes expanded!', 'success');
           }
         });
 
@@ -557,7 +349,7 @@
           state.expandedNodes.forEach(dn => {
             viewer.collapseNode(dn);
           });
-          showStatus('All nodes collapsed!', 'success');
+          showStatus('status-container', 'All nodes collapsed!', 'success');
         }
       });
 

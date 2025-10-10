@@ -4,7 +4,7 @@
  * while keeping types in dist/
  */
 
-import { mkdirSync, readdirSync, renameSync, statSync } from 'fs';
+import { mkdirSync, readdirSync, renameSync, statSync, copyFileSync } from 'fs';
 import { join } from 'path';
 
 const srcDir = 'dist/browser';
@@ -32,9 +32,24 @@ function moveJsFiles(src, dest) {
   }
 }
 
+function copySharedCss() {
+  const srcCss = 'src/browser/shared/styles/common-demo.css';
+  const destCss = 'static/browser/common-demo.css';
+
+  try {
+    console.log(`Copying ${srcCss} → ${destCss}`);
+    copyFileSync(srcCss, destCss);
+    console.log('✓ Shared CSS copied to static/browser/');
+  } catch (error) {
+    console.error('Error copying shared CSS:', error);
+  }
+}
+
 try {
   moveJsFiles(srcDir, destDir);
   console.log('✓ Browser libraries moved to static/browser/');
+
+  copySharedCss();
 } catch (error) {
   console.error('Error moving browser libraries:', error);
   process.exit(1);

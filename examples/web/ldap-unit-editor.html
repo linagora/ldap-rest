@@ -16,325 +16,31 @@
     />
 
     <!-- Library CSS -->
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
     <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
 
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      :root {
+        --primary-color: #f5576c;
+        --primary-color-dark: #d43d50;
       }
 
       body {
-        font-family: 'Roboto', sans-serif;
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        min-height: 100vh;
-        padding: 24px;
-      }
-
-      .demo-container {
-        max-width: 1400px;
-        margin: 0 auto;
-      }
-
-      .demo-header {
-        background: white;
-        color: #333;
-        padding: 32px;
-        margin-bottom: 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
 
       .demo-header h1 {
-        font-size: 32px;
-        font-weight: 500;
-        margin-bottom: 8px;
         color: #f5576c;
-      }
-
-      .demo-header p {
-        font-size: 16px;
-        color: #666;
-      }
-
-      #ldap-unit-editor {
-        /* The editor library will add its own styling */
-      }
-
-      .status-message {
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .status-message.error {
-        background: #ffebee;
-        color: #c62828;
-      }
-
-      .status-message.success {
-        background: #e8f5e9;
-        color: #2e7d32;
-      }
-
-      .action-buttons {
-        display: flex;
-        gap: 12px;
-        margin-top: 16px;
       }
 
       .action-button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        background: #f5576c;
-        color: white;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: background 0.2s;
+        background: var(--primary-color);
       }
 
       .action-button:hover {
-        background: #d43d50;
-      }
-
-      .action-button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-
-      .action-button.danger {
-        background: #d32f2f;
-      }
-
-      .action-button.danger:hover {
-        background: #b71c1c;
-      }
-
-      .modal-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .modal-overlay.active {
-        display: flex;
-      }
-
-      .modal {
-        background: white;
-        border-radius: 8px;
-        padding: 24px;
-        max-width: 600px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-      }
-
-      .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-      }
-
-      .modal-header h2 {
-        font-size: 24px;
-        font-weight: 500;
-        color: #333;
-        margin: 0;
-      }
-
-      .close-button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 24px;
-        color: #666;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-      }
-
-      .close-button:hover {
-        background: #f0f0f0;
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-      }
-
-      .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: #333;
-      }
-
-      .form-group label.required::after {
-        content: ' *';
-        color: #d32f2f;
-      }
-
-      .form-group input,
-      .form-group textarea,
-      .form-group select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-      }
-
-      .form-group textarea {
-        min-height: 80px;
-        resize: vertical;
-      }
-
-      .form-group input:focus,
-      .form-group textarea:focus,
-      .form-group select:focus {
-        outline: none;
-        border-color: #f5576c;
-      }
-
-      .form-select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-        background-color: white;
-        cursor: pointer;
-      }
-
-      .form-select:focus {
-        outline: none;
-        border-color: #f5576c;
-      }
-
-      .array-field {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .array-item {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .btn {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        transition: background 0.2s;
-      }
-
-      .btn-secondary {
-        background: #f0f0f0;
-        color: #333;
-      }
-
-      .btn-secondary:hover {
-        background: #e0e0e0;
-      }
-
-      .btn-icon {
-        padding: 8px;
-        min-width: auto;
-      }
-
-      .btn .material-icons {
-        font-size: 18px;
-      }
-
-      .form-group .help-text {
-        font-size: 12px;
-        color: #666;
-        margin-top: 4px;
-      }
-
-      .modal-footer {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        margin-top: 24px;
-      }
-
-      .modal-footer button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background 0.2s;
-      }
-
-      .modal-footer button.primary {
-        background: #f5576c;
-        color: white;
-      }
-
-      .modal-footer button.primary:hover {
-        background: #d43d50;
-      }
-
-      .modal-footer button.secondary {
-        background: #f0f0f0;
-        color: #333;
-      }
-
-      .modal-footer button.secondary:hover {
-        background: #e0e0e0;
-      }
-
-      .field-group {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 16px;
-        margin-bottom: 16px;
-        background: #f9f9f9;
-      }
-
-      .field-group-title {
-        font-weight: 500;
-        color: #f5576c;
-        margin-bottom: 12px;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        background: var(--primary-color-dark);
       }
     </style>
   </head>
@@ -383,130 +89,34 @@
       </div>
     </div>
 
+    <!-- Shared utilities -->
+    <script src="/static/browser/shared.js"></script>
     <!-- Library JS -->
     <script src="/static/browser/ldap-unit-editor.js"></script>
 
     <script>
       const { LdapUnitEditor } = window.LdapUnitEditor;
+      const {
+        escapeHtml,
+        showStatus,
+        generateFormField,
+        processFormData,
+        getOrganizationPath,
+      } = window.MiniDmShared;
 
       let editor;
       let unitSchema;
 
-      function escapeHtml(text) {
-        if (text == null) return '';
-        const map = {
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#x27;',
-          '/': '&#x2F;',
-        };
-        return String(text).replace(/[&<>"'/]/g, m => map[m]);
-      }
-
-      function showStatus(message, type = 'error') {
-        const container = document.getElementById('status-container');
-        container.innerHTML = `
-        <div class="status-message ${escapeHtml(type)}">
-          <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
-          <span>${escapeHtml(message)}</span>
-        </div>
-      `;
-        setTimeout(() => {
-          container.innerHTML = '';
-        }, 5000);
-      }
-
-      function getFieldLabel(fieldName, attribute) {
-        const labelMap = {
-          ou: 'Unit Name',
-          l: 'Location',
-          telephoneNumber: 'Phone Number',
-          facsimileTelephoneNumber: 'Fax Number',
-          postalAddress: 'Postal Address',
-          twakeDepartmentPath: 'Department Path',
-          twakeLocalAdminLink: 'Local Administrators',
-        };
-
-        if (labelMap[fieldName]) return labelMap[fieldName];
-
-        const label = fieldName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');
-        return label.charAt(0).toUpperCase() + label.slice(1);
-      }
-
-      async function generateFormField(fieldName, attribute) {
-        const label = getFieldLabel(fieldName, attribute);
-        const required = attribute.required ? 'required' : '';
-        const labelClass = attribute.required ? 'required' : '';
-
-        let fieldHtml = '';
-
-        if (attribute.type === 'array' && attribute.items?.type === 'string') {
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
-              <div class="help-text">Enter one DN per line</div>
-            </div>
-          `;
-        } else if (
-          attribute.type === 'number' ||
-          attribute.type === 'integer'
-        ) {
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <input type="number" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
-            </div>
-          `;
-        } else if (attribute.type === 'string') {
-          const type = fieldName.toLowerCase().includes('mail')
-            ? 'email'
-            : fieldName.toLowerCase().includes('phone') ||
-                fieldName.toLowerCase().includes('telephone')
-              ? 'tel'
-              : 'text';
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <input type="${escapeHtml(type)}" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
-            </div>
-          `;
-        }
-
-        return fieldHtml;
-      }
-
-      async function getOrganizationPath(orgDn) {
-        try {
-          const response = await fetch(
-            `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(orgDn)}`
-          );
-          if (!response.ok) {
-            console.error('Failed to fetch organization:', response.status);
-            return orgDn;
-          }
-          const org = await response.json();
-
-          if (org.twakeDepartmentPath) {
-            const pathValue = Array.isArray(org.twakeDepartmentPath)
-              ? org.twakeDepartmentPath[0]
-              : org.twakeDepartmentPath;
-            return pathValue;
-          }
-
-          if (org.ou) {
-            const ouValue = Array.isArray(org.ou) ? org.ou[0] : org.ou;
-            return ouValue;
-          }
-
-          return '';
-        } catch (error) {
-          console.error('Failed to get organization info:', error);
-          return '';
-        }
-      }
+      // Custom labels for unit editor
+      const customLabels = {
+        ou: 'Unit Name',
+        l: 'Location',
+        telephoneNumber: 'Phone Number',
+        facsimileTelephoneNumber: 'Fax Number',
+        postalAddress: 'Postal Address',
+        twakeDepartmentPath: 'Department Path',
+        twakeLocalAdminLink: 'Local Administrators',
+      };
 
       async function generateCreateUnitForm() {
         const config = editor.getConfig();
@@ -537,7 +147,7 @@
           throw new Error('No schema available for organizations');
         }
 
-        const parentPath = await getOrganizationPath(currentOrgDn);
+        const parentPath = await getOrganizationPath(currentOrgDn, window.location.origin);
 
         const formFields = document.getElementById('form-fields');
         let fieldsHtml = '';
@@ -590,7 +200,7 @@
           fieldsHtml +=
             '<div class="field-group"><div class="field-group-title">Basic Information</div>';
           for (const [fieldName, attribute] of basicFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute);
+            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
           }
           fieldsHtml += '</div>';
         }
@@ -600,7 +210,7 @@
           fieldsHtml +=
             '<div class="field-group"><div class="field-group-title">Contact Information</div>';
           for (const [fieldName, attribute] of contactFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute);
+            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
           }
           fieldsHtml += '</div>';
         }
@@ -610,7 +220,7 @@
           fieldsHtml +=
             '<div class="field-group"><div class="field-group-title">Administration</div>';
           for (const [fieldName, attribute] of adminFields) {
-            fieldsHtml += await generateFormField(fieldName, attribute);
+            fieldsHtml += await generateFormField(fieldName, attribute, { customLabels });
           }
           fieldsHtml += '</div>';
         }
@@ -626,7 +236,7 @@
           })
           .catch(error => {
             console.error('Failed to generate form:', error);
-            showStatus(`Error: ${error.message}`, 'error');
+            showStatus('status-container', `Error: ${error.message}`, 'error');
           });
       }
 
@@ -641,63 +251,19 @@
 
         const form = event.target;
         const formData = new FormData(form);
-        const unitData = {};
 
-        for (const [key, value] of formData.entries()) {
-          if (unitData[key]) {
-            if (!Array.isArray(unitData[key])) {
-              unitData[key] = [unitData[key]];
-            }
-            unitData[key].push(value);
-          } else {
-            unitData[key] = value;
-          }
-        }
+        // Use shared utility to process form data
+        const unitData = processFormData(formData, unitSchema.attributes);
 
-        for (const [fieldName, attribute] of Object.entries(
-          unitSchema.attributes
-        )) {
-          if (!unitData[fieldName]) continue;
-
-          if (
-            attribute.type === 'array' &&
-            typeof unitData[fieldName] === 'string'
-          ) {
-            unitData[fieldName] = unitData[fieldName]
-              .split('\n')
-              .map(line => line.trim())
-              .filter(line => line.length > 0);
-          } else if (
-            attribute.type === 'number' ||
-            attribute.type === 'integer'
-          ) {
-            unitData[fieldName] =
-              attribute.type === 'integer'
-                ? parseInt(unitData[fieldName], 10)
-                : parseFloat(unitData[fieldName]);
-          }
-        }
-
-        const cleanedData = {};
-        for (const [key, value] of Object.entries(unitData)) {
-          if (value === '' || value === null || value === undefined) {
-            continue;
-          }
-          if (Array.isArray(value) && value.length === 0) {
-            continue;
-          }
-          cleanedData[key] = value;
-        }
-
-        console.log('Creating unit with data:', cleanedData);
+        console.log('Creating unit with data:', unitData);
 
         try {
           const api = editor.getApi();
           const currentOrgDn = editor.getCurrentOrgDn();
-          const dn = `ou=${cleanedData.ou},${currentOrgDn}`;
+          const dn = `ou=${unitData.ou},${currentOrgDn}`;
 
-          await api.createEntry(dn, cleanedData);
-          showStatus('Organization unit created successfully!', 'success');
+          await api.createEntry(dn, unitData);
+          showStatus('status-container', 'Organization unit created successfully!', 'success');
           closeCreateUnitModal();
 
           // Refresh the editor
@@ -705,21 +271,21 @@
         } catch (error) {
           console.error('Failed to create unit:', error);
           const errorMessage = error.message || error.toString();
-          showStatus(`Error: ${errorMessage}`, 'error');
+          showStatus('status-container', `Error: ${errorMessage}`, 'error');
         }
       }
 
       async function handleDeleteUnit() {
         const currentOrgDn = editor.getCurrentOrgDn();
         if (!currentOrgDn) {
-          showStatus('No organization unit selected', 'error');
+          showStatus('status-container', 'No organization unit selected', 'error');
           return;
         }
 
         // Check if it's the root organization
         const ldapBase = editor.getConfig().ldapBase;
         if (currentOrgDn === ldapBase) {
-          showStatus('Cannot delete the root organization', 'error');
+          showStatus('status-container', 'Cannot delete the root organization', 'error');
           return;
         }
 
@@ -734,7 +300,7 @@
         try {
           const api = editor.getApi();
           await api.deleteEntry(currentOrgDn);
-          showStatus('Organization unit deleted successfully!', 'success');
+          showStatus('status-container', 'Organization unit deleted successfully!', 'success');
 
           document.getElementById('delete-unit-btn').disabled = true;
 
@@ -742,7 +308,7 @@
           await editor.init();
         } catch (error) {
           console.error('Failed to delete unit:', error);
-          showStatus(`Error: ${error.message}`, 'error');
+          showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
 
@@ -753,16 +319,17 @@
             apiBaseUrl: window.location.origin,
             onUnitSaved: unitDn => {
               console.log('Unit saved:', unitDn);
-              showStatus('Organization unit saved successfully!', 'success');
+              showStatus('status-container', 'Organization unit saved successfully!', 'success');
             },
             onError: error => {
               console.error('Editor error:', error);
-              showStatus(`Error: ${error.message}`, 'error');
+              showStatus('status-container', `Error: ${error.message}`, 'error');
             },
           });
 
           await editor.init();
           showStatus(
+            'status-container',
             'LDAP Organization Unit Editor loaded successfully!',
             'success'
           );
@@ -779,7 +346,7 @@
           }, 500);
         } catch (error) {
           console.error('Failed to initialize editor:', error);
-          showStatus(`Error: ${error.message}`, 'error');
+          showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
 
