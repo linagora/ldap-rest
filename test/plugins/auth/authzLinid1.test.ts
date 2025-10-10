@@ -714,6 +714,232 @@ describe('AuthzLinid1 Plugin', () => {
       });
     });
 
+    describe('WRITE - Move user between organizations', () => {
+      const testUser1Dn = `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+
+      afterEach(async () => {
+        try {
+          await dm.ldap.delete(testUser1Dn);
+        } catch (err) {
+          // Ignore if doesn't exist
+        }
+      });
+
+      it('should allow moving user to authorized organization', async () => {
+        // Create admin user
+        const adminEntry = {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        };
+        await dm.ldap.add(testUserDn, adminEntry);
+
+        // Create organization with admin (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+          twakeLocalAdminLink: testUserDn,
+        };
+        await dm.ldap.add(testOrgDn, org1Entry);
+
+        // Create second organization with admin (also authorized)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+          twakeLocalAdminLink: testUserDn,
+        };
+        await dm.ldap.add(testOrg2Dn, org2Entry);
+
+        // Create user in first organization
+        const userEntry = {
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'testuser1',
+          sn: 'User1',
+          cn: 'Test User 1',
+          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await dm.ldap.add(testUser1Dn, userEntry);
+
+        // Create mock request
+        const mockReq = { user: 'testadmin' } as any;
+
+        // Move user to second organization - should succeed
+        await dm.ldap.modify(
+          testUser1Dn,
+          {
+            replace: {
+              twakeDepartmentLink: testOrg2Dn,
+              twakeDepartmentPath: 'Test / Org2',
+            },
+          },
+          mockReq
+        );
+
+        // Verify it was updated
+        const searchResult = await dm.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+          },
+          testUser1Dn
+        );
+        expect((searchResult as any).searchEntries).to.have.lengthOf(1);
+        expect(
+          (searchResult as any).searchEntries[0].twakeDepartmentLink
+        ).to.equal(testOrg2Dn);
+      });
+
+      it('should reject moving user to unauthorized organization', async () => {
+        // Create admin user
+        const adminEntry = {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        };
+        await dm.ldap.add(testUserDn, adminEntry);
+
+        // Create organization 1 with admin (authorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+          twakeLocalAdminLink: testUserDn,
+        };
+        await dm.ldap.add(testOrgDn, org1Entry);
+
+        // Create organization 2 without admin (unauthorized)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+        };
+        await dm.ldap.add(testOrg2Dn, org2Entry);
+
+        // Create user in first organization
+        const userEntry = {
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'testuser1',
+          sn: 'User1',
+          cn: 'Test User 1',
+          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await dm.ldap.add(testUser1Dn, userEntry);
+
+        // Create mock request
+        const mockReq = { user: 'testadmin' } as any;
+
+        // Try to move user to unauthorized organization - should be rejected
+        try {
+          await dm.ldap.modify(
+            testUser1Dn,
+            {
+              replace: {
+                twakeDepartmentLink: testOrg2Dn,
+                twakeDepartmentPath: 'Test / Org2',
+              },
+            },
+            mockReq
+          );
+          expect.fail('Should have thrown an error for unauthorized move');
+        } catch (err) {
+          expect(err).to.be.instanceOf(Error);
+          expect((err as Error).message).to.include(
+            'does not have write permission'
+          );
+        }
+
+        // Verify user was not moved
+        const searchResult = await dm.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+          },
+          testUser1Dn
+        );
+        expect((searchResult as any).searchEntries).to.have.lengthOf(1);
+        expect(
+          (searchResult as any).searchEntries[0].twakeDepartmentLink
+        ).to.equal(testOrgDn); // Still in original org
+      });
+
+      it('should allow moving user from unauthorized org to authorized org', async () => {
+        // Create admin user
+        const adminEntry = {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        };
+        await dm.ldap.add(testUserDn, adminEntry);
+
+        // Create organization 1 without admin (user starts here, unauthorized)
+        const org1Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg',
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await dm.ldap.add(testOrgDn, org1Entry);
+
+        // Create organization 2 with admin (authorized for admin)
+        const org2Entry = {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'Test / Org2',
+          twakeLocalAdminLink: testUserDn,
+        };
+        await dm.ldap.add(testOrg2Dn, org2Entry);
+
+        // Create user in first organization (where admin has no rights)
+        const userEntry = {
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'testuser1',
+          sn: 'User1',
+          cn: 'Test User 1',
+          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentPath: 'Test / Org',
+        };
+        await dm.ldap.add(testUser1Dn, userEntry);
+
+        // Create mock request
+        const mockReq = { user: 'testadmin' } as any;
+
+        // Try to move user to authorized organization
+        // This should succeed because admin has write permission on target org
+        await dm.ldap.modify(
+          testUser1Dn,
+          {
+            replace: {
+              twakeDepartmentLink: testOrg2Dn,
+              twakeDepartmentPath: 'Test / Org2',
+            },
+          },
+          mockReq
+        );
+
+        // Verify it was updated
+        const searchResult = await dm.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+          },
+          testUser1Dn
+        );
+        expect((searchResult as any).searchEntries).to.have.lengthOf(1);
+        expect(
+          (searchResult as any).searchEntries[0].twakeDepartmentLink
+        ).to.equal(testOrg2Dn);
+      });
+    });
+
     describe('WRITE - Add user with twakeDepartmentLink', () => {
       const testUser1Dn = `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
       const testUser2Dn = `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;

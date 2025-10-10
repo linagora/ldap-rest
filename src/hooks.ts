@@ -35,7 +35,7 @@ export interface Hooks {
   ldapaddrequest?: ChainedHook<[string, AttributesList, Request?]>;
   ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
   // modify
-  ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number]>;
+  ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request?]>;
   ldapmodifydone?: (
     args: [string, ModifyRequest, number]
   ) => MaybePromise<void>;
@@ -108,7 +108,19 @@ export interface Hooks {
   externaluserentry?: ChainedHook<[string, AttributesList]>;
   externaluseradded?: (dn: string, mail: string) => MaybePromise<void>;
 
-  // External hooks
+  /**
+   * Generic flat resource move hooks
+   * Pattern: {hookPrefix}move
+   * Examples: ldapusermove, ldappositionmove, etc.
+   *
+   * move: before moving - can modify target or cancel
+   * Note: After move, onLdapChange is triggered automatically by modifyEntry()
+   */
+  // Note: These are defined dynamically via the index signature below
+  // but documented here for reference:
+  // - ldapusermove?: ChainedHook<[string, string, Request?]>  // [dn, targetOrgDn, req]
+
+  // External hooks (allows dynamic hook names like ldapusermove, ldapgroupmove, etc.)
   [K: string]:
     | ChainedHook<unknown>
     | VoidHook<unknown[]>

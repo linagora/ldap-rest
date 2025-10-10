@@ -177,6 +177,12 @@ export default abstract class LdapFlat extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       async (req, res) => this.apiModify(req, res)
     );
+
+    // Move entry to different organization
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
+      async (req, res) => this.apiMove(req, res)
+    );
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
@@ -236,6 +242,35 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!body) return;
     const id = decodeURIComponent(req.params.id);
     await tryMethod(res, this.modifyEntry.bind(this), id, body);
+  }
+
+  async apiMove(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'targetOrgDn') as
+      | { targetOrgDn: string }
+      | false;
+    if (!body) return;
+
+    const id = decodeURIComponent(req.params.id);
+    const { targetOrgDn } = body;
+
+    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
+      res.status(400).json({
+        error: 'Missing or invalid targetOrgDn in request body',
+      });
+      return;
+    }
+
+    try {
+      const result = await this.moveEntry(id, targetOrgDn, req);
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err) {
+      return serverError(res, err);
+    }
   }
 
   async addEntry(
@@ -387,6 +422,126 @@ export default abstract class LdapFlat extends DmPlugin {
     const res = await this.ldap.delete(dn);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}deletedone`], dn);
     return res;
+  }
+
+  /**
+   * Move entry to a different organization
+   * Updates department link and path attributes
+   */
+  async moveEntry(
+    id: string,
+    targetOrgDn: string,
+    req?: Request
+  ): Promise<{ departmentPath: string; departmentLink: string }> {
+    const dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+
+    // Get link and path attribute names from config
+    const linkAttr =
+      this.config.ldap_organization_link_attribute || 'twakeDepartmentLink';
+    const pathAttr =
+      this.config.ldap_organization_path_attribute || 'twakeDepartmentPath';
+
+    // Validate that the schema supports these attributes
+    if (
+      !this.schema?.attributes[linkAttr] ||
+      !this.schema?.attributes[pathAttr]
+    ) {
+      throw new Error(
+        `Schema for ${this.singularName} does not support move operation (missing ${linkAttr} or ${pathAttr})`
+      );
+    }
+
+    // Fetch current entry to get old organization
+    const currentEntry = (await this.ldap.search(
+      { paged: false, scope: 'base', attributes: [linkAttr] },
+      dn,
+      req
+    )) as SearchResult;
+
+    if (
+      !currentEntry.searchEntries ||
+      currentEntry.searchEntries.length === 0
+    ) {
+      throw new Error(`Entry ${dn} not found`);
+    }
+
+    const oldOrgDn = currentEntry.searchEntries[0][linkAttr];
+    const oldOrgDnStr = Array.isArray(oldOrgDn)
+      ? String(oldOrgDn[0])
+      : String(oldOrgDn);
+
+    // Get department path from target organization
+    const departmentPath = await this.getDepartmentPath(targetOrgDn, req);
+
+    // Launch pre-move hook (chained - can modify targetOrgDn or cancel)
+    [, targetOrgDn] = await launchHooksChained(
+      this.registeredHooks[`${this.hookPrefix}move`],
+      [dn, targetOrgDn, req]
+    );
+
+    // Prepare LDAP modify request
+    const changes: ModifyRequest = {
+      replace: {
+        [linkAttr]: targetOrgDn,
+        [pathAttr]: departmentPath,
+      },
+    };
+
+    // Execute the modification (will trigger onLdapChange hook)
+    await this.modifyEntry(id, changes);
+
+    return {
+      departmentPath,
+      departmentLink: targetOrgDn,
+    };
+  }
+
+  /**
+   * Get department path from an organization DN
+   * Fetches the path attribute directly from the organization entry
+   */
+  private async getDepartmentPath(
+    orgDn: string,
+    req?: Request
+  ): Promise<string> {
+    const pathAttr =
+      this.config.ldap_organization_path_attribute || 'twakeDepartmentPath';
+
+    try {
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: [pathAttr, 'ou', 'o'] },
+        orgDn,
+        req
+      )) as SearchResult;
+
+      if (!result.searchEntries || result.searchEntries.length === 0) {
+        throw new Error(`Organization ${orgDn} not found`);
+      }
+
+      const org = result.searchEntries[0];
+
+      // Return the path attribute if it exists
+      if (org[pathAttr]) {
+        const path = org[pathAttr];
+        return Array.isArray(path) ? String(path[0]) : String(path);
+      }
+
+      // Fallback: construct path from ou or o attribute
+      const ou = org.ou || org.o;
+      if (ou) {
+        const name = Array.isArray(ou) ? String(ou[0]) : String(ou);
+        return `/${name}`;
+      }
+
+      // Last resort: use the DN
+      this.logger.warn(
+        `Organization ${orgDn} has no ${pathAttr} attribute, using DN`
+      );
+      return orgDn;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
+    }
   }
 
   /**
