@@ -20,7 +20,9 @@ export class UnitApiClient {
   }
 
   async getOrganizations(): Promise<{ dn: string }> {
-    const response = await fetch(`${this.baseUrl}/api/v1/ldap/organizations/top`);
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/organizations/top`
+    );
     if (!response.ok) {
       throw new Error(`Failed to load organizations: ${response.statusText}`);
     }
@@ -77,7 +79,9 @@ export class UnitApiClient {
     }
   }
 
-  async getPointerOptions(branch: string): Promise<Array<{ dn: string; label: string }>> {
+  async getPointerOptions(
+    branch: string
+  ): Promise<Array<{ dn: string; label: string }>> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/search?base=${encodeURIComponent(branch)}&scope=one`
     );

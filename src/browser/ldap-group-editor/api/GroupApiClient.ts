@@ -20,7 +20,9 @@ export class GroupApiClient {
   }
 
   async getOrganizations(): Promise<{ dn: string }> {
-    const response = await fetch(`${this.baseUrl}/api/v1/ldap/organizations/top`);
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/organizations/top`
+    );
     if (!response.ok) {
       throw new Error(`Failed to load organizations: ${response.statusText}`);
     }
@@ -37,7 +39,9 @@ export class GroupApiClient {
     const subnodes = await response.json();
     // Filter to keep only groups
     return subnodes.filter((node: any) => {
-      const classes = Array.isArray(node.objectClass) ? node.objectClass : [node.objectClass];
+      const classes = Array.isArray(node.objectClass)
+        ? node.objectClass
+        : [node.objectClass];
       return classes.includes('groupOfNames') || classes.includes('group');
     });
   }
@@ -92,7 +96,9 @@ export class GroupApiClient {
     }
   }
 
-  async getPointerOptions(branch: string): Promise<Array<{ dn: string; label: string }>> {
+  async getPointerOptions(
+    branch: string
+  ): Promise<Array<{ dn: string; label: string }>> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/search?base=${encodeURIComponent(branch)}&scope=one`
     );

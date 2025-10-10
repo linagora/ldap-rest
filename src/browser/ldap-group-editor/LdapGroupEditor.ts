@@ -65,7 +65,7 @@ export class LdapGroupEditor {
     this.groupTree = new GroupTree(
       treeContainer,
       this.options.apiBaseUrl || window.location.origin,
-      (orgDn) => this.onOrgSelected(orgDn)
+      orgDn => this.onOrgSelected(orgDn)
     );
 
     try {
@@ -100,12 +100,16 @@ export class LdapGroupEditor {
         <div style="padding: 20px;">
           <h3 style="margin: 0 0 16px 0;">Groups</h3>
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${groups.map(group => `
+            ${groups
+              .map(
+                group => `
               <div class="group-item" data-dn="${this.escapeHtml(group.dn)}" style="padding: 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                 <span class="material-icons">group</span>
                 <span>${this.escapeHtml(group.cn || group.dn)}</span>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </div>
       `;
@@ -181,11 +185,11 @@ export class LdapGroupEditor {
   }
 
   // Public API
-  getApi() {
+  getApi(): GroupApiClient {
     return this.api;
   }
 
-  getConfig() {
+  getConfig(): Config | null {
     return this.config;
   }
 
@@ -198,12 +202,12 @@ export class LdapGroupEditor {
     return this.currentGroupDn;
   }
 
-  async createUser(data: Record<string, unknown>) {
+  async createUser(data: Record<string, unknown>): Promise<void> {
     // For compatibility - actually creates a group
     return this.api.createEntry(data.dn as string, data);
   }
 
-  async deleteUser(dn: string) {
+  async deleteUser(dn: string): Promise<void> {
     // For compatibility - actually deletes a group
     return this.api.deleteEntry(dn);
   }

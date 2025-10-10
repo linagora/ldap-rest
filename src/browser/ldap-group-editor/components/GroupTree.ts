@@ -34,7 +34,9 @@ export class GroupTree {
     `;
 
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/v1/ldap/organizations/top`);
+      const response = await fetch(
+        `${this.apiBaseUrl}/api/v1/ldap/organizations/top`
+      );
       if (!response.ok) throw new Error('Failed to load organizations');
 
       const topOrg = await response.json();
@@ -44,7 +46,8 @@ export class GroupTree {
       console.error('Failed to init tree:', error);
       const treeEl = this.container.querySelector('#tree-content');
       if (treeEl) {
-        treeEl.innerHTML = '<p style="color: #f44336;">Failed to load organizations</p>';
+        treeEl.innerHTML =
+          '<p style="color: #f44336;">Failed to load organizations</p>';
       }
     }
   }
@@ -102,8 +105,15 @@ export class GroupTree {
 
         const subnodes = await subnodesResponse.json();
         const orgs = subnodes.filter((n: any) => {
-          const classes = Array.isArray(n.objectClass) ? n.objectClass : n.objectClass ? [n.objectClass] : [];
-          return classes.includes('organizationalUnit') || classes.includes('organization');
+          const classes = Array.isArray(n.objectClass)
+            ? n.objectClass
+            : n.objectClass
+              ? [n.objectClass]
+              : [];
+          return (
+            classes.includes('organizationalUnit') ||
+            classes.includes('organization')
+          );
         });
 
         for (const subnode of orgs) {
@@ -120,7 +130,7 @@ export class GroupTree {
   private attachEventListeners(): void {
     // Toggle expand/collapse
     this.container.querySelectorAll('.tree-node-toggle').forEach(el => {
-      el.addEventListener('click', async (e) => {
+      el.addEventListener('click', async e => {
         e.stopPropagation();
         const dn = el.getAttribute('data-dn');
         if (!dn) return;
@@ -136,7 +146,7 @@ export class GroupTree {
 
     // Select organization
     this.container.querySelectorAll('.tree-node-label').forEach(el => {
-      el.addEventListener('click', (e) => {
+      el.addEventListener('click', e => {
         e.stopPropagation();
         const dn = el.getAttribute('data-dn');
         if (!dn) return;

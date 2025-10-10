@@ -98,6 +98,10 @@ export default [
         fetch: 'readonly',
         HTMLElement: 'readonly',
         CustomEvent: 'readonly',
+        alert: 'readonly',
+        confirm: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     plugins: {

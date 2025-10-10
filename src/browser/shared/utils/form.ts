@@ -116,10 +116,7 @@ export async function generateFormField(
         </div>
       `;
     }
-  } else if (
-    attribute.type === 'array' &&
-    attribute.items?.type === 'string'
-  ) {
+  } else if (attribute.type === 'array' && attribute.items?.type === 'string') {
     // Array field - use textarea
     fieldHtml = `
       <div class="form-group">
@@ -138,15 +135,16 @@ export async function generateFormField(
     `;
   } else if (attribute.type === 'string') {
     // String field - use input with appropriate type
-    const type = fieldName.toLowerCase().includes('password') ||
+    const type =
+      fieldName.toLowerCase().includes('password') ||
       fieldName.toLowerCase().includes('pwd')
-      ? 'password'
-      : fieldName.toLowerCase().includes('mail')
-        ? 'email'
-        : fieldName.toLowerCase().includes('phone') ||
-            fieldName.toLowerCase().includes('telephone')
-          ? 'tel'
-          : 'text';
+        ? 'password'
+        : fieldName.toLowerCase().includes('mail')
+          ? 'email'
+          : fieldName.toLowerCase().includes('phone') ||
+              fieldName.toLowerCase().includes('telephone')
+            ? 'tel'
+            : 'text';
     fieldHtml = `
       <div class="form-group">
         <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
@@ -250,10 +248,7 @@ export function collectPointerArrayValues(
  */
 export function groupSchemaFields(
   schema: Record<string, SchemaAttribute>,
-  categorizer?: (
-    fieldName: string,
-    attribute: SchemaAttribute
-  ) => string | null
+  categorizer?: (fieldName: string, attribute: SchemaAttribute) => string | null
 ): Map<string, [string, SchemaAttribute][]> {
   const groups = new Map<string, [string, SchemaAttribute][]>();
 

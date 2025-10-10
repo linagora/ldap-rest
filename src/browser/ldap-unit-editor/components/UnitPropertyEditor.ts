@@ -39,7 +39,10 @@ export class UnitPropertyEditor {
     console.warn('[UnitPropertyEditor] Organizations config:', orgsConfig);
 
     if (orgsConfig?.schemaUrl) {
-      console.warn('[UnitPropertyEditor] Loading schema from URL:', orgsConfig.schemaUrl);
+      console.warn(
+        '[UnitPropertyEditor] Loading schema from URL:',
+        orgsConfig.schemaUrl
+      );
       const response = await fetch(orgsConfig.schemaUrl);
       this.schema = await response.json();
       console.warn('[UnitPropertyEditor] Schema loaded from URL:', this.schema);
@@ -115,7 +118,9 @@ export class UnitPropertyEditor {
     const basicFields: [string, any][] = [];
     const otherFields: [string, any][] = [];
 
-    for (const [fieldName, attribute] of Object.entries(this.schema.attributes)) {
+    for (const [fieldName, attribute] of Object.entries(
+      this.schema.attributes
+    )) {
       if (attribute.fixed || fieldName === 'objectClass') continue;
 
       if (fieldName === 'ou' || fieldName === 'description') {
@@ -127,8 +132,10 @@ export class UnitPropertyEditor {
 
     // Basic Information
     if (basicFields.length > 0) {
-      html += '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
-      html += '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Basic Information</div>';
+      html +=
+        '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
+      html +=
+        '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Basic Information</div>';
       for (const [fieldName, attribute] of basicFields) {
         html += this.renderField(fieldName, attribute);
       }
@@ -137,8 +144,10 @@ export class UnitPropertyEditor {
 
     // Additional Properties
     if (otherFields.length > 0) {
-      html += '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
-      html += '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Additional Properties</div>';
+      html +=
+        '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
+      html +=
+        '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Additional Properties</div>';
       for (const [fieldName, attribute] of otherFields) {
         html += this.renderField(fieldName, attribute);
       }
@@ -187,13 +196,19 @@ export class UnitPropertyEditor {
       ou: 'Organization Unit',
       description: 'Description',
     };
-    return labelMap[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, str => str.toUpperCase());
+    return (
+      labelMap[fieldName] ||
+      fieldName
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/^./, str => str.toUpperCase())
+    );
   }
 
   private attachEventListeners(): void {
     const form = document.getElementById('unit-edit-form') as HTMLFormElement;
     if (form) {
-      form.addEventListener('submit', (e) => this.handleSubmit(e));
+      form.addEventListener('submit', e => this.handleSubmit(e));
     }
 
     const deleteBtn = document.getElementById('delete-unit-btn');
@@ -211,8 +226,14 @@ export class UnitPropertyEditor {
 
     for (const [key, value] of (formData as any).entries()) {
       if (this.schema?.attributes[key]?.type === 'array') {
-        updates[key] = (value as string).split('\n').map(v => v.trim()).filter(v => v);
-      } else if (this.schema?.attributes[key]?.type === 'number' || this.schema?.attributes[key]?.type === 'integer') {
+        updates[key] = (value as string)
+          .split('\n')
+          .map(v => v.trim())
+          .filter(v => v);
+      } else if (
+        this.schema?.attributes[key]?.type === 'number' ||
+        this.schema?.attributes[key]?.type === 'integer'
+      ) {
         updates[key] = Number(value);
       } else {
         updates[key] = value;
@@ -232,7 +253,11 @@ export class UnitPropertyEditor {
   }
 
   private async handleDelete(): Promise<void> {
-    if (!confirm(`Are you sure you want to delete this organizational unit?\n\n${this.unitDn}\n\nThis action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete this organizational unit?\n\n${this.unitDn}\n\nThis action cannot be undone.`
+      )
+    ) {
       return;
     }
 

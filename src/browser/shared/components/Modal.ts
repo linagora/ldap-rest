@@ -140,10 +140,12 @@ export class Modal {
   /**
    * Create and inject modal into DOM
    */
-  static create(options: ModalOptions & {
-    formId?: string;
-    submitLabel?: string;
-  }): Modal {
+  static create(
+    options: ModalOptions & {
+      formId?: string;
+      submitLabel?: string;
+    }
+  ): Modal {
     const html = Modal.createModalHTML(options);
     document.body.insertAdjacentHTML('beforeend', html);
     return new Modal(options);

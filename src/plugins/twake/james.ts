@@ -1092,9 +1092,8 @@ export default class James extends DmPlugin {
         });
       }
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       this.logger.error(
-        `Failed to remove members from team mailbox ${mailStr}: ${err}`
+        `Failed to remove members from team mailbox ${mailStr}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -1158,9 +1157,8 @@ export default class James extends DmPlugin {
         return this.getMailboxType(result.searchEntries[0]);
       }
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       this.logger.debug(
-        `Could not get mailbox type for group ${groupDn}: ${err}`
+        `Could not get mailbox type for group ${groupDn}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
 

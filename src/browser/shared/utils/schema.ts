@@ -82,7 +82,9 @@ export function replaceSchemaPlaceholders<T extends Record<string, unknown>>(
     return value;
   };
 
-  const processObject = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const processObject = (
+    obj: Record<string, unknown>
+  ): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = processValue(value);

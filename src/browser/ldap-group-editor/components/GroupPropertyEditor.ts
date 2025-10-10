@@ -49,29 +49,49 @@ export class GroupPropertyEditor {
     if (groupsConfig?.schemaUrl) {
       const response = await fetch(groupsConfig.schemaUrl);
       this.schema = await response.json();
-      console.warn('[GroupPropertyEditor] Schema loaded from URL:', this.schema);
+      console.warn(
+        '[GroupPropertyEditor] Schema loaded from URL:',
+        this.schema
+      );
     } else if (groupsConfig?.schema) {
       this.schema = groupsConfig.schema;
-      console.warn('[GroupPropertyEditor] Schema loaded from config:', this.schema);
+      console.warn(
+        '[GroupPropertyEditor] Schema loaded from config:',
+        this.schema
+      );
     } else {
       // Fallback: check in flatResources
       const groupsResource = config.features?.flatResources?.find(
         r => r.pluralName === 'groups' || r.name === 'groups'
       );
-      console.warn('[GroupPropertyEditor] Groups resource (flatResources):', groupsResource);
+      console.warn(
+        '[GroupPropertyEditor] Groups resource (flatResources):',
+        groupsResource
+      );
 
       if (groupsResource?.schemaUrl) {
         const response = await fetch(groupsResource.schemaUrl);
         this.schema = await response.json();
-        console.warn('[GroupPropertyEditor] Schema loaded from URL (flatResources):', this.schema);
+        console.warn(
+          '[GroupPropertyEditor] Schema loaded from URL (flatResources):',
+          this.schema
+        );
       } else if (groupsResource?.schema) {
         this.schema = groupsResource.schema;
-        console.warn('[GroupPropertyEditor] Schema loaded from config (flatResources):', this.schema);
+        console.warn(
+          '[GroupPropertyEditor] Schema loaded from config (flatResources):',
+          this.schema
+        );
       } else {
         // No schema configured - create a default schema from the group's attributes
-        console.warn('[GroupPropertyEditor] No schema configured, creating default schema from group attributes');
+        console.warn(
+          '[GroupPropertyEditor] No schema configured, creating default schema from group attributes'
+        );
         this.schema = this.createDefaultSchema();
-        console.warn('[GroupPropertyEditor] Default schema created:', this.schema);
+        console.warn(
+          '[GroupPropertyEditor] Default schema created:',
+          this.schema
+        );
       }
     }
   }
@@ -97,7 +117,9 @@ export class GroupPropertyEditor {
 
     return {
       entity: {
-        objectClass: Array.isArray(this.group.objectClass) ? this.group.objectClass : [this.group.objectClass],
+        objectClass: Array.isArray(this.group.objectClass)
+          ? this.group.objectClass
+          : [this.group.objectClass],
       },
       attributes,
     };
@@ -145,7 +167,9 @@ export class GroupPropertyEditor {
     const memberFields: [string, any][] = [];
     const mailFields: [string, any][] = [];
 
-    for (const [fieldName, attribute] of Object.entries(this.schema.attributes)) {
+    for (const [fieldName, attribute] of Object.entries(
+      this.schema.attributes
+    )) {
       if (attribute.fixed || fieldName === 'objectClass') continue;
 
       if (fieldName === 'member' || fieldName === 'owner') {
@@ -159,8 +183,10 @@ export class GroupPropertyEditor {
 
     // Basic Information
     if (basicFields.length > 0) {
-      html += '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
-      html += '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Basic Information</div>';
+      html +=
+        '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
+      html +=
+        '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Basic Information</div>';
       for (const [fieldName, attribute] of basicFields) {
         html += this.renderField(fieldName, attribute);
       }
@@ -169,8 +195,10 @@ export class GroupPropertyEditor {
 
     // Email/Mailbox Settings
     if (mailFields.length > 0) {
-      html += '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
-      html += '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Email/Mailbox Settings</div>';
+      html +=
+        '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
+      html +=
+        '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Email/Mailbox Settings</div>';
       for (const [fieldName, attribute] of mailFields) {
         html += this.renderField(fieldName, attribute);
       }
@@ -179,8 +207,10 @@ export class GroupPropertyEditor {
 
     // Members & Owners
     if (memberFields.length > 0) {
-      html += '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
-      html += '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Members & Owners</div>';
+      html +=
+        '<div class="field-group" style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 4px;">';
+      html +=
+        '<div class="field-group-title" style="font-weight: 500; color: var(--primary-color, #6200ee); margin-bottom: 12px; font-size: 14px; text-transform: uppercase;">Members & Owners</div>';
       for (const [fieldName, attribute] of memberFields) {
         html += this.renderField(fieldName, attribute);
       }
@@ -256,13 +286,19 @@ export class GroupPropertyEditor {
       mail: 'Email Address',
       twakeMailboxType: 'Mailbox Type',
     };
-    return labelMap[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, str => str.toUpperCase());
+    return (
+      labelMap[fieldName] ||
+      fieldName
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/^./, str => str.toUpperCase())
+    );
   }
 
   private attachEventListeners(): void {
     const form = document.getElementById('group-edit-form') as HTMLFormElement;
     if (form) {
-      form.addEventListener('submit', (e) => this.handleSubmit(e));
+      form.addEventListener('submit', e => this.handleSubmit(e));
     }
 
     const deleteBtn = document.getElementById('delete-group-btn');
@@ -273,19 +309,25 @@ export class GroupPropertyEditor {
     // Attach listeners for member/owner add buttons
     const addMemberBtn = this.container.querySelector('.btn-add-member');
     if (addMemberBtn) {
-      addMemberBtn.addEventListener('click', () => this.handleAddMember('member'));
+      addMemberBtn.addEventListener('click', () =>
+        this.handleAddMember('member')
+      );
     }
 
     const addOwnerBtn = this.container.querySelector('.btn-add-owner');
     if (addOwnerBtn) {
-      addOwnerBtn.addEventListener('click', () => this.handleAddMember('owner'));
+      addOwnerBtn.addEventListener('click', () =>
+        this.handleAddMember('owner')
+      );
     }
 
     // Handle Delete key for removing members/owners
     ['member', 'owner'].forEach(fieldName => {
-      const textarea = document.getElementById(`${fieldName}-list`) as HTMLTextAreaElement;
+      const textarea = document.getElementById(
+        `${fieldName}-list`
+      ) as HTMLTextAreaElement;
       if (textarea) {
-        textarea.addEventListener('keydown', (e) => {
+        textarea.addEventListener('keydown', e => {
           if (e.key === 'Delete') {
             this.handleDeleteMember(textarea, e);
           }
@@ -293,7 +335,9 @@ export class GroupPropertyEditor {
       }
 
       // Add autocomplete for member/owner inputs
-      const input = document.getElementById(`${fieldName}-add-input`) as HTMLInputElement;
+      const input = document.getElementById(
+        `${fieldName}-add-input`
+      ) as HTMLInputElement;
       if (input) {
         let searchTimeout: number;
         input.addEventListener('input', () => {
@@ -318,22 +362,32 @@ export class GroupPropertyEditor {
       if (!response.ok) return;
 
       const results = await response.json();
-      const datalist = document.getElementById(`${fieldName}-suggestions`) as HTMLDataListElement;
+      const datalist = document.getElementById(
+        `${fieldName}-suggestions`
+      ) as HTMLDataListElement;
 
       if (!datalist) return;
 
-      datalist.innerHTML = results.slice(0, 10).map((user: any) => {
-        const label = user.cn?.[0] || user.uid?.[0] || user.mail?.[0] || user.dn;
-        return `<option value="${this.escapeHtml(user.dn)}">${this.escapeHtml(label)}</option>`;
-      }).join('');
+      datalist.innerHTML = results
+        .slice(0, 10)
+        .map((user: any) => {
+          const label =
+            user.cn?.[0] || user.uid?.[0] || user.mail?.[0] || user.dn;
+          return `<option value="${this.escapeHtml(user.dn)}">${this.escapeHtml(label)}</option>`;
+        })
+        .join('');
     } catch (error) {
       console.error('Failed to search users:', error);
     }
   }
 
   private async handleAddMember(fieldName: 'member' | 'owner'): Promise<void> {
-    const input = document.getElementById(`${fieldName}-add-input`) as HTMLInputElement;
-    const textarea = document.getElementById(`${fieldName}-list`) as HTMLTextAreaElement;
+    const input = document.getElementById(
+      `${fieldName}-add-input`
+    ) as HTMLInputElement;
+    const textarea = document.getElementById(
+      `${fieldName}-list`
+    ) as HTMLTextAreaElement;
 
     if (!input || !textarea) return;
 
@@ -344,7 +398,10 @@ export class GroupPropertyEditor {
     }
 
     // Get current members/owners
-    const currentValues = textarea.value.split('\n').map(v => v.trim()).filter(v => v);
+    const currentValues = textarea.value
+      .split('\n')
+      .map(v => v.trim())
+      .filter(v => v);
 
     // Check if already exists
     if (currentValues.includes(valueToAdd)) {
@@ -361,7 +418,10 @@ export class GroupPropertyEditor {
     input.focus();
   }
 
-  private handleDeleteMember(textarea: HTMLTextAreaElement, e: KeyboardEvent): void {
+  private handleDeleteMember(
+    textarea: HTMLTextAreaElement,
+    e: KeyboardEvent
+  ): void {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const value = textarea.value;
@@ -399,8 +459,14 @@ export class GroupPropertyEditor {
 
     for (const [key, value] of (formData as any).entries()) {
       if (this.schema?.attributes[key]?.type === 'array') {
-        updates[key] = (value as string).split('\n').map(v => v.trim()).filter(v => v);
-      } else if (this.schema?.attributes[key]?.type === 'number' || this.schema?.attributes[key]?.type === 'integer') {
+        updates[key] = (value as string)
+          .split('\n')
+          .map(v => v.trim())
+          .filter(v => v);
+      } else if (
+        this.schema?.attributes[key]?.type === 'number' ||
+        this.schema?.attributes[key]?.type === 'integer'
+      ) {
         updates[key] = Number(value);
       } else {
         updates[key] = value;
@@ -420,7 +486,11 @@ export class GroupPropertyEditor {
   }
 
   private async handleDelete(): Promise<void> {
-    if (!confirm(`Are you sure you want to delete this group?\n\n${this.groupDn}\n\nThis action cannot be undone.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete this group?\n\n${this.groupDn}\n\nThis action cannot be undone.`
+      )
+    ) {
       return;
     }
 
