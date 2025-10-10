@@ -471,14 +471,21 @@ export default class James extends DmPlugin {
   /**
    * Generic LDAP search utility to fetch specific attributes from a DN
    * Reduces code duplication across multiple methods
+   * @param dn - The DN to fetch attributes from
+   * @param attributes - Optional array of attribute names to fetch.
+   *                     If undefined or empty, fetches all attributes (*)
    */
   private async ldapGetAttributes(
     dn: string,
-    attributes: string[]
+    attributes?: string[]
   ): Promise<AttributesList | null> {
     try {
+      // If attributes is undefined or empty, fetch all attributes
+      const searchAttrs =
+        attributes && attributes.length > 0 ? attributes : undefined;
+
       const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes },
+        { paged: false, scope: 'base', attributes: searchAttrs },
         dn
       )) as SearchResult;
 
@@ -550,8 +557,8 @@ export default class James extends DmPlugin {
     const template = this.config.james_signature_template;
     if (!template) return null;
 
-    // Get all attributes (no filter - needed for template placeholders)
-    const entry = await this.ldapGetAttributes(dn, []);
+    // Get all attributes (needed for template placeholders)
+    const entry = await this.ldapGetAttributes(dn);
     if (!entry) return null;
 
     // Replace all {attributeName} placeholders with LDAP values
