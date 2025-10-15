@@ -131,6 +131,12 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       async (req, res) => this.apiDelete(req, res)
     );
+
+    // Move organization to a different parent
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
+      async (req, res) => this.apiMove(req, res)
+    );
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {
@@ -171,6 +177,38 @@ export default class LdapOrganizations extends DmPlugin {
     const dn = decodeURIComponent(req.params.dn);
     if (!dn) return badRequest(res, 'dn is required');
     await tryMethod(res, this.deleteOrganization.bind(this), dn);
+  }
+
+  async apiMove(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'targetOrgDn') as
+      | { targetOrgDn: string }
+      | false;
+    if (!body) return;
+
+    const dn = decodeURIComponent(req.params.dn);
+    if (!dn) return badRequest(res, 'dn is required');
+
+    const { targetOrgDn } = body;
+
+    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
+      return badRequest(res, 'Missing or invalid targetOrgDn in request body');
+    }
+
+    try {
+      const result = await this.moveOrganization(dn, targetOrgDn);
+      res.json({
+        success: true,
+        newDn: result.newDn,
+      });
+    } catch (err) {
+      return badRequest(
+        res,
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `Failed to move organization: ${err}`
+      );
+    }
   }
 
   /**
@@ -610,6 +648,76 @@ export default class LdapOrganizations extends DmPlugin {
     }
 
     return true;
+  }
+
+  /**
+   * Move an organization to a different parent organization
+   * Uses LDAP modifyDN to change the DN hierarchy
+   */
+  async moveOrganization(
+    dn: string,
+    targetOrgDn: string
+  ): Promise<{ newDn: string }> {
+    // Validate that target organization exists
+    try {
+      const targetOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        targetOrgDn
+      )) as SearchResult;
+
+      if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
+        throw new Error(`Target organization ${targetOrgDn} not found`);
+      }
+
+      // Verify it's actually an organizational unit
+      if (!this.isOu(targetOrg.searchEntries[0])) {
+        throw new Error(`Target ${targetOrgDn} is not an organizational unit`);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Invalid target organization: ${err}`);
+    }
+
+    // Extract the RDN (relative DN) from the source DN
+    // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
+    const rdn = dn.split(',')[0];
+
+    // Construct the new DN
+    const newDn = `${rdn},${targetOrgDn}`;
+
+    // Verify the organization to move exists
+    try {
+      const sourceOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+
+      if (!sourceOrg.searchEntries || sourceOrg.searchEntries.length === 0) {
+        throw new Error(`Source organization ${dn} not found`);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Source organization not found: ${err}`);
+    }
+
+    // Prevent moving to itself or creating circular references
+    if (newDn === dn) {
+      throw new Error('Cannot move organization to its current location');
+    }
+    if (targetOrgDn.startsWith(dn + ',') || targetOrgDn === dn) {
+      throw new Error('Cannot move organization into itself or its descendant');
+    }
+
+    // Perform the LDAP modifyDN operation
+    try {
+      await this.server.ldap.rename(dn, newDn);
+      this.logger.info(`Moved organization from ${dn} to ${newDn}`);
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to move organization: ${err}`);
+    }
+
+    return { newDn };
   }
 
   async deleteOrganization(dn: string): Promise<boolean> {

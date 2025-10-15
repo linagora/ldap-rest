@@ -4,6 +4,7 @@
 
 import type { UnitApiClient } from '../api/UnitApiClient';
 import type { LdapUnit, SchemaDefinition } from '../types';
+import { MoveUnitModal } from './MoveUnitModal';
 
 export class UnitPropertyEditor {
   private container: HTMLElement;
@@ -92,15 +93,21 @@ export class UnitPropertyEditor {
         </h3>
         <form id="unit-edit-form">
           ${this.renderFields()}
-          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: flex-end;">
-            <button type="button" id="delete-unit-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">delete</span>
-              Delete Unit
+          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: space-between;">
+            <button type="button" id="move-unit-btn" class="btn btn-secondary" style="background: #757575; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons" style="font-size: 18px;">drive_file_move</span>
+              Move
             </button>
-            <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">save</span>
-              Save Changes
-            </button>
+            <div style="display: flex; gap: 12px;">
+              <button type="button" id="delete-unit-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons" style="font-size: 18px;">delete</span>
+                Delete Unit
+              </button>
+              <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons" style="font-size: 18px;">save</span>
+                Save Changes
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -215,6 +222,11 @@ export class UnitPropertyEditor {
     if (deleteBtn) {
       deleteBtn.addEventListener('click', () => this.handleDelete());
     }
+
+    const moveBtn = document.getElementById('move-unit-btn');
+    if (moveBtn) {
+      moveBtn.addEventListener('click', () => this.handleMove());
+    }
   }
 
   private async handleSubmit(e: Event): Promise<void> {
@@ -250,6 +262,37 @@ export class UnitPropertyEditor {
       console.error('Failed to update unit:', error);
       alert(`Failed to update unit: ${(error as Error).message}`);
     }
+  }
+
+  private async handleMove(): Promise<void> {
+    if (!this.unit) return;
+
+    // Extract parent DN from current unit DN
+    const parentDn = this.unitDn.split(',').slice(1).join(',');
+
+    const modal = new MoveUnitModal(this.api, parentDn, async targetOrgDn => {
+      try {
+        const result = await this.api.moveUnit(this.unitDn, targetOrgDn);
+        alert('Unit moved successfully!');
+
+        // Reload the unit with its new DN
+        if (result.newDn) {
+          this.unitDn = result.newDn;
+          await this.loadUnit();
+          this.render();
+          this.attachEventListeners();
+        }
+
+        if (this.saveCallback) {
+          this.saveCallback();
+        }
+      } catch (error) {
+        console.error('Failed to move unit:', error);
+        alert(`Failed to move unit: ${(error as Error).message}`);
+      }
+    });
+
+    await modal.show();
   }
 
   private async handleDelete(): Promise<void> {

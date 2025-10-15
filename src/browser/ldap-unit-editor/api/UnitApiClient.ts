@@ -94,4 +94,23 @@ export class UnitApiClient {
       label: entry.cn?.[0] || entry.ou?.[0] || entry.dn,
     }));
   }
+
+  async moveUnit(
+    dn: string,
+    targetOrgDn: string
+  ): Promise<{ success: boolean; newDn?: string }> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}/move`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetOrgDn }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to move unit');
+    }
+    return response.json();
+  }
 }
