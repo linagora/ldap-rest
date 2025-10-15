@@ -1,0 +1,31 @@
+{
+  "entity": {
+    "name": "twakeMailboxType",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "applicationProcess"],
+    "singularName": "mailboxType",
+    "pluralName": "mailboxTypes",
+    "base": "ou=twakeMailboxType,ou=nomenclature,{ldap_base}"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["top", "applicationProcess"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^(group|mailingList|teamMailbox)$",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

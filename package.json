@@ -228,6 +228,10 @@
       "import": "./static/schemas/twake/nomenclature/twakeListType.json",
       "require": "./static/schemas/twake/nomenclature/twakeListType.json"
     },
+    "schema-twake-nomenclature-twakemailboxtype": {
+      "import": "./static/schemas/twake/nomenclature/twakeMailboxType.json",
+      "require": "./static/schemas/twake/nomenclature/twakeMailboxType.json"
+    },
     "schema-twake-nomenclature-twaketitle": {
       "import": "./static/schemas/twake/nomenclature/twakeTitle.json",
       "require": "./static/schemas/twake/nomenclature/twakeTitle.json"

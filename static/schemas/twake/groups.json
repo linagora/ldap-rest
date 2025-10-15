@@ -33,6 +33,12 @@
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
       "required": false
     },
+    "twakeMailboxType": {
+      "type": "pointer",
+      "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
+      "group": "Mailbox Settings",
+      "required": false
+    },
     "member": {
       "type": "array",
       "items": {
