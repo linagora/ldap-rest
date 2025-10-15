@@ -31,9 +31,10 @@ export class UserList {
   async init(): Promise<void> {
     // Load config and schema first
     this.config = await this.api.getConfig();
-    const usersResource = this.config.features?.flatResources?.find(
-      r => r.pluralName === 'users' || r.name === 'users'
-    );
+    const usersResource =
+      this.config.features?.ldapFlatGeneric?.flatResources?.find(
+        r => r.pluralName === 'users' || r.name === 'users'
+      );
     if (usersResource?.schemaUrl) {
       this.schema = await this.api.getSchema(usersResource.schemaUrl);
     }

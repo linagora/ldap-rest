@@ -14,7 +14,7 @@ These are declared in the plugin's `dependencies` property and are required for 
 ```typescript
 dependencies = {
   ldapGroups: 'core/ldap/ldapGroups',
-  onLdapChange: 'core/ldap/onChange'
+  onLdapChange: 'core/ldap/onChange',
 };
 ```
 
@@ -28,42 +28,49 @@ dependencies = {
 ### Authentication Plugins
 
 #### `authToken` (core/auth/token)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: Standalone authentication plugin
 
 #### `authLemonldapNg` (core/auth/llng)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: LemonLDAP::NG SSO integration
 
 #### `openidconnect` (core/auth/openidconnect)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: `beforeAuth`, `afterAuth`
 - **Notes**: OAuth2/OIDC authentication
 
 #### `crowdsec` (core/auth/crowdsec)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: IP blocking via CrowdSec (must be loaded before auth plugins)
 
 #### `rateLimit` (core/auth/rateLimit)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: Rate limiting (must be loaded before auth plugins)
 
 #### `authzPerBranch` (core/auth/authzPerBranch)
+
 - **Dependencies**: None (requires any auth plugin to be loaded first)
 - **Provides Hooks**: Authorization hooks via `AuthzBase`
 - **Consumes Hooks**: None
 - **Notes**: Branch-level authorization
 
 #### `authzLinid1` (core/auth/authzLinid1)
+
 - **Dependencies**: None (requires any auth plugin to be loaded first)
 - **Provides Hooks**: Authorization hooks via `AuthzBase`
 - **Consumes Hooks**: None
@@ -72,6 +79,7 @@ dependencies = {
 ### LDAP Core Plugins
 
 #### `onLdapChange` (core/ldap/onChange)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapmodifyrequest` - Before LDAP modify
@@ -86,6 +94,7 @@ dependencies = {
 - **Notes**: Core plugin for change detection and notification
 
 #### `ldapFlatGeneric` (core/ldap/flatGeneric)
+
 - **Dependencies**:
   - `departmentSync: 'core/ldap/departmentSync'` (optional)
 - **Provides Hooks**: Dynamic hooks based on entity type (e.g., `ldap{Entity}add`, `ldap{Entity}modify`, etc.)
@@ -93,6 +102,7 @@ dependencies = {
 - **Notes**: Creates multiple plugin instances based on schemas
 
 #### `ldapGroups` (core/ldap/groups)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapdeleterequest` - Before LDAP delete (checks group membership)
@@ -114,6 +124,7 @@ dependencies = {
 - **Notes**: Central group management plugin
 
 #### `ldapOrganizations` (core/ldap/organization)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapaddrequest` - Validates organization link/path on add
@@ -125,6 +136,7 @@ dependencies = {
 - **Notes**: Hierarchical organization management
 
 #### `ldapDepartmentSync` (core/ldap/departmentSync)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldaprenamedone` - After organization rename/move, updates all resources
@@ -132,6 +144,7 @@ dependencies = {
 - **Notes**: Synchronizes department links when organizations are renamed
 
 #### `externalUsersInGroups` (core/ldap/externalUsersInGroups)
+
 - **Dependencies**:
   - `ldapGroups: 'core/ldap/ldapGroups'` ⚠️ **Required**
 - **Provides Hooks**:
@@ -142,6 +155,7 @@ dependencies = {
 - **Notes**: Auto-creates external contacts when added to groups
 
 #### `trash` (core/ldap/trash)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapdeleterequest` - Intercepts deletes and moves to trash
@@ -149,6 +163,7 @@ dependencies = {
 - **Notes**: Soft delete system
 
 #### `ldapBulkImport` (core/ldap/bulkImport)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
@@ -157,6 +172,7 @@ dependencies = {
 ### Twake Integration Plugins
 
 #### `james` (twake/james)
+
 - **Dependencies**:
   - `onLdapChange: 'core/ldap/onChange'` ⚠️ **Required**
   - `ldapGroups: 'core/ldap/groups'` ⚠️ **Required**
@@ -175,6 +191,7 @@ dependencies = {
 - **Notes**: Synchronizes LDAP users/groups with Apache James mail server
 
 #### `calendarResources` (twake/calendarResources)
+
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapcalendarResourceadddone` - After calendar resource added
@@ -186,18 +203,21 @@ dependencies = {
 ### Utility Plugins
 
 #### `static` (core/static)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: Serves static files and JSON schemas
 
 #### `weblogs` (core/weblogs)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: HTTP request logging
 
 #### `configApi` (core/configApi)
+
 - **Dependencies**: None (reads configuration from other loaded plugins)
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
@@ -206,6 +226,7 @@ dependencies = {
 ### Demo Plugins
 
 #### `hello` (demo/helloworld)
+
 - **Dependencies**: None
 - **Provides Hooks**: None
 - **Consumes Hooks**: `hello` (demonstrates hook system)
@@ -458,14 +479,17 @@ graph TB
 ## Loading Order Recommendations
 
 ### 1. Security Plugins (must load first)
+
 1. `crowdsec` - IP blocking
 2. `rateLimit` - Rate limiting
 
 ### 2. Authentication Plugins
+
 3. `authToken` OR `authLemonldapNg` OR `openidconnect`
 4. `authzPerBranch` OR `authzLinid1` (optional, after auth)
 
 ### 3. LDAP Core Plugins
+
 5. `onChange` - Required by `james`
 6. `groups` - Required by `james` and `externalUsersInGroups`
 7. `organizations` - Organization management
@@ -476,10 +500,12 @@ graph TB
 12. `bulkImport` - Bulk import (optional)
 
 ### 4. Integration Plugins
+
 13. `james` - After `onChange` and `groups`
 14. `calendarResources` - Calendar sync (optional)
 
 ### 5. Utility Plugins (can load anytime)
+
 - `static` - Static files
 - `weblogs` - Logging
 - `configApi` - Configuration API
@@ -511,10 +537,12 @@ Hooks are executed in the order plugins are loaded. For chained hooks:
 3. Last plugin's return value is used
 
 For non-chained hooks:
+
 - All hooks execute in parallel
 - Order doesn't matter
 
 **Example**: `ldapdeleterequest` chain
+
 ```
 Request → trash (moves to trash) → groups (checks members) → organizations (checks empty) → LDAP
 ```
@@ -529,7 +557,7 @@ export default class MyPlugin extends DmPlugin {
 
   dependencies = {
     ldapGroups: 'core/ldap/ldapGroups',
-    onChange: 'core/ldap/onChange'
+    onChange: 'core/ldap/onChange',
   };
 }
 ```
@@ -542,7 +570,7 @@ export default class MyPlugin extends DmPlugin {
     onLdapMailChange: async ([dn, oldMail, newMail]) => {
       // React to mail changes
       console.log(`Mail changed from ${oldMail} to ${newMail}`);
-    }
+    },
   };
 }
 ```

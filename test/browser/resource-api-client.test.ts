@@ -238,16 +238,18 @@ describe('Browser Resource API Client', () => {
       const branch = 'ou=users,${LDAP_BASE}';
       const mockConfig = {
         features: {
-          flatResources: [
-            {
-              base: branch,
-              mainAttribute: 'uid',
-              schemaUrl: '/static/schemas/users.json',
-              endpoints: {
-                list: '/api/v1/ldap/users',
+          ldapFlatGeneric: {
+            flatResources: [
+              {
+                base: branch,
+                mainAttribute: 'uid',
+                schemaUrl: '/static/schemas/users.json',
+                endpoints: {
+                  list: '/api/v1/ldap/users',
+                },
               },
-            },
-          ],
+            ],
+          },
         },
       };
       const mockSchema = {
@@ -274,7 +276,7 @@ describe('Browser Resource API Client', () => {
     it('should handle missing config gracefully', async () => {
       const branch = 'ou=unknown,${LDAP_BASE}';
       const mockConfig = {
-        features: { flatResources: [] },
+        features: { ldapFlatGeneric: { flatResources: [] } },
       };
 
       nock(baseUrl).get('/api/v1/config').reply(200, mockConfig);

@@ -93,12 +93,7 @@ interface BulkImportConfig {
 interface ConfigApiResponse {
   apiPrefix: string;
   ldapBase: string;
-  features: {
-    groups?: GroupsConfig;
-    organizations?: OrganizationsConfig;
-    bulkImport?: BulkImportConfig;
-    flatResources: FlatResourceConfig[];
-  };
+  features: Record<string, unknown>;
 }
 
 export default class ConfigApi extends DmPlugin {
@@ -118,28 +113,8 @@ export default class ConfigApi extends DmPlugin {
       const config: ConfigApiResponse = {
         apiPrefix: apiPrefix,
         ldapBase: this.config.ldap_base || '',
-        features: {
-          flatResources: this.getFlatResourcesConfig(),
-        },
+        features: this.collectPluginConfigs(),
       };
-
-      // Add groups if available
-      const groupsConfig = this.getGroupsConfig();
-      if (groupsConfig) {
-        config.features.groups = groupsConfig;
-      }
-
-      // Add organizations if available
-      const orgsConfig = this.getOrganizationsConfig();
-      if (orgsConfig) {
-        config.features.organizations = orgsConfig;
-      }
-
-      // Add bulk import if available
-      const bulkImportConfig = this.getBulkImportConfig();
-      if (bulkImportConfig) {
-        config.features.bulkImport = bulkImportConfig;
-      }
 
       res.json(config);
     });
@@ -148,6 +123,38 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * Collect configuration from all plugins with 'configurable' role
+   */
+  private collectPluginConfigs(): Record<string, unknown> {
+    const features: Record<string, unknown> = {};
+
+    // Iterate through all loaded plugins
+    for (const [pluginName, plugin] of Object.entries(
+      this.server.loadedPlugins
+    )) {
+      // Skip self
+      if (pluginName === 'configApi') continue;
+
+      // Check if plugin has 'configurable' role
+      if (plugin.roles?.includes('configurable') && plugin.getConfigApiData) {
+        try {
+          const pluginConfig = plugin.getConfigApiData();
+          if (pluginConfig) {
+            features[pluginName] = pluginConfig;
+          }
+        } catch (err) {
+          this.logger.warn(
+            `Failed to get config from plugin ${pluginName}: ${String(err)}`
+          );
+        }
+      }
+    }
+
+    return features;
+  }
+
+  /**
+   * @deprecated Legacy method - kept for backward compatibility
    * Generate schema URL if static plugin is loaded
    */
   private getSchemaUrl(schemaPath: string): string | undefined {
@@ -176,6 +183,7 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * @deprecated Use plugin.getConfigApiData() instead (plugins should implement 'configurable' role)
    * Get configuration for ldapFlat instances
    */
   private getFlatResourcesConfig(): FlatResourceConfig[] {
@@ -229,6 +237,7 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * @deprecated Use plugin.getConfigApiData() instead (plugins should implement 'configurable' role)
    * Get configuration for groups plugin
    */
   private getGroupsConfig(): GroupsConfig | undefined {
@@ -278,6 +287,7 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * @deprecated Use plugin.getConfigApiData() instead (plugins should implement 'configurable' role)
    * Get configuration for organizations plugin
    */
   private getOrganizationsConfig(): OrganizationsConfig | undefined {
@@ -335,6 +345,7 @@ export default class ConfigApi extends DmPlugin {
   }
 
   /**
+   * @deprecated Use plugin.getConfigApiData() instead (plugins should implement 'configurable' role)
    * Get configuration for bulk import plugin
    */
   private getBulkImportConfig(): BulkImportConfig | undefined {

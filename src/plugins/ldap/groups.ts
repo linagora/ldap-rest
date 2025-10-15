@@ -46,7 +46,7 @@ export type postModify = ModifyRequest;
 
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
-  roles: Role[] = ['api'] as const;
+  roles: Role[] = ['api', 'configurable'] as const;
   base?: string;
   ldap: ldapActions;
   cn: string;
@@ -822,5 +822,43 @@ export default class LdapGroups extends DmPlugin {
       }
     }
     return true;
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    // Generate schema URL if static plugin is loaded
+    let schemaUrl: string | undefined;
+    if (this.server.loadedPlugins['static'] && this.config.group_schema) {
+      const staticName = this.config.static_name || 'static';
+      const schemasIndex = this.config.group_schema.indexOf('/schemas/');
+      if (schemasIndex !== -1) {
+        const relativePath = this.config.group_schema.substring(schemasIndex);
+        schemaUrl = `/${staticName}${relativePath}`;
+      }
+    }
+
+    return {
+      enabled: true,
+      base: this.base || '',
+      mainAttribute: this.cn || 'cn',
+      objectClass: this.config.group_class || ['top', 'groupOfNames'],
+      schema: this.schema,
+      schemaUrl,
+      endpoints: {
+        list: `${apiPrefix}/v1/ldap/groups`,
+        get: `${apiPrefix}/v1/ldap/groups/:id`,
+        create: `${apiPrefix}/v1/ldap/groups`,
+        update: `${apiPrefix}/v1/ldap/groups/:id`,
+        delete: `${apiPrefix}/v1/ldap/groups/:id`,
+        addMember: `${apiPrefix}/v1/ldap/groups/:id/members`,
+        removeMember: `${apiPrefix}/v1/ldap/groups/:id/members/:memberId`,
+        rename: `${apiPrefix}/v1/ldap/groups/:id/rename`,
+        move: `${apiPrefix}/v1/ldap/groups/:id/move`,
+      },
+    };
   }
 }

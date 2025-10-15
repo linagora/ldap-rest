@@ -58,7 +58,7 @@ interface BulkImportResult {
 
 export default class LdapBulkImport extends DmPlugin {
   name = 'ldapBulkImport';
-  roles: Role[] = [] as const; // No standard role, custom plugin
+  roles: Role[] = ['configurable'] as const;
 
   private resources: Map<string, BulkImportResource> = new Map();
   private upload: multer.Multer;
@@ -401,5 +401,45 @@ export default class LdapBulkImport extends DmPlugin {
     } catch (e) {
       return false;
     }
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+    const resources: Array<{
+      name: string;
+      mainAttribute: string;
+      base: string;
+      maxFileSize: number;
+      batchSize: number;
+      endpoints: {
+        template: string;
+        import: string;
+      };
+    }> = [];
+
+    this.resources.forEach((resource, resourceName) => {
+      resources.push({
+        name: resourceName,
+        mainAttribute: resource.mainAttribute,
+        base: resource.base,
+        maxFileSize:
+          parseInt(this.config.bulk_import_max_file_size as string, 10) ||
+          10485760,
+        batchSize:
+          parseInt(this.config.bulk_import_batch_size as string, 10) || 100,
+        endpoints: {
+          template: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
+          import: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}`,
+        },
+      });
+    });
+
+    return {
+      enabled: true,
+      resources,
+    };
   }
 }

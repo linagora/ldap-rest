@@ -105,7 +105,7 @@
 
       async function generateCreateUserForm() {
         const config = editor.getConfig();
-        if (!config || !config.features?.flatResources) {
+        if (!config || !config.features?.ldapFlatGeneric?.flatResources) {
           throw new Error('Configuration not loaded');
         }
 
@@ -116,9 +116,10 @@
         }
 
         // Find users resource
-        const usersResource = config.features.flatResources.find(
-          r => r.pluralName === 'users' || r.name === 'users'
-        );
+        const usersResource =
+          config.features.ldapFlatGeneric.flatResources.find(
+            r => r.pluralName === 'users' || r.name === 'users'
+          );
 
         if (!usersResource) {
           throw new Error('Users resource not found in configuration');

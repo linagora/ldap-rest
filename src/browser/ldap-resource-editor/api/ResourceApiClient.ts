@@ -225,9 +225,11 @@ export class ResourceApiClient {
     try {
       const config = await this.getConfig();
 
-      const resource = config.features?.flatResources?.find(r => {
-        return branch === r.base || branch.startsWith(r.base);
-      });
+      const resource = config.features?.ldapFlatGeneric?.flatResources?.find(
+        r => {
+          return branch === r.base || branch.startsWith(r.base);
+        }
+      );
 
       if (resource && resource.endpoints?.list) {
         const url = `${this.baseUrl}${resource.endpoints.list}`;
