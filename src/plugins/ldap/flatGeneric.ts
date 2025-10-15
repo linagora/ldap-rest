@@ -63,7 +63,7 @@ export default class LdapFlatGeneric extends DmPlugin {
     }
 
     // Load each schema and create an instance
-    schemas.forEach((schemaPath, index) => {
+    schemas.forEach((schemaPath) => {
       try {
         const schemaData = fs.readFileSync(schemaPath, 'utf8');
         const schema = JSON.parse(
