@@ -48,16 +48,22 @@ If you want to extend Mini-DM with custom plugins, see below:
 #### LDAP Management
 
 - **[ldapFlatGeneric](ldapFlatGeneric.md)** - Schema-driven LDAP entity management (users, positions, etc.)
-- **[ldapFlat](ldapFlat.md)** - Legacy flat LDAP plugin (deprecated, use ldapFlatGeneric)
 - **[ldapGroups](ldapGroups.md)** - LDAP group management with member validation
 - **[ldapOrganizations](ldapOrganizations.md)** - Hierarchical organization tree management
 - **[ldapExternalUsersInGroups](ldapExternalUsersInGroups.md)** - Auto-create external contacts in groups
+- **[ldapTrash](ldapTrash.md)** - Soft delete system - moves entries to trash instead of deleting
 - **[onChange](onChange.md)** - Detect and react to LDAP attribute changes
 
 #### Authentication & Authorization
 
 - **[authentication](authentication.md)** - Complete authentication guide (Token, LLNG, OpenID Connect)
 - **[authzPerBranch](authzPerBranch.md)** - Branch-level authorization and access control
+- **[authzLinid1](authzLinid1.md)** - LinID 1.x authorization integration
+
+#### Security
+
+- **crowdsec** - CrowdSec integration to block banned IPs (must be loaded before auth plugins)
+- **rateLimit** - Rate limiting to prevent brute-force attacks (must be loaded before auth plugins)
 
 #### Utilities
 
@@ -69,6 +75,7 @@ If you want to extend Mini-DM with custom plugins, see below:
 #### Twake
 
 - **[twakeJames](twakeJames.md)** - Apache James mail server synchronization
+- **[twakeCalendarResources](twakeCalendarResources.md)** - Twake Calendar resources synchronization
 
 ## Quick Start
 
@@ -129,6 +136,7 @@ Plugins for managing different LDAP entity types:
 | ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers |
 | ldapGroups        | Groups                   | Member validation, Nested groups    |
 | ldapOrganizations | Organizational Units     | Tree navigation, Search             |
+| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata    |
 
 ### Authentication
 
@@ -140,6 +148,16 @@ Secure API access:
 | llng           | LemonLDAP::NG | Enterprise SSO               |
 | openidconnect  | OAuth2/OIDC   | Cloud identity, Social login |
 | authzPerBranch | Authorization | Branch-level access control  |
+| authzLinid1    | Authorization | LinID 1.x integration        |
+
+### Security
+
+Protection and rate limiting:
+
+| Plugin    | Type                | Use Case                        |
+| --------- | ------------------- | ------------------------------- |
+| crowdsec  | IP blocking         | Block banned IPs via CrowdSec   |
+| rateLimit | Rate limiting       | Prevent brute-force attacks     |
 
 ### Integration
 
