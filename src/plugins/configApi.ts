@@ -17,6 +17,7 @@ import type { Schema } from '../config/schema';
 import type LdapFlatGeneric from './ldap/flatGeneric';
 import type LdapGroups from './ldap/groups';
 import type LdapOrganization from './ldap/organization';
+import type LdapBulkImport from './ldap/bulkImport';
 
 interface FlatResourceConfig {
   name: string;
@@ -72,12 +73,30 @@ interface OrganizationsConfig {
   };
 }
 
+interface BulkImportResourceConfig {
+  name: string;
+  mainAttribute: string;
+  base: string;
+  maxFileSize: number;
+  batchSize: number;
+  endpoints: {
+    template: string;
+    import: string;
+  };
+}
+
+interface BulkImportConfig {
+  enabled: boolean;
+  resources: BulkImportResourceConfig[];
+}
+
 interface ConfigApiResponse {
   apiPrefix: string;
   ldapBase: string;
   features: {
     groups?: GroupsConfig;
     organizations?: OrganizationsConfig;
+    bulkImport?: BulkImportConfig;
     flatResources: FlatResourceConfig[];
   };
 }
@@ -114,6 +133,12 @@ export default class ConfigApi extends DmPlugin {
       const orgsConfig = this.getOrganizationsConfig();
       if (orgsConfig) {
         config.features.organizations = orgsConfig;
+      }
+
+      // Add bulk import if available
+      const bulkImportConfig = this.getBulkImportConfig();
+      if (bulkImportConfig) {
+        config.features.bulkImport = bulkImportConfig;
       }
 
       res.json(config);
@@ -306,6 +331,58 @@ export default class ConfigApi extends DmPlugin {
         getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
         searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
       },
+    };
+  }
+
+  /**
+   * Get configuration for bulk import plugin
+   */
+  private getBulkImportConfig(): BulkImportConfig | undefined {
+    const bulkImportPlugin = this.server.loadedPlugins[
+      'ldapBulkImport'
+    ] as LdapBulkImport;
+    if (!bulkImportPlugin) {
+      return undefined;
+    }
+
+    const apiPrefix = this.config.api_prefix || '/api';
+    const resources: BulkImportResourceConfig[] = [];
+
+    // Access the resources map from the plugin
+    // @ts-expect-error - accessing private property for configuration purposes
+    const resourcesMap = bulkImportPlugin.resources as Map<
+      string,
+      {
+        name: string;
+        base: string;
+        mainAttribute: string;
+      }
+    >;
+
+    if (!resourcesMap) {
+      return undefined;
+    }
+
+    resourcesMap.forEach((resource, resourceName) => {
+      resources.push({
+        name: resourceName,
+        mainAttribute: resource.mainAttribute,
+        base: resource.base,
+        maxFileSize:
+          parseInt(this.config.bulk_import_max_file_size as string, 10) ||
+          10485760,
+        batchSize:
+          parseInt(this.config.bulk_import_batch_size as string, 10) || 100,
+        endpoints: {
+          template: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
+          import: `${apiPrefix}/v1/ldap/bulk-import/${resourceName}`,
+        },
+      });
+    });
+
+    return {
+      enabled: true,
+      resources,
     };
   }
 }
