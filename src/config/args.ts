@@ -129,6 +129,7 @@ export interface Config {
   james_concurrency?: number;
   james_init_delay?: number;
   james_mailing_list_branch?: string[];
+  james_mailbox_type_attribute?: string;
 
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
@@ -333,6 +334,11 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--james-mailing-list-branches',
+  ],
+  [
+    '--james-mailbox-type-attribute',
+    'DM_JAMES_MAILBOX_TYPE_ATTRIBUTE',
+    'twakeMailboxType',
   ],
 
   // Calendar Resources plugin

@@ -114,6 +114,7 @@ description: Deleted on 2025-10-15T10:30:45.123Z from uid=john,ou=users,dc=examp
 ```
 
 This helps track:
+
 - When the entry was deleted
 - Where it originally existed
 
@@ -143,7 +144,7 @@ await dm.ldap.move(
 
 // Clean up metadata (optional)
 await dm.ldap.modify('uid=john,ou=users,dc=example,dc=com', {
-  delete: { description: [] }
+  delete: { description: [] },
 });
 ```
 
@@ -180,6 +181,7 @@ olcAccess: to dn.subtree="dc=example,dc=com"
 ```
 
 If you get permission errors, check your LDAP ACLs and ensure the bind DN can:
+
 - Read entries from watched branches
 - Move entries to trash branch (modifyDN)
 - Modify entries in trash (to add metadata)

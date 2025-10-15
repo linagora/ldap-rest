@@ -48,15 +48,19 @@ Add to your mini-dm configuration:
 ```bash
 # Optional: Restrict mailing lists to specific branches
 --james-mailing-list-branches "ou=lists,dc=example,dc=com"
+
+# Optional: Custom mailbox type attribute (default: twakeMailboxType)
+--james-mailbox-type-attribute "mailboxType"
 ```
 
-Or via environment variable:
+Or via environment variables:
 
 ```bash
 DM_JAMES_MAILING_LIST_BRANCHES="ou=lists,dc=example,dc=com"
+DM_JAMES_MAILBOX_TYPE_ATTRIBUTE="mailboxType"
 ```
 
-If empty (default), mailing lists can be created anywhere.
+If `james-mailing-list-branches` is empty (default), mailing lists can be created anywhere.
 
 ## Usage
 

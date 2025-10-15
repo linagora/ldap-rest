@@ -154,10 +154,10 @@ Secure API access:
 
 Protection and rate limiting:
 
-| Plugin    | Type                | Use Case                        |
-| --------- | ------------------- | ------------------------------- |
-| crowdsec  | IP blocking         | Block banned IPs via CrowdSec   |
-| rateLimit | Rate limiting       | Prevent brute-force attacks     |
+| Plugin    | Type          | Use Case                      |
+| --------- | ------------- | ----------------------------- |
+| crowdsec  | IP blocking   | Block banned IPs via CrowdSec |
+| rateLimit | Rate limiting | Prevent brute-force attacks   |
 
 ### Integration
 

@@ -23,6 +23,7 @@ export default class James extends TwakePlugin {
   // James-specific configuration attributes
   private quotaAttr: string;
   private aliasAttr: string;
+  private mailboxTypeAttr: string;
   private initDelay: number;
 
   constructor(server: DM) {
@@ -37,6 +38,9 @@ export default class James extends TwakePlugin {
     this.quotaAttr = (this.config.quota_attribute as string) || 'mailQuotaSize';
     this.aliasAttr =
       (this.config.alias_attribute as string) || 'mailAlternateAddress';
+    this.mailboxTypeAttr =
+      (this.config.james_mailbox_type_attribute as string) ||
+      'twakeMailboxType';
     this.initDelay =
       typeof this.config.james_init_delay === 'number'
         ? this.config.james_init_delay
@@ -383,7 +387,10 @@ export default class James extends TwakePlugin {
       const [dn, changes] = args;
 
       // Check if mailboxType is being changed
-      if (changes.replace?.twakeMailboxType || changes.add?.twakeMailboxType) {
+      if (
+        changes.replace?.[this.mailboxTypeAttr] ||
+        changes.add?.[this.mailboxTypeAttr]
+      ) {
         await this.handleMailboxTypeTransition(dn, changes);
         return; // Transition handles everything including members
       }
@@ -520,7 +527,7 @@ export default class James extends TwakePlugin {
     const attributes = await this.ldapGetAttributes(dn, [
       'mail',
       'member',
-      'twakeMailboxType',
+      this.mailboxTypeAttr,
     ]);
 
     if (!attributes) {
@@ -544,13 +551,14 @@ export default class James extends TwakePlugin {
 
     // Determine old and new mailbox types
     const newMailboxTypeDn =
-      changes.replace?.twakeMailboxType || changes.add?.twakeMailboxType;
+      changes.replace?.[this.mailboxTypeAttr] ||
+      changes.add?.[this.mailboxTypeAttr];
     const newMailboxTypeStr = Array.isArray(newMailboxTypeDn)
       ? String(newMailboxTypeDn[0])
       : String(newMailboxTypeDn);
 
     const newType = this.getMailboxType({
-      twakeMailboxType: newMailboxTypeStr,
+      [this.mailboxTypeAttr]: newMailboxTypeStr,
     });
     const oldType = this.getMailboxType(attributes);
 
@@ -814,7 +822,7 @@ export default class James extends TwakePlugin {
   private getMailboxType(
     attributes: AttributesList
   ): 'group' | 'mailingList' | 'teamMailbox' | null {
-    const mailboxType = attributes.twakeMailboxType;
+    const mailboxType = attributes[this.mailboxTypeAttr];
     if (!mailboxType) return null;
 
     // Extract cn from DN (e.g., "cn=mailingList,ou=twakeMailboxType,...")
@@ -1078,7 +1086,7 @@ export default class James extends TwakePlugin {
   ): Promise<'group' | 'mailingList' | 'teamMailbox' | null> {
     try {
       const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: ['twakeMailboxType'] },
+        { paged: false, scope: 'base', attributes: [this.mailboxTypeAttr] },
         groupDn
       )) as SearchResult;
 

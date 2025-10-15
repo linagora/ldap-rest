@@ -166,7 +166,9 @@ class ldapActions {
     }
 
     if (expired.length > 0) {
-      this.logger.debug(`Cleaned up ${expired.length} expired LDAP connections`);
+      this.logger.debug(
+        `Cleaned up ${expired.length} expired LDAP connections`
+      );
     }
   }
 
@@ -201,8 +203,10 @@ class ldapActions {
     }
 
     // Pool is full, wait for an available connection
-    this.logger.debug('LDAP connection pool full, waiting for available connection');
-    return new Promise((resolve) => {
+    this.logger.debug(
+      'LDAP connection pool full, waiting for available connection'
+    );
+    return new Promise(resolve => {
       const checkInterval = setInterval(() => {
         this.cleanupExpiredConnections();
         const available = this.connectionPool.find(conn => !conn.inUse);
@@ -313,7 +317,10 @@ class ldapActions {
 
       // For paginated searches, return a wrapped generator that releases connection when done
       if (opts.paged) {
-        return this.wrapPaginatedSearch(res as AsyncGenerator<SearchResult>, pooled);
+        return this.wrapPaginatedSearch(
+          res as AsyncGenerator<SearchResult>,
+          pooled
+        );
       }
 
       return res;

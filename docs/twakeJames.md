@@ -39,6 +39,7 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--mail-attribute`: LDAP attribute for email (default: `mail`)
 - `--quota-attribute`: LDAP attribute for quota (default: `mailQuota`)
 - `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
+- `--james-mailbox-type-attribute`: LDAP attribute for mailbox type (default: `twakeMailboxType`)
 
 ## How It Works
 
