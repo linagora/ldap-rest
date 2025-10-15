@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import pLimit from 'p-limit';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
@@ -25,6 +26,9 @@ export default class James extends DmPlugin {
   private aliasAttr: string;
   private displayNameAttr: string;
 
+  // Concurrency limiter for James HTTP requests
+  private jamesLimit: ReturnType<typeof pLimit>;
+
   constructor(server: DM) {
     super(server);
 
@@ -33,6 +37,16 @@ export default class James extends DmPlugin {
     this.quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
     this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
     this.displayNameAttr = this.config.display_name_attribute || 'displayName';
+
+    // Initialize James HTTP concurrency limiter
+    const jamesConcurrency =
+      typeof this.config.james_concurrency === 'number'
+        ? this.config.james_concurrency
+        : 10;
+    this.jamesLimit = pLimit(jamesConcurrency);
+    this.logger.info(
+      `James HTTP request concurrency limit set to ${jamesConcurrency}`
+    );
   }
 
   /**
@@ -785,10 +799,12 @@ export default class James extends DmPlugin {
     try {
       // Step 1: Get user identities
       const identitiesUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}`;
-      const getRes = await fetch(identitiesUrl, {
-        method: 'GET',
-        headers: this.createJamesHeaders(),
-      });
+      const getRes = await this.jamesLimit(() =>
+        fetch(identitiesUrl, {
+          method: 'GET',
+          headers: this.createJamesHeaders(),
+        })
+      );
       if (!getRes.ok) {
         this.logger.error({
           ...log,
@@ -839,11 +855,13 @@ export default class James extends DmPlugin {
         updatePayload.htmlSignature = htmlSignature;
       }
 
-      const updateRes = await fetch(updateUrl, {
-        method: 'PUT',
-        headers: this.createJamesHeaders('application/json'),
-        body: JSON.stringify(updatePayload),
-      });
+      const updateRes = await this.jamesLimit(() =>
+        fetch(updateUrl, {
+          method: 'PUT',
+          headers: this.createJamesHeaders('application/json'),
+          body: JSON.stringify(updatePayload),
+        })
+      );
 
       if (!updateRes.ok) {
         this.logger.error({
@@ -1300,55 +1318,57 @@ export default class James extends DmPlugin {
     body: string | null,
     fields: object
   ): Promise<void> {
-    // Prepare log
-    const log = {
-      plugin: this.name,
-      event: `${hookname}`,
-      result: 'error',
-      dn,
-      ...fields,
-    };
-    try {
-      const opts: {
-        method: string;
-        body?: string | null;
-        headers?: { Authorization?: string };
-      } = { method };
-      if (body) Object.assign(opts, { body });
-      if (this.config.james_webadmin_token) {
-        if (!opts.headers) opts.headers = {};
-        opts.headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
-      }
-      const res = await fetch(url, opts);
-      if (!res.ok) {
-        // 409 Conflict is acceptable for alias creation - may already exist
-        // (e.g., James automatically creates alias when renaming user)
-        if (res.status === 409 && hookname.includes('Alias')) {
-          this.logger.debug({
-            ...log,
-            result: 'already_exists',
-            http_status: res.status,
-            http_status_text: res.statusText,
-          });
+    return this.jamesLimit(async () => {
+      // Prepare log
+      const log = {
+        plugin: this.name,
+        event: `${hookname}`,
+        result: 'error',
+        dn,
+        ...fields,
+      };
+      try {
+        const opts: {
+          method: string;
+          body?: string | null;
+          headers?: { Authorization?: string };
+        } = { method };
+        if (body) Object.assign(opts, { body });
+        if (this.config.james_webadmin_token) {
+          if (!opts.headers) opts.headers = {};
+          opts.headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
+        }
+        const res = await fetch(url, opts);
+        if (!res.ok) {
+          // 409 Conflict is acceptable for alias creation - may already exist
+          // (e.g., James automatically creates alias when renaming user)
+          if (res.status === 409 && hookname.includes('Alias')) {
+            this.logger.debug({
+              ...log,
+              result: 'already_exists',
+              http_status: res.status,
+              http_status_text: res.statusText,
+            });
+          } else {
+            this.logger.error({
+              ...log,
+              http_status: res.status,
+              http_status_text: res.statusText,
+            });
+          }
         } else {
-          this.logger.error({
+          this.logger.info({
             ...log,
+            result: 'success',
             http_status: res.status,
-            http_status_text: res.statusText,
           });
         }
-      } else {
-        this.logger.info({
+      } catch (err) {
+        this.logger.error({
           ...log,
-          result: 'success',
-          http_status: res.status,
+          error: err,
         });
       }
-    } catch (err) {
-      this.logger.error({
-        ...log,
-        error: err,
-      });
-    }
+    });
   }
 }
