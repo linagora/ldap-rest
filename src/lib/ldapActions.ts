@@ -510,7 +510,7 @@ class ldapActions {
     }
   }
 
-  async rename(dn: string, newRdn: string, req?: any): Promise<boolean> {
+  async rename(dn: string, newRdn: string, req?: Request): Promise<boolean> {
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
     [dn, newRdn] = await launchHooksChained(

@@ -196,7 +196,13 @@ export default class LdapOrganizations extends DmPlugin {
       return badRequest(res, 'Missing or invalid targetOrgDn in request body');
     }
 
-    await tryMethodData(res, this.moveOrganization.bind(this), dn, targetOrgDn, req);
+    await tryMethodData(
+      res,
+      this.moveOrganization.bind(this),
+      dn,
+      targetOrgDn,
+      req
+    );
   }
 
   /**
@@ -689,7 +695,7 @@ export default class LdapOrganizations extends DmPlugin {
   async moveOrganization(
     dn: string,
     targetOrgDn: string,
-    req?: any
+    req?: Request
   ): Promise<{ newDn: string }> {
     // Validate that target organization exists
     try {
