@@ -64,6 +64,10 @@
       "import": "./dist/plugins/demo/helloworld.js",
       "types": "./dist/src/plugins/demo/helloworld.d.ts"
     },
+    "plugin-ldap-departmentsync": {
+      "import": "./dist/plugins/ldap/departmentSync.js",
+      "types": "./dist/src/plugins/ldap/departmentSync.d.ts"
+    },
     "plugin-ldap-externalusersingroups": {
       "import": "./dist/plugins/ldap/externalUsersInGroups.js",
       "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts"
@@ -187,6 +191,10 @@
     "browser-ldap-unit-editor-api-unitapiclient": {
       "import": "./static/browser/ldap-unit-editor/api/UnitApiClient.js",
       "types": "./dist/src/browser/ldap-unit-editor/api/UnitApiClient.d.ts"
+    },
+    "browser-ldap-unit-editor-components-moveunitmodal": {
+      "import": "./static/browser/ldap-unit-editor/components/MoveUnitModal.js",
+      "types": "./dist/src/browser/ldap-unit-editor/components/MoveUnitModal.d.ts"
     },
     "browser-ldap-unit-editor-components-unitpropertyeditor": {
       "import": "./static/browser/ldap-unit-editor/components/UnitPropertyEditor.js",
