@@ -269,6 +269,12 @@ POST /api/v1/ldap/organizations/:dn/move
 - Cannot move to the same parent (no-op)
 - Target must be a valid organizational unit
 
+**Authorization:**
+
+When using the `authzPerBranch` plugin, moving an organization requires:
+- **Read** permission on the source organization (current parent)
+- **Write** permission on the destination organization (new parent)
+
 **Example:**
 
 ```bash
@@ -285,7 +291,6 @@ This moves `ou=Recruitment,ou=HR,dc=example,dc=com` to `ou=Recruitment,ou=Operat
 
 ```json
 {
-  "success": true,
   "newDn": "ou=Recruitment,ou=Operations,dc=example,dc=com"
 }
 ```

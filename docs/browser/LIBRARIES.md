@@ -1166,9 +1166,9 @@ The LdapUnitEditor requires the following Mini-DM API endpoints:
 - `GET /api/v1/ldap/organizations/:dn` - Get organization details
 - `GET /api/v1/ldap/organizations/:dn/subnodes` - Get child organizations
 - `POST /api/v1/ldap/organizations` - Create new organization
-- `PATCH /api/v1/ldap/organizations/:dn` - Update organization
+- `PUT /api/v1/ldap/organizations/:dn` - Update organization
 - `POST /api/v1/ldap/organizations/:dn/move` - Move organization to new parent
-- `DELETE /api/v1/ldap/entries/:dn` - Delete organization
+- `DELETE /api/v1/ldap/organizations/:dn` - Delete organization
 
 See [LDAP Organizations Plugin Documentation](../ldapOrganizations.md) for API details.
 
