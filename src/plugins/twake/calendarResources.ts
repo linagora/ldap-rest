@@ -293,7 +293,9 @@ export default class CalendarResources extends DmPlugin {
           };
         } = {
           method,
-          headers: this.createCalendarHeaders(body ? 'application/json' : undefined),
+          headers: this.createCalendarHeaders(
+            body ? 'application/json' : undefined
+          ),
         };
 
         if (body) {

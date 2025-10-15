@@ -67,9 +67,10 @@ class ldapActions {
     );
 
     // Initialize LRU cache for search results
-    const cacheMax: number = typeof this.config.ldap_cache_max === 'string'
-      ? parseInt(this.config.ldap_cache_max, 10) || 1000
-      : (this.config.ldap_cache_max ?? 1000);
+    const cacheMax: number =
+      typeof this.config.ldap_cache_max === 'string'
+        ? parseInt(this.config.ldap_cache_max, 10) || 1000
+        : (this.config.ldap_cache_max ?? 1000);
     const cacheTtl = (this.config.ldap_cache_ttl || 300) * 1000; // Convert seconds to ms
     this.searchCache = new LRUCache<string, SearchResult>({
       max: cacheMax,
@@ -142,8 +143,8 @@ class ldapActions {
       typeof opts.filter === 'string'
         ? opts.filter
         : opts.filter
-        ? opts.filter.toString()
-        : '(objectClass=*)';
+          ? opts.filter.toString()
+          : '(objectClass=*)';
     return `${base}:${opts.scope || 'sub'}:${filterStr}:${sortedAttrs}`;
   }
 

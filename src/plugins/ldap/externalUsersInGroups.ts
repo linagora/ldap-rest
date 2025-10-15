@@ -82,8 +82,9 @@ export default class ExternalUsersInGroups extends DmPlugin {
                   );
                   return true;
                 } catch (e) {
-                  // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-                  throw new Error(`Unable to insert ${m}: ${e}`);
+                  throw new Error(
+                    `Unable to insert ${m}: ${e instanceof Error ? e.message : String(e)}`
+                  );
                 }
               }
             })

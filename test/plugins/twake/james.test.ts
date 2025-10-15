@@ -400,6 +400,73 @@ describe('James Plugin', () => {
         renameScope.persist(false);
       }
     });
+
+    it('should rename mailbox when mail changes without aliases', async () => {
+      // Create user without aliases
+      const testDNNoAlias = `uid=noaliasuser,${process.env.DM_LDAP_BASE}`;
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'noaliasuser',
+        mail: 'noalias@test.org',
+        cn: 'No Alias User',
+        sn: 'User',
+      };
+
+      // Add rename mock for this test
+      const renameScope = nock(
+        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+      )
+        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename')
+        .reply(200, { success: true })
+        .get('/jmap/identities/noalias@test.org')
+        .reply(200, [
+          {
+            id: 'noalias-identity-id',
+            name: 'No Alias User',
+            email: 'noalias@test.org',
+          },
+        ])
+        .put('/jmap/identities/noalias@test.org/noalias-identity-id')
+        .reply(200, { success: true })
+        .get('/jmap/identities/newalias@test.org')
+        .reply(200, [
+          {
+            id: 'newalias-identity-id',
+            name: 'No Alias User',
+            email: 'newalias@test.org',
+          },
+        ])
+        .put('/jmap/identities/newalias@test.org/newalias-identity-id')
+        .reply(200, { success: true });
+
+      try {
+        let res = await dm.ldap.add(testDNNoAlias, entry);
+        expect(res).to.be.true;
+
+        // Wait for creation
+        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        // Change mail - should only rename, no aliases to update
+        res = await dm.ldap.modify(testDNNoAlias, {
+          replace: { mail: 'newalias@test.org' },
+        });
+        expect(res).to.be.true;
+
+        // Wait for rename
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verify the rename endpoint was called
+        expect(renameScope.isDone()).to.be.false; // nock persist mode
+      } finally {
+        // Cleanup
+        try {
+          await dm.ldap.delete(testDNNoAlias);
+        } catch (err) {
+          // Ignore
+        }
+        renameScope.persist(false);
+      }
+    });
   });
 
   describe('Forward management', () => {

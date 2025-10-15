@@ -15,309 +15,32 @@
       rel="stylesheet"
     />
 
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
     <!-- Library CSS -->
     <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
 
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+      :root {
+        --primary-color: #6200ee;
+        --primary-color-dark: #4a00b8;
       }
 
       body {
-        font-family: 'Roboto', sans-serif;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        padding: 24px;
-      }
-
-      .demo-container {
-        max-width: 1400px;
-        margin: 0 auto;
-      }
-
-      .demo-header {
-        background: white;
-        color: #333;
-        padding: 32px;
-        margin-bottom: 24px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
 
       .demo-header h1 {
-        font-size: 32px;
-        font-weight: 500;
-        margin-bottom: 8px;
         color: #6200ee;
       }
 
-      .demo-header p {
-        font-size: 16px;
-        color: #666;
-      }
-
-      #ldap-user-editor {
-        /* The editor library will add its own styling */
-      }
-
-      .status-message {
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .status-message.error {
-        background: #ffebee;
-        color: #c62828;
-      }
-
-      .status-message.success {
-        background: #e8f5e9;
-        color: #2e7d32;
-      }
-
-      .action-buttons {
-        display: flex;
-        gap: 12px;
-        margin-top: 16px;
-      }
-
       .action-button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        background: #6200ee;
-        color: white;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: background 0.2s;
+        background: var(--primary-color);
       }
 
       .action-button:hover {
-        background: #4a00b8;
-      }
-
-      .action-button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-
-      .action-button.danger {
-        background: #d32f2f;
-      }
-
-      .action-button.danger:hover {
-        background: #b71c1c;
-      }
-
-      .modal-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .modal-overlay.active {
-        display: flex;
-      }
-
-      .modal {
-        background: white;
-        border-radius: 8px;
-        padding: 24px;
-        max-width: 600px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-      }
-
-      .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-      }
-
-      .modal-header h2 {
-        font-size: 24px;
-        font-weight: 500;
-        color: #333;
-        margin: 0;
-      }
-
-      .close-button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 24px;
-        color: #666;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-      }
-
-      .close-button:hover {
-        background: #f0f0f0;
-      }
-
-      .form-group {
-        margin-bottom: 20px;
-      }
-
-      .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: #333;
-      }
-
-      .form-group label.required::after {
-        content: ' *';
-        color: #d32f2f;
-      }
-
-      .form-group input,
-      .form-group textarea,
-      .form-group select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-      }
-
-      .form-group textarea {
-        min-height: 80px;
-        resize: vertical;
-      }
-
-      .form-group input:focus,
-      .form-group textarea:focus,
-      .form-group select:focus {
-        outline: none;
-        border-color: #6200ee;
-      }
-
-      .form-select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        font-size: 14px;
-        font-family: 'Roboto', sans-serif;
-        background-color: white;
-        cursor: pointer;
-      }
-
-      .form-select:focus {
-        outline: none;
-        border-color: #6200ee;
-      }
-
-      .array-field {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .array-item {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .btn {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        transition: background 0.2s;
-      }
-
-      .btn-secondary {
-        background: #f0f0f0;
-        color: #333;
-      }
-
-      .btn-secondary:hover {
-        background: #e0e0e0;
-      }
-
-      .btn-icon {
-        padding: 8px;
-        min-width: auto;
-      }
-
-      .btn .material-icons {
-        font-size: 18px;
-      }
-
-      .form-group .help-text {
-        font-size: 12px;
-        color: #666;
-        margin-top: 4px;
-      }
-
-      .modal-footer {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        margin-top: 24px;
-      }
-
-      .modal-footer button {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: background 0.2s;
-      }
-
-      .modal-footer button.primary {
-        background: #6200ee;
-        color: white;
-      }
-
-      .modal-footer button.primary:hover {
-        background: #4a00b8;
-      }
-
-      .modal-footer button.secondary {
-        background: #f0f0f0;
-        color: #333;
-      }
-
-      .modal-footer button.secondary:hover {
-        background: #e0e0e0;
+        background: var(--primary-color-dark);
       }
     </style>
   </head>
@@ -360,214 +83,25 @@
       </div>
     </div>
 
+    <!-- Shared utilities -->
+    <script src="/static/browser/shared.js"></script>
     <!-- Library JS -->
     <script src="/static/browser/ldap-user-editor.js"></script>
 
     <script>
       const { LdapUserEditor } = window.LdapUserEditor;
+      const {
+        escapeHtml,
+        showStatus,
+        generateFormField,
+        processFormData,
+        loadPointerOptions,
+        replaceSchemaPlaceholders,
+        getOrganizationPath,
+      } = window.MiniDmShared;
 
       let editor;
       let userSchema;
-      let pointerOptionsCache = {};
-
-      /**
-       * Escape HTML special characters to prevent XSS attacks
-       * Reference: https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
-       */
-      function escapeHtml(text) {
-        if (text == null) return '';
-        const map = {
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#x27;',
-          '/': '&#x2F;',
-        };
-        return String(text).replace(/[&<>"'/]/g, m => map[m]);
-      }
-
-      function showStatus(message, type = 'error') {
-        const container = document.getElementById('status-container');
-        container.innerHTML = `
-        <div class="status-message ${escapeHtml(type)}">
-          <span class="material-icons">${type === 'error' ? 'error_outline' : 'check_circle'}</span>
-          <span>${escapeHtml(message)}</span>
-        </div>
-      `;
-        setTimeout(() => {
-          container.innerHTML = '';
-        }, 5000);
-      }
-
-      function getFieldLabel(fieldName, attribute) {
-        // Convert camelCase or snake_case to Title Case
-        const label = fieldName.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ');
-        return label.charAt(0).toUpperCase() + label.slice(1);
-      }
-
-      async function loadPointerOptions(branch) {
-        if (pointerOptionsCache[branch]) {
-          return pointerOptionsCache[branch];
-        }
-
-        try {
-          const api = editor.getApi();
-          const options = await api.getPointerOptions(branch);
-          pointerOptionsCache[branch] = options;
-          return options;
-        } catch (error) {
-          console.error(
-            'Failed to load pointer options for branch:',
-            branch,
-            error
-          );
-          return [];
-        }
-      }
-
-      async function generateFormField(fieldName, attribute) {
-        const label = getFieldLabel(fieldName, attribute);
-        const required = attribute.required ? 'required' : '';
-        const labelClass = attribute.required ? 'required' : '';
-
-        let fieldHtml = '';
-
-        if (attribute.type === 'pointer') {
-          // Pointer field - load options and display select
-          const branch = attribute.branch?.[0];
-          if (branch) {
-            const options = await loadPointerOptions(branch);
-            fieldHtml = `
-              <div class="form-group">
-                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-                <select id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" class="form-select" ${required}>
-                  <option value="">Select...</option>
-                  ${options
-                    .map(
-                      opt => `
-                    <option value="${escapeHtml(opt.dn)}">${escapeHtml(opt.label)}</option>
-                  `
-                    )
-                    .join('')}
-                </select>
-              </div>
-            `;
-          } else {
-            // Fallback if no branch defined
-            fieldHtml = `
-              <div class="form-group">
-                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-                <input type="text" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
-                <div class="help-text">Enter DN (Distinguished Name)</div>
-              </div>
-            `;
-          }
-        } else if (
-          attribute.type === 'array' &&
-          attribute.items?.type === 'pointer'
-        ) {
-          // Array of pointers - load options and display multiple selects
-          const branch = attribute.items.branch?.[0];
-          if (branch) {
-            const options = await loadPointerOptions(branch);
-            fieldHtml = `
-              <div class="form-group">
-                <label class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-                <div class="array-field pointer-array-field" data-field="${escapeHtml(fieldName)}" data-branch="${escapeHtml(branch)}">
-                  <button type="button" class="btn btn-secondary add-pointer-item" data-field="${escapeHtml(fieldName)}">
-                    <span class="material-icons">add</span>
-                    Add ${escapeHtml(label)}
-                  </button>
-                </div>
-                <input type="hidden" name="${escapeHtml(fieldName)}" id="${escapeHtml(fieldName)}-hidden" value="" />
-              </div>
-            `;
-          } else {
-            // Fallback
-            fieldHtml = `
-              <div class="form-group">
-                <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-                <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
-                <div class="help-text">Enter one DN per line</div>
-              </div>
-            `;
-          }
-        } else if (
-          attribute.type === 'array' &&
-          attribute.items?.type === 'string'
-        ) {
-          // Array field - use textarea
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <textarea id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required}></textarea>
-              <div class="help-text">Enter one value per line</div>
-            </div>
-          `;
-        } else if (
-          attribute.type === 'number' ||
-          attribute.type === 'integer'
-        ) {
-          // Number field
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <input type="number" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
-            </div>
-          `;
-        } else if (attribute.type === 'string') {
-          // String field - use input
-          const type =
-            fieldName.toLowerCase().includes('password') ||
-            fieldName.toLowerCase().includes('pwd')
-              ? 'password'
-              : fieldName.toLowerCase().includes('mail')
-                ? 'email'
-                : 'text';
-          fieldHtml = `
-            <div class="form-group">
-              <label for="${escapeHtml(fieldName)}" class="${escapeHtml(labelClass)}">${escapeHtml(label)}</label>
-              <input type="${escapeHtml(type)}" id="${escapeHtml(fieldName)}" name="${escapeHtml(fieldName)}" ${required} />
-            </div>
-          `;
-        }
-
-        return fieldHtml;
-      }
-
-      async function getOrganizationPath(orgDn) {
-        try {
-          const response = await fetch(
-            `${window.location.origin}/api/v1/ldap/organizations/${encodeURIComponent(orgDn)}`
-          );
-          if (!response.ok) {
-            console.error('Failed to fetch organization:', response.status);
-            return orgDn;
-          }
-          const org = await response.json();
-
-          // Use twakeDepartmentPath if available (Twake schema)
-          if (org.twakeDepartmentPath) {
-            const pathValue = Array.isArray(org.twakeDepartmentPath)
-              ? org.twakeDepartmentPath[0]
-              : org.twakeDepartmentPath;
-            return pathValue;
-          }
-
-          // Fallback to ou name for non-Twake schemas
-          if (org.ou) {
-            const ouValue = Array.isArray(org.ou) ? org.ou[0] : org.ou;
-            return ouValue;
-          }
-
-          // Last resort: use DN
-          return orgDn;
-        } catch (error) {
-          console.error('Failed to get organization info:', error);
-          return orgDn;
-        }
-      }
 
       async function generateCreateUserForm() {
         const config = editor.getConfig();
@@ -602,26 +136,17 @@
         }
 
         // Get organization path for twakeDepartmentPath
-        const orgPath = await getOrganizationPath(currentOrgDn);
+        const orgPath = await getOrganizationPath(
+          currentOrgDn,
+          window.location.origin
+        );
 
         // Replace placeholders in schema branches
         const ldapBase = editor.getConfig().ldapBase;
-        for (const attr of Object.values(userSchema.attributes)) {
-          if (attr.branch) {
-            attr.branch = attr.branch.map(b =>
-              b
-                .replace(/__LDAP_BASE__/g, ldapBase)
-                .replace(/__ldap_base__/g, ldapBase)
-            );
-          }
-          if (attr.items?.branch) {
-            attr.items.branch = attr.items.branch.map(b =>
-              b
-                .replace(/__LDAP_BASE__/g, ldapBase)
-                .replace(/__ldap_base__/g, ldapBase)
-            );
-          }
-        }
+        userSchema = replaceSchemaPlaceholders(userSchema, {
+          __LDAP_BASE__: ldapBase,
+          __ldap_base__: ldapBase,
+        });
 
         // Generate form fields from schema
         const formFields = document.getElementById('form-fields');
@@ -632,6 +157,12 @@
         fieldsHtml += objectClasses
           .map(oc => `<input type="hidden" name="objectClass" value="${oc}" />`)
           .join('');
+
+        // API loader for pointer options
+        const pointerLoader = async branch => {
+          const api = editor.getApi();
+          return await api.getPointerOptions(branch);
+        };
 
         // Generate fields for all non-fixed attributes
         for (const [fieldName, attribute] of Object.entries(
@@ -655,7 +186,9 @@
             continue;
           }
 
-          fieldsHtml += await generateFormField(fieldName, attribute);
+          fieldsHtml += await generateFormField(fieldName, attribute, {
+            pointerOptionsLoader: pointerLoader,
+          });
         }
 
         formFields.innerHTML = fieldsHtml;
@@ -666,6 +199,7 @@
 
       function attachPointerArrayHandlers() {
         const modal = document.getElementById('create-user-modal');
+        const api = editor.getApi();
 
         // Add button handlers for pointer arrays
         modal.querySelectorAll('.add-pointer-item').forEach(btn => {
@@ -676,8 +210,10 @@
 
             if (!branch) return;
 
-            // Load options if not cached
-            const options = await loadPointerOptions(branch);
+            // Load options using shared utility
+            const options = await loadPointerOptions(branch, async b => {
+              return await api.getPointerOptions(b);
+            });
 
             // Create new select element
             const itemHtml = `
@@ -722,7 +258,7 @@
           })
           .catch(error => {
             console.error('Failed to generate form:', error);
-            showStatus(`Error: ${error.message}`, 'error');
+            showStatus('status-container', `Error: ${error.message}`, 'error');
           });
       }
 
@@ -730,8 +266,6 @@
         const modal = document.getElementById('create-user-modal');
         modal.classList.remove('active');
         document.getElementById('create-user-form').reset();
-        // Clear pointer options cache when closing
-        pointerOptionsCache = {};
       }
 
       async function handleCreateUser(event) {
@@ -739,20 +273,6 @@
 
         const form = event.target;
         const formData = new FormData(form);
-        const userData = {};
-
-        // Process form data
-        for (const [key, value] of formData.entries()) {
-          if (userData[key]) {
-            // Multiple values for the same key - convert to array
-            if (!Array.isArray(userData[key])) {
-              userData[key] = [userData[key]];
-            }
-            userData[key].push(value);
-          } else {
-            userData[key] = value;
-          }
-        }
 
         // Process pointer array fields (manually collect from selects)
         const modal = document.getElementById('create-user-modal');
@@ -764,66 +284,35 @@
             .filter(val => val); // Remove empty values
 
           if (values.length > 0) {
-            userData[fieldName] = values;
+            // Add all values to formData
+            values.forEach(val => formData.append(fieldName, val));
           }
         });
 
-        // Process special field types
-        for (const [fieldName, attribute] of Object.entries(
-          userSchema.attributes
-        )) {
-          if (!userData[fieldName]) continue;
+        // Use shared utility to process form data
+        const userData = processFormData(formData, userSchema.attributes);
 
-          if (
-            attribute.type === 'array' &&
-            typeof userData[fieldName] === 'string'
-          ) {
-            // Split by newlines and filter empty lines
-            userData[fieldName] = userData[fieldName]
-              .split('\n')
-              .map(line => line.trim())
-              .filter(line => line.length > 0);
-          } else if (
-            attribute.type === 'number' ||
-            attribute.type === 'integer'
-          ) {
-            // Convert to number
-            userData[fieldName] =
-              attribute.type === 'integer'
-                ? parseInt(userData[fieldName], 10)
-                : parseFloat(userData[fieldName]);
-          }
-        }
-
-        // Clean up: remove empty strings and null values
-        const cleanedData = {};
-        for (const [key, value] of Object.entries(userData)) {
-          if (value === '' || value === null || value === undefined) {
-            continue; // Skip empty values
-          }
-          if (Array.isArray(value) && value.length === 0) {
-            continue; // Skip empty arrays
-          }
-          cleanedData[key] = value;
-        }
-
-        console.log('Creating user with data:', cleanedData);
+        console.log('Creating user with data:', userData);
 
         try {
-          await editor.createUser(cleanedData);
-          showStatus('User created successfully!', 'success');
+          await editor.createUser(userData);
+          showStatus(
+            'status-container',
+            'User created successfully!',
+            'success'
+          );
           closeCreateUserModal();
         } catch (error) {
           console.error('Failed to create user:', error);
           const errorMessage = error.message || error.toString();
-          showStatus(`Error: ${errorMessage}`, 'error');
+          showStatus('status-container', `Error: ${errorMessage}`, 'error');
         }
       }
 
       async function handleDeleteUser() {
         const userDn = editor.getCurrentUserDn();
         if (!userDn) {
-          showStatus('No user selected', 'error');
+          showStatus('status-container', 'No user selected', 'error');
           return;
         }
 
@@ -835,13 +324,17 @@
 
         try {
           await editor.deleteUser(userDn);
-          showStatus('User deleted successfully!', 'success');
+          showStatus(
+            'status-container',
+            'User deleted successfully!',
+            'success'
+          );
 
           // Disable delete button
           document.getElementById('delete-user-btn').disabled = true;
         } catch (error) {
           console.error('Failed to delete user:', error);
-          showStatus(`Error: ${error.message}`, 'error');
+          showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
 
@@ -852,16 +345,28 @@
             apiBaseUrl: window.location.origin,
             onUserSaved: userDn => {
               console.log('User saved:', userDn);
-              showStatus('User saved successfully!', 'success');
+              showStatus(
+                'status-container',
+                'User saved successfully!',
+                'success'
+              );
             },
             onError: error => {
               console.error('Editor error:', error);
-              showStatus(`Error: ${error.message}`, 'error');
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
             },
           });
 
           await editor.init();
-          showStatus('LDAP User Editor loaded successfully!', 'success');
+          showStatus(
+            'status-container',
+            'LDAP User Editor loaded successfully!',
+            'success'
+          );
 
           // Enable/disable buttons based on selection
           setInterval(() => {
@@ -872,7 +377,7 @@
           }, 500);
         } catch (error) {
           console.error('Failed to initialize editor:', error);
-          showStatus(`Error: ${error.message}`, 'error');
+          showStatus('status-container', `Error: ${error.message}`, 'error');
         }
       }
 

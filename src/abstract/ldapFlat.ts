@@ -465,11 +465,6 @@ export default abstract class LdapFlat extends DmPlugin {
       throw new Error(`Entry ${dn} not found`);
     }
 
-    const oldOrgDn = currentEntry.searchEntries[0][linkAttr];
-    const oldOrgDnStr = Array.isArray(oldOrgDn)
-      ? String(oldOrgDn[0])
-      : String(oldOrgDn);
-
     // Get department path from target organization
     const departmentPath = await this.getDepartmentPath(targetOrgDn, req);
 

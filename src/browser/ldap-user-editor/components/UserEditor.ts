@@ -5,6 +5,7 @@
 import type { LdapUser, Schema, SchemaAttribute } from '../types';
 import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
+import { MoveUserModal } from './MoveUserModal';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -164,11 +165,17 @@ export class UserEditor {
         <form id="user-edit-form" class="editor-form">
           ${this.renderFormSections()}
 
-          <div class="editor-actions" style="margin-top: 2rem; justify-content: space-between">
-            <button type="button" class="btn btn-secondary" id="delete-user-btn" style="background: #d32f2f; color: white;">
-              <span class="material-icons">person_remove</span>
-              Delete User
-            </button>
+          <div class="editor-actions" style="margin-top: 2rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="btn btn-secondary" id="move-user-btn">
+                <span class="material-icons">drive_file_move</span>
+                Move User
+              </button>
+              <button type="button" class="btn btn-secondary" id="delete-user-btn" style="background: #d32f2f; color: white;">
+                <span class="material-icons">person_remove</span>
+                Delete User
+              </button>
+            </div>
             <button type="submit" class="btn btn-primary">
               <span class="material-icons">save</span>
               Save Changes
@@ -241,6 +248,11 @@ export class UserEditor {
 
     // Skip fixed fields - they cannot be edited
     if (attr.fixed) {
+      return '';
+    }
+
+    // Hide organizationLink and organizationPath fields - use Move button instead
+    if (attr.role === 'organizationLink' || attr.role === 'organizationPath') {
       return '';
     }
 
@@ -425,6 +437,10 @@ export class UserEditor {
     const form = this.container.querySelector('#user-edit-form');
     form?.addEventListener('submit', e => this.handleSubmit(e));
 
+    // Move button
+    const moveBtn = this.container.querySelector('#move-user-btn');
+    moveBtn?.addEventListener('click', () => this.handleMove());
+
     // Delete button
     const deleteBtn = this.container.querySelector('#delete-user-btn');
     deleteBtn?.addEventListener('click', () => this.handleDelete());
@@ -570,9 +586,101 @@ export class UserEditor {
     }
   }
 
+  private async handleMove(): Promise<void> {
+    if (!this.user || !this.schema) return;
+
+    // Find the organizationLink field to get current organization
+    const orgLinkField = Object.entries(this.schema.attributes).find(
+      ([, attr]) => attr.role === 'organizationLink'
+    );
+
+    if (!orgLinkField) {
+      alert('This user type does not support moving between organizations');
+      return;
+    }
+
+    const [orgLinkFieldName] = orgLinkField;
+    const currentOrgDn = Array.isArray(this.user[orgLinkFieldName])
+      ? String(this.user[orgLinkFieldName][0])
+      : String(this.user[orgLinkFieldName] || '');
+
+    if (!currentOrgDn) {
+      alert('User does not have an organization link');
+      return;
+    }
+
+    const modal = new MoveUserModal(
+      this.api,
+      currentOrgDn,
+      async (targetOrgDn: string) => {
+        await this.performMove(targetOrgDn);
+      }
+    );
+
+    await modal.show();
+  }
+
+  private async performMove(targetOrgDn: string): Promise<void> {
+    const alertContainer = this.container.querySelector('#alert-container');
+    const moveBtn = this.container.querySelector(
+      '#move-user-btn'
+    ) as HTMLButtonElement;
+
+    if (alertContainer) alertContainer.innerHTML = '';
+    if (moveBtn) {
+      moveBtn.disabled = true;
+      moveBtn.innerHTML = `
+        <span class="spinner" style="width: 1rem; height: 1rem; border-width: 2px;"></span>
+        Moving...
+      `;
+    }
+
+    try {
+      const result = await this.api.moveUser(this.userDn, targetOrgDn);
+
+      if (alertContainer) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-success">
+            <span class="material-icons">check_circle</span>
+            <div>User moved successfully!</div>
+          </div>
+        `;
+      }
+
+      // Update the userDn if it changed
+      if (result.newDn) {
+        this.userDn = result.newDn;
+      }
+
+      // Reload the user data to show updated organization
+      await this.init();
+
+      if (this.onSaved) this.onSaved();
+    } catch (error) {
+      if (alertContainer) {
+        alertContainer.innerHTML = `
+          <div class="alert alert-error">
+            <span class="material-icons">error</span>
+            <div>${UserEditor.escapeHtml((error as Error).message)}</div>
+          </div>
+        `;
+      }
+
+      // Re-enable button on error
+      if (moveBtn) {
+        moveBtn.disabled = false;
+        moveBtn.innerHTML = `
+          <span class="material-icons">drive_file_move</span>
+          Move User
+        `;
+      }
+
+      throw error;
+    }
+  }
+
   private async handleDelete(): Promise<void> {
     if (
-      // eslint-disable-next-line no-undef
       !confirm(`Are you sure you want to delete this user?\n\n${this.userDn}`)
     ) {
       return;

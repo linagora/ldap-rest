@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP Unit Editor Demo</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Library CSS -->
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
+    <link rel="stylesheet" href="/static/browser/ldap-user-editor.css" />
+
+    <style>
+      :root {
+        --primary-color: #f5576c;
+        --primary-color-dark: #d43d50;
+      }
+
+      body {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+
+      .demo-header h1 {
+        color: #f5576c;
+      }
+
+      .action-button {
+        background: var(--primary-color);
+      }
+
+      .action-button:hover {
+        background: var(--primary-color-dark);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>🏢 LDAP Organization Unit Editor</h1>
+        <p>
+          Manage organizational units and departments in your LDAP directory
+        </p>
+      </div>
+
+      <div id="status-container"></div>
+
+      <div id="ldap-unit-editor" style="min-height: 600px"></div>
+    </div>
+
+    <!-- Shared utilities -->
+    <script src="/static/browser/shared.js"></script>
+    <!-- Library JS -->
+    <script src="/static/browser/ldap-unit-editor.js"></script>
+
+    <script>
+      const { LdapUnitEditor } = window.LdapUnitEditor;
+      const { showStatus } = window.MiniDmShared;
+
+      async function initEditor() {
+        try {
+          const editor = new LdapUnitEditor({
+            containerId: 'ldap-unit-editor',
+            apiBaseUrl: window.location.origin,
+            onUnitSaved: unitDn => {
+              console.log('Unit saved:', unitDn);
+              showStatus(
+                'status-container',
+                'Organization unit saved successfully!',
+                'success'
+              );
+            },
+            onError: error => {
+              console.error('Editor error:', error);
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
+            },
+          });
+
+          await editor.init();
+          showStatus(
+            'status-container',
+            'LDAP Organization Unit Editor loaded successfully!',
+            'success'
+          );
+        } catch (error) {
+          console.error('Failed to initialize editor:', error);
+          showStatus('status-container', `Error: ${error.message}`, 'error');
+        }
+      }
+
+      initEditor();
+    </script>
+  </body>
+</html>

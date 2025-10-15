@@ -7,12 +7,15 @@
  * @group Libraries
  */
 import type { SearchOptions } from 'ldapts';
-import type { Request } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../auth/base';
-import type { AttributesList, ModifyRequest, SearchResult } from '../ldapActions';
+import type {
+  AttributesList,
+  ModifyRequest,
+  SearchResult,
+} from '../ldapActions';
 import { getParentDn } from '../utils';
 
 /**
@@ -193,7 +196,7 @@ export default abstract class AuthzBase extends DmPlugin {
       AttributesList | null,
     ]): Promise<[DmRequest | undefined, AttributesList | null]> => {
       // If no user, return default
-      if (this.shouldSkipAuthorization(req as DmRequest | undefined)) {
+      if (this.shouldSkipAuthorization(req as DmRequest)) {
         return [req, defaultTop];
       }
 

@@ -1,18 +1,27 @@
 /**
- * LDAP User Editor - API Client
+ * LDAP Resource Editor - Generic API Client
  */
 
-import type { Config, LdapUser, PointerOption, Schema } from '../types';
+import type {
+  Config,
+  LdapResource,
+  PointerOption,
+  Schema,
+  ResourceType,
+} from '../types';
 import { CacheManager } from '../cache/CacheManager';
 
-export class UserApiClient {
+export class ResourceApiClient {
   private baseUrl: string;
   private cache: CacheManager;
+  private resourceType: ResourceType;
 
   constructor(
+    resourceType: ResourceType,
     baseUrl: string = '',
     cacheOptions?: { ttl?: number; maxEntries?: number }
   ) {
+    this.resourceType = resourceType;
     this.baseUrl =
       baseUrl || (typeof window !== 'undefined' ? window.location.origin : '');
     this.cache = new CacheManager(cacheOptions);
@@ -25,6 +34,10 @@ export class UserApiClient {
 
   private getApiBase(): string {
     return `${this.baseUrl}/api/v1`;
+  }
+
+  private getResourceEndpoint(): string {
+    return `${this.getApiBase()}/ldap/${this.resourceType}`;
   }
 
   private getFirstValue(value: unknown): string {
@@ -74,25 +87,28 @@ export class UserApiClient {
     return this.cachedFetch<Schema>(url);
   }
 
-  async getUsers(search = ''): Promise<LdapUser[]> {
+  async getResources(search = ''): Promise<LdapResource[]> {
     const url = search
-      ? `${this.getApiBase()}/ldap/users?match=${encodeURIComponent(search)}&attribute=uid`
-      : `${this.getApiBase()}/ldap/users`;
-    const data = await this.cachedFetch<LdapUser[] | Record<string, LdapUser>>(
-      url
-    );
-    // Convert from object format {uid: entry} to array format
+      ? `${this.getResourceEndpoint()}?match=${encodeURIComponent(search)}&attribute=${this.getMainAttribute()}`
+      : this.getResourceEndpoint();
+    const data = await this.cachedFetch<
+      LdapResource[] | Record<string, LdapResource>
+    >(url);
+    // Convert from object format {key: entry} to array format
     return Array.isArray(data) ? data : Object.values(data);
   }
 
-  async getUser(dn: string): Promise<LdapUser> {
-    const url = `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`;
-    return this.cachedFetch<LdapUser>(url);
+  async getResource(dn: string): Promise<LdapResource> {
+    const url = `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`;
+    return this.cachedFetch<LdapResource>(url);
   }
 
-  async updateUser(dn: string, data: Partial<LdapUser>): Promise<LdapUser> {
+  async updateResource(
+    dn: string,
+    data: Partial<LdapResource>
+  ): Promise<LdapResource> {
     const res = await fetch(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`,
+      `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -101,112 +117,132 @@ export class UserApiClient {
     );
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(error || 'Failed to update user');
+      throw new Error(
+        `Failed to update ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
     const result = await res.json();
 
-    // Invalidate cache for this user and user lists
+    // Invalidate cache
     this.cache.invalidate(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
+      `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`
     );
-    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+    this.cache.invalidatePattern(`${this.getResourceEndpoint()}*`);
 
     return result;
   }
 
-  async createUser(data: Partial<LdapUser>): Promise<LdapUser> {
-    const res = await fetch(`${this.getApiBase()}/ldap/users`, {
+  async createResource(data: Partial<LdapResource>): Promise<LdapResource> {
+    const res = await fetch(this.getResourceEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(error || 'Failed to create user');
+      throw new Error(
+        `Failed to create ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
     const result = await res.json();
 
-    // Invalidate cache for user lists
-    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+    // Invalidate cache
+    this.cache.invalidatePattern(`${this.getResourceEndpoint()}*`);
 
     return result;
   }
 
-  async deleteUser(dn: string): Promise<void> {
+  async deleteResource(dn: string): Promise<void> {
     const res = await fetch(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`,
+      `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`,
       {
         method: 'DELETE',
       }
     );
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(error || 'Failed to delete user');
+      throw new Error(
+        `Failed to delete ${this.resourceType}: ${error || 'Unknown error'}`
+      );
     }
 
-    // Invalidate cache for this user and user lists
+    // Invalidate cache
     this.cache.invalidate(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
+      `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`
     );
-    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+    this.cache.invalidatePattern(`${this.getResourceEndpoint()}*`);
   }
 
-  async moveUser(
+  /**
+   * Create a generic entry (for organizations tree navigation)
+   */
+  async createEntry(
     dn: string,
-    targetOrgDn: string
-  ): Promise<{ success: boolean; newDn?: string }> {
+    data: Partial<LdapResource>
+  ): Promise<LdapResource> {
     const res = await fetch(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}/move`,
+      `${this.getApiBase()}/ldap/entry/${encodeURIComponent(dn)}`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetOrgDn }),
+        body: JSON.stringify(data),
       }
     );
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(error || 'Failed to move user');
+      throw new Error(`Failed to create entry: ${error || 'Unknown error'}`);
     }
     const result = await res.json();
 
-    // Invalidate cache for this user and user lists
-    this.cache.invalidate(
-      `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`
-    );
-    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/users*`);
+    // Invalidate cache
+    this.cache.invalidatePattern(`${this.getResourceEndpoint()}*`);
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/organizations*`);
 
     return result;
   }
 
+  /**
+   * Delete a generic entry (for organizations)
+   */
+  async deleteEntry(dn: string): Promise<void> {
+    const res = await fetch(
+      `${this.getApiBase()}/ldap/entry/${encodeURIComponent(dn)}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(`Failed to delete entry: ${error || 'Unknown error'}`);
+    }
+
+    // Invalidate cache
+    this.cache.invalidatePattern(`${this.getResourceEndpoint()}*`);
+    this.cache.invalidatePattern(`${this.getApiBase()}/ldap/organizations*`);
+  }
+
   async getPointerOptions(branch: string): Promise<PointerOption[]> {
     try {
-      // Load config to find the right endpoint by matching base
       const config = await this.getConfig();
 
-      // Find resource that matches this branch by comparing base
       const resource = config.features?.flatResources?.find(r => {
-        // Match if branch equals base or branch starts with base
         return branch === r.base || branch.startsWith(r.base);
       });
 
       if (resource && resource.endpoints?.list) {
-        // Use the endpoint from config
         const url = `${this.baseUrl}${resource.endpoints.list}`;
         const data = await this.cachedFetch<
-          LdapUser[] | Record<string, LdapUser>
+          LdapResource[] | Record<string, LdapResource>
         >(url);
 
-        // Convert from object format {key: entry} to array
         const items = Array.isArray(data) ? data : Object.values(data);
 
-        // Load schema to get displayName field
-        let displayNameField = 'cn'; // Default fallback
+        let displayNameField = 'cn';
         const identifierField = resource.mainAttribute;
 
         if (resource.schemaUrl) {
           try {
             const schema = await this.getSchema(resource.schemaUrl);
-            // Find field with displayName role
             const displayField = Object.entries(schema.attributes).find(
               ([, attr]) => attr.role === 'displayName'
             );
@@ -219,7 +255,7 @@ export class UserApiClient {
           }
         }
 
-        return items.map((item: LdapUser) => {
+        return items.map((item: LdapResource) => {
           const displayName = this.getFirstValue(item[displayNameField]);
           const identifier = this.getFirstValue(item[identifierField]);
           return {
@@ -229,7 +265,6 @@ export class UserApiClient {
         });
       }
 
-      // No matching resource found in config
       throw new Error(`No flatResource found in config for branch: ${branch}`);
     } catch (error) {
       console.error(
@@ -242,26 +277,32 @@ export class UserApiClient {
   }
 
   /**
-   * Cache management methods
+   * Get main attribute for this resource type
    */
+  private getMainAttribute(): string {
+    switch (this.resourceType) {
+      case 'users':
+        return 'uid';
+      case 'groups':
+        return 'cn';
+      case 'organizations':
+        return 'ou';
+      default:
+        return 'cn';
+    }
+  }
 
   /**
-   * Clear all cache
+   * Cache management methods
    */
   clearCache(): void {
     this.cache.clear();
   }
 
-  /**
-   * Invalidate cache for a specific URL pattern
-   */
   invalidateCache(pattern: string): void {
     this.cache.invalidatePattern(pattern);
   }
 
-  /**
-   * Get cache statistics
-   */
   getCacheStats(): {
     size: number;
     maxSize: number;
@@ -271,9 +312,6 @@ export class UserApiClient {
     return this.cache.getStats();
   }
 
-  /**
-   * Get cache instance (for advanced usage)
-   */
   getCache(): CacheManager {
     return this.cache;
   }
