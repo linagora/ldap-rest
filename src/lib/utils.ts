@@ -19,10 +19,13 @@ export const launchHooks = async (
 ): Promise<void> => {
   if (hooks) {
     for (const hook of hooks) {
-      if (hook)
-        await hook(...args).catch((e: unknown) =>
-          logger.error('Hook error', e)
-        );
+      if (hook) {
+        try {
+          await hook(...args);
+        } catch (e: unknown) {
+          logger.error('Hook error', e);
+        }
+      }
     }
   }
 };
