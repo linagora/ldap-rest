@@ -389,7 +389,10 @@ export default class LdapOrganizations extends DmPlugin {
             entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
             entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
           ) {
-            const entryPath = entry[this.pathAttr] as string | undefined;
+            const pathValue = entry[this.pathAttr];
+            const entryPath = Array.isArray(pathValue)
+              ? (pathValue[0] as string | undefined)
+              : (pathValue as string | undefined);
             // Top org should either have no path attribute or a simple path (just its name)
             if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
               found = true;
@@ -405,7 +408,10 @@ export default class LdapOrganizations extends DmPlugin {
         // Verify parent organization exists with the specified path
         let found = false;
         for (const entry of (entries as SearchResult).searchEntries) {
-          const entryPath = entry[this.pathAttr] as string;
+          const pathValue = entry[this.pathAttr];
+          const entryPath = Array.isArray(pathValue)
+            ? (pathValue[0] as string)
+            : (pathValue as string);
           if (entryPath && entryPath === ouPath) {
             found = true;
             break;

@@ -56,10 +56,18 @@ export class UnitApiClient {
 
   async createEntry(dn: string, data: Record<string, unknown>): Promise<void> {
     // Use the organizations API for creating units
+    // Extract ou and parentDn from DN
+    // DN format: ou=value,parent,dn,parts
+    const match = dn.match(/^ou=([^,]+),(.+)$/);
+    if (!match) {
+      throw new Error(`Invalid DN format: ${dn}`);
+    }
+    const [, ou, parentDn] = match;
+
     const response = await fetch(`${this.baseUrl}/api/v1/ldap/organizations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dn, ...data }),
+      body: JSON.stringify({ ou, parentDn, ...data }),
     });
     if (!response.ok) {
       const error = await response.text();
