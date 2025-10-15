@@ -355,10 +355,10 @@ describe('LdapGroups Plugin', function () {
       expect(result).to.have.property('success', true);
 
       // Verify group was moved
-      const group = await plugin.ldap.search(
+      const group = (await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      ) as SearchResult;
+      )) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });
@@ -420,10 +420,10 @@ describe('LdapGroups Plugin', function () {
       expect(res.body).to.deep.equal({ success: true });
 
       // Verify group was moved
-      const group = await plugin.ldap.search(
+      const group = (await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      ) as SearchResult;
+      )) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });
@@ -433,10 +433,10 @@ describe('LdapGroups Plugin', function () {
       expect(result).to.have.property('success', true);
 
       // Verify group was moved
-      const group = await plugin.ldap.search(
+      const group = (await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      ) as SearchResult;
+      )) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });

@@ -203,7 +203,13 @@ export default class LdapGroups extends DmPlugin {
             targetOrgDn: string;
           };
           if (!body) return;
-          await tryMethod(res, this.moveGroup.bind(this), cn, body.targetOrgDn);
+          await tryMethod(
+            res,
+            this.moveGroup.bind(this),
+            cn,
+            body.targetOrgDn,
+            req
+          );
         }
       );
     }
@@ -488,7 +494,8 @@ export default class LdapGroups extends DmPlugin {
    */
   async moveGroup(
     cn: string,
-    targetOrgDn: string
+    targetOrgDn: string,
+    req?: any
   ): Promise<{ success: boolean }> {
     const linkAttr = this.config.ldap_organization_link_attribute as string;
     const pathAttr = this.config.ldap_organization_path_attribute as string;
@@ -551,12 +558,16 @@ export default class LdapGroups extends DmPlugin {
     }
 
     // Update group's department link and path
-    await this.ldap.modify(dn, {
-      replace: {
-        [linkAttr]: targetOrgDn,
-        [pathAttr]: targetPath,
+    await this.ldap.modify(
+      dn,
+      {
+        replace: {
+          [linkAttr]: targetOrgDn,
+          [pathAttr]: targetPath,
+        },
       },
-    });
+      req
+    );
 
     this.logger.info(
       `Group ${dn} moved from ${currentDeptLink} to ${targetOrgDn}`

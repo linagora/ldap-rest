@@ -90,28 +90,73 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, changes, opNumber, req];
       }
 
-      // Determine which branch to check permissions for
-      let branchToCheck: string;
-
-      // If modifying organization link, check write permission for the new organization
+      // Check if this is a move operation (changing organization link)
       const linkAttr = this.config.ldap_organization_link_attribute;
       if (linkAttr && changes.replace?.[linkAttr]) {
+        // For move operations, we need to check:
+        // 1. Read permission on the source (current location)
+        // 2. Write permission on the destination (new location)
+
+        // First, check read permission on source
+        // Get the current entry to find its current organization link
+        try {
+          const currentEntry = (await this.server.ldap.search(
+            { paged: false, scope: 'base', attributes: [linkAttr] },
+            dn
+          )) as SearchResult;
+
+          if (currentEntry.searchEntries.length > 0) {
+            const currentLink = currentEntry.searchEntries[0][linkAttr];
+            const sourceBranch = Array.isArray(currentLink)
+              ? String(currentLink[0])
+              : String(currentLink);
+
+            const sourcePermissions = await this.getUserPermissions(
+              user,
+              sourceBranch
+            );
+            if (!sourcePermissions.read) {
+              throw new Error(
+                `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+              );
+            }
+          }
+        } catch (err) {
+          // If we can't read the current entry, check permissions on the entry's parent branch
+          const sourceBranch = this.extractBranchDn(dn);
+          const sourcePermissions = await this.getUserPermissions(
+            user,
+            sourceBranch
+          );
+          if (!sourcePermissions.read) {
+            throw new Error(
+              `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+            );
+          }
+        }
+
+        // Then check write permission on destination
         const newLink = changes.replace[linkAttr];
-        branchToCheck = Array.isArray(newLink)
+        const destBranch = Array.isArray(newLink)
           ? String(newLink[0])
           : String(newLink);
+
+        const destPermissions = await this.getUserPermissions(user, destBranch);
+        if (!destPermissions.write) {
+          throw new Error(
+            `User ${req!.user} does not have write permission for destination branch ${destBranch}`
+          );
+        }
       } else {
-        // For other modifications, check the entry's current branch
-        branchToCheck = this.extractBranchDn(dn);
-      }
+        // For other modifications, check write permission on the entry's current branch
+        const branchToCheck = this.extractBranchDn(dn);
+        const permissions = await this.getUserPermissions(user, branchToCheck);
 
-      const permissions = await this.getUserPermissions(user, branchToCheck);
-
-      // Check write permission
-      if (!permissions.write) {
-        throw new Error(
-          `User ${req!.user} does not have write permission for branch ${branchToCheck}`
-        );
+        if (!permissions.write) {
+          throw new Error(
+            `User ${req!.user} does not have write permission for branch ${branchToCheck}`
+          );
+        }
       }
 
       return [dn, changes, opNumber, req];
@@ -239,6 +284,51 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Return default if no authorized branches
       return [req, defaultTop];
+    },
+
+    ldaprenamerequest: async ([oldDn, newDn, req]: [
+      string,
+      string,
+      DmRequest?,
+    ]): Promise<[string, string, DmRequest?]> => {
+      if (this.shouldSkipAuthorization(req)) {
+        return [oldDn, newDn, req];
+      }
+
+      const user = await this.resolveUser(req!.user!);
+      if (!user) {
+        this.logger.warn(`User ${req!.user} could not be resolved`);
+        return [oldDn, newDn, req];
+      }
+
+      // For rename/move operations, we need to check:
+      // 1. Read permission on the source (current location)
+      // 2. Write permission on the destination (new location)
+
+      // Extract source and destination branches
+      const sourceBranch = this.extractBranchDn(oldDn);
+      const destBranch = this.extractBranchDn(newDn);
+
+      // Check read permission on source
+      const sourcePermissions = await this.getUserPermissions(
+        user,
+        sourceBranch
+      );
+      if (!sourcePermissions.read) {
+        throw new Error(
+          `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+        );
+      }
+
+      // Check write permission on destination
+      const destPermissions = await this.getUserPermissions(user, destBranch);
+      if (!destPermissions.write) {
+        throw new Error(
+          `User ${req!.user} does not have write permission for destination branch ${destBranch}`
+        );
+      }
+
+      return [oldDn, newDn, req];
     },
   };
 }

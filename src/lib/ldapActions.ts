@@ -510,12 +510,12 @@ class ldapActions {
     }
   }
 
-  async rename(dn: string, newRdn: string): Promise<boolean> {
+  async rename(dn: string, newRdn: string, req?: any): Promise<boolean> {
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
     [dn, newRdn] = await launchHooksChained(
       this.parent.hooks.ldaprenamerequest,
-      [dn, newRdn]
+      [dn, newRdn, req]
     );
     const pooled = await this.acquireConnection();
     try {

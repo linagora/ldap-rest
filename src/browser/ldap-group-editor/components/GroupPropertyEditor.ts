@@ -488,7 +488,9 @@ export class GroupPropertyEditor {
     try {
       // Check if cn has changed - if so, use rename API instead
       if (updates.cn && this.group?.cn) {
-        const oldCn = Array.isArray(this.group.cn) ? this.group.cn[0] : this.group.cn;
+        const oldCn = Array.isArray(this.group.cn)
+          ? this.group.cn[0]
+          : this.group.cn;
         const newCn = updates.cn as string;
 
         if (oldCn !== newCn) {
@@ -499,7 +501,10 @@ export class GroupPropertyEditor {
           await this.api.renameGroup(this.groupDn, newCn);
 
           // Update the groupDn for subsequent operations
-          const newDn = this.groupDn.replace(new RegExp(`^cn=${oldCn},`), `cn=${newCn},`);
+          const newDn = this.groupDn.replace(
+            new RegExp(`^cn=${oldCn},`),
+            `cn=${newCn},`
+          );
           this.groupDn = newDn;
 
           // If there are other updates, apply them to the renamed group

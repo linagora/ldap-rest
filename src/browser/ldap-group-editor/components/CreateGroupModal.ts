@@ -131,7 +131,8 @@ export class CreateGroupModal {
       if (!response.ok) return null;
 
       const org = await response.json();
-      const pathAttr = (this.config as any).features?.organizations?.pathAttribute as string | undefined;
+      const pathAttr = (this.config as any).features?.organizations
+        ?.pathAttribute as string | undefined;
       if (pathAttr && org[pathAttr]) {
         return Array.isArray(org[pathAttr]) ? org[pathAttr][0] : org[pathAttr];
       }
@@ -188,12 +189,10 @@ export class CreateGroupModal {
       }
 
       // Add organization link and path (required for twake groups)
-      const linkAttr = (this.config as any).features?.organizations?.linkAttribute as
-        | string
-        | undefined;
-      const pathAttr = (this.config as any).features?.organizations?.pathAttribute as
-        | string
-        | undefined;
+      const linkAttr = (this.config as any).features?.organizations
+        ?.linkAttribute as string | undefined;
+      const pathAttr = (this.config as any).features?.organizations
+        ?.pathAttribute as string | undefined;
 
       if (linkAttr && pathAttr) {
         if (!orgPath) {
@@ -205,11 +204,14 @@ export class CreateGroupModal {
       }
 
       // Create the group using the proper API
-      const response = await fetch(`${this.api['baseUrl']}/api/v1/ldap/groups`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(groupData),
-      });
+      const response = await fetch(
+        `${this.api['baseUrl']}/api/v1/ldap/groups`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(groupData),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.text();

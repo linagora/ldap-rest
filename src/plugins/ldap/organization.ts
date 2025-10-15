@@ -196,19 +196,7 @@ export default class LdapOrganizations extends DmPlugin {
       return badRequest(res, 'Missing or invalid targetOrgDn in request body');
     }
 
-    try {
-      const result = await this.moveOrganization(dn, targetOrgDn);
-      res.json({
-        success: true,
-        newDn: result.newDn,
-      });
-    } catch (err) {
-      return badRequest(
-        res,
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `Failed to move organization: ${err}`
-      );
-    }
+    await tryMethodData(res, this.moveOrganization.bind(this), dn, targetOrgDn, req);
   }
 
   /**
@@ -694,7 +682,8 @@ export default class LdapOrganizations extends DmPlugin {
    */
   async moveOrganization(
     dn: string,
-    targetOrgDn: string
+    targetOrgDn: string,
+    req?: any
   ): Promise<{ newDn: string }> {
     // Validate that target organization exists
     try {
@@ -750,7 +739,7 @@ export default class LdapOrganizations extends DmPlugin {
 
     // Perform the LDAP modifyDN operation
     try {
-      await this.server.ldap.rename(dn, newDn);
+      await this.server.ldap.rename(dn, newDn, req);
       this.logger.info(`Moved organization from ${dn} to ${newDn}`);
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions

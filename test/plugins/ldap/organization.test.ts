@@ -789,7 +789,6 @@ describe('LDAP Organizations Plugin', function () {
           });
 
         expect(res.status).to.equal(200);
-        expect(res.body).to.have.property('success', true);
         expect(res.body).to.have.property('newDn', `ou=child,${targetOrgDn}`);
 
         // Verify organization was moved
@@ -833,8 +832,8 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`,
           });
 
-        expect(res.status).to.equal(400);
-        expect(res.text).to.match(/Failed to move organization/);
+        expect(res.status).to.equal(500);
+        expect(res.body.error).to.equal('check logs');
       });
 
       it('should return error when source does not exist', async () => {
@@ -847,8 +846,8 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn,
           });
 
-        expect(res.status).to.equal(400);
-        expect(res.text).to.match(/Failed to move organization/);
+        expect(res.status).to.equal(500);
+        expect(res.body.error).to.equal('check logs');
       });
 
       it('should return error for circular move', async () => {
@@ -861,8 +860,8 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: childOrgDn,
           });
 
-        expect(res.status).to.equal(400);
-        expect(res.text).to.match(/Failed to move organization/);
+        expect(res.status).to.equal(500);
+        expect(res.body.error).to.equal('check logs');
       });
 
       it('should return error when moving to same location', async () => {
@@ -875,8 +874,8 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: parentOrgDn,
           });
 
-        expect(res.status).to.equal(400);
-        expect(res.text).to.match(/Failed to move organization/);
+        expect(res.status).to.equal(500);
+        expect(res.body.error).to.equal('check logs');
       });
     });
   });
