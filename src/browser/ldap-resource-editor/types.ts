@@ -73,6 +73,9 @@ export interface Config {
   ldapBase: string;
   features?: {
     flatResources?: FlatResourceConfig[];
+    ldapFlatGeneric?: {
+      flatResources?: FlatResourceConfig[];
+    };
   };
 }
 

@@ -23,7 +23,7 @@ import type { Schema } from '../../config/schema';
 
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
-  roles: Role[] = ['api', 'consistency'] as const;
+  roles: Role[] = ['api', 'consistency', 'configurable'] as const;
   pathAttr: string;
   linkAttr: string;
   schema?: Schema;
@@ -819,5 +819,52 @@ export default class LdapOrganizations extends DmPlugin {
     );
 
     return result;
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    // Generate schema URL if static plugin is loaded
+    let schemaUrl: string | undefined;
+    if (
+      this.server.loadedPlugins['static'] &&
+      this.config.organization_schema
+    ) {
+      const staticName = this.config.static_name || 'static';
+      const schemasIndex = this.config.organization_schema.indexOf('/schemas/');
+      if (schemasIndex !== -1) {
+        const relativePath =
+          this.config.organization_schema.substring(schemasIndex);
+        schemaUrl = `/${staticName}${relativePath}`;
+      }
+    }
+
+    return {
+      enabled: true,
+      topOrganization: this.config.ldap_top_organization || '',
+      organizationClass: this.config.ldap_organization_class || [
+        'top',
+        'organizationalUnit',
+      ],
+      linkAttribute: this.linkAttr || '',
+      pathAttribute: this.pathAttr || '',
+      pathSeparator: this.config.ldap_organization_path_separator || ' / ',
+      maxSubnodes: this.config.ldap_organization_max_subnodes || 50,
+      schema: this.schema,
+      schemaUrl,
+      endpoints: {
+        getTop: `${apiPrefix}/v1/ldap/organizations`,
+        get: `${apiPrefix}/v1/ldap/organizations/:dn`,
+        getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
+        searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
+        create: `${apiPrefix}/v1/ldap/organizations`,
+        update: `${apiPrefix}/v1/ldap/organizations/:dn`,
+        move: `${apiPrefix}/v1/ldap/organizations/:dn/move`,
+        delete: `${apiPrefix}/v1/ldap/organizations/:dn`,
+      },
+    };
   }
 }

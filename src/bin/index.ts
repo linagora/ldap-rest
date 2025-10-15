@@ -62,15 +62,32 @@ export class DM {
     const promises: Promise<void | boolean>[] = [];
 
     if (this.config.plugin) {
+      // Separate configApi from other plugins
+      const configApiPlugin = this.config.plugin.find(p =>
+        p.includes('configApi')
+      );
+      let regularPlugins = this.config.plugin.filter(
+        p => !p.includes('configApi')
+      );
+
+      // Load priority plugins first
       for (const p of pluginPriority) {
-        if (this.config.plugin.includes(p)) {
-          // ensure priority plugins are loaded first
-          this.config.plugin = this.config.plugin.filter(pl => pl !== p);
+        if (regularPlugins.includes(p)) {
+          regularPlugins = regularPlugins.filter(pl => pl !== p);
           promises.push(this.loadPlugin(p));
         }
       }
-      for (const pluginName of this.config.plugin) {
+
+      // Load remaining plugins
+      for (const pluginName of regularPlugins) {
         promises.push(this.loadPlugin(pluginName));
+      }
+
+      // Load configApi last
+      if (configApiPlugin) {
+        promises.push(
+          Promise.all(promises).then(() => this.loadPlugin(configApiPlugin))
+        );
       }
     }
     this.ready = new Promise((resolve, reject) => {

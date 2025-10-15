@@ -64,8 +64,8 @@ export class UnitPropertyEditor {
     console.warn('[UnitPropertyEditor] Loading schema...');
     const config = await this.api.getConfig();
 
-    // First check in features.organizations (from ldapOrganizations plugin)
-    const orgsConfig = (config.features as any)?.organizations;
+    // First check in features.ldapOrganizations (from ldapOrganizations plugin)
+    const orgsConfig = (config.features as any)?.ldapOrganizations;
     console.warn('[UnitPropertyEditor] Organizations config:', orgsConfig);
 
     if (orgsConfig?.schemaUrl) {
@@ -82,9 +82,10 @@ export class UnitPropertyEditor {
     } else {
       // Fallback: check in flatResources
       console.warn('[UnitPropertyEditor] Falling back to flatResources');
-      const unitsResource = config.features?.flatResources?.find(
-        r => r.pluralName === 'organizations' || r.name === 'organizations'
-      );
+      const unitsResource =
+        config.features?.ldapFlatGeneric?.flatResources?.find(
+          r => r.pluralName === 'organizations' || r.name === 'organizations'
+        );
 
       if (unitsResource?.schemaUrl) {
         const response = await fetch(unitsResource.schemaUrl);

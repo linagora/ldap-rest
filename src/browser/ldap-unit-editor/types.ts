@@ -13,6 +13,13 @@ export interface Config {
   ldapBase: string;
   features?: {
     flatResources?: ResourceConfig[];
+    ldapFlatGeneric?: {
+      flatResources?: ResourceConfig[];
+    };
+    ldapOrganizations?: {
+      schemaUrl?: string;
+      schema?: SchemaDefinition;
+    };
   };
   [key: string]: unknown;
 }

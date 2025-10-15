@@ -67,6 +67,8 @@ export interface Config {
   apiPrefix: string;
   ldapBase: string;
   features?: {
-    flatResources?: FlatResourceConfig[];
+    ldapFlatGeneric?: {
+      flatResources?: FlatResourceConfig[];
+    };
   };
 }

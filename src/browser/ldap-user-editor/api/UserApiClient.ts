@@ -184,10 +184,12 @@ export class UserApiClient {
       const config = await this.getConfig();
 
       // Find resource that matches this branch by comparing base
-      const resource = config.features?.flatResources?.find(r => {
-        // Match if branch equals base or branch starts with base
-        return branch === r.base || branch.startsWith(r.base);
-      });
+      const resource = config.features?.ldapFlatGeneric?.flatResources?.find(
+        r => {
+          // Match if branch equals base or branch starts with base
+          return branch === r.base || branch.startsWith(r.base);
+        }
+      );
 
       if (resource && resource.endpoints?.list) {
         // Use the endpoint from config

@@ -345,6 +345,7 @@ curl -X POST "http://localhost:8081/api/v1/ldap/bulk-import/users" \
 - Successfully created entries remain in LDAP even if later entries fail
 
 **Example with 5 entries**:
+
 - Entry 1: ✅ Created
 - Entry 2: ✅ Created
 - Entry 3: ❌ Failed (invalid organization)
@@ -361,6 +362,7 @@ curl -X POST "http://localhost:8081/api/v1/ldap/bulk-import/users" \
 - No rollback (LDAP doesn't support transactions)
 
 **Example with same 5 entries**:
+
 - Entry 1: ✅ Created
 - Entry 2: ✅ Created
 - Entry 3: ❌ Failed → **STOPS HERE**
@@ -500,6 +502,7 @@ When importing large batches, some entries may fail while others succeed:
 **Recommended workflow**:
 
 1. **First import with continueOnError=true**:
+
    ```bash
    curl -X POST "http://localhost:8081/api/v1/ldap/bulk-import/users" \
      -F "file=@users.csv" \
@@ -507,13 +510,14 @@ When importing large batches, some entries may fail while others succeed:
    ```
 
 2. **Check response for errors**:
+
    ```json
    {
      "created": 95,
      "failed": 5,
      "errors": [
-       {"line": 10, "identifier": "user10", "error": "..."},
-       {"line": 25, "identifier": "user25", "error": "..."}
+       { "line": 10, "identifier": "user10", "error": "..." },
+       { "line": 25, "identifier": "user25", "error": "..." }
      ]
    }
    ```
@@ -537,27 +541,33 @@ When importing large batches, some entries may fail while others succeed:
 If you need to re-run an import (e.g., after partial failure):
 
 **Option 1: Skip existing entries** (default)
+
 ```bash
 # Only creates new entries, skips existing ones
 -F "updateExisting=false"
 ```
+
 - Safe for re-runs
 - Won't modify existing data
 - Good for: Adding new entries only
 
 **Option 2: Update existing entries**
+
 ```bash
 # Updates existing entries with CSV data
 -F "updateExisting=true"
 ```
+
 - Updates all attributes from CSV
 - Good for: Correcting bulk data, synchronization
 
 **Option 3: Delete and re-create**
+
 ```bash
 # First, delete all entries manually or via API
 # Then re-import with fresh data
 ```
+
 - Clean slate approach
 - Good for: Testing, development
 

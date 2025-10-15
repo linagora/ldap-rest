@@ -85,7 +85,7 @@ export class UserEditor {
     this.ldapBase = config.ldapBase;
 
     // Find users resource in flatResources array
-    const usersResource = config.features?.flatResources?.find(
+    const usersResource = config.features?.ldapFlatGeneric?.flatResources?.find(
       r => r.pluralName === 'users' || r.name === 'users'
     );
 

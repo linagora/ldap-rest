@@ -48,7 +48,9 @@ class LdapFlatInstance extends LdapFlat {
 
 export default class LdapFlatGeneric extends DmPlugin {
   name = 'ldapFlatGeneric';
+  roles: Role[] = ['configurable'] as const;
   instances: LdapFlatInstance[] = [];
+  private schemaPaths: string[] = [];
 
   constructor(server: DM) {
     super(server);
@@ -113,6 +115,7 @@ export default class LdapFlatGeneric extends DmPlugin {
 
         instance.name = `ldapFlat:${schema.entity.name}`;
         this.instances.push(instance);
+        this.schemaPaths.push(schemaPath);
 
         this.logger.info(
           `Created ldapFlat instance for "${schema.entity.name}" (${schema.entity.pluralName})`
@@ -131,5 +134,48 @@ export default class LdapFlatGeneric extends DmPlugin {
     this.instances.forEach(instance => {
       instance.api(app);
     });
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+    const staticName = this.config.static_name || 'static';
+
+    const flatResources = this.instances.map((instance, index) => {
+      // Generate schema URL if static plugin is loaded
+      let schemaUrl: string | undefined;
+      if (this.server.loadedPlugins['static'] && this.schemaPaths[index]) {
+        const schemaPath = this.schemaPaths[index];
+        const schemasIndex = schemaPath.indexOf('/schemas/');
+        if (schemasIndex !== -1) {
+          const relativePath = schemaPath.substring(schemasIndex);
+          schemaUrl = `/${staticName}${relativePath}`;
+        }
+      }
+
+      return {
+        name: instance.name.replace('ldapFlat:', ''),
+        singularName: instance.singularName,
+        pluralName: instance.pluralName,
+        mainAttribute: instance.mainAttribute,
+        objectClass: instance.objectClass,
+        base: instance.base,
+        schema: instance.schema || { strict: false, attributes: {} },
+        schemaUrl,
+        endpoints: {
+          list: `${apiPrefix}/v1/ldap/${instance.pluralName}`,
+          get: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id`,
+          create: `${apiPrefix}/v1/ldap/${instance.pluralName}`,
+          update: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id`,
+          delete: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id`,
+        },
+      };
+    });
+
+    return {
+      flatResources,
+    };
   }
 }

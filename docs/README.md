@@ -134,13 +134,13 @@ mini-dm \
 
 Plugins for managing different LDAP entity types:
 
-| Plugin            | Entity Type              | Features                                       |
-| ----------------- | ------------------------ | ---------------------------------------------- |
-| ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers            |
-| ldapGroups        | Groups                   | Member validation, Nested groups               |
-| ldapOrganizations | Organizational Units     | Tree navigation, Search                        |
-| ldapBulkImport    | Any (bulk operations)    | CSV import, Template generation, Multi-schema  |
-| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata               |
+| Plugin            | Entity Type              | Features                                      |
+| ----------------- | ------------------------ | --------------------------------------------- |
+| ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers           |
+| ldapGroups        | Groups                   | Member validation, Nested groups              |
+| ldapOrganizations | Organizational Units     | Tree navigation, Search                       |
+| ldapBulkImport    | Any (bulk operations)    | CSV import, Template generation, Multi-schema |
+| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata              |
 
 ### Authentication
 
@@ -311,6 +311,7 @@ POST   /api/v1/ldap/bulk-import/{resource}                 # Import entries from
 ```
 
 **Parameters for POST**:
+
 - `file` (multipart): CSV file to import
 - `dryRun` (optional): Validate without creating (true/false)
 - `updateExisting` (optional): Update existing entries (true/false)

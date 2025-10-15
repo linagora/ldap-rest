@@ -43,8 +43,8 @@ export class GroupPropertyEditor {
     const config = await this.api.getConfig();
     console.warn('[GroupPropertyEditor] Config loaded:', config);
 
-    // First check in features.groups (from ldapGroups plugin)
-    const groupsConfig = (config.features as any)?.groups;
+    // First check in features.ldapGroups (from ldapGroups plugin)
+    const groupsConfig = (config.features as any)?.ldapGroups;
     console.warn('[GroupPropertyEditor] Groups config:', groupsConfig);
 
     if (groupsConfig?.schemaUrl) {
@@ -62,9 +62,10 @@ export class GroupPropertyEditor {
       );
     } else {
       // Fallback: check in flatResources
-      const groupsResource = config.features?.flatResources?.find(
-        r => r.pluralName === 'groups' || r.name === 'groups'
-      );
+      const groupsResource =
+        config.features?.ldapFlatGeneric?.flatResources?.find(
+          r => r.pluralName === 'groups' || r.name === 'groups'
+        );
       console.warn(
         '[GroupPropertyEditor] Groups resource (flatResources):',
         groupsResource

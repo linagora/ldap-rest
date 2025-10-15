@@ -241,9 +241,9 @@ curl -H "Accept: application/json" \
 
 - `apiPrefix`: API URL prefix (default: `/api`)
 - `ldapBase`: LDAP base DN
-- `features.flatResources`: Array of flat LDAP resources (users, positions, etc.)
-- `features.groups`: Group management configuration (if enabled)
-- `features.organizations`: Organization tree configuration (if enabled)
+- `features.ldapFlatGeneric.flatResources`: Array of flat LDAP resources (users, positions, etc.)
+- `features.ldapGroups`: Group management configuration (if enabled)
+- `features.ldapOrganizations`: Organization tree configuration (if enabled)
 
 ---
 
@@ -1221,7 +1221,7 @@ Use the Configuration API to discover available endpoints before making requests
 CONFIG=$(curl -s http://localhost:8081/api/v1/config)
 
 # 2. Extract users endpoint
-USERS_ENDPOINT=$(echo $CONFIG | jq -r '.features.flatResources[0].endpoints.list')
+USERS_ENDPOINT=$(echo $CONFIG | jq -r '.features.ldapFlatGeneric.flatResources[0].endpoints.list')
 
 # 3. Use endpoint
 curl -s $USERS_ENDPOINT

@@ -65,10 +65,15 @@ describe('ConfigApi Plugin', () => {
 
     expect(response.status).to.equal(200);
 
-    expect(response.body.features.flatResources).to.be.an('array');
-    expect(response.body.features.flatResources.length).to.be.greaterThan(0);
+    expect(response.body.features.ldapFlatGeneric).to.exist;
+    expect(response.body.features.ldapFlatGeneric.flatResources).to.be.an(
+      'array'
+    );
+    expect(
+      response.body.features.ldapFlatGeneric.flatResources.length
+    ).to.be.greaterThan(0);
 
-    const resource = response.body.features.flatResources[0];
+    const resource = response.body.features.ldapFlatGeneric.flatResources[0];
     expect(resource).to.have.property('name');
     expect(resource).to.have.property('singularName');
     expect(resource).to.have.property('pluralName');
@@ -97,12 +102,14 @@ describe('ConfigApi Plugin', () => {
 
     expect(response.status).to.equal(200);
 
-    expect(response.body.features.groups).to.exist;
-    expect(response.body.features.groups.enabled).to.be.true;
-    expect(response.body.features.groups).to.have.property('base');
-    expect(response.body.features.groups).to.have.property('endpoints');
-    expect(response.body.features.groups.endpoints).to.have.property('list');
-    expect(response.body.features.groups.endpoints).to.have.property(
+    expect(response.body.features.ldapGroups).to.exist;
+    expect(response.body.features.ldapGroups.enabled).to.be.true;
+    expect(response.body.features.ldapGroups).to.have.property('base');
+    expect(response.body.features.ldapGroups).to.have.property('endpoints');
+    expect(response.body.features.ldapGroups.endpoints).to.have.property(
+      'list'
+    );
+    expect(response.body.features.ldapGroups.endpoints).to.have.property(
       'addMember'
     );
   });
@@ -125,16 +132,18 @@ describe('ConfigApi Plugin', () => {
 
     expect(response.status).to.equal(200);
 
-    expect(response.body.features.organizations).to.exist;
-    expect(response.body.features.organizations.enabled).to.be.true;
-    expect(response.body.features.organizations).to.have.property(
+    expect(response.body.features.ldapOrganizations).to.exist;
+    expect(response.body.features.ldapOrganizations.enabled).to.be.true;
+    expect(response.body.features.ldapOrganizations).to.have.property(
       'topOrganization'
     );
-    expect(response.body.features.organizations).to.have.property('endpoints');
-    expect(response.body.features.organizations.endpoints).to.have.property(
+    expect(response.body.features.ldapOrganizations).to.have.property(
+      'endpoints'
+    );
+    expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getTop'
     );
-    expect(response.body.features.organizations.endpoints).to.have.property(
+    expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getSubnodes'
     );
   });
@@ -179,10 +188,15 @@ describe('ConfigApi Plugin', () => {
 
     expect(response.status).to.equal(200);
 
-    expect(response.body.features.flatResources).to.be.an('array');
-    expect(response.body.features.flatResources.length).to.be.greaterThan(0);
+    expect(response.body.features.ldapFlatGeneric).to.exist;
+    expect(response.body.features.ldapFlatGeneric.flatResources).to.be.an(
+      'array'
+    );
+    expect(
+      response.body.features.ldapFlatGeneric.flatResources.length
+    ).to.be.greaterThan(0);
 
-    const resource = response.body.features.flatResources[0];
+    const resource = response.body.features.ldapFlatGeneric.flatResources[0];
     expect(resource).to.have.property('schemaUrl');
     expect(resource.schemaUrl).to.equal(
       '/static/schemas/twake/nomenclature/twakeDeliveryMode.json'

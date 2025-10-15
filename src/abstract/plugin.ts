@@ -15,7 +15,8 @@ export type Role =
   | 'api'
   | 'logging'
   | 'demo'
-  | 'consistency';
+  | 'consistency'
+  | 'configurable';
 
 export default abstract class DmPlugin {
   /**
@@ -48,6 +49,9 @@ export default abstract class DmPlugin {
 
   /* Function to register API */
   api?(app: Express): MaybePromise<void>;
+
+  /* Function to provide configuration for config API */
+  getConfigApiData?(): Record<string, unknown> | undefined;
 
   /* Uniq name of this plugin */
   abstract name: string;
