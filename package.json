@@ -116,6 +116,10 @@
       "import": "./static/browser/ldap-group-editor/api/GroupApiClient.js",
       "types": "./dist/src/browser/ldap-group-editor/api/GroupApiClient.d.ts"
     },
+    "browser-ldap-group-editor-components-creategroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/CreateGroupModal.js",
+      "types": "./dist/src/browser/ldap-group-editor/components/CreateGroupModal.d.ts"
+    },
     "browser-ldap-group-editor-components-grouppropertyeditor": {
       "import": "./static/browser/ldap-group-editor/components/GroupPropertyEditor.js",
       "types": "./dist/src/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts"
@@ -123,6 +127,10 @@
     "browser-ldap-group-editor-components-grouptree": {
       "import": "./static/browser/ldap-group-editor/components/GroupTree.js",
       "types": "./dist/src/browser/ldap-group-editor/components/GroupTree.d.ts"
+    },
+    "browser-ldap-group-editor-components-movegroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/MoveGroupModal.js",
+      "types": "./dist/src/browser/ldap-group-editor/components/MoveGroupModal.d.ts"
     },
     "browser-ldap-group-editor-index": {
       "import": "./static/browser/ldap-group-editor/index.js",

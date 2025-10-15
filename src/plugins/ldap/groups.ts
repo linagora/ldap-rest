@@ -187,6 +187,47 @@ export default class LdapGroups extends DmPlugin {
         await tryMethod(res, this.deleteMember.bind(this), cn, member);
       }
     );
+
+    // Move group to different organization (only if organization attributes are configured)
+    if (
+      this.config.ldap_organization_link_attribute &&
+      this.config.ldap_organization_path_attribute
+    ) {
+      app.post(
+        `${this.config.api_prefix}/v1/ldap/groups/:cn/move`,
+        async (req, res) => {
+          if (!wantJson(req, res)) return;
+          const cn = decodeURIComponent(req.params.cn);
+          if (!cn) return badRequest(res, 'cn is required');
+          const body = jsonBody(req, res, 'targetOrgDn') as {
+            targetOrgDn: string;
+          };
+          if (!body) return;
+          await tryMethod(
+            res,
+            this.moveGroup.bind(this),
+            cn,
+            body.targetOrgDn,
+            req
+          );
+        }
+      );
+    }
+
+    // Rename group (change cn)
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn/rename`,
+      async (req, res) => {
+        if (!wantJson(req, res)) return;
+        const cn = decodeURIComponent(req.params.cn);
+        if (!cn) return badRequest(res, 'cn is required');
+        const body = jsonBody(req, res, 'newCn') as {
+          newCn: string;
+        };
+        if (!body) return;
+        await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn);
+      }
+    );
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
@@ -226,7 +267,11 @@ export default class LdapGroups extends DmPlugin {
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
         ([key, _value]) =>
-          key !== this.cn && key !== 'member' && _value !== undefined
+          key !== this.cn &&
+          key !== 'member' &&
+          _value !== undefined &&
+          // Filter out fixed fields from schema
+          !(this.schema?.attributes[key]?.fixed === true)
       )
     ) as AttributesList;
     await tryMethod(res, this.addGroup.bind(this), cn, members, additional);
@@ -244,7 +289,13 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const dn = this.fixDn(decodeURIComponent(req.params.cn));
     if (!dn) return badRequest(res);
-    await tryMethod(res, this.modifyGroup.bind(this), dn, body);
+    // Filter out fixed fields from schema
+    const filteredBody = Object.fromEntries(
+      Object.entries(body).filter(
+        ([key, _value]) => !(this.schema?.attributes[key]?.fixed === true)
+      )
+    ) as postModify;
+    await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody);
   }
 
   /**
@@ -432,6 +483,97 @@ export default class LdapGroups extends DmPlugin {
           )
       )
     );
+  }
+
+  /**
+   * Move a group to a different organization by updating organization link and path attributes
+   * This method should only be called when organization attributes are configured
+   * @param cn Group cn or DN
+   * @param targetOrgDn DN of the target organization
+   * @returns Success status
+   */
+  async moveGroup(
+    cn: string,
+    targetOrgDn: string,
+    req?: any
+  ): Promise<{ success: boolean }> {
+    const linkAttr = this.config.ldap_organization_link_attribute as string;
+    const pathAttr = this.config.ldap_organization_path_attribute as string;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+
+    // Get current group to check if it has department attributes
+    const currentGroup = (await this.ldap.search(
+      { paged: false, scope: 'base' },
+      dn
+    )) as SearchResult;
+
+    if (currentGroup.searchEntries.length === 0) {
+      throw new Error(`Group ${dn} not found`);
+    }
+
+    const group = currentGroup.searchEntries[0];
+    const currentDeptLink = group[linkAttr] as string | undefined;
+
+    // Check if group has department link attribute
+    if (!currentDeptLink) {
+      throw new Error(
+        `Group ${dn} does not have ${linkAttr} attribute and cannot be moved`
+      );
+    }
+
+    // Prevent moving to the same location
+    if (currentDeptLink === targetOrgDn) {
+      throw new Error('Group is already in the target organization');
+    }
+
+    // Verify target organization exists and get its path
+    let targetOrg: SearchResult;
+    try {
+      targetOrg = (await this.ldap.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: [pathAttr, 'ou', 'o'],
+        },
+        targetOrgDn
+      )) as SearchResult;
+    } catch (err) {
+      throw new Error(
+        `Target organization ${targetOrgDn} not found: ${err instanceof Error && err.message ? err.message : String(err)}`
+      );
+    }
+
+    if (targetOrg.searchEntries.length === 0) {
+      throw new Error(`Target organization ${targetOrgDn} not found`);
+    }
+
+    const targetPath = targetOrg.searchEntries[0][pathAttr] as
+      | string
+      | undefined;
+
+    if (!targetPath) {
+      throw new Error(
+        `Target organization ${targetOrgDn} does not have ${pathAttr} attribute`
+      );
+    }
+
+    // Update group's department link and path
+    await this.ldap.modify(
+      dn,
+      {
+        replace: {
+          [linkAttr]: targetOrgDn,
+          [pathAttr]: targetPath,
+        },
+      },
+      req
+    );
+
+    this.logger.info(
+      `Group ${dn} moved from ${currentDeptLink} to ${targetOrgDn}`
+    );
+
+    return { success: true };
   }
 
   /**

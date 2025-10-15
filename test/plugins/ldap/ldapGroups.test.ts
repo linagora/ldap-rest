@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
+import { SearchResult } from 'ldapts';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
@@ -289,6 +290,155 @@ describe('LdapGroups Plugin', function () {
         cn: 'testgroup',
         member: [user1],
       });
+    });
+  });
+
+  describe('moveGroup', function () {
+    // Skip tests if no organization plugin configured
+    if (!process.env.DM_LDAP_TOP_ORGANIZATION) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'Skipping moveGroup tests: DM_LDAP_TOP_ORGANIZATION env var is required'
+      );
+      // @ts-ignore
+      this.skip?.();
+      return;
+    }
+
+    const org1Dn = `ou=testorg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const org2Dn = `ou=testorg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const groupDn = `cn=testgroup,${DM_LDAP_GROUP_BASE}`;
+
+    beforeEach(async () => {
+      // Create test organizations
+      await plugin.ldap.add(org1Dn, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'testorg1',
+        twakeDepartmentPath: 'Test Org 1',
+      });
+      await plugin.ldap.add(org2Dn, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'testorg2',
+        twakeDepartmentPath: 'Test Org 2',
+      });
+
+      // Create test group with department link
+      await plugin.ldap.add(groupDn, {
+        objectClass: ['groupOfNames', 'twakeStaticGroup', 'top'],
+        cn: 'testgroup',
+        member: [`cn=fakeuser`],
+        twakeDepartmentLink: org1Dn,
+        twakeDepartmentPath: 'Test Org 1',
+      });
+    });
+
+    afterEach(async () => {
+      try {
+        await plugin.ldap.delete(groupDn);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.ldap.delete(org1Dn);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.ldap.delete(org2Dn);
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    it('should move group to different organization', async () => {
+      const result = await plugin.moveGroup('testgroup', org2Dn);
+      expect(result).to.have.property('success', true);
+
+      // Verify group was moved
+      const group = (await plugin.ldap.search(
+        { paged: false, scope: 'base' },
+        groupDn
+      )) as SearchResult;
+      expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
+      expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
+    });
+
+    it('should reject move to same location', async () => {
+      try {
+        await plugin.moveGroup('testgroup', org1Dn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /already in the target organization/
+        );
+      }
+    });
+
+    it('should reject move of group without department link', async () => {
+      // Create group without department link
+      const noDeptGroupDn = `cn=nodeptgroup,${DM_LDAP_GROUP_BASE}`;
+      await plugin.ldap.add(noDeptGroupDn, {
+        objectClass: ['groupOfNames', 'top'],
+        cn: 'nodeptgroup',
+        member: [`cn=fakeuser`],
+      });
+
+      try {
+        await plugin.moveGroup('nodeptgroup', org2Dn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /does not have twakeDepartmentLink attribute/
+        );
+      } finally {
+        await plugin.ldap.delete(noDeptGroupDn);
+      }
+    });
+
+    it('should reject move to non-existent organization', async () => {
+      const fakeOrgDn = `ou=nonexistent,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+      try {
+        await plugin.moveGroup('testgroup', fakeOrgDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(/not found/);
+      }
+    });
+
+    it('should move group via API', async () => {
+      const request = supertest(server.app);
+      plugin.api(server.app);
+
+      const res = await request
+        .post('/api/v1/ldap/groups/testgroup/move')
+        .type('json')
+        .send({
+          targetOrgDn: org2Dn,
+        });
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ success: true });
+
+      // Verify group was moved
+      const group = (await plugin.ldap.search(
+        { paged: false, scope: 'base' },
+        groupDn
+      )) as SearchResult;
+      expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
+      expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
+    });
+
+    it('should work with DN parameter', async () => {
+      const result = await plugin.moveGroup(groupDn, org2Dn);
+      expect(result).to.have.property('success', true);
+
+      // Verify group was moved
+      const group = (await plugin.ldap.search(
+        { paged: false, scope: 'base' },
+        groupDn
+      )) as SearchResult;
+      expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
+      expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });
   });
 });

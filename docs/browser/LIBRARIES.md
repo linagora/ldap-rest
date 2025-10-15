@@ -19,17 +19,22 @@ This guide covers Mini-DM's browser libraries for building LDAP management inter
   - [Public Methods](#ldapusereditor-public-methods)
   - [Features](#ldapusereditor-features)
   - [CSS Customization](#ldapusereditor-css-customization)
+- [LdapUnitEditor](#ldapuniteditor)
+  - [Installation](#ldapuniteditor-installation)
+  - [Basic Usage](#ldapuniteditor-basic-usage)
+  - [Features](#ldapuniteditor-features)
 
 ---
 
 ## Overview
 
-Mini-DM provides two ready-to-use browser libraries for building LDAP management interfaces:
+Mini-DM provides three ready-to-use browser libraries for building LDAP management interfaces:
 
 - **LdapTreeViewer** - Interactive hierarchical tree view of LDAP organizations
 - **LdapUserEditor** - Complete user management interface with organization tree, user list, and edit form
+- **LdapUnitEditor** - Organization management interface with create, move, edit, and delete operations
 
-Both libraries are:
+All libraries are:
 
 - **Framework-agnostic** - Work with vanilla JavaScript or any framework
 - **TypeScript-first** - Full type definitions included
@@ -898,11 +903,283 @@ The LdapUserEditor uses CSS variables for easy customization. Override these var
 
 ---
 
+## LdapUnitEditor
+
+A complete organizational unit (OU) management interface with tree navigation, create, move, edit, and delete operations.
+
+<a name="ldapuniteditor-installation"></a>
+
+### Installation
+
+#### Direct Browser Usage
+
+Include the required dependencies in your HTML:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Google Fonts - Roboto (required) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Material Icons (required) -->
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Shared CSS (required) -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+  </head>
+  <body>
+    <div id="editor-container"></div>
+
+    <!-- LdapUnitEditor JavaScript -->
+    <script src="/static/browser/ldap-unit-editor.js"></script>
+  </body>
+</html>
+```
+
+<a name="ldapuniteditor-basic-usage"></a>
+
+### Basic Usage
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Organization Management</title>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+  </head>
+  <body>
+    <div class="demo-container">
+      <header class="demo-header">
+        <h1>Organization Management</h1>
+        <p>Create, edit, move, and delete organizational units</p>
+      </header>
+      <div id="editor-container"></div>
+    </div>
+
+    <script src="/static/browser/ldap-unit-editor.js"></script>
+    <script>
+      const { LdapUnitEditor } = window.LdapUnitEditor;
+
+      const editor = new LdapUnitEditor({
+        containerId: 'editor-container',
+        apiBaseUrl: window.location.origin,
+      });
+
+      editor.init().catch(error => {
+        console.error('Failed to initialize editor:', error);
+      });
+    </script>
+  </body>
+</html>
+```
+
+<a name="ldapuniteditor-features"></a>
+
+### Features
+
+The LdapUnitEditor provides a complete organization management interface with two main panels:
+
+#### 1. Organization Tree Panel
+
+- **Hierarchical navigation** - Browse LDAP organizations in an expandable tree structure
+- **Material Icons** - Visual indicators with business icons
+- **Create button** - Quickly create new sub-organizations under selected unit
+- **Click to edit** - Select an organization to view and edit its properties
+- **Automatic expansion** - Tree expands to show newly created organizations
+
+**Features:**
+
+- Create new organizational units under any parent organization
+- Prompts for OU name with validation
+- Automatically expands parent after creation
+- Refreshes tree to show new structure
+
+#### 2. Property Editor Panel
+
+- **Schema-driven forms** - Automatically generated from JSON schema
+- **Field validation** - Required fields, type checking
+- **Field groups** - Organized into "Basic Information" and "Additional Properties"
+- **Move operation** - Relocate organizations to different parents with modal tree picker
+- **Delete protection** - Automatically disables delete button when organization has sub-organizations
+- **Real-time feedback** - Success/error messages via alerts
+
+**Features:**
+
+- **Edit Properties**: Modify OU name, description, and custom attributes
+- **Move Organization**:
+  - Opens modal with organization tree
+  - Cannot move into itself or descendants (circular reference prevention)
+  - Shows current organization as disabled in the tree
+  - Updates DN automatically after move
+- **Delete Organization**:
+  - Button disabled when organization contains sub-organizations
+  - Visual indication (grayed out, cursor not-allowed)
+  - Tooltip explaining why deletion is blocked
+  - Confirmation dialog before deletion
+- **Validation**: All changes validated against configured schema
+
+#### 3. Move Modal
+
+When clicking the "Move" button, a modal dialog appears with:
+
+- **Organization tree picker** - Navigate and select target parent organization
+- **Visual feedback** - Current organization shown as disabled
+- **Expand/collapse** - Load children on demand
+- **Selection highlighting** - Clear visual indication of selected target
+- **Circular move prevention** - Cannot select current org or its descendants
+- **Cancel/Move actions** - Confirm or cancel the move operation
+
+**Example Move Operation:**
+
+```
+Original: ou=Recruitment,ou=HR,dc=example,dc=com
+Target:   ou=Operations,dc=example,dc=com
+Result:   ou=Recruitment,ou=Operations,dc=example,dc=com
+```
+
+All users, groups, and sub-organizations linked to the moved unit automatically update their references.
+
+### Usage Example
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP Organization Manager</title>
+
+    <!-- Required fonts and icons -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f5f5f5;
+        font-family: 'Roboto', sans-serif;
+      }
+
+      .demo-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .demo-header {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .demo-header h1 {
+        margin: 0 0 8px 0;
+        color: var(--primary-color, #6200ee);
+      }
+
+      .demo-header p {
+        margin: 0;
+        color: #666;
+      }
+
+      #editor-container {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        min-height: 600px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <header class="demo-header">
+        <h1>Organization Management System</h1>
+        <p>
+          Manage your LDAP organizational structure - Create, edit, move, and
+          delete organizational units
+        </p>
+      </header>
+
+      <div id="editor-container"></div>
+    </div>
+
+    <script src="/static/browser/ldap-unit-editor.js"></script>
+    <script>
+      const { LdapUnitEditor } = window.LdapUnitEditor;
+
+      const editor = new LdapUnitEditor({
+        containerId: 'editor-container',
+        apiBaseUrl: window.location.origin,
+      });
+
+      editor.init().catch(error => {
+        console.error('Failed to initialize organization editor:', error);
+        document.getElementById('editor-container').innerHTML = `
+          <div style="color: #c62828; padding: 20px; text-align: center;">
+            <p style="font-size: 18px; margin: 0;">Failed to load editor</p>
+            <p style="margin: 8px 0 0 0;">${error.message}</p>
+          </div>
+        `;
+      });
+    </script>
+  </body>
+</html>
+```
+
+### API Requirements
+
+The LdapUnitEditor requires the following Mini-DM API endpoints:
+
+- `GET /api/v1/config` - Configuration and schema
+- `GET /api/v1/ldap/organizations/top` - Top organization
+- `GET /api/v1/ldap/organizations/:dn` - Get organization details
+- `GET /api/v1/ldap/organizations/:dn/subnodes` - Get child organizations
+- `POST /api/v1/ldap/organizations` - Create new organization
+- `PUT /api/v1/ldap/organizations/:dn` - Update organization
+- `POST /api/v1/ldap/organizations/:dn/move` - Move organization to new parent
+- `DELETE /api/v1/ldap/organizations/:dn` - Delete organization
+
+See [LDAP Organizations Plugin Documentation](../ldapOrganizations.md) for API details.
+
+---
+
 ## Next Steps
 
 - **[REST API Documentation](../api/REST_API.md)** - Learn about the underlying API
 - **[Integration Examples](../examples/EXAMPLES.md)** - See real-world integration examples
 - **[JSON Schemas Guide](../schemas/SCHEMAS.md)** - Understand schema-driven architecture
+- **[LDAP Organizations Plugin](../ldapOrganizations.md)** - Learn about organization management
 
 ---
 

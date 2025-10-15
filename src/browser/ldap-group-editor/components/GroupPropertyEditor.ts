@@ -4,6 +4,7 @@
 
 import type { GroupApiClient } from '../api/GroupApiClient';
 import type { LdapGroup, SchemaDefinition } from '../types';
+import { MoveGroupModal } from './MoveGroupModal';
 
 export class GroupPropertyEditor {
   private container: HTMLElement;
@@ -140,15 +141,21 @@ export class GroupPropertyEditor {
         </h3>
         <form id="group-edit-form">
           ${this.renderFields()}
-          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: flex-end;">
-            <button type="button" id="delete-group-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">delete</span>
-              Delete Group
+          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: space-between;">
+            <button type="button" id="move-group-btn" class="btn btn-secondary" style="background: #757575; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons" style="font-size: 18px;">drive_file_move</span>
+              Move
             </button>
-            <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">save</span>
-              Save Changes
-            </button>
+            <div style="display: flex; gap: 12px;">
+              <button type="button" id="delete-group-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons" style="font-size: 18px;">delete</span>
+                Delete Group
+              </button>
+              <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons" style="font-size: 18px;">save</span>
+                Save Changes
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -304,6 +311,11 @@ export class GroupPropertyEditor {
     const deleteBtn = document.getElementById('delete-group-btn');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', () => this.handleDelete());
+    }
+
+    const moveBtn = document.getElementById('move-group-btn');
+    if (moveBtn) {
+      moveBtn.addEventListener('click', () => this.handleMove());
     }
 
     // Attach listeners for member/owner add buttons
@@ -474,7 +486,40 @@ export class GroupPropertyEditor {
     }
 
     try {
-      await this.api.updateGroup(this.groupDn, updates);
+      // Check if cn has changed - if so, use rename API instead
+      if (updates.cn && this.group?.cn) {
+        const oldCn = Array.isArray(this.group.cn)
+          ? this.group.cn[0]
+          : this.group.cn;
+        const newCn = updates.cn as string;
+
+        if (oldCn !== newCn) {
+          // Remove cn from updates
+          delete updates.cn;
+
+          // First rename the group
+          await this.api.renameGroup(this.groupDn, newCn);
+
+          // Update the groupDn for subsequent operations
+          const newDn = this.groupDn.replace(
+            new RegExp(`^cn=${oldCn},`),
+            `cn=${newCn},`
+          );
+          this.groupDn = newDn;
+
+          // If there are other updates, apply them to the renamed group
+          if (Object.keys(updates).length > 0) {
+            await this.api.updateGroup(this.groupDn, updates);
+          }
+        } else {
+          // cn hasn't changed, just do a normal update
+          await this.api.updateGroup(this.groupDn, updates);
+        }
+      } else {
+        // No cn change, normal update
+        await this.api.updateGroup(this.groupDn, updates);
+      }
+
       alert('Group updated successfully!');
       if (this.saveCallback) {
         this.saveCallback();
@@ -483,6 +528,51 @@ export class GroupPropertyEditor {
       console.error('Failed to update group:', error);
       alert(`Failed to update group: ${(error as Error).message}`);
     }
+  }
+
+  private async handleMove(): Promise<void> {
+    if (!this.group) return;
+
+    // Get current organization DN from twakeDepartmentLink attribute
+    const currentOrgDn = (this.group as any).twakeDepartmentLink as
+      | string
+      | undefined;
+
+    if (!currentOrgDn) {
+      alert(
+        'Cannot move group: no organization link attribute found. This group may not support move operation.'
+      );
+      return;
+    }
+
+    // Extract group cn from DN
+    const cnMatch = this.groupDn.match(/^cn=([^,]+)/);
+    const cn = cnMatch ? cnMatch[1] : this.groupDn;
+
+    const modal = new MoveGroupModal(
+      this.api,
+      currentOrgDn,
+      async targetOrgDn => {
+        try {
+          await this.api.moveGroup(cn, targetOrgDn);
+          alert('Group moved successfully!');
+
+          // Reload the group
+          await this.loadGroup();
+          this.render();
+          this.attachEventListeners();
+
+          if (this.saveCallback) {
+            this.saveCallback();
+          }
+        } catch (error) {
+          console.error('Failed to move group:', error);
+          alert(`Failed to move group: ${(error as Error).message}`);
+        }
+      }
+    );
+
+    await modal.show();
   }
 
   private async handleDelete(): Promise<void> {

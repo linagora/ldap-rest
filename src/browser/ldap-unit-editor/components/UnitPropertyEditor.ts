@@ -4,6 +4,7 @@
 
 import type { UnitApiClient } from '../api/UnitApiClient';
 import type { LdapUnit, SchemaDefinition } from '../types';
+import { MoveUnitModal } from './MoveUnitModal';
 
 export class UnitPropertyEditor {
   private container: HTMLElement;
@@ -12,6 +13,7 @@ export class UnitPropertyEditor {
   private unit: LdapUnit | null = null;
   private schema: SchemaDefinition | null = null;
   private saveCallback: (() => void) | null = null;
+  private hasSubnodes: boolean = false;
 
   constructor(container: HTMLElement, api: UnitApiClient, unitDn: string) {
     this.container = container;
@@ -22,12 +24,40 @@ export class UnitPropertyEditor {
   async init(): Promise<void> {
     await this.loadUnit();
     await this.loadSchema();
+    await this.checkSubnodes();
     this.render();
     this.attachEventListeners();
   }
 
   private async loadUnit(): Promise<void> {
     this.unit = await this.api.getUnit(this.unitDn);
+  }
+
+  private async checkSubnodes(): Promise<void> {
+    try {
+      const response = await fetch(
+        `${this.api['baseUrl']}/api/v1/ldap/organizations/${encodeURIComponent(this.unitDn)}/subnodes`
+      );
+      if (response.ok) {
+        const subnodes = await response.json();
+        // Check if there are any organizational subnodes
+        this.hasSubnodes = subnodes.some((node: any) => {
+          const classes = Array.isArray(node.objectClass)
+            ? node.objectClass
+            : node.objectClass
+              ? [node.objectClass]
+              : [];
+          return (
+            classes.includes('organizationalUnit') ||
+            classes.includes('organization')
+          );
+        });
+      }
+    } catch (error) {
+      console.error('Failed to check subnodes:', error);
+      // On error, assume it might have subnodes to be safe
+      this.hasSubnodes = false;
+    }
   }
 
   private async loadSchema(): Promise<void> {
@@ -92,15 +122,21 @@ export class UnitPropertyEditor {
         </h3>
         <form id="unit-edit-form">
           ${this.renderFields()}
-          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: flex-end;">
-            <button type="button" id="delete-unit-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">delete</span>
-              Delete Unit
+          <div class="form-actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e0e0e0; display: flex; gap: 12px; justify-content: space-between;">
+            <button type="button" id="move-unit-btn" class="btn btn-secondary" style="background: #757575; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons" style="font-size: 18px;">drive_file_move</span>
+              Move
             </button>
-            <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-              <span class="material-icons" style="font-size: 18px;">save</span>
-              Save Changes
-            </button>
+            <div style="display: flex; gap: 12px;">
+              <button type="button" id="delete-unit-btn" class="btn btn-danger" ${this.hasSubnodes ? 'disabled title="Cannot delete: organization has sub-organizations"' : ''} style="background: ${this.hasSubnodes ? '#ccc' : '#d32f2f'}; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: ${this.hasSubnodes ? 'not-allowed' : 'pointer'}; display: flex; align-items: center; gap: 8px; opacity: ${this.hasSubnodes ? '0.5' : '1'};">
+                <span class="material-icons" style="font-size: 18px;">delete</span>
+                Delete Unit
+              </button>
+              <button type="submit" class="btn btn-primary" style="background: var(--primary-color, #6200ee); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <span class="material-icons" style="font-size: 18px;">save</span>
+                Save Changes
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -215,6 +251,11 @@ export class UnitPropertyEditor {
     if (deleteBtn) {
       deleteBtn.addEventListener('click', () => this.handleDelete());
     }
+
+    const moveBtn = document.getElementById('move-unit-btn');
+    if (moveBtn) {
+      moveBtn.addEventListener('click', () => this.handleMove());
+    }
   }
 
   private async handleSubmit(e: Event): Promise<void> {
@@ -252,7 +293,46 @@ export class UnitPropertyEditor {
     }
   }
 
+  private async handleMove(): Promise<void> {
+    if (!this.unit) return;
+
+    // Extract parent DN from current unit DN
+    const parentDn = this.unitDn.split(',').slice(1).join(',');
+
+    const modal = new MoveUnitModal(this.api, parentDn, async targetOrgDn => {
+      try {
+        const result = await this.api.moveUnit(this.unitDn, targetOrgDn);
+        alert('Unit moved successfully!');
+
+        // Reload the unit with its new DN
+        if (result.newDn) {
+          this.unitDn = result.newDn;
+          await this.loadUnit();
+          this.render();
+          this.attachEventListeners();
+        }
+
+        if (this.saveCallback) {
+          this.saveCallback();
+        }
+      } catch (error) {
+        console.error('Failed to move unit:', error);
+        alert(`Failed to move unit: ${(error as Error).message}`);
+      }
+    });
+
+    await modal.show();
+  }
+
   private async handleDelete(): Promise<void> {
+    // Don't allow delete if there are subnodes
+    if (this.hasSubnodes) {
+      alert(
+        'Cannot delete this organizational unit because it contains sub-organizations. Please delete all sub-organizations first.'
+      );
+      return;
+    }
+
     if (
       !confirm(
         `Are you sure you want to delete this organizational unit?\n\n${this.unitDn}\n\nThis action cannot be undone.`

@@ -22,7 +22,8 @@
     "cn": {
       "type": "string",
       "test": "^[a-zA-Z][a-zA-Z0-9-]{0,254}$",
-      "required": true
+      "required": true,
+      "role": "identifier"
     },
     "description": {
       "type": "string",
@@ -31,7 +32,8 @@
     "mail": {
       "type": "string",
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "required": false
+      "required": false,
+      "role": "primaryEmail"
     },
     "twakeMailboxType": {
       "type": "pointer",
@@ -45,7 +47,8 @@
         "type": "string",
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
       },
-      "required": false
+      "required": false,
+      "role": "members"
     },
     "owner": {
       "type": "array",
@@ -53,17 +56,20 @@
         "type": "string",
         "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$"
       },
-      "required": false
+      "required": false,
+      "role": "owners"
     },
     "twakeDepartmentLink": {
       "type": "string",
       "test": "^.*,__LDAP_BASE__",
-      "required": true
+      "required": true,
+      "role": "organizationLink"
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[\\w\\s/,]+$",
-      "required": true
+      "required": true,
+      "role": "organizationPath"
     }
   }
 }

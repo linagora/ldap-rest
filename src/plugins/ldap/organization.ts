@@ -131,6 +131,12 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       async (req, res) => this.apiDelete(req, res)
     );
+
+    // Move organization to a different parent
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
+      async (req, res) => this.apiMove(req, res)
+    );
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {
@@ -171,6 +177,26 @@ export default class LdapOrganizations extends DmPlugin {
     const dn = decodeURIComponent(req.params.dn);
     if (!dn) return badRequest(res, 'dn is required');
     await tryMethod(res, this.deleteOrganization.bind(this), dn);
+  }
+
+  async apiMove(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'targetOrgDn') as
+      | { targetOrgDn: string }
+      | false;
+    if (!body) return;
+
+    const dn = decodeURIComponent(req.params.dn);
+    if (!dn) return badRequest(res, 'dn is required');
+
+    const { targetOrgDn } = body;
+
+    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
+      return badRequest(res, 'Missing or invalid targetOrgDn in request body');
+    }
+
+    await tryMethodData(res, this.moveOrganization.bind(this), dn, targetOrgDn, req);
   }
 
   /**
@@ -323,19 +349,26 @@ export default class LdapOrganizations extends DmPlugin {
    */
   async checkDeptPath(entry: AttributesList): Promise<void> {
     if (entry[this.pathAttr]) {
-      const path = entry[this.pathAttr][0] as string;
+      const pathValue = entry[this.pathAttr];
+      const path = (
+        Array.isArray(pathValue) ? pathValue[0] : pathValue
+      ) as string;
       const sep = this.config.ldap_organization_path_separator || ' / ';
 
       let matchingPath = path;
       if (this.isOu(entry)) {
-        if (!path.startsWith((entry.ou[0] as string) + sep))
+        const ouValue = entry.ou;
+        const ouName = (
+          Array.isArray(ouValue) ? ouValue[0] : ouValue
+        ) as string;
+        if (!path.startsWith(ouName + sep))
           throw new Error(
             `Organization path must start with its own name followed by separator "${sep}"`
           );
-        matchingPath = path.slice((entry.ou[0] as string).length + sep.length);
+        matchingPath = path.slice(ouName.length + sep.length);
       }
       const [ou, ouPath] = matchingPath.split(sep, 2);
-      if (!ouPath) throw new Error(`Invalid organization path ${path}`);
+
       // Search will benefit from cache for repeated validations
       const entries = await this.server.ldap.search(
         { paged: false, filter: `(ou=${ou})`, scope: 'sub' },
@@ -343,18 +376,52 @@ export default class LdapOrganizations extends DmPlugin {
       );
       if ((entries as SearchResult).searchEntries.length === 0)
         throw new Error(`Invalid organization path ${path}`);
-      let found = false;
-      for (const entry of (entries as SearchResult).searchEntries) {
-        const entryPath = entry[this.pathAttr] as string;
-        if (entryPath && entryPath === ouPath) {
-          found = true;
-          break;
+
+      // If ouPath is undefined, this references the top organization
+      // Verify it exists and has no parent path (or matches top org DN)
+      if (!ouPath) {
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const entryDn = entry.dn;
+          const topOrgDn = this.config.ldap_top_organization as string;
+          // Check if this is the top organization (DN matches or is direct child)
+          if (
+            entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
+            entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
+          ) {
+            const pathValue = entry[this.pathAttr];
+            const entryPath = Array.isArray(pathValue)
+              ? (pathValue[0] as string | undefined)
+              : (pathValue as string | undefined);
+            // Top org should either have no path attribute or a simple path (just its name)
+            if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
+              found = true;
+              break;
+            }
+          }
         }
+        if (!found)
+          throw new Error(
+            `Invalid organization path ${path}: no matching top-level entry for ${ou}`
+          );
+      } else {
+        // Verify parent organization exists with the specified path
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const pathValue = entry[this.pathAttr];
+          const entryPath = Array.isArray(pathValue)
+            ? (pathValue[0] as string)
+            : (pathValue as string);
+          if (entryPath && entryPath === ouPath) {
+            found = true;
+            break;
+          }
+        }
+        if (!found)
+          throw new Error(
+            `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
+          );
       }
-      if (!found)
-        throw new Error(
-          `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
-        );
     }
   }
 
@@ -374,9 +441,12 @@ export default class LdapOrganizations extends DmPlugin {
    */
   isOu(entry: AttributesList): boolean {
     if (!entry.objectClass) return false;
+    const entryClasses = (entry.objectClass as string[]).map(c =>
+      c.toLowerCase()
+    );
     return (this.config.ldap_organization_class as string[])
       .filter(c => c.toLowerCase() !== 'top')
-      .some(c => (entry.objectClass as string[]).includes(c.toLowerCase()));
+      .some(c => entryClasses.includes(c.toLowerCase()));
   }
 
   async getOrganisationTop(
@@ -610,6 +680,79 @@ export default class LdapOrganizations extends DmPlugin {
     }
 
     return true;
+  }
+
+  /**
+   * Move an organization to a different parent organization
+   * Uses LDAP modifyDN to change the DN hierarchy
+   */
+  async moveOrganization(
+    dn: string,
+    targetOrgDn: string,
+    req?: any
+  ): Promise<{ newDn: string }> {
+    // Validate that target organization exists
+    try {
+      const targetOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        targetOrgDn
+      )) as SearchResult;
+
+      if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
+        throw new Error(`Target organization ${targetOrgDn} not found`);
+      }
+
+      // Verify it's actually an organizational unit
+      if (!this.isOu(targetOrg.searchEntries[0])) {
+        throw new Error(`Target ${targetOrgDn} is not an organizational unit`);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Invalid target organization: ${err}`);
+    }
+
+    // Extract the RDN (relative DN) from the source DN
+    // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
+    const rdn = dn.split(',')[0];
+
+    // Construct the new DN
+    const newDn = `${rdn},${targetOrgDn}`;
+
+    // Verify the organization to move exists
+    try {
+      const sourceOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+
+      if (!sourceOrg.searchEntries || sourceOrg.searchEntries.length === 0) {
+        throw new Error(`Source organization ${dn} not found`);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Source organization not found: ${err}`);
+    }
+
+    // Prevent moving to itself or creating circular references
+    if (newDn === dn) {
+      throw new Error('Cannot move organization to its current location');
+    }
+    // Check if target is the source itself or a descendant of the source
+    // A descendant's DN will end with ",<source DN>"
+    if (targetOrgDn === dn || targetOrgDn.endsWith(`,${dn}`)) {
+      throw new Error('Cannot move organization into itself or its descendant');
+    }
+
+    // Perform the LDAP modifyDN operation
+    try {
+      await this.server.ldap.rename(dn, newDn, req);
+      this.logger.info(`Moved organization from ${dn} to ${newDn}`);
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to move organization: ${err}`);
+    }
+
+    return { newDn };
   }
 
   async deleteOrganization(dn: string): Promise<boolean> {

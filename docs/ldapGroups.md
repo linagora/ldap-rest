@@ -187,7 +187,7 @@ PUT /api/v1/ldap/groups/{cn}
 
 **Important:**
 
-- Cannot modify `cn` attribute (use this endpoint for non-member attributes)
+- Cannot modify `cn` attribute directly (use rename endpoint instead)
 - Cannot modify `member` attribute here (use member management endpoints instead)
 - Supports `add`, `replace`, and `delete` operations
 
@@ -198,6 +198,78 @@ PUT /api/v1/ldap/groups/{cn}
   "success": true
 }
 ```
+
+### Rename Group
+
+```http
+POST /api/v1/ldap/groups/{cn}/rename
+```
+
+**Path Parameter:**
+
+- `cn`: Current group common name
+
+**Request Body:**
+
+```json
+{
+  "newCn": "new-group-name"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true
+}
+```
+
+**Description:**
+
+Renames a group by changing its `cn` attribute. This performs an LDAP modifyDN operation to change the RDN of the group entry.
+
+### Move Group
+
+```http
+POST /api/v1/ldap/groups/{cn}/move
+```
+
+**Path Parameter:**
+
+- `cn`: Group common name
+
+**Request Body:**
+
+```json
+{
+  "targetOrgDn": "ou=NewDepartment,ou=organization,dc=example,dc=com"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "success": true
+}
+```
+
+**Description:**
+
+Moves a group to a different organization by updating its `twakeDepartmentLink` and `twakeDepartmentPath` attributes.
+
+**Authorization:**
+
+When using the `authzPerBranch` plugin, moving a group requires:
+- **Read** permission on the source organization
+- **Write** permission on the destination organization
+
+**Requirements:**
+
+- Target organization must exist
+- Group cannot be moved to the same organization
+- Requires `twakeDepartmentLink` and `twakeDepartmentPath` attributes in config
 
 ### Delete Group
 

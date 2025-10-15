@@ -23,10 +23,16 @@ export class UnitTree {
   async init(): Promise<void> {
     this.container.innerHTML = `
       <div class="unit-tree">
-        <h3 style="margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px;">
-          <span class="material-icons">account_tree</span>
-          Organizations
-        </h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+            <span class="material-icons">account_tree</span>
+            Organizations
+          </h3>
+          <button id="create-unit-btn" style="background: var(--primary-color, #6200ee); color: white; border: none; border-radius: 4px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 14px;">
+            <span class="material-icons" style="font-size: 18px;">add</span>
+            Create
+          </button>
+        </div>
         <div id="tree-content">
           <div class="loading"><div class="spinner"></div></div>
         </div>
@@ -42,6 +48,12 @@ export class UnitTree {
       const topOrg = await response.json();
       this.rootDn = topOrg.dn;
       await this.renderTree();
+
+      // Attach create button listener
+      const createBtn = this.container.querySelector('#create-unit-btn');
+      if (createBtn) {
+        createBtn.addEventListener('click', () => this.handleCreateUnit());
+      }
     } catch (error) {
       console.error('Failed to init tree:', error);
       const treeEl = this.container.querySelector('#tree-content');
@@ -49,6 +61,48 @@ export class UnitTree {
         treeEl.innerHTML =
           '<p style="color: #f44336;">Failed to load organizations</p>';
       }
+    }
+  }
+
+  private async handleCreateUnit(): Promise<void> {
+    const parentDn = this.selectedDn || this.rootDn;
+    if (!parentDn) {
+      alert('Please select a parent organization first');
+      return;
+    }
+
+    // eslint-disable-next-line no-undef
+    const ouName = prompt(
+      'Enter the name for the new organizational unit (ou):'
+    );
+    if (!ouName || !ouName.trim()) return;
+
+    try {
+      const response = await fetch(
+        `${this.apiBaseUrl}/api/v1/ldap/organizations`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ou: ouName.trim(),
+            parentDn,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to create organizational unit');
+      }
+
+      alert(`Organizational unit "${ouName}" created successfully!`);
+
+      // Expand the parent node and refresh tree
+      this.expandedNodes.add(parentDn);
+      await this.renderTree();
+    } catch (error) {
+      console.error('Failed to create unit:', error);
+      alert(`Failed to create unit: ${(error as Error).message}`);
     }
   }
 

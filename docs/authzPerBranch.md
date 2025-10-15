@@ -125,6 +125,43 @@ Intercepts all LDAP search operations:
 3. Verifies user has `read` permission
 4. Throws error if access denied
 
+### LDAP Add Hook
+
+Intercepts all LDAP add operations:
+
+1. Checks if request has authenticated user
+2. Resolves user's permissions for the target branch
+3. Verifies user has `write` permission
+4. Throws error if access denied
+
+### LDAP Modify Hook
+
+Intercepts all LDAP modify operations:
+
+1. For regular modifications: checks `write` permission on the entry's branch
+2. For **move operations** (changing organization link):
+   - Verifies user has `read` permission on source branch
+   - Verifies user has `write` permission on destination branch
+   - Throws error if either permission is missing
+
+### LDAP Delete Hook
+
+Intercepts all LDAP delete operations:
+
+1. Checks if request has authenticated user
+2. Resolves user's permissions for the entry's branch
+3. Verifies user has `delete` permission
+4. Throws error if access denied
+
+### LDAP Rename Hook
+
+Intercepts all LDAP rename/modifyDN operations (for organization moves):
+
+1. Extracts source and destination branches from DNs
+2. Verifies user has `read` permission on source branch
+3. Verifies user has `write` permission on destination branch
+4. Throws error if either permission is missing
+
 ### Organization Top Hook
 
 Modifies the organization tree API:
@@ -273,6 +310,34 @@ Grant access to multiple branches:
 }
 ```
 
+### Example 5: Move Operations Authorization
+
+For move operations (groups or organizations), the user needs **both** read permission on the source and write permission on the destination:
+
+```json
+{
+  "users": {
+    "manager": {
+      "ou=DeptA,ou=organization,dc=example,dc=com": {
+        "read": true,
+        "write": false,
+        "delete": false
+      },
+      "ou=DeptB,ou=organization,dc=example,dc=com": {
+        "read": true,
+        "write": true,
+        "delete": false
+      }
+    }
+  }
+}
+```
+
+With this configuration:
+- ✅ User `manager` **CAN** move items from DeptA to DeptB (has read on source, write on destination)
+- ❌ User `manager` **CANNOT** move items from DeptB to DeptA (has write on source but no write on destination)
+- ❌ User `manager` **CANNOT** move items from DeptC to DeptB (no read permission on source)
+
 ## API Integration
 
 ### Organization Tree API
@@ -391,6 +456,49 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 3. Check default permissions allow access
 
 4. Verify group membership if using group permissions
+
+### Problem: Move Operation Failed
+
+**Symptoms:**
+
+```json
+{
+  "error": "check logs"
+}
+```
+
+With logs showing:
+```
+User jdoe does not have read permission for source branch ou=DeptA,dc=example,dc=com
+```
+or
+```
+User jdoe does not have write permission for destination branch ou=DeptB,dc=example,dc=com
+```
+
+**Solutions:**
+
+1. Verify user has **read** permission on the source branch
+2. Verify user has **write** permission on the destination branch
+3. Move operations require **both** permissions - having write on source is not sufficient
+
+Example fix:
+```json
+{
+  "users": {
+    "jdoe": {
+      "ou=DeptA,dc=example,dc=com": {
+        "read": true,
+        "write": false
+      },
+      "ou=DeptB,dc=example,dc=com": {
+        "read": true,
+        "write": true
+      }
+    }
+  }
+}
+```
 
 ### Problem: No Branches Returned
 

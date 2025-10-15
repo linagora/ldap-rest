@@ -242,6 +242,65 @@ PUT /api/v1/ldap/organizations/:dn
 }
 ```
 
+### Move Organization
+
+```http
+POST /api/v1/ldap/organizations/:dn/move
+```
+
+**Path Parameter:**
+
+- `dn`: Organization DN to move (URL-encoded)
+
+**Request Body:**
+
+```json
+{
+  "targetOrgDn": "ou=NewParent,dc=example,dc=com"
+}
+```
+
+**Notes:**
+
+- Moves an organization to a different parent organization
+- The organization will become a child of the target organization
+- All sub-organizations and linked entities (users/groups) move with it
+- Cannot move an organization into itself or its own descendants (circular reference prevention)
+- Cannot move to the same parent (no-op)
+- Target must be a valid organizational unit
+
+**Authorization:**
+
+When using the `authzPerBranch` plugin, moving an organization requires:
+- **Read** permission on the source organization (current parent)
+- **Write** permission on the destination organization (new parent)
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DHR%2Co%3Dgov%2Cc%3Dmu/move" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetOrgDn": "ou=Operations,dc=example,dc=com"
+  }'
+```
+
+This moves `ou=Recruitment,ou=HR,dc=example,dc=com` to `ou=Recruitment,ou=Operations,dc=example,dc=com`
+
+**Response (200):**
+
+```json
+{
+  "newDn": "ou=Recruitment,ou=Operations,dc=example,dc=com"
+}
+```
+
+**Error Examples:**
+
+- **Circular move (500):** `Cannot move organization into itself or its descendant`
+- **Invalid target (500):** `Target ou=InvalidOU,dc=example,dc=com is not an organizational unit`
+- **Same location (500):** `Organization is already in the target location`
+
 ### Delete Organization
 
 ```http
@@ -393,14 +452,29 @@ curl -X PUT "http://localhost:8081/api/v1/ldap/organizations/ou%3DHR%2Co%3Dgov%2
   }'
 ```
 
-### Example 5: Delete Empty Organization
+### Example 5: Move Organization to Different Parent
+
+```bash
+# Move Recruitment from HR to Operations department
+curl -X POST "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DHR%2Co%3Dgov%2Cc%3Dmu/move" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetOrgDn": "ou=Operations,dc=example,dc=com"
+  }'
+```
+
+This changes the DN from `ou=Recruitment,ou=HR,dc=example,dc=com` to `ou=Recruitment,ou=Operations,dc=example,dc=com`.
+
+All users, groups, and sub-organizations linked to Recruitment will automatically move with it.
+
+### Example 6: Delete Empty Organization
 
 ```bash
 # First verify organization is empty
-curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DHR%2Co%3Dgov%2Cc%3Dmu/subnodes"
+curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DOperations%2Co%3Dgov%2Cc%3Dmu/subnodes"
 
 # If empty, delete it
-curl -X DELETE "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DHR%2Co%3Dgov%2Cc%3Dmu"
+curl -X DELETE "http://localhost:8081/api/v1/ldap/organizations/ou%3DRecruitment%2Cou%3DOperations%2Co%3Dgov%2Cc%3Dmu"
 ```
 
 ## Integration with Other Plugins

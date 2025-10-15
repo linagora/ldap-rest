@@ -278,6 +278,8 @@ GET    /api/v1/ldap/groups                 # List groups
 GET    /api/v1/ldap/groups/{cn}            # Get group
 POST   /api/v1/ldap/groups                 # Create group
 PUT    /api/v1/ldap/groups/{cn}            # Modify group
+POST   /api/v1/ldap/groups/{cn}/rename     # Rename group (change cn)
+POST   /api/v1/ldap/groups/{cn}/move       # Move group to different organization
 DELETE /api/v1/ldap/groups/{cn}            # Delete group
 ```
 
@@ -291,6 +293,7 @@ GET    /api/v1/ldap/organizations/{dn}/subnodes             # List sub-organizat
 GET    /api/v1/ldap/organizations/{dn}/subnodes/search      # Search in organization
 POST   /api/v1/ldap/organizations                           # Create organization
 PUT    /api/v1/ldap/organizations/{dn}                      # Modify organization
+POST   /api/v1/ldap/organizations/{dn}/move                 # Move organization to different parent
 DELETE /api/v1/ldap/organizations/{dn}                      # Delete organization
 ```
 

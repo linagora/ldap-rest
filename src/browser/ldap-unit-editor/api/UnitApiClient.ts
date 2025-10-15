@@ -43,7 +43,7 @@ export class UnitApiClient {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }
@@ -55,10 +55,19 @@ export class UnitApiClient {
   }
 
   async createEntry(dn: string, data: Record<string, unknown>): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/v1/ldap/entries`, {
+    // Use the organizations API for creating units
+    // Extract ou and parentDn from DN
+    // DN format: ou=value,parent,dn,parts
+    const match = dn.match(/^ou=([^,]+),(.+)$/);
+    if (!match) {
+      throw new Error(`Invalid DN format: ${dn}`);
+    }
+    const [, ou, parentDn] = match;
+
+    const response = await fetch(`${this.baseUrl}/api/v1/ldap/organizations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dn, ...data }),
+      body: JSON.stringify({ ou, parentDn, ...data }),
     });
     if (!response.ok) {
       const error = await response.text();
@@ -67,8 +76,9 @@ export class UnitApiClient {
   }
 
   async deleteEntry(dn: string): Promise<void> {
+    // Use the organizations API for deleting units
     const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/entries/${encodeURIComponent(dn)}`,
+      `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`,
       {
         method: 'DELETE',
       }
@@ -93,5 +103,24 @@ export class UnitApiClient {
       dn: entry.dn,
       label: entry.cn?.[0] || entry.ou?.[0] || entry.dn,
     }));
+  }
+
+  async moveUnit(
+    dn: string,
+    targetOrgDn: string
+  ): Promise<{ success: boolean; newDn?: string }> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}/move`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetOrgDn }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || 'Failed to move unit');
+    }
+    return response.json();
   }
 }

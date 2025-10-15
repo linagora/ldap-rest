@@ -2,7 +2,6 @@
  * Utility functions
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
@@ -19,10 +18,13 @@ export const launchHooks = async (
 ): Promise<void> => {
   if (hooks) {
     for (const hook of hooks) {
-      if (hook)
-        await hook(...args).catch((e: unknown) =>
-          logger.error('Hook error', e)
-        );
+      if (hook) {
+        try {
+          await hook(...args);
+        } catch (e: unknown) {
+          logger.error('Hook error', e);
+        }
+      }
     }
   }
 };

@@ -207,10 +207,12 @@ class ldapActions {
       'LDAP connection pool full, waiting for available connection'
     );
     return new Promise(resolve => {
+      // eslint-disable-next-line no-undef
       const checkInterval = setInterval(() => {
         this.cleanupExpiredConnections();
         const available = this.connectionPool.find(conn => !conn.inUse);
         if (available) {
+          // eslint-disable-next-line no-undef
           clearInterval(checkInterval);
           available.inUse = true;
           resolve(available);
@@ -508,12 +510,12 @@ class ldapActions {
     }
   }
 
-  async rename(dn: string, newRdn: string): Promise<boolean> {
+  async rename(dn: string, newRdn: string, req?: any): Promise<boolean> {
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
     [dn, newRdn] = await launchHooksChained(
       this.parent.hooks.ldaprenamerequest,
-      [dn, newRdn]
+      [dn, newRdn, req]
     );
     const pooled = await this.acquireConnection();
     try {
