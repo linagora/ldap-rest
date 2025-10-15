@@ -3,6 +3,9 @@ import nock from 'nock';
 
 import { ResourceApiClient } from '../../src/browser/ldap-resource-editor/api/ResourceApiClient';
 
+const { DM_LDAP_BASE } = process.env;
+const LDAP_BASE = DM_LDAP_BASE || '${LDAP_BASE}';
+
 describe('Browser Resource API Client', () => {
   const baseUrl = 'http://localhost:8081';
 
@@ -19,8 +22,8 @@ describe('Browser Resource API Client', () => {
 
     it('should get resources', async () => {
       const mockResponse = [
-        { dn: 'uid=user1,ou=users,o=gov,c=mu', uid: 'user1' },
-        { dn: 'uid=user2,ou=users,o=gov,c=mu', uid: 'user2' },
+        { dn: 'uid=user1,ou=users,${LDAP_BASE}', uid: 'user1' },
+        { dn: 'uid=user2,ou=users,${LDAP_BASE}', uid: 'user2' },
       ];
 
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockResponse);
@@ -31,7 +34,7 @@ describe('Browser Resource API Client', () => {
 
     it('should get resources with search', async () => {
       const mockResponse = [
-        { dn: 'uid=john,ou=users,o=gov,c=mu', uid: 'john' },
+        { dn: 'uid=john,ou=users,${LDAP_BASE}', uid: 'john' },
       ];
 
       nock(baseUrl)
@@ -44,8 +47,8 @@ describe('Browser Resource API Client', () => {
 
     it('should handle object response format', async () => {
       const mockResponse = {
-        user1: { dn: 'uid=user1,ou=users,o=gov,c=mu', uid: 'user1' },
-        user2: { dn: 'uid=user2,ou=users,o=gov,c=mu', uid: 'user2' },
+        user1: { dn: 'uid=user1,ou=users,${LDAP_BASE}', uid: 'user1' },
+        user2: { dn: 'uid=user2,ou=users,${LDAP_BASE}', uid: 'user2' },
       };
 
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockResponse);
@@ -56,7 +59,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should get single resource', async () => {
-      const dn = 'uid=user1,ou=users,o=gov,c=mu';
+      const dn = 'uid=user1,ou=users,${LDAP_BASE}';
       const mockResponse = { dn, uid: 'user1' };
 
       nock(baseUrl)
@@ -68,7 +71,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should update resource', async () => {
-      const dn = 'uid=user1,ou=users,o=gov,c=mu';
+      const dn = 'uid=user1,ou=users,${LDAP_BASE}';
       const data = { cn: 'Updated Name' };
       const mockResponse = { dn, uid: 'user1', cn: 'Updated Name' };
 
@@ -83,7 +86,7 @@ describe('Browser Resource API Client', () => {
     it('should create resource', async () => {
       const data = { uid: 'newuser', cn: 'New User' };
       const mockResponse = {
-        dn: 'uid=newuser,ou=users,o=gov,c=mu',
+        dn: 'uid=newuser,ou=users,${LDAP_BASE}',
         ...data,
       };
 
@@ -94,7 +97,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should delete resource', async () => {
-      const dn = 'uid=user1,ou=users,o=gov,c=mu';
+      const dn = 'uid=user1,ou=users,${LDAP_BASE}';
 
       nock(baseUrl)
         .delete(`/api/v1/ldap/users/${encodeURIComponent(dn)}`)
@@ -113,7 +116,7 @@ describe('Browser Resource API Client', () => {
 
     it('should use correct endpoint for groups', async () => {
       const mockResponse = [
-        { dn: 'cn=group1,ou=groups,o=gov,c=mu', cn: 'group1' },
+        { dn: 'cn=group1,ou=groups,${LDAP_BASE}', cn: 'group1' },
       ];
 
       nock(baseUrl).get('/api/v1/ldap/groups').reply(200, mockResponse);
@@ -124,7 +127,7 @@ describe('Browser Resource API Client', () => {
 
     it('should use cn as main attribute', async () => {
       const mockResponse = [
-        { dn: 'cn=admin,ou=groups,o=gov,c=mu', cn: 'admin' },
+        { dn: 'cn=admin,ou=groups,${LDAP_BASE}', cn: 'admin' },
       ];
 
       nock(baseUrl)
@@ -145,7 +148,7 @@ describe('Browser Resource API Client', () => {
 
     it('should use correct endpoint for organizations', async () => {
       const mockResponse = [
-        { dn: 'ou=org1,ou=organization,o=gov,c=mu', ou: 'org1' },
+        { dn: 'ou=org1,ou=organization,${LDAP_BASE}', ou: 'org1' },
       ];
 
       nock(baseUrl).get('/api/v1/ldap/organizations').reply(200, mockResponse);
@@ -156,7 +159,7 @@ describe('Browser Resource API Client', () => {
 
     it('should use ou as main attribute', async () => {
       const mockResponse = [
-        { dn: 'ou=HR,ou=organization,o=gov,c=mu', ou: 'HR' },
+        { dn: 'ou=HR,ou=organization,${LDAP_BASE}', ou: 'HR' },
       ];
 
       nock(baseUrl)
@@ -168,7 +171,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should create entry for organizations', async () => {
-      const dn = 'ou=neworg,ou=organization,o=gov,c=mu';
+      const dn = 'ou=neworg,ou=organization,${LDAP_BASE}';
       const data = { ou: 'neworg' };
       const mockResponse = { dn, ...data };
 
@@ -181,7 +184,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should delete entry for organizations', async () => {
-      const dn = 'ou=oldorg,ou=organization,o=gov,c=mu';
+      const dn = 'ou=oldorg,ou=organization,${LDAP_BASE}';
 
       nock(baseUrl)
         .delete(`/api/v1/ldap/entry/${encodeURIComponent(dn)}`)
@@ -200,7 +203,7 @@ describe('Browser Resource API Client', () => {
 
     it('should get config', async () => {
       const mockConfig = {
-        ldapBase: 'o=gov,c=mu',
+        ldapBase: '${LDAP_BASE}',
         features: { flatResources: [] },
       };
 
@@ -232,7 +235,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should get pointer options', async () => {
-      const branch = 'ou=users,o=gov,c=mu';
+      const branch = 'ou=users,${LDAP_BASE}';
       const mockConfig = {
         features: {
           flatResources: [
@@ -253,8 +256,8 @@ describe('Browser Resource API Client', () => {
         },
       };
       const mockUsers = [
-        { dn: 'uid=user1,ou=users,o=gov,c=mu', uid: 'user1', cn: 'User One' },
-        { dn: 'uid=user2,ou=users,o=gov,c=mu', uid: 'user2', cn: 'User Two' },
+        { dn: 'uid=user1,ou=users,${LDAP_BASE}', uid: 'user1', cn: 'User One' },
+        { dn: 'uid=user2,ou=users,${LDAP_BASE}', uid: 'user2', cn: 'User Two' },
       ];
 
       nock(baseUrl).get('/api/v1/config').reply(200, mockConfig);
@@ -269,7 +272,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should handle missing config gracefully', async () => {
-      const branch = 'ou=unknown,o=gov,c=mu';
+      const branch = 'ou=unknown,${LDAP_BASE}';
       const mockConfig = {
         features: { flatResources: [] },
       };
@@ -289,7 +292,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should cache GET requests', async () => {
-      const mockResponse = [{ dn: 'uid=user1,ou=users,o=gov,c=mu' }];
+      const mockResponse = [{ dn: 'uid=user1,ou=users,${LDAP_BASE}' }];
 
       // First request
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockResponse);
@@ -303,7 +306,7 @@ describe('Browser Resource API Client', () => {
 
     it('should not cache non-GET requests', async () => {
       const data = { uid: 'newuser' };
-      const mockResponse = { dn: 'uid=newuser,ou=users,o=gov,c=mu', ...data };
+      const mockResponse = { dn: 'uid=newuser,ou=users,${LDAP_BASE}', ...data };
 
       nock(baseUrl).post('/api/v1/ldap/users', data).reply(200, mockResponse);
 
@@ -315,7 +318,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should clear cache', async () => {
-      const mockResponse = [{ dn: 'uid=user1,ou=users,o=gov,c=mu' }];
+      const mockResponse = [{ dn: 'uid=user1,ou=users,${LDAP_BASE}' }];
 
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockResponse);
       await client.getResources();
@@ -327,8 +330,8 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should invalidate cache by pattern', async () => {
-      const mockUsers = [{ dn: 'uid=user1,ou=users,o=gov,c=mu' }];
-      const mockConfig = { ldapBase: 'o=gov,c=mu' };
+      const mockUsers = [{ dn: 'uid=user1,ou=users,${LDAP_BASE}' }];
+      const mockConfig = { ldapBase: '${LDAP_BASE}' };
 
       nock(baseUrl).get('/api/v1/ldap/users').reply(200, mockUsers);
       nock(baseUrl).get('/api/v1/config').reply(200, mockConfig);
@@ -352,7 +355,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should handle 404 errors', async () => {
-      const dn = 'uid=notfound,ou=users,o=gov,c=mu';
+      const dn = 'uid=notfound,ou=users,${LDAP_BASE}';
 
       nock(baseUrl)
         .get(`/api/v1/ldap/users/${encodeURIComponent(dn)}`)
@@ -368,7 +371,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should handle update errors', async () => {
-      const dn = 'uid=user1,ou=users,o=gov,c=mu';
+      const dn = 'uid=user1,ou=users,${LDAP_BASE}';
       const data = { cn: 'Updated' };
 
       nock(baseUrl)
@@ -399,7 +402,7 @@ describe('Browser Resource API Client', () => {
     });
 
     it('should handle delete errors', async () => {
-      const dn = 'uid=user1,ou=users,o=gov,c=mu';
+      const dn = 'uid=user1,ou=users,${LDAP_BASE}';
 
       nock(baseUrl)
         .delete(`/api/v1/ldap/users/${encodeURIComponent(dn)}`)

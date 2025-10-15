@@ -35,6 +35,12 @@ class LdapFlatInstance extends LdapFlat {
   name: string = 'ldapFlatInstance';
   roles: Role[] = ['api'] as const;
 
+  // Ensure department sync is loaded to maintain consistency
+  // when organizations are renamed/moved
+  dependencies = {
+    departmentSync: 'core/ldap/departmentSync',
+  };
+
   constructor(server: DM, config: ConstructorParameters<typeof LdapFlat>[1]) {
     super(server, config);
   }

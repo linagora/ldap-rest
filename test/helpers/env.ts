@@ -42,3 +42,19 @@ export const LDAP_ENV_VARS_WITH_ORG = [
   ...LDAP_ENV_VARS,
   'DM_LDAP_TOP_ORGANIZATION',
 ] as const;
+
+/**
+ * James environment variables
+ */
+export const JAMES_ENV_VARS = [
+  'DM_JAMES_WEBADMIN_URL',
+  'DM_JAMES_WEBADMIN_TOKEN',
+] as const;
+
+/**
+ * Combined LDAP and James environment variables
+ */
+export const LDAP_AND_JAMES_ENV_VARS = [
+  ...LDAP_ENV_VARS,
+  ...JAMES_ENV_VARS,
+] as const;
