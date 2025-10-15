@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
-import pLimit from 'p-limit';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import TwakePlugin from '../../abstract/twakePlugin';
+import { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type {
   AttributesList,
@@ -11,7 +11,7 @@ import type {
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 
-export default class James extends DmPlugin {
+export default class James extends TwakePlugin {
   name = 'james';
   roles: Role[] = ['consistency'] as const;
 
@@ -20,78 +20,27 @@ export default class James extends DmPlugin {
     ldapGroups: 'core/ldap/groups',
   };
 
-  // Cached configuration attributes
-  private mailAttr: string;
+  // James-specific configuration attributes
   private quotaAttr: string;
   private aliasAttr: string;
-  private displayNameAttr: string;
   private initDelay: number;
 
-  // Concurrency limiter for James HTTP requests
-  private jamesLimit: ReturnType<typeof pLimit>;
-
   constructor(server: DM) {
-    super(server);
+    super(
+      server,
+      'james_webadmin_url',
+      'james_webadmin_token',
+      'james_concurrency'
+    );
 
-    // Initialize cached configuration attributes
-    this.mailAttr = this.config.mail_attribute || 'mail';
-    this.quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
-    this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
-    this.displayNameAttr = this.config.display_name_attribute || 'displayName';
+    // Initialize James-specific configuration attributes
+    this.quotaAttr = (this.config.quota_attribute as string) || 'mailQuotaSize';
+    this.aliasAttr =
+      (this.config.alias_attribute as string) || 'mailAlternateAddress';
     this.initDelay =
       typeof this.config.james_init_delay === 'number'
         ? this.config.james_init_delay
         : 1000;
-
-    // Initialize James HTTP concurrency limiter
-    const jamesConcurrency =
-      typeof this.config.james_concurrency === 'number'
-        ? this.config.james_concurrency
-        : 10;
-    this.jamesLimit = pLimit(jamesConcurrency);
-    this.logger.info(
-      `James HTTP request concurrency limit set to ${jamesConcurrency}`
-    );
-  }
-
-  /**
-   * Normalize email alias - handle AD format (smtp:alias@domain.com)
-   */
-  private normalizeAlias(alias: string): string {
-    if (alias.toLowerCase().startsWith('smtp:')) {
-      return alias.substring(5);
-    }
-    return alias;
-  }
-
-  /**
-   * Create HTTP headers with optional Authorization token
-   */
-  private createJamesHeaders(contentType?: string): {
-    Authorization?: string;
-    'Content-Type'?: string;
-  } {
-    const headers: { Authorization?: string; 'Content-Type'?: string } = {};
-    if (this.config.james_webadmin_token) {
-      headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
-    }
-    if (contentType) {
-      headers['Content-Type'] = contentType;
-    }
-    return headers;
-  }
-
-  /**
-   * Extract aliases from LDAP attribute value
-   */
-  private getAliases(
-    value: string | string[] | Buffer | Buffer[] | undefined
-  ): string[] {
-    if (!value) return [];
-    const aliases = Array.isArray(value) ? value : [value];
-    return aliases
-      .map(a => (Buffer.isBuffer(a) ? a.toString('utf-8') : String(a)))
-      .map(a => this.normalizeAlias(a));
   }
 
   hooks: Hooks = {
@@ -121,9 +70,9 @@ export default class James extends DmPlugin {
           ? Number(quota[0])
           : Number(quota);
         if (!isNaN(quotaNum) && quotaNum > 0) {
-          await this._try(
+          await this.callWebAdminApi(
             'ldapadddone:quota',
-            `${this.config.james_webadmin_url}/quota/users/${mailStr}/size`,
+            `${this.webadminUrl}/quota/users/${mailStr}/size`,
             'PUT',
             dn,
             quotaNum.toString(),
@@ -137,9 +86,9 @@ export default class James extends DmPlugin {
         const aliasList = this.getAliases(aliases);
         await Promise.all(
           aliasList.map(alias =>
-            this._try(
+            this.callWebAdminApi(
               'ldapadddone:alias',
-              `${this.config.james_webadmin_url}/address/aliases/${mailStr}/sources/${alias}`,
+              `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
               'PUT',
               dn,
               null,
@@ -166,9 +115,9 @@ export default class James extends DmPlugin {
       }
 
       // Rename the mailbox
-      await this._try(
+      await this.callWebAdminApi(
         'onLdapMailChange',
-        `${this.config.james_webadmin_url}/users/${oldmail}/rename/${newmail}?action=rename`,
+        `${this.webadminUrl}/users/${oldmail}/rename/${newmail}?action=rename`,
         'POST',
         dn,
         null,
@@ -192,9 +141,9 @@ export default class James extends DmPlugin {
             // Delete old aliases and create new ones in parallel
             await Promise.all([
               ...aliases.map(alias =>
-                this._try(
+                this.callWebAdminApi(
                   'onLdapMailChange-delete',
-                  `${this.config.james_webadmin_url}/address/aliases/${oldmail}/sources/${alias}`,
+                  `${this.webadminUrl}/address/aliases/${oldmail}/sources/${alias}`,
                   'DELETE',
                   dn,
                   null,
@@ -202,9 +151,9 @@ export default class James extends DmPlugin {
                 )
               ),
               ...aliases.map(alias =>
-                this._try(
+                this.callWebAdminApi(
                   'onLdapMailChange-create',
-                  `${this.config.james_webadmin_url}/address/aliases/${newmail}/sources/${alias}`,
+                  `${this.webadminUrl}/address/aliases/${newmail}/sources/${alias}`,
                   'PUT',
                   dn,
                   null,
@@ -238,9 +187,9 @@ export default class James extends DmPlugin {
       // Delete and add aliases in parallel
       await Promise.all([
         ...toDelete.map(alias =>
-          this._try(
+          this.callWebAdminApi(
             'onLdapAliasChange-delete',
-            `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
+            `${this.webadminUrl}/address/aliases/${mail}/sources/${alias}`,
             'DELETE',
             dn,
             null,
@@ -248,9 +197,9 @@ export default class James extends DmPlugin {
           )
         ),
         ...toAdd.map(alias =>
-          this._try(
+          this.callWebAdminApi(
             'onLdapAliasChange-add',
-            `${this.config.james_webadmin_url}/address/aliases/${mail}/sources/${alias}`,
+            `${this.webadminUrl}/address/aliases/${mail}/sources/${alias}`,
             'PUT',
             dn,
             null,
@@ -265,9 +214,9 @@ export default class James extends DmPlugin {
       oldQuota: number,
       newQuota: number
     ) => {
-      return this._try(
+      return this.callWebAdminApi(
         'onLdapQuotaChange',
-        `${this.config.james_webadmin_url}/quota/users/${mail}/size`,
+        `${this.webadminUrl}/quota/users/${mail}/size`,
         'PUT',
         dn,
         newQuota.toString(),
@@ -297,9 +246,9 @@ export default class James extends DmPlugin {
       // Delete and add forwards in parallel
       await Promise.all([
         ...toDelete.map(forward =>
-          this._try(
+          this.callWebAdminApi(
             'onLdapForwardChange-delete',
-            `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+            `${this.webadminUrl}/domains/${domain}/forwards/${mail}/${forward}`,
             'DELETE',
             dn,
             null,
@@ -307,9 +256,9 @@ export default class James extends DmPlugin {
           )
         ),
         ...toAdd.map(forward =>
-          this._try(
+          this.callWebAdminApi(
             'onLdapForwardChange-add',
-            `${this.config.james_webadmin_url}/domains/${domain}/forwards/${mail}/${forward}`,
+            `${this.webadminUrl}/domains/${domain}/forwards/${mail}/${forward}`,
             'PUT',
             dn,
             null,
@@ -465,18 +414,18 @@ export default class James extends DmPlugin {
         operations.push(
           ...memberMails.map(memberMail => {
             if (isTeamMailbox && domain) {
-              return this._try(
+              return this.callWebAdminApi(
                 'ldapgroupmodifydone:teamMailbox',
-                `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
+                `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
                 'PUT',
                 dn,
                 null,
                 { domain, groupMail, memberMail, action: 'add' }
               );
             } else {
-              return this._try(
+              return this.callWebAdminApi(
                 'ldapgroupmodifydone:mailingList',
-                `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
+                `${this.webadminUrl}/address/groups/${groupMail}/${memberMail}`,
                 'PUT',
                 dn,
                 null,
@@ -501,18 +450,18 @@ export default class James extends DmPlugin {
           operations.push(
             ...memberMails.map(memberMail => {
               if (isTeamMailbox && domain) {
-                return this._try(
+                return this.callWebAdminApi(
                   'ldapgroupmodifydone:teamMailbox',
-                  `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
+                  `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
                   'DELETE',
                   dn,
                   null,
                   { domain, groupMail, memberMail, action: 'delete' }
                 );
               } else {
-                return this._try(
+                return this.callWebAdminApi(
                   'ldapgroupmodifydone:mailingList',
-                  `${this.config.james_webadmin_url}/address/groups/${groupMail}/${memberMail}`,
+                  `${this.webadminUrl}/address/groups/${groupMail}/${memberMail}`,
                   'DELETE',
                   dn,
                   null,
@@ -544,9 +493,9 @@ export default class James extends DmPlugin {
         await this.removeAllTeamMailboxMembers(dn, groupMail);
       } else {
         // Delete the entire address group from James (mailing list)
-        await this._try(
+        await this.callWebAdminApi(
           'ldapgroupdeletedone:mailingList',
-          `${this.config.james_webadmin_url}/address/groups/${groupMail}`,
+          `${this.webadminUrl}/address/groups/${groupMail}`,
           'DELETE',
           dn,
           null,
@@ -662,49 +611,6 @@ export default class James extends DmPlugin {
   }
 
   /**
-   * Helper to convert LDAP attribute value to string
-   */
-  private attributeToString(value: unknown): string | null {
-    if (!value) return null;
-    if (Array.isArray(value)) {
-      return value.length > 0 ? String(value[0]) : null;
-    }
-    return String(value as string | Buffer);
-  }
-
-  /**
-   * Generic LDAP search utility to fetch specific attributes from a DN
-   * Reduces code duplication across multiple methods
-   * @param dn - The DN to fetch attributes from
-   * @param attributes - Optional array of attribute names to fetch.
-   *                     If undefined or empty, fetches all attributes (*)
-   */
-  private async ldapGetAttributes(
-    dn: string,
-    attributes?: string[]
-  ): Promise<AttributesList | null> {
-    try {
-      // If attributes is undefined or empty, fetch all attributes
-      const searchAttrs =
-        attributes && attributes.length > 0 ? attributes : undefined;
-
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: searchAttrs },
-        dn
-      )) as SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        return result.searchEntries[0] as AttributesList;
-      }
-      return null;
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.debug(`Could not fetch attributes from DN ${dn}: ${err}`);
-      return null;
-    }
-  }
-
-  /**
    * Extract display name from LDAP attributes
    * Fallback logic: displayName → cn → givenName+sn → mail
    */
@@ -805,11 +711,11 @@ export default class James extends DmPlugin {
 
     try {
       // Step 1: Get user identities
-      const identitiesUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}`;
-      const getRes = await this.jamesLimit(() =>
+      const identitiesUrl = `${this.webadminUrl}/jmap/identities/${mail}`;
+      const getRes = await this.requestLimit(() =>
         fetch(identitiesUrl, {
           method: 'GET',
-          headers: this.createJamesHeaders(),
+          headers: this.createHeaders(),
         })
       );
       if (!getRes.ok) {
@@ -845,7 +751,7 @@ export default class James extends DmPlugin {
       const htmlSignature = await this.generateSignature(dn);
 
       // Step 4: Update identity name and signature
-      const updateUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}/${defaultIdentity.id}`;
+      const updateUrl = `${this.webadminUrl}/jmap/identities/${mail}/${defaultIdentity.id}`;
 
       const updatePayload: {
         id: string;
@@ -862,10 +768,10 @@ export default class James extends DmPlugin {
         updatePayload.htmlSignature = htmlSignature;
       }
 
-      const updateRes = await this.jamesLimit(() =>
+      const updateRes = await this.requestLimit(() =>
         fetch(updateUrl, {
           method: 'PUT',
-          headers: this.createJamesHeaders('application/json'),
+          headers: this.createHeaders('application/json'),
           body: JSON.stringify(updatePayload),
         })
       );
@@ -936,14 +842,6 @@ export default class James extends DmPlugin {
   }
 
   /**
-   * Extract domain from email address
-   */
-  private extractMailDomain(email: string): string | null {
-    const parts = email.split('@');
-    return parts.length === 2 ? parts[1] : null;
-  }
-
-  /**
    * Create a mailing list in James
    */
   private async createMailingList(
@@ -964,9 +862,9 @@ export default class James extends DmPlugin {
     // Add each member to the James address group (parallelize)
     await Promise.all(
       memberMails.map(memberMail =>
-        this._try(
+        this.callWebAdminApi(
           'ldapgroupadddone:mailingList',
-          `${this.config.james_webadmin_url}/address/groups/${mailStr}/${memberMail}`,
+          `${this.webadminUrl}/address/groups/${mailStr}/${memberMail}`,
           'PUT',
           dn,
           null,
@@ -1011,9 +909,9 @@ export default class James extends DmPlugin {
 
     // Create the team mailbox itself
     operations.push(
-      this._try(
+      this.callWebAdminApi(
         'ldapgroupadddone:teamMailbox:create',
-        `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${mailStr}`,
+        `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
         'PUT',
         dn,
         null,
@@ -1024,9 +922,9 @@ export default class James extends DmPlugin {
     // Add each member
     for (const memberMail of memberMails) {
       operations.push(
-        this._try(
+        this.callWebAdminApi(
           'ldapgroupadddone:teamMailbox:addMember',
-          `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
+          `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
           'PUT',
           dn,
           null,
@@ -1054,9 +952,9 @@ export default class James extends DmPlugin {
       return;
     }
 
-    await this._try(
+    await this.callWebAdminApi(
       'ldapgroupdeletedone:teamMailbox',
-      `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${mailStr}`,
+      `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
       'DELETE',
       dn,
       null,
@@ -1103,9 +1001,9 @@ export default class James extends DmPlugin {
         // Remove each member
         await Promise.all(
           memberMails.map(memberMail =>
-            this._try(
+            this.callWebAdminApi(
               'removeAllTeamMailboxMembers',
-              `${this.config.james_webadmin_url}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
+              `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
               'DELETE',
               dn,
               null,
@@ -1135,9 +1033,9 @@ export default class James extends DmPlugin {
    * Delete a mailing list from James
    */
   private async deleteMailingList(dn: string, mailStr: string): Promise<void> {
-    await this._try(
+    await this.callWebAdminApi(
       'deleteMailingList',
-      `${this.config.james_webadmin_url}/address/groups/${mailStr}`,
+      `${this.webadminUrl}/address/groups/${mailStr}`,
       'DELETE',
       dn,
       null,
@@ -1265,9 +1163,9 @@ export default class James extends DmPlugin {
     for (const { dn: delegateDN, email: delegateEmail } of addedResults) {
       if (delegateEmail) {
         operations.push(
-          this._try(
+          this.callWebAdminApi(
             'onLdapChange:addDelegation',
-            `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            `${this.webadminUrl}/users/${userMail}/authorizedUsers/${delegateEmail}`,
             'PUT',
             dn,
             null,
@@ -1280,9 +1178,9 @@ export default class James extends DmPlugin {
     for (const { dn: delegateDN, email: delegateEmail } of removedResults) {
       if (delegateEmail) {
         operations.push(
-          this._try(
+          this.callWebAdminApi(
             'onLdapChange:removeDelegation',
-            `${this.config.james_webadmin_url}/users/${userMail}/authorizedUsers/${delegateEmail}`,
+            `${this.webadminUrl}/users/${userMail}/authorizedUsers/${delegateEmail}`,
             'DELETE',
             dn,
             null,
@@ -1315,67 +1213,5 @@ export default class James extends DmPlugin {
     if (!value) return [];
     if (Array.isArray(value)) return value as string[];
     return [value as string];
-  }
-
-  async _try(
-    hookname: string,
-    url: string,
-    method: string,
-    dn: string,
-    body: string | null,
-    fields: object
-  ): Promise<void> {
-    return this.jamesLimit(async () => {
-      // Prepare log
-      const log = {
-        plugin: this.name,
-        event: `${hookname}`,
-        result: 'error',
-        dn,
-        ...fields,
-      };
-      try {
-        const opts: {
-          method: string;
-          body?: string | null;
-          headers?: { Authorization?: string };
-        } = { method };
-        if (body) Object.assign(opts, { body });
-        if (this.config.james_webadmin_token) {
-          if (!opts.headers) opts.headers = {};
-          opts.headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
-        }
-        const res = await fetch(url, opts);
-        if (!res.ok) {
-          // 409 Conflict is acceptable for alias creation - may already exist
-          // (e.g., James automatically creates alias when renaming user)
-          if (res.status === 409 && hookname.includes('Alias')) {
-            this.logger.debug({
-              ...log,
-              result: 'already_exists',
-              http_status: res.status,
-              http_status_text: res.statusText,
-            });
-          } else {
-            this.logger.error({
-              ...log,
-              http_status: res.status,
-              http_status_text: res.statusText,
-            });
-          }
-        } else {
-          this.logger.info({
-            ...log,
-            result: 'success',
-            http_status: res.status,
-          });
-        }
-      } catch (err) {
-        this.logger.error({
-          ...log,
-          error: err,
-        });
-      }
-    });
   }
 }

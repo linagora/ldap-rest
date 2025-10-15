@@ -1,7 +1,5 @@
-import fetch from 'node-fetch';
-import pLimit from 'p-limit';
-
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import TwakePlugin from '../../abstract/twakePlugin';
+import { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
 
@@ -11,28 +9,25 @@ import { Hooks } from '../../hooks';
  * Monitors a LDAP branch for resources (meeting rooms, equipment, etc.)
  * and automatically creates/updates/deletes them in Twake Calendar via WebAdmin API
  */
-export default class CalendarResources extends DmPlugin {
+export default class CalendarResources extends TwakePlugin {
   name = 'calendarResources';
   roles: Role[] = ['consistency'] as const;
 
-  // Cached configuration attributes
-  private calendarUrl: string;
-  private calendarToken: string;
+  // Calendar-specific configuration attributes
   private resourceBase: string;
   private resourceObjectClass: string;
   private resourceCreator: string;
   private resourceDomain: string;
 
-  // Concurrency limiter for Calendar HTTP requests
-  private calendarLimit: ReturnType<typeof pLimit>;
-
   constructor(server: import('../../bin').DM) {
-    super(server);
+    super(
+      server,
+      'calendar_webadmin_url',
+      'calendar_webadmin_token',
+      'calendar_concurrency'
+    );
 
-    // Initialize cached configuration attributes
-    this.calendarUrl =
-      (this.config.calendar_webadmin_url as string) || 'http://localhost:8080';
-    this.calendarToken = (this.config.calendar_webadmin_token as string) || '';
+    // Initialize Calendar-specific configuration attributes
     this.resourceBase = (this.config.calendar_resource_base as string) || '';
     this.resourceObjectClass =
       (this.config.calendar_resource_objectclass as string) || '';
@@ -40,33 +35,6 @@ export default class CalendarResources extends DmPlugin {
       (this.config.calendar_resource_creator as string) || 'admin@example.com';
     this.resourceDomain =
       (this.config.calendar_resource_domain as string) || '';
-
-    // Initialize Calendar HTTP concurrency limiter
-    const calendarConcurrency =
-      typeof this.config.calendar_concurrency === 'number'
-        ? this.config.calendar_concurrency
-        : 10;
-    this.calendarLimit = pLimit(calendarConcurrency);
-    this.logger.info(
-      `Calendar HTTP request concurrency limit set to ${calendarConcurrency}`
-    );
-  }
-
-  /**
-   * Create HTTP headers with optional Authorization token
-   */
-  private createCalendarHeaders(contentType?: string): {
-    Authorization?: string;
-    'Content-Type'?: string;
-  } {
-    const headers: { Authorization?: string; 'Content-Type'?: string } = {};
-    if (this.calendarToken) {
-      headers.Authorization = `Bearer ${this.calendarToken}`;
-    }
-    if (contentType) {
-      headers['Content-Type'] = contentType;
-    }
-    return headers;
   }
 
   hooks: Hooks = {
@@ -87,9 +55,9 @@ export default class CalendarResources extends DmPlugin {
         return;
       }
 
-      await this._callApi(
+      await this.callWebAdminApi(
         'ldapcalendarResourceadddone',
-        `${this.calendarUrl}/resources`,
+        `${this.webadminUrl}/resources`,
         'POST',
         dn,
         JSON.stringify(resourceData),
@@ -141,9 +109,9 @@ export default class CalendarResources extends DmPlugin {
         return;
       }
 
-      await this._callApi(
+      await this.callWebAdminApi(
         'ldapcalendarResourcemodifydone',
-        `${this.calendarUrl}/resources/${resourceId}`,
+        `${this.webadminUrl}/resources/${resourceId}`,
         'PATCH',
         dn,
         JSON.stringify(updateData),
@@ -158,9 +126,9 @@ export default class CalendarResources extends DmPlugin {
         return;
       }
 
-      await this._callApi(
+      await this.callWebAdminApi(
         'ldapcalendarResourcedeletedone',
-        `${this.calendarUrl}/resources/${resourceId}`,
+        `${this.webadminUrl}/resources/${resourceId}`,
         'DELETE',
         dn,
         null,
@@ -209,25 +177,21 @@ export default class CalendarResources extends DmPlugin {
   } | null {
     // Extract required fields
     const cn = attributes.cn;
-    const name = Array.isArray(cn) ? String(cn[0]) : String(cn);
+    const name = this.attributeToString(cn);
 
     if (!name) {
       return null;
     }
 
     // Extract optional description
-    const desc = attributes.description;
-    const description = desc
-      ? Array.isArray(desc)
-        ? String(desc[0])
-        : String(desc)
-      : undefined;
+    const description =
+      this.attributeToString(attributes.description) || undefined;
 
     // Use configured creator or default
     const creator = this.resourceCreator;
 
     // Extract domain from DN or use configured domain
-    const domain = this.resourceDomain || this.extractDomain(dn);
+    const domain = this.resourceDomain || this.extractDomainFromDn(dn);
 
     // Generate ID from DN (use cn or uid)
     const id =
@@ -249,83 +213,5 @@ export default class CalendarResources extends DmPlugin {
     // Extract cn or uid from DN
     const match = dn.match(/(?:cn|uid)=([^,]+)/i);
     return match ? match[1] : null;
-  }
-
-  /**
-   * Extract domain from DN
-   */
-  private extractDomain(dn: string): string {
-    // Extract dc components and join them
-    const dcMatches = dn.match(/dc=([^,]+)/gi);
-    if (dcMatches) {
-      return dcMatches.map(dc => dc.substring(3)).join('.');
-    }
-    return 'example.com';
-  }
-
-  /**
-   * Call Twake Calendar WebAdmin API
-   */
-  async _callApi(
-    hookname: string,
-    url: string,
-    method: string,
-    dn: string,
-    body: string | null,
-    fields: object
-  ): Promise<void> {
-    return this.calendarLimit(async () => {
-      const log = {
-        plugin: this.name,
-        event: hookname,
-        result: 'error',
-        dn,
-        ...fields,
-      };
-
-      try {
-        const opts: {
-          method: string;
-          body?: string | null;
-          headers: {
-            'Content-Type'?: string;
-            Authorization?: string;
-          };
-        } = {
-          method,
-          headers: this.createCalendarHeaders(
-            body ? 'application/json' : undefined
-          ),
-        };
-
-        if (body) {
-          opts.body = body;
-        }
-
-        const res = await fetch(url, opts);
-
-        if (!res.ok) {
-          this.logger.error({
-            ...log,
-            http_status: res.status,
-            http_status_text: res.statusText,
-            url,
-          });
-        } else {
-          this.logger.info({
-            ...log,
-            result: 'success',
-            http_status: res.status,
-            url,
-          });
-        }
-      } catch (err) {
-        this.logger.error({
-          ...log,
-          error: err,
-          url,
-        });
-      }
-    });
   }
 }
