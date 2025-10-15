@@ -272,6 +272,7 @@ POST /api/v1/ldap/organizations/:dn/move
 **Authorization:**
 
 When using the `authzPerBranch` plugin, moving an organization requires:
+
 - **Read** permission on the source organization (current parent)
 - **Write** permission on the destination organization (new parent)
 

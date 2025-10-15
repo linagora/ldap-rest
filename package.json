@@ -64,6 +64,10 @@
       "import": "./dist/plugins/demo/helloworld.js",
       "types": "./dist/src/plugins/demo/helloworld.d.ts"
     },
+    "plugin-ldap-bulkimport": {
+      "import": "./dist/plugins/ldap/bulkImport.js",
+      "types": "./dist/src/plugins/ldap/bulkImport.d.ts"
+    },
     "plugin-ldap-departmentsync": {
       "import": "./dist/plugins/ldap/departmentSync.js",
       "types": "./dist/src/plugins/ldap/departmentSync.d.ts"
@@ -400,10 +404,12 @@
   },
   "dependencies": {
     "body-parser": "^2.2.0",
+    "csv-parse": "^6.1.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
     "ldapts": "^8.0.9",
     "lru-cache": "^11.2.2",
+    "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "p-limit": "^7.1.1",
     "winston": "^3.17.0"
@@ -417,6 +423,7 @@
     "@types/chai": "^5.2.2",
     "@types/express": "^5.0.3",
     "@types/mocha": "^10.0.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.5.1",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.44.0",

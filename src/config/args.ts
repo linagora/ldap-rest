@@ -77,6 +77,11 @@ export interface Config {
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
 
+  // LDAP Bulk Import plugin
+  bulk_import_schemas?: string;
+  bulk_import_max_file_size?: string;
+  bulk_import_batch_size?: string;
+
   // External users in groups
   external_members_branch?: string;
   external_branch_class?: string[];
@@ -320,6 +325,11 @@ const configArgs: ConfigTemplate = [
     'array',
     '--ldap-flat-schemas',
   ],
+
+  // LDAP Bulk Import plugin
+  ['--bulk-import-schemas', 'DM_BULK_IMPORT_SCHEMAS', ''],
+  ['--bulk-import-max-file-size', 'DM_BULK_IMPORT_MAX_FILE_SIZE', '10485760'],
+  ['--bulk-import-batch-size', 'DM_BULK_IMPORT_BATCH_SIZE', '100'],
 
   // James plugin
   ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],
