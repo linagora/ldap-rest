@@ -25,6 +25,7 @@ export default class James extends DmPlugin {
   private quotaAttr: string;
   private aliasAttr: string;
   private displayNameAttr: string;
+  private initDelay: number;
 
   // Concurrency limiter for James HTTP requests
   private jamesLimit: ReturnType<typeof pLimit>;
@@ -37,6 +38,10 @@ export default class James extends DmPlugin {
     this.quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
     this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
     this.displayNameAttr = this.config.display_name_attribute || 'displayName';
+    this.initDelay =
+      typeof this.config.james_init_delay === 'number'
+        ? this.config.james_init_delay
+        : 1000;
 
     // Initialize James HTTP concurrency limiter
     const jamesConcurrency =
@@ -104,9 +109,11 @@ export default class James extends DmPlugin {
 
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
-      // Wait a bit to ensure James has created the user
-      // eslint-disable-next-line no-undef -- setTimeout is a Node.js global
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for James to create the user (configurable delay)
+      if (this.initDelay > 0) {
+        // eslint-disable-next-line no-undef -- setTimeout is a Node.js global
+        await new Promise(resolve => setTimeout(resolve, this.initDelay));
+      }
 
       // Initialize quota if present
       if (quota) {

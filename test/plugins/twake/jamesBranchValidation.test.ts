@@ -29,6 +29,7 @@ describe('James Branch Validation', () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
     dm.config.james_mailing_list_branch = [listsBase];
+    dm.config.james_init_delay = 0; // No delay in tests
     await dm.ready;
     james = new James(dm);
     ldapGroups = new LdapGroups(dm);
@@ -132,7 +133,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Lists',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Should succeed - mailing list created
       expect(true).to.be.true;
@@ -177,7 +178,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Teams',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Mailing list should NOT be created in James (validation failed)
       // The LDAP entry will exist, but James won't have it
@@ -223,7 +224,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Teams',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Should succeed - team mailbox created
       expect(true).to.be.true;
@@ -268,7 +269,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Lists',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Team mailbox should NOT be created in James (validation failed)
       // The LDAP entry will exist, but James won't have it
@@ -314,7 +315,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Teams',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Try to transition to mailing list (should fail - wrong branch)
       await dm.ldap.modify(testGroupDN, {
@@ -323,7 +324,7 @@ describe('James Branch Validation', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Transition should be rejected
       expect(true).to.be.true;
@@ -368,7 +369,7 @@ describe('James Branch Validation', () => {
         twakeDepartmentPath: 'Lists',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Try to transition to team mailbox (should fail - in mailing list branch)
       await dm.ldap.modify(testGroupDN, {
@@ -377,7 +378,7 @@ describe('James Branch Validation', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Transition should be rejected
       expect(true).to.be.true;
@@ -418,6 +419,7 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
     dm.config.james_mailing_list_branch = []; // Empty = no restrictions
+    dm.config.james_init_delay = 0; // No delay in tests
     await dm.ready;
     james = new James(dm);
     ldapGroups = new LdapGroups(dm);
@@ -510,7 +512,7 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
         twakeDepartmentPath: 'Teams',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Mailing list should be created successfully
       expect(true).to.be.true;
@@ -555,7 +557,7 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
         twakeDepartmentPath: 'Teams',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Team mailbox should be created successfully
       expect(true).to.be.true;

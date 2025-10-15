@@ -125,6 +125,7 @@ export interface Config {
   james_signature_template?: string;
   ldap_concurrency?: number;
   james_concurrency?: number;
+  james_init_delay?: number;
   james_mailing_list_branch?: string[];
 
   // Calendar Resources plugin
@@ -321,6 +322,7 @@ const configArgs: ConfigTemplate = [
   ['--james-signature-template', 'DM_JAMES_SIGNATURE_TEMPLATE', ''],
   ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
   ['--james-concurrency', 'DM_JAMES_CONCURRENCY', 10, 'number'],
+  ['--james-init-delay', 'DM_JAMES_INIT_DELAY', 1000, 'number'],
   [
     '--james-mailing-list-branch',
     'DM_JAMES_MAILING_LIST_BRANCHES',

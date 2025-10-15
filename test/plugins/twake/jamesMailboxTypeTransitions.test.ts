@@ -26,6 +26,7 @@ describe('James Mailbox Type Transitions', () => {
     // Create DM instance once for all tests
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
+    dm.config.james_init_delay = 0; // No delay in tests
     await dm.ready;
     james = new James(dm);
     ldapGroups = new LdapGroups(dm);
@@ -119,7 +120,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Transition to team mailbox
       await dm.ldap.modify(testGroupDN, {
@@ -128,7 +129,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify transition occurred (checked by nock)
       expect(scope.isDone()).to.be.false;
@@ -173,7 +174,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Transition to mailing list
       await dm.ldap.modify(testGroupDN, {
@@ -182,7 +183,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify transition occurred
       // Team mailbox members should be removed (not deleted)
@@ -228,7 +229,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Add mail and change to team mailbox
       await dm.ldap.modify(testGroupDN, {
@@ -240,7 +241,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify team mailbox was created
       expect(scope.isDone()).to.be.false;
@@ -285,7 +286,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Change to simple group
       await dm.ldap.modify(testGroupDN, {
@@ -294,7 +295,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify all members were removed from team mailbox (preserved)
       expect(scope.isDone()).to.be.false;
@@ -338,7 +339,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Add mail and change to mailing list
       await dm.ldap.modify(testGroupDN, {
@@ -350,7 +351,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify mailing list was created
       expect(scope.isDone()).to.be.false;
@@ -395,7 +396,7 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Change to simple group
       await dm.ldap.modify(testGroupDN, {
@@ -404,7 +405,7 @@ describe('James Mailbox Type Transitions', () => {
         },
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify mailing list was deleted
       expect(scope.isDone()).to.be.false;
@@ -458,12 +459,12 @@ describe('James Mailbox Type Transitions', () => {
         twakeDepartmentPath: 'Test',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Delete the group
       await dm.ldap.delete(testGroupDN);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify all members were removed (but mailbox preserved)
       // The team mailbox should NOT be deleted

@@ -26,6 +26,7 @@ describe('James Team Mailboxes', () => {
     // Create DM instance once for all tests
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
+    dm.config.james_init_delay = 0; // No delay in tests
     await dm.ready;
     james = new James(dm);
     ldapGroups = new LdapGroups(dm);

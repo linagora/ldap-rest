@@ -187,6 +187,7 @@ describe('James Plugin', () => {
   beforeEach(async () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
+    dm.config.james_init_delay = 0; // No delay in tests
     await dm.ready;
     james = new James(dm);
     ldapGroups = new LdapGroups(dm);
@@ -247,7 +248,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for ldapadddone hook to execute
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     it('should update quota when modified in LDAP', async () => {
@@ -280,7 +281,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for ldapadddone hook to execute
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      await new Promise(resolve => setTimeout(resolve, 100));
     });
 
     it('should add and remove aliases when mailAlternateAddress is modified', async () => {
@@ -306,7 +307,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for alias changes to be applied
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
     });
 
     it('should update all aliases when primary mail changes', async () => {
@@ -330,7 +331,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for aliases to be updated
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 50));
     });
 
     it('should rename mailbox when mail changes without aliases', async () => {
@@ -385,7 +386,7 @@ describe('James Plugin', () => {
         expect(res).to.be.true;
 
         // Wait for rename
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         // Verify the rename endpoint was called
         expect(renameScope.isDone()).to.be.false; // nock persist mode
@@ -432,8 +433,8 @@ describe('James Plugin', () => {
       });
       expect(res).to.be.true;
 
-      // Wait for hook to execute
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for onChange hook to execute (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Verify the HTTP calls were made
       expect(forwardScope1.isDone()).to.be.true;
@@ -471,8 +472,8 @@ describe('James Plugin', () => {
       });
       expect(res).to.be.true;
 
-      // Wait for initial forwards to be created
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for initial forwards to be created (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       expect(initialScope1.isDone()).to.be.true;
       expect(initialScope2.isDone()).to.be.true;
@@ -498,8 +499,8 @@ describe('James Plugin', () => {
       });
       expect(res).to.be.true;
 
-      // Wait for forward changes to be applied
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for forward changes to be applied (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Verify the HTTP calls were made
       expect(deleteScope.isDone()).to.be.true;
@@ -576,8 +577,8 @@ describe('James Plugin', () => {
         add: { twakeDelegatedUsers: assistantDN },
       });
 
-      // Wait for hooks
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for onChange hook to execute (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       expect(apiCalled).to.be.true;
     });
@@ -621,16 +622,16 @@ describe('James Plugin', () => {
         add: { twakeDelegatedUsers: assistantDN },
       });
 
-      // Wait for add hook
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for add hook (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       // Now remove delegation
       await dm.ldap.modify(userDN, {
         delete: { twakeDelegatedUsers: assistantDN },
       });
 
-      // Wait for remove hook
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for remove hook (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       expect(removeApiCalled).to.be.true;
     });
@@ -679,8 +680,8 @@ describe('James Plugin', () => {
         },
       });
 
-      // Wait for hooks
-      await new Promise(resolve => setTimeout(resolve, 400));
+      // Wait for onChange hook to execute (needs more time with real LDAP)
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       expect(multiAddScope1.isDone()).to.be.true;
       expect(multiAddScope2.isDone()).to.be.true;
@@ -908,7 +909,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for hook to execute
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 50));
     });
 
     it('should handle missing attributes in template gracefully', async () => {

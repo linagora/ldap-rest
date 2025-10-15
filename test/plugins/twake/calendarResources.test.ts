@@ -103,7 +103,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(calendarApiCalled).to.be.true;
 
@@ -125,7 +125,7 @@ describe('Calendar Resources Plugin', function () {
     });
 
     // Wait for create hook to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // Track update API call
     let calendarApiCalled = false;
@@ -146,7 +146,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(calendarApiCalled).to.be.true;
 
@@ -169,7 +169,7 @@ describe('Calendar Resources Plugin', function () {
     });
 
     // Wait for create hook to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     // Track delete API call
     let calendarApiCalled = false;
@@ -187,7 +187,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(calendarApiCalled).to.be.true;
 
