@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import pLimit from 'p-limit';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';
@@ -13,6 +14,60 @@ import { Hooks } from '../../hooks';
 export default class CalendarResources extends DmPlugin {
   name = 'calendarResources';
   roles: Role[] = ['consistency'] as const;
+
+  // Cached configuration attributes
+  private calendarUrl: string;
+  private calendarToken: string;
+  private resourceBase: string;
+  private resourceObjectClass: string;
+  private resourceCreator: string;
+  private resourceDomain: string;
+
+  // Concurrency limiter for Calendar HTTP requests
+  private calendarLimit: ReturnType<typeof pLimit>;
+
+  constructor(server: import('../../bin').DM) {
+    super(server);
+
+    // Initialize cached configuration attributes
+    this.calendarUrl =
+      (this.config.calendar_webadmin_url as string) || 'http://localhost:8080';
+    this.calendarToken = (this.config.calendar_webadmin_token as string) || '';
+    this.resourceBase = (this.config.calendar_resource_base as string) || '';
+    this.resourceObjectClass =
+      (this.config.calendar_resource_objectclass as string) || '';
+    this.resourceCreator =
+      (this.config.calendar_resource_creator as string) || 'admin@example.com';
+    this.resourceDomain =
+      (this.config.calendar_resource_domain as string) || '';
+
+    // Initialize Calendar HTTP concurrency limiter
+    const calendarConcurrency =
+      typeof this.config.calendar_concurrency === 'number'
+        ? this.config.calendar_concurrency
+        : 10;
+    this.calendarLimit = pLimit(calendarConcurrency);
+    this.logger.info(
+      `Calendar HTTP request concurrency limit set to ${calendarConcurrency}`
+    );
+  }
+
+  /**
+   * Create HTTP headers with optional Authorization token
+   */
+  private createCalendarHeaders(contentType?: string): {
+    Authorization?: string;
+    'Content-Type'?: string;
+  } {
+    const headers: { Authorization?: string; 'Content-Type'?: string } = {};
+    if (this.calendarToken) {
+      headers.Authorization = `Bearer ${this.calendarToken}`;
+    }
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+    return headers;
+  }
 
   hooks: Hooks = {
     // Hook when a resource is added to LDAP
@@ -34,7 +89,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourceadddone',
-        `${this.config.calendar_webadmin_url as string}/resources`,
+        `${this.calendarUrl}/resources`,
         'POST',
         dn,
         JSON.stringify(resourceData),
@@ -88,7 +143,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourcemodifydone',
-        `${this.config.calendar_webadmin_url as string}/resources/${resourceId}`,
+        `${this.calendarUrl}/resources/${resourceId}`,
         'PATCH',
         dn,
         JSON.stringify(updateData),
@@ -105,7 +160,7 @@ export default class CalendarResources extends DmPlugin {
 
       await this._callApi(
         'ldapcalendarResourcedeletedone',
-        `${this.config.calendar_webadmin_url as string}/resources/${resourceId}`,
+        `${this.calendarUrl}/resources/${resourceId}`,
         'DELETE',
         dn,
         null,
@@ -119,22 +174,20 @@ export default class CalendarResources extends DmPlugin {
    */
   private isResource(dn: string, attributes: AttributesList): boolean {
     // Check if DN is under the resources branch
-    const resourceBase = this.config.calendar_resource_base;
     if (
-      resourceBase &&
-      !dn.toLowerCase().includes(resourceBase.toLowerCase())
+      this.resourceBase &&
+      !dn.toLowerCase().includes(this.resourceBase.toLowerCase())
     ) {
       return false;
     }
 
     // Check for specific objectClass if configured
     const objectClass = attributes.objectClass;
-    if (this.config.calendar_resource_objectclass) {
+    if (this.resourceObjectClass) {
       const classes = Array.isArray(objectClass) ? objectClass : [objectClass];
       return classes.some(
         cls =>
-          String(cls).toLowerCase() ===
-          (this.config.calendar_resource_objectclass as string).toLowerCase()
+          String(cls).toLowerCase() === this.resourceObjectClass.toLowerCase()
       );
     }
 
@@ -171,12 +224,10 @@ export default class CalendarResources extends DmPlugin {
       : undefined;
 
     // Use configured creator or default
-    const creator =
-      this.config.calendar_resource_creator || 'admin@example.com';
+    const creator = this.resourceCreator;
 
     // Extract domain from DN or use configured domain
-    const domain =
-      this.config.calendar_resource_domain || this.extractDomain(dn);
+    const domain = this.resourceDomain || this.extractDomain(dn);
 
     // Generate ID from DN (use cn or uid)
     const id =
@@ -223,59 +274,56 @@ export default class CalendarResources extends DmPlugin {
     body: string | null,
     fields: object
   ): Promise<void> {
-    const log = {
-      plugin: this.name,
-      event: hookname,
-      result: 'error',
-      dn,
-      ...fields,
-    };
-
-    try {
-      const opts: {
-        method: string;
-        body?: string | null;
-        headers: {
-          'Content-Type'?: string;
-          Authorization?: string;
-        };
-      } = {
-        method,
-        headers: {},
+    return this.calendarLimit(async () => {
+      const log = {
+        plugin: this.name,
+        event: hookname,
+        result: 'error',
+        dn,
+        ...fields,
       };
 
-      if (body) {
-        opts.body = body;
-        opts.headers['Content-Type'] = 'application/json';
-      }
+      try {
+        const opts: {
+          method: string;
+          body?: string | null;
+          headers: {
+            'Content-Type'?: string;
+            Authorization?: string;
+          };
+        } = {
+          method,
+          headers: this.createCalendarHeaders(body ? 'application/json' : undefined),
+        };
 
-      if (this.config.calendar_webadmin_token) {
-        opts.headers.Authorization = `Bearer ${this.config.calendar_webadmin_token}`;
-      }
+        if (body) {
+          opts.body = body;
+        }
 
-      const res = await fetch(url, opts);
+        const res = await fetch(url, opts);
 
-      if (!res.ok) {
+        if (!res.ok) {
+          this.logger.error({
+            ...log,
+            http_status: res.status,
+            http_status_text: res.statusText,
+            url,
+          });
+        } else {
+          this.logger.info({
+            ...log,
+            result: 'success',
+            http_status: res.status,
+            url,
+          });
+        }
+      } catch (err) {
         this.logger.error({
           ...log,
-          http_status: res.status,
-          http_status_text: res.statusText,
-          url,
-        });
-      } else {
-        this.logger.info({
-          ...log,
-          result: 'success',
-          http_status: res.status,
+          error: err,
           url,
         });
       }
-    } catch (err) {
-      this.logger.error({
-        ...log,
-        error: err,
-        url,
-      });
-    }
+    });
   }
 }

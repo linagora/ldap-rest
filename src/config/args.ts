@@ -130,6 +130,7 @@ export interface Config {
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
   calendar_webadmin_token?: string;
+  calendar_concurrency?: number;
   calendar_resource_base?: string;
   calendar_resource_objectclass?: string;
   calendar_resource_creator?: string;
@@ -335,6 +336,7 @@ const configArgs: ConfigTemplate = [
     'http://localhost:8080',
   ],
   ['--calendar-webadmin-token', 'DM_CALENDAR_WEBADMIN_TOKEN', ''],
+  ['--calendar-concurrency', 'DM_CALENDAR_CONCURRENCY', 10, 'number'],
   ['--calendar-resource-base', 'DM_CALENDAR_RESOURCE_BASE', ''],
   ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
   ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
