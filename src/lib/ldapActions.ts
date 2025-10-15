@@ -21,6 +21,13 @@ export type AttributeValue = Buffer | Buffer[] | string[] | string;
 export type AttributesList = Record<string, AttributeValue>;
 export type LdapList = Record<string, AttributesList>;
 
+// Connection pool entry
+interface PooledConnection {
+  client: Client;
+  createdAt: number;
+  inUse: boolean;
+}
+
 // search
 const defaultSearchOptions: SearchOptions = {
   scope: 'sub',
@@ -53,11 +60,21 @@ class ldapActions {
   logger: winston.Logger;
   private searchCache: LRUCache<string, SearchResult>;
   public queryLimit: ReturnType<typeof pLimit>;
+  private connectionPool: PooledConnection[] = [];
+  private poolSize: number;
+  private connectionTtl: number; // in milliseconds
 
   constructor(server: DM) {
     this.parent = server;
     this.logger = server.logger;
     this.config = server.config;
+
+    // Initialize connection pool settings
+    this.poolSize = this.config.ldap_pool_size || 5;
+    this.connectionTtl = (this.config.ldap_connection_ttl || 60) * 1000; // Convert to ms
+    this.logger.info(
+      `LDAP connection pool initialized: size=${this.poolSize}, ttl=${this.connectionTtl / 1000}s`
+    );
 
     // Initialize global LDAP query concurrency limiter
     const concurrency = this.config.ldap_concurrency || 10;
@@ -111,14 +128,10 @@ class ldapActions {
     this.pwd = server.config.ldap_pwd;
   }
 
-  /* Connect to LDAP server
-
-   Here we choose to have no persistent LDAP connection
-   This is safer because a persistent connection must
-   be monitored and reconnected if needed
-   and such admin tool won't push a lot of requests
+  /**
+   * Create a new LDAP connection
    */
-  async connect(): Promise<Client> {
+  private async createConnection(): Promise<Client> {
     const client: Client = new Client(this.options);
     try {
       await client.bind(this.dn, this.pwd);
@@ -128,6 +141,94 @@ class ldapActions {
     }
     if (!client) throw new Error('LDAP connection error');
     return client;
+  }
+
+  /**
+   * Clean up expired connections from the pool
+   */
+  private cleanupExpiredConnections(): void {
+    const now = Date.now();
+    const expired: PooledConnection[] = [];
+
+    for (let i = this.connectionPool.length - 1; i >= 0; i--) {
+      const conn = this.connectionPool[i];
+      if (!conn.inUse && now - conn.createdAt > this.connectionTtl) {
+        expired.push(conn);
+        this.connectionPool.splice(i, 1);
+      }
+    }
+
+    // Unbind expired connections asynchronously
+    for (const conn of expired) {
+      void conn.client.unbind().catch(err => {
+        this.logger.debug(`Error unbinding expired connection: ${String(err)}`);
+      });
+    }
+
+    if (expired.length > 0) {
+      this.logger.debug(`Cleaned up ${expired.length} expired LDAP connections`);
+    }
+  }
+
+  /**
+   * Acquire a connection from the pool or create a new one
+   */
+  private async acquireConnection(): Promise<PooledConnection> {
+    // Clean up expired connections
+    this.cleanupExpiredConnections();
+
+    // Try to find an available connection in the pool
+    const available = this.connectionPool.find(conn => !conn.inUse);
+    if (available) {
+      available.inUse = true;
+      this.logger.debug('Reusing pooled LDAP connection');
+      return available;
+    }
+
+    // If pool is not full, create a new connection
+    if (this.connectionPool.length < this.poolSize) {
+      const client = await this.createConnection();
+      const pooled: PooledConnection = {
+        client,
+        createdAt: Date.now(),
+        inUse: true,
+      };
+      this.connectionPool.push(pooled);
+      this.logger.debug(
+        `Created new LDAP connection (pool: ${this.connectionPool.length}/${this.poolSize})`
+      );
+      return pooled;
+    }
+
+    // Pool is full, wait for an available connection
+    this.logger.debug('LDAP connection pool full, waiting for available connection');
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        this.cleanupExpiredConnections();
+        const available = this.connectionPool.find(conn => !conn.inUse);
+        if (available) {
+          clearInterval(checkInterval);
+          available.inUse = true;
+          resolve(available);
+        }
+      }, 50); // Check every 50ms
+    });
+  }
+
+  /**
+   * Release a connection back to the pool
+   */
+  private releaseConnection(pooled: PooledConnection): void {
+    pooled.inUse = false;
+    this.logger.debug('Released LDAP connection back to pool');
+  }
+
+  /**
+   * Legacy connect method for backward compatibility
+   * @deprecated Use acquireConnection/releaseConnection instead
+   */
+  async connect(): Promise<Client> {
+    return await this.createConnection();
   }
 
   /**
@@ -169,7 +270,6 @@ class ldapActions {
     base: string = this.base,
     req?: Request
   ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
-    const client = await this.connect();
     let opts = {
       ...defaultSearchOptions,
       ...options,
@@ -191,24 +291,54 @@ class ldapActions {
       }
     }
 
-    let res = opts.paged
-      ? client.searchPaginated(base, opts)
-      : client.search(base, opts);
-    res = (await launchHooksChained(
-      this.parent.hooks.ldapsearchresult,
-      res
-    )) as typeof res;
+    // Acquire connection from pool
+    const pooled = await this.acquireConnection();
+    try {
+      let res = opts.paged
+        ? pooled.client.searchPaginated(base, opts)
+        : pooled.client.search(base, opts);
+      res = (await launchHooksChained(
+        this.parent.hooks.ldapsearchresult,
+        res
+      )) as typeof res;
 
-    // Cache non-paginated, base-scope search results
-    if (!opts.paged && opts.scope === 'base' && res instanceof Promise) {
-      const result = await res;
-      const cacheKey = this.getCacheKey(base, opts);
-      this.searchCache.set(cacheKey, result);
-      this.logger.debug(`LDAP search cached: ${cacheKey}`);
-      return result;
+      // Cache non-paginated, base-scope search results
+      if (!opts.paged && opts.scope === 'base' && res instanceof Promise) {
+        const result = await res;
+        const cacheKey = this.getCacheKey(base, opts);
+        this.searchCache.set(cacheKey, result);
+        this.logger.debug(`LDAP search cached: ${cacheKey}`);
+        return result;
+      }
+
+      // For paginated searches, return a wrapped generator that releases connection when done
+      if (opts.paged) {
+        return this.wrapPaginatedSearch(res as AsyncGenerator<SearchResult>, pooled);
+      }
+
+      return res;
+    } finally {
+      // For non-paginated searches, release connection immediately
+      if (!opts.paged) {
+        this.releaseConnection(pooled);
+      }
     }
+  }
 
-    return res;
+  /**
+   * Wrap paginated search to ensure connection is released when done
+   */
+  private async *wrapPaginatedSearch(
+    generator: AsyncGenerator<SearchResult>,
+    pooled: PooledConnection
+  ): AsyncGenerator<SearchResult> {
+    try {
+      for await (const result of generator) {
+        yield result;
+      }
+    } finally {
+      this.releaseConnection(pooled);
+    }
   }
 
   /*
@@ -226,7 +356,6 @@ class ldapActions {
     ) {
       entry.objectClass = this.config.user_class;
     }
-    const client = await this.connect();
     // Convert Buffer/Buffer[] values to string/string[]
     const sanitizedEntry: Record<string, string | string[]> = {};
     for (const [key, value] of Object.entries(entry)) {
@@ -260,9 +389,9 @@ class ldapActions {
       );
     }
 
+    const pooled = await this.acquireConnection();
     try {
-      await client.add(dn, attributes);
-      void client.unbind();
+      await pooled.client.add(dn, attributes);
       // Invalidate cache for this DN
       this.invalidateCache(dn);
       void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
@@ -270,6 +399,8 @@ class ldapActions {
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`LDAP add error: ${error}`);
+    } finally {
+      this.releaseConnection(pooled);
     }
   }
 
@@ -347,10 +478,9 @@ class ldapActions {
       }
     }
     if (ldapChanges.length !== 0) {
-      const client = await this.connect();
+      const pooled = await this.acquireConnection();
       try {
-        await client.modify(dn, ldapChanges);
-        void client.unbind();
+        await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
         void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
@@ -361,6 +491,8 @@ class ldapActions {
         );
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         throw new Error(`LDAP modify error: ${error}`);
+      } finally {
+        this.releaseConnection(pooled);
       }
     } else {
       this.logger.error('No changes to apply');
@@ -376,15 +508,16 @@ class ldapActions {
       this.parent.hooks.ldaprenamerequest,
       [dn, newRdn]
     );
-    const client = await this.connect();
+    const pooled = await this.acquireConnection();
     try {
-      await client.modifyDN(dn, newRdn);
-      void client.unbind();
+      await pooled.client.modifyDN(dn, newRdn);
       void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`LDAP rename error: ${error}`);
+    } finally {
+      this.releaseConnection(pooled);
     }
   }
 
@@ -404,15 +537,16 @@ class ldapActions {
   async move(dn: string, newDn: string): Promise<boolean> {
     dn = this.setDn(dn);
     newDn = this.setDn(newDn);
-    const client = await this.connect();
+    const pooled = await this.acquireConnection();
     try {
-      await client.modifyDN(dn, newDn);
-      void client.unbind();
+      await pooled.client.modifyDN(dn, newDn);
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`LDAP move error: ${error}`);
+    } finally {
+      this.releaseConnection(pooled);
     }
   }
 
@@ -430,20 +564,24 @@ class ldapActions {
       this.parent?.hooks.ldapdeleterequest,
       dn
     )) as string | string[];
-    const client = await this.connect();
-    for (const entry of dn) {
-      try {
-        await client.del(entry);
-        void client.unbind();
-        // Invalidate cache for this DN
-        this.invalidateCache(entry);
-      } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`LDAP delete error: ${error}`);
+
+    const pooled = await this.acquireConnection();
+    try {
+      for (const entry of dn) {
+        try {
+          await pooled.client.del(entry);
+          // Invalidate cache for this DN
+          this.invalidateCache(entry);
+        } catch (error) {
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          throw new Error(`LDAP delete error: ${error}`);
+        }
+        void launchHooks(this.parent.hooks.ldapdeletedone, entry);
       }
-      void launchHooks(this.parent.hooks.ldapdeletedone, entry);
+      return true;
+    } finally {
+      this.releaseConnection(pooled);
     }
-    return true;
   }
 
   private setDn(dn: string): string {

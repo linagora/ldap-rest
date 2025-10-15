@@ -51,6 +51,8 @@ export interface Config {
   ldap_user_main_attribute?: string;
   ldap_cache_max?: number;
   ldap_cache_ttl?: number;
+  ldap_pool_size?: number;
+  ldap_connection_ttl?: number;
   user_class?: string[];
 
   // LDAP groups plugin
@@ -189,6 +191,8 @@ const configArgs: ConfigTemplate = [
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
   ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 300, 'number'], // seconds
+  ['--ldap-pool-size', 'DM_LDAP_POOL_SIZE', 5, 'number'],
+  ['--ldap-connection-ttl', 'DM_LDAP_CONNECTION_TTL', 60, 'number'], // seconds
   [
     '--schemas-path',
     'DM_SCHEMAS_PATH',
