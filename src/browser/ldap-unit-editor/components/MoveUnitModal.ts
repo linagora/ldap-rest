@@ -208,13 +208,33 @@ export class MoveUnitModal {
     // If expanded, load and render subnodes
     if (isExpanded) {
       try {
-        // Use the pointer options method which searches subnodes
-        const subnodes = await this.api.getPointerOptions(dn);
+        // Use the organizations subnodes API to get only organizational units
+        const response = await fetch(
+          `${this.api['baseUrl']}/api/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`
+        );
+        if (!response.ok) {
+          throw new Error('Failed to load subnodes');
+        }
 
-        for (const subnode of subnodes) {
+        const subnodes = await response.json();
+        // Filter for organizational units only
+        const orgs = subnodes.filter((n: any) => {
+          const classes = Array.isArray(n.objectClass)
+            ? n.objectClass
+            : n.objectClass
+              ? [n.objectClass]
+              : [];
+          return (
+            classes.includes('organizationalUnit') ||
+            classes.includes('organization')
+          );
+        });
+
+        for (const subnode of orgs) {
           html += await this.renderNode(subnode.dn, level + 1);
         }
-      } catch {
+      } catch (error) {
+        console.error('Failed to load subnodes for', dn, error);
         // No subnodes or error loading them
       }
     }

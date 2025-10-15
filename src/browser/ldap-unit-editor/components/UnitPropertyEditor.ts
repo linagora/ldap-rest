@@ -13,6 +13,7 @@ export class UnitPropertyEditor {
   private unit: LdapUnit | null = null;
   private schema: SchemaDefinition | null = null;
   private saveCallback: (() => void) | null = null;
+  private hasSubnodes: boolean = false;
 
   constructor(container: HTMLElement, api: UnitApiClient, unitDn: string) {
     this.container = container;
@@ -23,12 +24,40 @@ export class UnitPropertyEditor {
   async init(): Promise<void> {
     await this.loadUnit();
     await this.loadSchema();
+    await this.checkSubnodes();
     this.render();
     this.attachEventListeners();
   }
 
   private async loadUnit(): Promise<void> {
     this.unit = await this.api.getUnit(this.unitDn);
+  }
+
+  private async checkSubnodes(): Promise<void> {
+    try {
+      const response = await fetch(
+        `${this.api['baseUrl']}/api/v1/ldap/organizations/${encodeURIComponent(this.unitDn)}/subnodes`
+      );
+      if (response.ok) {
+        const subnodes = await response.json();
+        // Check if there are any organizational subnodes
+        this.hasSubnodes = subnodes.some((node: any) => {
+          const classes = Array.isArray(node.objectClass)
+            ? node.objectClass
+            : node.objectClass
+              ? [node.objectClass]
+              : [];
+          return (
+            classes.includes('organizationalUnit') ||
+            classes.includes('organization')
+          );
+        });
+      }
+    } catch (error) {
+      console.error('Failed to check subnodes:', error);
+      // On error, assume it might have subnodes to be safe
+      this.hasSubnodes = false;
+    }
   }
 
   private async loadSchema(): Promise<void> {
@@ -99,7 +128,7 @@ export class UnitPropertyEditor {
               Move
             </button>
             <div style="display: flex; gap: 12px;">
-              <button type="button" id="delete-unit-btn" class="btn btn-danger" style="background: #d32f2f; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <button type="button" id="delete-unit-btn" class="btn btn-danger" ${this.hasSubnodes ? 'disabled title="Cannot delete: organization has sub-organizations"' : ''} style="background: ${this.hasSubnodes ? '#ccc' : '#d32f2f'}; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: ${this.hasSubnodes ? 'not-allowed' : 'pointer'}; display: flex; align-items: center; gap: 8px; opacity: ${this.hasSubnodes ? '0.5' : '1'};">
                 <span class="material-icons" style="font-size: 18px;">delete</span>
                 Delete Unit
               </button>
@@ -296,6 +325,12 @@ export class UnitPropertyEditor {
   }
 
   private async handleDelete(): Promise<void> {
+    // Don't allow delete if there are subnodes
+    if (this.hasSubnodes) {
+      alert('Cannot delete this organizational unit because it contains sub-organizations. Please delete all sub-organizations first.');
+      return;
+    }
+
     if (
       !confirm(
         `Are you sure you want to delete this organizational unit?\n\n${this.unitDn}\n\nThis action cannot be undone.`
