@@ -856,7 +856,7 @@ Failed to fetch
 Check schema via Configuration API:
 
 ```bash
-curl http://localhost:8081/api/v1/config | jq '.features.flatResources[0].schema.attributes'
+curl http://localhost:8081/api/v1/config | jq '.features.ldapFlatGeneric.flatResources[0].schema.attributes'
 ```
 
 Ensure all required fields are included:

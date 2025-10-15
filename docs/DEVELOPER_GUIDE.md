@@ -243,7 +243,7 @@ The `/api/v1/config` endpoint exposes all available features, endpoints, and sch
 const config = await fetch('/api/v1/config').then(r => r.json());
 
 // Find users endpoint
-const usersEndpoint = config.features.flatResources.find(
+const usersEndpoint = config.features.ldapFlatGeneric.flatResources.find(
   r => r.pluralName === 'users'
 )?.endpoints.list;
 
