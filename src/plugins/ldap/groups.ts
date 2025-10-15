@@ -207,6 +207,21 @@ export default class LdapGroups extends DmPlugin {
         }
       );
     }
+
+    // Rename group (change cn)
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/groups/:cn/rename`,
+      async (req, res) => {
+        if (!wantJson(req, res)) return;
+        const cn = decodeURIComponent(req.params.cn);
+        if (!cn) return badRequest(res, 'cn is required');
+        const body = jsonBody(req, res, 'newCn') as {
+          newCn: string;
+        };
+        if (!body) return;
+        await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn);
+      }
+    );
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {

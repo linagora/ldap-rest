@@ -113,6 +113,21 @@ export class GroupApiClient {
     }
   }
 
+  async renameGroup(cn: string, newCn: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(cn)}/rename`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newCn }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to rename group: ${error}`);
+    }
+  }
+
   async getPointerOptions(
     branch: string
   ): Promise<Array<{ dn: string; label: string }>> {

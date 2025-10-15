@@ -486,7 +486,35 @@ export class GroupPropertyEditor {
     }
 
     try {
-      await this.api.updateGroup(this.groupDn, updates);
+      // Check if cn has changed - if so, use rename API instead
+      if (updates.cn && this.group?.cn) {
+        const oldCn = Array.isArray(this.group.cn) ? this.group.cn[0] : this.group.cn;
+        const newCn = updates.cn as string;
+
+        if (oldCn !== newCn) {
+          // Remove cn from updates
+          delete updates.cn;
+
+          // First rename the group
+          await this.api.renameGroup(this.groupDn, newCn);
+
+          // Update the groupDn for subsequent operations
+          const newDn = this.groupDn.replace(new RegExp(`^cn=${oldCn},`), `cn=${newCn},`);
+          this.groupDn = newDn;
+
+          // If there are other updates, apply them to the renamed group
+          if (Object.keys(updates).length > 0) {
+            await this.api.updateGroup(this.groupDn, updates);
+          }
+        } else {
+          // cn hasn't changed, just do a normal update
+          await this.api.updateGroup(this.groupDn, updates);
+        }
+      } else {
+        // No cn change, normal update
+        await this.api.updateGroup(this.groupDn, updates);
+      }
+
       alert('Group updated successfully!');
       if (this.saveCallback) {
         this.saveCallback();
