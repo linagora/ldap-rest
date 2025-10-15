@@ -13,5 +13,6 @@ Typescript definitions into [hooks.ts](./src/hooks.ts)
 - **ldapopts**: called before any ldapsearch to modify search options
 - **ldapsearchresult**: called after any ldapsearch to modify search result
 - **ldapaddrequest**: called before any ldapadd
-- **ldapmodifyrequest**
-- **ldapdeleterequest**
+- **ldapmodifyrequest**: called before any ldapmodify
+- **ldapdeleterequest**: called before any ldapdelete
+- **ldaprenamerequest**: called before any ldap rename/modifyDN operation
