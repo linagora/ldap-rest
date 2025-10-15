@@ -246,7 +246,11 @@ export default class LdapGroups extends DmPlugin {
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
         ([key, _value]) =>
-          key !== this.cn && key !== 'member' && _value !== undefined
+          key !== this.cn &&
+          key !== 'member' &&
+          _value !== undefined &&
+          // Filter out fixed fields from schema
+          !(this.schema?.attributes[key]?.fixed === true)
       )
     ) as AttributesList;
     await tryMethod(res, this.addGroup.bind(this), cn, members, additional);
@@ -264,7 +268,13 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const dn = this.fixDn(decodeURIComponent(req.params.cn));
     if (!dn) return badRequest(res);
-    await tryMethod(res, this.modifyGroup.bind(this), dn, body);
+    // Filter out fixed fields from schema
+    const filteredBody = Object.fromEntries(
+      Object.entries(body).filter(
+        ([key, _value]) => !(this.schema?.attributes[key]?.fixed === true)
+      )
+    ) as postModify;
+    await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody);
   }
 
   /**

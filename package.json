@@ -116,6 +116,10 @@
       "import": "./static/browser/ldap-group-editor/api/GroupApiClient.js",
       "types": "./dist/src/browser/ldap-group-editor/api/GroupApiClient.d.ts"
     },
+    "browser-ldap-group-editor-components-creategroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/CreateGroupModal.js",
+      "types": "./dist/src/browser/ldap-group-editor/components/CreateGroupModal.d.ts"
+    },
     "browser-ldap-group-editor-components-grouppropertyeditor": {
       "import": "./static/browser/ldap-group-editor/components/GroupPropertyEditor.js",
       "types": "./dist/src/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts"

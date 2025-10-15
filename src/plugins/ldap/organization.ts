@@ -362,13 +362,17 @@ export default class LdapOrganizations extends DmPlugin {
   async checkDeptPath(entry: AttributesList): Promise<void> {
     if (entry[this.pathAttr]) {
       const pathValue = entry[this.pathAttr];
-      const path = (Array.isArray(pathValue) ? pathValue[0] : pathValue) as string;
+      const path = (
+        Array.isArray(pathValue) ? pathValue[0] : pathValue
+      ) as string;
       const sep = this.config.ldap_organization_path_separator || ' / ';
 
       let matchingPath = path;
       if (this.isOu(entry)) {
         const ouValue = entry.ou;
-        const ouName = (Array.isArray(ouValue) ? ouValue[0] : ouValue) as string;
+        const ouName = (
+          Array.isArray(ouValue) ? ouValue[0] : ouValue
+        ) as string;
         if (!path.startsWith(ouName + sep))
           throw new Error(
             `Organization path must start with its own name followed by separator "${sep}"`
@@ -390,11 +394,13 @@ export default class LdapOrganizations extends DmPlugin {
       if (!ouPath) {
         let found = false;
         for (const entry of (entries as SearchResult).searchEntries) {
-          const entryDn = entry.dn as string;
+          const entryDn = entry.dn;
           const topOrgDn = this.config.ldap_top_organization as string;
           // Check if this is the top organization (DN matches or is direct child)
-          if (entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
-              entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)) {
+          if (
+            entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
+            entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
+          ) {
             const entryPath = entry[this.pathAttr] as string | undefined;
             // Top org should either have no path attribute or a simple path (just its name)
             if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {

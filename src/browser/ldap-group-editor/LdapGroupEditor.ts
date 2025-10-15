@@ -7,6 +7,7 @@ import type { GroupEditorOptions, Config } from './types';
 import { GroupApiClient } from './api/GroupApiClient';
 import { GroupTree } from './components/GroupTree';
 import { GroupPropertyEditor } from './components/GroupPropertyEditor';
+import { CreateGroupModal } from './components/CreateGroupModal';
 
 export class LdapGroupEditor {
   private options: GroupEditorOptions;
@@ -85,42 +86,55 @@ export class LdapGroupEditor {
       // Load groups for this organization
       const groups = await this.api.getGroups(orgDn);
 
-      if (groups.length === 0) {
-        editorContainer.innerHTML = `
-          <div class="empty-state">
-            <span class="material-icons">group</span>
-            <p>No groups in this organization</p>
-          </div>
-        `;
-        return;
-      }
-
-      // Show list of groups
+      // Show list of groups with create button
       editorContainer.innerHTML = `
         <div style="padding: 20px;">
-          <h3 style="margin: 0 0 16px 0;">Groups</h3>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${groups
-              .map(
-                group => `
-              <div class="group-item" data-dn="${this.escapeHtml(group.dn)}" style="padding: 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                <span class="material-icons">group</span>
-                <span>${this.escapeHtml(group.cn || group.dn)}</span>
-              </div>
-            `
-              )
-              .join('')}
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">Groups</h3>
+            <button type="button" id="create-group-btn" style="padding: 8px 16px; background: var(--primary-color, #6200ee); color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <span class="material-icons" style="font-size: 18px;">group_add</span>
+              Create
+            </button>
           </div>
+          ${
+            groups.length === 0
+              ? `
+            <div class="empty-state">
+              <span class="material-icons">group</span>
+              <p>No groups in this organization</p>
+            </div>
+          `
+              : `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${groups
+                .map(
+                  group => `
+                <div class="group-item" data-dn="${this.escapeHtml(group.dn)}" style="padding: 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <span class="material-icons">group</span>
+                  <span>${this.escapeHtml(group.cn || group.dn)}</span>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          `
+          }
         </div>
       `;
 
-      // Attach click handlers
+      // Attach click handlers for group items
       editorContainer.querySelectorAll('.group-item').forEach(item => {
         item.addEventListener('click', () => {
           const groupDn = (item as HTMLElement).dataset.dn!;
           this.onGroupSelected(groupDn);
         });
       });
+
+      // Attach click handler for create button
+      const createBtn = editorContainer.querySelector('#create-group-btn');
+      if (createBtn) {
+        createBtn.addEventListener('click', () => this.handleCreateGroup());
+      }
     } catch (error) {
       this.handleError(error as Error);
       editorContainer.innerHTML = `
@@ -162,6 +176,25 @@ export class LdapGroupEditor {
         </div>
       `;
     }
+  }
+
+  private async handleCreateGroup(): Promise<void> {
+    if (!this.currentOrgDn || !this.config) return;
+
+    const modal = new CreateGroupModal(
+      this.api,
+      this.config,
+      this.currentOrgDn,
+      async () => {
+        // Refresh the group list after creation
+        await this.onOrgSelected(this.currentOrgDn!);
+        if (this.options.onGroupSaved) {
+          this.options.onGroupSaved('');
+        }
+      }
+    );
+
+    await modal.show();
   }
 
   private escapeHtml(text: string | null | undefined): string {

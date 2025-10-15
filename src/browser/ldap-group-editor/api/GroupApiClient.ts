@@ -60,7 +60,7 @@ export class GroupApiClient {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }
@@ -72,10 +72,11 @@ export class GroupApiClient {
   }
 
   async createEntry(dn: string, data: Record<string, unknown>): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/v1/ldap/entries`, {
+    // Use the groups API for creating groups
+    const response = await fetch(`${this.baseUrl}/api/v1/ldap/groups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dn, ...data }),
+      body: JSON.stringify(data),
     });
     if (!response.ok) {
       const error = await response.text();
@@ -84,8 +85,9 @@ export class GroupApiClient {
   }
 
   async deleteEntry(dn: string): Promise<void> {
+    // Use the groups API for deleting groups
     const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/entries/${encodeURIComponent(dn)}`,
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}`,
       {
         method: 'DELETE',
       }

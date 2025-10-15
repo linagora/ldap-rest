@@ -43,7 +43,7 @@ export class UnitApiClient {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`,
       {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }
@@ -55,7 +55,8 @@ export class UnitApiClient {
   }
 
   async createEntry(dn: string, data: Record<string, unknown>): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/api/v1/ldap/entries`, {
+    // Use the organizations API for creating units
+    const response = await fetch(`${this.baseUrl}/api/v1/ldap/organizations`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dn, ...data }),
@@ -67,8 +68,9 @@ export class UnitApiClient {
   }
 
   async deleteEntry(dn: string): Promise<void> {
+    // Use the organizations API for deleting units
     const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/entries/${encodeURIComponent(dn)}`,
+      `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`,
       {
         method: 'DELETE',
       }
