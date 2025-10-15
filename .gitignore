@@ -4,3 +4,4 @@ dist/
 node_modules/
 static/browser/
 static/*.html
+openapi.json

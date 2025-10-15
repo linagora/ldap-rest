@@ -395,6 +395,7 @@
     "format:check-diff": "prettier --check $(git diff $(git rev-parse --abbrev-ref --symbolic-full-name @{u}) --name-status|grep -E '^M|A'|cut -f2)",
     "format:fix": "prettier --write .",
     "format:fix-diff": "prettier --write $(git checkout|grep -E '^(M|A)'|cut -f2)",
+    "generate:openapi": "tsx scripts/generate-openapi.ts",
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
     "start:dev": "./.dev.mk start",
