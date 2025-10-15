@@ -379,6 +379,158 @@ describe('LDAP Organizations Plugin', function () {
     });
   });
 
+  describe('moveOrganization', () => {
+    let parentOrgDn: string;
+    let childOrgDn: string;
+    let targetOrgDn: string;
+
+    beforeEach(async () => {
+      parentOrgDn = `ou=parent,${DM_LDAP_TOP_ORGANIZATION}`;
+      childOrgDn = `ou=child,${parentOrgDn}`;
+      targetOrgDn = `ou=target,${DM_LDAP_TOP_ORGANIZATION}`;
+
+      // Create parent organization
+      await plugin.server.ldap.add(parentOrgDn, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'parent',
+      });
+
+      // Create child organization under parent
+      await plugin.server.ldap.add(childOrgDn, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'child',
+      });
+
+      // Create target organization
+      await plugin.server.ldap.add(targetOrgDn, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'target',
+      });
+    });
+
+    afterEach(async () => {
+      // Clean up in reverse order (child first)
+      const newChildDn = `ou=child,${targetOrgDn}`;
+      try {
+        await plugin.server.ldap.delete(newChildDn);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.server.ldap.delete(childOrgDn);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.server.ldap.delete(parentOrgDn);
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await plugin.server.ldap.delete(targetOrgDn);
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    it('should move organization to different parent', async () => {
+      const result = await plugin.moveOrganization(childOrgDn, targetOrgDn);
+
+      expect(result).to.have.property('newDn');
+      expect(result.newDn).to.equal(`ou=child,${targetOrgDn}`);
+
+      // Verify organization was moved
+      const movedOrg = await plugin.getOrganisationByDn(result.newDn);
+      expect(movedOrg).to.have.property('ou', 'child');
+
+      // Verify old DN no longer exists
+      try {
+        await plugin.getOrganisationByDn(childOrgDn);
+        expect.fail('Old DN should not exist');
+      } catch (e) {
+        expect((e as Error).message).to.match(/not found|Code: 0x20/);
+      }
+    });
+
+    it('should reject move to non-existent target', async () => {
+      const invalidTarget = `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`;
+
+      try {
+        await plugin.moveOrganization(childOrgDn, invalidTarget);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(/Invalid target organization/);
+      }
+    });
+
+    it('should reject move of non-existent organization', async () => {
+      const invalidSource = `ou=nonexistent,${parentOrgDn}`;
+
+      try {
+        await plugin.moveOrganization(invalidSource, targetOrgDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(/Source organization not found/);
+      }
+    });
+
+    it('should reject move to same location', async () => {
+      try {
+        await plugin.moveOrganization(childOrgDn, parentOrgDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /Cannot move organization to its current location/
+        );
+      }
+    });
+
+    it('should reject circular move (move into itself)', async () => {
+      try {
+        await plugin.moveOrganization(parentOrgDn, childOrgDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /Cannot move organization into itself or its descendant/
+        );
+      }
+    });
+
+    it('should reject move into itself', async () => {
+      try {
+        await plugin.moveOrganization(parentOrgDn, parentOrgDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /Cannot move organization into itself or its descendant/
+        );
+      }
+    });
+
+    it('should reject move to non-organizational target', async () => {
+      // Create a non-organizational entry
+      const userDn = `uid=testuser,${process.env.DM_LDAP_BASE}`;
+      await plugin.server.ldap.add(userDn, {
+        objectClass: ['inetOrgPerson', 'person', 'top'],
+        uid: 'testuser',
+        cn: 'Test User',
+        sn: 'User',
+      });
+
+      try {
+        await plugin.moveOrganization(childOrgDn, userDn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /is not an organizational unit/
+        );
+      }
+
+      // Clean up
+      await plugin.server.ldap.delete(userDn);
+    });
+  });
+
   describe('API', () => {
     describe('GET /api/v1/ldap/organizations/top', () => {
       it('should return top organization', async () => {
@@ -571,6 +723,162 @@ describe('LDAP Organizations Plugin', function () {
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(500);
+      });
+    });
+
+    describe('POST /api/v1/ldap/organizations/:dn/move', () => {
+      let parentOrgDn: string;
+      let childOrgDn: string;
+      let targetOrgDn: string;
+
+      beforeEach(async () => {
+        parentOrgDn = `ou=parent,${DM_LDAP_TOP_ORGANIZATION}`;
+        childOrgDn = `ou=child,${parentOrgDn}`;
+        targetOrgDn = `ou=target,${DM_LDAP_TOP_ORGANIZATION}`;
+
+        // Create parent organization
+        await plugin.server.ldap.add(parentOrgDn, {
+          objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+          ou: 'parent',
+        });
+
+        // Create child organization under parent
+        await plugin.server.ldap.add(childOrgDn, {
+          objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+          ou: 'child',
+        });
+
+        // Create target organization
+        await plugin.server.ldap.add(targetOrgDn, {
+          objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+          ou: 'target',
+        });
+      });
+
+      afterEach(async () => {
+        // Clean up in reverse order (child first)
+        const newChildDn = `ou=child,${targetOrgDn}`;
+        try {
+          await plugin.server.ldap.delete(newChildDn);
+        } catch (e) {
+          // ignore
+        }
+        try {
+          await plugin.server.ldap.delete(childOrgDn);
+        } catch (e) {
+          // ignore
+        }
+        try {
+          await plugin.server.ldap.delete(parentOrgDn);
+        } catch (e) {
+          // ignore
+        }
+        try {
+          await plugin.server.ldap.delete(targetOrgDn);
+        } catch (e) {
+          // ignore
+        }
+      });
+
+      it('should move organization via API', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn,
+          });
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('success', true);
+        expect(res.body).to.have.property('newDn', `ou=child,${targetOrgDn}`);
+
+        // Verify organization was moved
+        const movedOrg = await plugin.getOrganisationByDn(res.body.newDn);
+        expect(movedOrg).to.have.property('ou', 'child');
+      });
+
+      it('should return error when targetOrgDn is missing', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({});
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Bad content/);
+      });
+
+      it('should return error when targetOrgDn is invalid', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn: 123, // Invalid type
+          });
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Missing or invalid targetOrgDn/);
+      });
+
+      it('should return error when target does not exist', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn: `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`,
+          });
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Failed to move organization/);
+      });
+
+      it('should return error when source does not exist', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${parentOrgDn}`)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn,
+          });
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Failed to move organization/);
+      });
+
+      it('should return error for circular move', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(parentOrgDn)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn: childOrgDn,
+          });
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Failed to move organization/);
+      });
+
+      it('should return error when moving to same location', async () => {
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({
+            targetOrgDn: parentOrgDn,
+          });
+
+        expect(res.status).to.equal(400);
+        expect(res.text).to.match(/Failed to move organization/);
       });
     });
   });

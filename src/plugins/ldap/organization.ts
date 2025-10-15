@@ -412,9 +412,10 @@ export default class LdapOrganizations extends DmPlugin {
    */
   isOu(entry: AttributesList): boolean {
     if (!entry.objectClass) return false;
+    const entryClasses = (entry.objectClass as string[]).map(c => c.toLowerCase());
     return (this.config.ldap_organization_class as string[])
       .filter(c => c.toLowerCase() !== 'top')
-      .some(c => (entry.objectClass as string[]).includes(c.toLowerCase()));
+      .some(c => entryClasses.includes(c.toLowerCase()));
   }
 
   async getOrganisationTop(
@@ -704,7 +705,9 @@ export default class LdapOrganizations extends DmPlugin {
     if (newDn === dn) {
       throw new Error('Cannot move organization to its current location');
     }
-    if (targetOrgDn.startsWith(dn + ',') || targetOrgDn === dn) {
+    // Check if target is the source itself or a descendant of the source
+    // A descendant's DN will end with ",<source DN>"
+    if (targetOrgDn === dn || targetOrgDn.endsWith(`,${dn}`)) {
       throw new Error('Cannot move organization into itself or its descendant');
     }
 
