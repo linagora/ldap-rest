@@ -19,8 +19,20 @@ export default class James extends DmPlugin {
     ldapGroups: 'core/ldap/groups',
   };
 
+  // Cached configuration attributes
+  private mailAttr: string;
+  private quotaAttr: string;
+  private aliasAttr: string;
+  private displayNameAttr: string;
+
   constructor(server: DM) {
     super(server);
+
+    // Initialize cached configuration attributes
+    this.mailAttr = this.config.mail_attribute || 'mail';
+    this.quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
+    this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
+    this.displayNameAttr = this.config.display_name_attribute || 'displayName';
   }
 
   /**
@@ -31,6 +43,23 @@ export default class James extends DmPlugin {
       return alias.substring(5);
     }
     return alias;
+  }
+
+  /**
+   * Create HTTP headers with optional Authorization token
+   */
+  private createJamesHeaders(contentType?: string): {
+    Authorization?: string;
+    'Content-Type'?: string;
+  } {
+    const headers: { Authorization?: string; 'Content-Type'?: string } = {};
+    if (this.config.james_webadmin_token) {
+      headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
+    }
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+    return headers;
   }
 
   /**
@@ -46,24 +75,13 @@ export default class James extends DmPlugin {
       .map(a => this.normalizeAlias(a));
   }
 
-  /**
-   * Extract domain from email address
-   */
-  private extractDomain(email: string): string | null {
-    const parts = email.split('@');
-    return parts.length === 2 ? parts[1] : null;
-  }
-
   hooks: Hooks = {
     ldapadddone: async (args: [string, AttributesList]) => {
       const [dn, attributes] = args;
-      const mailAttr = this.config.mail_attribute || 'mail';
-      const quotaAttr = this.config.quota_attribute || 'mailQuotaSize';
-      const aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
 
-      const mail = attributes[mailAttr];
-      const quota = attributes[quotaAttr];
-      const aliases = attributes[aliasAttr];
+      const mail = attributes[this.mailAttr];
+      const quota = attributes[this.quotaAttr];
+      const aliases = attributes[this.aliasAttr];
 
       if (!mail) {
         // Not a user with mail, skip
@@ -138,39 +156,41 @@ export default class James extends DmPlugin {
 
       // Get current aliases from LDAP and recreate them for the new mail
       try {
-        const aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
         const entry = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: [aliasAttr] },
+          { paged: false, scope: 'base', attributes: [this.aliasAttr] },
           dn
         )) as SearchResult;
 
         if (entry.searchEntries && entry.searchEntries.length > 0) {
-          const aliases = this.getAliases(entry.searchEntries[0][aliasAttr]);
+          const aliases = this.getAliases(
+            entry.searchEntries[0][this.aliasAttr]
+          );
 
           // Only process if user has aliases
           if (aliases.length > 0) {
-            // Delete old aliases and create new ones
-            for (const alias of aliases) {
-              // Delete old alias pointing to old mail
-              await this._try(
-                'onLdapMailChange-delete',
-                `${this.config.james_webadmin_url}/address/aliases/${oldmail}/sources/${alias}`,
-                'DELETE',
-                dn,
-                null,
-                { oldmail, alias }
-              );
-
-              // Create new alias pointing to new mail
-              await this._try(
-                'onLdapMailChange-create',
-                `${this.config.james_webadmin_url}/address/aliases/${newmail}/sources/${alias}`,
-                'PUT',
-                dn,
-                null,
-                { newmail, alias }
-              );
-            }
+            // Delete old aliases and create new ones in parallel
+            await Promise.all([
+              ...aliases.map(alias =>
+                this._try(
+                  'onLdapMailChange-delete',
+                  `${this.config.james_webadmin_url}/address/aliases/${oldmail}/sources/${alias}`,
+                  'DELETE',
+                  dn,
+                  null,
+                  { oldmail, alias }
+                )
+              ),
+              ...aliases.map(alias =>
+                this._try(
+                  'onLdapMailChange-create',
+                  `${this.config.james_webadmin_url}/address/aliases/${newmail}/sources/${alias}`,
+                  'PUT',
+                  dn,
+                  null,
+                  { newmail, alias }
+                )
+              ),
+            ]);
           }
         }
       } catch (err) {
@@ -239,7 +259,7 @@ export default class James extends DmPlugin {
       oldForwards: string[],
       newForwards: string[]
     ) => {
-      const domain = this.extractDomain(mail);
+      const domain = this.extractMailDomain(mail);
       if (!domain) {
         this.logger.error(
           `Cannot extract domain from mail ${mail} for forward management`
@@ -294,8 +314,8 @@ export default class James extends DmPlugin {
     ) => {
       // Get mail and display name attributes using cached ldapGetAttributes
       const attrs = [
-        this.config.mail_attribute || 'mail',
-        this.config.display_name_attribute || 'displayName',
+        this.mailAttr,
+        this.displayNameAttr,
         'cn',
         'givenName',
         'sn',
@@ -309,8 +329,7 @@ export default class James extends DmPlugin {
         return;
       }
 
-      const mailAttr = this.config.mail_attribute || 'mail';
-      const mail = this.attributeToString(entry[mailAttr]);
+      const mail = this.attributeToString(entry[this.mailAttr]);
 
       if (!mail) {
         this.logger.warn(
@@ -528,16 +547,13 @@ export default class James extends DmPlugin {
     }
   ): Promise<void> {
     // Get current group attributes
-    const result = (await this.server.ldap.search(
-      {
-        paged: false,
-        scope: 'base',
-        attributes: ['mail', 'member', 'twakeMailboxType'],
-      },
-      dn
-    )) as SearchResult;
+    const attributes = await this.ldapGetAttributes(dn, [
+      'mail',
+      'member',
+      'twakeMailboxType',
+    ]);
 
-    if (!result.searchEntries || result.searchEntries.length === 0) {
+    if (!attributes) {
       this.logger.error({
         plugin: this.name,
         event: 'handleMailboxTypeTransition',
@@ -546,8 +562,6 @@ export default class James extends DmPlugin {
       });
       return;
     }
-
-    const attributes = result.searchEntries[0];
     const mail = attributes.mail;
     if (!mail) {
       this.logger.debug(
@@ -676,11 +690,10 @@ export default class James extends DmPlugin {
   private getDisplayNameFromAttributes(
     attributes: import('../../lib/ldapActions').AttributesList
   ): string | null {
-    const displayNameAttr = this.config.display_name_attribute || 'displayName';
-    const mailAttr = this.config.mail_attribute || 'mail';
-
     // 1. Try displayName first
-    const displayName = this.attributeToString(attributes[displayNameAttr]);
+    const displayName = this.attributeToString(
+      attributes[this.displayNameAttr]
+    );
     if (displayName) return displayName;
 
     // 2. Try cn
@@ -698,25 +711,24 @@ export default class James extends DmPlugin {
     }
 
     // 4. Fallback to mail
-    const mail = this.attributeToString(attributes[mailAttr]);
+    const mail = this.attributeToString(attributes[this.mailAttr]);
     if (mail) return mail;
 
     return null;
   }
 
   async getMailFromDN(dn: string): Promise<string | null> {
-    const mailAttr = this.config.mail_attribute || 'mail';
-    const entry = await this.ldapGetAttributes(dn, [mailAttr]);
-    return entry ? this.attributeToString(entry[mailAttr]) : null;
+    const entry = await this.ldapGetAttributes(dn, [this.mailAttr]);
+    return entry ? this.attributeToString(entry[this.mailAttr]) : null;
   }
 
   async getDisplayNameFromDN(dn: string): Promise<string | null> {
     const attrs = [
-      this.config.display_name_attribute || 'displayName',
+      this.displayNameAttr,
       'cn',
       'givenName',
       'sn',
-      this.config.mail_attribute || 'mail',
+      this.mailAttr,
     ];
     const entry = await this.ldapGetAttributes(dn, attrs);
     return entry ? this.getDisplayNameFromAttributes(entry) : null;
@@ -773,12 +785,10 @@ export default class James extends DmPlugin {
     try {
       // Step 1: Get user identities
       const identitiesUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}`;
-      const headers: { Authorization?: string; 'Content-Type'?: string } = {};
-      if (this.config.james_webadmin_token) {
-        headers.Authorization = `Bearer ${this.config.james_webadmin_token}`;
-      }
-
-      const getRes = await fetch(identitiesUrl, { method: 'GET', headers });
+      const getRes = await fetch(identitiesUrl, {
+        method: 'GET',
+        headers: this.createJamesHeaders(),
+      });
       if (!getRes.ok) {
         this.logger.error({
           ...log,
@@ -813,7 +823,6 @@ export default class James extends DmPlugin {
 
       // Step 4: Update identity name and signature
       const updateUrl = `${this.config.james_webadmin_url}/jmap/identities/${mail}/${defaultIdentity.id}`;
-      headers['Content-Type'] = 'application/json';
 
       const updatePayload: {
         id: string;
@@ -830,12 +839,10 @@ export default class James extends DmPlugin {
         updatePayload.htmlSignature = htmlSignature;
       }
 
-      const updateBody = JSON.stringify(updatePayload);
-
       const updateRes = await fetch(updateUrl, {
         method: 'PUT',
-        headers,
-        body: updateBody,
+        headers: this.createJamesHeaders('application/json'),
+        body: JSON.stringify(updatePayload),
       });
 
       if (!updateRes.ok) {
@@ -1092,9 +1099,9 @@ export default class James extends DmPlugin {
         });
       }
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      const errorMsg = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `Failed to remove members from team mailbox ${mailStr}: ${err}`
+        `Failed to remove members from team mailbox ${mailStr}: ${errorMsg}`
       );
     }
   }
@@ -1118,15 +1125,13 @@ export default class James extends DmPlugin {
    * Uses p-limit to parallelize LDAP queries while limiting concurrency
    */
   async getMemberEmails(memberDns: string[]): Promise<string[]> {
-    const mailAttr = this.config.mail_attribute || 'mail';
-
     // Create promises for each member DN, with global concurrency limit
     const emailPromises = memberDns
       .filter(memberDn => memberDn !== this.config.group_dummy_user)
       .map(memberDn =>
         this.server.ldap.queryLimit(async () => {
-          const entry = await this.ldapGetAttributes(memberDn, [mailAttr]);
-          return entry ? this.attributeToString(entry[mailAttr]) : null;
+          const entry = await this.ldapGetAttributes(memberDn, [this.mailAttr]);
+          return entry ? this.attributeToString(entry[this.mailAttr]) : null;
         })
       );
 
@@ -1158,9 +1163,9 @@ export default class James extends DmPlugin {
         return this.getMailboxType(result.searchEntries[0]);
       }
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      const errorMsg = err instanceof Error ? err.message : String(err);
       this.logger.debug(
-        `Could not get mailbox type for group ${groupDn}: ${err}`
+        `Could not get mailbox type for group ${groupDn}: ${errorMsg}`
       );
     }
 
@@ -1172,12 +1177,8 @@ export default class James extends DmPlugin {
     changes: ChangesToNotify
   ): Promise<void> {
     // Get the user's mail attribute from LDAP (only fetch mail attribute)
-    const mailAttr = this.config.mail_attribute || 'mail';
-    const entry = (await this.server.ldap.search(
-      { paged: false, scope: 'base', attributes: [mailAttr] },
-      dn
-    )) as SearchResult;
-    if (!entry.searchEntries || entry.searchEntries.length !== 1) {
+    const entry = await this.ldapGetAttributes(dn, [this.mailAttr]);
+    if (!entry) {
       this.logger.warn({
         plugin: this.name,
         event: 'onLdapChange',
@@ -1187,7 +1188,7 @@ export default class James extends DmPlugin {
       return;
     }
 
-    const userMail = entry.searchEntries[0][mailAttr];
+    const userMail = entry[this.mailAttr];
     if (!userMail || typeof userMail !== 'string') {
       this.logger.warn({
         plugin: this.name,
@@ -1270,8 +1271,7 @@ export default class James extends DmPlugin {
   }
 
   async _getDelegateEmail(dn: string): Promise<string | null> {
-    const mailAttr = this.config.mail_attribute || 'mail';
-    const entry = await this.ldapGetAttributes(dn, [mailAttr]);
+    const entry = await this.ldapGetAttributes(dn, [this.mailAttr]);
 
     if (!entry) {
       this.logger.warn({
@@ -1283,7 +1283,7 @@ export default class James extends DmPlugin {
       return null;
     }
 
-    return this.attributeToString(entry[mailAttr]);
+    return this.attributeToString(entry[this.mailAttr]);
   }
 
   _normalizeToArray(value: AttributeValue | null): string[] {
