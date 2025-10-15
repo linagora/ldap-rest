@@ -207,10 +207,12 @@ class ldapActions {
       'LDAP connection pool full, waiting for available connection'
     );
     return new Promise(resolve => {
+      // eslint-disable-next-line no-undef
       const checkInterval = setInterval(() => {
         this.cleanupExpiredConnections();
         const available = this.connectionPool.find(conn => !conn.inUse);
         if (available) {
+          // eslint-disable-next-line no-undef
           clearInterval(checkInterval);
           available.inUse = true;
           resolve(available);

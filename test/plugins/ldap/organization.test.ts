@@ -521,9 +521,7 @@ describe('LDAP Organizations Plugin', function () {
         await plugin.moveOrganization(childOrgDn, userDn);
         expect.fail('Should have thrown error');
       } catch (e) {
-        expect((e as Error).message).to.match(
-          /is not an organizational unit/
-        );
+        expect((e as Error).message).to.match(/is not an organizational unit/);
       }
 
       // Clean up

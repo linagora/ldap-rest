@@ -361,19 +361,22 @@ export default class LdapOrganizations extends DmPlugin {
    */
   async checkDeptPath(entry: AttributesList): Promise<void> {
     if (entry[this.pathAttr]) {
-      const path = entry[this.pathAttr][0] as string;
+      const pathValue = entry[this.pathAttr];
+      const path = (Array.isArray(pathValue) ? pathValue[0] : pathValue) as string;
       const sep = this.config.ldap_organization_path_separator || ' / ';
 
       let matchingPath = path;
       if (this.isOu(entry)) {
-        if (!path.startsWith((entry.ou[0] as string) + sep))
+        const ouValue = entry.ou;
+        const ouName = (Array.isArray(ouValue) ? ouValue[0] : ouValue) as string;
+        if (!path.startsWith(ouName + sep))
           throw new Error(
             `Organization path must start with its own name followed by separator "${sep}"`
           );
-        matchingPath = path.slice((entry.ou[0] as string).length + sep.length);
+        matchingPath = path.slice(ouName.length + sep.length);
       }
       const [ou, ouPath] = matchingPath.split(sep, 2);
-      if (!ouPath) throw new Error(`Invalid organization path ${path}`);
+
       // Search will benefit from cache for repeated validations
       const entries = await this.server.ldap.search(
         { paged: false, filter: `(ou=${ou})`, scope: 'sub' },
@@ -381,18 +384,44 @@ export default class LdapOrganizations extends DmPlugin {
       );
       if ((entries as SearchResult).searchEntries.length === 0)
         throw new Error(`Invalid organization path ${path}`);
-      let found = false;
-      for (const entry of (entries as SearchResult).searchEntries) {
-        const entryPath = entry[this.pathAttr] as string;
-        if (entryPath && entryPath === ouPath) {
-          found = true;
-          break;
+
+      // If ouPath is undefined, this references the top organization
+      // Verify it exists and has no parent path (or matches top org DN)
+      if (!ouPath) {
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const entryDn = entry.dn as string;
+          const topOrgDn = this.config.ldap_top_organization as string;
+          // Check if this is the top organization (DN matches or is direct child)
+          if (entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
+              entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)) {
+            const entryPath = entry[this.pathAttr] as string | undefined;
+            // Top org should either have no path attribute or a simple path (just its name)
+            if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
+              found = true;
+              break;
+            }
+          }
         }
+        if (!found)
+          throw new Error(
+            `Invalid organization path ${path}: no matching top-level entry for ${ou}`
+          );
+      } else {
+        // Verify parent organization exists with the specified path
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const entryPath = entry[this.pathAttr] as string;
+          if (entryPath && entryPath === ouPath) {
+            found = true;
+            break;
+          }
+        }
+        if (!found)
+          throw new Error(
+            `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
+          );
       }
-      if (!found)
-        throw new Error(
-          `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
-        );
     }
   }
 
@@ -412,7 +441,9 @@ export default class LdapOrganizations extends DmPlugin {
    */
   isOu(entry: AttributesList): boolean {
     if (!entry.objectClass) return false;
-    const entryClasses = (entry.objectClass as string[]).map(c => c.toLowerCase());
+    const entryClasses = (entry.objectClass as string[]).map(c =>
+      c.toLowerCase()
+    );
     return (this.config.ldap_organization_class as string[])
       .filter(c => c.toLowerCase() !== 'top')
       .some(c => entryClasses.includes(c.toLowerCase()));

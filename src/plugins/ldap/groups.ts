@@ -203,12 +203,7 @@ export default class LdapGroups extends DmPlugin {
             targetOrgDn: string;
           };
           if (!body) return;
-          await tryMethod(
-            res,
-            this.moveGroup.bind(this),
-            cn,
-            body.targetOrgDn
-          );
+          await tryMethod(res, this.moveGroup.bind(this), cn, body.targetOrgDn);
         }
       );
     }
@@ -511,7 +506,9 @@ export default class LdapGroups extends DmPlugin {
         targetOrgDn
       )) as SearchResult;
     } catch (err) {
-      throw new Error(`Target organization ${targetOrgDn} not found`);
+      throw new Error(
+        `Target organization ${targetOrgDn} not found: ${err instanceof Error && err.message ? err.message : String(err)}`
+      );
     }
 
     if (targetOrg.searchEntries.length === 0) {

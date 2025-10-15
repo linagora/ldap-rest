@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
+import { SearchResult } from 'ldapts';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
@@ -357,7 +358,7 @@ describe('LdapGroups Plugin', function () {
       const group = await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      );
+      ) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });
@@ -422,7 +423,7 @@ describe('LdapGroups Plugin', function () {
       const group = await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      );
+      ) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });
@@ -435,7 +436,7 @@ describe('LdapGroups Plugin', function () {
       const group = await plugin.ldap.search(
         { paged: false, scope: 'base' },
         groupDn
-      );
+      ) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
     });

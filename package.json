@@ -124,6 +124,10 @@
       "import": "./static/browser/ldap-group-editor/components/GroupTree.js",
       "types": "./dist/src/browser/ldap-group-editor/components/GroupTree.d.ts"
     },
+    "browser-ldap-group-editor-components-movegroupmodal": {
+      "import": "./static/browser/ldap-group-editor/components/MoveGroupModal.js",
+      "types": "./dist/src/browser/ldap-group-editor/components/MoveGroupModal.d.ts"
+    },
     "browser-ldap-group-editor-index": {
       "import": "./static/browser/ldap-group-editor/index.js",
       "types": "./dist/src/browser/ldap-group-editor/index.d.ts"

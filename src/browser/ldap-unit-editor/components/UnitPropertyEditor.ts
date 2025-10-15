@@ -327,7 +327,9 @@ export class UnitPropertyEditor {
   private async handleDelete(): Promise<void> {
     // Don't allow delete if there are subnodes
     if (this.hasSubnodes) {
-      alert('Cannot delete this organizational unit because it contains sub-organizations. Please delete all sub-organizations first.');
+      alert(
+        'Cannot delete this organizational unit because it contains sub-organizations. Please delete all sub-organizations first.'
+      );
       return;
     }
 

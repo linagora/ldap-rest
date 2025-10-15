@@ -71,18 +71,24 @@ export class UnitTree {
       return;
     }
 
-    const ouName = prompt('Enter the name for the new organizational unit (ou):');
+    // eslint-disable-next-line no-undef
+    const ouName = prompt(
+      'Enter the name for the new organizational unit (ou):'
+    );
     if (!ouName || !ouName.trim()) return;
 
     try {
-      const response = await fetch(`${this.apiBaseUrl}/api/v1/ldap/organizations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ou: ouName.trim(),
-          parentDn,
-        }),
-      });
+      const response = await fetch(
+        `${this.apiBaseUrl}/api/v1/ldap/organizations`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ou: ouName.trim(),
+            parentDn,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.text();
