@@ -334,6 +334,7 @@ For move operations (groups or organizations), the user needs **both** read perm
 ```
 
 With this configuration:
+
 - ✅ User `manager` **CAN** move items from DeptA to DeptB (has read on source, write on destination)
 - ❌ User `manager` **CANNOT** move items from DeptB to DeptA (has write on source but no write on destination)
 - ❌ User `manager` **CANNOT** move items from DeptC to DeptB (no read permission on source)
@@ -468,10 +469,13 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 ```
 
 With logs showing:
+
 ```
 User jdoe does not have read permission for source branch ou=DeptA,dc=example,dc=com
 ```
+
 or
+
 ```
 User jdoe does not have write permission for destination branch ou=DeptB,dc=example,dc=com
 ```
@@ -483,6 +487,7 @@ User jdoe does not have write permission for destination branch ou=DeptB,dc=exam
 3. Move operations require **both** permissions - having write on source is not sufficient
 
 Example fix:
+
 ```json
 {
   "users": {

@@ -121,6 +121,7 @@ export default abstract class AuthzBase extends DmPlugin {
               );
             }
           }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err) {
           // If we can't read the current entry, check permissions on the entry's parent branch
           const sourceBranch = this.extractBranchDn(dn);

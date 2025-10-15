@@ -50,6 +50,7 @@ If you want to extend Mini-DM with custom plugins, see below:
 - **[ldapFlatGeneric](ldapFlatGeneric.md)** - Schema-driven LDAP entity management (users, positions, etc.)
 - **[ldapGroups](ldapGroups.md)** - LDAP group management with member validation
 - **[ldapOrganizations](ldapOrganizations.md)** - Hierarchical organization tree management
+- **[ldapBulkImport](ldapBulkImport.md)** - CSV-based bulk import for LDAP resources
 - **[ldapExternalUsersInGroups](ldapExternalUsersInGroups.md)** - Auto-create external contacts in groups
 - **[ldapTrash](ldapTrash.md)** - Soft delete system - moves entries to trash instead of deleting
 - **[onChange](onChange.md)** - Detect and react to LDAP attribute changes
@@ -116,10 +117,12 @@ mini-dm \
   --plugin core/ldap/flatGeneric \
   --plugin core/ldap/groups \
   --plugin core/ldap/organization \
+  --plugin core/ldap/bulkImport \
   --plugin core/ldap/externalUsersInGroups \
   --plugin core/static \
   --plugin core/weblogs \
   --ldap-flat-schema ./schemas/standard/users.json \
+  --bulk-import-schemas "users:./schemas/standard/users.json" \
   --auth-token "admin-token" \
   --static-path ./static \
   ...
@@ -131,12 +134,13 @@ mini-dm \
 
 Plugins for managing different LDAP entity types:
 
-| Plugin            | Entity Type              | Features                            |
-| ----------------- | ------------------------ | ----------------------------------- |
-| ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers |
-| ldapGroups        | Groups                   | Member validation, Nested groups    |
-| ldapOrganizations | Organizational Units     | Tree navigation, Search             |
-| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata    |
+| Plugin            | Entity Type              | Features                                       |
+| ----------------- | ------------------------ | ---------------------------------------------- |
+| ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers            |
+| ldapGroups        | Groups                   | Member validation, Nested groups               |
+| ldapOrganizations | Organizational Units     | Tree navigation, Search                        |
+| ldapBulkImport    | Any (bulk operations)    | CSV import, Template generation, Multi-schema  |
+| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata               |
 
 ### Authentication
 
@@ -296,6 +300,21 @@ PUT    /api/v1/ldap/organizations/{dn}                      # Modify organizatio
 POST   /api/v1/ldap/organizations/{dn}/move                 # Move organization to different parent
 DELETE /api/v1/ldap/organizations/{dn}                      # Delete organization
 ```
+
+### Bulk Import
+
+Provided by `ldapBulkImport`:
+
+```
+GET    /api/v1/ldap/bulk-import/{resource}/template.csv    # Generate CSV template from schema
+POST   /api/v1/ldap/bulk-import/{resource}                 # Import entries from CSV file
+```
+
+**Parameters for POST**:
+- `file` (multipart): CSV file to import
+- `dryRun` (optional): Validate without creating (true/false)
+- `updateExisting` (optional): Update existing entries (true/false)
+- `continueOnError` (optional): Continue on errors (true/false, default: true)
 
 ### Static Files
 

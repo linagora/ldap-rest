@@ -168,8 +168,8 @@ export class CreateGroupModal {
 
     try {
       // Get the group branch from config
-      const groupBranch = this.config.ldap_groups_branch as string;
-      const dn = `cn=${cn},${groupBranch}`;
+      // const groupBranch = this.config.ldap_groups_branch as string;
+      // const dn = `cn=${cn},${groupBranch}`;
 
       // Get organization path for the group
       const orgPath = await this.getOrgPath(this.orgDn);

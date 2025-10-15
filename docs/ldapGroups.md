@@ -262,6 +262,7 @@ Moves a group to a different organization by updating its `twakeDepartmentLink` 
 **Authorization:**
 
 When using the `authzPerBranch` plugin, moving a group requires:
+
 - **Read** permission on the source organization
 - **Write** permission on the destination organization
 

@@ -495,7 +495,7 @@ export default class LdapGroups extends DmPlugin {
   async moveGroup(
     cn: string,
     targetOrgDn: string,
-    req?: any
+    req?: Request
   ): Promise<{ success: boolean }> {
     const linkAttr = this.config.ldap_organization_link_attribute as string;
     const pathAttr = this.config.ldap_organization_path_attribute as string;
