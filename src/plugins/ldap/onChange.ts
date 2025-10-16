@@ -33,8 +33,28 @@ class OnLdapChange extends DmPlugin {
   roles: Role[] = ['consistency'] as const;
 
   stack: Record<number, Entry> = {};
+  // Store entries before deletion to trigger notify with proper changes
+  pendingDeletions: Map<string, Entry> = new Map();
 
   hooks: Hooks = {
+    /**
+     * When a user is added, trigger notify with all new attributes
+     */
+    ldapadddone: (
+      args: [string, import('../../lib/ldapActions').AttributesList]
+    ) => {
+      const [dn, attributes] = args;
+
+      // Build ChangesToNotify with ALL attributes from the new entry
+      const res: ChangesToNotify = {};
+      for (const [key, value] of Object.entries(attributes)) {
+        res[key] = [null, value];
+      }
+
+      // Trigger notify which will call appropriate hooks based on configured attributes
+      this.notify(dn, res);
+    },
+
     ldapmodifyrequest: async ([dn, attributes, op]) => {
       const tmp = (await this.server.ldap.search(
         { paged: false },
@@ -82,6 +102,58 @@ class OnLdapChange extends DmPlugin {
         }
       }
       this.notify(dn, res);
+    },
+
+    /**
+     * Before deletion, capture entry to trigger notify with proper changes
+     */
+    ldapdeleterequest: async (dn: string | string[]) => {
+      const dns = Array.isArray(dn) ? dn : [dn];
+
+      for (const userDn of dns) {
+        try {
+          const result = await this.server.ldap.search(
+            {
+              scope: 'base',
+              paged: false,
+            },
+            userDn
+          );
+          const entry = (result as SearchResult).searchEntries?.[0];
+          if (entry) {
+            this.pendingDeletions.set(userDn, entry);
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (e) {
+          // Entry might not exist, ignore
+        }
+      }
+      return dn;
+    },
+
+    /**
+     * After deletion, trigger notify with all attributes set to null
+     */
+    ldapdeletedone: (dn: string | string[]) => {
+      const dns = Array.isArray(dn) ? dn : [dn];
+
+      for (const userDn of dns) {
+        const entry = this.pendingDeletions.get(userDn);
+        if (entry) {
+          this.pendingDeletions.delete(userDn);
+
+          // Build ChangesToNotify with ALL attributes from the deleted entry
+          const res: ChangesToNotify = {};
+          for (const [key, value] of Object.entries(entry)) {
+            // Skip the dn attribute
+            if (key === 'dn') continue;
+            res[key] = [value, null];
+          }
+
+          // Trigger notify which will call appropriate hooks based on configured attributes
+          this.notify(userDn, res);
+        }
+      }
     },
   };
 

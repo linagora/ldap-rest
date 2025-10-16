@@ -108,10 +108,26 @@ export default class James extends TwakePlugin {
         await this.updateJamesIdentity(dn, mailStr, displayName);
       }
     },
-    onLdapMailChange: async (dn: string, oldmail: string, newmail: string) => {
-      // Skip if oldmail is empty/undefined (this is an add, not a change)
+    onLdapMailChange: async (
+      dn: string,
+      oldmail: AttributeValue | null,
+      newmail: AttributeValue | null
+    ) => {
+      // Convert to strings
+      const oldmailStr = oldmail
+        ? Array.isArray(oldmail)
+          ? String(oldmail[0])
+          : String(oldmail)
+        : null;
+      const newmailStr = newmail
+        ? Array.isArray(newmail)
+          ? String(newmail[0])
+          : String(newmail)
+        : null;
+
+      // Skip if oldmail is empty/null (this is an add, not a change)
       // The mailbox will be created by ldapadddone
-      if (!oldmail || oldmail === 'undefined') {
+      if (!oldmailStr) {
         this.logger.debug(
           `Skipping mail rename for ${dn}: oldmail is empty (mail attribute was added, not changed)`
         );
@@ -121,11 +137,11 @@ export default class James extends TwakePlugin {
       // Rename the mailbox
       await this.callWebAdminApi(
         'onLdapMailChange',
-        `${this.webadminUrl}/users/${oldmail}/rename/${newmail}?action=rename`,
+        `${this.webadminUrl}/users/${oldmailStr}/rename/${newmailStr}?action=rename`,
         'POST',
         dn,
         null,
-        { oldmail, newmail }
+        { oldmail: oldmailStr, newmail: newmailStr }
       );
 
       // Get current aliases from LDAP and recreate them for the new mail
@@ -147,21 +163,21 @@ export default class James extends TwakePlugin {
               ...aliases.map(alias =>
                 this.callWebAdminApi(
                   'onLdapMailChange-delete',
-                  `${this.webadminUrl}/address/aliases/${oldmail}/sources/${alias}`,
+                  `${this.webadminUrl}/address/aliases/${oldmailStr}/sources/${alias}`,
                   'DELETE',
                   dn,
                   null,
-                  { oldmail, alias }
+                  { oldmail: oldmailStr, alias }
                 )
               ),
               ...aliases.map(alias =>
                 this.callWebAdminApi(
                   'onLdapMailChange-create',
-                  `${this.webadminUrl}/address/aliases/${newmail}/sources/${alias}`,
+                  `${this.webadminUrl}/address/aliases/${newmailStr}/sources/${alias}`,
                   'PUT',
                   dn,
                   null,
-                  { newmail, alias }
+                  { newmail: newmailStr, alias }
                 )
               ),
             ]);

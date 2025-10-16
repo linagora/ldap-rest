@@ -5,7 +5,11 @@
 import type { SearchOptions, SearchResult } from 'ldapts';
 import type { Request, Response } from 'express';
 
-import type { ModifyRequest, AttributesList } from './lib/ldapActions';
+import type {
+  ModifyRequest,
+  AttributesList,
+  AttributeValue,
+} from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/ldap/onChange';
 import * as utils from './lib/utils';
 
@@ -77,8 +81,8 @@ export interface Hooks {
   onLdapChange?: (dn: string, changes: ChangesToNotify) => MaybePromise<void>;
   onLdapMailChange?: (
     dn: string,
-    oldMail: string,
-    newMail: string
+    oldMail: AttributeValue | null,
+    newMail: AttributeValue | null
   ) => MaybePromise<void>;
   onLdapAliasChange?: (
     dn: string,

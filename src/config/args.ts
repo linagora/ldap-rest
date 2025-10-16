@@ -145,6 +145,10 @@ export interface Config {
   calendar_resource_creator?: string;
   calendar_resource_domain?: string;
 
+  // Applicative Accounts plugin
+  applicative_account_base?: string;
+  max_app_accounts?: number;
+
   // Trash plugin
   trash_base?: string;
   trash_watched_bases?: string;
@@ -363,6 +367,10 @@ const configArgs: ConfigTemplate = [
   ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
   ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
   ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
+
+  // Applicative Accounts plugin
+  ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
+  ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
 
   // Trash plugin
   ['--trash-base', 'DM_TRASH_BASE', ''],

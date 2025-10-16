@@ -748,5 +748,4 @@ export default abstract class LdapFlat extends DmPlugin {
     }
     return true;
   }
-
 }

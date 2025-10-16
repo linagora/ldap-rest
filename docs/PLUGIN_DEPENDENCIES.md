@@ -200,6 +200,25 @@ dependencies = {
 - **Consumes Hooks**: None
 - **Notes**: Synchronizes calendar resources with Twake Calendar
 
+#### `appAccountsConsistency` (twake/appAccountsConsistency)
+
+- **Dependencies**:
+  - `onLdapChange: 'core/ldap/onChange'` ⚠️ **Required**
+- **Provides Hooks**:
+  - `ldapadddone` - After user added, creates principal applicative account
+  - `onLdapMailChange` - When mail changes, updates applicative accounts
+- **Consumes Hooks**: (Hooks provided by `onLdapChange`)
+- **Notes**: Automatically creates and maintains principal applicative accounts (uid=mail)
+
+#### `appAccountsApi` (twake/appAccountsApi)
+
+- **Dependencies**:
+  - `authToken: 'core/auth/token'` ⚠️ **Required** (or another auth plugin)
+  - `appAccountsConsistency: 'core/twake/appAccountsConsistency'` ⚠️ **Required**
+- **Provides Hooks**: None
+- **Consumes Hooks**: None
+- **Notes**: RESTful API for managing applicative accounts (device/app-specific accounts). Depends on `appAccountsConsistency` for automatic cleanup and synchronization of app accounts.
+
 ### Utility Plugins
 
 #### `static` (core/static)
