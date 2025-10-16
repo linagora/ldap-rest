@@ -15,7 +15,7 @@ import { wantJson } from '../../lib/expressFormatedResponses';
 
 export default class AppAccountsApi extends DmPlugin {
   name = 'appAccountsApi';
-  roles: Role[] = ['api'] as const;
+  roles: Role[] = ['api', 'configurable'] as const;
   dependencies = {
     authToken: 'core/auth/token',
     appAccountsConsistency: 'core/twake/appAccountsConsistency',
@@ -456,5 +456,24 @@ export default class AppAccountsApi extends DmPlugin {
     }
 
     return blocks.join('-');
+  }
+
+  /**
+   * Expose configuration for configApi
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    return {
+      enabled: true,
+      base: this.applicativeAccountBase,
+      maxAccounts: this.maxAppAccounts,
+      mailAttribute: this.mailAttr,
+      endpoints: {
+        list: `${apiPrefix}/v1/users/:user/app-accounts`,
+        create: `${apiPrefix}/v1/users/:user/app-accounts`,
+        delete: `${apiPrefix}/v1/users/:user/app-accounts/:uid`,
+      },
+    };
   }
 }
