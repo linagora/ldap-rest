@@ -100,6 +100,14 @@
       "import": "./dist/plugins/static.js",
       "types": "./dist/src/plugins/static.d.ts"
     },
+    "plugin-twake-appaccountsapi": {
+      "import": "./dist/plugins/twake/appAccountsApi.js",
+      "types": "./dist/src/plugins/twake/appAccountsApi.d.ts"
+    },
+    "plugin-twake-appaccountsconsistency": {
+      "import": "./dist/plugins/twake/appAccountsConsistency.js",
+      "types": "./dist/src/plugins/twake/appAccountsConsistency.d.ts"
+    },
     "plugin-twake-calendarresources": {
       "import": "./dist/plugins/twake/calendarResources.js",
       "types": "./dist/src/plugins/twake/calendarResources.d.ts"
@@ -320,6 +328,14 @@
       "import": "./static/schemas/ad/users.json",
       "require": "./static/schemas/ad/users.json"
     },
+    "schema-obm-organizations": {
+      "import": "./static/schemas/obm/organizations.json",
+      "require": "./static/schemas/obm/organizations.json"
+    },
+    "schema-obm-users": {
+      "import": "./static/schemas/obm/users.json",
+      "require": "./static/schemas/obm/users.json"
+    },
     "schema-standard-devices": {
       "import": "./static/schemas/standard/devices.json",
       "require": "./static/schemas/standard/devices.json"
@@ -381,6 +397,7 @@
   "bin": {
     "cleanup-external-users": "bin/cleanup-external-users.mjs",
     "ldap-rest": "bin/index.mjs",
+    "sync-app-accounts": "bin/sync-app-accounts.mjs",
     "sync-james": "bin/sync-james.mjs"
   },
   "files": [

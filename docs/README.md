@@ -77,6 +77,7 @@ If you want to extend LDAP-Rest with custom plugins, see below:
 
 - **[twakeJames](twakeJames.md)** - Apache James mail server synchronization
 - **[twakeCalendarResources](twakeCalendarResources.md)** - Twake Calendar resources synchronization
+- **[twakeAppAccountsApi](twakeAppAccountsApi.md)** - Applicative accounts API (device/app-specific accounts)
 
 ## Quick Start
 
@@ -134,67 +135,68 @@ ldap-rest \
 
 Plugins for managing different LDAP entity types:
 
-| Plugin            | Entity Type              | Features                                      |
-| ----------------- | ------------------------ | --------------------------------------------- |
-| ldapFlatGeneric   | Users, Positions, Custom | Schema-driven, Validation, Pointers           |
-| ldapGroups        | Groups                   | Member validation, Nested groups              |
-| ldapOrganizations | Organizational Units     | Tree navigation, Search                       |
-| ldapBulkImport    | Any (bulk operations)    | CSV import, Template generation, Multi-schema |
-| ldapTrash         | Any (soft delete)        | Trash system, Recovery, Metadata              |
+| Plugin                 | Entity Type              | Features                                      |
+| ---------------------- | ------------------------ | --------------------------------------------- |
+| core/ldap/flatGeneric  | Users, Positions, Custom | Schema-driven, Validation, Pointers           |
+| core/ldap/groups       | Groups                   | Member validation, Nested groups              |
+| core/ldap/organization | Organizational Units     | Tree navigation, Search                       |
+| core/ldap/bulkImport   | Any (bulk operations)    | CSV import, Template generation, Multi-schema |
+| core/ldap/trash        | Any (soft delete)        | Trash system, Recovery, Metadata              |
 
 ### Authentication
 
 Secure API access:
 
-| Plugin         | Type          | Use Case                     |
-| -------------- | ------------- | ---------------------------- |
-| token          | Bearer tokens | Development, APIs, Scripts   |
-| llng           | LemonLDAP::NG | Enterprise SSO               |
-| openidconnect  | OAuth2/OIDC   | Cloud identity, Social login |
-| authzPerBranch | Authorization | Branch-level access control  |
-| authzLinid1    | Authorization | LinID 1.x integration        |
+| Plugin                   | Type          | Use Case                     |
+| ------------------------ | ------------- | ---------------------------- |
+| core/auth/token          | Bearer tokens | Development, APIs, Scripts   |
+| core/auth/llng           | LemonLDAP::NG | Enterprise SSO               |
+| core/auth/openidconnect  | OAuth2/OIDC   | Cloud identity, Social login |
+| core/auth/authzPerBranch | Authorization | Branch-level access control  |
+| core/auth/authzLinid1    | Authorization | LinID 1.x integration        |
 
 ### Security
 
 Protection and rate limiting:
 
-| Plugin    | Type          | Use Case                      |
-| --------- | ------------- | ----------------------------- |
-| crowdsec  | IP blocking   | Block banned IPs via CrowdSec |
-| rateLimit | Rate limiting | Prevent brute-force attacks   |
+| Plugin              | Type          | Use Case                      |
+| ------------------- | ------------- | ----------------------------- |
+| core/auth/crowdsec  | IP blocking   | Block banned IPs via CrowdSec |
+| core/auth/rateLimit | Rate limiting | Prevent brute-force attacks   |
 
 ### Integration
 
 Connect to external systems:
 
-| Plugin                | Integrates With | Purpose              |
-| --------------------- | --------------- | -------------------- |
-| onChange              | Any             | Detect LDAP changes  |
-| twake/james           | Apache James    | Mail server sync     |
-| externalUsersInGroups | Groups          | Auto-create contacts |
+| Plugin                          | Integrates With | Purpose                  |
+| ------------------------------- | --------------- | ------------------------ |
+| core/ldap/onChange              | Any             | Detect LDAP changes      |
+| core/twake/james                | Apache James    | Mail server sync         |
+| core/twake/appAccountsApi       | LDAP            | App-specific account API |
+| core/ldap/externalUsersInGroups | Groups          | Auto-create contacts     |
 
 ### Utilities
 
 Support plugins:
 
-| Plugin  | Purpose               |
-| ------- | --------------------- |
-| static  | Serve web UI, schemas |
-| weblogs | Request logging       |
+| Plugin       | Purpose               |
+| ------------ | --------------------- |
+| core/static  | Serve web UI, schemas |
+| core/weblogs | Request logging       |
 
 ## Plugin Dependencies
 
 Some plugins require others:
 
 ```
-twake/james
+core/twake/james
   └─ requires: core/ldap/onChange
 
 core/ldap/externalUsersInGroups
   └─ requires: core/ldap/groups
 
 core/auth/authzPerBranch
-  └─ requires: Any authentication plugin (token, llng, openidconnect)
+  └─ requires: Any authentication plugin (core/auth/token, core/auth/llng, core/auth/openidconnect)
 ```
 
 ## Configuration
