@@ -1,6 +1,6 @@
 # Authentication Plugins
 
-Mini-DM provides multiple authentication plugins to secure API access. These plugins can be used individually or combined depending on your infrastructure requirements.
+LDAP-Rest provides multiple authentication plugins to secure API access. These plugins can be used individually or combined depending on your infrastructure requirements.
 
 ## Available Authentication Methods
 
@@ -102,7 +102,7 @@ INFO: Request from user: token 1
 
 ```bash
 # API server configuration with named tokens
-npx mini-dm \
+npx ldap-rest \
   --plugin core/auth/token \
   --auth-token "a1b2c3d4e5f6:production-web-app" \
   --auth-token "f6e5d4c3b2a1:prometheus-monitoring" \
@@ -156,7 +156,7 @@ DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
 
 1. **LemonLDAP::NG Handler**: The `lemonldap-ng-handler` npm package (optional dependency)
 2. **LLNG Configuration**: Valid `lemonldap-ng.ini` file
-3. **Virtual Host Configuration**: Mini-DM must be configured as a protected application in LLNG
+3. **Virtual Host Configuration**: LDAP-Rest must be configured as a protected application in LLNG
 
 ### How It Works
 
@@ -175,7 +175,7 @@ npm install lemonldap-ng-handler
 
 ### LLNG Configuration
 
-Configure Mini-DM as a protected virtual host in LemonLDAP::NG:
+Configure LDAP-Rest as a protected virtual host in LemonLDAP::NG:
 
 ```apache
 # In LLNG Manager: Virtual Hosts > api.example.com
@@ -185,7 +185,7 @@ Configure Mini-DM as a protected virtual host in LemonLDAP::NG:
   # LemonLDAP::NG Handler
   PerlHeaderParserHandler Lemonldap::NG::Handler::ApacheMP2
 
-  # Proxy to Mini-DM
+  # Proxy to LDAP-Rest
   ProxyPass / http://localhost:8081/
   ProxyPassReverse / http://localhost:8081/
 </VirtualHost>
@@ -222,7 +222,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 ```bash
 --plugin core/auth/openidconnect \
 --oidc-server "https://auth.example.com" \
---oidc-client-id "mini-dm-client" \
+--oidc-client-id "ldap-rest-client" \
 --oidc-client-secret "client-secret-here" \
 --base-url "https://api.example.com"
 ```
@@ -231,7 +231,7 @@ OAuth 2.0 / OpenID Connect authentication for modern identity providers.
 
 ```bash
 DM_OIDC_SERVER="https://auth.example.com"
-DM_OIDC_CLIENT_ID="mini-dm-client"
+DM_OIDC_CLIENT_ID="ldap-rest-client"
 DM_OIDC_CLIENT_SECRET="client-secret-here"
 DM_BASE_URL="https://api.example.com"
 ```
@@ -239,7 +239,7 @@ DM_BASE_URL="https://api.example.com"
 ### Prerequisites
 
 1. **OpenID Provider**: [Lemonldap-NG](https://lemonldap-ng.org), Keycloak, Auth0, Okta, Azure AD, etc.
-2. **Client Registration**: Mini-DM registered as OAuth2/OIDC client
+2. **Client Registration**: LDAP-Rest registered as OAuth2/OIDC client
 3. **Optional Dependency**: The `express-openid-connect` npm package
 
 ### Installation
@@ -264,7 +264,7 @@ npm install express-openid-connect
 
 ```bash
 --oidc-server "https://keycloak.example.com/realms/master" \
---oidc-client-id "mini-dm" \
+--oidc-client-id "ldap-rest" \
 --oidc-client-secret "abc123..." \
 --base-url "https://api.example.com"
 ```

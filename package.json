@@ -1,17 +1,17 @@
 {
-  "name": "mini-dm",
+  "name": "ldap-rest",
   "version": "0.0.1",
   "description": "Light directory manager",
   "keywords": [
     "Identity-Manager"
   ],
-  "homepage": "https://github.com/linagora/mini-dm#readme",
+  "homepage": "https://github.com/linagora/ldap-rest#readme",
   "bugs": {
-    "url": "https://github.com/linagora/mini-dm/issues"
+    "url": "https://github.com/linagora/ldap-rest/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/linagora/mini-dm.git"
+    "url": "git+https://github.com/linagora/ldap-rest.git"
   },
   "license": "AGPL-3.0",
   "author": "Xavier Guimard <yadd@debian.org>",
@@ -368,7 +368,7 @@
   "main": "dist/bin/index.mjs",
   "bin": {
     "cleanup-external-users": "bin/cleanup-external-users.mjs",
-    "mini-dm": "bin/index.mjs",
+    "ldap-rest": "bin/index.mjs",
     "sync-james": "bin/sync-james.mjs"
   },
   "files": [

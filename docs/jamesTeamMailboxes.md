@@ -41,9 +41,9 @@ This creates three nomenclature entries:
 - `cn=mailingList,ou=twakeMailboxType,ou=nomenclature,{ldap_base}`
 - `cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,{ldap_base}`
 
-### Mini-DM Configuration
+### LDAP-Rest Configuration
 
-Add to your mini-dm configuration:
+Add to your ldap-rest configuration:
 
 ```bash
 # Optional: Restrict mailing lists to specific branches
@@ -340,4 +340,4 @@ npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
 ## References
 
 - [TMail Team Mailboxes Documentation](https://github.com/linagora/tmail-backend/blob/master/docs/modules/ROOT/pages/tmail-backend/webadmin.adoc#team-mailboxes)
-- [GitHub Issue #5](https://github.com/linagora/mini-dm/issues/5)
+- [GitHub Issue #5](https://github.com/linagora/ldap-rest/issues/5)

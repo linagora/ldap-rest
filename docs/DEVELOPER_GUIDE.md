@@ -1,6 +1,6 @@
-# Developer Guide - Mini-DM
+# Developer Guide - LDAP-Rest
 
-Welcome to the Mini-DM Developer Guide! This guide helps you build web applications using Mini-DM's APIs and libraries.
+Welcome to the LDAP-Rest Developer Guide! This guide helps you build web applications using LDAP-Rest's APIs and libraries.
 
 ## Quick Links
 
@@ -27,7 +27,7 @@ Welcome to the Mini-DM Developer Guide! This guide helps you build web applicati
 
 ## Introduction
 
-Mini-DM is a lightweight LDAP directory manager that provides:
+LDAP-Rest is a lightweight LDAP directory manager that provides:
 
 - **Complete REST API** for managing LDAP users, groups, and organizations
 - **Ready-to-use browser libraries** in JavaScript/TypeScript
@@ -50,7 +50,7 @@ Mini-DM is a lightweight LDAP directory manager that provides:
 └─────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────┐
-│   Mini-DM Server                    │
+│   LDAP-Rest Server                    │
 │                                     │
 │  ┌───────────────────────────────┐ │
 │  │  REST API                     │ │
@@ -80,10 +80,10 @@ Mini-DM is a lightweight LDAP directory manager that provides:
 
 ## Quick Start
 
-### 1. Start Mini-DM Server
+### 1. Start LDAP-Rest Server
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --ldap-url 'ldap://localhost:389' \
   --ldap-dn 'cn=admin,dc=example,dc=com' \
@@ -208,7 +208,7 @@ console.log(config);
 
 ### Schema-Driven Architecture
 
-Mini-DM uses JSON schemas to define LDAP entity structure:
+LDAP-Rest uses JSON schemas to define LDAP entity structure:
 
 ```json
 {
@@ -255,7 +255,7 @@ See [REST API Guide](./api/REST_API.md) for details.
 
 ### Plugin-Based Extensibility
 
-Extend Mini-DM with custom plugins that:
+Extend LDAP-Rest with custom plugins that:
 
 - Add REST API endpoints
 - Hook into LDAP operations
@@ -277,7 +277,7 @@ See [Plugin Development Guide](./plugins/DEVELOPMENT.md) for details.
 
 ## Resources
 
-- [GitHub Repository](https://github.com/linagora/mini-dm)
+- [GitHub Repository](https://github.com/linagora/ldap-rest)
 - [Contributing Guide](../CONTRIBUTING.md)
 - [Plugin Development](../src/plugins/README.md)
 - [Hooks Reference](../HOOKS.md)
@@ -286,8 +286,8 @@ See [Plugin Development Guide](./plugins/DEVELOPMENT.md) for details.
 
 ## Support
 
-- **Issues**: https://github.com/linagora/mini-dm/issues
-- **Documentation**: https://github.com/linagora/mini-dm/tree/master/docs
+- **Issues**: https://github.com/linagora/ldap-rest/issues
+- **Documentation**: https://github.com/linagora/ldap-rest/tree/master/docs
 
 ---
 

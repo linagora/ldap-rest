@@ -1,6 +1,6 @@
 # Plugin Dependency Graph
 
-This document describes the dependencies between Mini-DM plugins. There are two types of dependencies:
+This document describes the dependencies between LDAP-Rest plugins. There are two types of dependencies:
 
 1. **Explicit Dependencies**: Defined in the `dependencies` property of a plugin class
 2. **Hook Dependencies**: Implicit dependencies through hooks (one plugin provides a hook, another consumes it)
@@ -512,7 +512,7 @@ graph TB
 
 ## Plugin Priority System
 
-Mini-DM uses a priority system defined in `src/plugins/priority.json`:
+LDAP-Rest uses a priority system defined in `src/plugins/priority.json`:
 
 ```json
 [
@@ -588,7 +588,7 @@ export default class MyPlugin extends DmPlugin {
 
 ## Dependency Validation
 
-Mini-DM validates dependencies at startup:
+LDAP-Rest validates dependencies at startup:
 
 1. Checks all `dependencies` properties
 2. Ensures required plugins are loaded

@@ -106,7 +106,7 @@ DM_LDAP_FLAT_SCHEMA="/path/to/calendar-resources-schema.json"
    DM_PLUGINS="core/ldap/onChange,core/ldap/flatGeneric,twake/calendarResources"
    ```
 
-4. Start mini-dm - resources will be automatically synced
+4. Start ldap-rest - resources will be automatically synced
 
 ## Logging
 

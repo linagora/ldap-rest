@@ -35,7 +35,7 @@ ENV NODE_ENV=production \
  DM_LDAP_CACHE_TTL="300" \
  DM_LDAP_POOL_SIZE="5" \
  DM_LDAP_CONNECTION_TTL="60" \
- DM_SCHEMAS_PATH="/app/node_modules/mini-dm/static/schemas" \
+ DM_SCHEMAS_PATH="/app/node_modules/ldap-rest/static/schemas" \
  DM_MAIL_ATTRIBUTE="mail" \
  DM_QUOTA_ATTRIBUTE="mailQuota" \
  DM_DELEGATION_ATTRIBUTE="twakeDelegatedUsers" \
@@ -55,10 +55,10 @@ ENV NODE_ENV=production \
  DM_ALLOW_UNEXISTENT_MEMBERS=false \
  DM_GROUP_DEFAULT_ATTRIBUTES="{}" \
  DM_GROUP_DUMMY_USER="cn=fakeuser" \
- DM_GROUP_SCHEMA="/app/node_modules/mini-dm/static/schemas/twake/groups.json" \
+ DM_GROUP_SCHEMA="/app/node_modules/ldap-rest/static/schemas/twake/groups.json" \
  DM_EXTERNAL_MEMBERS_BRANCH="ou=contacts,dc=example,dc=com" \
  DM_EXTERNAL_BRANCH_CLASSES=top,inetOrgPerson \
- DM_STATIC_PATH="/app/node_modules/mini-dm/static" \
+ DM_STATIC_PATH="/app/node_modules/ldap-rest/static" \
  DM_STATIC_NAME="static" \
  DM_LDAP_FLAT_SCHEMA= \
  DM_BULK_IMPORT_SCHEMAS= \
@@ -99,4 +99,4 @@ ENV NODE_ENV=production \
  DM_CROWDSEC_CACHE_TTL="60"
 
 EXPOSE 8081
-CMD ["npx", "mini-dm"]
+CMD ["npx", "ldap-rest"]

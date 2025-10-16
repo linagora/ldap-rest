@@ -1,6 +1,6 @@
 # JSON Schemas Documentation
 
-Mini-DM uses JSON schemas to define LDAP entity structure, validation rules, and UI behavior. Schemas are the foundation for API operations, data validation, and automatic user interface generation.
+LDAP-Rest uses JSON schemas to define LDAP entity structure, validation rules, and UI behavior. Schemas are the foundation for API operations, data validation, and automatic user interface generation.
 
 ---
 
@@ -168,7 +168,7 @@ This will be replaced with the actual LDAP base at runtime (e.g., `ou=users,dc=e
 
 ## Attribute Types
 
-Mini-DM supports three main attribute types: `string`, `array`, and `pointer`.
+LDAP-Rest supports three main attribute types: `string`, `array`, and `pointer`.
 
 ### String Type
 
@@ -598,7 +598,7 @@ Email-related roles help applications handle email addresses consistently across
 
 ## Validation Rules
 
-Mini-DM validates LDAP entries against schemas using the following rules:
+LDAP-Rest validates LDAP entries against schemas using the following rules:
 
 ### Strict Mode
 
@@ -694,7 +694,7 @@ Attributes with `"fixed": true` cannot be modified after creation.
 
 ## Predefined Schemas
 
-Mini-DM includes three sets of predefined schemas for common LDAP directory types.
+LDAP-Rest includes three sets of predefined schemas for common LDAP directory types.
 
 ### Schema Structure Overview
 
@@ -772,7 +772,7 @@ twake/
 **Usage:**
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/twake/users.json \
@@ -834,7 +834,7 @@ ad/
 **Usage:**
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/ad/users.json \
@@ -902,7 +902,7 @@ standard/
 **Usage:**
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/standard/users.json \
@@ -1044,10 +1044,10 @@ Start with the schema that most closely matches your directory type:
 
 ### Step 6: Test and Deploy
 
-Save your schema and reference it when starting Mini-DM:
+Save your schema and reference it when starting LDAP-Rest:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./path/to/custom-users.json
@@ -1160,7 +1160,7 @@ Add comments in your schema documentation (not in JSON) explaining custom attrib
 - Review server logs for detailed error messages
 
 ```bash
-npx mini-dm --log-level debug ...
+npx ldap-rest --log-level debug ...
 ```
 
 ### Validation Errors

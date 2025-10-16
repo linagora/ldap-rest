@@ -1,5 +1,5 @@
 /**
- * @packageDocumentation mini-dm
+ * @packageDocumentation ldap-rest
  * @author Xavier Guimard <xguimard@linagora.com>
  *
  * Main server file

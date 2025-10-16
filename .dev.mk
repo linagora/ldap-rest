@@ -28,7 +28,7 @@ _builddev:
 	node scripts/moveBrowserLibs.mjs
 
 builddocker: Dockerfile
-	docker build -t mini-dm .
+	docker build -t ldap-rest .
 
 Dockerfile: scripts/buildDockerfile.ts $(SRCFILES) bin rollup.config.mjs tsconfig.json static
 	npx tsx scripts/buildDockerfile.ts

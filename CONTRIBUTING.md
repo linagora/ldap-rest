@@ -1,6 +1,6 @@
-# Contributing to Mini-DM
+# Contributing to LDAP-Rest
 
-Thank you for your interest in contributing to Mini-DM! This document provides guidelines and information for developers who want to contribute to the project.
+Thank you for your interest in contributing to LDAP-Rest! This document provides guidelines and information for developers who want to contribute to the project.
 
 ## Table of Contents
 
@@ -27,8 +27,8 @@ Thank you for your interest in contributing to Mini-DM! This document provides g
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/linagora/mini-dm.git
-cd mini-dm
+git clone https://github.com/linagora/ldap-rest.git
+cd ldap-rest
 ```
 
 2. **Install dependencies:**
@@ -65,12 +65,12 @@ source ~/.test-env && npm run start:dev
 
 ## Project Architecture
 
-Mini-DM follows a **plugin-based architecture** where functionality is organized into modular, reusable plugins.
+LDAP-Rest follows a **plugin-based architecture** where functionality is organized into modular, reusable plugins.
 
 ### Directory Structure
 
 ```
-mini-dm/
+ldap-rest/
 ├── src/
 │   ├── abstract/          # Abstract base classes
 │   │   ├── plugin.ts      # Base plugin class
@@ -112,7 +112,7 @@ mini-dm/
 
 #### 1. Plugins
 
-Plugins are the building blocks of Mini-DM. Each plugin:
+Plugins are the building blocks of LDAP-Rest. Each plugin:
 
 - Extends `DmPlugin` abstract class
 - Has a unique `name` property
@@ -295,8 +295,8 @@ Create a file anywhere on your system, e.g., `/path/to/my-plugin.ts`:
 
 ```typescript
 import type { Express } from 'express';
-import DmPlugin from 'mini-dm/plugin'; // If published to npm
-// Or: import DmPlugin from './node_modules/mini-dm/dist/abstract/plugin.js';
+import DmPlugin from 'ldap-rest/plugin'; // If published to npm
+// Or: import DmPlugin from './node_modules/ldap-rest/dist/abstract/plugin.js';
 
 export default class ExternalPlugin extends DmPlugin {
   name = 'externalPlugin';
@@ -312,7 +312,7 @@ export default class ExternalPlugin extends DmPlugin {
 Load it with:
 
 ```bash
-npx mini-dm --plugin /path/to/my-plugin.ts
+npx ldap-rest --plugin /path/to/my-plugin.ts
 ```
 
 #### 3. Adding Custom Configuration Options
@@ -339,7 +339,7 @@ export default class MyPlugin extends DmPlugin {
 Load with:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --plugin ./my-plugin.ts \
   --my-custom-option "value" \
   --my-custom-value "value1" \
@@ -618,7 +618,7 @@ git push origin feature/my-new-feature
 
 ### Documentation
 
-- [Developer Guide](./docs/DEVELOPER_GUIDE.md) - For application developers using Mini-DM APIs
+- [Developer Guide](./docs/DEVELOPER_GUIDE.md) - For application developers using LDAP-Rest APIs
 - [Plugin README](./src/plugins/README.md) - Plugin development guide
 - [Hooks Documentation](./HOOKS.md) - Available hooks and their usage
 - [Schema Guide](./docs/schemas/) - JSON schema documentation
@@ -626,20 +626,20 @@ git push origin feature/my-new-feature
 ### Examples
 
 - [Example Plugins](./src/plugins/demo/) - Demo plugins
-- [Example Applications](./examples/) - Web applications using Mini-DM
+- [Example Applications](./examples/) - Web applications using LDAP-Rest
 - [Test Files](./test/) - Test examples
 
 ### Communication
 
-- **Issues**: [GitHub Issues](https://github.com/linagora/mini-dm/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/linagora/mini-dm/discussions)
+- **Issues**: [GitHub Issues](https://github.com/linagora/ldap-rest/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/linagora/ldap-rest/discussions)
 
 ---
 
 ## License
 
-By contributing to Mini-DM, you agree that your contributions will be licensed under the [AGPL-3.0 License](./LICENSE).
+By contributing to LDAP-Rest, you agree that your contributions will be licensed under the [AGPL-3.0 License](./LICENSE).
 
 ---
 
-Thank you for contributing to Mini-DM! 🎉
+Thank you for contributing to LDAP-Rest! 🎉

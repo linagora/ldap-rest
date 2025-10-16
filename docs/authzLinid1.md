@@ -470,7 +470,7 @@ EOF
 --plugin core/auth/openidconnect \
 --plugin core/auth/authzLinid1 \
 --oidc-server "https://auth.example.com" \
---oidc-client-id "mini-dm" \
+--oidc-client-id "ldap-rest" \
 --oidc-client-secret "secret" \
 --base-url "https://api.example.com" \
 --ldap-top-organization "ou=organization,dc=example,dc=com"

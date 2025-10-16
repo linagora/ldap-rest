@@ -1,6 +1,6 @@
 # Plugin Development Guide
 
-This guide will help you create powerful, production-ready plugins for Mini-DM.
+This guide will help you create powerful, production-ready plugins for LDAP-Rest.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This guide will help you create powerful, production-ready plugins for Mini-DM.
 
 ## Why Create a Plugin
 
-Plugins extend Mini-DM with custom functionality for your specific needs:
+Plugins extend LDAP-Rest with custom functionality for your specific needs:
 
 ### Common Use Cases
 
@@ -65,7 +65,7 @@ export default class MyPlugin extends DmPlugin {
 
 ## Creating Your Plugin
 
-### Option 1: Core Plugin (Inside mini-dm Repository)
+### Option 1: Core Plugin (Inside ldap-rest Repository)
 
 Create a file in `src/plugins/<category>/<pluginName>.ts`:
 
@@ -138,7 +138,7 @@ export default class WebhookNotifier extends DmPlugin {
 Load with:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --plugin core/notification/webhook \
   --webhook-url https://example.com/webhook
 ```
@@ -154,13 +154,13 @@ Create a standalone file anywhere on your system, e.g., `/opt/custom-plugins/my-
  */
 import type { Express } from 'express';
 
-// Import from mini-dm (if installed as npm package)
-// import DmPlugin from 'mini-dm/plugin';
+// Import from ldap-rest (if installed as npm package)
+// import DmPlugin from 'ldap-rest/plugin';
 
 // Or use relative path to node_modules
-import DmPlugin from './node_modules/mini-dm/dist/abstract/plugin.js';
-import type { DM } from './node_modules/mini-dm/dist/bin/index.js';
-import type { Hooks } from './node_modules/mini-dm/dist/hooks.js';
+import DmPlugin from './node_modules/ldap-rest/dist/abstract/plugin.js';
+import type { DM } from './node_modules/ldap-rest/dist/bin/index.js';
+import type { Hooks } from './node_modules/ldap-rest/dist/hooks.js';
 
 export default class ExternalAuditPlugin extends DmPlugin {
   name = 'externalAudit';
@@ -201,7 +201,7 @@ export default class ExternalAuditPlugin extends DmPlugin {
 Load with:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --plugin /opt/custom-plugins/my-plugin.ts \
   --audit-path /var/log/ldap-audit.log
 ```
@@ -211,14 +211,14 @@ Or via environment variable:
 ```bash
 export DM_PLUGINS=/opt/custom-plugins/my-plugin.ts
 export DM_AUDIT_PATH=/var/log/ldap-audit.log
-npx mini-dm
+npx ldap-rest
 ```
 
 ---
 
 ## Custom Configuration Options
 
-Mini-DM automatically accepts and stores any unknown command-line options in the config object. This allows your plugin to define custom configuration without modifying core files.
+LDAP-Rest automatically accepts and stores any unknown command-line options in the config object. This allows your plugin to define custom configuration without modifying core files.
 
 ### How It Works
 
@@ -231,7 +231,7 @@ Mini-DM automatically accepts and stores any unknown command-line options in the
 
 ```bash
 # Command line
-npx mini-dm \
+npx ldap-rest \
   --webhook-url https://example.com/webhook \
   --webhook-timeout 5000 \
   --webhook-retry true
@@ -265,7 +265,7 @@ Repeat the same option multiple times to create an array:
 
 ```bash
 # Command line
-npx mini-dm \
+npx ldap-rest \
   --allowed-domain example.com \
   --allowed-domain test.com \
   --allowed-domain dev.com
@@ -320,10 +320,10 @@ constructor(server: DM) {
 
 ```bash
 # Load by path within src/plugins/
-npx mini-dm --plugin core/notification/webhook
+npx ldap-rest --plugin core/notification/webhook
 
 # Load multiple plugins
-npx mini-dm \
+npx ldap-rest \
   --plugin core/ldap/groups \
   --plugin core/notification/webhook \
   --plugin core/static
@@ -333,10 +333,10 @@ npx mini-dm \
 
 ```bash
 # Load by absolute file path
-npx mini-dm --plugin /path/to/my-plugin.ts
+npx ldap-rest --plugin /path/to/my-plugin.ts
 
 # Load multiple external plugins
-npx mini-dm \
+npx ldap-rest \
   --plugin /opt/plugins/audit.ts \
   --plugin /opt/plugins/validation.ts
 ```
@@ -346,11 +346,11 @@ npx mini-dm \
 ```bash
 # Single plugin
 export DM_PLUGINS=core/notification/webhook
-npx mini-dm
+npx ldap-rest
 
 # Multiple plugins (comma-separated)
 export DM_PLUGINS=core/ldap/groups,core/static,/opt/plugins/custom.ts
-npx mini-dm
+npx ldap-rest
 ```
 
 ### Plugin Loading Order
@@ -749,7 +749,7 @@ Add clear documentation in your plugin file:
  *
  * Example usage:
  *
- *   npx mini-dm \
+ *   npx ldap-rest \
  *     --plugin core/notification/webhook \
  *     --webhook-url https://example.com/webhook \
  *     --webhook-secret mysecret123 \
@@ -976,7 +976,7 @@ export default class NotificationPlugin extends DmPlugin {
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
-          'User-Agent': 'Mini-DM-Webhook/1.0',
+          'User-Agent': 'LDAP-Rest-Webhook/1.0',
         },
         body,
         signal: controller.signal,
@@ -1012,8 +1012,8 @@ export default class NotificationPlugin extends DmPlugin {
 ### Usage Example
 
 ```bash
-# Start Mini-DM with notification plugin
-npx mini-dm \
+# Start LDAP-Rest with notification plugin
+npx ldap-rest \
   --ldap-base dc=example,dc=com \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
@@ -1209,11 +1209,11 @@ source ~/.test-env && npm run test:dev
 
 ## Support
 
-- **Issues**: https://github.com/linagora/mini-dm/issues
-- **Discussions**: https://github.com/linagora/mini-dm/discussions
+- **Issues**: https://github.com/linagora/ldap-rest/issues
+- **Discussions**: https://github.com/linagora/ldap-rest/discussions
 
 ---
 
 ## License
 
-By contributing plugins to Mini-DM, you agree that your contributions will be licensed under the AGPL-3.0 License.
+By contributing plugins to LDAP-Rest, you agree that your contributions will be licensed under the AGPL-3.0 License.

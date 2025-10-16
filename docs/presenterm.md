@@ -1,17 +1,17 @@
 ---
-title: Mini-DM
+title: LDAP-Rest
 sub_title: Lightweight Directory Manager
 ---
 
-# Mini-DM
+# LDAP-Rest
 
 ## Lightweight Directory Manager with Plugin Architecture
 
-![Mini-DM Logo](./linagora.png)
+![LDAP-Rest Logo](./linagora.png)
 
 <!-- end_slide -->
 
-# What is Mini-DM?
+# What is LDAP-Rest?
 
 A **lightweight** and **extensible** directory manager for LDAP
 
@@ -190,7 +190,7 @@ POST /api/v1/ldap/groups
 
 ## Automatic Consistency Plugins
 
-Mini-DM automatically maintains **consistency** between LDAP and external systems
+LDAP-Rest automatically maintains **consistency** between LDAP and external systems
 
 ### Mechanisms
 
@@ -305,7 +305,7 @@ Complete user management interface
 ## Usage
 
 ```typescript
-import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+import LdapTreeViewer from 'ldap-rest/browser-ldap-tree-viewer-index';
 
 const viewer = new LdapTreeViewer({
   containerId: 'tree-container',
@@ -325,7 +325,7 @@ await viewer.init();
 ## Usage
 
 ```typescript
-import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+import LdapUserEditor from 'ldap-rest/browser-ldap-user-editor-index';
 
 const editor = new LdapUserEditor({
   containerId: 'editor-container',
@@ -345,13 +345,13 @@ await editor.init();
 ## Installation
 
 ```bash
-npm install mini-dm
+npm install ldap-rest
 ```
 
 ## Quick Start
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
   --ldap-dn 'cn=admin,dc=example,dc=com' \
   --ldap-pwd admin \
@@ -417,13 +417,13 @@ npm run build:prod
 
 ```bash
 npm run build:docker     # Build image
-docker run -p 8081:8081 mini-dm
+docker run -p 8081:8081 ldap-rest
 ```
 
 ## Distribution
 
 - NPM package with TypeScript exports
-- CLI binaries: `mini-dm`, `sync-james`, `cleanup-external-users`
+- CLI binaries: `ldap-rest`, `sync-james`, `cleanup-external-users`
 - Static files ready for CDN
 
 <!-- end_slide -->
@@ -460,8 +460,8 @@ docker run -p 8081:8081 mini-dm
 ## Create a Custom Plugin
 
 ```typescript
-import DmPlugin from 'mini-dm/plugin-abstract';
-import { Hooks } from 'mini-dm/hooks';
+import DmPlugin from 'ldap-rest/plugin-abstract';
+import { Hooks } from 'ldap-rest/hooks';
 
 export default class CustomPlugin extends DmPlugin {
   name = 'custom/myPlugin';
@@ -558,9 +558,9 @@ export default class CustomPlugin extends DmPlugin {
 
 ## Contributing
 
-- 🐛 **Issues**: https://github.com/linagora/mini-dm/issues
+- 🐛 **Issues**: https://github.com/linagora/ldap-rest/issues
 - 💡 **Discussions**: GitHub Discussions
-- 📖 **Wiki**: https://deepwiki.com/linagora/mini-dm
+- 📖 **Wiki**: https://deepwiki.com/linagora/ldap-rest
 - 🤝 **Contributions**: See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
@@ -577,7 +577,7 @@ Free and open source software
 
 ```bash
 # Complete configuration
-npx mini-dm \
+npx ldap-rest \
   --plugin core/ldap/onChange \
   --plugin core/ldap/groups \
   --plugin twake/james \
@@ -600,7 +600,7 @@ LDAP Change → onChange → Hook → James WebAdmin API
 
 ```typescript
 // 1. LDAP Group Consistency
-import groups from 'mini-dm/plugin-ldap-groups';
+import groups from 'ldap-rest/plugin-ldap-groups';
 dm.registerPlugin('groups', groups);
 
 // User deletion:
@@ -608,7 +608,7 @@ dm.registerPlugin('groups', groups);
 // → Update member/uniqueMember attributes
 
 // 2. LDAP ↔ James Consistency
-import james from 'mini-dm/plugin-twake-james';
+import james from 'ldap-rest/plugin-twake-james';
 dm.registerPlugin('james', james);
 
 // LDAP mail change:
@@ -625,7 +625,7 @@ dm.registerPlugin('james', james);
 ## Custom Web Interface
 
 ```typescript
-import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+import LdapUserEditor from 'ldap-rest/browser-ldap-user-editor-index';
 
 // Integration in your React/Vue/Angular app
 const editor = new LdapUserEditor({
@@ -645,22 +645,22 @@ const editor = new LdapUserEditor({
 
 # Comparison
 
-## Mini-DM vs Alternatives
+## LDAP-Rest vs Alternatives
 
-| Feature             | Mini-DM | LDAP Account Manager | phpLDAPadmin |
-| ------------------- | ------- | -------------------- | ------------ |
-| TypeScript          | ✅      | ❌                   | ❌           |
-| Plugin Architecture | ✅      | ⚠️                   | ❌           |
-| REST API            | ✅      | ⚠️                   | ❌           |
-| Browser Libraries   | ✅      | ❌                   | ❌           |
-| Modern Stack        | ✅      | ⚠️                   | ❌           |
-| Extensibility       | ✅✅    | ⚠️                   | ⚠️           |
-| James Sync          | ✅      | ❌                   | ❌           |
-| Auto Consistency    | ✅      | ❌                   | ❌           |
+| Feature             | LDAP-Rest | LDAP Account Manager | phpLDAPadmin |
+| ------------------- | --------- | -------------------- | ------------ |
+| TypeScript          | ✅        | ❌                   | ❌           |
+| Plugin Architecture | ✅        | ⚠️                   | ❌           |
+| REST API            | ✅        | ⚠️                   | ❌           |
+| Browser Libraries   | ✅        | ❌                   | ❌           |
+| Modern Stack        | ✅        | ⚠️                   | ❌           |
+| Extensibility       | ✅✅      | ⚠️                   | ⚠️           |
+| James Sync          | ✅        | ❌                   | ❌           |
+| Auto Consistency    | ✅        | ❌                   | ❌           |
 
 <!-- end_slide -->
 
-# Why Mini-DM?
+# Why LDAP-Rest?
 
 ## Key Benefits
 
@@ -689,15 +689,15 @@ const editor = new LdapUserEditor({
 ## Contact
 
 - 📧 Email: yadd@debian.org
-- 🐙 GitHub: https://github.com/linagora/mini-dm
+- 🐙 GitHub: https://github.com/linagora/ldap-rest
 - 🏢 LINAGORA: https://linagora.com
 
 ## Live Demo
 
 ```bash
 # Launch demo
-git clone https://github.com/linagora/mini-dm
-cd mini-dm
+git clone https://github.com/linagora/ldap-rest
+cd ldap-rest
 npm install
 npm run dev
 ```
@@ -708,11 +708,11 @@ Open http://localhost:8081
 
 # Thank You!
 
-## Mini-DM - Lightweight Directory Manager
+## LDAP-Rest - Lightweight Directory Manager
 
 [![Powered by LINAGORA](./linagora.png)](https://linagora.com)
 
-**GitHub**: https://github.com/linagora/mini-dm
+**GitHub**: https://github.com/linagora/ldap-rest
 
 **License**: AGPL-3.0
 

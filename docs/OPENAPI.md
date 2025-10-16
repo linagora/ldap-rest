@@ -1,6 +1,6 @@
 # OpenAPI Documentation Generation
 
-Mini-DM includes an automatic OpenAPI 3.0 specification generator that analyzes TypeScript source code to generate API documentation without modifying production code.
+LDAP-Rest includes an automatic OpenAPI 3.0 specification generator that analyzes TypeScript source code to generate API documentation without modifying production code.
 
 ## Features
 
@@ -27,6 +27,7 @@ This creates `openapi.json` in the project root containing the complete API spec
 You can use the generated `openapi.json` with various tools:
 
 **Swagger UI** (online viewer):
+
 ```bash
 # Serve the spec with a simple HTTP server
 npx http-server -p 8080
@@ -36,6 +37,7 @@ npx http-server -p 8080
 ```
 
 **Redoc** (documentation generator):
+
 ```bash
 npx @redocly/cli preview-docs openapi.json
 ```
@@ -62,7 +64,7 @@ Searches for classes extending `DmPlugin`:
 
 ```typescript
 class LdapGroups extends DmPlugin {
-  name = 'ldapGroups';  // Extracted as plugin name
+  name = 'ldapGroups'; // Extracted as plugin name
 
   api(app: Express): void {
     // Routes extracted from here
@@ -101,16 +103,17 @@ app.get(`${this.config.api_prefix}/v1/ldap/groups/:cn`, (req, res) => {...});
 
 Replaces template variables with actual values:
 
-| Template Variable | Replacement |
-|-------------------|-------------|
-| `${this.config.api_prefix}` | `/api` |
-| `${apiPrefix}` | `/api` |
-| `${this.config.static_name}` | `static` |
-| `${resourceName}` | `{resource}` |
+| Template Variable            | Replacement  |
+| ---------------------------- | ------------ |
+| `${this.config.api_prefix}`  | `/api`       |
+| `${apiPrefix}`               | `/api`       |
+| `${this.config.static_name}` | `static`     |
+| `${resourceName}`            | `{resource}` |
 
 ### 5. Special Handling
 
 **Multipart Form Data** (Bulk Import):
+
 ```typescript
 // Detected from path pattern
 if (pathTemplate.includes('bulk-import')) {
@@ -121,14 +124,15 @@ if (pathTemplate.includes('bulk-import')) {
           file: { type: 'string', format: 'binary' },
           dryRun: { type: 'boolean' },
           // ...
-        }
-      }
-    }
+        },
+      },
+    },
   };
 }
 ```
 
 **CSV Templates**:
+
 ```typescript
 // Detected from path pattern
 if (method === 'get' && pathTemplate.includes('template.csv')) {
@@ -136,9 +140,9 @@ if (method === 'get' && pathTemplate.includes('template.csv')) {
     '200': {
       description: 'CSV template',
       content: {
-        'text/csv': { schema: { type: 'string' } }
-      }
-    }
+        'text/csv': { schema: { type: 'string' } },
+      },
+    },
   };
 }
 ```
@@ -151,9 +155,9 @@ The `openapi.json` file contains:
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Mini-DM API",
+    "title": "LDAP-Rest API",
     "version": "1.0.0",
-    "description": "RESTful API for LDAP management with Mini-DM"
+    "description": "RESTful API for LDAP management with LDAP-Rest"
   },
   "servers": [
     {
@@ -176,15 +180,15 @@ The `openapi.json` file contains:
 
 The generator automatically discovers routes from all plugins:
 
-| Plugin | Tag | Routes |
-|--------|-----|--------|
-| `ldapGroups` | Groups | 8 endpoints |
+| Plugin              | Tag           | Routes      |
+| ------------------- | ------------- | ----------- |
+| `ldapGroups`        | Groups        | 8 endpoints |
 | `ldapOrganizations` | Organizations | 7 endpoints |
-| `ldapBulkImport` | Bulk Import | 2 endpoints |
-| `configApi` | Configuration | 1 endpoint |
-| `static` | Static Files | 2 endpoints |
+| `ldapBulkImport`    | Bulk Import   | 2 endpoints |
+| `configApi`         | Configuration | 1 endpoint  |
+| `static`            | Static Files  | 2 endpoints |
 
-*Note: Number of routes may vary based on configuration and loaded plugins*
+_Note: Number of routes may vary based on configuration and loaded plugins_
 
 ## Customizing Summaries
 
@@ -201,6 +205,7 @@ app.get(`${this.config.api_prefix}/v1/ldap/groups`, async (req, res) => {
 ```
 
 The generator will extract these annotations:
+
 - `@openapi summary:` → `summary` field
 - `@openapi description:` → `description` field
 
@@ -297,6 +302,7 @@ ls tsconfig.json
 ### "Found 0 plugins"
 
 Check that:
+
 1. Plugins extend `DmPlugin`
 2. Plugins have an `api(app: Express)` method
 3. TypeScript compilation succeeds: `npm run check:ts`
@@ -307,20 +313,16 @@ Template variables not replaced correctly? Check:
 
 ```typescript
 // Supported:
-`${this.config.api_prefix}/v1/...`
-`${apiPrefix}/v1/...`
-`${this.config.static_name}/...`
-
+`${this.config.api_prefix}/v1/...``${apiPrefix}/v1/...``${this.config.static_name}/...`
 // Not supported:
-`${someOtherVariable}/...`
+`${someOtherVariable}/...`;
 ```
 
 Add custom replacements in `scripts/generate-openapi.ts`:
 
 ```typescript
-pathTemplate = text
-  .replace(/\$\{myVariable\}/g, 'replacement')
-  // ...
+pathTemplate = text.replace(/\$\{myVariable\}/g, 'replacement');
+// ...
 ```
 
 ### Routes missing
@@ -376,11 +378,13 @@ await validator.validate('./openapi.json');
 ### tsoa (TypeScript OpenAPI)
 
 **Pros**:
+
 - Full type inference
 - Automatic validation
 - Schema generation
 
 **Cons**:
+
 - ❌ Requires decorators in production code
 - ❌ Changes code structure
 - ❌ Runtime overhead
@@ -388,23 +392,27 @@ await validator.validate('./openapi.json');
 ### swagger-jsdoc
 
 **Pros**:
+
 - JSDoc annotations
 - Familiar syntax
 
 **Cons**:
+
 - ❌ Requires extensive annotations
 - ❌ Pollutes code with comments
 - ❌ Manual maintenance
 
-### Mini-DM Generator
+### LDAP-Rest Generator
 
 **Pros**:
+
 - ✅ No production code changes
 - ✅ Zero runtime overhead
 - ✅ Automatic route discovery
 - ✅ Works with existing code
 
 **Cons**:
+
 - ⚠️ Limited type information
 - ⚠️ Generic schemas
 
