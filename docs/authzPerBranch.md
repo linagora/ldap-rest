@@ -568,7 +568,7 @@ User should inherit group permissions but doesn't.
 --plugin core/auth/openidconnect \
 --plugin core/auth/authzPerBranch \
 --oidc-server "https://auth.example.com" \
---oidc-client-id "mini-dm" \
+--oidc-client-id "ldap-rest" \
 --oidc-client-secret "secret" \
 --base-url "https://api.example.com" \
 --authz-per-branch-config '{

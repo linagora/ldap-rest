@@ -1,6 +1,6 @@
 # REST API Guide
 
-This guide covers the Mini-DM REST API for managing LDAP users, groups, and organizations. The API follows REST conventions and returns JSON responses.
+This guide covers the LDAP-Rest REST API for managing LDAP users, groups, and organizations. The API follows REST conventions and returns JSON responses.
 
 ## Table of Contents
 
@@ -50,14 +50,14 @@ Authorization: Bearer your-token-here
 
 ## Authentication
 
-Mini-DM supports multiple authentication methods. Choose the one that fits your infrastructure.
+LDAP-Rest supports multiple authentication methods. Choose the one that fits your infrastructure.
 
 ### 1. No Authentication (Development Only)
 
-For development and testing, you can run Mini-DM without authentication:
+For development and testing, you can run LDAP-Rest without authentication:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
@@ -102,11 +102,11 @@ OAuth 2.0 / OpenID Connect authentication for modern web applications.
 ```bash
 --plugin core/auth/openidconnect \
 --oidc-issuer https://auth.example.com \
---oidc-client-id mini-dm \
+--oidc-client-id ldap-rest \
 --oidc-client-secret your-secret
 ```
 
-> **NB**: the `redirect_uri` is `https://mini-dm-server/callback`
+> **NB**: the `redirect_uri` is `https://ldap-rest-server/callback`
 
 **Usage:**
 

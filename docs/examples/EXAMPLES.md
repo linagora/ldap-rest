@@ -1,6 +1,6 @@
-# Integration Examples - Mini-DM
+# Integration Examples - LDAP-Rest
 
-This guide provides complete, production-ready examples for integrating Mini-DM into your applications using React, Vue.js, and Vanilla JavaScript.
+This guide provides complete, production-ready examples for integrating LDAP-Rest into your applications using React, Vue.js, and Vanilla JavaScript.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This guide provides complete, production-ready examples for integrating Mini-DM 
 
 ## React Application Example
 
-This example demonstrates a complete React functional component that fetches users from Mini-DM and displays them in a list.
+This example demonstrates a complete React functional component that fetches users from LDAP-Rest and displays them in a list.
 
 ### Complete React Component
 
@@ -645,7 +645,7 @@ This example demonstrates a complete HTML page with sidebar tree navigation and 
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Organization Browser - Mini-DM</title>
+    <title>Organization Browser - LDAP-Rest</title>
 
     <!-- Material Icons -->
     <link
@@ -1074,7 +1074,7 @@ class GroupManager {
       const groupsConfig = this.config.features?.groups;
       if (!groupsConfig || !groupsConfig.enabled) {
         throw new Error(
-          'Groups feature is not enabled in Mini-DM configuration'
+          'Groups feature is not enabled in LDAP-Rest configuration'
         );
       }
 
@@ -1496,7 +1496,7 @@ demonstrateGroupManagement();
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Group Management - Mini-DM</title>
+    <title>Group Management - LDAP-Rest</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -1648,7 +1648,7 @@ demonstrateGroupManagement();
 
 ## Resources
 
-- [GitHub Repository](https://github.com/linagora/mini-dm)
+- [GitHub Repository](https://github.com/linagora/ldap-rest)
 - [API Reference](../api/REFERENCE.md)
 - [Plugin Development](../plugins/DEVELOPMENT.md)
 

@@ -1,6 +1,6 @@
-# Browser Libraries - Mini-DM
+# Browser Libraries - LDAP-Rest
 
-This guide covers Mini-DM's browser libraries for building LDAP management interfaces in web applications.
+This guide covers LDAP-Rest's browser libraries for building LDAP management interfaces in web applications.
 
 ## Table of Contents
 
@@ -28,7 +28,7 @@ This guide covers Mini-DM's browser libraries for building LDAP management inter
 
 ## Overview
 
-Mini-DM provides three ready-to-use browser libraries for building LDAP management interfaces:
+LDAP-Rest provides three ready-to-use browser libraries for building LDAP management interfaces:
 
 - **LdapTreeViewer** - Interactive hierarchical tree view of LDAP organizations
 - **LdapUserEditor** - Complete user management interface with organization tree, user list, and edit form
@@ -43,7 +43,7 @@ All libraries are:
 
 ### Usage Modes
 
-Mini-DM browser libraries can be used in two ways:
+LDAP-Rest browser libraries can be used in two ways:
 
 #### 1. ES Module Imports (Recommended for bundlers)
 
@@ -51,15 +51,15 @@ When using a bundler (Webpack, Vite, Rollup, etc.) or in modern Node.js applicat
 
 ```typescript
 // LDAP Tree Viewer - Main component
-import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+import LdapTreeViewer from 'ldap-rest/browser-ldap-tree-viewer-index';
 
 // LDAP User Editor - Main component
-import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+import LdapUserEditor from 'ldap-rest/browser-ldap-user-editor-index';
 
 // Individual components (if needed)
-import LdapApiClient from 'mini-dm/browser-ldap-tree-viewer-api-ldapapiclient';
-import TreeNode from 'mini-dm/browser-ldap-tree-viewer-components-treenode';
-import UserApiClient from 'mini-dm/browser-ldap-user-editor-api-userapiclient';
+import LdapApiClient from 'ldap-rest/browser-ldap-tree-viewer-api-ldapapiclient';
+import TreeNode from 'ldap-rest/browser-ldap-tree-viewer-components-treenode';
+import UserApiClient from 'ldap-rest/browser-ldap-user-editor-api-userapiclient';
 ```
 
 **Available exports:**
@@ -102,11 +102,11 @@ An interactive tree component for displaying and navigating LDAP organizational 
 #### With a Bundler (Webpack, Vite, Rollup, etc.)
 
 ```bash
-npm install mini-dm
+npm install ldap-rest
 ```
 
 ```typescript
-import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+import LdapTreeViewer from 'ldap-rest/browser-ldap-tree-viewer-index';
 // Don't forget to include Material Icons in your HTML
 ```
 
@@ -146,7 +146,7 @@ Include the required files in your HTML:
 #### With ES Modules
 
 ```typescript
-import LdapTreeViewer from 'mini-dm/browser-ldap-tree-viewer-index';
+import LdapTreeViewer from 'ldap-rest/browser-ldap-tree-viewer-index';
 
 // Create and initialize the tree viewer
 const viewer = new LdapTreeViewer({
@@ -197,7 +197,7 @@ interface ViewerOptions {
   // Required: ID of the HTML container element
   containerId: string;
 
-  // Required: Base URL of the Mini-DM API
+  // Required: Base URL of the LDAP-Rest API
   apiBaseUrl: string;
 
   // Optional: Authentication token for API requests
@@ -483,11 +483,11 @@ A complete user management interface with organization tree, user list, and edit
 #### With a Bundler (Webpack, Vite, Rollup, etc.)
 
 ```bash
-npm install mini-dm
+npm install ldap-rest
 ```
 
 ```typescript
-import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+import LdapUserEditor from 'ldap-rest/browser-ldap-user-editor-index';
 // Don't forget to include Roboto font and Material Icons in your HTML
 ```
 
@@ -533,7 +533,7 @@ Include the required dependencies in your HTML:
 #### With ES Modules
 
 ```typescript
-import LdapUserEditor from 'mini-dm/browser-ldap-user-editor-index';
+import LdapUserEditor from 'ldap-rest/browser-ldap-user-editor-index';
 
 // Create and initialize the editor
 const editor = new LdapUserEditor({
@@ -584,7 +584,7 @@ interface EditorOptions {
   // Required: ID of the HTML container element
   containerId: string;
 
-  // Optional: Base URL of the Mini-DM API (defaults to current origin)
+  // Optional: Base URL of the LDAP-Rest API (defaults to current origin)
   apiBaseUrl?: string;
 
   // Optional: Callback when a user is saved
@@ -1159,7 +1159,7 @@ All users, groups, and sub-organizations linked to the moved unit automatically 
 
 ### API Requirements
 
-The LdapUnitEditor requires the following Mini-DM API endpoints:
+The LdapUnitEditor requires the following LDAP-Rest API endpoints:
 
 - `GET /api/v1/config` - Configuration and schema
 - `GET /api/v1/ldap/organizations/top` - Top organization
@@ -1185,7 +1185,7 @@ See [LDAP Organizations Plugin Documentation](../ldapOrganizations.md) for API d
 
 ## Resources
 
-- [GitHub Repository](https://github.com/linagora/mini-dm)
+- [GitHub Repository](https://github.com/linagora/ldap-rest)
 - [Developer Guide](../DEVELOPER_GUIDE.md)
 - [API Reference](../api/REFERENCE.md)
 

@@ -48,7 +48,7 @@ for (const [arg, env, def, type] of configArgs) {
     const envDef = ((typeof def !== 'string' ? def.toString() : def) as string)
       .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
-      .replace(new RegExp(moduleDir, 'g'), '/app/node_modules/mini-dm');
+      .replace(new RegExp(moduleDir, 'g'), '/app/node_modules/ldap-rest');
     content += envDef.length > 0 ? ` \\\n ${env}="${envDef}"` : ` \\\n ${env}=`;
   }
 }
@@ -56,7 +56,7 @@ for (const [arg, env, def, type] of configArgs) {
 content += `
 
 EXPOSE 8081
-CMD ["npx", "mini-dm"]
+CMD ["npx", "ldap-rest"]
 `;
 
 fs.writeFileSync(dockerFile, content);

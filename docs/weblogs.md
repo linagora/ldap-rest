@@ -306,7 +306,7 @@ Configure log rotation using environment or external tools:
 ### Using Winston File Transport
 
 ```bash
---log-file ./logs/mini-dm.log \
+--log-file ./logs/ldap-rest.log \
 --log-max-size 10485760 \    # 10MB
 --log-max-files 5
 ```
@@ -314,16 +314,16 @@ Configure log rotation using environment or external tools:
 ### Using logrotate (Linux)
 
 ```
-/var/log/mini-dm/*.log {
+/var/log/ldap-rest/*.log {
     daily
     rotate 7
     compress
     delaycompress
     notifempty
-    create 0640 mini-dm mini-dm
+    create 0640 ldap-rest ldap-rest
     sharedscripts
     postrotate
-        systemctl reload mini-dm
+        systemctl reload ldap-rest
     endscript
 }
 ```
@@ -348,7 +348,7 @@ Configure log rotation using environment or external tools:
 
 3. Verify logs go to stdout/stderr:
    ```bash
-   mini-dm --plugin core/weblogs 2>&1 | tee app.log
+   ldap-rest --plugin core/weblogs 2>&1 | tee app.log
    ```
 
 ### Problem: Too Many Logs
@@ -364,7 +364,7 @@ Configure log rotation using environment or external tools:
 2. Filter specific endpoints:
 
    ```bash
-   mini-dm --plugin core/weblogs 2>&1 | grep -v '/health'
+   ldap-rest --plugin core/weblogs 2>&1 | grep -v '/health'
    ```
 
 3. Use log aggregation with filtering

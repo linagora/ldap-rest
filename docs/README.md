@@ -1,10 +1,10 @@
-# Mini-DM Documentation
+# LDAP-Rest Documentation
 
-Complete documentation for mini-dm plugins and features.
+Complete documentation for ldap-rest plugins and features.
 
 ## Presentations
 
-Interactive slide presentations about Mini-DM (using [presenterm](https://github.com/mfontanini/presenterm)):
+Interactive slide presentations about LDAP-Rest (using [presenterm](https://github.com/mfontanini/presenterm)):
 
 - **[presenterm.md](./presenterm.md)** - English presentation
 - **[presenterm-fr.md](./presenterm-fr.md)** - Présentation en français
@@ -27,7 +27,7 @@ Topics covered:
 
 ## For Application Developers
 
-If you want to build a web application that uses Mini-DM's APIs and browser libraries:
+If you want to build a web application that uses LDAP-Rest's APIs and browser libraries:
 
 📖 **[Developer Guide](./DEVELOPER_GUIDE.md)** - Complete guide covering:
 
@@ -39,7 +39,7 @@ If you want to build a web application that uses Mini-DM's APIs and browser libr
 
 ## For Plugin Developers
 
-If you want to extend Mini-DM with custom plugins, see below:
+If you want to extend LDAP-Rest with custom plugins, see below:
 
 ## Table of Contents
 
@@ -85,7 +85,7 @@ If you want to extend Mini-DM with custom plugins, see below:
 Minimal setup with user management:
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/ldap/flatGeneric \
   --ldap-url ldap://localhost:389 \
   --ldap-dn "cn=admin,dc=example,dc=com" \
@@ -99,7 +99,7 @@ mini-dm \
 Add token authentication:
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/auth/token \
   --plugin core/ldap/flatGeneric \
   --auth-token "secret-token" \
@@ -112,7 +112,7 @@ mini-dm \
 Full-featured LDAP management with web UI:
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/auth/token \
   --plugin core/ldap/flatGeneric \
   --plugin core/ldap/groups \
@@ -216,7 +216,7 @@ export DM_AUTH_TOKENS="token1,token2"
 export DM_LDAP_FLAT_SCHEMA="./schemas/users.json"
 
 # Start server
-mini-dm
+ldap-rest
 ```
 
 ### Configuration Files
@@ -225,10 +225,10 @@ Use `.env` files or shell scripts:
 
 ```bash
 # Load configuration
-source ~/.mini-dm-config
+source ~/.ldap-rest-config
 
 # Start server
-mini-dm
+ldap-rest
 ```
 
 ## Schemas
@@ -436,7 +436,7 @@ Authentication plugins load first to secure API endpoints.
 Enable detailed logging:
 
 ```bash
-mini-dm --log-level debug ...
+ldap-rest --log-level debug ...
 ```
 
 ### Testing
@@ -455,8 +455,8 @@ See `DEVELOPMENT.md` for more testing information.
 
 ## Support
 
-- **Issues**: https://github.com/linagora/mini-dm/issues
-- **Documentation**: https://github.com/linagora/mini-dm/tree/master/docs
+- **Issues**: https://github.com/linagora/ldap-rest/issues
+- **Documentation**: https://github.com/linagora/ldap-rest/tree/master/docs
 - **Examples**: See `DEVELOPMENT.md` and plugin documentation
 
 ## License

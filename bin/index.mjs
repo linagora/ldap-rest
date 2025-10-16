@@ -7,13 +7,13 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-mini-dm - Lightweight LDAP directory manager
+ldap-rest - Lightweight LDAP directory manager
 
 Usage:
-  mini-dm [OPTIONS]
+  ldap-rest [OPTIONS]
 
 Description:
-  Starts the mini-dm server which provides a REST API and web interface
+  Starts the ldap-rest server which provides a REST API and web interface
   for managing LDAP directories. Configuration is done through environment
   variables or command-line arguments.
 
@@ -37,13 +37,13 @@ Environment Variables:
 
 Examples:
   # Start server with default configuration
-  npx mini-dm
+  npx ldap-rest
 
   # Start with specific LDAP server
-  npx mini-dm --ldap-url ldap://localhost:389
+  npx ldap-rest --ldap-url ldap://localhost:389
 
   # Load specific plugins
-  npx mini-dm --plugin ldapGroups --plugin ldapOrganization
+  npx ldap-rest --plugin ldapGroups --plugin ldapOrganization
 `);
   process.exit(0);
 }

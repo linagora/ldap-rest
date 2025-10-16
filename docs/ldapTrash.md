@@ -55,7 +55,7 @@ After:  uid=john,ou=trash,dc=example,dc=com
 ### Watch All Branches (Default)
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/ldap/trash \
   --trash-base "ou=trash,dc=example,dc=com"
 ```
@@ -65,7 +65,7 @@ This watches all LDAP branches except the trash branch itself.
 ### Watch Specific Branches Only
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/ldap/trash \
   --trash-base "ou=trash,dc=example,dc=com" \
   --trash-watched-bases "ou=users,dc=example,dc=com,ou=groups,dc=example,dc=com"
@@ -76,7 +76,7 @@ This only intercepts deletes from `ou=users` and `ou=groups`. Deletes from other
 ### Disable Metadata
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/ldap/trash \
   --trash-base "ou=trash,dc=example,dc=com" \
   --trash-add-metadata false
@@ -99,7 +99,7 @@ description: LDAP Trash - Deleted entries are moved here
 EOF
 
 # Configure plugin to not auto-create
-mini-dm \
+ldap-rest \
   --plugin core/ldap/trash \
   --trash-base "ou=trash,dc=example,dc=com" \
   --trash-auto-create false
@@ -238,7 +238,7 @@ If you see messages about removing old trash entries, this is normal behavior. T
 Full production setup:
 
 ```bash
-mini-dm \
+ldap-rest \
   --plugin core/auth/token \
   --plugin core/ldap/trash \
   --plugin core/ldap/flatGeneric \

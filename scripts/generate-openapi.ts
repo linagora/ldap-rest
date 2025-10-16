@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * OpenAPI Generator for Mini-DM
+ * OpenAPI Generator for LDAP-Rest
  *
  * Generates OpenAPI 3.0 specification by analyzing TypeScript source code.
  * Extracts routes from plugin api() methods without requiring runtime execution.
@@ -103,7 +103,11 @@ class OpenAPIGenerator {
 
   constructor(private rootDir: string) {
     // Create TypeScript program
-    const configPath = ts.findConfigFile(rootDir, ts.sys.fileExists, 'tsconfig.json');
+    const configPath = ts.findConfigFile(
+      rootDir,
+      ts.sys.fileExists,
+      'tsconfig.json'
+    );
     if (!configPath) {
       throw new Error('tsconfig.json not found');
     }
@@ -198,7 +202,11 @@ class OpenAPIGenerator {
     }
 
     // Analyze the api() method body
-    const routes = this.extractRoutesFromMethod(apiMethod.body, sourceFile, pluginName);
+    const routes = this.extractRoutesFromMethod(
+      apiMethod.body,
+      sourceFile,
+      pluginName
+    );
     if (routes.length > 0) {
       this.routes.set(pluginName, routes);
     }
@@ -251,7 +259,10 @@ class OpenAPIGenerator {
     let pathTemplate = '';
 
     // Handle template literals with ${this.config.api_prefix}
-    if (ts.isTemplateExpression(pathArg) || ts.isNoSubstitutionTemplateLiteral(pathArg)) {
+    if (
+      ts.isTemplateExpression(pathArg) ||
+      ts.isNoSubstitutionTemplateLiteral(pathArg)
+    ) {
       const text = pathArg.getText(sourceFile);
       // Replace template variables with proper values
       pathTemplate = text
@@ -259,7 +270,7 @@ class OpenAPIGenerator {
         .replace(/\$\{this\.config\.api_prefix\}/g, '/api')
         .replace(/\$\{[^}]*api_prefix[^}]*\}/g, '/api')
         .replace(/\$\{apiPrefix\}/g, '/api')
-        .replace(/\$\{this\.config\.static_name\}/g, 'static')  // No leading slash
+        .replace(/\$\{this\.config\.static_name\}/g, 'static') // No leading slash
         .replace(/\$\{[^}]*static_name[^}]*\}/g, 'static')
         .replace(/\$\{resourceName\}/g, '{resource}')
         .replace(/\$\{[^}]*resourceName[^}]*\}/g, '{resource}');
@@ -411,13 +422,14 @@ class OpenAPIGenerator {
   }
 
   private generateSummary(method: string, path: string): string {
-    const action = {
-      get: 'Get',
-      post: 'Create',
-      put: 'Update',
-      delete: 'Delete',
-      patch: 'Modify',
-    }[method] || method.toUpperCase();
+    const action =
+      {
+        get: 'Get',
+        post: 'Create',
+        put: 'Update',
+        delete: 'Delete',
+        patch: 'Modify',
+      }[method] || method.toUpperCase();
 
     // Extract resource from path
     const parts = path.split('/').filter(p => p && !p.startsWith('{'));
@@ -433,9 +445,9 @@ class OpenAPIGenerator {
     const spec: OpenAPISpec = {
       openapi: '3.0.0',
       info: {
-        title: 'Mini-DM API',
+        title: 'LDAP-Rest API',
         version: '1.0.0',
-        description: 'RESTful API for LDAP management with Mini-DM',
+        description: 'RESTful API for LDAP management with LDAP-Rest',
       },
       servers: [
         {
@@ -449,17 +461,17 @@ class OpenAPIGenerator {
             protocol: {
               default: 'http',
               enum: ['http', 'https'],
-              description: 'Protocol scheme'
+              description: 'Protocol scheme',
             },
             host: {
               default: 'localhost',
-              description: 'Host name'
+              description: 'Host name',
             },
             port: {
               default: '8081',
-              description: 'Port number'
-            }
-          }
+              description: 'Port number',
+            },
+          },
         },
       ],
       paths: {},
@@ -507,7 +519,7 @@ const rootDir = path.join(__dirname, '..');
 const outputPath = path.join(rootDir, 'openapi.json');
 
 try {
-  console.log('🔍 Analyzing Mini-DM plugins...');
+  console.log('🔍 Analyzing LDAP-Rest plugins...');
   const generator = new OpenAPIGenerator(rootDir);
   generator.analyze();
   generator.writeSpec(outputPath);

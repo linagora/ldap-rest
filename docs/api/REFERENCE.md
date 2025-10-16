@@ -1,6 +1,6 @@
 # API Reference
 
-Complete technical reference for the Mini-DM REST API including detailed specifications, data formats, and troubleshooting.
+Complete technical reference for the LDAP-Rest REST API including detailed specifications, data formats, and troubleshooting.
 
 ## Table of Contents
 
@@ -622,7 +622,7 @@ curl -H "Accept: application/json" \
 #### No Authentication
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
@@ -635,7 +635,7 @@ npx mini-dm \
 #### Token Authentication
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
@@ -651,14 +651,14 @@ npx mini-dm \
 #### OpenID Connect
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
   --ldap-base dc=example,dc=com \
   --plugin core/auth/openidconnect \
   --oidc-issuer https://auth.example.com \
-  --oidc-client-id mini-dm \
+  --oidc-client-id ldap-rest \
   --oidc-client-secret your-secret
 ```
 
@@ -668,7 +668,7 @@ npx mini-dm \
 #### LemonLDAP::NG
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
@@ -764,13 +764,13 @@ if (req.method === 'OPTIONS') {
 4. **Test Without Authentication:**
    ```bash
    # Temporarily disable auth plugin to verify API works
-   npx mini-dm --ldap-url ldap://localhost:389 ...
+   npx ldap-rest --ldap-url ldap://localhost:389 ...
    # (without --plugin core/auth/token)
    ```
 
 ### Connection Issues
 
-#### Problem: Cannot Connect to Mini-DM
+#### Problem: Cannot Connect to LDAP-Rest
 
 **Error:**
 
@@ -800,7 +800,7 @@ Failed to fetch
 
 4. **Check Server Logs:**
    ```bash
-   npx mini-dm --log-level debug
+   npx ldap-rest --log-level debug
    ```
 
 #### Problem: LDAP Connection Failed
@@ -908,7 +908,7 @@ You cannot change the main identifier (uid, cn) using modify operations. Create 
 Enable detailed logging:
 
 ```bash
-npx mini-dm \
+npx ldap-rest \
   --ldap-url ldap://localhost:389 \
   --ldap-dn cn=admin,dc=example,dc=com \
   --ldap-pwd admin \
@@ -949,7 +949,7 @@ npx mini-dm \
 1. **Check Logs:**
 
    ```bash
-   npx mini-dm --log-level debug
+   npx ldap-rest --log-level debug
    ```
 
 2. **Test LDAP Connection:**
@@ -965,7 +965,7 @@ npx mini-dm \
    ```
 
 4. **Check GitHub Issues:**
-   https://github.com/linagora/mini-dm/issues
+   https://github.com/linagora/ldap-rest/issues
 
 5. **Review Documentation:**
    - [REST API Guide](./REST_API.md)

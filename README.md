@@ -1,6 +1,6 @@
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/linagora/mini-dm)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/linagora/ldap-rest)
 
-# Mini-dm
+# LDAP-Rest
 
 Lite LinID directory manager is a lightweight directory manager that provides LDAP integration through a plugin-based architecture.
 This system enables directory management operations with configurable authentication, extensible functionality through events/hooks,
@@ -14,7 +14,7 @@ All configuration is done via command-line arguments and/or environment variable
 Example:
 
 ```shell
-npx mini-dm --ldap-base 'dc=example,dc=com' \
+npx ldap-rest --ldap-base 'dc=example,dc=com' \
     --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd admin \
     --ldap-url ldap://localhost \
     --plugin core/ldap/groups --ldap-group-base 'ou=groups,dc=example,dc=com' \
@@ -31,7 +31,7 @@ See also [Typescript declarations](./src/config/args.ts).
 
 ### For Application Developers
 
-- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Complete guide for building web applications using Mini-DM APIs and browser libraries
+- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Complete guide for building web applications using LDAP-Rest APIs and browser libraries
 
 ### For Plugin Developers
 

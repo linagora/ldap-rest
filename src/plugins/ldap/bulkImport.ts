@@ -1,7 +1,7 @@
 /**
  * LDAP Bulk Import Plugin
  * Provides CSV-based bulk import for LDAP resources based on JSON schemas
- * @author Mini-DM Team
+ * @author LDAP-Rest Team
  */
 
 import fs from 'fs';
