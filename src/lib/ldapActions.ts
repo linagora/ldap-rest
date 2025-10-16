@@ -230,14 +230,6 @@ class ldapActions {
   }
 
   /**
-   * Legacy connect method for backward compatibility
-   * @deprecated Use acquireConnection/releaseConnection instead
-   */
-  async connect(): Promise<Client> {
-    return await this.createConnection();
-  }
-
-  /**
    * Generate cache key for LDAP search
    */
   private getCacheKey(base: string, opts: SearchOptions): string {
