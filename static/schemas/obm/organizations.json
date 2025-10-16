@@ -1,0 +1,24 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "organizationalUnit"],
+      "required": true,
+      "fixed": true
+    },
+    "ou": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

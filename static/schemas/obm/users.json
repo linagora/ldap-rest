@@ -1,0 +1,192 @@
+{
+  "entity": {
+    "name": "obmUser",
+    "mainAttribute": "uid",
+    "objectClass": [
+      "top",
+      "inetOrgPerson",
+      "posixAccount",
+      "shadowAccount",
+      "sambaSamAccount",
+      "obmUser"
+    ],
+    "singularName": "user",
+    "pluralName": "users",
+    "base": "ou=users,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": [
+        "top",
+        "inetOrgPerson",
+        "posixAccount",
+        "shadowAccount",
+        "sambaSamAccount",
+        "obmUser"
+      ],
+      "required": true,
+      "fixed": true
+    },
+    "uid": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "uidNumber": {
+      "type": "number",
+      "required": true
+    },
+    "gidNumber": {
+      "type": "number",
+      "required": true
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "sn": {
+      "type": "string",
+      "required": true
+    },
+    "homeDirectory": {
+      "type": "string",
+      "required": false
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "required": true,
+      "role": "primaryEmail"
+    },
+    "mailAlias": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      },
+      "required": false,
+      "role": "emailAliases"
+    },
+    "givenName": {
+      "type": "string",
+      "required": true
+    },
+    "displayName": {
+      "type": "string",
+      "required": true
+    },
+    "loginShell": {
+      "type": "string",
+      "required": false
+    },
+    "title": {
+      "type": "string",
+      "required": false
+    },
+    "personalTitle": {
+      "type": "string",
+      "required": false
+    },
+    "ou": {
+      "type": "string",
+      "required": true
+    },
+    "webAccess": {
+      "type": "string",
+      "test": "^(PERMIT|REJECT)$",
+      "required": false
+    },
+    "mailBox": {
+      "type": "string",
+      "required": true
+    },
+    "mailBoxServer": {
+      "type": "string",
+      "required": false
+    },
+    "mailAccess": {
+      "type": "string",
+      "test": "^(PERMIT|REJECT)$",
+      "required": true
+    },
+    "registeredAddress": {
+      "type": "string",
+      "required": false
+    },
+    "l": {
+      "type": "string",
+      "required": false
+    },
+    "hiddenUser": {
+      "type": "string",
+      "test": "^(TRUE|FALSE)$",
+      "required": false
+    },
+    "obmDomain": {
+      "type": "string",
+      "required": true
+    },
+    "telephoneNumber": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "mobile": {
+      "type": "string",
+      "required": false
+    },
+    "userPassword": {
+      "type": "string",
+      "required": false
+    },
+    "sambaAcctFlags": {
+      "type": "string",
+      "required": false
+    },
+    "sambaSID": {
+      "type": "string",
+      "required": false
+    },
+    "sambaPrimaryGroupSID": {
+      "type": "string",
+      "required": false
+    },
+    "sambaHomeDrive": {
+      "type": "string",
+      "required": false
+    },
+    "sambaHomePath": {
+      "type": "string",
+      "required": false
+    },
+    "sambaProfilePath": {
+      "type": "string",
+      "required": false
+    },
+    "sambaLMPassword": {
+      "type": "string",
+      "required": false
+    },
+    "sambaNTPassword": {
+      "type": "string",
+      "required": false
+    },
+    "sambaPwdLastSet": {
+      "type": "number",
+      "required": false
+    },
+    "jpegPhoto": {
+      "type": "string",
+      "required": false
+    }
+  }
+}
