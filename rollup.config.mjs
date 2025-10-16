@@ -73,6 +73,12 @@ async function getPluginEntries() {
     .sort();
 }
 
+async function getAbstractEntries() {
+  return (await fg('src/abstract/**/*.ts'))
+    .map(file => file.replace(/^src\/abstract\//, ''))
+    .sort();
+}
+
 async function getSpecs() {
   return (await fg('static/schemas/**/*.json'))
     .map(file => file.replace(/^static\/schemas\//, ''))
@@ -113,6 +119,15 @@ export default async () => {
     };
   });
 
+  const a = await getAbstractEntries();
+  a.forEach(abstract => {
+    const name = abstract.replace(/\.ts$/, '');
+    pkg.exports[`abstract-${name.toLowerCase().replace(/\//g, '-')}`] = {
+      import: `./dist/abstract/${name}.js`,
+      types: `./dist/src/abstract/${name}.d.ts`,
+    };
+  });
+
   (await getBrowserLibraries()).forEach(browserLib => {
     const name = browserLib.toLowerCase().replace(/\//g, '-');
     pkg.exports[`browser-${name}`] = {
@@ -135,6 +150,7 @@ export default async () => {
       input: [
         'src/bin/index.ts',
         ...p.map(file => `${PLUGINS_SRC_DIR}/${file}`),
+        ...a.map(file => `src/abstract/${file}`),
       ],
       output: {
         dir: 'dist',

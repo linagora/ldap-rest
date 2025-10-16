@@ -112,6 +112,18 @@
       "import": "./dist/plugins/weblogs.js",
       "types": "./dist/src/plugins/weblogs.d.ts"
     },
+    "abstract-ldapflat": {
+      "import": "./dist/abstract/ldapFlat.js",
+      "types": "./dist/src/abstract/ldapFlat.d.ts"
+    },
+    "abstract-plugin": {
+      "import": "./dist/abstract/plugin.js",
+      "types": "./dist/src/abstract/plugin.d.ts"
+    },
+    "abstract-twakeplugin": {
+      "import": "./dist/abstract/twakePlugin.js",
+      "types": "./dist/src/abstract/twakePlugin.d.ts"
+    },
     "browser-ldap-group-editor-ldapgroupeditor": {
       "import": "./static/browser/ldap-group-editor/LdapGroupEditor.js",
       "types": "./dist/src/browser/ldap-group-editor/LdapGroupEditor.d.ts"
