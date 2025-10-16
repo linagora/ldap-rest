@@ -320,6 +320,14 @@
       "import": "./static/schemas/ad/users.json",
       "require": "./static/schemas/ad/users.json"
     },
+    "schema-obm-organizations": {
+      "import": "./static/schemas/obm/organizations.json",
+      "require": "./static/schemas/obm/organizations.json"
+    },
+    "schema-obm-users": {
+      "import": "./static/schemas/obm/users.json",
+      "require": "./static/schemas/obm/users.json"
+    },
     "schema-standard-devices": {
       "import": "./static/schemas/standard/devices.json",
       "require": "./static/schemas/standard/devices.json"

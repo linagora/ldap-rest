@@ -21,7 +21,7 @@ import { transformSchemas } from '../lib/utils';
 
 export default class Static extends DmPlugin {
   name: string = 'static';
-  roles: Role[] = ['api'] as const;
+  roles: Role[] = ['api', 'configurable'] as const;
 
   api(app: Express): void {
     const rep = this.config.static_path;
@@ -76,5 +76,23 @@ export default class Static extends DmPlugin {
       });
     });
     app.use(`/${this.config.static_name}`, express.static(rep));
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const staticName = this.config.static_name || 'static';
+    const staticPath = `/${staticName}`;
+
+    return {
+      enabled: true,
+      staticPath,
+      endpoints: {
+        schema: `${staticPath}/schemas/:name`,
+        schemaInSubdir: `${staticPath}/schemas/:dir/:name`,
+        files: `${staticPath}/*`,
+      },
+    };
   }
 }
