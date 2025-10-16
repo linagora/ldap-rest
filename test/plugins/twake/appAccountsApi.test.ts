@@ -76,7 +76,7 @@ describe('App Accounts API Plugin', function () {
 
     // Register onChange plugin (dependency)
     const onChange = new OnChange(dm);
-    await dm.registerPlugin('onChange', onChange);
+    await dm.registerPlugin('onLdapChange', onChange);
 
     // Register appAccountsConsistency plugin
     const appAccountsConsistency = new AppAccountsConsistency(dm);
@@ -313,7 +313,7 @@ describe('App Accounts API Plugin', function () {
       await dmTest.registerPlugin('authToken', authToken);
 
       const onChange = new OnChange(dmTest);
-      await dmTest.registerPlugin('onChange', onChange);
+      await dmTest.registerPlugin('onLdapChange', onChange);
 
       const appAccountsConsistency = new AppAccountsConsistency(dmTest);
       await dmTest.registerPlugin('appAccountsConsistency', appAccountsConsistency);

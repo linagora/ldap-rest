@@ -37,9 +37,9 @@ export default class AppAccountsConsistency extends DmPlugin {
   name = 'appAccountsConsistency';
   roles: Role[] = ['consistency'] as const;
 
-  // Note: This plugin uses onLdapMailChange hook from onChange plugin,
-  // but onChange is not declared as a dependency to avoid loading issues in tests.
-  // Make sure to load onChange plugin before this one in production.
+  dependencies = {
+    onLdapChange: 'core/ldap/onChange',
+  };
 
   // Configuration
   private mailAttr: string;

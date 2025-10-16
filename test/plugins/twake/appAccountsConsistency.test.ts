@@ -66,7 +66,7 @@ describe('App Accounts Consistency Plugin', function () {
 
     // Register onChange plugin (dependency)
     const onChange = new OnChange(dm);
-    await dm.registerPlugin('onChange', onChange);
+    await dm.registerPlugin('onLdapChange', onChange);
 
     appAccountsConsistency = new AppAccountsConsistency(dm);
     await dm.registerPlugin('appAccountsConsistency', appAccountsConsistency);
