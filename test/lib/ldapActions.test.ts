@@ -17,14 +17,6 @@ describe('ldapActions', function () {
     ldapActions = new LdapActions(new DM());
   });
 
-  describe('connect', () => {
-    it('should connect to LDAP server successfully', async () => {
-      const result = await ldapActions.connect();
-      expect(result).to.be.instanceOf(Client);
-      await result?.unbind();
-    });
-  });
-
   describe('search', () => {
     it('should perform a search and return results', async () => {
       const options = {

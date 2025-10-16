@@ -749,38 +749,4 @@ export default abstract class LdapFlat extends DmPlugin {
     return true;
   }
 
-  /**
-   * Escape special characters in DN values for LDAP attributes
-   * Escape spaces and special characters with backslashes
-   */
-  private escapeDnValue(dn: string): string {
-    if (!dn) return dn;
-
-    // Split DN into RDN components
-    const parts = dn.split(',').map(part => {
-      const trimmed = part.trim();
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) return trimmed;
-
-      const key = trimmed.substring(0, eqIndex);
-      let value = trimmed.substring(eqIndex + 1);
-
-      // Escape special characters according to RFC 4514
-      // Characters that must be escaped: space, #, +, ,, ;, <, >, \
-      // Also escape leading # and space
-      value = value
-        .replace(/\\/g, '\\\\') // Backslash first
-        .replace(/ /g, '\\ ') // Spaces (all of them, not just leading/trailing)
-        .replace(/#/g, '\\#')
-        .replace(/\+/g, '\\+')
-        .replace(/,/g, '\\,')
-        .replace(/;/g, '\\;')
-        .replace(/</g, '\\<')
-        .replace(/>/g, '\\>');
-
-      return `${key}=${value}`;
-    });
-
-    return parts.join(',');
-  }
 }
