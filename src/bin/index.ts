@@ -29,8 +29,10 @@ import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
 import pluginPriority from '../plugins/priority.json';
+import type { Request, Response, NextFunction } from 'express';
 
 export type { Config };
+export { asyncHandler } from '../lib/utils';
 
 //export const build = () => {
 
@@ -102,6 +104,38 @@ export class DM {
   }
 
   run(): Promise<void> {
+    // Add error handling middleware - must be after all routes
+    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+      this.logger.error(`Unhandled error in request ${req.method} ${req.path}: ${err.message}`, {
+        stack: err.stack,
+        url: req.url,
+        method: req.method
+      });
+
+      // Send error response if headers not sent yet
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: this.config.debug ? err.message : 'An error occurred'
+        });
+      }
+    });
+
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (err: Error) => {
+      this.logger.error(`Uncaught exception: ${err.message}`, { stack: err.stack });
+      // Don't exit the process, just log the error
+    });
+
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
+      this.logger.error(`Unhandled promise rejection: ${reason}`, {
+        reason,
+        promise
+      });
+      // Don't exit the process, just log the error
+    });
+
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(this.config.port, err => {
         if (err) {

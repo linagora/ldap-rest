@@ -34,6 +34,7 @@ LDAP-Rest is a lightweight LDAP directory manager that provides:
 - **Schema-driven architecture** to adapt to different directory types (Twake, Active Directory, standard LDAP)
 - **Dynamic configuration** exposed via API
 - **Plugin-based extensibility** for custom functionality
+- **Robust error handling** ensuring server stability even when plugins encounter errors
 
 ### Architecture Overview
 

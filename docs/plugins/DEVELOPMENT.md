@@ -61,6 +61,49 @@ export default class MyPlugin extends DmPlugin {
 - **this.logger**: Winston logger instance
 - **this.registeredHooks**: Access to global hook registry
 
+### Error Handling and Server Resilience
+
+LDAP-Rest includes robust error handling to ensure the server remains operational even when plugins encounter errors:
+
+#### Global Error Handling
+
+The server automatically catches and handles:
+- **Uncaught exceptions** in plugin code
+- **Unhandled promise rejections**
+- **Errors in async route handlers**
+
+All errors are logged with full stack traces without crashing the server.
+
+#### Using asyncHandler
+
+For async route handlers, **always use the `asyncHandler` wrapper**:
+
+```typescript
+import DmPlugin, { asyncHandler } from '../../abstract/plugin';
+
+export default class MyPlugin extends DmPlugin {
+  api(app: Express): void {
+    // ✅ Correct: Errors are automatically caught
+    app.get('/api/data', asyncHandler(async (req, res) => {
+      const data = await someAsyncOperation();
+      res.json(data);
+    }));
+
+    // ❌ Wrong: Errors can crash the server
+    app.get('/api/data', async (req, res) => {
+      const data = await someAsyncOperation();
+      res.json(data);
+    });
+  }
+}
+```
+
+The `asyncHandler` is exported from:
+- `ldap-rest/abstract/plugin` (recommended for plugins)
+- `ldap-rest` (for external use)
+
+See [Exposing API Endpoints](#exposing-api-endpoints) for detailed examples.
+
 ---
 
 ## Creating Your Plugin
@@ -78,7 +121,7 @@ Create a file in `src/plugins/<category>/<pluginName>.ts`:
  */
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 
@@ -104,12 +147,15 @@ export default class WebhookNotifier extends DmPlugin {
 
   // Register API endpoints
   api(app: Express): void {
-    app.get(`${this.config.api_prefix}/v1/webhook/status`, (req, res) => {
-      res.json({
-        status: 'active',
-        url: this.config.webhook_url,
-      });
-    });
+    app.get(
+      `${this.config.api_prefix}/v1/webhook/status`,
+      asyncHandler(async (req, res) => {
+        res.json({
+          status: 'active',
+          url: this.config.webhook_url,
+        });
+      })
+    );
   }
 
   // Register hooks
@@ -152,15 +198,17 @@ Create a standalone file anywhere on your system, e.g., `/opt/custom-plugins/my-
  * External plugin example
  * This plugin can be loaded from anywhere
  */
-import type { Express } from 'express';
+import type { Express, Request, Response } from 'express';
 
 // Import from ldap-rest (if installed as npm package)
-// import DmPlugin from 'ldap-rest/plugin';
+// import DmPlugin, { asyncHandler } from 'ldap-rest/plugin';
 
 // Or use relative path to node_modules
 import DmPlugin from './node_modules/ldap-rest/dist/abstract/plugin.js';
 import type { DM } from './node_modules/ldap-rest/dist/bin/index.js';
 import type { Hooks } from './node_modules/ldap-rest/dist/hooks.js';
+// Import asyncHandler for error handling
+import { asyncHandler } from './node_modules/ldap-rest/dist/lib/utils.js';
 
 export default class ExternalAuditPlugin extends DmPlugin {
   name = 'externalAudit';
@@ -174,12 +222,15 @@ export default class ExternalAuditPlugin extends DmPlugin {
   }
 
   api(app: Express): void {
-    app.get(`${this.config.api_prefix}/v1/audit/stats`, (req, res) => {
-      res.json({
-        message: 'External plugin API',
-        auditEnabled: true,
-      });
-    });
+    app.get(
+      `${this.config.api_prefix}/v1/audit/stats`,
+      asyncHandler(async (req: Request, res: Response) => {
+        res.json({
+          message: 'External plugin API',
+          auditEnabled: true,
+        });
+      })
+    );
   }
 
   hooks: Hooks = {
@@ -551,79 +602,107 @@ hooks: Hooks = {
 
 ### Exposing API Endpoints
 
-Create REST API endpoints for your plugin:
+Create REST API endpoints for your plugin. **Important:** Always use the `asyncHandler` wrapper for async routes to ensure errors are properly handled and don't crash the server.
 
 ```typescript
+import DmPlugin, { asyncHandler } from '../../abstract/plugin';
+
 api(app: Express): void {
-  // GET endpoint
+  // GET endpoint with asyncHandler
   app.get(
     `${this.config.api_prefix}/v1/myplugin/status`,
-    async (req: Request, res: Response) => {
-      try {
-        const status = await this.getStatus();
-        res.json({ success: true, data: status });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
-    }
+    asyncHandler(async (req: Request, res: Response) => {
+      const status = await this.getStatus();
+      res.json({ success: true, data: status });
+    })
   );
 
-  // POST endpoint with body
+  // POST endpoint with body validation
   app.post(
     `${this.config.api_prefix}/v1/myplugin/process`,
-    async (req: Request, res: Response) => {
-      try {
-        // Validate request body
-        if (!req.body || !req.body.data) {
-          return res.status(400).json({
-            success: false,
-            error: 'data is required'
-          });
-        }
-
-        const result = await this.processData(req.body.data);
-        res.json({ success: true, data: result });
-      } catch (error) {
-        this.logger.error('Process failed:', error);
-        res.status(500).json({
+    asyncHandler(async (req: Request, res: Response) => {
+      // Validate request body
+      if (!req.body || !req.body.data) {
+        return res.status(400).json({
           success: false,
-          error: error.message
+          error: 'data is required'
         });
       }
-    }
+
+      const result = await this.processData(req.body.data);
+      res.json({ success: true, data: result });
+    })
   );
 
   // PUT endpoint
   app.put(
     `${this.config.api_prefix}/v1/myplugin/config`,
-    async (req: Request, res: Response) => {
-      try {
-        await this.updateConfig(req.body);
-        res.json({ success: true });
-      } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }
+    asyncHandler(async (req: Request, res: Response) => {
+      await this.updateConfig(req.body);
+      res.json({ success: true });
+    })
   );
 
   // DELETE endpoint
   app.delete(
     `${this.config.api_prefix}/v1/myplugin/cache`,
-    async (req: Request, res: Response) => {
-      try {
-        await this.clearCache();
-        res.json({ success: true, message: 'Cache cleared' });
-      } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-      }
-    }
+    asyncHandler(async (req: Request, res: Response) => {
+      await this.clearCache();
+      res.json({ success: true, message: 'Cache cleared' });
+    })
   );
 
   this.logger.info('MyPlugin API endpoints registered');
 }
+```
+
+#### Error Handling Best Practices
+
+The `asyncHandler` wrapper automatically catches errors and passes them to the global error middleware. This ensures:
+
+- **Server stability**: Exceptions in routes won't crash the server
+- **Consistent error responses**: All errors return proper HTTP 500 responses
+- **Automatic logging**: Errors are logged with full stack traces
+- **Clean code**: No need for try/catch blocks in every route
+
+**Without asyncHandler (DON'T DO THIS):**
+```typescript
+// ❌ BAD: Unhandled async errors can crash the server
+app.get('/api/data', async (req, res) => {
+  const data = await fetchData(); // If this throws, server crashes
+  res.json(data);
+});
+```
+
+**With asyncHandler (RECOMMENDED):**
+```typescript
+// ✅ GOOD: Errors are caught and handled gracefully
+app.get('/api/data', asyncHandler(async (req, res) => {
+  const data = await fetchData(); // If this throws, error is logged and 500 returned
+  res.json(data);
+}));
+```
+
+**Custom error handling:**
+```typescript
+// You can still handle specific errors manually
+app.post('/api/process', asyncHandler(async (req, res) => {
+  try {
+    const result = await processData(req.body);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      // Handle specific error types
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.details
+      });
+    }
+    // Re-throw to let asyncHandler handle it
+    throw error;
+  }
+}));
 ```
 
 ### Logging
@@ -781,7 +860,7 @@ Here's a complete, production-ready plugin that sends webhook notifications on L
 import type { Express, Request, Response } from 'express';
 import crypto from 'crypto';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { AttributesList, ModifyRequest } from '../../lib/ldapActions';
@@ -854,7 +933,7 @@ export default class NotificationPlugin extends DmPlugin {
     // Get webhook stats
     app.get(
       `${this.config.api_prefix}/v1/notifications/stats`,
-      (req: Request, res: Response) => {
+      asyncHandler(async (req: Request, res: Response) => {
         res.json({
           success: true,
           data: {
@@ -863,23 +942,16 @@ export default class NotificationPlugin extends DmPlugin {
             enabledEvents: Array.from(this.enabledEvents),
           },
         });
-      }
+      })
     );
 
     // Test webhook
     app.post(
       `${this.config.api_prefix}/v1/notifications/test`,
-      async (req: Request, res: Response) => {
-        try {
-          await this.sendWebhook('test', 'test', { message: 'Test webhook' });
-          res.json({ success: true, message: 'Test webhook sent' });
-        } catch (error) {
-          res.status(500).json({
-            success: false,
-            error: (error as Error).message,
-          });
-        }
-      }
+      asyncHandler(async (req: Request, res: Response) => {
+        await this.sendWebhook('test', 'test', { message: 'Test webhook' });
+        res.json({ success: true, message: 'Test webhook sent' });
+      })
     );
 
     this.logger.info('NotificationPlugin API registered');

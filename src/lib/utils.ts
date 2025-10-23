@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
 import type { Config } from '../bin';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { getLogger } from './expressFormatedResponses';
 
@@ -190,3 +191,26 @@ export function isChildOf(dn: string, parentDn: string): boolean {
   );
   return beforeParent.endsWith(',');
 }
+
+/**
+ * Wrapper for async Express route handlers to catch errors and pass them to error middleware
+ * This ensures that errors in async routes are properly handled and don't crash the server
+ *
+ * @param fn - The async route handler function
+ * @returns A wrapped handler that catches errors
+ *
+ * @example
+ * ```typescript
+ * app.get('/api/data', asyncHandler(async (req, res) => {
+ *   const data = await fetchData();
+ *   res.json(data);
+ * }));
+ * ```
+ */
+export const asyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+): RequestHandler => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};

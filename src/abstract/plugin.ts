@@ -8,6 +8,8 @@ import type winston from 'winston';
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
 
+export { asyncHandler } from '../lib/utils';
+
 export type Role =
   | 'auth'
   | 'authz'

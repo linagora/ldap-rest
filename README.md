@@ -8,6 +8,15 @@ and extensible REST API.
 
 Core plugins also provide plugins that ensure LDAP data consistency.
 
+## Key Features
+
+- 🔒 **Robust Error Handling** - Server stays online even when plugins encounter errors
+- 🔌 **Plugin Architecture** - Extensible through a powerful plugin system
+- 🔐 **Flexible Authentication** - Support for multiple authentication methods
+- 📊 **REST API** - Complete LDAP operations through REST endpoints
+- 🎯 **Event Hooks** - Intercept and customize LDAP operations
+- 🌐 **Browser Libraries** - Ready-to-use JavaScript components
+
 ## How it works
 
 All configuration is done via command-line arguments and/or environment variables.

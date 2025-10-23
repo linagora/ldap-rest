@@ -6,7 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
 
 export default class HelloWorld extends DmPlugin {
   name = 'hello';
@@ -15,7 +15,7 @@ export default class HelloWorld extends DmPlugin {
   api(app: Express): void {
     app.get(
       `${this.config.api_prefix}/hello`,
-      async (req: Request, res: Response) => {
+      asyncHandler(async (req: Request, res: Response) => {
         const response = { message: 'Hello', hookResults: [] as unknown[] };
         if (this.server.hooks && this.server.hooks['hello']) {
           for (const hook of this.server.hooks['hello']) {
@@ -24,7 +24,7 @@ export default class HelloWorld extends DmPlugin {
           }
         }
         res.json(response);
-      }
+      })
     );
   }
 }
