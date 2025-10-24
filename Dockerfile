@@ -81,6 +81,7 @@ ENV NODE_ENV=production \
  DM_CALENDAR_RESOURCE_DOMAIN= \
  DM_APPLICATIVE_ACCOUNT_BASE= \
  DM_MAX_APP_ACCOUNTS="5" \
+ DM_LDAP_OPERATIONAL_ATTRIBUTES=dn,controls,structuralObjectClass,entryUUID,entryDN,subschemaSubentry,modifyTimestamp,modifiersName,createTimestamp,creatorsName,userPassword \
  DM_TRASH_BASE= \
  DM_TRASH_WATCHED_BASES= \
  DM_TRASH_ADD_METADATA="true" \

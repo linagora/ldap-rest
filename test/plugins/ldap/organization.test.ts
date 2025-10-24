@@ -8,12 +8,6 @@ import {
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
 
-const {
-  DM_LDAP_TOP_ORGANIZATION,
-  DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE,
-  DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE,
-} = process.env;
-
 describe('LDAP Organizations Plugin', function () {
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
@@ -22,11 +16,19 @@ describe('LDAP Organizations Plugin', function () {
   let server: DM;
   let plugin: LdapOrganizations;
   let request: any;
-
-  const testOrgDn = `ou=testorg,${DM_LDAP_TOP_ORGANIZATION}`;
-  const testSubOrgDn = `ou=testsuborg,${DM_LDAP_TOP_ORGANIZATION}`;
+  let testOrgDn: string;
+  let testSubOrgDn: string;
+  let DM_LDAP_TOP_ORGANIZATION: string | undefined;
+  let DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE: string | undefined;
+  let DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE: string | undefined;
 
   before(async () => {
+    // Initialize from env vars after they're set
+    DM_LDAP_TOP_ORGANIZATION = process.env.DM_LDAP_TOP_ORGANIZATION;
+    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
+    testOrgDn = `ou=testorg,${DM_LDAP_TOP_ORGANIZATION}`;
+    testSubOrgDn = `ou=testsuborg,${DM_LDAP_TOP_ORGANIZATION}`;
     server = new DM();
     await server.ready;
     plugin = new LdapOrganizations(server);

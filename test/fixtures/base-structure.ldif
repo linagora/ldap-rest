@@ -1,0 +1,154 @@
+# Base LDAP structure for tests
+# This file is automatically loaded when starting the test LDAP server
+
+# Organizational Units
+dn: ou=users,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+description: Users branch (B2C)
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+description: Groups branch (B2C)
+
+dn: ou=lists,ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: lists
+description: Mailing lists branch
+
+dn: ou=teams,ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: teams
+description: Team mailboxes branch
+
+dn: ou=applicative,dc=example,dc=com
+objectClass: organizationalUnit
+ou: applicative
+description: Applicative accounts branch
+
+dn: ou=calendarResources,dc=example,dc=com
+objectClass: organizationalUnit
+ou: calendarResources
+description: Calendar resources branch
+
+dn: ou=trash,dc=example,dc=com
+objectClass: organizationalUnit
+ou: trash
+description: Trash bin for deleted entries
+
+dn: ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: nomenclature
+description: Nomenclature data
+
+dn: ou=twakeTitle,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeTitle
+description: Title nomenclature
+
+dn: ou=twakeListType,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeListType
+description: List type nomenclature
+
+dn: ou=twakeMailboxType,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeMailboxType
+description: Mailbox type nomenclature
+
+# Standard nomenclature entries
+dn: cn=Dr,ou=twakeTitle,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: Dr
+description: Doctor
+
+dn: cn=Mr,ou=twakeTitle,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: Mr
+description: Mister
+
+dn: cn=Ms,ou=twakeTitle,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: Ms
+description: Miss
+
+dn: cn=openList,ou=twakeListType,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: openList
+description: Open mailing list
+
+dn: cn=memberRestrictedList,ou=twakeListType,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: memberRestrictedList
+description: Member-restricted mailing list
+
+dn: cn=group,ou=twakeMailboxType,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: group
+description: Simple group without mailbox
+
+dn: cn=mailingList,ou=twakeMailboxType,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: mailingList
+description: Mailing list (address group)
+
+dn: cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: teamMailbox
+description: Team mailbox (shared mailbox)
+
+# Test users (B2C)
+dn: uid=john.doe,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: john.doe
+cn: John Doe
+sn: Doe
+givenName: John
+mail: john.doe@example.com
+userPassword: password123
+displayName: John Doe
+description: Test user for B2C
+
+dn: uid=jane.smith,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: jane.smith
+cn: Jane Smith
+sn: Smith
+givenName: Jane
+mail: jane.smith@example.com
+userPassword: password123
+displayName: Jane Smith
+description: Test user for B2C
+
+dn: uid=peter.jones,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: peter.jones
+cn: Peter Jones
+sn: Jones
+givenName: Peter
+mail: peter.jones@example.com
+userPassword: password123
+displayName: Peter Jones
+description: Test user for search tests
+
+# Test group (B2C)
+dn: cn=admins,ou=groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: admins
+description: Administrators group
+member: uid=john.doe,ou=users,dc=example,dc=com
+member: uid=jane.smith,ou=users,dc=example,dc=com
+
+# Organization structure (B2B)
+dn: ou=organization,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: organization
+description: Top organization for B2B

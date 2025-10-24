@@ -79,6 +79,10 @@ describe('App Accounts Consistency Plugin', function () {
       testApplicativeDN,
       `uid=testuser2,${userBase}`,
       `uid=testuser2,${applicativeBase}`,
+      // Cleanup for mail change tests
+      `uid=newemail@example.com,${applicativeBase}`,
+      `uid=testuser_c12345678,${applicativeBase}`,
+      `uid=testuser_c87654321,${applicativeBase}`,
     ];
 
     for (const dn of testDNs) {

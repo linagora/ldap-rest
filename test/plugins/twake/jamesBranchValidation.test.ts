@@ -9,13 +9,12 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 
 describe('James Branch Validation', () => {
   const timestamp = Date.now();
-  const userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
-  const groupBase =
-    process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
-  const listsBase = `ou=lists,${groupBase}`;
-  const teamsBase = `ou=teams,${groupBase}`;
-  const nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
-  const mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
+  let userBase: string;
+  let groupBase: string;
+  let listsBase: string;
+  let teamsBase: string;
+  let nomenclatureBase: string;
+  let mailboxTypeBase: string;
 
   let dm: DM;
   let james: James;
@@ -24,6 +23,15 @@ describe('James Branch Validation', () => {
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Initialize DNs after env vars are set
+    userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
+    groupBase =
+      process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+    listsBase = `ou=lists,${groupBase}`;
+    teamsBase = `ou=teams,${groupBase}`;
+    nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
+    mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
 
     // Create DM instance with branch restrictions
     dm = new DM();
@@ -400,12 +408,11 @@ describe('James Branch Validation', () => {
 
 describe('James Branch Validation - Unrestricted Configuration', () => {
   const timestamp = Date.now();
-  const userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
-  const groupBase =
-    process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
-  const teamsBase = `ou=teams,${groupBase}`;
-  const nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
-  const mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
+  let userBase: string;
+  let groupBase: string;
+  let teamsBase: string;
+  let nomenclatureBase: string;
+  let mailboxTypeBase: string;
 
   let dm: DM;
   let james: James;
@@ -414,6 +421,14 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Initialize DNs after env vars are set
+    userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
+    groupBase =
+      process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+    teamsBase = `ou=teams,${groupBase}`;
+    nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
+    mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
 
     // Create DM instance WITHOUT branch restrictions
     dm = new DM();

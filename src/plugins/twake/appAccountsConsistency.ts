@@ -44,6 +44,7 @@ export default class AppAccountsConsistency extends DmPlugin {
   // Configuration
   private mailAttr: string;
   private applicativeAccountBase: string;
+  private operationalAttributes: string[];
 
   constructor(server: DM) {
     super(server);
@@ -52,6 +53,7 @@ export default class AppAccountsConsistency extends DmPlugin {
     this.mailAttr = (this.config.mail_attribute as string) || 'mail';
     this.applicativeAccountBase = this.config
       .applicative_account_base as string;
+    this.operationalAttributes = this.config.ldap_operational_attributes as string[];
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -62,6 +64,15 @@ export default class AppAccountsConsistency extends DmPlugin {
     this.logger.info(
       `${this.name}: initialized with applicative_account_base=${this.applicativeAccountBase}`
     );
+  }
+
+  /**
+   * Check if an attribute should be excluded when copying LDAP entry attributes
+   * @param key - The attribute name to check
+   * @returns true if the attribute should be excluded
+   */
+  private shouldExcludeAttribute(key: string): boolean {
+    return this.operationalAttributes.includes(key);
   }
 
   hooks: Hooks = {
@@ -144,20 +155,8 @@ export default class AppAccountsConsistency extends DmPlugin {
       // Filter out operational attributes and userPassword (let API set passwords separately)
       const applicativeAttrs: AttributesList = {};
       for (const [key, value] of Object.entries(userEntry)) {
-        // Skip operational attributes and userPassword
-        if (
-          key === 'dn' ||
-          key === 'controls' ||
-          key === 'structuralObjectClass' ||
-          key === 'entryUUID' ||
-          key === 'entryDN' ||
-          key === 'subschemaSubentry' ||
-          key === 'modifyTimestamp' ||
-          key === 'modifiersName' ||
-          key === 'createTimestamp' ||
-          key === 'creatorsName' ||
-          key === 'userPassword'
-        ) {
+        // Skip operational attributes
+        if (this.shouldExcludeAttribute(key)) {
           continue;
         }
         // Skip empty values
@@ -306,6 +305,23 @@ export default class AppAccountsConsistency extends DmPlugin {
         }
 
         try {
+          // Save old applicative account entry attributes before deletion
+          // This preserves attributes like description that don't exist in user entry
+          const oldApplicativeAttrs: AttributesList = {};
+          for (const [key, value] of Object.entries(entry)) {
+            // Skip operational attributes
+            if (this.shouldExcludeAttribute(key)) {
+              continue;
+            }
+            if (value === undefined || value === null) {
+              continue;
+            }
+            if (Array.isArray(value) && value.length === 0) {
+              continue;
+            }
+            oldApplicativeAttrs[key] = value;
+          }
+
           // Delete old applicative account
           try {
             await this.server.ldap.delete(oldApplicativeDn);
@@ -330,23 +346,30 @@ export default class AppAccountsConsistency extends DmPlugin {
           }
 
           // Create new applicative account with updated mail
-          // Filter out operational attributes and clean the entry
-          const newAttrs: AttributesList = {};
-          for (const [key, value] of Object.entries(entry)) {
-            // Skip operational attributes and userPassword (already hashed, would fail ppolicy)
-            if (
-              key === 'dn' ||
-              key === 'controls' ||
-              key === 'structuralObjectClass' ||
-              key === 'entryUUID' ||
-              key === 'entryDN' ||
-              key === 'subschemaSubentry' ||
-              key === 'modifyTimestamp' ||
-              key === 'modifiersName' ||
-              key === 'createTimestamp' ||
-              key === 'creatorsName' ||
-              key === 'userPassword'
-            ) {
+          // Start with old applicative account attributes to preserve things like description, userPassword
+          const newAttrs: AttributesList = { ...oldApplicativeAttrs };
+
+          // Read the current user entry to get fresh user attributes
+          const userResult = await this.server.ldap.search(
+            {
+              scope: 'base',
+              paged: false,
+            },
+            userDn
+          );
+
+          const userEntry = (userResult as SearchResult).searchEntries?.[0];
+          if (!userEntry) {
+            this.logger.warn(
+              `${this.name}: Could not find user ${userDn} to update applicative account`
+            );
+            return;
+          }
+
+          // Overwrite with fresh user attributes (cn, sn, givenName, mail, etc.)
+          for (const [key, value] of Object.entries(userEntry)) {
+            // Skip operational attributes
+            if (this.shouldExcludeAttribute(key)) {
               continue;
             }
             // Skip empty values
@@ -359,9 +382,6 @@ export default class AppAccountsConsistency extends DmPlugin {
             }
             newAttrs[key] = value;
           }
-
-          // Update mail attribute for all accounts
-          newAttrs[this.mailAttr] = newMail;
 
           // For principal account: change uid to newMail
           // For applicative accounts: keep the same uid (username_cXXXXXXXX)

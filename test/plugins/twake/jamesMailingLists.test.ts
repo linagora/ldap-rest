@@ -9,9 +9,8 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 
 describe('James Mailing Lists', () => {
   const timestamp = Date.now();
-  const userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
-  const groupBase =
-    process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+  let userBase: string;
+  let groupBase: string;
 
   let dm: DM;
   let james: James;
@@ -20,6 +19,11 @@ describe('James Mailing Lists', () => {
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Initialize DNs after env vars are set
+    userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
+    groupBase =
+      process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
 
     // Create DM instance once for all tests
     dm = new DM();

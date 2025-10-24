@@ -323,9 +323,24 @@ export default class LdapGroups extends DmPlugin {
     });
 
     // Build entry
+    let objectClasses = [...(this.config.group_class as string[])];
+
+    // Add twakeGroup objectClass if group has mail or twake-specific attributes
+    // Only add if not already using twakeStaticGroup (which includes all these attributes)
+    if (
+      (additional.mail ||
+        additional.twakeMailboxType ||
+        additional.twakeDepartmentLink ||
+        additional.twakeDepartmentPath) &&
+      !objectClasses.includes('twakeGroup') &&
+      !objectClasses.includes('twakeStaticGroup')
+    ) {
+      objectClasses.push('twakeGroup');
+    }
+
     let entry: AttributesList = {
-      // Classes from --group-class
-      objectClass: this.config.group_class as string[],
+      // Classes from --group-class (with twakeGroup added if mail present)
+      objectClass: objectClasses,
       // Default attributes from --group-default-attributes
       ...this.config.group_default_attributes,
       // cn calculated here

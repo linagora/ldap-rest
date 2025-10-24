@@ -9,11 +9,10 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 
 describe('James Mailbox Type Transitions', () => {
   const timestamp = Date.now();
-  const userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
-  const groupBase =
-    process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
-  const nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
-  const mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
+  let userBase: string;
+  let groupBase: string;
+  let nomenclatureBase: string;
+  let mailboxTypeBase: string;
 
   let dm: DM;
   let james: James;
@@ -22,6 +21,13 @@ describe('James Mailbox Type Transitions', () => {
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Initialize DNs after env vars are set
+    userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
+    groupBase =
+      process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+    nomenclatureBase = `ou=nomenclature,${process.env.DM_LDAP_BASE}`;
+    mailboxTypeBase = `ou=twakeMailboxType,${nomenclatureBase}`;
 
     // Create DM instance once for all tests
     dm = new DM();

@@ -1,0 +1,95 @@
+# B2B Organization structures for testing
+# This file creates sample B2B organizations with users and groups
+
+# Organization 1: Acme Corporation
+dn: o=acme-corp,dc=example,dc=com
+objectClass: organization
+o: acme-corp
+description: Acme Corporation
+
+dn: ou=users,o=acme-corp,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+description: Acme Corp users
+
+dn: ou=groups,o=acme-corp,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+description: Acme Corp groups
+
+# Acme users
+dn: uid=alice.johnson,ou=users,o=acme-corp,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: alice.johnson
+cn: Alice Johnson
+sn: Johnson
+givenName: Alice
+mail: alice@acme-corp.example.com
+userPassword: password123
+displayName: Alice Johnson
+description: Engineer at Acme Corp
+
+dn: uid=bob.wilson,ou=users,o=acme-corp,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: bob.wilson
+cn: Bob Wilson
+sn: Wilson
+givenName: Bob
+mail: bob@acme-corp.example.com
+userPassword: password123
+displayName: Bob Wilson
+description: Manager at Acme Corp
+
+# Acme groups
+dn: cn=engineering,ou=groups,o=acme-corp,dc=example,dc=com
+objectClass: groupOfNames
+cn: engineering
+description: Engineering team
+member: uid=alice.johnson,ou=users,o=acme-corp,dc=example,dc=com
+
+dn: cn=management,ou=groups,o=acme-corp,dc=example,dc=com
+objectClass: groupOfNames
+cn: management
+description: Management team
+member: uid=bob.wilson,ou=users,o=acme-corp,dc=example,dc=com
+
+# Organization 2: Beta Industries
+dn: o=beta-industries,dc=example,dc=com
+objectClass: organization
+o: beta-industries
+description: Beta Industries
+
+dn: ou=users,o=beta-industries,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+description: Beta Industries users
+
+dn: ou=groups,o=beta-industries,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+description: Beta Industries groups
+
+# Beta users
+dn: uid=charlie.brown,ou=users,o=beta-industries,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+uid: charlie.brown
+cn: Charlie Brown
+sn: Brown
+givenName: Charlie
+mail: charlie@beta-industries.example.com
+userPassword: password123
+displayName: Charlie Brown
+description: Sales rep at Beta Industries
+
+# Beta groups
+dn: cn=sales,ou=groups,o=beta-industries,dc=example,dc=com
+objectClass: groupOfNames
+cn: sales
+description: Sales team
+member: uid=charlie.brown,ou=users,o=beta-industries,dc=example,dc=com

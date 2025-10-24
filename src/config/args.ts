@@ -148,6 +148,7 @@ export interface Config {
   // Applicative Accounts plugin
   applicative_account_base?: string;
   max_app_accounts?: number;
+  ldap_operational_attributes?: string[];
 
   // Trash plugin
   trash_base?: string;
@@ -371,6 +372,25 @@ const configArgs: ConfigTemplate = [
   // Applicative Accounts plugin
   ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
   ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
+  [
+    '--ldap-operational-attribute',
+    'DM_LDAP_OPERATIONAL_ATTRIBUTES',
+    [
+      'dn',
+      'controls',
+      'structuralObjectClass',
+      'entryUUID',
+      'entryDN',
+      'subschemaSubentry',
+      'modifyTimestamp',
+      'modifiersName',
+      'createTimestamp',
+      'creatorsName',
+      'userPassword',
+    ],
+    'array',
+    '--ldap-operational-attributes',
+  ],
 
   // Trash plugin
   ['--trash-base', 'DM_TRASH_BASE', ''],

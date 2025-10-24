@@ -37,6 +37,9 @@ describe('ldapActions', function () {
   });
 
   describe('Modify entries', () => {
+    let testDN: string;
+    let newDN: string;
+
     before(function () {
       // Skip tests if env vars are not set
       if (!process.env.DM_LDAP_BASE) {
@@ -45,10 +48,12 @@ describe('ldapActions', function () {
         // @ts-ignore
         this.skip();
       }
+      // Initialize DNs after env vars are set
+      testDN = `uid=testuser,${process.env.DM_LDAP_BASE}`;
+      newDN = `uid=newtestuser,${process.env.DM_LDAP_BASE}`;
     });
 
     describe('add', () => {
-      const testDN = `uid=testuser,${process.env.DM_LDAP_BASE}`;
       afterEach(async () => {
         // Clean up: delete the test entry if it exists
         try {
@@ -105,8 +110,9 @@ describe('ldapActions', function () {
         expect((result as SearchResult).searchEntries.length).to.equal(0);
       });
 
-      it('should fail to add an entry that already exists (this tests also an entry without objectClass)', async () => {
+      it('should fail to add an entry that already exists', async () => {
         const entry = {
+          objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
           cn: 'Test User',
           sn: 'User',
           uid: 'testuser',
@@ -127,8 +133,6 @@ describe('ldapActions', function () {
     });
 
     describe('rename', () => {
-      const testDN = `uid=testuser,${process.env.DM_LDAP_BASE}`;
-      const newDN = `uid=newtestuser,${process.env.DM_LDAP_BASE}`;
       afterEach(async () => {
         // Clean up: delete the test entry if it exists
         try {

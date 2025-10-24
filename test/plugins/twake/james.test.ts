@@ -8,10 +8,10 @@ import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 
 describe('James Plugin', () => {
-  const testDN = `uid=testusermail,${process.env.DM_LDAP_BASE}`;
-  const testDNQuota = `uid=quotauser,${process.env.DM_LDAP_BASE}`;
-  const testDNAliases = `uid=aliasuser,${process.env.DM_LDAP_BASE}`;
-  const testDNForwards = `uid=forwarduser,${process.env.DM_LDAP_BASE}`;
+  let testDN: string;
+  let testDNQuota: string;
+  let testDNAliases: string;
+  let testDNForwards: string;
   let dm: DM;
   let james: James;
   let ldapGroups: LdapGroups;
@@ -19,6 +19,12 @@ describe('James Plugin', () => {
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+
+    // Initialize DNs after env vars are set
+    testDN = `uid=testusermail,${process.env.DM_LDAP_BASE}`;
+    testDNQuota = `uid=quotauser,${process.env.DM_LDAP_BASE}`;
+    testDNAliases = `uid=aliasuser,${process.env.DM_LDAP_BASE}`;
+    testDNForwards = `uid=forwarduser,${process.env.DM_LDAP_BASE}`;
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       .persist()
       // Mail rename
@@ -576,10 +582,17 @@ describe('James Plugin', () => {
   });
 
   describe('Delegation', () => {
-    const userDN = `uid=testdelegate,${process.env.DM_LDAP_BASE}`;
-    const assistantDN = `uid=assistant,${process.env.DM_LDAP_BASE}`;
-    const assistant1DN = `uid=assistant1,${process.env.DM_LDAP_BASE}`;
-    const assistant2DN = `uid=assistant2,${process.env.DM_LDAP_BASE}`;
+    let userDN: string;
+    let assistantDN: string;
+    let assistant1DN: string;
+    let assistant2DN: string;
+
+    before(() => {
+      userDN = `uid=testdelegate,${process.env.DM_LDAP_BASE}`;
+      assistantDN = `uid=assistant,${process.env.DM_LDAP_BASE}`;
+      assistant1DN = `uid=assistant1,${process.env.DM_LDAP_BASE}`;
+      assistant2DN = `uid=assistant2,${process.env.DM_LDAP_BASE}`;
+    });
 
     beforeEach(async () => {
       // Create assistant user
@@ -759,8 +772,13 @@ describe('James Plugin', () => {
     const timestamp = Date.now();
     const testUser1 = `testidentity${timestamp}`;
     const testUser2 = `newuser${timestamp}`;
-    const testDN2 = `uid=${testUser1},${process.env.DM_LDAP_BASE}`;
-    const testDN3 = `uid=${testUser2},${process.env.DM_LDAP_BASE}`;
+    let testDN2: string;
+    let testDN3: string;
+
+    before(() => {
+      testDN2 = `uid=${testUser1},${process.env.DM_LDAP_BASE}`;
+      testDN3 = `uid=${testUser2},${process.env.DM_LDAP_BASE}`;
+    });
     const testMail1 = `${testUser1}@test.org`;
     const testMail2 = `${testUser2}@test.org`;
     let identityScope: nock.Scope;
@@ -888,11 +906,12 @@ describe('James Plugin', () => {
   });
 
   describe('Signature template', () => {
-    const testDN4 = `uid=testsignature,${process.env.DM_LDAP_BASE}`;
+    let testDN4: string;
     let signatureScope: nock.Scope;
     let savedTemplate: string | undefined;
 
     before(function () {
+      testDN4 = `uid=testsignature,${process.env.DM_LDAP_BASE}`;
       // Save current template and set test template
       savedTemplate = process.env.DM_JAMES_SIGNATURE_TEMPLATE;
       process.env.DM_JAMES_SIGNATURE_TEMPLATE =
