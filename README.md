@@ -41,12 +41,18 @@ See also [Typescript declarations](./src/config/args.ts).
 ### For Application Developers
 
 - **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Complete guide for building web applications using LDAP-Rest APIs and browser libraries
+- **[Browser Examples](./examples/web/)** - Interactive demos of browser libraries (TOTP client, LDAP tree viewer, etc.)
 
 ### For Plugin Developers
 
 - **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute and develop plugins
 - [Plugins](./src/plugins/README.md)
 - [Hooks](./HOOKS.md)
+
+### Authentication
+
+- **[Authentication Guide](./docs/authentication.md)** - Token, TOTP, LemonLDAP::NG, OpenID Connect
+- **[TOTP Client Demo](./examples/web/totp-client.html)** - Interactive TOTP generator and API client
 
 ## Copyright and license
 

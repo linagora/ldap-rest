@@ -96,6 +96,15 @@ export interface Config {
   // auth/token
   auth_token?: string[];
 
+  // auth/totp
+  auth_totp?: string[];
+  auth_totp_window?: number;
+  auth_totp_step?: number;
+
+  // auth/hmac
+  auth_hmac?: string[];
+  auth_hmac_window?: number;
+
   // auth/openidconnect
   oidc_server?: string;
   oidc_client_id?: string;
@@ -405,6 +414,15 @@ const configArgs: ConfigTemplate = [
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
+
+  // Auth TOTP plugin
+  ['--auth-totp', 'DM_AUTH_TOTP', [], 'array', '--auth-totps'],
+  ['--auth-totp-window', 'DM_AUTH_TOTP_WINDOW', 1, 'number'],
+  ['--auth-totp-step', 'DM_AUTH_TOTP_STEP', 30, 'number'],
+
+  // Auth HMAC plugin
+  ['--auth-hmac', 'DM_AUTH_HMAC', [], 'array', '--auth-hmacs'],
+  ['--auth-hmac-window', 'DM_AUTH_HMAC_WINDOW', 120000, 'number'],
 
   // Auth authzPerBranch plugin
   [

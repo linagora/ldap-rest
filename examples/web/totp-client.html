@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TOTP Client Demo</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+
+    <style>
+      :root {
+        --primary-color: #00bfa5;
+        --primary-color-dark: #00897b;
+        --success-color: #4caf50;
+        --error-color: #f44336;
+      }
+
+      body {
+        background: linear-gradient(135deg, #00bfa5 0%, #00695c 100%);
+      }
+
+      .demo-header h1 {
+        color: #00bfa5;
+      }
+
+      .totp-code {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 48px;
+        font-weight: 700;
+        text-align: center;
+        padding: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        letter-spacing: 8px;
+        margin: 20px 0;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        user-select: all;
+      }
+
+      .totp-code.expired {
+        opacity: 0.5;
+      }
+
+      .countdown {
+        text-align: center;
+        font-size: 18px;
+        color: #666;
+        margin-top: 10px;
+      }
+
+      .countdown-bar {
+        height: 6px;
+        background: #e0e0e0;
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+
+      .countdown-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4caf50 0%, #ff9800 50%, #f44336 100%);
+        transition: width 0.3s ease;
+      }
+
+      .secret-input {
+        font-family: 'Roboto Mono', monospace;
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        margin: 10px 0;
+        text-transform: uppercase;
+      }
+
+      .secret-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .config-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin: 20px 0;
+      }
+
+      .config-field label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 5px;
+        color: #555;
+      }
+
+      .config-field input,
+      .config-field select {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .api-test {
+        margin-top: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 8px;
+      }
+
+      .api-response {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 12px;
+        background: #263238;
+        color: #aed581;
+        padding: 15px;
+        border-radius: 8px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 10px;
+      }
+
+      .api-response.error {
+        color: #ef5350;
+      }
+
+      .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 4px;
+      }
+
+      .info-box h3 {
+        margin-top: 0;
+        color: #1976d2;
+      }
+
+      .info-box code {
+        background: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Roboto Mono', monospace;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin: 15px 0;
+      }
+
+      .demo-button.secondary {
+        background: #6c757d;
+      }
+
+      .demo-button.secondary:hover {
+        background: #5a6268;
+      }
+
+      .demo-button.success {
+        background: #4caf50;
+      }
+
+      .demo-button.success:hover {
+        background: #45a049;
+      }
+
+      @media (max-width: 768px) {
+        .config-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .totp-code {
+          font-size: 36px;
+          letter-spacing: 6px;
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>🔐 TOTP Client Demo</h1>
+        <p>Time-based One-Time Password Generator and API Client</p>
+      </div>
+
+      <div id="status-container"></div>
+
+      <div class="demo-grid">
+        <!-- TOTP Generator Panel -->
+        <div class="demo-panel">
+          <h2>
+            <span class="material-icons">vpn_key</span>
+            TOTP Generator
+          </h2>
+
+          <div class="info-box">
+            <h3>What is TOTP?</h3>
+            <p>
+              TOTP generates temporary codes that change every 30 seconds.
+              Enter your Base32 secret to generate codes compatible with Google
+              Authenticator, Authy, and other authenticator apps.
+            </p>
+          </div>
+
+          <label for="secret-input" style="font-weight: 500; margin-bottom: 5px; display: block;">
+            Base32 Secret
+          </label>
+          <input
+            type="text"
+            id="secret-input"
+            class="secret-input"
+            placeholder="JBSWY3DPEHPK3PXP"
+            value="JBSWY3DPEHPK3PXP"
+          />
+
+          <div class="config-grid">
+            <div class="config-field">
+              <label for="digits-input">Digits</label>
+              <select id="digits-input" aria-label="Number of digits for TOTP code">
+                <option value="6" selected>6 digits</option>
+                <option value="8">8 digits</option>
+                <option value="10">10 digits</option>
+              </select>
+            </div>
+            <div class="config-field">
+              <label for="step-input">Time Step (seconds)</label>
+              <input
+                type="number"
+                id="step-input"
+                value="30"
+                min="10"
+                max="120"
+              />
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button id="btn-generate" class="demo-button success">
+              <span class="material-icons" style="vertical-align: middle">
+                refresh
+              </span>
+              Generate Code
+            </button>
+            <button id="btn-copy" class="demo-button secondary">
+              <span class="material-icons" style="vertical-align: middle">
+                content_copy
+              </span>
+              Copy Code
+            </button>
+          </div>
+
+          <div id="totp-display">
+            <div class="totp-code" id="totp-code">------</div>
+            <div class="countdown-bar">
+              <div class="countdown-bar-fill" id="countdown-bar"></div>
+            </div>
+            <div class="countdown" id="countdown-text">
+              Waiting for code generation...
+            </div>
+          </div>
+        </div>
+
+        <!-- API Client Panel -->
+        <div class="demo-panel">
+          <h2>
+            <span class="material-icons">http</span>
+            API Client Test
+          </h2>
+
+          <div class="info-box">
+            <h3>API Authentication</h3>
+            <p>
+              The TOTP client automatically adds the current code to the
+              <code>Authorization: Bearer</code> header for each request.
+            </p>
+          </div>
+
+          <div class="api-test">
+            <h3>Test API Request</h3>
+            <p>
+              Test the TOTP authentication by making a request to the LDAP REST
+              API.
+            </p>
+
+            <div class="config-field">
+              <label for="api-endpoint">API Endpoint</label>
+              <input
+                type="text"
+                id="api-endpoint"
+                value="/api/hello"
+                placeholder="/api/v1/ldap/users"
+              />
+            </div>
+
+            <div class="button-group">
+              <button id="btn-test-api" class="demo-button">
+                <span class="material-icons" style="vertical-align: middle">
+                  send
+                </span>
+                Test Request
+              </button>
+            </div>
+
+            <div id="api-response-container" style="display: none">
+              <h4>Response:</h4>
+              <div id="api-response" class="api-response"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Usage Examples Panel -->
+      <div class="demo-panel" style="margin-top: 20px">
+        <h2>
+          <span class="material-icons">code</span>
+          Usage Examples
+        </h2>
+
+        <h3>Installation</h3>
+        <div class="api-response" style="margin-bottom: 20px">
+npm install ldap-rest
+# or
+yarn add ldap-rest</div>
+
+        <h3>Import the TOTP Client</h3>
+        <div class="api-response" style="margin-bottom: 20px">
+import { generateTotp, TotpAuthClient } from 'ldap-rest/browser-shared-utils-totp';</div>
+
+        <h3>Generate TOTP Code</h3>
+        <div class="api-response" style="margin-bottom: 20px">
+// Generate a TOTP code
+const code = await generateTotp({
+  secret: 'JBSWY3DPEHPK3PXP',
+  digits: 6,
+  step: 30
+});
+
+console.log('Current TOTP code:', code);</div>
+
+        <h3>Use TotpAuthClient for API Requests</h3>
+        <div class="api-response" style="margin-bottom: 20px">
+// Create authenticated client
+const client = new TotpAuthClient({
+  secret: 'JBSWY3DPEHPK3PXP',
+  digits: 6,
+  step: 30
+});
+
+// Make authenticated requests
+const users = await client.get('/api/v1/ldap/users');
+const userData = await users.json();
+
+// POST with automatic authentication
+await client.post('/api/v1/ldap/users', {
+  uid: 'user1',
+  mail: 'user1@example.com'
+});
+
+// Other methods: put, patch, delete
+await client.put('/api/v1/ldap/users/user1', { mail: 'new@example.com' });
+await client.delete('/api/v1/ldap/users/user1');</div>
+
+        <h3>Helper Functions</h3>
+        <div class="api-response">
+import { getRemainingSeconds, isValidBase32 } from 'ldap-rest/browser-shared-utils-totp';
+
+// Check how much time until next code
+const remaining = getRemainingSeconds(30);
+console.log(`Code expires in ${remaining} seconds`);
+
+// Validate Base32 secret
+if (isValidBase32('JBSWY3DPEHPK3PXP')) {
+  console.log('Valid secret!');
+}</div>
+      </div>
+    </div>
+
+    <script type="module">
+      import {
+        generateTotp,
+        TotpAuthClient,
+        getRemainingSeconds,
+        isValidBase32,
+      } from '/static/browser/shared/utils/totp.js';
+      import { showStatus } from '/static/browser/shared/components/StatusMessage.js';
+
+      const secretInput = document.getElementById('secret-input');
+      const digitsInput = document.getElementById('digits-input');
+      const stepInput = document.getElementById('step-input');
+      const totpCodeEl = document.getElementById('totp-code');
+      const countdownBar = document.getElementById('countdown-bar');
+      const countdownText = document.getElementById('countdown-text');
+      const btnGenerate = document.getElementById('btn-generate');
+      const btnCopy = document.getElementById('btn-copy');
+      const btnTestApi = document.getElementById('btn-test-api');
+      const apiEndpoint = document.getElementById('api-endpoint');
+      const apiResponseContainer = document.getElementById(
+        'api-response-container'
+      );
+      const apiResponse = document.getElementById('api-response');
+
+      let intervalId = null;
+      let currentCode = '';
+
+      async function updateTotpCode() {
+        const secret = secretInput.value.trim().toUpperCase();
+        const digits = parseInt(digitsInput.value);
+        const step = parseInt(stepInput.value);
+
+        if (!secret) {
+          showStatus('error', 'Please enter a Base32 secret');
+          return;
+        }
+
+        if (!isValidBase32(secret)) {
+          showStatus('error', 'Invalid Base32 secret (use A-Z and 2-7)');
+          totpCodeEl.textContent = 'ERROR';
+          totpCodeEl.classList.add('expired');
+          return;
+        }
+
+        try {
+          const code = await generateTotp({ secret, digits, step });
+          currentCode = code;
+          totpCodeEl.textContent = code;
+          totpCodeEl.classList.remove('expired');
+
+          // Update countdown
+          const remaining = getRemainingSeconds(step);
+          const percentage = (remaining / step) * 100;
+          countdownBar.style.width = `${percentage}%`;
+          countdownText.textContent = `Expires in ${remaining} seconds`;
+
+          // Mark as expired if less than 3 seconds
+          if (remaining <= 3) {
+            totpCodeEl.classList.add('expired');
+          }
+        } catch (error) {
+          showStatus('error', `Error generating code: ${error.message}`);
+          totpCodeEl.textContent = 'ERROR';
+          totpCodeEl.classList.add('expired');
+        }
+      }
+
+      function startAutoRefresh() {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+
+        updateTotpCode();
+        intervalId = setInterval(updateTotpCode, 1000);
+      }
+
+      btnGenerate.addEventListener('click', () => {
+        startAutoRefresh();
+        showStatus('success', 'TOTP code generated and auto-refresh started');
+      });
+
+      btnCopy.addEventListener('click', async () => {
+        if (currentCode && currentCode !== '------' && currentCode !== 'ERROR') {
+          try {
+            await navigator.clipboard.writeText(currentCode);
+            showStatus('success', `Code ${currentCode} copied to clipboard!`);
+          } catch (error) {
+            showStatus('error', 'Failed to copy to clipboard');
+          }
+        } else {
+          showStatus('error', 'No valid code to copy');
+        }
+      });
+
+      btnTestApi.addEventListener('click', async () => {
+        const secret = secretInput.value.trim().toUpperCase();
+        const digits = parseInt(digitsInput.value);
+        const step = parseInt(stepInput.value);
+        const endpoint = apiEndpoint.value;
+
+        if (!secret) {
+          showStatus('error', 'Please enter a Base32 secret first');
+          return;
+        }
+
+        if (!isValidBase32(secret)) {
+          showStatus('error', 'Invalid Base32 secret');
+          return;
+        }
+
+        try {
+          showStatus('info', 'Sending request...');
+
+          const client = new TotpAuthClient({ secret, digits, step });
+          const response = await client.get(endpoint);
+
+          apiResponseContainer.style.display = 'block';
+
+          const data = await response.json();
+          apiResponse.textContent = JSON.stringify(data, null, 2);
+          apiResponse.classList.remove('error');
+
+          if (response.ok) {
+            showStatus('success', `API request successful (${response.status})`);
+          } else {
+            showStatus('warning', `API returned status ${response.status}`);
+            apiResponse.classList.add('error');
+          }
+        } catch (error) {
+          apiResponseContainer.style.display = 'block';
+          apiResponse.textContent = `Error: ${error.message}`;
+          apiResponse.classList.add('error');
+          showStatus('error', `Request failed: ${error.message}`);
+        }
+      });
+
+      // Auto-start on load
+      startAutoRefresh();
+
+      // Clean up on page unload
+      window.addEventListener('beforeunload', () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      });
+    </script>
+  </body>
+</html>

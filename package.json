@@ -40,6 +40,10 @@
       "import": "./dist/plugins/auth/crowdsec.js",
       "types": "./dist/src/plugins/auth/crowdsec.d.ts"
     },
+    "plugin-auth-hmac": {
+      "import": "./dist/plugins/auth/hmac.js",
+      "types": "./dist/src/plugins/auth/hmac.d.ts"
+    },
     "plugin-auth-llng": {
       "import": "./dist/plugins/auth/llng.js",
       "types": "./dist/src/plugins/auth/llng.d.ts"
@@ -55,6 +59,10 @@
     "plugin-auth-token": {
       "import": "./dist/plugins/auth/token.js",
       "types": "./dist/src/plugins/auth/token.d.ts"
+    },
+    "plugin-auth-totp": {
+      "import": "./dist/plugins/auth/totp.js",
+      "types": "./dist/src/plugins/auth/totp.d.ts"
     },
     "plugin-configapi": {
       "import": "./dist/plugins/configApi.js",
@@ -308,9 +316,17 @@
       "import": "./static/browser/shared/utils/form.js",
       "types": "./dist/src/browser/shared/utils/form.d.ts"
     },
+    "browser-shared-utils-hmac": {
+      "import": "./static/browser/shared/utils/hmac.js",
+      "types": "./dist/src/browser/shared/utils/hmac.d.ts"
+    },
     "browser-shared-utils-schema": {
       "import": "./static/browser/shared/utils/schema.js",
       "types": "./dist/src/browser/shared/utils/schema.d.ts"
+    },
+    "browser-shared-utils-totp": {
+      "import": "./static/browser/shared/utils/totp.js",
+      "types": "./dist/src/browser/shared/utils/totp.d.ts"
     },
     "schema-ad-computers": {
       "import": "./static/schemas/ad/computers.json",
