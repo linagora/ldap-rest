@@ -164,6 +164,7 @@ objectClass: organizationalUnit
 objectClass: twakeDepartment
 ou: Test Org 1
 description: Test organization 1
+twakeLocalAdminLink: uid=alice.admin,ou=users,dc=example,dc=com
 
 dn: ou=Test Org 2,ou=organization,dc=example,dc=com
 objectClass: organizationalUnit
@@ -209,9 +210,3 @@ displayName: Bob User
 description: Test user in organization
 twakeDepartmentLink: ou=Sub Org 1,ou=Test Org 1,ou=organization,dc=example,dc=com
 twakeDepartmentPath: Test Org 1/Sub Org 1
-
-# Add twakeLocalAdminLink to organization
-dn: ou=Test Org 1,ou=organization,dc=example,dc=com
-changetype: modify
-add: twakeLocalAdminLink
-twakeLocalAdminLink: uid=alice.admin,ou=users,dc=example,dc=com

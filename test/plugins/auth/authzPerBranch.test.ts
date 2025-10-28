@@ -41,8 +41,8 @@ class TestAuthPlugin extends AuthBase {
   }
 }
 
-const { DM_LDAP_BASE, DM_LDAP_GROUP_BRANCH } = process.env;
-const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
+// Use getters to ensure env vars are evaluated after setup
+const getUserBranch = () => `ou=users,${process.env.DM_LDAP_BASE}`;
 
 describe('AuthzPerBranch', function () {
   before(function () {
@@ -64,14 +64,14 @@ describe('AuthzPerBranch', function () {
       },
       users: {
         testuser1: {
-          [USER_BRANCH as string]: {
+          [getUserBranch() as string]: {
             read: true,
             write: true,
             delete: false,
           },
         },
         testuser2: {
-          [USER_BRANCH as string]: {
+          [getUserBranch() as string]: {
             read: true,
             write: false,
             delete: false,
@@ -113,7 +113,7 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'unknownuser',
-        USER_BRANCH as string
+        getUserBranch() as string
       );
       expect(permissions).to.deep.equal({
         read: false,
@@ -126,7 +126,7 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'testuser1',
-        USER_BRANCH as string
+        getUserBranch() as string
       );
       expect(permissions.read).to.be.true;
       expect(permissions.write).to.be.true;
@@ -137,7 +137,7 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       const permissions = await plugin.getUserPermissions(
         'testuser2',
-        USER_BRANCH as string
+        getUserBranch() as string
       );
       expect(permissions.read).to.be.true;
       expect(permissions.write).to.be.false;
@@ -147,7 +147,7 @@ describe('AuthzPerBranch', function () {
     it('should support sub-branch permissions', async function () {
       this.timeout(5000);
       // Test that permissions apply to sub-branches
-      const subBranch = `ou=test,${USER_BRANCH}`;
+      const subBranch = `ou=test,${getUserBranch()}`;
       const permissions = await plugin.getUserPermissions(
         'testuser1',
         subBranch
@@ -165,7 +165,7 @@ describe('AuthzPerBranch', function () {
         'read'
       );
       expect(branches).to.be.an('array');
-      expect(branches).to.include(USER_BRANCH);
+      expect(branches).to.include(getUserBranch());
     });
 
     it('should return authorized branches for write permission', async function () {
@@ -175,7 +175,7 @@ describe('AuthzPerBranch', function () {
         'write'
       );
       expect(branches).to.be.an('array');
-      expect(branches).to.include(USER_BRANCH);
+      expect(branches).to.include(getUserBranch());
     });
 
     it('should return empty array for unauthorized permission', async function () {
@@ -251,7 +251,7 @@ describe('AuthzPerBranch', function () {
         const mockReq = { user: 'unknownuser' } as any;
         if (plugin.hooks?.ldapsearchrequest) {
           await plugin.hooks.ldapsearchrequest([
-            USER_BRANCH as string,
+            getUserBranch() as string,
             { paged: false },
             mockReq,
           ]);
@@ -267,12 +267,12 @@ describe('AuthzPerBranch', function () {
       const mockReq = { user: 'testuser1' } as any;
       if (plugin.hooks?.ldapsearchrequest) {
         const result = await plugin.hooks.ldapsearchrequest([
-          USER_BRANCH as string,
+          getUserBranch() as string,
           { paged: false },
           mockReq,
         ]);
 
-        expect(result[0]).to.equal(USER_BRANCH);
+        expect(result[0]).to.equal(getUserBranch());
         // When searching within authorized branch, filter should not be modified
         expect(result[1]).to.not.be.undefined;
       }
@@ -283,24 +283,24 @@ describe('AuthzPerBranch', function () {
       const mockReq = {} as any;
       if (plugin.hooks?.ldapsearchrequest) {
         const result = await plugin.hooks.ldapsearchrequest([
-          USER_BRANCH as string,
+          getUserBranch() as string,
           { paged: false },
           mockReq,
         ]);
 
-        expect(result[0]).to.equal(USER_BRANCH);
+        expect(result[0]).to.equal(getUserBranch());
         expect(result[1]).to.deep.equal({ paged: false });
       }
     });
   });
 
   describe('API access control', () => {
-    const testOrgDn = `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-    const testOrg2Dn = `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-    const testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
-    const testSubOrg2Dn = `ou=SubOrg2,${testOrg2Dn}`;
-    const testUser1Dn = `uid=testuser1,ou=users,${DM_LDAP_BASE}`;
-    const testUser2Dn = `uid=testuser2,ou=users,${DM_LDAP_BASE}`;
+    const getTestOrgDn = () => `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestSubOrg1Dn = () => `ou=SubOrg1,${getTestOrgDn()}`;
+    const getTestSubOrg2Dn = () => `ou=SubOrg2,${getTestOrg2Dn()}`;
+    const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestUser2Dn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
     const adminToken = 'test-admin-token';
     let request: ReturnType<typeof supertest>;
     let orgPlugin: LdapOrganization;
@@ -319,7 +319,7 @@ describe('AuthzPerBranch', function () {
         },
         users: {
           testuser1: {
-            [testOrgDn]: {
+            [getTestOrgDn()]: {
               read: true,
               write: true,
               delete: false,
@@ -352,32 +352,32 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       // Clean up test entries
       try {
-        await apiServer.ldap.delete(testUser1Dn);
+        await apiServer.ldap.delete(getTestUser1Dn());
       } catch (err) {
         // Ignore
       }
       try {
-        await apiServer.ldap.delete(testUser2Dn);
+        await apiServer.ldap.delete(getTestUser2Dn());
       } catch (err) {
         // Ignore
       }
       try {
-        await apiServer.ldap.delete(testSubOrg1Dn);
+        await apiServer.ldap.delete(getTestSubOrg1Dn());
       } catch (err) {
         // Ignore
       }
       try {
-        await apiServer.ldap.delete(testSubOrg2Dn);
+        await apiServer.ldap.delete(getTestSubOrg2Dn());
       } catch (err) {
         // Ignore
       }
       try {
-        await apiServer.ldap.delete(testOrgDn);
+        await apiServer.ldap.delete(getTestOrgDn());
       } catch (err) {
         // Ignore
       }
       try {
-        await apiServer.ldap.delete(testOrg2Dn);
+        await apiServer.ldap.delete(getTestOrg2Dn());
       } catch (err) {
         // Ignore
       }
@@ -393,7 +393,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 (NOT authorized)
         const org2Entry = {
@@ -401,11 +401,11 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+        await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to get unauthorized org via API - should fail
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrg2Dn)}`)
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testuser1')
           .set('Accept', 'application/json');
@@ -424,17 +424,17 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Try to get authorized org via API - should succeed
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}`)
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testuser1')
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(200);
-        expect(res.body).to.have.property('dn', testOrgDn);
+        expect(res.body).to.have.property('dn', getTestOrgDn());
         expect(res.body).to.have.property('ou', 'TestOrg');
       });
     });
@@ -449,7 +449,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 (unauthorized)
         const org2Entry = {
@@ -457,7 +457,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+        await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to add a sub-org under unauthorized org2 via API
         const res = await request
@@ -467,7 +467,7 @@ describe('AuthzPerBranch', function () {
           .type('json')
           .send({
             ou: 'SubOrg2',
-            parentDn: testOrg2Dn,
+            parentDn: getTestOrg2Dn(),
           });
 
         // Should be rejected
@@ -481,7 +481,7 @@ describe('AuthzPerBranch', function () {
               scope: 'base',
               filter: '(objectClass=*)',
             },
-            testSubOrg2Dn
+            getTestSubOrg2Dn()
           );
           expect.fail('SubOrg2 should not have been created');
         } catch (err) {
@@ -499,7 +499,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Try to add a sub-org under authorized org1 via API
         const res = await request
@@ -509,7 +509,7 @@ describe('AuthzPerBranch', function () {
           .type('json')
           .send({
             ou: 'SubOrg1',
-            parentDn: testOrgDn,
+            parentDn: getTestOrgDn(),
           });
 
         // Should succeed
@@ -523,7 +523,7 @@ describe('AuthzPerBranch', function () {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testSubOrg1Dn
+          getTestSubOrg1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect((searchResult as any).searchEntries[0].ou).to.equal('SubOrg1');
@@ -540,7 +540,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create user with twakeDepartmentLink pointing to authorized org
         const newUserEntry = {
@@ -548,13 +548,13 @@ describe('AuthzPerBranch', function () {
           uid: 'testuser1',
           sn: 'User1',
           cn: 'Test User 1',
-          twakeDepartmentLink: [testOrgDn],
+          twakeDepartmentLink: [getTestOrgDn()],
         };
 
         const mockReq = { user: 'testuser1' } as any;
 
         // This should succeed
-        await apiServer.ldap.add(testUser1Dn, newUserEntry, mockReq);
+        await apiServer.ldap.add(getTestUser1Dn(), newUserEntry, mockReq);
 
         // Verify it was written
         const searchResult = await apiServer.ldap.search(
@@ -563,7 +563,7 @@ describe('AuthzPerBranch', function () {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testUser1Dn
+          getTestUser1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect((searchResult as any).searchEntries[0].uid).to.equal(
@@ -580,7 +580,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await apiServer.ldap.add(testOrgDn, org1Entry);
+        await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 (unauthorized)
         const org2Entry = {
@@ -588,7 +588,7 @@ describe('AuthzPerBranch', function () {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await apiServer.ldap.add(testOrg2Dn, org2Entry);
+        await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to create user with twakeDepartmentLink pointing to unauthorized org
         const newUserEntry = {
@@ -596,14 +596,14 @@ describe('AuthzPerBranch', function () {
           uid: 'testuser2',
           sn: 'User2',
           cn: 'Test User 2',
-          twakeDepartmentLink: [testOrg2Dn], // UNAUTHORIZED
+          twakeDepartmentLink: [getTestOrg2Dn()], // UNAUTHORIZED
         };
 
         const mockReq = { user: 'testuser1' } as any;
 
         // This should be rejected
         try {
-          await apiServer.ldap.add(testUser2Dn, newUserEntry, mockReq);
+          await apiServer.ldap.add(getTestUser2Dn(), newUserEntry, mockReq);
           expect.fail('Should have thrown an error for unauthorized write');
         } catch (err) {
           expect(err).to.be.instanceOf(Error);
@@ -620,7 +620,7 @@ describe('AuthzPerBranch', function () {
               scope: 'base',
               filter: '(objectClass=*)',
             },
-            testUser2Dn
+            getTestUser2Dn()
           );
           expect.fail('User should not have been created');
         } catch (err) {

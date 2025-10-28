@@ -42,8 +42,9 @@ describe('AuthzLinid1 Plugin', () => {
   let dm: DM;
   let authz: AuthzLinid1;
 
-  const testOrgDn = `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const testUserDn = `uid=testadmin,${process.env.DM_LDAP_BASE}`;
+  // Use getters to ensure env vars are evaluated after setup
+  const getTestOrgDn = () => `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestUserDn = () => `uid=testadmin,${process.env.DM_LDAP_BASE}`;
 
   before(function () {
     skipIfMissingEnvVars(this, [
@@ -63,12 +64,12 @@ describe('AuthzLinid1 Plugin', () => {
   afterEach(async () => {
     // Clean up test entries
     try {
-      await dm.ldap.delete(testOrgDn);
+      await dm.ldap.delete(getTestOrgDn());
     } catch (err) {
       // Ignore if doesn't exist
     }
     try {
-      await dm.ldap.delete(testUserDn);
+      await dm.ldap.delete(getTestUserDn());
     } catch (err) {
       // Ignore if doesn't exist
     }
@@ -83,10 +84,10 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, entry);
+      await dm.ldap.add(getTestUserDn(), entry);
 
       const dn = await authz.getUserDn('testadmin');
-      expect(dn).to.equal(testUserDn);
+      expect(dn).to.equal(getTestUserDn());
     });
 
     it('should return null for non-existent user', async () => {
@@ -104,19 +105,19 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Create test organization with user as local admin
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get permissions
-      const perms = await authz.getUserPermissions(testUserDn, testOrgDn);
+      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -131,7 +132,7 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Create test organization without user as local admin
       const orgEntry = {
@@ -139,10 +140,10 @@ describe('AuthzLinid1 Plugin', () => {
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get permissions
-      const perms = await authz.getUserPermissions(testUserDn, testOrgDn);
+      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
 
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
@@ -157,20 +158,20 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Create parent organization with user as local admin
       const parentOrgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, parentOrgEntry);
+      await dm.ldap.add(getTestOrgDn(), parentOrgEntry);
 
       // Check permissions for a sub-branch
-      const subBranchDn = `ou=SubOrg,${testOrgDn}`;
-      const perms = await authz.getUserPermissions(testUserDn, subBranchDn);
+      const subBranchDn = `ou=SubOrg,${getTestOrgDn()}`;
+      const perms = await authz.getUserPermissions(getTestUserDn(), subBranchDn);
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -187,22 +188,22 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Create test organization with user as local admin
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get authorized branches
-      const branches = await authz.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(getTestUserDn());
 
       expect(branches).to.be.an('array');
-      expect(branches).to.include(testOrgDn);
+      expect(branches).to.include(getTestOrgDn());
     });
 
     it('should return empty array when user has no permissions', async () => {
@@ -213,10 +214,10 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Get authorized branches (no org with this user as admin)
-      const branches = await authz.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(getTestUserDn());
 
       expect(branches).to.be.an('array');
       expect(branches).to.have.lengthOf(0);
@@ -232,51 +233,51 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, userEntry);
+      await dm.ldap.add(getTestUserDn(), userEntry);
 
       // Create test organization
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // First call - should fetch from LDAP
-      const perms1 = await authz.getUserPermissions(testUserDn, testOrgDn);
+      const perms1 = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
       expect(perms1.read).to.be.true;
 
       // Second call - should use cache
-      const perms2 = await authz.getUserPermissions(testUserDn, testOrgDn);
+      const perms2 = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
       expect(perms2.read).to.be.true;
 
       // Verify cache was used
-      const cached = authz.permissionsCache.get(testUserDn);
+      const cached = authz.permissionsCache.get(getTestUserDn());
       expect(cached).to.exist;
       expect(cached?.branches.size).to.be.greaterThan(0);
     });
   });
 
   describe('Integration with users branch', () => {
-    const testUserInOrgDn = `uid=testuser,ou=users,${process.env.DM_LDAP_BASE}`;
-    const testUser2InOrgDn = `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
-    const testOrg2Dn = `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestUserInOrgDn = () => `uid=testuser,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestUser2InOrgDn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
 
     afterEach(async () => {
       // Clean up test users in users branch
       try {
-        await dm.ldap.delete(testUserInOrgDn);
+        await dm.ldap.delete(getTestUserInOrgDn());
       } catch (err) {
         // Ignore if doesn't exist
       }
       try {
-        await dm.ldap.delete(testUser2InOrgDn);
+        await dm.ldap.delete(getTestUser2InOrgDn());
       } catch (err) {
         // Ignore if doesn't exist
       }
       try {
-        await dm.ldap.delete(testOrg2Dn);
+        await dm.ldap.delete(getTestOrg2Dn());
       } catch (err) {
         // Ignore if doesn't exist
       }
@@ -290,16 +291,16 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, adminEntry);
+      await dm.ldap.add(getTestUserDn(), adminEntry);
 
       // Create organization with admin
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Create user in users branch linked to this organization
       const userEntry = {
@@ -307,13 +308,13 @@ describe('AuthzLinid1 Plugin', () => {
         uid: 'testuser',
         sn: 'User',
         cn: 'Test User',
-        twakeDepartmentLink: testOrgDn,
+        twakeDepartmentLink: getTestOrgDn(),
       };
-      await dm.ldap.add(testUserInOrgDn, userEntry);
+      await dm.ldap.add(getTestUserInOrgDn(), userEntry);
 
       // Admin should have permissions to read the users branch
       const perms = await authz.getUserPermissions(
-        testUserDn,
+        getTestUserDn(),
         `ou=users,${process.env.DM_LDAP_BASE}`
       );
 
@@ -331,22 +332,22 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, adminEntry);
+      await dm.ldap.add(getTestUserDn(), adminEntry);
 
       // Create organization with admin
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get authorized branches
-      const branches = await authz.getAuthorizedBranches(testUserDn);
+      const branches = await authz.getAuthorizedBranches(getTestUserDn());
 
       // Should include the organization
-      expect(branches).to.include(testOrgDn);
+      expect(branches).to.include(getTestOrgDn());
     });
 
     it('should return sub-organization as top for local admin via getOrganisationTop hook', async function () {
@@ -365,23 +366,23 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, adminEntry);
+      await dm.ldap.add(getTestUserDn(), adminEntry);
 
       // Create sub-organization with admin
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, orgEntry);
+      await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Create a mock request with the admin user
       const req = { user: 'testadmin' } as any;
 
       // First verify that the user has been granted permissions
-      const branches = await authz.getAuthorizedBranches(testUserDn);
-      expect(branches).to.include(testOrgDn);
+      const branches = await authz.getAuthorizedBranches(getTestUserDn());
+      expect(branches).to.include(getTestOrgDn());
 
       // Call getOrganisationTop - should return the sub-org, not the top org
       const result = await orgPlugin.getOrganisationTop(req);
@@ -392,7 +393,7 @@ describe('AuthzLinid1 Plugin', () => {
         typeof (result as any).dn === 'string'
           ? (result as any).dn
           : String((result as any).dn);
-      expect(resultDn).to.equal(testOrgDn);
+      expect(resultDn).to.equal(getTestOrgDn());
     });
 
     it('should deny admin access to users from other organizations', async () => {
@@ -403,16 +404,16 @@ describe('AuthzLinid1 Plugin', () => {
         sn: 'Admin',
         cn: 'Test Admin',
       };
-      await dm.ldap.add(testUserDn, adminEntry);
+      await dm.ldap.add(getTestUserDn(), adminEntry);
 
       // Create organization 1 with admin
       const org1Entry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
         twakeDepartmentPath: 'TestOrg / organization',
-        twakeLocalAdminLink: testUserDn,
+        twakeLocalAdminLink: getTestUserDn(),
       };
-      await dm.ldap.add(testOrgDn, org1Entry);
+      await dm.ldap.add(getTestOrgDn(), org1Entry);
 
       // Create organization 2 without admin
       const org2Entry = {
@@ -420,7 +421,7 @@ describe('AuthzLinid1 Plugin', () => {
         ou: 'TestOrg2',
         twakeDepartmentPath: 'TestOrg2 / organization',
       };
-      await dm.ldap.add(testOrg2Dn, org2Entry);
+      await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
       // Create user in users branch linked to organization 2
       const user2Entry = {
@@ -428,17 +429,17 @@ describe('AuthzLinid1 Plugin', () => {
         uid: 'testuser2',
         sn: 'User2',
         cn: 'Test User 2',
-        twakeDepartmentLink: testOrg2Dn,
+        twakeDepartmentLink: getTestOrg2Dn(),
       };
-      await dm.ldap.add(testUser2InOrgDn, user2Entry);
+      await dm.ldap.add(getTestUser2InOrgDn(), user2Entry);
 
       // Get authorized branches - should only include org1, not org2
-      const branches = await authz.getAuthorizedBranches(testUserDn);
-      expect(branches).to.include(testOrgDn);
-      expect(branches).to.not.include(testOrg2Dn);
+      const branches = await authz.getAuthorizedBranches(getTestUserDn());
+      expect(branches).to.include(getTestOrgDn());
+      expect(branches).to.not.include(getTestOrg2Dn());
 
       // Admin should not have permissions on org2
-      const perms = await authz.getUserPermissions(testUserDn, testOrg2Dn);
+      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrg2Dn());
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
       expect(perms.delete).to.be.false;
@@ -449,9 +450,9 @@ describe('AuthzLinid1 Plugin', () => {
     let request: ReturnType<typeof supertest>;
     let orgPlugin: LdapOrganization;
     let authPlugin: TestAuthPlugin;
-    const testOrg2Dn = `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-    const testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
-    const testSubOrg2Dn = `ou=SubOrg2,${testOrg2Dn}`;
+    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestSubOrg1Dn = () => `ou=SubOrg1,${getTestOrgDn()}`;
+    const getTestSubOrg2Dn = () => `ou=SubOrg2,${getTestOrg2Dn()}`;
     const adminToken = 'test-admin-token';
 
     beforeEach(async () => {
@@ -476,17 +477,17 @@ describe('AuthzLinid1 Plugin', () => {
     afterEach(async () => {
       // Clean up test entries
       try {
-        await dm.ldap.delete(testSubOrg1Dn);
+        await dm.ldap.delete(getTestSubOrg1Dn());
       } catch (err) {
         // Ignore if doesn't exist
       }
       try {
-        await dm.ldap.delete(testSubOrg2Dn);
+        await dm.ldap.delete(getTestSubOrg2Dn());
       } catch (err) {
         // Ignore if doesn't exist
       }
       try {
-        await dm.ldap.delete(testOrg2Dn);
+        await dm.ldap.delete(getTestOrg2Dn());
       } catch (err) {
         // Ignore if doesn't exist
       }
@@ -502,16 +503,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 without admin (unauthorized)
         const org2Entry = {
@@ -519,11 +520,11 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to get unauthorized org via API - should fail
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrg2Dn)}`)
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
@@ -541,26 +542,26 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Try to get authorized org via API - should succeed
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}`)
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`)
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(200);
-        expect(res.body).to.have.property('dn', testOrgDn);
+        expect(res.body).to.have.property('dn', getTestOrgDn());
         expect(res.body).to.have.property('ou', 'TestOrg');
       });
 
@@ -572,16 +573,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 without admin (unauthorized)
         const org2Entry = {
@@ -589,12 +590,12 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to search subnodes of unauthorized org - should fail
         const res = await request
           .get(
-            `/api/v1/ldap/organizations/${encodeURIComponent(testOrg2Dn)}/subnodes`
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}/subnodes`
           )
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testadmin')
@@ -614,16 +615,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 without admin (unauthorized)
         const org2Entry = {
@@ -631,7 +632,7 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to add a sub-org under unauthorized org2 via API
         const res = await request
@@ -641,7 +642,7 @@ describe('AuthzLinid1 Plugin', () => {
           .type('json')
           .send({
             ou: 'SubOrg2',
-            parentDn: testOrg2Dn,
+            parentDn: getTestOrg2Dn(),
           });
 
         // Should be rejected
@@ -655,7 +656,7 @@ describe('AuthzLinid1 Plugin', () => {
               scope: 'base',
               filter: '(objectClass=*)',
             },
-            testSubOrg2Dn
+            getTestSubOrg2Dn()
           );
           // If search succeeds, ensure it returned 0 entries
           expect((searchResult as any).searchEntries).to.have.lengthOf(0);
@@ -674,16 +675,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Try to add a sub-org under authorized org1 via API
         const res = await request
@@ -693,7 +694,7 @@ describe('AuthzLinid1 Plugin', () => {
           .type('json')
           .send({
             ou: 'SubOrg1',
-            parentDn: testOrgDn,
+            parentDn: getTestOrgDn(),
           });
 
         // Should succeed
@@ -707,7 +708,7 @@ describe('AuthzLinid1 Plugin', () => {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testSubOrg1Dn
+          getTestSubOrg1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect((searchResult as any).searchEntries[0].ou).to.equal('SubOrg1');
@@ -715,11 +716,11 @@ describe('AuthzLinid1 Plugin', () => {
     });
 
     describe('WRITE - Move user between organizations', () => {
-      const testUser1Dn = `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
 
       afterEach(async () => {
         try {
-          await dm.ldap.delete(testUser1Dn);
+          await dm.ldap.delete(getTestUser1Dn());
         } catch (err) {
           // Ignore if doesn't exist
         }
@@ -733,25 +734,25 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create second organization with admin (also authorized)
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Create user in first organization
         const userEntry = {
@@ -759,20 +760,20 @@ describe('AuthzLinid1 Plugin', () => {
           uid: 'testuser1',
           sn: 'User1',
           cn: 'Test User 1',
-          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentLink: getTestOrgDn(),
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await dm.ldap.add(testUser1Dn, userEntry);
+        await dm.ldap.add(getTestUser1Dn(), userEntry);
 
         // Create mock request
         const mockReq = { user: 'testadmin' } as any;
 
         // Move user to second organization - should succeed
         await dm.ldap.modify(
-          testUser1Dn,
+          getTestUser1Dn(),
           {
             replace: {
-              twakeDepartmentLink: testOrg2Dn,
+              twakeDepartmentLink: getTestOrg2Dn(),
               twakeDepartmentPath: 'TestOrg2 / organization',
             },
           },
@@ -786,12 +787,12 @@ describe('AuthzLinid1 Plugin', () => {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testUser1Dn
+          getTestUser1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect(
           (searchResult as any).searchEntries[0].twakeDepartmentLink
-        ).to.equal(testOrg2Dn);
+        ).to.equal(getTestOrg2Dn());
       });
 
       it('should reject moving user to unauthorized organization', async () => {
@@ -802,16 +803,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 without admin (unauthorized)
         const org2Entry = {
@@ -819,7 +820,7 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Create user in first organization
         const userEntry = {
@@ -827,10 +828,10 @@ describe('AuthzLinid1 Plugin', () => {
           uid: 'testuser1',
           sn: 'User1',
           cn: 'Test User 1',
-          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentLink: getTestOrgDn(),
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await dm.ldap.add(testUser1Dn, userEntry);
+        await dm.ldap.add(getTestUser1Dn(), userEntry);
 
         // Create mock request
         const mockReq = { user: 'testadmin' } as any;
@@ -838,10 +839,10 @@ describe('AuthzLinid1 Plugin', () => {
         // Try to move user to unauthorized organization - should be rejected
         try {
           await dm.ldap.modify(
-            testUser1Dn,
+            getTestUser1Dn(),
             {
               replace: {
-                twakeDepartmentLink: testOrg2Dn,
+                twakeDepartmentLink: getTestOrg2Dn(),
                 twakeDepartmentPath: 'TestOrg2 / organization',
               },
             },
@@ -862,12 +863,12 @@ describe('AuthzLinid1 Plugin', () => {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testUser1Dn
+          getTestUser1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect(
           (searchResult as any).searchEntries[0].twakeDepartmentLink
-        ).to.equal(testOrgDn); // Still in original org
+        ).to.equal(getTestOrgDn()); // Still in original org
       });
 
       it('should reject moving user from unauthorized org (requires read on source)', async () => {
@@ -878,7 +879,7 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 without admin (user starts here, unauthorized)
         const org1Entry = {
@@ -886,16 +887,16 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 with admin (authorized for admin)
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Create user in first organization (where admin has no rights)
         const userEntry = {
@@ -903,10 +904,10 @@ describe('AuthzLinid1 Plugin', () => {
           uid: 'testuser1',
           sn: 'User1',
           cn: 'Test User 1',
-          twakeDepartmentLink: testOrgDn,
+          twakeDepartmentLink: getTestOrgDn(),
           twakeDepartmentPath: 'TestOrg / organization',
         };
-        await dm.ldap.add(testUser1Dn, userEntry);
+        await dm.ldap.add(getTestUser1Dn(), userEntry);
 
         // Create mock request
         const mockReq = { user: 'testadmin' } as any;
@@ -915,10 +916,10 @@ describe('AuthzLinid1 Plugin', () => {
         // This should fail because admin does not have read permission on source org
         try {
           await dm.ldap.modify(
-            testUser1Dn,
+            getTestUser1Dn(),
             {
               replace: {
-                twakeDepartmentLink: testOrg2Dn,
+                twakeDepartmentLink: getTestOrg2Dn(),
                 twakeDepartmentPath: 'TestOrg2 / organization',
               },
             },
@@ -939,27 +940,27 @@ describe('AuthzLinid1 Plugin', () => {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testUser1Dn
+          getTestUser1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect(
           (searchResult as any).searchEntries[0].twakeDepartmentLink
-        ).to.equal(testOrgDn); // Still in original org
+        ).to.equal(getTestOrgDn()); // Still in original org
       });
     });
 
     describe('WRITE - Add user with twakeDepartmentLink', () => {
-      const testUser1Dn = `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
-      const testUser2Dn = `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser2Dn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
 
       afterEach(async () => {
         try {
-          await dm.ldap.delete(testUser1Dn);
+          await dm.ldap.delete(getTestUser1Dn());
         } catch (err) {
           // Ignore if doesn't exist
         }
         try {
-          await dm.ldap.delete(testUser2Dn);
+          await dm.ldap.delete(getTestUser2Dn());
         } catch (err) {
           // Ignore if doesn't exist
         }
@@ -973,21 +974,21 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Admin should NOT have direct write permission on ou=users
         const usersBranchDn = `ou=users,${process.env.DM_LDAP_BASE}`;
         const usersBranchPerms = await authz.getUserPermissions(
-          testUserDn,
+          getTestUserDn(),
           usersBranchDn
         );
         expect(usersBranchPerms.write).to.be.false;
@@ -999,14 +1000,14 @@ describe('AuthzLinid1 Plugin', () => {
           uid: 'testuser1',
           sn: 'User1',
           cn: 'Test User 1',
-          twakeDepartmentLink: [testOrgDn], // Points to authorized org (array format)
+          twakeDepartmentLink: [getTestOrgDn()], // Points to authorized org (array format)
         };
 
         // Create mock request
         const mockReq = { user: 'testadmin' } as any;
 
         // This should succeed because twakeDepartmentLink points to authorized org
-        await dm.ldap.add(testUser1Dn, newUserEntry, mockReq);
+        await dm.ldap.add(getTestUser1Dn(), newUserEntry, mockReq);
 
         // Verify it was written to LDAP
         const searchResult = await dm.ldap.search(
@@ -1015,7 +1016,7 @@ describe('AuthzLinid1 Plugin', () => {
             scope: 'base',
             filter: '(objectClass=*)',
           },
-          testUser1Dn
+          getTestUser1Dn()
         );
         expect((searchResult as any).searchEntries).to.have.lengthOf(1);
         expect((searchResult as any).searchEntries[0].uid).to.equal(
@@ -1023,7 +1024,7 @@ describe('AuthzLinid1 Plugin', () => {
         );
         expect(
           (searchResult as any).searchEntries[0].twakeDepartmentLink
-        ).to.equal(testOrgDn);
+        ).to.equal(getTestOrgDn());
       });
 
       it('should reject adding a user in ou=users if twakeDepartmentLink points to unauthorized org', async () => {
@@ -1034,16 +1035,16 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'Admin',
           cn: 'Test Admin',
         };
-        await dm.ldap.add(testUserDn, adminEntry);
+        await dm.ldap.add(getTestUserDn(), adminEntry);
 
         // Create organization 1 with admin (authorized)
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
           twakeDepartmentPath: 'TestOrg / organization',
-          twakeLocalAdminLink: testUserDn,
+          twakeLocalAdminLink: getTestUserDn(),
         };
-        await dm.ldap.add(testOrgDn, org1Entry);
+        await dm.ldap.add(getTestOrgDn(), org1Entry);
 
         // Create organization 2 without admin (unauthorized)
         const org2Entry = {
@@ -1051,7 +1052,7 @@ describe('AuthzLinid1 Plugin', () => {
           ou: 'TestOrg2',
           twakeDepartmentPath: 'TestOrg2 / organization',
         };
-        await dm.ldap.add(testOrg2Dn, org2Entry);
+        await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
         // Try to create a user with twakeDepartmentLink pointing to unauthorized org
         const newUserEntry = {
@@ -1059,7 +1060,7 @@ describe('AuthzLinid1 Plugin', () => {
           uid: 'testuser2',
           sn: 'User2',
           cn: 'Test User 2',
-          twakeDepartmentLink: [testOrg2Dn], // Points to UNAUTHORIZED org (array format)
+          twakeDepartmentLink: [getTestOrg2Dn()], // Points to UNAUTHORIZED org (array format)
         };
 
         // Create mock request
@@ -1067,7 +1068,7 @@ describe('AuthzLinid1 Plugin', () => {
 
         // This should be rejected
         try {
-          await dm.ldap.add(testUser2Dn, newUserEntry, mockReq);
+          await dm.ldap.add(getTestUser2Dn(), newUserEntry, mockReq);
           expect.fail('Should have thrown an error for unauthorized write');
         } catch (err) {
           expect(err).to.be.instanceOf(Error);
@@ -1084,7 +1085,7 @@ describe('AuthzLinid1 Plugin', () => {
               scope: 'base',
               filter: '(objectClass=*)',
             },
-            testUser2Dn
+            getTestUser2Dn()
           );
           expect.fail('User should not have been created');
         } catch (err) {

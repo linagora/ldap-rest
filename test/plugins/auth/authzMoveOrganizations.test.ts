@@ -37,9 +37,9 @@ describe('Authorization for Organization Move', function () {
   let orgPlugin: LdapOrganizations;
   let request: any;
 
-  const parentOrg1Dn = `ou=parent1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const parentOrg2Dn = `ou=parent2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const childOrgDn = `ou=child,${parentOrg1Dn}`;
+  const getParentOrg1Dn = () => `ou=parent1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getParentOrg2Dn = () => `ou=parent2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getChildOrgDn = () => `ou=child,${getParentOrg1Dn()}`;
 
   before(async function () {
     this.timeout(10000);
@@ -54,12 +54,12 @@ describe('Authorization for Organization Move', function () {
       users: {
         testuser1: {
           // Has read access to parent1 and write access to parent2
-          [parentOrg1Dn]: {
+          [getParentOrg1Dn()]: {
             read: true,
             write: false,
             delete: false,
           },
-          [parentOrg2Dn as string]: {
+          [getParentOrg2Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -67,7 +67,7 @@ describe('Authorization for Organization Move', function () {
         },
         testuser2: {
           // Has write access to parent1 but no access to parent2
-          [parentOrg1Dn]: {
+          [getParentOrg1Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -75,12 +75,12 @@ describe('Authorization for Organization Move', function () {
         },
         testuser3: {
           // Has read/write access to both parents
-          [parentOrg1Dn]: {
+          [getParentOrg1Dn()]: {
             read: true,
             write: true,
             delete: false,
           },
-          [parentOrg2Dn as string]: {
+          [getParentOrg2Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -116,11 +116,11 @@ describe('Authorization for Organization Move', function () {
     request = supertest(server.app);
 
     // Create test parent organizations
-    await server.ldap.add(parentOrg1Dn, {
+    await server.ldap.add(getParentOrg1Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'parent1',
     });
-    await server.ldap.add(parentOrg2Dn, {
+    await server.ldap.add(getParentOrg2Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'parent2',
     });
@@ -128,12 +128,12 @@ describe('Authorization for Organization Move', function () {
 
   after(async () => {
     try {
-      await server.ldap.delete(parentOrg1Dn);
+      await server.ldap.delete(getParentOrg1Dn());
     } catch (e) {
       // ignore
     }
     try {
-      await server.ldap.delete(parentOrg2Dn);
+      await server.ldap.delete(getParentOrg2Dn());
     } catch (e) {
       // ignore
     }
@@ -141,7 +141,7 @@ describe('Authorization for Organization Move', function () {
 
   beforeEach(async () => {
     // Create test child organization under parent1
-    await server.ldap.add(childOrgDn, {
+    await server.ldap.add(getChildOrgDn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'child',
       twakeDepartmentPath: 'child / parent1',
@@ -151,12 +151,12 @@ describe('Authorization for Organization Move', function () {
   afterEach(async () => {
     try {
       // Try both possible locations
-      await server.ldap.delete(childOrgDn);
+      await server.ldap.delete(getChildOrgDn());
     } catch (e) {
       // ignore
     }
     try {
-      const movedChildDn = `ou=child,${parentOrg2Dn}`;
+      const movedChildDn = `ou=child,${getParentOrg2Dn()}`;
       await server.ldap.delete(movedChildDn);
     } catch (e) {
       // ignore
@@ -165,18 +165,18 @@ describe('Authorization for Organization Move', function () {
 
   it('should allow move when user has read access to source and write access to destination', async () => {
     const res = await request
-      .post(`/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`)
+      .post(`/api/v1/ldap/organizations/${encodeURIComponent(getChildOrgDn())}/move`)
       .set('X-Test-User', 'testuser1')
       .type('json')
       .send({
-        targetOrgDn: parentOrg2Dn,
+        targetOrgDn: getParentOrg2Dn(),
       });
 
     expect(res.status).to.equal(200);
     expect(res.body).to.have.property('newDn');
 
     // Verify organization was moved
-    const movedChildDn = `ou=child,${parentOrg2Dn}`;
+    const movedChildDn = `ou=child,${getParentOrg2Dn()}`;
     const org = await server.ldap.search(
       { paged: false, scope: 'base' },
       movedChildDn
@@ -186,11 +186,11 @@ describe('Authorization for Organization Move', function () {
 
   it('should reject move when user lacks read access to source', async () => {
     const res = await request
-      .post(`/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`)
+      .post(`/api/v1/ldap/organizations/${encodeURIComponent(getChildOrgDn())}/move`)
       .set('X-Test-User', 'testuser2')
       .type('json')
       .send({
-        targetOrgDn: parentOrg2Dn,
+        targetOrgDn: getParentOrg2Dn(),
       });
 
     expect(res.status).to.equal(500);
@@ -199,7 +199,7 @@ describe('Authorization for Organization Move', function () {
 
   it('should reject move when user lacks write access to destination', async () => {
     // testuser1 has read on parent1 but no write, so moving within parent1 should fail
-    const siblingOrgDn = `ou=sibling,${parentOrg1Dn}`;
+    const siblingOrgDn = `ou=sibling,${getParentOrg1Dn()}`;
     await server.ldap.add(siblingOrgDn, {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'sibling',
@@ -209,7 +209,7 @@ describe('Authorization for Organization Move', function () {
     try {
       const res = await request
         .post(
-          `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          `/api/v1/ldap/organizations/${encodeURIComponent(getChildOrgDn())}/move`
         )
         .set('X-Test-User', 'testuser1')
         .type('json')
@@ -226,11 +226,11 @@ describe('Authorization for Organization Move', function () {
 
   it('should allow move when user has full access', async () => {
     const res = await request
-      .post(`/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`)
+      .post(`/api/v1/ldap/organizations/${encodeURIComponent(getChildOrgDn())}/move`)
       .set('X-Test-User', 'testuser3')
       .type('json')
       .send({
-        targetOrgDn: parentOrg2Dn,
+        targetOrgDn: getParentOrg2Dn(),
       });
 
     expect(res.status).to.equal(200);

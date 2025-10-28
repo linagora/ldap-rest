@@ -37,9 +37,9 @@ describe('Authorization for Group Move', function () {
   let groupsPlugin: LdapGroups;
   let request: any;
 
-  const org1Dn = `ou=testorg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const org2Dn = `ou=testorg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const groupDn = `cn=testgroup,${process.env.DM_LDAP_GROUP_BASE}`;
+  const getOrg1Dn = () => `ou=testorg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getOrg2Dn = () => `ou=testorg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getGroupDn = () => `cn=testgroup,${process.env.DM_LDAP_GROUP_BASE}`;
 
   before(async function () {
     this.timeout(10000);
@@ -54,12 +54,12 @@ describe('Authorization for Group Move', function () {
       users: {
         testuser1: {
           // Has read access to org1 and write access to org2
-          [org1Dn]: {
+          [getOrg1Dn()]: {
             read: true,
             write: false,
             delete: false,
           },
-          [org2Dn as string]: {
+          [getOrg2Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -67,7 +67,7 @@ describe('Authorization for Group Move', function () {
         },
         testuser2: {
           // Has write access to org1 but no access to org2
-          [org1Dn]: {
+          [getOrg1Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -75,12 +75,12 @@ describe('Authorization for Group Move', function () {
         },
         testuser3: {
           // Has read/write access to both orgs
-          [org1Dn]: {
+          [getOrg1Dn()]: {
             read: true,
             write: true,
             delete: false,
           },
-          [org2Dn as string]: {
+          [getOrg2Dn()]: {
             read: true,
             write: true,
             delete: false,
@@ -88,12 +88,12 @@ describe('Authorization for Group Move', function () {
         },
         testuser4: {
           // Has read access to org1 but no write access to org2
-          [org1Dn]: {
+          [getOrg1Dn()]: {
             read: true,
             write: false,
             delete: false,
           },
-          [org2Dn as string]: {
+          [getOrg2Dn()]: {
             read: true,
             write: false,
             delete: false,
@@ -129,12 +129,12 @@ describe('Authorization for Group Move', function () {
     request = supertest(server.app);
 
     // Create test organizations
-    await server.ldap.add(org1Dn, {
+    await server.ldap.add(getOrg1Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'testorg1',
       twakeDepartmentPath: 'Test Org 1',
     });
-    await server.ldap.add(org2Dn, {
+    await server.ldap.add(getOrg2Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'testorg2',
       twakeDepartmentPath: 'Test Org 2',
@@ -143,12 +143,12 @@ describe('Authorization for Group Move', function () {
 
   after(async () => {
     try {
-      await server.ldap.delete(org1Dn);
+      await server.ldap.delete(getOrg1Dn());
     } catch (e) {
       // ignore
     }
     try {
-      await server.ldap.delete(org2Dn);
+      await server.ldap.delete(getOrg2Dn());
     } catch (e) {
       // ignore
     }
@@ -156,18 +156,18 @@ describe('Authorization for Group Move', function () {
 
   beforeEach(async () => {
     // Create test group in org1
-    await server.ldap.add(groupDn, {
+    await server.ldap.add(getGroupDn(), {
       objectClass: ['groupOfNames', 'twakeStaticGroup', 'top'],
       cn: 'testgroup',
       member: ['cn=fakeuser'],
-      twakeDepartmentLink: org1Dn,
+      twakeDepartmentLink: getOrg1Dn(),
       twakeDepartmentPath: 'Test Org 1',
     });
   });
 
   afterEach(async () => {
     try {
-      await server.ldap.delete(groupDn);
+      await server.ldap.delete(getGroupDn());
     } catch (e) {
       // ignore
     }
@@ -179,7 +179,7 @@ describe('Authorization for Group Move', function () {
       .set('X-Test-User', 'testuser1')
       .type('json')
       .send({
-        targetOrgDn: org2Dn,
+        targetOrgDn: getOrg2Dn(),
       });
 
     expect(res.status).to.equal(200);
@@ -188,11 +188,11 @@ describe('Authorization for Group Move', function () {
     // Verify group was moved
     const group = await server.ldap.search(
       { paged: false, scope: 'base' },
-      groupDn
+      getGroupDn()
     );
     expect(
       (group as SearchResult).searchEntries[0].twakeDepartmentLink
-    ).to.equal(org2Dn);
+    ).to.equal(getOrg2Dn());
   });
 
   it('should reject move when user lacks read access to source', async () => {
@@ -201,7 +201,7 @@ describe('Authorization for Group Move', function () {
       .set('X-Test-User', 'testuser2')
       .type('json')
       .send({
-        targetOrgDn: org2Dn,
+        targetOrgDn: getOrg2Dn(),
       });
 
     expect(res.status).to.equal(500);
@@ -214,7 +214,7 @@ describe('Authorization for Group Move', function () {
       .set('X-Test-User', 'testuser4')
       .type('json')
       .send({
-        targetOrgDn: org2Dn,
+        targetOrgDn: getOrg2Dn(),
       });
 
     expect(res.status).to.equal(500);
@@ -227,7 +227,7 @@ describe('Authorization for Group Move', function () {
       .set('X-Test-User', 'testuser3')
       .type('json')
       .send({
-        targetOrgDn: org2Dn,
+        targetOrgDn: getOrg2Dn(),
       });
 
     expect(res.status).to.equal(200);

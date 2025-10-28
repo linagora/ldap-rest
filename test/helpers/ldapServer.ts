@@ -109,6 +109,9 @@ export class LdapTestServer {
     // Wait for LDAP to be ready
     await this.waitForReady();
 
+    // Wait for ldapi:/// socket to be available (needed for schema loading)
+    await this.waitForLdapi();
+
     console.log(
       `✓ LDAP test server started on port ${this.port} (container: ${this.containerName})`
     );
@@ -232,6 +235,29 @@ export class LdapTestServer {
 
     throw new Error(
       `LDAP server did not become ready after ${maxRetries} attempts`
+    );
+  }
+
+  /**
+   * Wait for ldapi:/// socket to be available
+   */
+  private async waitForLdapi(maxRetries = 30): Promise<void> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        // Try to connect with ldapwhoami using EXTERNAL mechanism
+        execSync(
+          `docker exec ${this.containerName} ldapwhoami -Y EXTERNAL -H ldapi:///`,
+          { stdio: 'ignore', timeout: 2000 }
+        );
+        return; // Success
+      } catch (err) {
+        // Not ready yet, wait
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    throw new Error(
+      `LDAP ldapi:/// socket did not become available after ${maxRetries} attempts`
     );
   }
 

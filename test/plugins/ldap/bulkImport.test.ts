@@ -18,8 +18,8 @@ describe('LDAP Bulk Import Plugin', function () {
   let plugin: LdapBulkImport;
   let request: any;
 
-  const testOrg1Dn = `ou=TestOrg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const testOrg2Dn = `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestOrg1Dn = () => `ou=TestOrg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
 
   before(async function () {
     this.timeout(10000);
@@ -93,12 +93,12 @@ describe('LDAP Bulk Import Plugin', function () {
     request = supertest(server.app);
 
     // Create test organizations
-    await server.ldap.add(testOrg1Dn, {
+    await server.ldap.add(getTestOrg1Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'TestOrg1',
       twakeDepartmentPath: 'TestOrg1',
     });
-    await server.ldap.add(testOrg2Dn, {
+    await server.ldap.add(getTestOrg2Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'TestOrg2',
       twakeDepartmentPath: 'TestOrg2',
@@ -108,12 +108,12 @@ describe('LDAP Bulk Import Plugin', function () {
   after(async function () {
     // Clean up test organizations
     try {
-      await server.ldap.delete(testOrg1Dn);
+      await server.ldap.delete(getTestOrg1Dn());
     } catch (e) {
       // ignore
     }
     try {
-      await server.ldap.delete(testOrg2Dn);
+      await server.ldap.delete(getTestOrg2Dn());
     } catch (e) {
       // ignore
     }
@@ -175,8 +175,8 @@ describe('LDAP Bulk Import Plugin', function () {
 
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org,Passw0rd!123,"${testOrg1Dn}"`,
-        `bulkuser2,Bulk User 2,User2,Bulk,bulkuser2@test.org,Passw0rd!456,"${testOrg2Dn}"`,
+        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org,Passw0rd!123,"${getTestOrg1Dn()}"`,
+        `bulkuser2,Bulk User 2,User2,Bulk,bulkuser2@test.org,Passw0rd!456,"${getTestOrg2Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -198,7 +198,7 @@ describe('LDAP Bulk Import Plugin', function () {
       );
       expect((user1 as any).searchEntries[0].uid).to.equal('bulkuser1');
       expect((user1 as any).searchEntries[0].twakeDepartmentLink).to.equal(
-        testOrg1Dn
+        getTestOrg1Dn()
       );
       expect((user1 as any).searchEntries[0].twakeDepartmentPath).to.equal(
         'TestOrg1'
@@ -208,7 +208,7 @@ describe('LDAP Bulk Import Plugin', function () {
     it('should handle dry run mode', async () => {
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org,Passw0rd!123,"${testOrg1Dn}"`,
+        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org,Passw0rd!123,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -245,8 +245,8 @@ describe('LDAP Bulk Import Plugin', function () {
 
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Updated User,User1,Updated,updated@test.org,Newpass!123,"${testOrg1Dn}"`,
-        `bulkuser2,New User,User2,New,new@test.org,Passw0rd!123,"${testOrg1Dn}"`,
+        `bulkuser1,Updated User,User1,Updated,updated@test.org,Newpass!123,"${getTestOrg1Dn()}"`,
+        `bulkuser2,New User,User2,New,new@test.org,Passw0rd!123,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -280,7 +280,7 @@ describe('LDAP Bulk Import Plugin', function () {
 
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Updated User,User1,Updated,updated@test.org,Newpass!123,"${testOrg1Dn}"`,
+        `bulkuser1,Updated User,User1,Updated,updated@test.org,Newpass!123,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -302,9 +302,9 @@ describe('LDAP Bulk Import Plugin', function () {
     it('should handle errors and continue when continueOnError is true', async () => {
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Valid User,User1,Valid,valid@test.org,Passw0rd!123,"${testOrg1Dn}"`,
+        `bulkuser1,Valid User,User1,Valid,valid@test.org,Passw0rd!123,"${getTestOrg1Dn()}"`,
         `invaliduser,Invalid User,User2,Invalid,invalid@test.org,Passw0rd!123,"ou=nonexistent,dc=invalid"`, // Invalid org
-        `bulkuser2,Valid User 2,User2,Valid,valid2@test.org,Passw0rd!456,"${testOrg1Dn}"`,
+        `bulkuser2,Valid User 2,User2,Valid,valid2@test.org,Passw0rd!456,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -322,7 +322,7 @@ describe('LDAP Bulk Import Plugin', function () {
     it('should validate required attributes', async () => {
       const csvContent = [
         'uid,cn,givenName,mail,organizationDn', // Missing 'sn'
-        `bulkuser1,Bulk User 1,Bulk,bulkuser1@test.org,"${testOrg1Dn}"`,
+        `bulkuser1,Bulk User 1,Bulk,bulkuser1@test.org,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
@@ -341,7 +341,7 @@ describe('LDAP Bulk Import Plugin', function () {
 
       const csvContent = [
         'uid,cn,sn,givenName,mail,userPassword,organizationDn',
-        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org;bulkuser1-alt@test.org,Passw0rd!123,"${testOrg1Dn}"`,
+        `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org;bulkuser1-alt@test.org,Passw0rd!123,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
