@@ -138,6 +138,27 @@ export class LdapTestServer {
       }
     }
 
+    // Load dyngroup schema (required for groupOfURLs objectClass used by twakeDynamicGroup)
+    try {
+      console.log(`Loading dyngroup schema...`);
+      const result = execSync(
+        `docker exec ${this.containerName} ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/ldap/schema/dyngroup.ldif`,
+        { encoding: 'utf-8' }
+      );
+      console.log(`✓ Dyngroup schema loaded`);
+      if (result && result.trim()) {
+        console.log(`Dyngroup schema output: ${result.trim()}`);
+      }
+      // Wait for schema to be fully loaded
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (err: any) {
+      console.error(`ERROR loading dyngroup schema:`);
+      console.error(`  stdout: ${err.stdout?.toString()}`);
+      console.error(`  stderr: ${err.stderr?.toString()}`);
+      console.error(`  message: ${err.message}`);
+      throw new Error(`Failed to load dyngroup schema: ${err.stderr?.toString() || err.message}`);
+    }
+
     // Load Twake custom schema
     // Try to use the official schema from the container first
     try {
@@ -328,6 +349,14 @@ export class LdapTestServer {
       DM_LDAP_PWD: this.config.adminPassword,
       DM_LDAP_BASE: this.config.baseDn,
       DM_LDAP_GROUP_BASE: `ou=groups,${this.config.baseDn}`,
+      // External members branch for groups
+      DM_EXTERNAL_MEMBERS_BRANCH: `ou=external,${this.config.baseDn}`,
+      // Applicative accounts branch
+      DM_APPLICATIVE_ACCOUNT_BASE: `ou=applicative,${this.config.baseDn}`,
+      // Calendar resources branch
+      DM_CALENDAR_RESOURCES_BASE: `ou=calendarResources,${this.config.baseDn}`,
+      // Trash branch
+      DM_TRASH_BRANCH: `ou=trash,${this.config.baseDn}`,
       // Keep legacy names for hasExternalLdap() check
       DM_LDAP_URI: `ldap://localhost:${this.port}`,
     };

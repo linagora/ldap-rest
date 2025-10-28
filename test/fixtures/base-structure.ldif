@@ -37,6 +37,11 @@ objectClass: organizationalUnit
 ou: trash
 description: Trash bin for deleted entries
 
+dn: ou=external,dc=example,dc=com
+objectClass: organizationalUnit
+ou: external
+description: External members branch for groups
+
 dn: ou=nomenclature,dc=example,dc=com
 objectClass: organizationalUnit
 ou: nomenclature
@@ -152,3 +157,61 @@ objectClass: organizationalUnit
 objectClass: top
 ou: organization
 description: Top organization for B2B
+
+# Test organizations with twakeDepartment auxiliary class
+dn: ou=Test Org 1,ou=organization,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: twakeDepartment
+ou: Test Org 1
+description: Test organization 1
+
+dn: ou=Test Org 2,ou=organization,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: twakeDepartment
+ou: Test Org 2
+description: Test organization 2
+
+dn: ou=Sub Org 1,ou=Test Org 1,ou=organization,dc=example,dc=com
+objectClass: organizationalUnit
+objectClass: twakeDepartment
+ou: Sub Org 1
+description: Sub-organization under Test Org 1
+
+# Test user with organization link (B2B)
+dn: uid=alice.admin,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: twakeWhitePages
+uid: alice.admin
+cn: Alice Admin
+sn: Admin
+givenName: Alice
+mail: alice.admin@example.com
+userPassword: password123
+displayName: Alice Admin
+description: Test user with admin role
+twakeDepartmentLink: ou=Test Org 1,ou=organization,dc=example,dc=com
+twakeDepartmentPath: Test Org 1
+
+dn: uid=bob.user,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: twakeWhitePages
+uid: bob.user
+cn: Bob User
+sn: User
+givenName: Bob
+mail: bob.user@example.com
+userPassword: password123
+displayName: Bob User
+description: Test user in organization
+twakeDepartmentLink: ou=Sub Org 1,ou=Test Org 1,ou=organization,dc=example,dc=com
+twakeDepartmentPath: Test Org 1/Sub Org 1
+
+# Add twakeLocalAdminLink to organization
+dn: ou=Test Org 1,ou=organization,dc=example,dc=com
+changetype: modify
+add: twakeLocalAdminLink
+twakeLocalAdminLink: uid=alice.admin,ou=users,dc=example,dc=com

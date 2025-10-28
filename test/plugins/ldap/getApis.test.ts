@@ -6,21 +6,6 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organization';
 
 describe('GET APIs for individual entities', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_GROUP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping GET API tests: LDAP credentials and DM_LDAP_GROUP_BASE are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let flatPlugin: LdapFlatGeneric;
   let groupsPlugin: LdapGroups;
@@ -28,6 +13,20 @@ describe('GET APIs for individual entities', function () {
   let request: any;
 
   before(async function () {
+    // Skip all tests if required env vars are not set
+    if (
+      !process.env.DM_LDAP_DN ||
+      !process.env.DM_LDAP_PWD ||
+      !process.env.DM_LDAP_GROUP_BASE
+    ) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'Skipping GET API tests: LDAP credentials and DM_LDAP_GROUP_BASE are required'
+      );
+      this.skip();
+      return;
+    }
+
     this.timeout(5000);
     process.env.DM_LDAP_FLAT_SCHEMA =
       './static/schemas/twake/nomenclature/twakeTitle.json';

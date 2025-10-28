@@ -46,9 +46,13 @@ export const mochaHooks = {
           process.env[key] = value;
         });
 
+        // Set top organization for tests requiring it
+        process.env.DM_LDAP_TOP_ORGANIZATION = `ou=organization,${envVars.DM_LDAP_BASE}`;
+
         console.log('✓ Embedded LDAP server ready');
         console.log(`  URL: ${envVars.DM_LDAP_URL}`);
         console.log(`  Base DN: ${envVars.DM_LDAP_BASE}`);
+        console.log(`  Top Org: ${process.env.DM_LDAP_TOP_ORGANIZATION}`);
         console.log('');
       }
 

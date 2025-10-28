@@ -7,13 +7,6 @@ import {
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
 
-const {
-  DM_LDAP_TOP_ORGANIZATION,
-  DM_LDAP_BASE,
-  DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE,
-  DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE,
-} = process.env;
-
 describe('LDAP Department Sync Plugin', function () {
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
@@ -21,16 +14,31 @@ describe('LDAP Department Sync Plugin', function () {
 
   let server: DM;
   let plugin: LdapDepartmentSync;
-
-  const testOrgDn = `ou=SyncTestOrg,${DM_LDAP_TOP_ORGANIZATION}`;
-  const testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
-  const testSubOrg2Dn = `ou=SubOrg2,${testSubOrg1Dn}`;
-  const movedOrgDn = `ou=SyncTestOrgMoved,${DM_LDAP_TOP_ORGANIZATION}`;
-  const testUserDn = `uid=synctestuser,${DM_LDAP_BASE}`;
-  const testUser2Dn = `uid=synctestuser2,${DM_LDAP_BASE}`;
-  const testGroupDn = `cn=synctestgroup,${DM_LDAP_BASE}`;
+  let DM_LDAP_TOP_ORGANIZATION: string;
+  let DM_LDAP_BASE: string;
+  let DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE: string | undefined;
+  let DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE: string | undefined;
+  let testOrgDn: string;
+  let testSubOrg1Dn: string;
+  let testSubOrg2Dn: string;
+  let movedOrgDn: string;
+  let testUserDn: string;
+  let testUser2Dn: string;
+  let testGroupDn: string;
 
   before(async () => {
+    DM_LDAP_TOP_ORGANIZATION = process.env.DM_LDAP_TOP_ORGANIZATION!;
+    DM_LDAP_BASE = process.env.DM_LDAP_BASE!;
+    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
+    testOrgDn = `ou=SyncTestOrg,${DM_LDAP_TOP_ORGANIZATION}`;
+    testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
+    testSubOrg2Dn = `ou=SubOrg2,${testSubOrg1Dn}`;
+    movedOrgDn = `ou=SyncTestOrgMoved,${DM_LDAP_TOP_ORGANIZATION}`;
+    testUserDn = `uid=synctestuser,${DM_LDAP_BASE}`;
+    testUser2Dn = `uid=synctestuser2,${DM_LDAP_BASE}`;
+    testGroupDn = `cn=synctestgroup,${DM_LDAP_BASE}`;
+
     server = new DM();
     await server.ready;
     plugin = new LdapDepartmentSync(server);
