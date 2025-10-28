@@ -127,6 +127,8 @@ export class LdapTestServer {
         if (result && result.trim()) {
           console.log(`Mail schema output: ${result.trim()}`);
         }
+        // Wait for schema to be fully loaded
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (err: any) {
         console.error(`ERROR loading mail schema:`);
         console.error(`  stdout: ${err.stdout?.toString()}`);
@@ -148,6 +150,8 @@ export class LdapTestServer {
       if (result && result.trim()) {
         console.log(`Schema load output: ${result.trim()}`);
       }
+      // Wait for schema to be fully loaded
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (err: any) {
       // Fallback to custom schema if official one doesn't exist
       const schemaPath = join(__dirname, '../fixtures/twake-schema.ldif');
@@ -166,6 +170,8 @@ export class LdapTestServer {
           if (result && result.trim()) {
             console.log(`Schema load output: ${result.trim()}`);
           }
+          // Wait for schema to be fully loaded
+          await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (err: any) {
           console.error(`ERROR loading Twake schema:`);
           console.error(`  stdout: ${err.stdout?.toString()}`);
@@ -227,7 +233,7 @@ export class LdapTestServer {
   /**
    * Load LDIF data into the server
    */
-  async loadLdif(ldifContent: string): Promise<void> {
+  async loadLdif(ldifContent: string, maxRetries = 10): Promise<void> {
     // Write LDIF to temporary file in container
     const tempFile = `/tmp/load-${Date.now()}.ldif`;
 
@@ -252,16 +258,29 @@ export class LdapTestServer {
         });
       });
 
-      // Load LDIF using ldapadd
-      execSync(
-        `docker exec ${this.containerName} ldapadd -x -D "${this.config.adminDn}" -w "${this.config.adminPassword}" -f ${tempFile}`,
-        { stdio: 'pipe' }
-      );
+      // Load LDIF using ldapadd with retry logic
+      let lastError: Error | undefined;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          execSync(
+            `docker exec ${this.containerName} ldapadd -x -D "${this.config.adminDn}" -w "${this.config.adminPassword}" -f ${tempFile}`,
+            { stdio: 'pipe', timeout: 5000 }
+          );
 
-      // Clean up temp file
-      execSync(`docker exec ${this.containerName} rm ${tempFile}`, {
-        stdio: 'ignore',
-      });
+          // Success - clean up temp file
+          execSync(`docker exec ${this.containerName} rm ${tempFile}`, {
+            stdio: 'ignore',
+          });
+          return;
+        } catch (err) {
+          lastError = err as Error;
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // All retries failed
+      throw new Error(`Failed to load LDIF after ${maxRetries} attempts: ${lastError?.message}`);
     } catch (err) {
       throw new Error(`Failed to load LDIF: ${(err as Error).message}`);
     }
