@@ -35,7 +35,10 @@ describe('App Accounts Consistency Plugin', function () {
 
     // Initialize bases
     userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
-    applicativeBase = `ou=applicative,${process.env.DM_LDAP_BASE}`;
+    // Use environment variable if set, otherwise fallback to ou=applicative
+    applicativeBase =
+      process.env.DM_APPLICATIVE_ACCOUNT_BASE ||
+      `ou=applicative,${process.env.DM_LDAP_BASE}`;
 
     testUserDN = `uid=testuser,${userBase}`;
     testApplicativeDN = `uid=testuser@example.com,${applicativeBase}`;
@@ -50,11 +53,15 @@ describe('App Accounts Consistency Plugin', function () {
       // Ignore if already exists
     }
 
-    // Ensure ou=applicative exists
+    // Ensure applicative base exists
     try {
+      // Extract ou from DN (e.g., "ou=appaccounts" from "ou=appaccounts,o=gov,c=mu")
+      const ouMatch = applicativeBase.match(/^ou=([^,]+)/);
+      const ouValue = ouMatch ? ouMatch[1] : 'applicative';
+
       await dm.ldap.add(applicativeBase, {
         objectClass: ['organizationalUnit', 'top'],
-        ou: 'applicative',
+        ou: ouValue,
       });
     } catch (err) {
       // Ignore if already exists
@@ -63,6 +70,23 @@ describe('App Accounts Consistency Plugin', function () {
     // Configure and register plugins
     dm.config.applicative_account_base = applicativeBase;
     dm.config.mail_attribute = 'mail';
+    // Set operational attributes - use default list from config/args.ts
+    // This is needed because test environment doesn't load config from env/cli
+    if (!dm.config.ldap_operational_attributes) {
+      dm.config.ldap_operational_attributes = [
+        'dn',
+        'controls',
+        'structuralObjectClass',
+        'entryUUID',
+        'entryDN',
+        'subschemaSubentry',
+        'modifyTimestamp',
+        'modifiersName',
+        'createTimestamp',
+        'creatorsName',
+        'userPassword',
+      ];
+    }
 
     // Register onChange plugin (dependency)
     const onChange = new OnChange(dm);
