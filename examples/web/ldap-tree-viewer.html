@@ -141,13 +141,12 @@
                   id="search-input"
                   placeholder="Search by name, uid, email..."
                   style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
-                  onkeypress="if(event.key === 'Enter') document.getElementById('search-btn').click()"
                 />
                 <button
                   id="search-btn"
                   class="demo-button"
                   style="margin: 0;"
-                  onclick="performSearch('${parentDn}', document.getElementById('search-input').value)"
+                  data-parent-dn="${escapeHtml(parentDn)}"
                 >
                   Search
                 </button>
@@ -156,6 +155,21 @@
             </div>
           </div>
         `;
+
+          // Attach event listeners for search functionality (avoid inline handlers for security)
+          const searchBtn = document.getElementById('search-btn');
+          const searchInput = document.getElementById('search-input');
+          if (searchBtn && searchInput) {
+            searchBtn.addEventListener('click', () => {
+              const dn = searchBtn.getAttribute('data-parent-dn');
+              performSearch(dn, searchInput.value);
+            });
+            searchInput.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                searchBtn.click();
+              }
+            });
+          }
           return;
         }
 
