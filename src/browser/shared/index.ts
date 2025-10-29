@@ -7,6 +7,7 @@
 export * from './utils/dom';
 export * from './utils/form';
 export * from './utils/schema';
+export * from './utils/totp';
 
 // Component exports
 export { Modal, type ModalOptions } from './components/Modal';
