@@ -150,7 +150,11 @@ export default class AuthTotp extends AuthBase {
    */
   private base32Decode(input: string): Buffer {
     const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    const cleanInput = input.toUpperCase().replace(/=+$/, '');
+    // Remove trailing padding characters (avoid ReDoS by using simple loop instead of regex)
+    let cleanInput = input.toUpperCase();
+    while (cleanInput.endsWith('=')) {
+      cleanInput = cleanInput.slice(0, -1);
+    }
 
     let bits = 0;
     let value = 0;

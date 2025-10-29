@@ -225,7 +225,7 @@ describe('AuthTotp', () => {
 
     it('should reject code generated with wrong step', async () => {
       const wrongCode = generateTestTotp(testSecret, 6, 30);
-      const res = await request(app)
+      await request(app)
         .get('/api/hello')
         .set('Authorization', `Bearer ${wrongCode}`);
       // This might pass or fail depending on timing, but it's a good edge case

@@ -177,7 +177,6 @@ describe('AuthHmac', () => {
 
     it('should validate signature with JSON body', async () => {
       const timestamp = Date.now();
-      const body = { name: 'test', value: 123 };
       const signature = generateHmacSignature(
         secret,
         'GET',
