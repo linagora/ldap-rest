@@ -63,6 +63,8 @@ class ldapActions {
   private connectionPool: PooledConnection[] = [];
   private poolSize: number;
   private connectionTtl: number; // in milliseconds
+  private ldapUrls: string[];
+  private currentUrlIndex: number = 0;
 
   constructor(server: DM) {
     this.parent = server;
@@ -98,7 +100,7 @@ class ldapActions {
     this.logger.info(
       `LDAP search cache initialized: max=${cacheMax}, ttl=${cacheTtl / 1000}s`
     );
-    if (!server.config.ldap_url) {
+    if (!server.config.ldap_url || server.config.ldap_url.length === 0) {
       throw new Error('LDAP URL is not defined');
     }
     if (!server.config.ldap_dn) {
@@ -113,13 +115,17 @@ class ldapActions {
     } else {
       this.base = server.config.ldap_base;
     }
+    this.ldapUrls = server.config.ldap_url;
+    this.logger.info(
+      `LDAP failover configured with ${this.ldapUrls.length} URL(s): ${this.ldapUrls.join(', ')}`
+    );
     this.options = {
-      url: server.config.ldap_url,
+      url: this.ldapUrls[0],
       timeout: 0,
       connectTimeout: 0,
       strictDN: false,
     };
-    if (server.config.ldap_url.startsWith('ldaps://')) {
+    if (this.ldapUrls[0].startsWith('ldaps://')) {
       this.options.tlsOptions = {
         minVersion: 'TLSv1.2',
       };
@@ -129,18 +135,51 @@ class ldapActions {
   }
 
   /**
-   * Create a new LDAP connection
+   * Create a new LDAP connection with failover support
    */
   private async createConnection(): Promise<Client> {
-    const client: Client = new Client(this.options);
-    try {
-      await client.bind(this.dn, this.pwd);
-    } catch (error) {
-      this.logger.error('LDAP bind error:', error);
-      throw new Error('LDAP bind error');
+    const errors: Error[] = [];
+
+    // Try each URL in order
+    for (let i = 0; i < this.ldapUrls.length; i++) {
+      const urlIndex = (this.currentUrlIndex + i) % this.ldapUrls.length;
+      const url = this.ldapUrls[urlIndex];
+
+      try {
+        this.logger.debug(`Attempting connection to ${url}`);
+        const options: ClientOptions = {
+          ...this.options,
+          url,
+          tlsOptions: url.startsWith('ldaps://')
+            ? { minVersion: 'TLSv1.2' }
+            : undefined,
+        };
+
+        const client: Client = new Client(options);
+        await client.bind(this.dn, this.pwd);
+
+        // Connection successful
+        if (urlIndex !== this.currentUrlIndex) {
+          this.logger.info(
+            `LDAP failover: switched from ${this.ldapUrls[this.currentUrlIndex]} to ${url}`
+          );
+          this.currentUrlIndex = urlIndex;
+        }
+
+        return client;
+      } catch (error) {
+        this.logger.warn(`Failed to connect to ${url}: ${String(error)}`);
+        errors.push(error as Error);
+      }
     }
-    if (!client) throw new Error('LDAP connection error');
-    return client;
+
+    // All URLs failed
+    this.logger.error(
+      `LDAP connection failed for all ${this.ldapUrls.length} URL(s)`
+    );
+    throw new Error(
+      `LDAP connection failed for all URLs: ${errors.map(e => e.message).join(', ')}`
+    );
   }
 
   /**

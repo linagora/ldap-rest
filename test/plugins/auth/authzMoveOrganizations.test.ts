@@ -115,6 +115,28 @@ describe('Authorization for Organization Move', function () {
 
     request = supertest(server.app);
 
+    // Clean up any existing test organizations first (including children)
+    const cleanupOrg = async (dn: string) => {
+      try {
+        // Search for children first
+        const result: SearchResult = await server.ldap.search(
+          { scope: 'one', filter: '(objectClass=*)', paged: false },
+          dn
+        ) as SearchResult;
+        // Delete children first
+        for (const entry of result.searchEntries) {
+          await cleanupOrg(entry.dn);
+        }
+        // Then delete the parent
+        await server.ldap.delete(dn);
+      } catch (e) {
+        // ignore if doesn't exist
+      }
+    };
+
+    await cleanupOrg(getParentOrg1Dn());
+    await cleanupOrg(getParentOrg2Dn());
+
     // Create test parent organizations
     await server.ldap.add(getParentOrg1Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],

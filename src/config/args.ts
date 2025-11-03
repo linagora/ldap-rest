@@ -47,7 +47,7 @@ export interface Config {
   ldap_base?: string;
   ldap_dn?: string;
   ldap_pwd?: string;
-  ldap_url?: string;
+  ldap_url?: string[];
   ldap_user_main_attribute?: string;
   ldap_cache_max?: number;
   ldap_cache_ttl?: number;
@@ -207,7 +207,7 @@ const configArgs: ConfigTemplate = [
   ['--ldap-base', 'DM_LDAP_BASE', ''],
   ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=com'],
   ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
-  ['--ldap-url', 'DM_LDAP_URL', 'ldap://localhost'],
+  ['--ldap-url', 'DM_LDAP_URL', ['ldap://localhost'], 'array', '--ldap-urls'],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
   ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 300, 'number'], // seconds
