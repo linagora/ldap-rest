@@ -198,7 +198,7 @@ const configArgs: ConfigTemplate = [
   // Global options
   ['--port', 'DM_PORT', 8081, 'number'],
   ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins'],
-  ['--log-level', 'DM_LOG_LEVEL', 'info'],
+  ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
   ['--mail-domain', 'DM_MAIL_DOMAIN', [], 'array', '--mail-domains'],

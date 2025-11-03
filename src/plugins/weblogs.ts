@@ -48,6 +48,6 @@ export default class WebLogs extends DmPlugin {
       duration,
       ...log,
     };
-    this.logger.info(_log);
+    this.logger.notice(_log);
   }
 }
