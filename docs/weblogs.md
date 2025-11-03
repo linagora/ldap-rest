@@ -26,11 +26,11 @@ Each request is logged when it arrives:
 
 ### Response Logging
 
-Each response is logged when completed:
+Each response is logged when completed at **notice** level (between info and warn):
 
 ```json
 {
-  "level": "info",
+  "level": "notice",
   "message": "GET /api/v1/ldap/users 200 45ms",
   "user": "admin",
   "method": "GET",
@@ -167,11 +167,19 @@ Track authorization failures:
 Configure log level to control verbosity:
 
 ```bash
---log-level debug  # All requests + debug info
---log-level info   # Completed requests only
---log-level warn   # Only warnings and errors
---log-level error  # Only errors
+--log-level debug   # All requests + debug info
+--log-level info    # Completed requests + info messages
+--log-level notice  # Completed requests (web logs) only
+--log-level warn    # Only warnings and errors (no web logs)
+--log-level error   # Only errors
 ```
+
+The log level hierarchy (following syslog convention):
+- **error** (0) - Error messages only
+- **warn** (1) - Warnings and errors
+- **notice** (2) - Web access logs, warnings and errors
+- **info** (3) - General info messages, web logs, warnings and errors
+- **debug** (4) - All messages including debug output
 
 ### Debug Level
 
@@ -188,6 +196,22 @@ Output:
 [info] POST /api/v1/ldap/users 201 123ms
 ```
 
+### Notice Level (Recommended)
+
+```bash
+--plugin core/weblogs \
+--log-level notice
+```
+
+Output:
+
+```
+[notice] POST /api/v1/ldap/users 201 123ms {"user":"admin"}
+[notice] GET /api/v1/ldap/users 200 45ms {"user":"admin"}
+```
+
+This level shows only web access logs without general info messages, ideal for production.
+
 ### Info Level
 
 ```bash
@@ -198,9 +222,13 @@ Output:
 Output:
 
 ```
-[info] POST /api/v1/ldap/users 201 123ms {"user":"admin"}
-[info] GET /api/v1/ldap/users 200 45ms {"user":"admin"}
+[info] LDAP connection pool initialized: size=5, ttl=60s
+[info] Plugin loaded: core/weblogs
+[notice] POST /api/v1/ldap/users 201 123ms {"user":"admin"}
+[notice] GET /api/v1/ldap/users 200 45ms {"user":"admin"}
 ```
+
+This level includes general info messages along with web logs.
 
 ## Event Handling
 

@@ -26,9 +26,32 @@ Example:
 npx ldap-rest --ldap-base 'dc=example,dc=com' \
     --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd admin \
     --ldap-url ldap://localhost \
+    --log-level notice \
     --plugin core/ldap/groups --ldap-group-base 'ou=groups,dc=example,dc=com' \
     --plugin core/ldap/externalUsersInGroups
 ```
+
+### LDAP Failover
+
+Multiple LDAP servers are supported for high availability:
+
+```shell
+--ldap-url ldap://ldap1.example.com,ldap://ldap2.example.com,ldap://ldap3.example.com
+```
+
+The system automatically tries each URL in order and fails over if a connection fails.
+
+### Log Levels
+
+LDAP-Rest uses syslog-style log levels:
+
+- `error` - Only errors
+- `warn` - Warnings and errors
+- `notice` - Web access logs (recommended for production)
+- `info` - General info + web logs
+- `debug` - All debug output
+
+Use `--log-level notice` for production to see web access logs without general info messages.
 
 ## Command-line options and environment variables
 

@@ -207,7 +207,7 @@ All CLI options can be set via environment variables:
 
 ```bash
 # LDAP connection
-export DM_LDAP_URL="ldap://localhost:389"
+export DM_LDAP_URL="ldap://localhost:389"  # or multiple URLs for failover
 export DM_LDAP_DN="cn=admin,dc=example,dc=com"
 export DM_LDAP_PWD="password"
 export DM_LDAP_BASE="dc=example,dc=com"
@@ -217,9 +217,44 @@ export DM_PLUGIN="core/auth/token,core/ldap/flatGeneric"
 export DM_AUTH_TOKENS="token1,token2"
 export DM_LDAP_FLAT_SCHEMA="./schemas/users.json"
 
+# Logging
+export DM_LOG_LEVEL="notice"  # error, warn, notice, info, debug
+
 # Start server
 ldap-rest
 ```
+
+### LDAP Failover
+
+LDAP-Rest supports multiple LDAP servers for high availability. Provide multiple URLs separated by commas:
+
+```bash
+# Command line
+--ldap-url ldap://ldap1.example.com,ldap://ldap2.example.com,ldap://ldap3.example.com
+
+# Or via environment variable
+export DM_LDAP_URL="ldap://ldap1.example.com,ldap://ldap2.example.com,ldap://ldap3.example.com"
+```
+
+The system will:
+1. Try to connect to each URL in order
+2. Use the first successful connection
+3. Automatically failover to the next URL if the current connection fails
+4. Log failover events for monitoring
+
+### Log Levels
+
+LDAP-Rest uses syslog-style log levels:
+
+```bash
+--log-level error   # Only errors
+--log-level warn    # Warnings and errors
+--log-level notice  # Web access logs (recommended for production)
+--log-level info    # General info + web logs + warnings + errors
+--log-level debug   # All messages including debug output
+```
+
+The **notice** level is ideal for production as it shows web access logs without flooding with general info messages.
 
 ### Configuration Files
 
@@ -440,6 +475,13 @@ Enable detailed logging:
 ```bash
 ldap-rest --log-level debug ...
 ```
+
+Available log levels (following syslog convention):
+- `error` - Only errors
+- `warn` - Warnings and errors
+- `notice` - Web access logs, warnings and errors (recommended for production)
+- `info` - General info messages, web logs, warnings and errors
+- `debug` - All messages including debug output
 
 ### Testing
 

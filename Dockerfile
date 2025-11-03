@@ -22,7 +22,7 @@ RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /
 ENV NODE_ENV=production \
  DM_PORT="8081" \
  DM_PLUGINS=core/static,core/helloworld \
- DM_LOG_LEVEL="info" \
+ DM_LOG_LEVEL="notice" \
  DM_LOGGER="console" \
  DM_API_PREFIX="/api" \
  DM_MAIL_DOMAIN= \
