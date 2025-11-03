@@ -45,34 +45,11 @@ function copySharedCss() {
   }
 }
 
-function copyExamples() {
-  const srcDir = 'examples/web';
-  const destDir = 'static/examples/web';
-
-  try {
-    mkdirSync(destDir, { recursive: true });
-
-    const files = readdirSync(srcDir);
-    for (const file of files) {
-      if (file.endsWith('.html')) {
-        const srcPath = join(srcDir, file);
-        const destPath = join(destDir, file);
-        console.log(`Copying ${srcPath} → ${destPath}`);
-        copyFileSync(srcPath, destPath);
-      }
-    }
-    console.log('✓ HTML examples copied to static/examples/web/');
-  } catch (error) {
-    console.error('Error copying examples:', error);
-  }
-}
-
 try {
   moveJsFiles(srcDir, destDir);
   console.log('✓ Browser libraries moved to static/browser/');
 
   copySharedCss();
-  copyExamples();
 } catch (error) {
   console.error('Error moving browser libraries:', error);
   process.exit(1);
