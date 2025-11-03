@@ -47,6 +47,7 @@ The test framework automatically detects which LDAP server to use:
 ### Test Output Examples
 
 **With embedded LDAP (default):**
+
 ```
 🚀 Setting up global test environment...
 
@@ -62,6 +63,7 @@ Loading initial LDIF from .../base-structure.ldif...
 ```
 
 **With external LDAP:**
+
 ```
 🚀 Setting up global test environment...
 
@@ -75,12 +77,14 @@ Loading initial LDIF from .../base-structure.ldif...
 ### Running Tests
 
 **Using embedded LDAP (no setup required):**
+
 ```bash
 npm test
 npm run test:one test/plugins/ldap/flatGeneric.test.ts
 ```
 
 **Using external LDAP:**
+
 ```bash
 export DM_LDAP_URL=ldap://localhost:389
 export DM_LDAP_DN=cn=admin,dc=example,dc=com
@@ -93,6 +97,7 @@ npm test
 ### In CI/CD
 
 **GitHub Actions example:**
+
 ```yaml
 name: Tests
 
@@ -213,7 +218,7 @@ describe('My plugin', () => {
   let server: DM;
 
   before(async () => {
-    server = new DM();  // Reads env vars automatically
+    server = new DM(); // Reads env vars automatically
     await server.ready;
   });
 
@@ -279,7 +284,7 @@ docker rm -f $(docker ps -a | grep ldap-test | awk '{print $1}')
 Increase timeout in your test if LDAP is slow to start:
 
 ```typescript
-before(async function() {
+before(async function () {
   this.timeout(120000); // 2 minutes
   // ...
 });
@@ -305,7 +310,7 @@ No changes needed! Tests using `skipIfMissingEnvVars()` will now always pass:
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('My test', () => {
-  before(function() {
+  before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]); // Still works!
   });
 });
@@ -324,7 +329,7 @@ describe('New plugin', () => {
   let server: DM;
 
   before(async () => {
-    server = new DM();  // That's it!
+    server = new DM(); // That's it!
     await server.ready;
   });
 

@@ -237,6 +237,7 @@ export DM_LDAP_URL="ldap://ldap1.example.com,ldap://ldap2.example.com,ldap://lda
 ```
 
 The system will:
+
 1. Try to connect to each URL in order
 2. Use the first successful connection
 3. Automatically failover to the next URL if the current connection fails
@@ -477,6 +478,7 @@ ldap-rest --log-level debug ...
 ```
 
 Available log levels (following syslog convention):
+
 - `error` - Only errors
 - `warn` - Warnings and errors
 - `notice` - Web access logs, warnings and errors (recommended for production)

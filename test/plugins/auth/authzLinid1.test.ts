@@ -43,7 +43,8 @@ describe('AuthzLinid1 Plugin', () => {
   let authz: AuthzLinid1;
 
   // Use getters to ensure env vars are evaluated after setup
-  const getTestOrgDn = () => `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestOrgDn = () =>
+    `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
   const getTestUserDn = () => `uid=testadmin,${process.env.DM_LDAP_BASE}`;
 
   before(function () {
@@ -117,7 +118,10 @@ describe('AuthzLinid1 Plugin', () => {
       await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get permissions
-      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      const perms = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -143,7 +147,10 @@ describe('AuthzLinid1 Plugin', () => {
       await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // Get permissions
-      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      const perms = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
 
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
@@ -171,7 +178,10 @@ describe('AuthzLinid1 Plugin', () => {
 
       // Check permissions for a sub-branch
       const subBranchDn = `ou=SubOrg,${getTestOrgDn()}`;
-      const perms = await authz.getUserPermissions(getTestUserDn(), subBranchDn);
+      const perms = await authz.getUserPermissions(
+        getTestUserDn(),
+        subBranchDn
+      );
 
       expect(perms.read).to.be.true;
       expect(perms.write).to.be.true;
@@ -245,11 +255,17 @@ describe('AuthzLinid1 Plugin', () => {
       await dm.ldap.add(getTestOrgDn(), orgEntry);
 
       // First call - should fetch from LDAP
-      const perms1 = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      const perms1 = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
       expect(perms1.read).to.be.true;
 
       // Second call - should use cache
-      const perms2 = await authz.getUserPermissions(getTestUserDn(), getTestOrgDn());
+      const perms2 = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrgDn()
+      );
       expect(perms2.read).to.be.true;
 
       // Verify cache was used
@@ -260,9 +276,12 @@ describe('AuthzLinid1 Plugin', () => {
   });
 
   describe('Integration with users branch', () => {
-    const getTestUserInOrgDn = () => `uid=testuser,ou=users,${process.env.DM_LDAP_BASE}`;
-    const getTestUser2InOrgDn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
-    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestUserInOrgDn = () =>
+      `uid=testuser,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestUser2InOrgDn = () =>
+      `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestOrg2Dn = () =>
+      `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
 
     afterEach(async () => {
       // Clean up test users in users branch
@@ -439,7 +458,10 @@ describe('AuthzLinid1 Plugin', () => {
       expect(branches).to.not.include(getTestOrg2Dn());
 
       // Admin should not have permissions on org2
-      const perms = await authz.getUserPermissions(getTestUserDn(), getTestOrg2Dn());
+      const perms = await authz.getUserPermissions(
+        getTestUserDn(),
+        getTestOrg2Dn()
+      );
       expect(perms.read).to.be.false;
       expect(perms.write).to.be.false;
       expect(perms.delete).to.be.false;
@@ -450,7 +472,8 @@ describe('AuthzLinid1 Plugin', () => {
     let request: ReturnType<typeof supertest>;
     let orgPlugin: LdapOrganization;
     let authPlugin: TestAuthPlugin;
-    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestOrg2Dn = () =>
+      `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     const getTestSubOrg1Dn = () => `ou=SubOrg1,${getTestOrgDn()}`;
     const getTestSubOrg2Dn = () => `ou=SubOrg2,${getTestOrg2Dn()}`;
     const adminToken = 'test-admin-token';
@@ -524,7 +547,9 @@ describe('AuthzLinid1 Plugin', () => {
 
         // Try to get unauthorized org via API - should fail
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`)
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`
+          )
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
@@ -555,7 +580,9 @@ describe('AuthzLinid1 Plugin', () => {
 
         // Try to get authorized org via API - should succeed
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`)
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`
+          )
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
@@ -716,7 +743,8 @@ describe('AuthzLinid1 Plugin', () => {
     });
 
     describe('WRITE - Move user between organizations', () => {
-      const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser1Dn = () =>
+        `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
 
       afterEach(async () => {
         try {
@@ -950,8 +978,10 @@ describe('AuthzLinid1 Plugin', () => {
     });
 
     describe('WRITE - Add user with twakeDepartmentLink', () => {
-      const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
-      const getTestUser2Dn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser1Dn = () =>
+        `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+      const getTestUser2Dn = () =>
+        `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
 
       afterEach(async () => {
         try {

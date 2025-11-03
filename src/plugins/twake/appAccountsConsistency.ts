@@ -53,7 +53,8 @@ export default class AppAccountsConsistency extends DmPlugin {
     this.mailAttr = (this.config.mail_attribute as string) || 'mail';
     this.applicativeAccountBase = this.config
       .applicative_account_base as string;
-    this.operationalAttributes = (this.config.ldap_operational_attributes as string[]) || [];
+    this.operationalAttributes =
+      (this.config.ldap_operational_attributes as string[]) || [];
 
     if (!this.applicativeAccountBase) {
       throw new Error(

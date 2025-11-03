@@ -20,7 +20,7 @@ async function sha256(data: string): Promise<string> {
   const dataBuffer = encoder.encode(data);
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -43,7 +43,7 @@ async function hmacSha256(secret: string, message: string): Promise<string> {
   // Calculate HMAC
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
   const signatureArray = Array.from(new Uint8Array(signature));
-  return signatureArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -272,8 +272,10 @@ export function isSecretSecure(secret: string): boolean {
  * Generate a random secure secret for HMAC (for testing/development)
  * In production, secrets should be generated securely on the backend
  */
-export async function generateRandomSecret(length: number = 64): Promise<string> {
+export async function generateRandomSecret(
+  length: number = 64
+): Promise<string> {
   const array = new Uint8Array(length);
   crypto.getRandomValues(array);
-  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }

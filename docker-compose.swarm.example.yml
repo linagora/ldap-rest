@@ -18,26 +18,26 @@ services:
     networks:
       - mini-dm-network
     ports:
-      - "8081:8081"
+      - '8081:8081'
     environment:
       # LDAP Configuration - Pointant vers les 2 VM
-      DM_LDAP_URL: "ldap://192.168.1.10:389,ldap://192.168.1.11:389"
-      DM_LDAP_BASE: "dc=example,dc=com"
-      DM_LDAP_DN: "cn=admin,dc=example,dc=com"
-      DM_LDAP_PWD: "changeme"
-      DM_LDAP_USER_ATTRIBUTE: "uid"
-      DM_MAIL_DOMAIN: "example.com"
+      DM_LDAP_URL: 'ldap://192.168.1.10:389,ldap://192.168.1.11:389'
+      DM_LDAP_BASE: 'dc=example,dc=com'
+      DM_LDAP_DN: 'cn=admin,dc=example,dc=com'
+      DM_LDAP_PWD: 'changeme'
+      DM_LDAP_USER_ATTRIBUTE: 'uid'
+      DM_MAIL_DOMAIN: 'example.com'
 
       # Caching LDAP
-      DM_LDAP_CACHE_MAX: "1000"
-      DM_LDAP_CACHE_TTL: "300"
-      DM_LDAP_POOL_SIZE: "5"
+      DM_LDAP_CACHE_MAX: '1000'
+      DM_LDAP_CACHE_TTL: '300'
+      DM_LDAP_POOL_SIZE: '5'
 
       # Application
-      DM_PORT: "8081"
-      DM_LOG_LEVEL: "info"
-      DM_PLUGINS: "core/static,core/helloworld"
-      DM_API_PREFIX: "/api"
+      DM_PORT: '8081'
+      DM_LOG_LEVEL: 'info'
+      DM_PLUGINS: 'core/static,core/helloworld'
+      DM_API_PREFIX: '/api'
 
       # Optional: James integration
       # DM_JAMES_WEBADMIN_URL: "http://james:8000"
@@ -47,7 +47,15 @@ services:
       # DM_CALENDAR_WEBADMIN_URL: "http://calendar:8080"
       # DM_CALENDAR_WEBADMIN_TOKEN: "secret"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/api/health"]
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:8081/api/health',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

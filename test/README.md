@@ -25,6 +25,7 @@ The test suite automatically manages LDAP server setup:
 - **LDAP env vars set** → Uses your external LDAP server
 
 This means tests work:
+
 - ✅ In CI/CD without any setup
 - ✅ Locally without installing LDAP
 - ✅ With your existing LDAP server if configured
@@ -99,13 +100,16 @@ describe('Advanced LDAP Feature', () => {
 Pre-loaded LDAP data:
 
 **Users:**
+
 - john.doe@example.com (password: password123)
 - jane.smith@example.com (password: password123)
 
 **Groups:**
+
 - cn=admins (members: john.doe, jane.smith)
 
 **Nomenclature:**
+
 - Titles: Dr, Mr, Ms
 - List Types: openList, memberRestrictedList
 - Mailbox Types: group, mailingList, teamMailbox
@@ -113,6 +117,7 @@ Pre-loaded LDAP data:
 ## Troubleshooting
 
 **Tests fail with "LDAP server not started":**
+
 ```bash
 # Check Docker is running
 docker ps
@@ -122,11 +127,13 @@ docker rm -f $(docker ps -a | grep ldap-test | awk '{print $1}')
 ```
 
 **Tests are slow:**
+
 - First test run starts LDAP server (~2-3s)
 - Subsequent tests in same run are fast
 - Server is shared across all tests in a single `npm test` run
 
 **Want to use external LDAP:**
+
 ```bash
 # Set these before running tests
 export DM_LDAP_URL=ldap://your-server:389

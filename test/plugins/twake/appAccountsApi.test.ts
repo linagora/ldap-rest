@@ -316,7 +316,10 @@ describe('App Accounts API Plugin', function () {
       await dmTest.registerPlugin('onLdapChange', onChange);
 
       const appAccountsConsistency = new AppAccountsConsistency(dmTest);
-      await dmTest.registerPlugin('appAccountsConsistency', appAccountsConsistency);
+      await dmTest.registerPlugin(
+        'appAccountsConsistency',
+        appAccountsConsistency
+      );
 
       const testAppAccountsApi = new AppAccountsApi(dmTest);
       await dmTest.registerPlugin('appAccountsApi', testAppAccountsApi);

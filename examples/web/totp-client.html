@@ -70,7 +70,12 @@
 
       .countdown-bar-fill {
         height: 100%;
-        background: linear-gradient(90deg, #4caf50 0%, #ff9800 50%, #f44336 100%);
+        background: linear-gradient(
+          90deg,
+          #4caf50 0%,
+          #ff9800 50%,
+          #f44336 100%
+        );
         transition: width 0.3s ease;
       }
 
@@ -214,13 +219,16 @@
           <div class="info-box">
             <h3>What is TOTP?</h3>
             <p>
-              TOTP generates temporary codes that change every 30 seconds.
-              Enter your Base32 secret to generate codes compatible with Google
+              TOTP generates temporary codes that change every 30 seconds. Enter
+              your Base32 secret to generate codes compatible with Google
               Authenticator, Authy, and other authenticator apps.
             </p>
           </div>
 
-          <label for="secret-input" style="font-weight: 500; margin-bottom: 5px; display: block;">
+          <label
+            for="secret-input"
+            style="font-weight: 500; margin-bottom: 5px; display: block"
+          >
             Base32 Secret
           </label>
           <input
@@ -336,60 +344,43 @@
 
         <h3>Installation</h3>
         <div class="api-response" style="margin-bottom: 20px">
-npm install ldap-rest
-# or
-yarn add ldap-rest</div>
+          npm install ldap-rest # or yarn add ldap-rest
+        </div>
 
         <h3>Import the TOTP Client</h3>
         <div class="api-response" style="margin-bottom: 20px">
-import { generateTotp, TotpAuthClient } from 'ldap-rest/browser-shared-utils-totp';</div>
+          import { generateTotp, TotpAuthClient } from
+          'ldap-rest/browser-shared-utils-totp';
+        </div>
 
         <h3>Generate TOTP Code</h3>
         <div class="api-response" style="margin-bottom: 20px">
-// Generate a TOTP code
-const code = await generateTotp({
-  secret: 'JBSWY3DPEHPK3PXP',
-  digits: 6,
-  step: 30
-});
-
-console.log('Current TOTP code:', code);</div>
+          // Generate a TOTP code const code = await generateTotp({ secret:
+          'JBSWY3DPEHPK3PXP', digits: 6, step: 30 }); console.log('Current TOTP
+          code:', code);
+        </div>
 
         <h3>Use TotpAuthClient for API Requests</h3>
         <div class="api-response" style="margin-bottom: 20px">
-// Create authenticated client
-const client = new TotpAuthClient({
-  secret: 'JBSWY3DPEHPK3PXP',
-  digits: 6,
-  step: 30
-});
-
-// Make authenticated requests
-const users = await client.get('/api/v1/ldap/users');
-const userData = await users.json();
-
-// POST with automatic authentication
-await client.post('/api/v1/ldap/users', {
-  uid: 'user1',
-  mail: 'user1@example.com'
-});
-
-// Other methods: put, patch, delete
-await client.put('/api/v1/ldap/users/user1', { mail: 'new@example.com' });
-await client.delete('/api/v1/ldap/users/user1');</div>
+          // Create authenticated client const client = new TotpAuthClient({
+          secret: 'JBSWY3DPEHPK3PXP', digits: 6, step: 30 }); // Make
+          authenticated requests const users = await
+          client.get('/api/v1/ldap/users'); const userData = await users.json();
+          // POST with automatic authentication await
+          client.post('/api/v1/ldap/users', { uid: 'user1', mail:
+          'user1@example.com' }); // Other methods: put, patch, delete await
+          client.put('/api/v1/ldap/users/user1', { mail: 'new@example.com' });
+          await client.delete('/api/v1/ldap/users/user1');
+        </div>
 
         <h3>Helper Functions</h3>
         <div class="api-response">
-import { getRemainingSeconds, isValidBase32 } from 'ldap-rest/browser-shared-utils-totp';
-
-// Check how much time until next code
-const remaining = getRemainingSeconds(30);
-console.log(`Code expires in ${remaining} seconds`);
-
-// Validate Base32 secret
-if (isValidBase32('JBSWY3DPEHPK3PXP')) {
-  console.log('Valid secret!');
-}</div>
+          import { getRemainingSeconds, isValidBase32 } from
+          'ldap-rest/browser-shared-utils-totp'; // Check how much time until
+          next code const remaining = getRemainingSeconds(30); console.log(`Code
+          expires in ${remaining} seconds`); // Validate Base32 secret if
+          (isValidBase32('JBSWY3DPEHPK3PXP')) { console.log('Valid secret!'); }
+        </div>
       </div>
     </div>
 
@@ -475,7 +466,11 @@ if (isValidBase32('JBSWY3DPEHPK3PXP')) {
       });
 
       btnCopy.addEventListener('click', async () => {
-        if (currentCode && currentCode !== '------' && currentCode !== 'ERROR') {
+        if (
+          currentCode &&
+          currentCode !== '------' &&
+          currentCode !== 'ERROR'
+        ) {
           try {
             await navigator.clipboard.writeText(currentCode);
             showStatus('success', `Code ${currentCode} copied to clipboard!`);
@@ -516,7 +511,10 @@ if (isValidBase32('JBSWY3DPEHPK3PXP')) {
           apiResponse.classList.remove('error');
 
           if (response.ok) {
-            showStatus('success', `API request successful (${response.status})`);
+            showStatus(
+              'success',
+              `API request successful (${response.status})`
+            );
           } else {
             showStatus('warning', `API returned status ${response.status}`);
             apiResponse.classList.add('error');

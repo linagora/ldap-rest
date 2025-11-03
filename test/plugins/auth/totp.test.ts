@@ -9,7 +9,11 @@ import { createHmac } from 'crypto';
 /**
  * Generate a TOTP code for testing
  */
-function generateTestTotp(secret: string, digits: number, step: number): string {
+function generateTestTotp(
+  secret: string,
+  digits: number,
+  step: number
+): string {
   const now = Math.floor(Date.now() / 1000);
   const counter = Math.floor(now / step);
 

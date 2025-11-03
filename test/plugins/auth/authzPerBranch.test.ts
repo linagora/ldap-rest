@@ -295,12 +295,16 @@ describe('AuthzPerBranch', function () {
   });
 
   describe('API access control', () => {
-    const getTestOrgDn = () => `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-    const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestOrgDn = () =>
+      `ou=TestOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+    const getTestOrg2Dn = () =>
+      `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     const getTestSubOrg1Dn = () => `ou=SubOrg1,${getTestOrgDn()}`;
     const getTestSubOrg2Dn = () => `ou=SubOrg2,${getTestOrg2Dn()}`;
-    const getTestUser1Dn = () => `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
-    const getTestUser2Dn = () => `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestUser1Dn = () =>
+      `uid=testuser1,ou=users,${process.env.DM_LDAP_BASE}`;
+    const getTestUser2Dn = () =>
+      `uid=testuser2,ou=users,${process.env.DM_LDAP_BASE}`;
     const adminToken = 'test-admin-token';
     let request: ReturnType<typeof supertest>;
     let orgPlugin: LdapOrganization;
@@ -405,7 +409,9 @@ describe('AuthzPerBranch', function () {
 
         // Try to get unauthorized org via API - should fail
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`)
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`
+          )
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testuser1')
           .set('Accept', 'application/json');
@@ -428,7 +434,9 @@ describe('AuthzPerBranch', function () {
 
         // Try to get authorized org via API - should succeed
         const res = await request
-          .get(`/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`)
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrgDn())}`
+          )
           .set('Authorization', `Bearer ${adminToken}`)
           .set('X-Test-User', 'testuser1')
           .set('Accept', 'application/json');

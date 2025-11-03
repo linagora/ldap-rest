@@ -86,10 +86,17 @@ describe('AuthHmac', () => {
 
     it('should accept valid HMAC signature for GET request', async () => {
       const timestamp = Date.now();
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp
+      );
       const authHeader = createAuthHeader(serviceId, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(200);
       expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
     });
@@ -106,18 +113,35 @@ describe('AuthHmac', () => {
 
     it('should reject request with invalid signature', async () => {
       const timestamp = Date.now();
-      const authHeader = createAuthHeader(serviceId, timestamp, 'invalid-signature');
+      const authHeader = createAuthHeader(
+        serviceId,
+        timestamp,
+        'invalid-signature'
+      );
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
 
     it('should reject request with unknown service ID', async () => {
       const timestamp = Date.now();
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp);
-      const authHeader = createAuthHeader('unknown-service', timestamp, signature);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp
+      );
+      const authHeader = createAuthHeader(
+        'unknown-service',
+        timestamp,
+        signature
+      );
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
 
@@ -129,9 +153,15 @@ describe('AuthHmac', () => {
         '/api/hello',
         expiredTimestamp
       );
-      const authHeader = createAuthHeader(serviceId, expiredTimestamp, signature);
+      const authHeader = createAuthHeader(
+        serviceId,
+        expiredTimestamp,
+        signature
+      );
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
 
@@ -143,17 +173,30 @@ describe('AuthHmac', () => {
         '/api/hello',
         futureTimestamp
       );
-      const authHeader = createAuthHeader(serviceId, futureTimestamp, signature);
+      const authHeader = createAuthHeader(
+        serviceId,
+        futureTimestamp,
+        signature
+      );
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
 
     it('should reject request with invalid timestamp format', async () => {
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', Date.now());
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        Date.now()
+      );
       const authHeader = `HMAC-SHA256 ${serviceId}:not-a-number:${signature}`;
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
   });
@@ -252,7 +295,9 @@ describe('AuthHmac', () => {
       );
       const authHeader = createAuthHeader(service1Id, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(200);
     });
 
@@ -266,7 +311,9 @@ describe('AuthHmac', () => {
       );
       const authHeader = createAuthHeader(service2Id, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(200);
     });
 
@@ -281,7 +328,9 @@ describe('AuthHmac', () => {
       );
       const authHeader = createAuthHeader(service1Id, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
   });
@@ -305,7 +354,12 @@ describe('AuthHmac', () => {
 
     it('should validate DELETE request (no body)', async () => {
       const timestamp = Date.now();
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp
+      );
       const authHeader = createAuthHeader(serviceId, timestamp, signature);
 
       const res = await request(app)
@@ -367,19 +421,33 @@ describe('AuthHmac', () => {
 
     it('should accept request within 1 minute window', async () => {
       const timestamp = Date.now() - 50000; // 50 seconds ago
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp
+      );
       const authHeader = createAuthHeader(serviceId, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(200);
     });
 
     it('should reject request outside 1 minute window', async () => {
       const timestamp = Date.now() - 70000; // 70 seconds ago
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp
+      );
       const authHeader = createAuthHeader(serviceId, timestamp, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
   });
@@ -453,11 +521,18 @@ describe('AuthHmac', () => {
 
     it('should reject signature with slight timing difference', async () => {
       const timestamp1 = Date.now();
-      const signature = generateHmacSignature(secret, 'GET', '/api/hello', timestamp1);
+      const signature = generateHmacSignature(
+        secret,
+        'GET',
+        '/api/hello',
+        timestamp1
+      );
       const timestamp2 = timestamp1 + 1; // Different timestamp
       const authHeader = createAuthHeader(serviceId, timestamp2, signature);
 
-      const res = await request(app).get('/api/hello').set('Authorization', authHeader);
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', authHeader);
       expect(res.status).to.equal(401);
     });
   });

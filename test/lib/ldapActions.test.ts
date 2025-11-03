@@ -112,7 +112,12 @@ describe('ldapActions', function () {
 
       it('should fail to add an entry that already exists', async () => {
         const entry = {
-          objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+          objectClass: [
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+            'top',
+          ],
           cn: 'Test User',
           sn: 'User',
           uid: 'testuser',

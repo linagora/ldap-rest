@@ -9,6 +9,7 @@ This directory contains interactive HTML examples demonstrating the use of LDAP-
 Interactive demonstration of the TOTP authentication client library.
 
 **Features:**
+
 - Real-time TOTP code generation
 - Countdown timer with visual indicator
 - Copy to clipboard functionality
@@ -17,6 +18,7 @@ Interactive demonstration of the TOTP authentication client library.
 - Code examples for npm usage
 
 **Usage:**
+
 ```bash
 # Start the LDAP-Rest server
 npm start
@@ -26,12 +28,13 @@ http://localhost:8081/static/examples/web/totp-client.html
 ```
 
 **NPM Module:**
+
 ```typescript
 import {
   generateTotp,
   TotpAuthClient,
   getRemainingSeconds,
-  isValidBase32
+  isValidBase32,
 } from 'ldap-rest/browser-shared-utils-totp';
 ```
 
@@ -40,6 +43,7 @@ import {
 Visualize and navigate LDAP directory structure.
 
 **Features:**
+
 - Interactive tree navigation
 - Node details display
 - Expand/collapse controls
@@ -50,6 +54,7 @@ Visualize and navigate LDAP directory structure.
 Browse and edit LDAP user entries.
 
 **Features:**
+
 - User list and tree view
 - Edit user properties
 - Move users between branches
@@ -60,6 +65,7 @@ Browse and edit LDAP user entries.
 Manage LDAP groups and memberships.
 
 **Features:**
+
 - Group tree navigation
 - Edit group properties
 - Manage members
@@ -70,6 +76,7 @@ Manage LDAP groups and memberships.
 Manage organizational units.
 
 **Features:**
+
 - Unit tree structure
 - Edit unit properties
 - Move units
@@ -78,6 +85,7 @@ Manage organizational units.
 ## Running Examples
 
 1. **Start the server:**
+
    ```bash
    npm start
    # or
@@ -87,6 +95,7 @@ Manage organizational units.
 2. **Configure authentication:**
 
    For TOTP example:
+
    ```bash
    npm start -- \
      --plugin core/auth/totp \

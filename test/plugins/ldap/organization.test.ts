@@ -25,8 +25,10 @@ describe('LDAP Organizations Plugin', function () {
   before(async () => {
     // Initialize from env vars after they're set
     DM_LDAP_TOP_ORGANIZATION = process.env.DM_LDAP_TOP_ORGANIZATION;
-    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
-    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE =
+      process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE =
+      process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
     testOrgDn = `ou=testorg,${DM_LDAP_TOP_ORGANIZATION}`;
     testSubOrgDn = `ou=testsuborg,${DM_LDAP_TOP_ORGANIZATION}`;
     server = new DM();

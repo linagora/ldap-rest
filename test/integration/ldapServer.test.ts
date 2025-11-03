@@ -12,7 +12,9 @@ describe('LDAP Test Server Integration', function () {
   // Skip all tests if using external LDAP
   before(function () {
     if (hasExternalLdap()) {
-      console.warn('Skipping LDAP Test Server Integration: using external LDAP');
+      console.warn(
+        'Skipping LDAP Test Server Integration: using external LDAP'
+      );
       this.skip();
     }
   });
@@ -86,10 +88,7 @@ userPassword: password123
     const server = getTestLdapServer();
 
     // Check for title nomenclature
-    const result = await server.search(
-      '(cn=Dr)',
-      ['cn', 'description']
-    );
+    const result = await server.search('(cn=Dr)', ['cn', 'description']);
     expect(result).to.include('cn=Dr');
     expect(result).to.include('description: Doctor');
   });
@@ -100,6 +99,8 @@ userPassword: password123
     // Check for admins group
     const result = await server.search('(cn=admins)', ['cn', 'member']);
     expect(result).to.include('cn=admins');
-    expect(result).to.include('member: uid=john.doe,ou=users,dc=example,dc=com');
+    expect(result).to.include(
+      'member: uid=john.doe,ou=users,dc=example,dc=com'
+    );
   });
 });

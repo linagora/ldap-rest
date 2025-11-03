@@ -121,7 +121,9 @@ export class LdapTestServer {
     if (existsSync(mailSchemaPath)) {
       console.log(`Loading mail schema from ${mailSchemaPath}...`);
       try {
-        execSync(`docker cp ${mailSchemaPath} ${this.containerName}:/tmp/mail-schema.ldif`);
+        execSync(
+          `docker cp ${mailSchemaPath} ${this.containerName}:/tmp/mail-schema.ldif`
+        );
         const result = execSync(
           `docker exec ${this.containerName} ldapadd -Y EXTERNAL -H ldapi:/// -f /tmp/mail-schema.ldif`,
           { encoding: 'utf-8' }
@@ -137,7 +139,9 @@ export class LdapTestServer {
         console.error(`  stdout: ${err.stdout?.toString()}`);
         console.error(`  stderr: ${err.stderr?.toString()}`);
         console.error(`  message: ${err.message}`);
-        throw new Error(`Failed to load mail schema: ${err.stderr?.toString() || err.message}`);
+        throw new Error(
+          `Failed to load mail schema: ${err.stderr?.toString() || err.message}`
+        );
       }
     }
 
@@ -159,7 +163,9 @@ export class LdapTestServer {
       console.error(`  stdout: ${err.stdout?.toString()}`);
       console.error(`  stderr: ${err.stderr?.toString()}`);
       console.error(`  message: ${err.message}`);
-      throw new Error(`Failed to load dyngroup schema: ${err.stderr?.toString() || err.message}`);
+      throw new Error(
+        `Failed to load dyngroup schema: ${err.stderr?.toString() || err.message}`
+      );
     }
 
     // Load Twake custom schema
@@ -183,7 +189,9 @@ export class LdapTestServer {
         console.log(`Loading custom Twake schema from ${schemaPath}...`);
         try {
           // Copy schema to container
-          execSync(`docker cp ${schemaPath} ${this.containerName}:/tmp/twake-schema.ldif`);
+          execSync(
+            `docker cp ${schemaPath} ${this.containerName}:/tmp/twake-schema.ldif`
+          );
 
           // Load schema using ldapadd
           const result = execSync(
@@ -201,7 +209,9 @@ export class LdapTestServer {
           console.error(`  stdout: ${err.stdout?.toString()}`);
           console.error(`  stderr: ${err.stderr?.toString()}`);
           console.error(`  message: ${err.message}`);
-          throw new Error(`Failed to load Twake schema: ${err.stderr?.toString() || err.message}`);
+          throw new Error(
+            `Failed to load Twake schema: ${err.stderr?.toString() || err.message}`
+          );
         }
       }
     }
@@ -327,7 +337,9 @@ export class LdapTestServer {
       }
 
       // All retries failed
-      throw new Error(`Failed to load LDIF after ${maxRetries} attempts: ${lastError?.message}`);
+      throw new Error(
+        `Failed to load LDIF after ${maxRetries} attempts: ${lastError?.message}`
+      );
     } catch (err) {
       throw new Error(`Failed to load LDIF: ${(err as Error).message}`);
     }

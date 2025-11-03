@@ -87,7 +87,9 @@ export default class AuthTotp extends AuthBase {
     // Try to validate token against all configured users
     for (const user of this.totpUsers) {
       if (this.verifyTotp(user.secret, token, user.digits)) {
-        this.logger.debug(`TOTP authentication successful for user: ${user.name}`);
+        this.logger.debug(
+          `TOTP authentication successful for user: ${user.name}`
+        );
         req.user = user.name;
         return next();
       }
@@ -119,7 +121,11 @@ export default class AuthTotp extends AuthBase {
   /**
    * Generate a TOTP token using HMAC-SHA1
    */
-  private generateTotp(secret: string, counter: number, digits: number): string {
+  private generateTotp(
+    secret: string,
+    counter: number,
+    digits: number
+  ): string {
     // Decode Base32 secret
     const key = this.base32Decode(secret);
 

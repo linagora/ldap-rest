@@ -34,7 +34,9 @@ export const mochaHooks = {
         console.log('');
         usingEmbeddedLdap = false;
       } else {
-        console.log('ℹ️  No external LDAP configured, starting embedded LDAP server...\n');
+        console.log(
+          'ℹ️  No external LDAP configured, starting embedded LDAP server...\n'
+        );
 
         // Start embedded LDAP server
         globalServer = await getGlobalTestLdapServer();
@@ -61,7 +63,6 @@ export const mochaHooks = {
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000';
       process.env.DM_JAMES_WEBADMIN_TOKEN =
         process.env.DM_JAMES_WEBADMIN_TOKEN || 'test-token';
-
     } catch (err) {
       console.error('❌ Failed to setup test environment:', err);
       throw err;

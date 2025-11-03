@@ -175,6 +175,7 @@ Configure log level to control verbosity:
 ```
 
 The log level hierarchy (following syslog convention):
+
 - **error** (0) - Error messages only
 - **warn** (1) - Warnings and errors
 - **notice** (2) - Web access logs, warnings and errors

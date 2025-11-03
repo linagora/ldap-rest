@@ -18,8 +18,10 @@ describe('LDAP Bulk Import Plugin', function () {
   let plugin: LdapBulkImport;
   let request: any;
 
-  const getTestOrg1Dn = () => `ou=TestOrg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-  const getTestOrg2Dn = () => `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestOrg1Dn = () =>
+    `ou=TestOrg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
+  const getTestOrg2Dn = () =>
+    `ou=TestOrg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
 
   before(async function () {
     this.timeout(10000);

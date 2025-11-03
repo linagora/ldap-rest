@@ -29,8 +29,10 @@ describe('LDAP Department Sync Plugin', function () {
   before(async () => {
     DM_LDAP_TOP_ORGANIZATION = process.env.DM_LDAP_TOP_ORGANIZATION!;
     DM_LDAP_BASE = process.env.DM_LDAP_BASE!;
-    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
-    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE = process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE =
+      process.env.DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE;
+    DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE =
+      process.env.DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE;
     testOrgDn = `ou=SyncTestOrg,${DM_LDAP_TOP_ORGANIZATION}`;
     testSubOrg1Dn = `ou=SubOrg1,${testOrgDn}`;
     testSubOrg2Dn = `ou=SubOrg2,${testSubOrg1Dn}`;

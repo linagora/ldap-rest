@@ -164,7 +164,7 @@
               const dn = searchBtn.getAttribute('data-parent-dn');
               performSearch(dn, searchInput.value);
             });
-            searchInput.addEventListener('keypress', (e) => {
+            searchInput.addEventListener('keypress', e => {
               if (e.key === 'Enter') {
                 searchBtn.click();
               }

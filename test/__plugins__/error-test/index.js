@@ -11,14 +11,20 @@ class ErrorTestPlugin extends Plugin {
     });
 
     // Route with asyncHandler - properly handled
-    app.get('/api/error-handled', asyncHandler(async (req, res) => {
-      throw new Error('Handled async error');
-    }));
+    app.get(
+      '/api/error-handled',
+      asyncHandler(async (req, res) => {
+        throw new Error('Handled async error');
+      })
+    );
 
     // Route that works - to test server is still alive after errors
-    app.get('/api/ok', asyncHandler(async (req, res) => {
-      res.json({ status: 'ok' });
-    }));
+    app.get(
+      '/api/ok',
+      asyncHandler(async (req, res) => {
+        res.json({ status: 'ok' });
+      })
+    );
   }
 }
 

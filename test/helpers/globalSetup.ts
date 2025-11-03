@@ -3,10 +3,7 @@
  * Starts LDAP server before all tests
  */
 
-import {
-  LdapTestServer,
-  getGlobalTestLdapServer,
-} from './ldapServer';
+import { LdapTestServer, getGlobalTestLdapServer } from './ldapServer';
 
 let globalServer: LdapTestServer | null = null;
 

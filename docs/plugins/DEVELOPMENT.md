@@ -68,6 +68,7 @@ LDAP-Rest includes robust error handling to ensure the server remains operationa
 #### Global Error Handling
 
 The server automatically catches and handles:
+
 - **Uncaught exceptions** in plugin code
 - **Unhandled promise rejections**
 - **Errors in async route handlers**
@@ -84,10 +85,13 @@ import DmPlugin, { asyncHandler } from '../../abstract/plugin';
 export default class MyPlugin extends DmPlugin {
   api(app: Express): void {
     // ✅ Correct: Errors are automatically caught
-    app.get('/api/data', asyncHandler(async (req, res) => {
-      const data = await someAsyncOperation();
-      res.json(data);
-    }));
+    app.get(
+      '/api/data',
+      asyncHandler(async (req, res) => {
+        const data = await someAsyncOperation();
+        res.json(data);
+      })
+    );
 
     // ❌ Wrong: Errors can crash the server
     app.get('/api/data', async (req, res) => {
@@ -99,6 +103,7 @@ export default class MyPlugin extends DmPlugin {
 ```
 
 The `asyncHandler` is exported from:
+
 - `ldap-rest/abstract/plugin` (recommended for plugins)
 - `ldap-rest` (for external use)
 
@@ -666,6 +671,7 @@ The `asyncHandler` wrapper automatically catches errors and passes them to the g
 - **Clean code**: No need for try/catch blocks in every route
 
 **Without asyncHandler (DON'T DO THIS):**
+
 ```typescript
 // ❌ BAD: Unhandled async errors can crash the server
 app.get('/api/data', async (req, res) => {
@@ -675,34 +681,42 @@ app.get('/api/data', async (req, res) => {
 ```
 
 **With asyncHandler (RECOMMENDED):**
+
 ```typescript
 // ✅ GOOD: Errors are caught and handled gracefully
-app.get('/api/data', asyncHandler(async (req, res) => {
-  const data = await fetchData(); // If this throws, error is logged and 500 returned
-  res.json(data);
-}));
+app.get(
+  '/api/data',
+  asyncHandler(async (req, res) => {
+    const data = await fetchData(); // If this throws, error is logged and 500 returned
+    res.json(data);
+  })
+);
 ```
 
 **Custom error handling:**
+
 ```typescript
 // You can still handle specific errors manually
-app.post('/api/process', asyncHandler(async (req, res) => {
-  try {
-    const result = await processData(req.body);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      // Handle specific error types
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: error.details
-      });
+app.post(
+  '/api/process',
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await processData(req.body);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        // Handle specific error types
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: error.details,
+        });
+      }
+      // Re-throw to let asyncHandler handle it
+      throw error;
     }
-    // Re-throw to let asyncHandler handle it
-    throw error;
-  }
-}));
+  })
+);
 ```
 
 ### Logging

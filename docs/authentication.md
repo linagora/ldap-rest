@@ -214,13 +214,13 @@ import {
   TotpAuthClient,
   generateTotp,
   getRemainingSeconds,
-  isValidBase32
+  isValidBase32,
 } from 'ldap-rest/browser-shared-utils-totp';
 
 const client = new TotpAuthClient({
   secret: 'JBSWY3DPEHPK3PXP',
   digits: 6,
-  step: 30
+  step: 30,
 });
 
 // Automatic authentication with current TOTP code
@@ -254,6 +254,7 @@ console.log(`Current TOTP code: ${code}`);
 ```
 
 **In logs:**
+
 ```
 INFO: TOTP authentication successful for user: admin
 INFO: TOTP authentication successful for user: api-service
@@ -396,6 +397,7 @@ DM_AUTH_HMAC_WINDOW=120000  # Default: 120000ms (2 minutes)
 #### Request Signing Process
 
 1. **Client calculates signature:**
+
    ```
    signature = HMAC-SHA256(
      secret,
@@ -410,6 +412,7 @@ DM_AUTH_HMAC_WINDOW=120000  # Default: 120000ms (2 minutes)
    - `body-hash`: SHA256(request_body) for POST/PATCH/PUT, empty string for GET/DELETE/HEAD
 
 2. **Client sends Authorization header:**
+
    ```
    Authorization: HMAC-SHA256 service-id:timestamp:signature
    ```
@@ -492,7 +495,7 @@ import { HmacAuthClient } from 'ldap-rest/browser-shared-utils-hmac';
 
 const client = new HmacAuthClient({
   serviceId: 'registration-service',
-  secret: 'secret-key-minimum-32-chars'
+  secret: 'secret-key-minimum-32-chars',
 });
 
 // Automatic authentication with HMAC signature
@@ -502,7 +505,7 @@ const users = await response.json();
 // POST with automatic body hashing and signing
 await client.post('/api/v1/ldap/users', {
   uid: 'user1',
-  mail: 'user1@example.com'
+  mail: 'user1@example.com',
 });
 
 // Other methods: put, patch, delete
@@ -520,7 +523,7 @@ const signature = await generateHmacSignature(
   'GET',
   '/api/v1/ldap/users',
   Date.now(),
-  undefined  // no body for GET
+  undefined // no body for GET
 );
 
 const authHeader = `HMAC-SHA256 registration-service:${Date.now()}:${signature}`;
@@ -558,15 +561,15 @@ const authHeader = `HMAC-SHA256 registration-service:${Date.now()}:${signature}`
 
 ### Advantages Over Other Methods
 
-| Feature                    | HMAC               | Token              | TOTP               |
-| -------------------------- | ------------------ | ------------------ | ------------------ |
-| **Request Integrity**      | ✅ Yes (body hash) | ❌ No              | ❌ No              |
-| **Replay Protection**      | ✅ Yes (timestamp) | ❌ No              | ✅ Yes (time-based)|
-| **Signature Per Request**  | ✅ Yes             | ❌ No (static)     | ✅ Yes (30s codes) |
-| **Body Tampering Detect**  | ✅ Yes             | ❌ No              | ❌ No              |
-| **Path/Query Protection**  | ✅ Yes             | ❌ No              | ❌ No              |
-| **Setup Complexity**       | Medium             | Simple             | Simple             |
-| **Best For**               | Backend services   | Simple APIs        | MFA, user auth     |
+| Feature                   | HMAC               | Token          | TOTP                |
+| ------------------------- | ------------------ | -------------- | ------------------- |
+| **Request Integrity**     | ✅ Yes (body hash) | ❌ No          | ❌ No               |
+| **Replay Protection**     | ✅ Yes (timestamp) | ❌ No          | ✅ Yes (time-based) |
+| **Signature Per Request** | ✅ Yes             | ❌ No (static) | ✅ Yes (30s codes)  |
+| **Body Tampering Detect** | ✅ Yes             | ❌ No          | ❌ No               |
+| **Path/Query Protection** | ✅ Yes             | ❌ No          | ❌ No               |
+| **Setup Complexity**      | Medium             | Simple         | Simple              |
+| **Best For**              | Backend services   | Simple APIs    | MFA, user auth      |
 
 ### Comparison with Standards
 
@@ -577,6 +580,7 @@ This implementation is similar to:
 - **HMAC-Based Authentication**: Industry-standard pattern for service authentication
 
 Our approach provides a good balance between security and simplicity:
+
 - ✅ Simpler than AWS Signature V4 (easier to implement)
 - ✅ More secure than static tokens (request-specific signatures)
 - ✅ Better integrity than TOTP (includes body and path hashing)
@@ -856,18 +860,18 @@ hooks: {
 
 ## Choosing an Authentication Method
 
-| Feature                | Token         | TOTP              | HMAC                  | LemonLDAP::NG         | OpenID Connect                   |
-| ---------------------- | ------------- | ----------------- | --------------------- | --------------------- | -------------------------------- |
-| **Setup Complexity**   | Simple        | Simple            | Medium                | Medium                | Medium                           |
-| **User Management**    | None          | Manual            | Manual (service-based)| External (LLNG)       | External (Provider)              |
-| **SSO Support**        | No            | No                | No                    | Yes                   | Yes                              |
-| **MFA Support**        | No            | Yes (TOTP itself) | N/A                   | Yes (via LLNG)        | Yes (via Provider)               |
-| **Session Management** | Stateless     | Stateless         | Stateless             | LLNG Sessions         | OIDC Sessions                    |
-| **Code Expiration**    | Never         | 30-60 seconds     | Per-request           | Session-based         | Session-based                    |
-| **Request Integrity**  | No            | No                | Yes (body + path hash)| No                    | No                               |
-| **Replay Protection**  | No            | Yes (time-based)  | Yes (timestamp)       | Session-based         | Session-based                    |
-| **Best For**           | APIs, Scripts | APIs, Enhanced    | Backend Services      | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
-| **Dependencies**       | None          | None              | None                  | lemonldap-ng-handler  | express-openid-connect           |
+| Feature                | Token         | TOTP              | HMAC                   | LemonLDAP::NG         | OpenID Connect                   |
+| ---------------------- | ------------- | ----------------- | ---------------------- | --------------------- | -------------------------------- |
+| **Setup Complexity**   | Simple        | Simple            | Medium                 | Medium                | Medium                           |
+| **User Management**    | None          | Manual            | Manual (service-based) | External (LLNG)       | External (Provider)              |
+| **SSO Support**        | No            | No                | No                     | Yes                   | Yes                              |
+| **MFA Support**        | No            | Yes (TOTP itself) | N/A                    | Yes (via LLNG)        | Yes (via Provider)               |
+| **Session Management** | Stateless     | Stateless         | Stateless              | LLNG Sessions         | OIDC Sessions                    |
+| **Code Expiration**    | Never         | 30-60 seconds     | Per-request            | Session-based         | Session-based                    |
+| **Request Integrity**  | No            | No                | Yes (body + path hash) | No                    | No                               |
+| **Replay Protection**  | No            | Yes (time-based)  | Yes (timestamp)        | Session-based         | Session-based                    |
+| **Best For**           | APIs, Scripts | APIs, Enhanced    | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
+| **Dependencies**       | None          | None              | None                   | lemonldap-ng-handler  | express-openid-connect           |
 
 ## Combining with Authorization
 
