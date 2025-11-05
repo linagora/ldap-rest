@@ -5,8 +5,9 @@
  * TOTP-based authentication plugin
  * @group Plugins
  */
-import type { Response } from 'express';
 import { createHmac } from 'crypto';
+
+import type { Response } from 'express';
 
 import { unauthorized } from '../../lib/expressFormatedResponses';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
@@ -75,7 +76,7 @@ export default class AuthTotp extends AuthBase {
   }
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
-    let authHeader = req.headers['authorization'];
+    const authHeader = req.headers['authorization'];
 
     if (!authHeader || !/^Bearer .+/.test(authHeader)) {
       this.logger.warn('Missing or invalid Authorization header');

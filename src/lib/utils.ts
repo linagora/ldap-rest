@@ -5,8 +5,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
-import type { Config } from '../bin';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
+
+import type { Config } from '../bin';
 
 import { getLogger } from './expressFormatedResponses';
 

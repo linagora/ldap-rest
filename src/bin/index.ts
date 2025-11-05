@@ -20,6 +20,7 @@ import { dirname, join } from 'path';
 import express from 'express';
 import bodyParser from 'body-parser';
 import type winston from 'winston';
+import type { Request, Response, NextFunction } from 'express';
 
 import { parseConfig } from '../lib/parseConfig';
 import configArgs, { type Config } from '../config/args';
@@ -29,10 +30,9 @@ import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
 import pluginPriority from '../plugins/priority.json';
-import type { Request, Response, NextFunction } from 'express';
 
 export type { Config };
-export { asyncHandler } from '../lib/utils';
+export * from '../lib/utils';
 
 //export const build = () => {
 
@@ -138,7 +138,7 @@ export class DM {
     process.on(
       'unhandledRejection',
       (reason: unknown, promise: Promise<unknown>) => {
-        this.logger.error(`Unhandled promise rejection: ${reason}`, {
+        this.logger.error(`Unhandled promise rejection: ${reason as string}`, {
           reason,
           promise,
         });

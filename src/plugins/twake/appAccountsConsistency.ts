@@ -253,7 +253,7 @@ export default class AppAccountsConsistency extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       // Ignore NoSuchObjectError if the applicative account base doesn't exist
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       if (error.code === 0x20 || error.message?.includes('NoSuchObject')) {
         this.logger.debug(
           `${this.name}: Applicative account base does not exist or no accounts found for mail ${mail}`
