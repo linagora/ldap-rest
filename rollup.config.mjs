@@ -100,10 +100,10 @@ pkg.exports = {
     import: './dist/bin/index.js',
     types: './dist/src/bin/index.d.ts',
   },
-  hooks: {
+  './hooks': {
     types: './dist/src/hooks.d.ts',
   },
-  expressformatedresponses: {
+  './expressformatedresponses': {
     import: './dist/lib/expressFormatedResponses.js',
     types: './dist/src/lib/expressFormatedResponses.d.ts',
   },
@@ -113,7 +113,7 @@ export default async () => {
   const p = await getPluginEntries();
   p.forEach(plugin => {
     const name = plugin.replace(/\.ts$/, '');
-    pkg.exports[`plugin-${name.toLowerCase().replace(/\//g, '-')}`] = {
+    pkg.exports[`./plugin-${name.toLowerCase().replace(/\//g, '-')}`] = {
       import: `./dist/plugins/${name}.js`,
       types: `./dist/src/plugins/${name}.d.ts`,
     };
@@ -122,7 +122,7 @@ export default async () => {
   const a = await getAbstractEntries();
   a.forEach(abstract => {
     const name = abstract.replace(/\.ts$/, '');
-    pkg.exports[`abstract-${name.toLowerCase().replace(/\//g, '-')}`] = {
+    pkg.exports[`./abstract-${name.toLowerCase().replace(/\//g, '-')}`] = {
       import: `./dist/abstract/${name}.js`,
       types: `./dist/src/abstract/${name}.d.ts`,
     };
@@ -130,7 +130,7 @@ export default async () => {
 
   (await getBrowserLibraries()).forEach(browserLib => {
     const name = browserLib.toLowerCase().replace(/\//g, '-');
-    pkg.exports[`browser-${name}`] = {
+    pkg.exports[`./browser-${name}`] = {
       import: `./static/browser/${browserLib}.js`,
       types: `./dist/src/browser/${browserLib}.d.ts`,
     };
@@ -138,7 +138,7 @@ export default async () => {
 
   (await getSpecs()).forEach(spec => {
     const name = spec.replace(/\.json$/, '').replace(/\//g, '-');
-    pkg.exports[`schema-${name.toLowerCase()}`] = {
+    pkg.exports[`./schema-${name.toLowerCase()}`] = {
       import: `./static/schemas/${spec}`,
       require: `./static/schemas/${spec}`,
     };
