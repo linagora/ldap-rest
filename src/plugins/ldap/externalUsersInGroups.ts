@@ -15,7 +15,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
   name = 'externalUsersInGroups';
   roles: Role[] = ['consistency'] as const;
 
-  dependencies = { ldapGroups: 'core/ldap/ldapGroups' };
+  dependencies = { ldapGroups: 'core/ldap/groups' };
 
   ldap: ldapActions;
 
