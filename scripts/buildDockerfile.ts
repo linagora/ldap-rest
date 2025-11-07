@@ -55,6 +55,8 @@ for (const [arg, env, def, type] of configArgs) {
 
 content += `
 
+USER node
+
 EXPOSE 8081
 CMD ["npx", "ldap-rest"]
 `;

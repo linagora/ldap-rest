@@ -106,5 +106,7 @@ ENV NODE_ENV=production \
  DM_CROWDSEC_API_KEY= \
  DM_CROWDSEC_CACHE_TTL="60"
 
+USER node
+
 EXPOSE 8081
 CMD ["npx", "ldap-rest"]
