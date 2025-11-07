@@ -72,18 +72,26 @@ export class DM {
         p => !p.includes('configApi')
       );
 
-      // Load priority plugins first
-      for (const p of pluginPriority) {
-        if (regularPlugins.includes(p)) {
-          regularPlugins = regularPlugins.filter(pl => pl !== p);
-          promises.push(this.loadPlugin(p));
+      // Load priority plugins first sequentially to ensure proper middleware order
+      const priorityPromise = (async () => {
+        for (const p of pluginPriority) {
+          if (regularPlugins.includes(p)) {
+            regularPlugins = regularPlugins.filter(pl => pl !== p);
+            await this.loadPlugin(p);
+          }
         }
-      }
+      })();
+      promises.push(priorityPromise);
 
-      // Load remaining plugins
-      for (const pluginName of regularPlugins) {
-        promises.push(this.loadPlugin(pluginName));
-      }
+      // Load remaining plugins in parallel after priority plugins
+      promises.push(
+        priorityPromise.then(async () => {
+          const regularPromises = regularPlugins.map(pluginName =>
+            this.loadPlugin(pluginName)
+          );
+          await Promise.all(regularPromises);
+        })
+      );
 
       // Load configApi last
       if (configApiPlugin) {
