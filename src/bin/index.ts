@@ -33,6 +33,20 @@ import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
 export * from '../lib/utils';
+export { asyncHandler } from '../lib/utils';
+export {
+  HttpError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+  UriTooLongError,
+  TooManyRequestsError,
+  BadGatewayError,
+  ServiceUnavailableError,
+  GatewayTimeoutError,
+} from '../lib/errors';
 
 //export const build = () => {
 
@@ -115,8 +129,24 @@ export class DM {
     // Add error handling middleware - must be after all routes
     this.app.use(
       (err: Error, req: Request, res: Response, next: NextFunction) => {
+        const statusCode = 'statusCode' in err
+          ? (err as { statusCode: number }).statusCode
+          : 500;
+
+        // Client error (4xx) - log as warning and return error message
+        if (statusCode >= 400 && statusCode < 500) {
+          this.logger.warn(
+            `Client error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`
+          );
+          if (!res.headersSent) {
+            return res.status(statusCode).json({ error: err.message });
+          }
+          return;
+        }
+
+        // Server error (5xx) - log as error and hide details
         this.logger.error(
-          `Unhandled error in request ${req.method} ${req.path}: ${err.message}`,
+          `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
           {
             stack: err.stack,
             url: req.url,
@@ -124,9 +154,8 @@ export class DM {
           }
         );
 
-        // Send error response if headers not sent yet
         if (!res.headersSent) {
-          res.status(500).json({
+          res.status(statusCode).json({
             error: 'Internal Server Error',
             message: this.config.debug ? err.message : 'An error occurred',
           });

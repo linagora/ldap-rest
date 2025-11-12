@@ -66,6 +66,88 @@ describe('Error Handling', () => {
     expect(res.body).to.deep.equal({ status: 'ok' });
   });
 
+  it('should return 400 for BadRequestError with error message', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-badrequest'
+    );
+    expect(res.status).to.equal(400);
+    expect(res.body).to.have.property('error');
+    expect(res.body.error).to.equal('Invalid request parameter');
+  });
+
+  it('should return 404 for NotFoundError with error message', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-notfound'
+    );
+    expect(res.status).to.equal(404);
+    expect(res.body).to.have.property('error');
+    expect(res.body.error).to.equal('Resource not found');
+  });
+
+  it('should keep server alive after client errors', async () => {
+    // Trigger client errors
+    await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-badrequest'
+    );
+    await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-notfound'
+    );
+
+    // Server should still respond to valid requests
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/ok'
+    );
+    expect(res.status).to.equal(200);
+    expect(res.body).to.deep.equal({ status: 'ok' });
+  });
+
+  it('should return 502 for BadGatewayError and hide error message', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-badgateway'
+    );
+    expect(res.status).to.equal(502);
+    expect(res.body).to.have.property('error');
+    expect(res.body.error).to.equal('Internal Server Error');
+  });
+
+  it('should return 503 for ServiceUnavailableError and hide error message', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-serviceunavailable'
+    );
+    expect(res.status).to.equal(503);
+    expect(res.body).to.have.property('error');
+    expect(res.body.error).to.equal('Internal Server Error');
+  });
+
+  it('should return 504 for GatewayTimeoutError and hide error message', async () => {
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-gatewaytimeout'
+    );
+    expect(res.status).to.equal(504);
+    expect(res.body).to.have.property('error');
+    expect(res.body.error).to.equal('Internal Server Error');
+  });
+
+  it('should keep server alive after server errors', async () => {
+    // Trigger server errors
+    await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-badgateway'
+    );
+    await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-serviceunavailable'
+    );
+    await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/error-gatewaytimeout'
+    );
+
+    // Server should still respond to valid requests
+    const res = await request(`http://localhost:${process.env.DM_PORT}`).get(
+      '/api/ok'
+    );
+    expect(res.status).to.equal(200);
+    expect(res.body).to.deep.equal({ status: 'ok' });
+  });
+
   after(() => {
     delete process.env.NODE_ENV;
     delete process.env.DM_PORT;

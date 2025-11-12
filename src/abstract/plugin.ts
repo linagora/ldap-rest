@@ -9,6 +9,19 @@ import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
 
 export { asyncHandler } from '../lib/utils';
+export {
+  HttpError,
+  BadRequestError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+  UriTooLongError,
+  TooManyRequestsError,
+  BadGatewayError,
+  ServiceUnavailableError,
+  GatewayTimeoutError,
+} from '../lib/errors';
 
 export type Role =
   | 'auth'

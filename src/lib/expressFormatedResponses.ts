@@ -92,6 +92,19 @@ export const tooManyRequests = (
 
 // We don't want to publish the real error in server responses
 export const serverError = (res: Response, err: unknown): void => {
+  const statusCode = err instanceof Error && 'statusCode' in err
+    ? (err as { statusCode: number }).statusCode
+    : 500;
+
+  // Client error (4xx) - log as warning and return error message
+  if (statusCode >= 400 && statusCode < 500) {
+    const message = err instanceof Error ? err.message : 'Bad request';
+    _logger.warn(`Client error ${statusCode}: ${message}`);
+    res.status(statusCode).json({ error: message });
+    return;
+  }
+
+  // Server error (5xx) - log as error and hide details
   if (err instanceof Error) {
     _logger.error(err.message, err);
   } else if (typeof err === 'string') {
@@ -99,7 +112,7 @@ export const serverError = (res: Response, err: unknown): void => {
   } else {
     _logger.error('Server error', err);
   }
-  res.status(500).json({ error: 'check logs' });
+  res.status(statusCode).json({ error: 'check logs' });
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>
   _rejectResponse(502, res, message);
