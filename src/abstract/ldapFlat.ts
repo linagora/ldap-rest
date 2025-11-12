@@ -23,17 +23,17 @@ import type {
 import {
   created,
   jsonBody,
-  notFound,
-  serverError,
   tryMethod,
   wantJson,
 } from '../lib/expressFormatedResponses';
 import {
+  asyncHandler,
   launchHooks,
   launchHooksChained,
   transformSchemas,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
+import { BadRequestError, NotFoundError, ConflictError } from '../lib/errors';
 
 import DmPlugin from './plugin';
 
@@ -128,60 +128,53 @@ export default abstract class LdapFlat extends DmPlugin {
     // List entries
     app.get(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
-      async (req, res) => {
+      asyncHandler(async (req, res) => {
         if (!wantJson(req, res)) return;
-        try {
-          const args: { filter?: string; attributes?: string[] } = {};
-          if (
-            req.query.match &&
-            typeof req.query.match === 'string' &&
-            req.query.attribute &&
-            typeof req.query.attribute === 'string'
-          ) {
-            args.filter = `(${req.query.attribute}=*${req.query.match}*)`;
-          }
-          if (
-            req.query.attributes &&
-            typeof req.query.attributes === 'string'
-          ) {
-            args.attributes = req.query.attributes.split(',');
-          }
-          const list = await this.listEntries(args);
-          res.json(list);
-        } catch (err) {
-          return serverError(res, err);
+        const args: { filter?: string; attributes?: string[] } = {};
+        if (
+          req.query.match &&
+          typeof req.query.match === 'string' &&
+          req.query.attribute &&
+          typeof req.query.attribute === 'string'
+        ) {
+          args.filter = `(${req.query.attribute}=*${req.query.match}*)`;
         }
-      }
+        if (req.query.attributes && typeof req.query.attributes === 'string') {
+          args.attributes = req.query.attributes.split(',');
+        }
+        const list = await this.listEntries(args);
+        res.json(list);
+      })
     );
 
     // Get entry by id or DN
     app.get(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      async (req, res) => this.apiGet(req, res)
+      asyncHandler(async (req, res) => this.apiGet(req, res))
     );
 
     // Add entry
     app.post(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
-      async (req, res) => this.apiAdd(req, res)
+      asyncHandler(async (req, res) => this.apiAdd(req, res))
     );
 
     // Delete entry
     app.delete(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      async (req, res) => this.apiDelete(req, res)
+      asyncHandler(async (req, res) => this.apiDelete(req, res))
     );
 
     // Modify entry
     app.put(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      async (req, res) => this.apiModify(req, res)
+      asyncHandler(async (req, res) => this.apiModify(req, res))
     );
 
     // Move entry to different organization
     app.post(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
-      async (req, res) => this.apiMove(req, res)
+      asyncHandler(async (req, res) => this.apiMove(req, res))
     );
   }
 
@@ -195,7 +188,7 @@ export default abstract class LdapFlat extends DmPlugin {
         dn
       )) as SearchResult;
       if (result.searchEntries.length === 0) {
-        return notFound(res, `${this.singularName} not found`);
+        throw new NotFoundError(`${this.singularName} not found`);
       }
       res.json(result.searchEntries[0]);
     } catch (err) {
@@ -204,9 +197,9 @@ export default abstract class LdapFlat extends DmPlugin {
         (err as { code?: number }).code &&
         (err as { code?: number }).code === 32
       ) {
-        return notFound(res, `${this.singularName} not found`);
+        throw new NotFoundError(`${this.singularName} not found`);
       }
-      return serverError(res, err);
+      throw err;
     }
   }
 
@@ -222,13 +215,9 @@ export default abstract class LdapFlat extends DmPlugin {
     // Remove dn if provided - it will be constructed by addEntry
     delete additional.dn;
 
-    try {
-      await this.addEntry(id, additional, req);
-      const entry = await this.searchEntriesByName(id, false);
-      return created(res, entry[id]);
-    } catch (err) {
-      return serverError(res, err);
-    }
+    await this.addEntry(id, additional, req);
+    const entry = await this.searchEntriesByName(id, false);
+    return created(res, entry[id]);
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
@@ -256,21 +245,16 @@ export default abstract class LdapFlat extends DmPlugin {
     const { targetOrgDn } = body;
 
     if (!targetOrgDn || typeof targetOrgDn !== 'string') {
-      res.status(400).json({
-        error: 'Missing or invalid targetOrgDn in request body',
-      });
-      return;
+      throw new BadRequestError(
+        'Missing or invalid targetOrgDn in request body'
+      );
     }
 
-    try {
-      const result = await this.moveEntry(id, targetOrgDn, req);
-      res.json({
-        success: true,
-        ...result,
-      });
-    } catch (err) {
-      return serverError(res, err);
-    }
+    const result = await this.moveEntry(id, targetOrgDn, req);
+    res.json({
+      success: true,
+      ...result,
+    });
   }
 
   async addEntry(
@@ -284,7 +268,7 @@ export default abstract class LdapFlat extends DmPlugin {
       dn = id;
       const expectedSuffix = `,${this.base}`;
       if (!dn.endsWith(expectedSuffix)) {
-        throw new Error(
+        throw new BadRequestError(
           `DN must be in the flat branch "${this.base}". ` +
             `Provided DN "${dn}" does not end with "${expectedSuffix}"`
         );
@@ -365,23 +349,27 @@ export default abstract class LdapFlat extends DmPlugin {
     );
     if (changes.add) {
       if (changes.add[this.mainAttribute])
-        throw new Error(
+        throw new ConflictError(
           `${this.mainAttribute} attribute is unique, cannot add`
         );
     }
     if (changes.delete) {
       if (changes.delete instanceof Object) {
         if ((changes.delete as AttributesList)[this.mainAttribute])
-          throw new Error(`Cannot delete ${this.mainAttribute} attribute`);
+          throw new BadRequestError(
+            `Cannot delete ${this.mainAttribute} attribute`
+          );
       }
       if (Array.isArray(changes.delete)) {
         if (changes.delete.includes(this.mainAttribute))
-          throw new Error(`Cannot delete ${this.mainAttribute} attribute`);
+          throw new BadRequestError(
+            `Cannot delete ${this.mainAttribute} attribute`
+          );
       }
     }
     if (changes.replace) {
       if (changes.replace[this.mainAttribute])
-        throw new Error(
+        throw new BadRequestError(
           `Use dedicated API to change ${this.mainAttribute} attribute`
         );
     }
@@ -446,7 +434,7 @@ export default abstract class LdapFlat extends DmPlugin {
       !this.schema?.attributes[linkAttr] ||
       !this.schema?.attributes[pathAttr]
     ) {
-      throw new Error(
+      throw new BadRequestError(
         `Schema for ${this.singularName} does not support move operation (missing ${linkAttr} or ${pathAttr})`
       );
     }
@@ -462,7 +450,7 @@ export default abstract class LdapFlat extends DmPlugin {
       !currentEntry.searchEntries ||
       currentEntry.searchEntries.length === 0
     ) {
-      throw new Error(`Entry ${dn} not found`);
+      throw new NotFoundError(`Entry ${dn} not found`);
     }
 
     // Get department path from target organization
@@ -510,7 +498,7 @@ export default abstract class LdapFlat extends DmPlugin {
       )) as SearchResult;
 
       if (!result.searchEntries || result.searchEntries.length === 0) {
-        throw new Error(`Organization ${orgDn} not found`);
+        throw new NotFoundError(`Organization ${orgDn} not found`);
       }
 
       const org = result.searchEntries[0];
@@ -603,7 +591,7 @@ export default abstract class LdapFlat extends DmPlugin {
     for (const [field, value] of Object.entries(entry)) {
       if (!this.schema.attributes[field]) {
         if (this.schema.strict)
-          throw new Error(
+          throw new BadRequestError(
             `Unknown attribute "${field}" for ${this.singularName}`
           );
         continue;
@@ -615,23 +603,23 @@ export default abstract class LdapFlat extends DmPlugin {
         const defaultStr = JSON.stringify(attr.default);
         const valueStr = JSON.stringify(value);
         if (defaultStr !== valueStr) {
-          throw new Error(
+          throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be modified. Expected: ${defaultStr}`
           );
         }
       }
 
       if (!(await this._validateOneChange(field, value))) {
-        throw new Error(`Invalid value for attribute "${field}"`);
+        throw new BadRequestError(`Invalid value for attribute "${field}"`);
       }
       if (attr.required && !value) {
-        throw new Error(`Attribute "${field}" is required`);
+        throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
     // Check required fields
     for (const [field, attr] of Object.entries(this.schema.attributes)) {
       if (attr.required && !entry[field]) {
-        throw new Error(`Attribute "${field}" is required`);
+        throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
     return true;
@@ -645,7 +633,9 @@ export default abstract class LdapFlat extends DmPlugin {
     const checkFixed = (field: string, value: AttributeValue): void => {
       const attr = this.schema?.attributes[field];
       if (attr?.fixed) {
-        throw new Error(`Attribute "${field}" is fixed and cannot be modified`);
+        throw new BadRequestError(
+          `Attribute "${field}" is fixed and cannot be modified`
+        );
       }
     };
 
@@ -653,7 +643,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.add)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new Error(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(`Invalid value for attribute "${field}"`);
         }
       }
     }
@@ -661,7 +651,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.replace)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new Error(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(`Invalid value for attribute "${field}"`);
         }
       }
     }
@@ -672,7 +662,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const field of deleteFields) {
         const attr = this.schema.attributes[field];
         if (attr?.fixed) {
-          throw new Error(
+          throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
           );
         }
@@ -696,7 +686,9 @@ export default abstract class LdapFlat extends DmPlugin {
     // Handle pointer type
     if (attr.type === 'pointer') {
       if (typeof value !== 'string') {
-        throw new Error(`Field ${field} must be a string (DN pointer)`);
+        throw new BadRequestError(
+          `Field ${field} must be a string (DN pointer)`
+        );
       }
 
       const dnValue: string = value;
@@ -711,7 +703,7 @@ export default abstract class LdapFlat extends DmPlugin {
           return branchPattern.test(dnValue);
         });
         if (!isInBranch) {
-          throw new Error(
+          throw new BadRequestError(
             `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
           );
         }
@@ -728,12 +720,12 @@ export default abstract class LdapFlat extends DmPlugin {
           !result.searchEntries ||
           result.searchEntries.length === 0
         )
-          throw new Error(
+          throw new BadRequestError(
             `Field ${field} points to non-existent DN: ${dnValue}`
           );
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
-        throw new Error(
+        throw new BadRequestError(
           `Field ${field} points to invalid or non-existent DN: ${dnValue}`
         );
       }

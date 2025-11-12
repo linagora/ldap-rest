@@ -16,9 +16,17 @@ import {
   tryMethod,
   jsonBody,
   wantJson,
-  badRequest,
 } from '../../lib/expressFormatedResponses';
-import { launchHooksChained, transformSchemas } from '../../lib/utils';
+import {
+  asyncHandler,
+  launchHooksChained,
+  transformSchemas,
+} from '../../lib/utils';
+import {
+  BadRequestError,
+  NotFoundError,
+  ConflictError,
+} from '../../lib/errors';
 import type { Schema } from '../../config/schema';
 
 export default class LdapOrganizations extends DmPlugin {
@@ -101,41 +109,42 @@ export default class LdapOrganizations extends DmPlugin {
     // Search in organization subnodes
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
-      async (req, res) => {
+      asyncHandler(async (req, res) => {
         const dn = decodeURIComponent(req.params.dn);
         const query = req.query.q as string;
-        if (!query) return badRequest(res, 'query parameter "q" is required');
+        if (!query)
+          throw new BadRequestError('query parameter "q" is required');
         await tryMethodData(
           res,
           this.searchOrganisationSubnodes.bind(this),
           dn,
           query
         );
-      }
+      })
     );
 
     // Add organization
     app.post(
       `${this.config.api_prefix}/v1/ldap/organizations`,
-      async (req, res) => this.apiAdd(req, res)
+      asyncHandler(async (req, res) => this.apiAdd(req, res))
     );
 
     // Modify organization
     app.put(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
-      async (req, res) => this.apiModify(req, res)
+      asyncHandler(async (req, res) => this.apiModify(req, res))
     );
 
     // Delete organization
     app.delete(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
-      async (req, res) => this.apiDelete(req, res)
+      asyncHandler(async (req, res) => this.apiDelete(req, res))
     );
 
     // Move organization to a different parent
     app.post(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
-      async (req, res) => this.apiMove(req, res)
+      asyncHandler(async (req, res) => this.apiMove(req, res))
     );
   }
 
@@ -168,14 +177,14 @@ export default class LdapOrganizations extends DmPlugin {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
     const dn = decodeURIComponent(req.params.dn);
-    if (!dn) return badRequest(res, 'dn is required');
+    if (!dn) throw new BadRequestError('dn is required');
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const dn = decodeURIComponent(req.params.dn);
-    if (!dn) return badRequest(res, 'dn is required');
+    if (!dn) throw new BadRequestError('dn is required');
     await tryMethod(res, this.deleteOrganization.bind(this), dn);
   }
 
@@ -188,12 +197,14 @@ export default class LdapOrganizations extends DmPlugin {
     if (!body) return;
 
     const dn = decodeURIComponent(req.params.dn);
-    if (!dn) return badRequest(res, 'dn is required');
+    if (!dn) throw new BadRequestError('dn is required');
 
     const { targetOrgDn } = body;
 
     if (!targetOrgDn || typeof targetOrgDn !== 'string') {
-      return badRequest(res, 'Missing or invalid targetOrgDn in request body');
+      throw new BadRequestError(
+        'Missing or invalid targetOrgDn in request body'
+      );
     }
 
     await tryMethodData(
@@ -271,10 +282,10 @@ export default class LdapOrganizations extends DmPlugin {
         if (hasLinkDelete || hasPathDelete) {
           const isOu = await checkIsOu();
           if (!isOu && hasLinkDelete) {
-            throw new Error(`An organization link cannot be deleted`);
+            throw new BadRequestError(`An organization link cannot be deleted`);
           }
           if (hasPathDelete) {
-            throw new Error(`An organization path cannot be deleted`);
+            throw new BadRequestError(`An organization path cannot be deleted`);
           }
         }
       }
@@ -339,13 +350,15 @@ export default class LdapOrganizations extends DmPlugin {
         orgDn
       );
       if ((res as SearchResult).searchEntries.length === 0)
-        throw new Error(`Organization ${orgDn} does not exist`);
+        throw new NotFoundError(`Organization ${orgDn} does not exist`);
       if (
         !new RegExp(`(.*,)?${this.config.ldap_top_organization}`).test(
           (res as SearchResult).searchEntries[0].dn
         )
       )
-        throw new Error(`Entry ${orgDn} isn't in top organization branch`);
+        throw new BadRequestError(
+          `Entry ${orgDn} isn't in top organization branch`
+        );
     }
   }
 
@@ -368,7 +381,7 @@ export default class LdapOrganizations extends DmPlugin {
           Array.isArray(ouValue) ? ouValue[0] : ouValue
         ) as string;
         if (!path.startsWith(ouName + sep))
-          throw new Error(
+          throw new BadRequestError(
             `Organization path must start with its own name followed by separator "${sep}"`
           );
         matchingPath = path.slice(ouName.length + sep.length);
@@ -381,7 +394,7 @@ export default class LdapOrganizations extends DmPlugin {
         this.config.ldap_top_organization
       );
       if ((entries as SearchResult).searchEntries.length === 0)
-        throw new Error(`Invalid organization path ${path}`);
+        throw new BadRequestError(`Invalid organization path ${path}`);
 
       // If ouPath is undefined, this references the top organization
       // Verify it exists and has no parent path (or matches top org DN)
@@ -407,7 +420,7 @@ export default class LdapOrganizations extends DmPlugin {
           }
         }
         if (!found)
-          throw new Error(
+          throw new BadRequestError(
             `Invalid organization path ${path}: no matching top-level entry for ${ou}`
           );
       } else {
@@ -424,7 +437,7 @@ export default class LdapOrganizations extends DmPlugin {
           }
         }
         if (!found)
-          throw new Error(
+          throw new BadRequestError(
             `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
           );
       }
@@ -437,7 +450,7 @@ export default class LdapOrganizations extends DmPlugin {
       filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
     });
     if ((res as SearchResult).searchEntries.length > 0)
-      throw new Error(`Organization ${dn} is not empty`);
+      throw new ConflictError(`Organization ${dn} is not empty`);
   }
 
   /**
@@ -459,7 +472,7 @@ export default class LdapOrganizations extends DmPlugin {
     req?: Request
   ): Promise<AttributesList | AttributesList[]> {
     if (!this.config.ldap_top_organization)
-      throw new Error('No top organization configured');
+      throw new BadRequestError('No top organization configured');
 
     // Get default top organization
     const top = await this.server.ldap.search(
@@ -468,7 +481,7 @@ export default class LdapOrganizations extends DmPlugin {
       req
     );
     if ((top as SearchResult).searchEntries.length !== 1)
-      throw new Error('Top organization not found');
+      throw new NotFoundError('Top organization not found');
 
     // Call hook to allow plugins (like authzPerBranch) to modify the result
     const [, result] = await launchHooksChained(
@@ -493,7 +506,7 @@ export default class LdapOrganizations extends DmPlugin {
       req
     );
     if ((org as SearchResult).searchEntries.length !== 1)
-      throw new Error(`Organization ${dn} not found`);
+      throw new NotFoundError(`Organization ${dn} not found`);
     return (org as SearchResult).searchEntries[0];
   }
 
@@ -611,14 +624,14 @@ export default class LdapOrganizations extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!this._validateOneChange(field, value)) {
-        throw new Error(`Invalid value for field ${field}`);
+        throw new BadRequestError(`Invalid value for field ${field}`);
       }
     }
 
     // Check required fields
     for (const [field, test] of Object.entries(this.schema.attributes)) {
       if (test.required && entry[field] == undefined)
-        throw new Error(`Missing required field ${field}`);
+        throw new BadRequestError(`Missing required field ${field}`);
     }
     return true;
   }
@@ -629,7 +642,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
         if (!this._validateOneChange(field, value)) {
-          throw new Error(`Invalid value for field ${field}`);
+          throw new BadRequestError(`Invalid value for field ${field}`);
         }
       }
     }
@@ -637,7 +650,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
         if (!this._validateOneChange(field, value)) {
-          throw new Error(`Invalid value for field ${field}`);
+          throw new BadRequestError(`Invalid value for field ${field}`);
         }
       }
     }

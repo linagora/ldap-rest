@@ -92,9 +92,10 @@ export const tooManyRequests = (
 
 // We don't want to publish the real error in server responses
 export const serverError = (res: Response, err: unknown): void => {
-  const statusCode = err instanceof Error && 'statusCode' in err
-    ? (err as { statusCode: number }).statusCode
-    : 500;
+  const statusCode =
+    err instanceof Error && 'statusCode' in err
+      ? (err as { statusCode: number }).statusCode
+      : 500;
 
   // Client error (4xx) - log as warning and return error message
   if (statusCode >= 400 && statusCode < 500) {

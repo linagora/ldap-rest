@@ -64,6 +64,8 @@ export class DM {
   ldap: ldapActions;
   operationSequence: number;
   logger: winston.Logger;
+  private _errorMiddlewareSetup: boolean = false;
+  private _errorMiddleware?: express.ErrorRequestHandler;
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -117,51 +119,80 @@ export class DM {
     this.ready = new Promise((resolve, reject) => {
       if (promises.length > 0) {
         Promise.all(promises)
-          .then(() => resolve())
+          .then(() => {
+            this.setupErrorMiddleware();
+            resolve();
+          })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
+        this.setupErrorMiddleware();
         resolve();
       }
     });
   }
 
-  run(): Promise<void> {
-    // Add error handling middleware - must be after all routes
-    this.app.use(
-      (err: Error, req: Request, res: Response, next: NextFunction) => {
-        const statusCode = 'statusCode' in err
+  setupErrorMiddleware(): void {
+    // Remove existing error middleware if already set up
+    if (this._errorMiddlewareSetup && this._errorMiddleware) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stack = (this.app as any)._router?.stack;
+      if (stack) {
+        const index = stack.findIndex(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (layer: any) => layer.handle === this._errorMiddleware
+        );
+        if (index !== -1) {
+          stack.splice(index, 1);
+        }
+      }
+    }
+
+    // Create error handling middleware - must be after all routes
+    this._errorMiddleware = (
+      err: Error,
+      req: Request,
+      res: Response,
+      next: NextFunction
+    ) => {
+      const statusCode =
+        'statusCode' in err
           ? (err as { statusCode: number }).statusCode
           : 500;
 
-        // Client error (4xx) - log as warning and return error message
-        if (statusCode >= 400 && statusCode < 500) {
-          this.logger.warn(
-            `Client error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`
-          );
-          if (!res.headersSent) {
-            return res.status(statusCode).json({ error: err.message });
-          }
-          return;
-        }
-
-        // Server error (5xx) - log as error and hide details
-        this.logger.error(
-          `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
-          {
-            stack: err.stack,
-            url: req.url,
-            method: req.method,
-          }
+      // Client error (4xx) - log as warning and return error message
+      if (statusCode >= 400 && statusCode < 500) {
+        this.logger.warn(
+          `Client error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`
         );
-
         if (!res.headersSent) {
-          res.status(statusCode).json({
-            error: 'Internal Server Error',
-            message: this.config.debug ? err.message : 'An error occurred',
-          });
+          return res.status(statusCode).json({ error: err.message });
         }
+        return;
       }
-    );
+
+      // Server error (5xx) - log as error and hide details
+      this.logger.error(
+        `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
+        {
+          stack: err.stack,
+          url: req.url,
+          method: req.method,
+        }
+      );
+
+      if (!res.headersSent) {
+        res.status(statusCode).json({
+          error: 'Internal Server Error',
+          message: this.config.debug ? err.message : 'An error occurred',
+        });
+      }
+    };
+
+    this.app.use(this._errorMiddleware);
+    this._errorMiddlewareSetup = true;
+  }
+
+  run(): Promise<void> {
 
     // Handle uncaught exceptions
     process.on('uncaughtException', (err: Error) => {
@@ -299,6 +330,10 @@ export class DM {
     if (obj.api) {
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
+      // If error middleware was already setup, re-setup it to ensure it stays at the end
+      if (this._errorMiddlewareSetup) {
+        this.setupErrorMiddleware();
+      }
     }
     if (obj.hooks as Hooks) {
       for (const hookName in obj.hooks as Hooks) {
