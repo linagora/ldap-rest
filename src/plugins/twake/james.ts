@@ -1,7 +1,8 @@
 import fetch from 'node-fetch';
+import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
-import { type Role } from '../../abstract/plugin';
+import { type Role, asyncHandler } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type {
   AttributesList,
@@ -10,10 +11,12 @@ import type {
 } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
+import { wantJson } from '../../lib/expressFormatedResponses';
+import { escapeLdapFilter } from '../../lib/utils';
 
 export default class James extends TwakePlugin {
   name = 'james';
-  roles: Role[] = ['consistency'] as const;
+  roles: Role[] = ['consistency', 'api'] as const;
 
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
@@ -45,6 +48,97 @@ export default class James extends TwakePlugin {
       typeof this.config.james_init_delay === 'number'
         ? this.config.james_init_delay
         : 1000;
+  }
+
+  /**
+   * Register API routes
+   */
+  api(app: Express): void {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    // Get quota usage and limits for a user
+    app.get(
+      `${apiPrefix}/v1/users/:user/quota-usage`,
+      asyncHandler((req: Request, res: Response) => this.getUserQuota(req, res))
+    );
+
+    this.logger.info(
+      `James API registered at ${apiPrefix}/v1/users/:user/quota-usage`
+    );
+  }
+
+  /**
+   * Get quota information for a user
+   */
+  private async getUserQuota(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const username = req.params.user;
+
+    try {
+      // Get user's mail from LDAP (escape username to prevent LDAP injection)
+      const escapedUsername = escapeLdapFilter(username);
+      const userResult = await this.server.ldap.search(
+        {
+          scope: 'sub',
+          filter: `(uid=${escapedUsername})`,
+          paged: false,
+          attributes: [this.mailAttr],
+        },
+        this.config.ldap_base || ''
+      );
+
+      const userEntry = (userResult as SearchResult).searchEntries?.[0];
+      if (!userEntry) {
+        res.status(404).json({ error: `User ${username} not found` });
+        return;
+      }
+
+      const mail = userEntry[this.mailAttr];
+      if (!mail) {
+        res
+          .status(400)
+          .json({ error: `User ${username} has no mail attribute` });
+        return;
+      }
+
+      const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+
+      // Get quota from James WebAdmin API
+      const quotaUrl = `${this.webadminUrl}/quota/users/${mailStr}`;
+      const quotaRes = await this.requestLimit(() =>
+        fetch(quotaUrl, {
+          method: 'GET',
+          headers: this.createHeaders(),
+        })
+      );
+
+      if (!quotaRes.ok) {
+        if (quotaRes.status === 404) {
+          res
+            .status(404)
+            .json({ error: `Quota not found for user ${username}` });
+        } else {
+          res.status(502).json({
+            error: `Failed to retrieve quota from James: ${quotaRes.statusText}`,
+          });
+        }
+        return;
+      }
+
+      const quotaData = await quotaRes.json();
+      res.json(quotaData);
+    } catch (error) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'getUserQuota',
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({
+        error: 'Internal server error while retrieving quota',
+      });
+    }
   }
 
   hooks: Hooks = {

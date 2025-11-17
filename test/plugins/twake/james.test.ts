@@ -1,4 +1,5 @@
 import nock from 'nock';
+import request from 'supertest';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
@@ -178,7 +179,42 @@ describe('James Plugin', () => {
         },
       ])
       .put('/jmap/identities/assistant2@test.org/assistant2-identity-id')
-      .reply(200, { success: true });
+      .reply(200, { success: true })
+      // Quota API - GET user quota
+      .get('/quota/users/quotauser@test.org')
+      .reply(200, {
+        global: { count: 1000, size: 1000000000 },
+        domain: { count: 800, size: 800000000 },
+        user: { count: 500, size: 75000000 },
+        computed: { count: 500, size: 75000000 },
+        occupation: {
+          size: 50000000,
+          count: 250,
+          ratio: {
+            size: 0.67,
+            count: 0.5,
+            max: 0.67,
+          },
+        },
+      })
+      .get('/quota/users/testmail@test.org')
+      .reply(200, {
+        global: null,
+        domain: null,
+        user: { count: null, size: 100000000 },
+        computed: { count: null, size: 100000000 },
+        occupation: {
+          size: 10000000,
+          count: 100,
+          ratio: {
+            size: 0.1,
+            count: null,
+            max: 0.1,
+          },
+        },
+      })
+      .get('/quota/users/nonexistent@test.org')
+      .reply(404);
     nock.disableNetConnect();
   });
 
@@ -1015,6 +1051,82 @@ describe('James Plugin', () => {
       // Test signature generation with missing attributes
       const signature = await james.generateSignature(testDN4);
       expect(signature).to.equal('--<br/>Jane Smith<br/><br/>');
+    });
+  });
+
+  describe('Quota Usage API', () => {
+    // Enable localhost connections for API tests
+    before(() => {
+      nock.enableNetConnect('127.0.0.1');
+    });
+
+    after(() => {
+      nock.disableNetConnect();
+    });
+
+    it('should return quota usage and limits for an existing user', async () => {
+      // Create user
+      const entry = {
+        objectClass: ['top', 'twakeAccount'],
+        uid: 'quotauser',
+        mail: 'quotauser@test.org',
+        mailQuotaSize: '75000000',
+      };
+      await dm.ldap.add(testDNQuota, entry);
+
+      // Get quota usage via API
+      const res = await request(dm.app)
+        .get('/api/v1/users/quotauser/quota-usage')
+        .expect(200);
+
+      expect(res.body).to.have.property('global');
+      expect(res.body).to.have.property('domain');
+      expect(res.body).to.have.property('user');
+      expect(res.body).to.have.property('computed');
+      expect(res.body).to.have.property('occupation');
+      expect(res.body.occupation).to.have.property('size');
+      expect(res.body.occupation).to.have.property('count');
+      expect(res.body.occupation).to.have.property('ratio');
+      expect(res.body.occupation.size).to.equal(50000000);
+      expect(res.body.occupation.count).to.equal(250);
+    });
+
+    it('should return 404 for non-existent user', async () => {
+      const res = await request(dm.app)
+        .get('/api/v1/users/nonexistentuser/quota-usage')
+        .expect(404);
+
+      expect(res.body).to.have.property('error');
+      expect(res.body.error).to.match(/not found/i);
+    });
+
+    it('should return quota usage for user with null limits', async () => {
+      // Create user
+      const entry = {
+        objectClass: ['top', 'twakeAccount'],
+        uid: 'testusermail',
+        mail: 'testmail@test.org',
+        mailQuotaSize: '100000000',
+      };
+      await dm.ldap.add(testDN, entry);
+
+      // Get quota usage via API
+      const res = await request(dm.app)
+        .get('/api/v1/users/testusermail/quota-usage')
+        .expect(200);
+
+      expect(res.body.occupation.size).to.equal(10000000);
+      expect(res.body.user.size).to.equal(100000000);
+    });
+
+    it('should prevent LDAP injection attacks', async () => {
+      // Attempt LDAP injection with wildcards and special characters
+      const res = await request(dm.app)
+        .get('/api/v1/users/*/quota-usage')
+        .expect(404);
+
+      expect(res.body).to.have.property('error');
+      expect(res.body.error).to.match(/not found/i);
     });
   });
 });
