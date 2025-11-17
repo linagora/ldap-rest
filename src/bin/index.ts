@@ -155,9 +155,7 @@ export class DM {
       next: NextFunction
     ) => {
       const statusCode =
-        'statusCode' in err
-          ? (err as { statusCode: number }).statusCode
-          : 500;
+        'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
 
       // Client error (4xx) - log as warning and return error message
       if (statusCode >= 400 && statusCode < 500) {
@@ -193,7 +191,6 @@ export class DM {
   }
 
   run(): Promise<void> {
-
     // Handle uncaught exceptions
     process.on('uncaughtException', (err: Error) => {
       this.logger.error(`Uncaught exception: ${err.message}`, {
