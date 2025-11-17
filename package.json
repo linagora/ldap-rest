@@ -450,6 +450,9 @@
     "test:dev": "./.dev.mk test",
     "test:one": "mocha --config .mocharc-one.json"
   },
+  "overrides": {
+    "glob": ">=11.0.4"
+  },
   "dependencies": {
     "body-parser": "^2.2.0",
     "csv-parse": "^6.1.0",
