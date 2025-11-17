@@ -243,6 +243,66 @@ proxyAddresses: SMTP:john.doe@company.com
 
 The `smtp:` prefix is automatically stripped. The capitalization (SMTP vs smtp) is ignored - only the email address after the colon is used.
 
+## REST API
+
+The James plugin exposes a REST API to retrieve quota usage and limits for users.
+
+### GET /api/v1/users/:user/quota-usage
+
+Retrieve quota usage and limits for a user from James. This endpoint returns both the quota limits configured for the user and their current mailbox usage.
+
+**Request:**
+
+```bash
+GET /api/v1/users/jdoe/quota-usage
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "global": { "count": 1000, "size": 1000000000 },
+  "domain": { "count": 800, "size": 800000000 },
+  "user": { "count": 500, "size": 75000000 },
+  "computed": { "count": 500, "size": 75000000 },
+  "occupation": {
+    "size": 50000000,
+    "count": 250,
+    "ratio": {
+      "size": 0.67,
+      "count": 0.5,
+      "max": 0.67
+    }
+  }
+}
+```
+
+**Response Fields:**
+
+- `global`: Global quota limit (server-wide)
+- `domain`: Domain-specific quota limit
+- `user`: User-specific quota limit from LDAP
+- `computed`: Effective quota limit applied (resolved from upper values)
+- `occupation`: **Current mailbox usage statistics**
+  - `size`: Storage currently used (bytes)
+  - `count`: Number of messages in mailbox
+  - `ratio`: Usage ratios (used / limit)
+
+**Error Responses:**
+
+- `404`: User not found in LDAP or quota not found in James
+- `400`: User has no mail attribute
+- `502`: Failed to retrieve quota from James
+- `500`: Internal server error
+
+**Example:**
+
+```bash
+# Get quota usage for user 'jdoe'
+curl http://localhost:8081/api/v1/users/jdoe/quota-usage \
+  -H "Authorization: Bearer admin-token"
+```
+
 ## James WebAdmin API
 
 ### Endpoints Used
@@ -251,6 +311,7 @@ The `smtp:` prefix is automatically stripped. The capitalization (SMTP vs smtp) 
 | ------------------- | ------------------------------------------ | ------ |
 | Rename account      | `/users/{old}/rename/{new}?action=rename`  | POST   |
 | Update quota        | `/quota/users/{mail}/size`                 | PUT    |
+| Get quota           | `/quota/users/{mail}`                      | GET    |
 | Add delegation      | `/users/{mail}/authorizedUsers/{delegate}` | PUT    |
 | Remove delegation   | `/users/{mail}/authorizedUsers/{delegate}` | DELETE |
 | Add alias           | `/address/aliases/{mail}/sources/{alias}`  | PUT    |
