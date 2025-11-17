@@ -1,0 +1,93 @@
+dn: cn=twakeUser,cn=schema,cn=config
+objectClass: olcSchemaConfig
+cn: twakeUser
+
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.1
+  NAME 'scryptR'
+  DESC 'scrypt R parameter'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.2
+  NAME 'scryptN'
+  DESC 'scrypt N parameter'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.3
+  NAME 'scryptP'
+  DESC 'scrypt P parameter'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.4
+  NAME 'scryptSalt'
+  DESC 'scrypt salt (base64 of hex string)'
+  EQUALITY caseExactMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.5
+  NAME 'scryptDKLength'
+  DESC 'scrypt derived key length'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.6
+  NAME 'iterations'
+  DESC 'PBKDF2 iterations count'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.7
+  NAME 'domain'
+  DESC 'instance domain'
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.8
+  NAME 'publicKey'
+  DESC 'user public key'
+  EQUALITY caseExactMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.9
+  NAME 'privateKey'
+  DESC 'user private key'
+  EQUALITY caseExactMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.10
+  NAME 'protectedKey'
+  DESC 'protected key'
+  EQUALITY caseExactMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.11
+  NAME 'twoFactorEnabled'
+  DESC 'marks if 2FA is enabled'
+  EQUALITY integerMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.27
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.12
+  NAME 'workspaceUrl'
+  DESC 'URL of the workspace'
+  EQUALITY caseIgnoreMatch
+  SUBSTR caseIgnoreSubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15
+  SINGLE-VALUE )
+olcAttributeTypes: ( 1.3.6.1.4.1.99999.1.13
+  NAME 'recoveryEmail'
+  DESC 'Recovery email address for the user'
+  EQUALITY caseIgnoreIA5Match
+  SUBSTR caseIgnoreIA5SubstringsMatch
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26
+  SINGLE-VALUE )
+olcObjectClasses: ( 1.3.6.1.4.1.99999.2.1
+  NAME 'twakeUser'
+  DESC 'Custom user object for Twake workplace users'
+  SUP top AUXILIARY
+  MAY ( scryptR $ scryptN $ scryptP $ scryptSalt $
+        scryptDKLength $ iterations $ domain $
+        publicKey $ privateKey $ protectedKey $
+        twoFactorEnabled $ workspaceUrl $ recoveryEmail ) )
