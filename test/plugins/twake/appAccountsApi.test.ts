@@ -22,6 +22,8 @@ describe('App Accounts API Plugin', function () {
     return;
   }
 
+  const timestamp = Date.now();
+  const testUser = `testuser-${timestamp}`;
   let applicativeBase: string;
   let userBase: string;
   let testUserDN: string;
@@ -42,8 +44,8 @@ describe('App Accounts API Plugin', function () {
     userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
     applicativeBase = `ou=applicative,${process.env.DM_LDAP_BASE}`;
 
-    testUserDN = `uid=testuser,${userBase}`;
-    testApplicativeDN = `uid=testuser@example.com,${applicativeBase}`;
+    testUserDN = `uid=${testUser},${userBase}`;
+    testApplicativeDN = `uid=${testUser}@example.com,${applicativeBase}`;
 
     // Ensure ou=users exists
     try {
@@ -96,7 +98,7 @@ describe('App Accounts API Plugin', function () {
       const result = await dm.ldap.search(
         {
           scope: 'sub',
-          filter: '(uid=testuser_*)',
+          filter: `(uid=${testUser}_*)`,
           paged: false,
         },
         applicativeBase
@@ -121,7 +123,7 @@ describe('App Accounts API Plugin', function () {
   describe('GET /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .get('/api/v1/users/testuser/app-accounts')
+        .get(`/api/v1/users/${testUser}/app-accounts`)
         .expect(401);
     });
 
@@ -138,17 +140,17 @@ describe('App Accounts API Plugin', function () {
       // Create user with mail
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       // Wait for principal account creation
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .get('/api/v1/users/testuser/app-accounts')
+        .get(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -160,10 +162,10 @@ describe('App Accounts API Plugin', function () {
       // Create user
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       // Wait for principal account
@@ -171,20 +173,20 @@ describe('App Accounts API Plugin', function () {
 
       // Create app accounts via API
       const res1 = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Phone' })
         .expect(200);
 
       const res2 = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Laptop' })
         .expect(200);
 
       // List accounts
       const listRes = await request(dm.app)
-        .get('/api/v1/users/testuser/app-accounts')
+        .get(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -207,7 +209,7 @@ describe('App Accounts API Plugin', function () {
   describe('POST /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .send({ name: 'Test' })
         .expect(401);
     });
@@ -226,17 +228,17 @@ describe('App Accounts API Plugin', function () {
       // Create user
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       // Wait for principal account
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Device' })
         .expect(200);
@@ -244,11 +246,11 @@ describe('App Accounts API Plugin', function () {
       expect(res.body).to.have.property('uid');
       expect(res.body).to.have.property('pwd');
       expect(res.body).to.have.property('mail');
-      expect(res.body.uid).to.match(/^testuser_c\d{8}$/);
+      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
       expect(res.body.pwd).to.match(
         /^[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+$/
       );
-      expect(res.body.mail).to.equal('testuser@example.com');
+      expect(res.body.mail).to.equal(`${testUser}@example.com`);
 
       // Verify account was created in LDAP
       const searchRes = await dm.ldap.search(
@@ -267,21 +269,21 @@ describe('App Accounts API Plugin', function () {
     it('should create account without description if not provided', async () => {
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({})
         .expect(200);
 
-      expect(res.body.uid).to.match(/^testuser_c\d{8}$/);
+      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
 
       // Verify no description attribute
       const searchRes = await dm.ldap.search(
@@ -327,30 +329,30 @@ describe('App Accounts API Plugin', function () {
       // Create user
       await dmTest.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Create 2 accounts (should succeed)
       await request(dmTest.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 1' })
         .expect(200);
 
       await request(dmTest.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 2' })
         .expect(200);
 
       // Third should fail
       const res = await request(dmTest.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 3' })
         .expect(400);
@@ -362,13 +364,13 @@ describe('App Accounts API Plugin', function () {
   describe('DELETE /api/v1/users/:user/app-accounts/:uid', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .delete('/api/v1/users/testuser/app-accounts/testuser_c12345678')
+        .delete(`/api/v1/users/${testUser}/app-accounts/${testUser}_c12345678`)
         .expect(401);
     });
 
     it('should return 403 if uid does not belong to user', async () => {
       const res = await request(dm.app)
-        .delete('/api/v1/users/testuser/app-accounts/otheruser_c12345678')
+        .delete(`/api/v1/users/${testUser}/app-accounts/otheruser_c12345678`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(403);
 
@@ -379,17 +381,17 @@ describe('App Accounts API Plugin', function () {
       // Create user
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: testUser,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `${testUser}@example.com`,
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Create app account
       const createRes = await request(dm.app)
-        .post('/api/v1/users/testuser/app-accounts')
+        .post(`/api/v1/users/${testUser}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Device' })
         .expect(200);
@@ -408,7 +410,7 @@ describe('App Accounts API Plugin', function () {
 
       // Delete account
       const deleteRes = await request(dm.app)
-        .delete(`/api/v1/users/testuser/app-accounts/${uid}`)
+        .delete(`/api/v1/users/${testUser}/app-accounts/${uid}`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -431,11 +433,11 @@ describe('App Accounts API Plugin', function () {
 
     it('should be idempotent (deleting non-existent account succeeds)', async () => {
       const res = await request(dm.app)
-        .delete('/api/v1/users/testuser/app-accounts/testuser_c99999999')
+        .delete(`/api/v1/users/${testUser}/app-accounts/${testUser}_c99999999`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
-      expect(res.body.uid).to.equal('testuser_c99999999');
+      expect(res.body.uid).to.equal(`${testUser}_c99999999`);
     });
   });
 

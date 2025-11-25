@@ -19,6 +19,8 @@ describe('App Accounts Consistency Plugin', function () {
     return;
   }
 
+  let testCounter = 0;
+  let timestamp: number;
   let applicativeBase: string;
   let userBase: string;
   let testUserDN: string;
@@ -28,6 +30,9 @@ describe('App Accounts Consistency Plugin', function () {
 
   beforeEach(async function () {
     this.timeout(10000);
+
+    // Generate unique timestamp for each test to avoid interference
+    timestamp = Date.now() + testCounter++;
 
     dm = new DM();
     dm.config.ldap_base = process.env.DM_LDAP_BASE;
@@ -40,8 +45,8 @@ describe('App Accounts Consistency Plugin', function () {
       process.env.DM_APPLICATIVE_ACCOUNT_BASE ||
       `ou=applicative,${process.env.DM_LDAP_BASE}`;
 
-    testUserDN = `uid=testuser,${userBase}`;
-    testApplicativeDN = `uid=testuser@example.com,${applicativeBase}`;
+    testUserDN = `uid=testuser-${timestamp},${userBase}`;
+    testApplicativeDN = `uid=testuser-${timestamp}@example.com,${applicativeBase}`;
 
     // Ensure ou=users exists
     try {
@@ -101,12 +106,15 @@ describe('App Accounts Consistency Plugin', function () {
     const testDNs = [
       testUserDN,
       testApplicativeDN,
-      `uid=testuser2,${userBase}`,
-      `uid=testuser2,${applicativeBase}`,
+      `uid=testuser2-${timestamp},${userBase}`,
+      `uid=testuser2-${timestamp},${applicativeBase}`,
       // Cleanup for mail change tests
-      `uid=newemail@example.com,${applicativeBase}`,
-      `uid=testuser_c12345678,${applicativeBase}`,
-      `uid=testuser_c87654321,${applicativeBase}`,
+      `uid=newemail-${timestamp}@example.com,${applicativeBase}`,
+      `uid=testuser-${timestamp}_c12345678,${applicativeBase}`,
+      `uid=testuser-${timestamp}_c87654321,${applicativeBase}`,
+      `uid=testuser-${timestamp}_c11111111,${applicativeBase}`,
+      `uid=testuser-${timestamp}_c22222222,${applicativeBase}`,
+      `uid=testuser-${timestamp}_c33333333,${applicativeBase}`,
     ];
 
     for (const dn of testDNs) {
@@ -123,10 +131,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user with mail attribute
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -145,8 +153,8 @@ describe('App Accounts Consistency Plugin', function () {
 
       expect((result as any).searchEntries).to.have.lengthOf(1);
       const entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal('testuser@example.com');
-      expect(entry.mail).to.equal('testuser@example.com');
+      expect(entry.uid).to.equal(`testuser-${timestamp}@example.com`);
+      expect(entry.mail).to.equal(`testuser-${timestamp}@example.com`);
       expect(entry.cn).to.equal('Test User');
     });
 
@@ -154,10 +162,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user with mail
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -165,7 +173,7 @@ describe('App Accounts Consistency Plugin', function () {
 
       // Trigger creation again by modifying mail to same value
       await dm.ldap.modify(testUserDN, {
-        replace: { mail: 'testuser@example.com' },
+        replace: { mail: `testuser-${timestamp}@example.com` },
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -187,10 +195,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -206,12 +214,12 @@ describe('App Accounts Consistency Plugin', function () {
     });
 
     it('should not create applicative account when user without mail is added', async () => {
-      const testUserDN2 = `uid=testuser2,${userBase}`;
+      const testUserDN2 = `uid=testuser2-${timestamp},${userBase}`;
 
       // Create user without mail attribute
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser2',
+        uid: `testuser2-${timestamp}`,
         cn: 'Test User 2',
         sn: 'User',
       };
@@ -222,7 +230,7 @@ describe('App Accounts Consistency Plugin', function () {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Verify no applicative account was created
-      const testApplicativeDN2 = `uid=testuser2,${applicativeBase}`;
+      const testApplicativeDN2 = `uid=testuser2-${timestamp},${applicativeBase}`;
       try {
         const result = await dm.ldap.search(
           {
@@ -249,10 +257,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user with mail attribute
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -300,10 +308,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'P@ssw0rd!123',
       };
 
@@ -311,34 +319,34 @@ describe('App Accounts Consistency Plugin', function () {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Create multiple app accounts
-      const appAccount1DN = `uid=testuser_c11111111,${applicativeBase}`;
-      const appAccount2DN = `uid=testuser_c22222222,${applicativeBase}`;
-      const appAccount3DN = `uid=testuser_c33333333,${applicativeBase}`;
+      const appAccount1DN = `uid=testuser-${timestamp}_c11111111,${applicativeBase}`;
+      const appAccount2DN = `uid=testuser-${timestamp}_c22222222,${applicativeBase}`;
+      const appAccount3DN = `uid=testuser-${timestamp}_c33333333,${applicativeBase}`;
 
       await dm.ldap.add(appAccount1DN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser_c11111111',
+        uid: `testuser-${timestamp}_c11111111`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'A1b2@-C3d4$-E5f6!-G7h8#-J9k0%-L1m2@',
       });
 
       await dm.ldap.add(appAccount2DN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser_c22222222',
+        uid: `testuser-${timestamp}_c22222222`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'M3n4!-P5q6@-R7s8#-T9u0$-V1w2%-X3y4@',
       });
 
       await dm.ldap.add(appAccount3DN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser_c33333333',
+        uid: `testuser-${timestamp}_c33333333`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'Z1a2!-B3c4@-D5e6#-F7g8$-H9i0%-J1k2@',
       });
 
@@ -372,10 +380,10 @@ describe('App Accounts Consistency Plugin', function () {
 
     it('should handle deletion when user has no applicative account', async () => {
       // Create user without mail
-      const testUserDN2 = `uid=testuser2,${userBase}`;
+      const testUserDN2 = `uid=testuser2-${timestamp},${userBase}`;
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser2',
+        uid: `testuser2-${timestamp}`,
         cn: 'Test User 2',
         sn: 'User',
       };
@@ -395,10 +403,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -420,10 +428,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user with mail
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -443,7 +451,7 @@ describe('App Accounts Consistency Plugin', function () {
 
       // Change user's mail
       await dm.ldap.modify(testUserDN, {
-        replace: { mail: 'newemail@example.com' },
+        replace: { mail: `newemail-${timestamp}@example.com` },
       });
 
       // Wait for applicative account update (hooks are async)
@@ -464,7 +472,7 @@ describe('App Accounts Consistency Plugin', function () {
       }
 
       // Verify new applicative account exists
-      const newApplicativeDN = `uid=newemail@example.com,${applicativeBase}`;
+      const newApplicativeDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
       result = await dm.ldap.search(
         {
           scope: 'base',
@@ -474,8 +482,8 @@ describe('App Accounts Consistency Plugin', function () {
       );
       expect((result as any).searchEntries).to.have.lengthOf(1);
       const entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal('newemail@example.com');
-      expect(entry.mail).to.equal('newemail@example.com');
+      expect(entry.uid).to.equal(`newemail-${timestamp}@example.com`);
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
 
       // Cleanup
       await dm.ldap.delete(newApplicativeDN);
@@ -485,10 +493,10 @@ describe('App Accounts Consistency Plugin', function () {
       // Create user
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
@@ -499,13 +507,13 @@ describe('App Accounts Consistency Plugin', function () {
 
       // Change mail (should handle gracefully with no accounts to update)
       await dm.ldap.modify(testUserDN, {
-        replace: { mail: 'newemail@example.com' },
+        replace: { mail: `newemail-${timestamp}@example.com` },
       });
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Verify no new account was created (updateApplicativeAccount returns when no accounts found)
-      const newApplicativeDN = `uid=newemail@example.com,${applicativeBase}`;
+      const newApplicativeDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
       try {
         await dm.ldap.search(
           {
@@ -524,57 +532,90 @@ describe('App Accounts Consistency Plugin', function () {
     });
 
     it('should update all app accounts when user mail changes', async function () {
-      this.timeout(10000);
+      this.timeout(15000);
 
       // Create user with mail
       const userAttrs = {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser',
+        uid: `testuser-${timestamp}`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'P@ssw0rd!123',
       };
 
       await dm.ldap.add(testUserDN, userAttrs);
 
-      // Wait for principal account creation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for principal account creation with retry
+      const principalDN = `uid=testuser-${timestamp}@example.com,${applicativeBase}`;
+      let principalCreated = false;
+      for (let i = 0; i < 10 && !principalCreated; i++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        try {
+          const checkResult = await dm.ldap.search(
+            { scope: 'base', paged: false },
+            principalDN
+          );
+          if ((checkResult as any).searchEntries?.length > 0) {
+            principalCreated = true;
+          }
+        } catch (err) {
+          // Not found yet, continue waiting
+        }
+      }
+      expect(principalCreated, 'Principal account should have been created').to.be
+        .true;
 
       // Create app accounts (simulating API creation)
-      const appAccount1DN = `uid=testuser_c12345678,${applicativeBase}`;
-      const appAccount2DN = `uid=testuser_c87654321,${applicativeBase}`;
+      const appAccount1DN = `uid=testuser-${timestamp}_c12345678,${applicativeBase}`;
+      const appAccount2DN = `uid=testuser-${timestamp}_c87654321,${applicativeBase}`;
 
       await dm.ldap.add(appAccount1DN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser_c12345678',
+        uid: `testuser-${timestamp}_c12345678`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'A1b2@-C3d4$-E5f6!-G7h8#-J9k0%-L1m2@',
         description: 'My Phone',
       });
 
       await dm.ldap.add(appAccount2DN, {
         objectClass: 'inetOrgPerson',
-        uid: 'testuser_c87654321',
+        uid: `testuser-${timestamp}_c87654321`,
         cn: 'Test User',
         sn: 'User',
-        mail: 'testuser@example.com',
+        mail: `testuser-${timestamp}@example.com`,
         userPassword: 'M3n4!-P5q6@-R7s8#-T9u0$-V1w2%-X3y4@',
         description: 'My Laptop',
       });
 
       // Change user's mail
       await dm.ldap.modify(testUserDN, {
-        replace: { mail: 'newemail@example.com' },
+        replace: { mail: `newemail-${timestamp}@example.com` },
       });
 
-      // Wait for all updates (hooks are async and need time to propagate)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for principal account rename with retry
+      const newPrincipalDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
+      let principalRenamed = false;
+      for (let i = 0; i < 15 && !principalRenamed; i++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        try {
+          const checkResult = await dm.ldap.search(
+            { scope: 'base', paged: false },
+            newPrincipalDN
+          );
+          if ((checkResult as any).searchEntries?.length > 0) {
+            principalRenamed = true;
+          }
+        } catch (err) {
+          // Not renamed yet, continue waiting
+        }
+      }
+      expect(principalRenamed, 'Principal account should have been renamed').to.be
+        .true;
 
       // Verify principal account changed uid
-      const newPrincipalDN = `uid=newemail@example.com,${applicativeBase}`;
       let result = await dm.ldap.search(
         {
           scope: 'base',
@@ -584,8 +625,8 @@ describe('App Accounts Consistency Plugin', function () {
       );
       expect((result as any).searchEntries).to.have.lengthOf(1);
       let entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal('newemail@example.com');
-      expect(entry.mail).to.equal('newemail@example.com');
+      expect(entry.uid).to.equal(`newemail-${timestamp}@example.com`);
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
 
       // Verify app accounts kept their uid but changed mail
       result = await dm.ldap.search(
@@ -597,8 +638,8 @@ describe('App Accounts Consistency Plugin', function () {
       );
       expect((result as any).searchEntries).to.have.lengthOf(1);
       entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal('testuser_c12345678'); // UID unchanged
-      expect(entry.mail).to.equal('newemail@example.com'); // Mail updated
+      expect(entry.uid).to.equal(`testuser-${timestamp}_c12345678`); // UID unchanged
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
       expect(entry.description).to.equal('My Phone'); // Description preserved
 
       result = await dm.ldap.search(
@@ -610,8 +651,8 @@ describe('App Accounts Consistency Plugin', function () {
       );
       expect((result as any).searchEntries).to.have.lengthOf(1);
       entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal('testuser_c87654321'); // UID unchanged
-      expect(entry.mail).to.equal('newemail@example.com'); // Mail updated
+      expect(entry.uid).to.equal(`testuser-${timestamp}_c87654321`); // UID unchanged
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
       expect(entry.description).to.equal('My Laptop'); // Description preserved
 
       // Cleanup - ignore errors if already deleted
