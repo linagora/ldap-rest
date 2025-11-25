@@ -6,7 +6,7 @@ import { DM } from '../../../src/bin';
 import DmPlugin from '../../../src/abstract/plugin';
 import TrustedProxy from '../../../src/plugins/auth/trustedProxy';
 
-// Simple plugin that exposes the X-Forwarded-For header value
+// Simple plugin that exposes the X-Forwarded-For header value and trusted proxy info
 class HeaderInspector extends DmPlugin {
   name = 'headerInspector';
 
@@ -15,6 +15,8 @@ class HeaderInspector extends DmPlugin {
       res.json({
         xForwardedFor: req.headers['x-forwarded-for'] || null,
         remoteAddress: req.socket.remoteAddress,
+        trustedProxy: req.trustedProxy || false,
+        proxyAuthUser: req.proxyAuthUser || null,
       });
     });
   }
@@ -322,6 +324,125 @@ describe('TrustedProxy Plugin', () => {
       expect(response.status).to.equal(200);
       // The spoofed header should be removed
       expect(response.body.xForwardedFor).to.equal(null);
+    });
+  });
+
+  describe('Auth-User header from trusted proxy', () => {
+    let app: Express;
+
+    before(async () => {
+      process.env.DM_TRUSTED_PROXIES = '127.0.0.1';
+      const dm = new DM();
+      await dm.ready;
+
+      const trustedProxy = new TrustedProxy(dm);
+      const headerInspector = new HeaderInspector(dm);
+
+      await dm.registerPlugin('trustedProxy', trustedProxy);
+      await dm.registerPlugin('headerInspector', headerInspector);
+
+      app = dm.app;
+    });
+
+    after(() => {
+      delete process.env.DM_TRUSTED_PROXIES;
+    });
+
+    it('should extract Auth-User from trusted proxy', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('Auth-User', 'john.doe@example.com');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.trustedProxy).to.equal(true);
+      expect(response.body.proxyAuthUser).to.equal('john.doe@example.com');
+    });
+
+    it('should mark request as trusted even without Auth-User', async () => {
+      const response = await request(app).get('/api/inspect');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.trustedProxy).to.equal(true);
+      expect(response.body.proxyAuthUser).to.equal(null);
+    });
+  });
+
+  describe('Auth-User header from untrusted source', () => {
+    let app: Express;
+
+    before(async () => {
+      // Trust a different IP than localhost
+      process.env.DM_TRUSTED_PROXIES = '10.0.0.1';
+      const dm = new DM();
+      await dm.ready;
+
+      const trustedProxy = new TrustedProxy(dm);
+      const headerInspector = new HeaderInspector(dm);
+
+      await dm.registerPlugin('trustedProxy', trustedProxy);
+      await dm.registerPlugin('headerInspector', headerInspector);
+
+      app = dm.app;
+    });
+
+    after(() => {
+      delete process.env.DM_TRUSTED_PROXIES;
+    });
+
+    it('should NOT extract Auth-User from untrusted source', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('Auth-User', 'attacker@evil.com');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.trustedProxy).to.equal(false);
+      // Auth-User should NOT be trusted from untrusted source
+      expect(response.body.proxyAuthUser).to.equal(null);
+    });
+  });
+
+  describe('Custom auth header', () => {
+    let app: Express;
+
+    before(async () => {
+      process.env.DM_TRUSTED_PROXIES = '127.0.0.1';
+      process.env.DM_TRUSTED_PROXY_AUTH_HEADER = 'X-Remote-User';
+      const dm = new DM();
+      await dm.ready;
+
+      const trustedProxy = new TrustedProxy(dm);
+      const headerInspector = new HeaderInspector(dm);
+
+      await dm.registerPlugin('trustedProxy', trustedProxy);
+      await dm.registerPlugin('headerInspector', headerInspector);
+
+      app = dm.app;
+    });
+
+    after(() => {
+      delete process.env.DM_TRUSTED_PROXIES;
+      delete process.env.DM_TRUSTED_PROXY_AUTH_HEADER;
+    });
+
+    it('should use custom auth header name', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('X-Remote-User', 'custom.user@example.com');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.trustedProxy).to.equal(true);
+      expect(response.body.proxyAuthUser).to.equal('custom.user@example.com');
+    });
+
+    it('should ignore default Auth-User header when custom is configured', async () => {
+      const response = await request(app)
+        .get('/api/inspect')
+        .set('Auth-User', 'should.be.ignored@example.com');
+
+      expect(response.status).to.equal(200);
+      expect(response.body.trustedProxy).to.equal(true);
+      // Auth-User should be ignored, X-Remote-User is not set
+      expect(response.body.proxyAuthUser).to.equal(null);
     });
   });
 });

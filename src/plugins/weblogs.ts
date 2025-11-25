@@ -13,7 +13,12 @@ export default class WebLogs extends DmPlugin {
       const start = Date.now();
       res.on('finish', () => {
         const log: Record<string, string | number> = {};
-        if (req.user) log.user = req.user;
+        // Use proxyAuthUser (from trusted proxy) if available, otherwise use authenticated user
+        if (req.proxyAuthUser) {
+          log.user = req.proxyAuthUser;
+        } else if (req.user) {
+          log.user = req.user;
+        }
         if (nd) this.log(req, res, start, log);
         nd = false;
       });

@@ -10,14 +10,33 @@
  * (like crowdsec and rateLimit) to ensure they receive sanitized headers.
  *
  * Configuration:
- * - trusted_proxies: Array of trusted proxy IPs or CIDR ranges (required)
+ * - trusted_proxy: Array of trusted proxy IPs or CIDR ranges (required)
  *   Example: ["127.0.0.1", "10.0.0.0/8", "192.168.1.0/24", "::1"]
+ * - trusted_proxy_auth_header: Header name containing the authenticated user
+ *   from trusted proxy (optional, default: "Auth-User")
+ *
+ * When a request comes from a trusted proxy:
+ * - X-Forwarded-For header is preserved
+ * - The request is marked as trusted (req.trustedProxy = true)
+ * - If trusted_proxy_auth_header is set and the header is present,
+ *   req.proxyAuthUser is set to its value for use by other plugins (e.g., weblogs)
  *
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
+
+// Extend Express Request to include trusted proxy info
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      trustedProxy?: boolean;
+      proxyAuthUser?: string;
+    }
+  }
+}
 
 interface ParsedCIDR {
   ip: bigint;
@@ -29,6 +48,7 @@ export default class TrustedProxy extends DmPlugin {
   name = 'trustedProxy';
   roles: Role[] = ['protect'] as const;
   private trustedNetworks: ParsedCIDR[] = [];
+  private authHeader: string;
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
@@ -56,8 +76,13 @@ export default class TrustedProxy extends DmPlugin {
       }
     }
 
+    // Get auth header name (default: Auth-User)
+    this.authHeader = (
+      (this.config.trusted_proxy_auth_header as string) || 'Auth-User'
+    ).toLowerCase();
+
     this.logger.info(
-      `Trusted proxy validation enabled for ${trustedProxies.length} address(es): ${trustedProxies.join(', ')}`
+      `Trusted proxy validation enabled for ${trustedProxies.length} address(es): ${trustedProxies.join(', ')} (auth header: ${this.authHeader})`
     );
   }
 
@@ -76,12 +101,24 @@ export default class TrustedProxy extends DmPlugin {
       // Check if request comes from a trusted proxy
       const xff = req.headers['x-forwarded-for'];
       if (this.isTrustedProxy(remoteAddr)) {
-        // Trust the X-Forwarded-For header
-        this.logger.debug(
-          `Request from trusted proxy ${remoteAddr}, X-Forwarded-For: ${xff ? String(xff) : '(none)'}`
-        );
+        // Mark request as coming from trusted proxy
+        req.trustedProxy = true;
+
+        // Extract auth user from header if present
+        const authUser = req.headers[this.authHeader];
+        if (authUser) {
+          req.proxyAuthUser = Array.isArray(authUser) ? authUser[0] : authUser;
+          this.logger.debug(
+            `Request from trusted proxy ${remoteAddr}, Auth-User: ${req.proxyAuthUser}, X-Forwarded-For: ${xff ? String(xff) : '(none)'}`
+          );
+        } else {
+          this.logger.debug(
+            `Request from trusted proxy ${remoteAddr}, X-Forwarded-For: ${xff ? String(xff) : '(none)'}`
+          );
+        }
       } else {
         // Untrusted source: remove X-Forwarded-For to prevent spoofing
+        req.trustedProxy = false;
         if (xff) {
           this.logger.warn(
             `Removing X-Forwarded-For header from untrusted source ${remoteAddr} (was: ${String(xff)})`

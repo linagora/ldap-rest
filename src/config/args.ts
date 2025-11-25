@@ -129,6 +129,7 @@ export interface Config {
 
   // auth/trustedProxy
   trusted_proxy?: string[];
+  trusted_proxy_auth_header?: string;
 
   // Special attributes
   mail_attribute?: string;
@@ -475,6 +476,11 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--trusted-proxies',
+  ],
+  [
+    '--trusted-proxy-auth-header',
+    'DM_TRUSTED_PROXY_AUTH_HEADER',
+    'Auth-User',
   ],
 ];
 
