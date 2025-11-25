@@ -64,6 +64,10 @@
       "import": "./dist/plugins/auth/totp.js",
       "types": "./dist/src/plugins/auth/totp.d.ts"
     },
+    "./plugin-auth-trustedproxy": {
+      "import": "./dist/plugins/auth/trustedProxy.js",
+      "types": "./dist/src/plugins/auth/trustedProxy.d.ts"
+    },
     "./plugin-configapi": {
       "import": "./dist/plugins/configApi.js",
       "types": "./dist/src/plugins/configApi.d.ts"

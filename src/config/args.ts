@@ -127,6 +127,10 @@ export interface Config {
   crowdsec_api_key?: string;
   crowdsec_cache_ttl?: number;
 
+  // auth/trustedProxy
+  trusted_proxy?: string[];
+  trusted_proxy_auth_header?: string;
+
   // Special attributes
   mail_attribute?: string;
   quota_attribute?: string;
@@ -464,6 +468,20 @@ const configArgs: ConfigTemplate = [
   ['--crowdsec-url', 'DM_CROWDSEC_URL', 'http://localhost:8080/v1/decisions'],
   ['--crowdsec-api-key', 'DM_CROWDSEC_API_KEY', ''],
   ['--crowdsec-cache-ttl', 'DM_CROWDSEC_CACHE_TTL', 60, 'number'],
+
+  // Trusted proxy plugin
+  [
+    '--trusted-proxy',
+    'DM_TRUSTED_PROXIES',
+    [],
+    'array',
+    '--trusted-proxies',
+  ],
+  [
+    '--trusted-proxy-auth-header',
+    'DM_TRUSTED_PROXY_AUTH_HEADER',
+    'Auth-User',
+  ],
 ];
 
 export default configArgs;

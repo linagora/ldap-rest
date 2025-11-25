@@ -42,6 +42,7 @@ This project supports multiple authentication/authorization mechanisms:
 
 Also:
 
+- Trusted proxy validation for X-Forwarded-For headers
 - Rate limiting
 - CrowdSec integration for IP blocking
 

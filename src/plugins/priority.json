@@ -1,4 +1,5 @@
 [
+  "core/auth/trustedProxy",
   "core/weblogs",
   "core/auth/crowdsec",
   "core/auth/rateLimit",
