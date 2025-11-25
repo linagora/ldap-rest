@@ -189,6 +189,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     let request: any;
     before(async () => {
       plugin.api(server.app);
+      server.setupErrorMiddleware();
       request = supertest(server.app);
     });
 
