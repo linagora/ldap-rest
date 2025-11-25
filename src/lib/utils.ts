@@ -63,6 +63,33 @@ export const transformSchemas = (
   return str;
 };
 
+// LDAP utilities
+
+/**
+ * Escape special characters in LDAP filter values according to RFC 4515
+ * Prevents LDAP injection attacks by escaping characters that have special meaning in LDAP filters
+ *
+ * @param value - The value to escape
+ * @returns The escaped value safe for use in LDAP filters
+ *
+ * @example
+ * ```typescript
+ * escapeLdapFilter('user*')
+ * // => 'user\\2a'
+ *
+ * escapeLdapFilter('Smith, John (admin)')
+ * // => 'Smith, John \\28admin\\29'
+ * ```
+ */
+export function escapeLdapFilter(value: string): string {
+  return value
+    .replace(/\\/g, '\\5c') // backslash
+    .replace(/\*/g, '\\2a') // asterisk
+    .replace(/\(/g, '\\28') // left paren
+    .replace(/\)/g, '\\29') // right paren
+    .replace(/\0/g, '\\00'); // null
+}
+
 // LDAP DN utilities
 
 /**
