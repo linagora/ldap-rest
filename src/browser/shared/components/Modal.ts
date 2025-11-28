@@ -80,8 +80,8 @@ export class Modal extends DisposableComponent {
    */
   override destroy(): void {
     this.close();
-    super.destroy();
     this.overlay = null;
+    super.destroy();
   }
 
   isOpen(): boolean {
