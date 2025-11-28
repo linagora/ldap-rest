@@ -5,8 +5,9 @@
 
 import type { LdapUser } from '../types';
 import { CacheManager } from '../cache/CacheManager';
+import { DisposableComponent } from '../../shared/components/DisposableComponent';
 
-export class UserTree {
+export class UserTree extends DisposableComponent {
   private container: HTMLElement;
   private baseUrl: string;
   private onSelectOrg: (dn: string) => void;
@@ -20,13 +21,14 @@ export class UserTree {
     baseUrl: string,
     onSelectOrg: (dn: string) => void
   ) {
+    super();
     this.container = container;
     this.baseUrl = baseUrl;
     this.onSelectOrg = onSelectOrg;
     this.cache = new CacheManager();
 
-    // Clean expired entries every 5 minutes
-    window.setInterval(() => this.cache.cleanExpired(), 5 * 60 * 1000);
+    // Clean expired entries every 5 minutes - now properly cleaned up
+    this.addManagedInterval(() => this.cache.cleanExpired(), 5 * 60 * 1000);
   }
 
   /**
@@ -187,7 +189,8 @@ export class UserTree {
     await this.renderTree();
   }
 
-  destroy(): void {
+  override destroy(): void {
     this.container.innerHTML = '';
+    super.destroy();
   }
 }
