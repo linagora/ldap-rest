@@ -65,6 +65,7 @@ class ldapActions {
   private connectionTtl: number; // in milliseconds
   private ldapUrls: string[];
   private currentUrlIndex: number = 0;
+  private attrSignatureCache = new Map<string, string>();
 
   constructor(server: DM) {
     this.parent = server;
@@ -269,14 +270,26 @@ class ldapActions {
   }
 
   /**
+   * Get a sorted signature for attribute list, using cache for performance
+   */
+  private getAttributeSignature(attributes: string[] | undefined): string {
+    if (!attributes || attributes.length === 0) return '*';
+    // Use array as-is for cache key (common patterns repeat)
+    const key = attributes.join('|');
+    let sig = this.attrSignatureCache.get(key);
+    if (!sig) {
+      sig = [...attributes].sort().join(',');
+      this.attrSignatureCache.set(key, sig);
+    }
+    return sig;
+  }
+
+  /**
    * Generate cache key for LDAP search
    */
   private getCacheKey(base: string, opts: SearchOptions): string {
     // Create a deterministic cache key from base DN and search options
-    // Sort attributes to ensure consistent key generation
-    const sortedAttrs = opts.attributes
-      ? [...opts.attributes].sort().join(',')
-      : '*';
+    const sortedAttrs = this.getAttributeSignature(opts.attributes);
     const filterStr =
       typeof opts.filter === 'string'
         ? opts.filter
