@@ -89,6 +89,27 @@ export default abstract class LdapFlat extends DmPlugin {
   singularName: string;
   pluralName: string;
   hookPrefix: string;
+  private regexCache = new Map<string, RegExp>();
+
+  /**
+   * Get a compiled RegExp from cache, or compile and cache it
+   */
+  protected getCompiledRegex(pattern: string, flags?: string): RegExp {
+    const key = flags ? `${pattern}:${flags}` : pattern;
+    let regex = this.regexCache.get(key);
+    if (!regex) {
+      regex = new RegExp(pattern, flags);
+      this.regexCache.set(key, regex);
+    }
+    return regex;
+  }
+
+  /**
+   * Escape special regex characters in a string
+   */
+  protected escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
   constructor(server: DM, config: LdapFlatConfig) {
     super(server);
@@ -696,8 +717,8 @@ export default abstract class LdapFlat extends DmPlugin {
       // Check branch restriction if provided
       if (attr.branch && attr.branch.length > 0) {
         const isInBranch = attr.branch.some(branch => {
-          const branchPattern = new RegExp(
-            `,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+          const branchPattern = this.getCompiledRegex(
+            `,?${this.escapeRegex(branch)}$`,
             'i'
           );
           return branchPattern.test(dnValue);
@@ -732,7 +753,10 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     if (attr.test) {
-      const regex = new RegExp(attr.test);
+      const regex =
+        typeof attr.test === 'string'
+          ? this.getCompiledRegex(attr.test)
+          : attr.test;
       if (Array.isArray(value)) {
         return value.every(v => regex.test(v as string));
       }
