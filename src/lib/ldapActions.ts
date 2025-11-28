@@ -251,12 +251,22 @@ class ldapActions {
       return pooled;
     }
 
-    // Pool is full, wait for an available connection using Promise (no polling)
+    // Pool is full, wait for an available connection using Promise with timeout
     this.logger.debug(
       'LDAP connection pool full, waiting for available connection'
     );
-    return new Promise(resolve => {
-      this.waitingResolvers.push(resolve);
+    return new Promise<PooledConnection>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        const idx = this.waitingResolvers.indexOf(resolveWrapper);
+        if (idx !== -1) this.waitingResolvers.splice(idx, 1);
+        reject(new Error('LDAP connection pool timeout after 30s'));
+      }, 30000);
+
+      const resolveWrapper = (conn: PooledConnection) => {
+        clearTimeout(timeoutId);
+        resolve(conn);
+      };
+      this.waitingResolvers.push(resolveWrapper);
     });
   }
 
@@ -265,6 +275,15 @@ class ldapActions {
    * If there are waiting requests, hand off the connection directly
    */
   private releaseConnection(pooled: PooledConnection): void {
+    // Check if connection has expired before reusing
+    if (Date.now() - pooled.createdAt > this.connectionTtl) {
+      const idx = this.connectionPool.indexOf(pooled);
+      if (idx !== -1) this.connectionPool.splice(idx, 1);
+      void pooled.client.unbind().catch(() => {});
+      this.logger.debug('Released expired LDAP connection (discarded)');
+      return;
+    }
+
     // If there are waiting requests, give them the connection directly (O(1))
     if (this.waitingResolvers.length > 0) {
       const resolve = this.waitingResolvers.shift()!;
