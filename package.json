@@ -296,6 +296,10 @@
       "import": "./static/browser/ldap-user-editor/types.js",
       "types": "./dist/src/browser/ldap-user-editor/types.d.ts"
     },
+    "./browser-shared-components-disposablecomponent": {
+      "import": "./static/browser/shared/components/DisposableComponent.js",
+      "types": "./dist/src/browser/shared/components/DisposableComponent.d.ts"
+    },
     "./browser-shared-components-modal": {
       "import": "./static/browser/shared/components/Modal.js",
       "types": "./dist/src/browser/shared/components/Modal.d.ts"

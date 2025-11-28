@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml, getElementByIdSafe } from '../utils/dom';
+import { DisposableComponent } from './DisposableComponent';
 
 export interface ModalOptions {
   id: string;
@@ -11,11 +12,12 @@ export interface ModalOptions {
   onClose?: () => void;
 }
 
-export class Modal {
+export class Modal extends DisposableComponent {
   private overlay: HTMLElement | null = null;
   private options: ModalOptions;
 
   constructor(options: ModalOptions) {
+    super();
     this.options = options;
     this.overlay = getElementByIdSafe(options.id);
 
@@ -32,25 +34,25 @@ export class Modal {
     // Close button
     const closeBtn = this.overlay.querySelector('.close-button');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.close());
+      this.addManagedEventListener(closeBtn, 'click', () => this.close());
     }
 
     // Cancel button
     const cancelBtn = this.overlay.querySelector('[data-modal-cancel]');
     if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => this.close());
+      this.addManagedEventListener(cancelBtn, 'click', () => this.close());
     }
 
     // Click outside to close
-    this.overlay.addEventListener('click', e => {
+    this.addManagedEventListener(this.overlay, 'click', e => {
       if (e.target === this.overlay) {
         this.close();
       }
     });
 
-    // Escape key to close
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && this.isOpen()) {
+    // Escape key to close - now properly cleaned up
+    this.addManagedEventListener(document, 'keydown', e => {
+      if ((e as KeyboardEvent).key === 'Escape' && this.isOpen()) {
         this.close();
       }
     });
@@ -71,6 +73,15 @@ export class Modal {
         this.options.onClose();
       }
     }
+  }
+
+  /**
+   * Clean up all event listeners and resources
+   */
+  override destroy(): void {
+    this.close();
+    super.destroy();
+    this.overlay = null;
   }
 
   isOpen(): boolean {

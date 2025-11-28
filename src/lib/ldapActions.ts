@@ -65,6 +65,9 @@ class ldapActions {
   private connectionTtl: number; // in milliseconds
   private ldapUrls: string[];
   private currentUrlIndex: number = 0;
+  private attrSignatureCache = new Map<string, string>();
+  private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
+  private availableConnections: PooledConnection[] = [];
 
   constructor(server: DM) {
     this.parent = server;
@@ -189,11 +192,17 @@ class ldapActions {
     const now = Date.now();
     const expired: PooledConnection[] = [];
 
-    for (let i = this.connectionPool.length - 1; i >= 0; i--) {
-      const conn = this.connectionPool[i];
-      if (!conn.inUse && now - conn.createdAt > this.connectionTtl) {
+    // Clean from availableConnections queue (only these can expire as they're not in use)
+    for (let i = this.availableConnections.length - 1; i >= 0; i--) {
+      const conn = this.availableConnections[i];
+      if (now - conn.createdAt > this.connectionTtl) {
         expired.push(conn);
-        this.connectionPool.splice(i, 1);
+        this.availableConnections.splice(i, 1);
+        // Also remove from main pool
+        const poolIdx = this.connectionPool.indexOf(conn);
+        if (poolIdx !== -1) {
+          this.connectionPool.splice(poolIdx, 1);
+        }
       }
     }
 
@@ -213,17 +222,18 @@ class ldapActions {
 
   /**
    * Acquire a connection from the pool or create a new one
+   * Optimized for O(1) lookup using separate available connections queue
    */
   private async acquireConnection(): Promise<PooledConnection> {
     // Clean up expired connections
     this.cleanupExpiredConnections();
 
-    // Try to find an available connection in the pool
-    const available = this.connectionPool.find(conn => !conn.inUse);
-    if (available) {
-      available.inUse = true;
+    // O(1) - Try to pop from available connections queue
+    if (this.availableConnections.length > 0) {
+      const conn = this.availableConnections.pop()!;
+      conn.inUse = true;
       this.logger.debug('Reusing pooled LDAP connection');
-      return available;
+      return conn;
     }
 
     // If pool is not full, create a new connection
@@ -241,31 +251,67 @@ class ldapActions {
       return pooled;
     }
 
-    // Pool is full, wait for an available connection
+    // Pool is full, wait for an available connection using Promise with timeout
     this.logger.debug(
       'LDAP connection pool full, waiting for available connection'
     );
-    return new Promise(resolve => {
-      // eslint-disable-next-line no-undef
-      const checkInterval = setInterval(() => {
-        this.cleanupExpiredConnections();
-        const available = this.connectionPool.find(conn => !conn.inUse);
-        if (available) {
-          // eslint-disable-next-line no-undef
-          clearInterval(checkInterval);
-          available.inUse = true;
-          resolve(available);
-        }
-      }, 50); // Check every 50ms
+    return new Promise<PooledConnection>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        const idx = this.waitingResolvers.indexOf(resolveWrapper);
+        if (idx !== -1) this.waitingResolvers.splice(idx, 1);
+        reject(new Error('LDAP connection pool timeout after 30s'));
+      }, 30000);
+
+      const resolveWrapper = (conn: PooledConnection) => {
+        clearTimeout(timeoutId);
+        resolve(conn);
+      };
+      this.waitingResolvers.push(resolveWrapper);
     });
   }
 
   /**
    * Release a connection back to the pool
+   * If there are waiting requests, hand off the connection directly
    */
   private releaseConnection(pooled: PooledConnection): void {
+    // Check if connection has expired before reusing
+    if (Date.now() - pooled.createdAt > this.connectionTtl) {
+      const idx = this.connectionPool.indexOf(pooled);
+      if (idx !== -1) this.connectionPool.splice(idx, 1);
+      void pooled.client.unbind().catch(() => {});
+      this.logger.debug('Released expired LDAP connection (discarded)');
+      return;
+    }
+
+    // If there are waiting requests, give them the connection directly (O(1))
+    if (this.waitingResolvers.length > 0) {
+      const resolve = this.waitingResolvers.shift()!;
+      // Connection stays in use, just transfer ownership
+      this.logger.debug('Released LDAP connection to waiting request');
+      resolve(pooled);
+      return;
+    }
+
+    // No waiters, mark as available
     pooled.inUse = false;
+    this.availableConnections.push(pooled);
     this.logger.debug('Released LDAP connection back to pool');
+  }
+
+  /**
+   * Get a sorted signature for attribute list, using cache for performance
+   */
+  private getAttributeSignature(attributes: string[] | undefined): string {
+    if (!attributes || attributes.length === 0) return '*';
+    // Use array as-is for cache key (common patterns repeat)
+    const key = attributes.join('|');
+    let sig = this.attrSignatureCache.get(key);
+    if (!sig) {
+      sig = [...attributes].sort().join(',');
+      this.attrSignatureCache.set(key, sig);
+    }
+    return sig;
   }
 
   /**
@@ -273,10 +319,7 @@ class ldapActions {
    */
   private getCacheKey(base: string, opts: SearchOptions): string {
     // Create a deterministic cache key from base DN and search options
-    // Sort attributes to ensure consistent key generation
-    const sortedAttrs = opts.attributes
-      ? [...opts.attributes].sort().join(',')
-      : '*';
+    const sortedAttrs = this.getAttributeSignature(opts.attributes);
     const filterStr =
       typeof opts.filter === 'string'
         ? opts.filter
