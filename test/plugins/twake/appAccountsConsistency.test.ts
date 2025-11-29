@@ -563,8 +563,8 @@ describe('App Accounts Consistency Plugin', function () {
           // Not found yet, continue waiting
         }
       }
-      expect(principalCreated, 'Principal account should have been created').to.be
-        .true;
+      expect(principalCreated, 'Principal account should have been created').to
+        .be.true;
 
       // Create app accounts (simulating API creation)
       const appAccount1DN = `uid=testuser-${timestamp}_c12345678,${applicativeBase}`;
@@ -612,8 +612,8 @@ describe('App Accounts Consistency Plugin', function () {
           // Not renamed yet, continue waiting
         }
       }
-      expect(principalRenamed, 'Principal account should have been renamed').to.be
-        .true;
+      expect(principalRenamed, 'Principal account should have been renamed').to
+        .be.true;
 
       // Verify principal account changed uid
       let result = await dm.ldap.search(

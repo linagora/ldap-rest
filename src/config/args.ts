@@ -470,18 +470,8 @@ const configArgs: ConfigTemplate = [
   ['--crowdsec-cache-ttl', 'DM_CROWDSEC_CACHE_TTL', 60, 'number'],
 
   // Trusted proxy plugin
-  [
-    '--trusted-proxy',
-    'DM_TRUSTED_PROXIES',
-    [],
-    'array',
-    '--trusted-proxies',
-  ],
-  [
-    '--trusted-proxy-auth-header',
-    'DM_TRUSTED_PROXY_AUTH_HEADER',
-    'Auth-User',
-  ],
+  ['--trusted-proxy', 'DM_TRUSTED_PROXIES', [], 'array', '--trusted-proxies'],
+  ['--trusted-proxy-auth-header', 'DM_TRUSTED_PROXY_AUTH_HEADER', 'Auth-User'],
 ];
 
 export default configArgs;

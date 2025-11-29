@@ -63,13 +63,13 @@ GET    /api/v1/config     # Available capabilities and schemas
 
 ## Response Codes
 
-| Code | Description |
-|------|-------------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Invalid request |
-| 401 | Not authenticated |
-| 403 | Access forbidden |
-| 404 | Not found |
-| 409 | Conflict (existing entry) |
-| 500 | Server error |
+| Code | Description               |
+| ---- | ------------------------- |
+| 200  | Success                   |
+| 201  | Created                   |
+| 400  | Invalid request           |
+| 401  | Not authenticated         |
+| 403  | Access forbidden          |
+| 404  | Not found                 |
+| 409  | Conflict (existing entry) |
+| 500  | Server error              |

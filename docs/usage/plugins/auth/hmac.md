@@ -208,15 +208,15 @@ const authHeader = `HMAC-SHA256 registration-service:${Date.now()}:${signature}`
 
 ## Advantages Over Other Methods
 
-| Feature                   | HMAC               | Token          | TOTP                |
-| ------------------------- | ------------------ | -------------- | ------------------- |
-| **Request Integrity**     | Yes (body hash) | No          | No               |
-| **Replay Protection**     | Yes (timestamp) | No          | Yes (time-based) |
-| **Signature Per Request** | Yes             | No (static) | Yes (30s codes)  |
-| **Body Tampering Detect** | Yes             | No          | No               |
-| **Path/Query Protection** | Yes             | No          | No               |
-| **Setup Complexity**      | Medium             | Simple         | Simple              |
-| **Best For**              | Backend services   | Simple APIs    | MFA, user auth      |
+| Feature                   | HMAC             | Token       | TOTP             |
+| ------------------------- | ---------------- | ----------- | ---------------- |
+| **Request Integrity**     | Yes (body hash)  | No          | No               |
+| **Replay Protection**     | Yes (timestamp)  | No          | Yes (time-based) |
+| **Signature Per Request** | Yes              | No (static) | Yes (30s codes)  |
+| **Body Tampering Detect** | Yes              | No          | No               |
+| **Path/Query Protection** | Yes              | No          | No               |
+| **Setup Complexity**      | Medium           | Simple      | Simple           |
+| **Best For**              | Backend services | Simple APIs | MFA, user auth   |
 
 ## Comparison with Standards
 

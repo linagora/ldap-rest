@@ -9,6 +9,7 @@ Guide for resolving common issues.
 **Symptom:** "Plugin not found" error at startup
 
 **Solutions:**
+
 1. Verify exact plugin name
 2. Use full path (e.g., `core/ldap/flatGeneric`)
 3. Check that plugin has no missing dependencies
@@ -18,6 +19,7 @@ Guide for resolving common issues.
 **Symptom:** Unable to connect to LDAP server
 
 **Solutions:**
+
 1. Verify LDAP URL (`--ldap-url`)
 2. Verify bind DN (`--ldap-dn`)
 3. Verify password (`--ldap-pwd`)
@@ -31,6 +33,7 @@ Guide for resolving common issues.
 **Symptom:** Schema validation error
 
 **Solutions:**
+
 1. Verify JSON schema syntax
 2. Check required fields
 3. Enable debug for more details:
@@ -45,6 +48,7 @@ Guide for resolving common issues.
 **Symptom:** API endpoint returns 404
 
 **Solutions:**
+
 1. Verify that the plugin providing the endpoint is loaded
 2. Check exact endpoint URL
 3. Check logs for registered routes
@@ -54,6 +58,7 @@ Guide for resolving common issues.
 **Symptom:** Authentication refused
 
 **Solutions:**
+
 1. Verify `Authorization: Bearer {token}` header format
 2. Verify token is in configured list
 3. For TOTP, verify clock synchronization
@@ -63,6 +68,7 @@ Guide for resolving common issues.
 **Symptom:** Access denied despite authentication
 
 **Solutions:**
+
 1. Check authorization rules (`authzPerBranch`)
 2. Verify IP is not blocked by CrowdSec
 3. Check logs for blocking reason

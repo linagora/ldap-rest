@@ -12,23 +12,23 @@ LDAP-Rest provides reusable web components for LDAP management.
 
 ## Available Components
 
-| Component | Description |
-|-----------|-------------|
-| `LdapTreeViewer` | LDAP tree navigation |
-| `LdapUserEditor` | User editing |
-| `LdapGroupEditor` | Group management |
-| `LdapUnitEditor` | Organizational unit management |
-| `LdapResourceEditor` | Resource management |
+| Component            | Description                    |
+| -------------------- | ------------------------------ |
+| `LdapTreeViewer`     | LDAP tree navigation           |
+| `LdapUserEditor`     | User editing                   |
+| `LdapGroupEditor`    | Group management               |
+| `LdapUnitEditor`     | Organizational unit management |
+| `LdapResourceEditor` | Resource management            |
 
 ## Utilities
 
-| Module | Description |
-|--------|-------------|
-| `browser-shared-utils-totp` | TOTP client for authentication |
-| `browser-shared-utils-hmac` | HMAC client for authentication |
-| `browser-shared-utils-dom` | DOM utilities |
-| `browser-shared-utils-form` | Form utilities |
-| `browser-shared-utils-schema` | JSON schema utilities |
+| Module                        | Description                    |
+| ----------------------------- | ------------------------------ |
+| `browser-shared-utils-totp`   | TOTP client for authentication |
+| `browser-shared-utils-hmac`   | HMAC client for authentication |
+| `browser-shared-utils-dom`    | DOM utilities                  |
+| `browser-shared-utils-form`   | Form utilities                 |
+| `browser-shared-utils-schema` | JSON schema utilities          |
 
 ## Installation
 

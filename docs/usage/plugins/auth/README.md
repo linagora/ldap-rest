@@ -4,28 +4,28 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 
 ## Available Authentication Methods
 
-| Method | Plugin | Description |
-|--------|--------|-------------|
-| [Token](token.md) | `core/auth/token` | Simple bearer token authentication |
-| [TOTP](totp.md) | `core/auth/totp` | Time-based One-Time Password authentication |
-| [HMAC](hmac.md) | `core/auth/hmac` | HMAC-SHA256 request signing for backend services |
-| [LemonLDAP::NG](llng.md) | `core/auth/llng` | Integration with LemonLDAP::NG SSO |
-| [OpenID Connect](oidc.md) | `core/auth/openidconnect` | OAuth 2.0 / OpenID Connect authentication |
+| Method                    | Plugin                    | Description                                      |
+| ------------------------- | ------------------------- | ------------------------------------------------ |
+| [Token](token.md)         | `core/auth/token`         | Simple bearer token authentication               |
+| [TOTP](totp.md)           | `core/auth/totp`          | Time-based One-Time Password authentication      |
+| [HMAC](hmac.md)           | `core/auth/hmac`          | HMAC-SHA256 request signing for backend services |
+| [LemonLDAP::NG](llng.md)  | `core/auth/llng`          | Integration with LemonLDAP::NG SSO               |
+| [OpenID Connect](oidc.md) | `core/auth/openidconnect` | OAuth 2.0 / OpenID Connect authentication        |
 
 ## Authorization Plugins
 
-| Method | Plugin | Description |
-|--------|--------|-------------|
+| Method                                          | Plugin                     | Description                 |
+| ----------------------------------------------- | -------------------------- | --------------------------- |
 | [Authorization Per Branch](authz-per-branch.md) | `core/auth/authzPerBranch` | Branch-level access control |
-| [Authorization LinID 1.x](authz-linid1.md) | `core/auth/authzLinid1` | LinID 1.x integration |
+| [Authorization LinID 1.x](authz-linid1.md)      | `core/auth/authzLinid1`    | LinID 1.x integration       |
 
 ## Security Plugins
 
-| Method | Plugin | Description |
-|--------|--------|-------------|
+| Method                            | Plugin                   | Description                                           |
+| --------------------------------- | ------------------------ | ----------------------------------------------------- |
 | [Trusted Proxy](trusted-proxy.md) | `core/auth/trustedProxy` | Validate X-Forwarded-For headers from reverse proxies |
-| [Rate Limiting](rate-limit.md) | `core/auth/rateLimit` | Prevent brute force attacks |
-| [CrowdSec](crowdsec.md) | `core/auth/crowdsec` | IP reputation and blocking |
+| [Rate Limiting](rate-limit.md)    | `core/auth/rateLimit`    | Prevent brute force attacks                           |
+| [CrowdSec](crowdsec.md)           | `core/auth/crowdsec`     | IP reputation and blocking                            |
 
 ## Choosing an Authentication Method
 

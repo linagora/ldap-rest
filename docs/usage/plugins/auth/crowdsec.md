@@ -76,6 +76,7 @@ Recommended security stack:
 ```
 
 Order matters:
+
 1. `trustedProxy` - Sanitize IP headers first
 2. `crowdsec` - Block known bad IPs
 3. `rateLimit` - Limit request frequency

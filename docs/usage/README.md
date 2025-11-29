@@ -67,6 +67,7 @@ ldap-rest \
 ```
 
 The system will:
+
 1. Try each URL in order
 2. Use the first successful connection
 3. Automatically failover on connection failure

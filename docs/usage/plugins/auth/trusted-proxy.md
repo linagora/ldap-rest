@@ -54,6 +54,7 @@ DM_TRUSTED_PROXY_AUTH_HEADER="X-Remote-User"
 ```
 
 The extracted username is:
+
 - Available as `req.proxyAuthUser` for other plugins
 - Used by the `weblogs` plugin to log the user field
 
