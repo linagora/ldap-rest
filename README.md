@@ -10,12 +10,12 @@ Core plugins also provide plugins that ensure LDAP data consistency.
 
 ## Key Features
 
-- 🔒 **Robust Error Handling** - Server stays online even when plugins encounter errors
-- 🔌 **Plugin Architecture** - Extensible through a powerful plugin system
-- 🔐 **Flexible Authentication** - Support for multiple authentication methods
-- 📊 **REST API** - Complete LDAP operations through REST endpoints
-- 🎯 **Event Hooks** - Intercept and customize LDAP operations
-- 🌐 **Browser Libraries** - Ready-to-use JavaScript components
+- **Robust Error Handling** - Server stays online even when plugins encounter errors
+- **Plugin Architecture** - Extensible through a powerful plugin system
+- **Flexible Authentication** - Support for multiple authentication methods
+- **REST API** - Complete LDAP operations through REST endpoints
+- **Event Hooks** - Intercept and customize LDAP operations
+- **Browser Libraries** - Ready-to-use JavaScript components
 
 ## How it works
 
@@ -53,29 +53,39 @@ LDAP-Rest uses syslog-style log levels:
 
 Use `--log-level notice` for production to see web access logs without general info messages.
 
-## Command-line options and environment variables
+## Configuration
 
-[ToDo]
-
-See also [Typescript declarations](./src/config/args.ts).
+See **[Configuration Guide](./docs/usage/configuration.md)** for all CLI options and environment variables.
 
 ## Documentation
 
-### For Application Developers
+Documentation is organized into 3 categories:
 
-- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Complete guide for building web applications using LDAP-Rest APIs and browser libraries
-- **[Browser Examples](./examples/web/)** - Interactive demos of browser libraries (TOTP client, LDAP tree viewer, etc.)
+### [Usage](./docs/usage/README.md)
 
-### For Plugin Developers
+Installation, configuration and plugin usage.
 
-- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute and develop plugins
-- [Plugins](./src/plugins/README.md)
-- [Hooks](./HOOKS.md)
+- **[Getting Started](./docs/usage/README.md)** - Quick start guide
+- **[Configuration](./docs/usage/configuration.md)** - CLI options and environment variables
+- **[Plugins](./docs/usage/plugins/README.md)** - Plugin documentation
+- **[Authentication](./docs/usage/plugins/auth/README.md)** - Token, TOTP, HMAC, LemonLDAP::NG, OpenID Connect
 
-### Authentication
+### [Plugin Development](./docs/plugin-development/README.md)
 
-- **[Authentication Guide](./docs/authentication.md)** - Token, TOTP, LemonLDAP::NG, OpenID Connect
-- **[TOTP Client Demo](./examples/web/totp-client.html)** - Interactive TOTP generator and API client
+Create and extend LDAP-Rest with custom plugins.
+
+- **[Development Guide](./docs/plugin-development/README.md)** - Architecture and plugin creation
+- **[Hooks](./docs/plugin-development/hooks.md)** - LDAP hooks system
+- **[Contributing](./CONTRIBUTING.md)** - Contribution guide
+
+### [Client Application Development](./docs/client-development/README.md)
+
+Integrate LDAP-Rest into your web applications.
+
+- **[REST API](./docs/client-development/api/rest-api.md)** - Complete API reference
+- **[Browser Libraries](./docs/client-development/browser/libraries.md)** - Web components
+- **[Examples](./docs/client-development/examples/README.md)** - React, Vue.js, Vanilla JS
+- **[Browser Demos](./examples/web/)** - Interactive demos (TOTP client, LDAP tree viewer)
 
 ## Copyright and license
 
@@ -83,4 +93,4 @@ See also [Typescript declarations](./src/config/args.ts).
 
 Copyright 2025-present [LINAGORA](https://linagora.com)
 
-Licensed under [GNU AGPL-3.0](./LICENSE])
+Licensed under [GNU AGPL-3.0](./LICENSE)

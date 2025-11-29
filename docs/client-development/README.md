@@ -11,17 +11,17 @@ Welcome to the LDAP-Rest Developer Guide! This guide helps you build web applica
 
 ### 📚 Core Documentation
 
-- **[REST API Documentation](./api/REST_API.md)** - Complete API reference (Config, Users, Groups, Organizations)
-- **[Browser Libraries](./browser/LIBRARIES.md)** - LdapTreeViewer and LdapUserEditor
-- **[JSON Schemas](./schemas/SCHEMAS.md)** - Schema structure and validation
-- **[Integration Examples](./examples/EXAMPLES.md)** - React, Vue.js, Vanilla JavaScript examples
-- **[Plugin Development](./plugins/DEVELOPMENT.md)** - Create your own plugins
+- **[REST API Documentation](./api/rest-api.md)** - Complete API reference (Config, Users, Groups, Organizations)
+- **[Browser Libraries](./browser/libraries.md)** - LdapTreeViewer and LdapUserEditor
+- **[JSON Schemas](./schemas/README.md)** - Schema structure and validation
+- **[Integration Examples](./examples/README.md)** - React, Vue.js, Vanilla JavaScript examples
+- **[Plugin Development](../plugin-development/README.md)** - Create your own plugins
 
 ### 🔧 Reference
 
-- **[API Reference](./api/REFERENCE.md)** - Complete API reference with all endpoints
-- [Authentication](./api/REST_API.md#authentication) - OpenID, Token, LemonLDAP::NG
-- [Troubleshooting](./api/REFERENCE.md#troubleshooting) - Common issues and solutions
+- **[API Reference](./api/reference.md)** - Complete API reference with all endpoints
+- [Authentication](./api/rest-api.md#authentication) - OpenID, Token, LemonLDAP::NG
+- [Troubleshooting](./api/reference.md#troubleshooting) - Common issues and solutions
 
 ---
 
@@ -152,14 +152,14 @@ console.log(config);
 
 ### API Documentation
 
-- **[REST API Guide](./api/REST_API.md)**
+- **[REST API Guide](./api/rest-api.md)**
   - Configuration API
   - Organizations API
   - Users API
   - Groups API
   - Authentication
 
-- **[Complete API Reference](./api/REFERENCE.md)**
+- **[Complete API Reference](./api/reference.md)**
   - All endpoints with examples
   - Request/response formats
   - Error codes
@@ -167,7 +167,7 @@ console.log(config);
 
 ### Browser Libraries
 
-- **[Browser Libraries Guide](./browser/LIBRARIES.md)**
+- **[Browser Libraries Guide](./browser/libraries.md)**
   - LdapTreeViewer - Interactive LDAP tree
   - LdapUserEditor - Complete user editor
   - Configuration options
@@ -176,7 +176,7 @@ console.log(config);
 
 ### Schemas
 
-- **[JSON Schemas Guide](./schemas/SCHEMAS.md)**
+- **[JSON Schemas Guide](./schemas/README.md)**
   - Schema structure
   - Entity metadata
   - Attribute types
@@ -186,7 +186,7 @@ console.log(config);
 
 ### Integration
 
-- **[Integration Examples](./examples/EXAMPLES.md)**
+- **[Integration Examples](./examples/README.md)**
   - React application
   - Vue.js application
   - Vanilla JavaScript
@@ -195,7 +195,7 @@ console.log(config);
 
 ### Plugin Development
 
-- **[Plugin Development Guide](./plugins/DEVELOPMENT.md)**
+- **[Plugin Development Guide](../plugin-development/README.md)**
   - Creating plugins
   - Custom configuration
   - Hooks system
@@ -234,7 +234,7 @@ LDAP-Rest uses JSON schemas to define LDAP entity structure:
 }
 ```
 
-See [JSON Schemas Guide](./schemas/SCHEMAS.md) for details.
+See [JSON Schemas Guide](./schemas/README.md) for details.
 
 ### Dynamic Configuration
 
@@ -252,7 +252,7 @@ const usersEndpoint = config.features.ldapFlatGeneric.flatResources.find(
 const users = await fetch(usersEndpoint).then(r => r.json());
 ```
 
-See [REST API Guide](./api/REST_API.md) for details.
+See [REST API Guide](./api/rest-api.md) for details.
 
 ### Plugin-Based Extensibility
 
@@ -263,25 +263,25 @@ Extend LDAP-Rest with custom plugins that:
 - Integrate external systems
 - Implement custom logic
 
-See [Plugin Development Guide](./plugins/DEVELOPMENT.md) for details.
+See [Plugin Development Guide](../plugin-development/README.md) for details.
 
 ---
 
 ## Next Steps
 
-1. **Learn the API** - Read the [REST API Guide](./api/REST_API.md)
-2. **Try the Libraries** - Check the [Browser Libraries Guide](./browser/LIBRARIES.md)
-3. **See Examples** - Explore [Integration Examples](./examples/EXAMPLES.md)
-4. **Build a Plugin** - Follow the [Plugin Development Guide](./plugins/DEVELOPMENT.md)
+1. **Learn the API** - Read the [REST API Guide](./api/rest-api.md)
+2. **Try the Libraries** - Check the [Browser Libraries Guide](./browser/libraries.md)
+3. **See Examples** - Explore [Integration Examples](./examples/README.md)
+4. **Build a Plugin** - Follow the [Plugin Development Guide](../plugin-development/README.md)
 
 ---
 
 ## Resources
 
 - [GitHub Repository](https://github.com/linagora/ldap-rest)
-- [Contributing Guide](../CONTRIBUTING.md)
-- [Plugin Development](../src/plugins/README.md)
-- [Hooks Reference](../HOOKS.md)
+- [Contributing Guide](../../CONTRIBUTING.md)
+- [Plugin Development](../plugin-development/README.md)
+- [Hooks Reference](../plugin-development/hooks.md)
 
 ---
 
