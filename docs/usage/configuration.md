@@ -2,6 +2,38 @@
 
 All LDAP-Rest configuration options.
 
+## Table of Contents
+
+- [Environment Variables](#environment-variables)
+  - [Array Options](#array-options)
+- [General Options](#general-options)
+- [LDAP Connection](#ldap-connection)
+- [Special Attributes](#special-attributes)
+- [Plugin Options](#plugin-options)
+  - [Organizations](#organizations-coreldaporganizations)
+  - [Groups](#groups-coreldapgroups)
+  - [External Users in Groups](#external-users-in-groups-coreldapexternalusersingroups)
+  - [Flat Generic](#flat-generic-coreldapflatgeneric)
+  - [Bulk Import](#bulk-import-coreldapbulkimport)
+  - [Trash](#trash-coreldaptrash)
+  - [Static Files](#static-files-corestatic)
+  - [Token Authentication](#token-authentication-coreauthtoken)
+  - [TOTP Authentication](#totp-authentication-coreauthtotp)
+  - [HMAC Authentication](#hmac-authentication-coreauthhmac)
+  - [LemonLDAP::NG](#lemonldapng-coreauthllng)
+  - [OpenID Connect](#openid-connect-coreauthopenidconnect)
+  - [Authorization Per Branch](#authorization-per-branch-coreauthauthzperbranch)
+  - [Authorization LinID 1.x](#authorization-linid-1x-coreauthauthzlinid1)
+  - [Rate Limiting](#rate-limiting-coreauthratelimit)
+  - [CrowdSec](#crowdsec-coreauthcrowdsec)
+  - [Trusted Proxy](#trusted-proxy-coreauthtrustedproxy)
+  - [Apache James](#apache-james-integrationstwakejames)
+  - [Calendar Resources](#calendar-resources-integrationstwakecalendarresources)
+  - [Applicative Accounts](#applicative-accounts-integrationstwakeapplicativeaccounts)
+- [Configuration File](#configuration-file)
+- [LDAP Failover](#ldap-failover)
+- [Log Levels](#log-levels)
+
 ## Environment Variables
 
 All CLI options can be set via environment variables with the `DM_` prefix.
