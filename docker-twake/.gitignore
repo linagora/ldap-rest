@@ -1,0 +1,9 @@
+# Environment files
+.env
+
+# Logs
+*.log
+
+# Temporary files
+.DS_Store
+*~
