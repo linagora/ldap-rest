@@ -50,6 +50,27 @@ export default class LdapGroups extends DmPlugin {
   ldap: ldapActions;
   cn: string;
   schema?: Schema;
+  private regexCache = new Map<string, RegExp>();
+
+  /**
+   * Get a compiled RegExp from cache, or compile and cache it
+   */
+  private getCompiledRegex(pattern: string, flags?: string): RegExp {
+    const key = flags ? `${pattern}:${flags}` : pattern;
+    let regex = this.regexCache.get(key);
+    if (!regex) {
+      regex = new RegExp(pattern, flags);
+      this.regexCache.set(key, regex);
+    }
+    return regex;
+  }
+
+  /**
+   * Escape special regex characters in a string
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
   constructor(server: DM) {
     super(server);
@@ -768,15 +789,17 @@ export default class LdapGroups extends DmPlugin {
           `Schema error: array of array not supported for ${field}`
         );
       if (test.items.test) {
-        if (typeof test.items.test === 'string')
-          test.items.test = new RegExp(test.items.test);
+        const itemRegex =
+          typeof test.items.test === 'string'
+            ? this.getCompiledRegex(test.items.test)
+            : test.items.test;
         for (let v of value) {
           if (typeof v !== test.items.type)
             throw new Error(
               `Field ${field} must be of type ${test.items.type}`
             );
           if (typeof v !== 'string') v = v.toString();
-          if (test.items.test && !test.items.test.test(v))
+          if (!itemRegex.test(v))
             throw new Error(`Field ${field} has invalid value ${v}`);
         }
       }
@@ -789,8 +812,8 @@ export default class LdapGroups extends DmPlugin {
       // Check branch restriction if provided
       if (test.branch && test.branch.length > 0) {
         const isInBranch = test.branch.some(branch => {
-          const branchPattern = new RegExp(
-            `,?${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+          const branchPattern = this.getCompiledRegex(
+            `,?${this.escapeRegex(branch)}$`,
             'i'
           );
           return branchPattern.test(dnValue);
@@ -824,16 +847,22 @@ export default class LdapGroups extends DmPlugin {
       }
       // Also check test regex if provided
       if (test.test) {
-        if (typeof test.test === 'string') test.test = new RegExp(test.test);
-        if (test.test && !test.test.test(dnValue))
+        const testRegex =
+          typeof test.test === 'string'
+            ? this.getCompiledRegex(test.test)
+            : test.test;
+        if (!testRegex.test(dnValue))
           throw new Error(`Field ${field} has invalid value ${dnValue}`);
       }
     } else {
       if (typeof value !== test.type) return false;
       if (typeof value !== 'string') value = value.toString();
       if (test.test) {
-        if (typeof test.test === 'string') test.test = new RegExp(test.test);
-        if (test.test && !test.test.test(value))
+        const testRegex =
+          typeof test.test === 'string'
+            ? this.getCompiledRegex(test.test)
+            : test.test;
+        if (!testRegex.test(value))
           throw new Error(`Field ${field} has invalid value ${value}`);
       }
     }
