@@ -10,26 +10,26 @@ All LDAP-Rest configuration options.
 - [LDAP Connection](#ldap-connection)
 - [Special Attributes](#special-attributes)
 - [Plugin Options](#plugin-options)
-  - [Organizations](#organizations-coreldaporganizations)
-  - [Groups](#groups-coreldapgroups)
-  - [External Users in Groups](#external-users-in-groups-coreldapexternalusersingroups)
-  - [Flat Generic](#flat-generic-coreldapflatgeneric)
-  - [Bulk Import](#bulk-import-coreldapbulkimport)
-  - [Trash](#trash-coreldaptrash)
-  - [Static Files](#static-files-corestatic)
-  - [Token Authentication](#token-authentication-coreauthtoken)
-  - [TOTP Authentication](#totp-authentication-coreauthtotp)
-  - [HMAC Authentication](#hmac-authentication-coreauthhmac)
-  - [LemonLDAP::NG](#lemonldapng-coreauthllng)
-  - [OpenID Connect](#openid-connect-coreauthopenidconnect)
-  - [Authorization Per Branch](#authorization-per-branch-coreauthauthzperbranch)
-  - [Authorization LinID 1.x](#authorization-linid-1x-coreauthauthzlinid1)
-  - [Rate Limiting](#rate-limiting-coreauthratelimit)
-  - [CrowdSec](#crowdsec-coreauthcrowdsec)
-  - [Trusted Proxy](#trusted-proxy-coreauthtrustedproxy)
-  - [Apache James](#apache-james-integrationstwakejames)
-  - [Calendar Resources](#calendar-resources-integrationstwakecalendarresources)
-  - [Applicative Accounts](#applicative-accounts-integrationstwakeapplicativeaccounts)
+  - [core/ldap/organizations](#coreldaporganizations)
+  - [core/ldap/groups](#coreldapgroups)
+  - [core/ldap/externalUsersInGroups](#coreldapexternalusersingroups)
+  - [core/ldap/flatGeneric](#coreldapflatgeneric)
+  - [core/ldap/bulkImport](#coreldapbulkimport)
+  - [core/ldap/trash](#coreldaptrash)
+  - [core/static](#corestatic)
+  - [core/auth/token](#coreauthtoken)
+  - [core/auth/totp](#coreauthtotp)
+  - [core/auth/hmac](#coreauthhmac)
+  - [core/auth/llng](#coreauthllng)
+  - [core/auth/openidconnect](#coreauthopenidconnect)
+  - [core/auth/authzPerBranch](#coreauthauthzperbranch)
+  - [core/auth/authzLinid1](#coreauthauthzlinid1)
+  - [core/auth/rateLimit](#coreauthratelimit)
+  - [core/auth/crowdsec](#coreauthcrowdsec)
+  - [core/auth/trustedProxy](#coreauthtrustedproxy)
+  - [core/twake/james](#coretwakejames)
+  - [core/twake/calendarResources](#coretwakecalendarresources)
+  - [core/twake/applicativeAccounts](#coretwakeapplicativeaccounts)
 - [Configuration File](#configuration-file)
 - [LDAP Failover](#ldap-failover)
 - [Log Levels](#log-levels)
@@ -106,7 +106,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 
 ## Plugin Options
 
-### Organizations (`core/ldap/organizations`)
+### `core/ldap/organizations`
 
 | CLI                                  | Plural                        | Env                                   | Default                                  | Description                |
 | ------------------------------------ | ----------------------------- | ------------------------------------- | ---------------------------------------- | -------------------------- |
@@ -117,7 +117,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--ldap-organization-path-separator` |                               | `DM_LDAP_ORGANIZATION_PATH_SEPARATOR` | `/`                                      | Path separator             |
 | `--ldap-organization-max-subnodes`   |                               | `DM_LDAP_ORGANIZATION_MAX_SUBNODES`   | `50`                                     | Max subnodes returned      |
 
-### Groups (`core/ldap/groups`)
+### `core/ldap/groups`
 
 | CLI                                | Plural            | Env                             | Default                            | Description                 |
 | ---------------------------------- | ----------------- | ------------------------------- | ---------------------------------- | --------------------------- |
@@ -129,20 +129,20 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--group-dummy-user`               |                   | `DM_GROUP_DUMMY_USER`           | `cn=fakeuser`                      | Dummy user for empty groups |
 | `--group-schema`                   |                   | `DM_GROUP_SCHEMA`               | `static/schemas/twake/groups.json` | Group JSON schema path      |
 
-### External Users in Groups (`core/ldap/externalUsersInGroups`)
+### `core/ldap/externalUsersInGroups`
 
 | CLI                         | Plural                      | Env                          | Default                         | Description                 |
 | --------------------------- | --------------------------- | ---------------------------- | ------------------------------- | --------------------------- |
 | `--external-members-branch` |                             | `DM_EXTERNAL_MEMBERS_BRANCH` | `ou=contacts,dc=example,dc=com` | External contacts branch    |
 | `--external-branch-class`   | `--external-branch-classes` | `DM_EXTERNAL_BRANCH_CLASSES` | `top,inetOrgPerson`             | External user objectClasses |
 
-### Flat Generic (`core/ldap/flatGeneric`)
+### `core/ldap/flatGeneric`
 
 | CLI                  | Plural                | Env                   | Default | Description           |
 | -------------------- | --------------------- | --------------------- | ------- | --------------------- |
 | `--ldap-flat-schema` | `--ldap-flat-schemas` | `DM_LDAP_FLAT_SCHEMA` | `[]`    | Entity schema path(s) |
 
-### Bulk Import (`core/ldap/bulkImport`)
+### `core/ldap/bulkImport`
 
 | CLI                           | Env                            | Default    | Description              |
 | ----------------------------- | ------------------------------ | ---------- | ------------------------ |
@@ -150,7 +150,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--bulk-import-max-file-size` | `DM_BULK_IMPORT_MAX_FILE_SIZE` | `10485760` | Max file size (bytes)    |
 | `--bulk-import-batch-size`    | `DM_BULK_IMPORT_BATCH_SIZE`    | `100`      | Batch size               |
 
-### Trash (`core/ldap/trash`)
+### `core/ldap/trash`
 
 | CLI                     | Env                      | Default | Description                 |
 | ----------------------- | ------------------------ | ------- | --------------------------- |
@@ -159,20 +159,20 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--trash-add-metadata`  | `DM_TRASH_ADD_METADATA`  | `true`  | Add deletion metadata       |
 | `--trash-auto-create`   | `DM_TRASH_AUTO_CREATE`   | `true`  | Auto-create trash container |
 
-### Static Files (`core/static`)
+### `core/static`
 
 | CLI             | Env              | Default  | Description            |
 | --------------- | ---------------- | -------- | ---------------------- |
 | `--static-path` | `DM_STATIC_PATH` | `static` | Static files directory |
 | `--static-name` | `DM_STATIC_NAME` | `static` | URL path prefix        |
 
-### Token Authentication (`core/auth/token`)
+### `core/auth/token`
 
 | CLI            | Plural          | Env              | Default | Description           |
 | -------------- | --------------- | ---------------- | ------- | --------------------- |
 | `--auth-token` | `--auth-tokens` | `DM_AUTH_TOKENS` | `[]`    | Authentication tokens |
 
-### TOTP Authentication (`core/auth/totp`)
+### `core/auth/totp`
 
 | CLI                  | Plural         | Env                   | Default | Description                      |
 | -------------------- | -------------- | --------------------- | ------- | -------------------------------- |
@@ -180,20 +180,20 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--auth-totp-window` |                | `DM_AUTH_TOTP_WINDOW` | `1`     | Validation window                |
 | `--auth-totp-step`   |                | `DM_AUTH_TOTP_STEP`   | `30`    | Time step (seconds)              |
 
-### HMAC Authentication (`core/auth/hmac`)
+### `core/auth/hmac`
 
 | CLI                  | Plural         | Env                   | Default  | Description                          |
 | -------------------- | -------------- | --------------------- | -------- | ------------------------------------ |
 | `--auth-hmac`        | `--auth-hmacs` | `DM_AUTH_HMAC`        | `[]`     | HMAC config (service-id:secret:name) |
 | `--auth-hmac-window` |                | `DM_AUTH_HMAC_WINDOW` | `120000` | Time window (ms)                     |
 
-### LemonLDAP::NG (`core/auth/llng`)
+### `core/auth/llng`
 
 | CLI          | Env           | Default                              | Description               |
 | ------------ | ------------- | ------------------------------------ | ------------------------- |
 | `--llng-ini` | `DM_LLNG_INI` | `/etc/lemonldap-ng/lemonldap-ng.ini` | LemonLDAP::NG config path |
 
-### OpenID Connect (`core/auth/openidconnect`)
+### `core/auth/openidconnect`
 
 | CLI                    | Env                     | Default | Description              |
 | ---------------------- | ----------------------- | ------- | ------------------------ |
@@ -202,27 +202,27 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--oidc-client-secret` | `DM_OIDC_CLIENT_SECRET` |         | OIDC Client Secret       |
 | `--base-url`           | `DM_BASE_URL`           |         | Public URL for callbacks |
 
-### Authorization Per Branch (`core/auth/authzPerBranch`)
+### `core/auth/authzPerBranch`
 
 | CLI                            | Env                             | Default                                          | Description                 |
 | ------------------------------ | ------------------------------- | ------------------------------------------------ | --------------------------- |
 | `--authz-per-branch-config`    | `DM_AUTHZ_PER_BRANCH_CONFIG`    | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON) |
 | `--authz-per-branch-cache-ttl` | `DM_AUTHZ_PER_BRANCH_CACHE_TTL` | `60`                                             | Cache TTL (seconds)         |
 
-### Authorization LinID 1.x (`core/auth/authzLinid1`)
+### `core/auth/authzLinid1`
 
 | CLI                             | Env                              | Default               | Description           |
 | ------------------------------- | -------------------------------- | --------------------- | --------------------- |
 | `--authz-local-admin-attribute` | `DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE` | `twakeLocalAdminLink` | Local admin attribute |
 
-### Rate Limiting (`core/auth/rateLimit`)
+### `core/auth/rateLimit`
 
 | CLI                      | Env                       | Default  | Description              |
 | ------------------------ | ------------------------- | -------- | ------------------------ |
 | `--rate-limit-window-ms` | `DM_RATE_LIMIT_WINDOW_MS` | `900000` | Time window (ms, 15 min) |
 | `--rate-limit-max`       | `DM_RATE_LIMIT_MAX`       | `100`    | Max requests per window  |
 
-### CrowdSec (`core/auth/crowdsec`)
+### `core/auth/crowdsec`
 
 | CLI                    | Env                     | Default                              | Description         |
 | ---------------------- | ----------------------- | ------------------------------------ | ------------------- |
@@ -230,14 +230,14 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--crowdsec-api-key`   | `DM_CROWDSEC_API_KEY`   |                                      | CrowdSec API key    |
 | `--crowdsec-cache-ttl` | `DM_CROWDSEC_CACHE_TTL` | `60`                                 | Cache TTL (seconds) |
 
-### Trusted Proxy (`core/auth/trustedProxy`)
+### `core/auth/trustedProxy`
 
 | CLI                           | Plural              | Env                            | Default     | Description            |
 | ----------------------------- | ------------------- | ------------------------------ | ----------- | ---------------------- |
 | `--trusted-proxy`             | `--trusted-proxies` | `DM_TRUSTED_PROXIES`           | `[]`        | Trusted proxy IPs/CIDR |
 | `--trusted-proxy-auth-header` |                     | `DM_TRUSTED_PROXY_AUTH_HEADER` | `Auth-User` | User header name       |
 
-### Apache James (`integrations/twake/james`)
+### `core/twake/james`
 
 | CLI                              | Plural                          | Env                               | Default                 | Description                 |
 | -------------------------------- | ------------------------------- | --------------------------------- | ----------------------- | --------------------------- |
@@ -250,7 +250,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--james-mailbox-type-attribute` |                                 | `DM_JAMES_MAILBOX_TYPE_ATTRIBUTE` | `twakeMailboxType`      | Mailbox type attribute      |
 | `--ldap-concurrency`             |                                 | `DM_LDAP_CONCURRENCY`             | `10`                    | LDAP operations concurrency |
 
-### Calendar Resources (`integrations/twake/calendarResources`)
+### `core/twake/calendarResources`
 
 | CLI                               | Env                                | Default                 | Description                   |
 | --------------------------------- | ---------------------------------- | ----------------------- | ----------------------------- |
@@ -262,7 +262,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--calendar-resource-creator`     | `DM_CALENDAR_RESOURCE_CREATOR`     |                         | Resource creator              |
 | `--calendar-resource-domain`      | `DM_CALENDAR_RESOURCE_DOMAIN`      |                         | Resource domain               |
 
-### Applicative Accounts (`integrations/twake/applicativeAccounts`)
+### `core/twake/applicativeAccounts`
 
 | CLI                            | Plural                          | Env                              | Default       | Description                       |
 | ------------------------------ | ------------------------------- | -------------------------------- | ------------- | --------------------------------- |
