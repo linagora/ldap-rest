@@ -205,15 +205,10 @@ Create a standalone file anywhere on your system, e.g., `/opt/custom-plugins/my-
  */
 import type { Express, Request, Response } from 'express';
 
-// Import from ldap-rest (if installed as npm package)
-// import DmPlugin, { asyncHandler } from 'ldap-rest/plugin';
-
-// Or use relative path to node_modules
-import DmPlugin from './node_modules/ldap-rest/dist/abstract/plugin.js';
-import type { DM } from './node_modules/ldap-rest/dist/bin/index.js';
-import type { Hooks } from './node_modules/ldap-rest/dist/hooks.js';
-// Import asyncHandler for error handling
-import { asyncHandler } from './node_modules/ldap-rest/dist/lib/utils.js';
+// Import from ldap-rest
+import DmPlugin, { asyncHandler } from 'ldap-rest/plugin';
+import type { DM } from 'ldap-rest';
+import type { Hooks } from 'ldap-rest/hooks';
 
 export default class ExternalAuditPlugin extends DmPlugin {
   name = 'externalAudit';

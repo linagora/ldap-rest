@@ -103,6 +103,10 @@ pkg.exports = {
   './hooks': {
     types: './dist/src/hooks.d.ts',
   },
+  './plugin': {
+    import: './dist/abstract/plugin.js',
+    types: './dist/src/abstract/plugin.d.ts',
+  },
   './expressformatedresponses': {
     import: './dist/lib/expressFormatedResponses.js',
     types: './dist/src/lib/expressFormatedResponses.d.ts',
