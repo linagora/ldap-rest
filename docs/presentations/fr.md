@@ -7,7 +7,7 @@ sub_title: Gestionnaire d'annuaire léger avec architecture à plugins
 
 ## Gestionnaire d'annuaire léger avec architecture à plugins
 
-![LDAP-Rest Logo](./linagora.png)
+![LDAP-Rest Logo](../linagora.png)
 
 <!-- end_slide -->
 
@@ -710,7 +710,7 @@ Ouvrez http://localhost:8081
 
 ## LDAP-Rest - Gestionnaire d'annuaire léger
 
-[![Powered by LINAGORA](./linagora.png)](https://linagora.com)
+[![Powered by LINAGORA](../linagora.png)](https://linagora.com)
 
 **GitHub**: https://github.com/linagora/ldap-rest
 

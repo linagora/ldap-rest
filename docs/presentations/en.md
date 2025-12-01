@@ -7,7 +7,7 @@ sub_title: Lightweight Directory Manager
 
 ## Lightweight Directory Manager with Plugin Architecture
 
-![LDAP-Rest Logo](./linagora.png)
+![LDAP-Rest Logo](../linagora.png)
 
 <!-- end_slide -->
 
@@ -710,7 +710,7 @@ Open http://localhost:8081
 
 ## LDAP-Rest - Lightweight Directory Manager
 
-[![Powered by LINAGORA](./linagora.png)](https://linagora.com)
+[![Powered by LINAGORA](../linagora.png)](https://linagora.com)
 
 **GitHub**: https://github.com/linagora/ldap-rest
 
