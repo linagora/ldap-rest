@@ -32,6 +32,10 @@
       "import": "./dist/lib/expressFormatedResponses.js",
       "types": "./dist/src/lib/expressFormatedResponses.d.ts"
     },
+    "./ldapactions": {
+      "import": "./dist/lib/ldapActions.js",
+      "types": "./dist/src/lib/ldapActions.d.ts"
+    },
     "./plugin-auth-authzlinid1": {
       "import": "./dist/plugins/auth/authzLinid1.js",
       "types": "./dist/src/plugins/auth/authzLinid1.d.ts"

@@ -111,6 +111,10 @@ pkg.exports = {
     import: './dist/lib/expressFormatedResponses.js',
     types: './dist/src/lib/expressFormatedResponses.d.ts',
   },
+  './ldapactions': {
+    import: './dist/lib/ldapActions.js',
+    types: './dist/src/lib/ldapActions.d.ts',
+  },
 };
 
 export default async () => {
