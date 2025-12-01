@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.1.6
+- Export ldapActions types
+
 ## v0.1.5 (2025-12-01)
 - Improve documentation and exports
 
