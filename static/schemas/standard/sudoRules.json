@@ -1,0 +1,87 @@
+{
+  "entity": {
+    "name": "sudoRule",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "sudoRole"],
+    "singularName": "sudoRule",
+    "pluralName": "sudoRules",
+    "base": "ou=sudoers,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "sudoRole"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "sudoUser": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true
+    },
+    "sudoHost": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true
+    },
+    "sudoCommand": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true
+    },
+    "sudoOption": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "sudoRunAsUser": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "sudoRunAsGroup": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "sudoNotBefore": {
+      "type": "string",
+      "required": false
+    },
+    "sudoNotAfter": {
+      "type": "string",
+      "required": false
+    },
+    "sudoOrder": {
+      "type": "number",
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

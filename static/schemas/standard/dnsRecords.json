@@ -1,0 +1,102 @@
+{
+  "entity": {
+    "name": "dnsRecord",
+    "mainAttribute": "dc",
+    "objectClass": ["top", "dNSDomain2"],
+    "singularName": "dnsRecord",
+    "pluralName": "dnsRecords",
+    "base": "ou=dns,__ldap_base__"
+  },
+  "strict": false,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "dNSDomain2"],
+      "required": true,
+      "fixed": true
+    },
+    "dc": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9@._*-]+$",
+      "required": true,
+      "role": "identifier"
+    },
+    "dNSTTL": {
+      "type": "number",
+      "required": false
+    },
+    "dNSClass": {
+      "type": "string",
+      "default": "IN",
+      "required": false
+    },
+    "aRecord": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$"
+      },
+      "required": false
+    },
+    "aAAARecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "mXRecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "nSRecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "cNAMERecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "pTRRecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "tXTRecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "sRVRecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "sOARecord": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    }
+  }
+}

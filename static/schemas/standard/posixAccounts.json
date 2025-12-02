@@ -1,0 +1,92 @@
+{
+  "entity": {
+    "name": "posixAccount",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "posixAccount", "shadowAccount"],
+    "singularName": "posixAccount",
+    "pluralName": "posixAccounts",
+    "base": "ou=users,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "posixAccount", "shadowAccount"],
+      "required": true,
+      "fixed": true
+    },
+    "uid": {
+      "type": "string",
+      "test": "^[a-z_][a-z0-9_-]{0,31}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "uidNumber": {
+      "type": "number",
+      "required": true
+    },
+    "gidNumber": {
+      "type": "number",
+      "required": true
+    },
+    "homeDirectory": {
+      "type": "string",
+      "test": "^/.*$",
+      "required": true
+    },
+    "loginShell": {
+      "type": "string",
+      "test": "^/.*$",
+      "default": "/bin/bash",
+      "required": false
+    },
+    "gecos": {
+      "type": "string",
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "userPassword": {
+      "type": "string",
+      "required": false
+    },
+    "shadowLastChange": {
+      "type": "number",
+      "required": false
+    },
+    "shadowMin": {
+      "type": "number",
+      "required": false
+    },
+    "shadowMax": {
+      "type": "number",
+      "required": false
+    },
+    "shadowWarning": {
+      "type": "number",
+      "required": false
+    },
+    "shadowInactive": {
+      "type": "number",
+      "required": false
+    },
+    "shadowExpire": {
+      "type": "number",
+      "required": false
+    },
+    "shadowFlag": {
+      "type": "number",
+      "required": false
+    }
+  }
+}

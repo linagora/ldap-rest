@@ -1,0 +1,49 @@
+{
+  "entity": {
+    "name": "posixGroup",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "posixGroup"],
+    "singularName": "posixGroup",
+    "pluralName": "posixGroups",
+    "base": "ou=groups,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "posixGroup"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-z_][a-z0-9_-]{0,31}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "gidNumber": {
+      "type": "number",
+      "required": true
+    },
+    "memberUid": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-z_][a-z0-9_-]{0,31}$"
+      },
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "userPassword": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

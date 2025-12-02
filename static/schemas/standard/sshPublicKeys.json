@@ -1,0 +1,49 @@
+{
+  "entity": {
+    "name": "sshPublicKey",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "ldapPublicKey", "inetOrgPerson"],
+    "singularName": "sshPublicKey",
+    "pluralName": "sshPublicKeys",
+    "base": "ou=users,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "ldapPublicKey", "inetOrgPerson"],
+      "required": true,
+      "fixed": true
+    },
+    "uid": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "sn": {
+      "type": "string",
+      "required": true
+    },
+    "sshPublicKey": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^(ssh-rsa|ssh-dss|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh\\.com|sk-ecdsa-sha2-nistp256@openssh\\.com) .*$"
+      },
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

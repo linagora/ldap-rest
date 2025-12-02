@@ -1,0 +1,48 @@
+{
+  "entity": {
+    "name": "netgroup",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "nisNetgroup"],
+    "singularName": "netgroup",
+    "pluralName": "netgroups",
+    "base": "ou=netgroups,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "nisNetgroup"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9._-]{1,255}$",
+      "required": true,
+      "role": "identifier"
+    },
+    "nisNetgroupTriple": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^\\([^,]*,[^,]*,[^)]*\\)$"
+      },
+      "required": false
+    },
+    "memberNisNetgroup": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}
