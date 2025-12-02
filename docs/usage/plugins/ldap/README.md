@@ -4,15 +4,16 @@ Plugins for LDAP entity management.
 
 ## Overview
 
-| Plugin                              | Entity                   | Features                            |
-| ----------------------------------- | ------------------------ | ----------------------------------- |
-| [flat-generic](flat-generic.md)     | Users, Positions, Custom | Schema-driven, Validation, Pointers |
-| [groups](groups.md)                 | Groups                   | Member validation, Nested groups    |
-| [organizations](organizations.md)   | Organizational Units     | Tree navigation, Search             |
-| [bulk-import](bulk-import.md)       | All (bulk operations)    | CSV import, Template generation     |
-| [trash](trash.md)                   | All (soft delete)        | Trash system, Recovery              |
-| [external-users](external-users.md) | Contacts                 | Automatic creation                  |
-| [on-change](on-change.md)           | All                      | Change detection                    |
+| Plugin                                | Entity                   | Features                            |
+| ------------------------------------- | ------------------------ | ----------------------------------- |
+| [flat-generic](flat-generic.md)       | Users, Positions, Custom | Schema-driven, Validation, Pointers |
+| [groups](groups.md)                   | Groups                   | Member validation, Nested groups    |
+| [organizations](organizations.md)     | Organizational Units     | Tree navigation, Search             |
+| [bulk-import](bulk-import.md)         | All (bulk operations)    | CSV import, Template generation     |
+| [trash](trash.md)                     | All (soft delete)        | Trash system, Recovery              |
+| [external-users](external-users.md)   | Contacts                 | Automatic creation                  |
+| [on-change](on-change.md)             | All                      | Change detection                    |
+| [password-policy](password-policy.md) | Password management      | Expiration, Lockout, Unlock         |
 
 ## API Endpoints
 
@@ -48,6 +49,17 @@ POST   /api/v1/ldap/organizations                       # Create
 PUT    /api/v1/ldap/organizations/{dn}                  # Modify
 POST   /api/v1/ldap/organizations/{dn}/move             # Move
 DELETE /api/v1/ldap/organizations/{dn}                  # Delete
+```
+
+### Password Policy (passwordPolicy)
+
+```
+GET    /api/v1/password-policy                  # Get ppolicy configuration
+GET    /api/v1/users/{id}/password-status       # Get user password status
+POST   /api/v1/users/{id}/unlock                # Unlock locked account
+GET    /api/v1/password-policy/expiring-soon    # List expiring passwords
+GET    /api/v1/password-policy/locked-accounts  # List locked accounts
+POST   /api/v1/password/validate                # Validate complexity (optional)
 ```
 
 ### Bulk Import (ldapBulkImport)
