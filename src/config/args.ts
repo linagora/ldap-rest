@@ -169,6 +169,17 @@ export interface Config {
   trash_add_metadata?: string;
   trash_auto_create?: string;
 
+  // Password Policy plugin
+  ppolicy_default_dn?: string;
+  ppolicy_warn_days?: number;
+  ppolicy_validate_complexity?: boolean;
+  ppolicy_min_length?: number;
+  ppolicy_require_uppercase?: boolean;
+  ppolicy_require_lowercase?: boolean;
+  ppolicy_require_digit?: boolean;
+  ppolicy_require_special?: boolean;
+  ldap_users_base?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -472,6 +483,32 @@ const configArgs: ConfigTemplate = [
   // Trusted proxy plugin
   ['--trusted-proxy', 'DM_TRUSTED_PROXIES', [], 'array', '--trusted-proxies'],
   ['--trusted-proxy-auth-header', 'DM_TRUSTED_PROXY_AUTH_HEADER', 'Auth-User'],
+
+  // Password Policy plugin
+  ['--ppolicy-default-dn', 'DM_PPOLICY_DEFAULT_DN', ''],
+  ['--ppolicy-warn-days', 'DM_PPOLICY_WARN_DAYS', 14, 'number'],
+  [
+    '--ppolicy-validate-complexity',
+    'DM_PPOLICY_VALIDATE_COMPLEXITY',
+    false,
+    'boolean',
+  ],
+  ['--ppolicy-min-length', 'DM_PPOLICY_MIN_LENGTH', 12, 'number'],
+  [
+    '--ppolicy-require-uppercase',
+    'DM_PPOLICY_REQUIRE_UPPERCASE',
+    true,
+    'boolean',
+  ],
+  [
+    '--ppolicy-require-lowercase',
+    'DM_PPOLICY_REQUIRE_LOWERCASE',
+    true,
+    'boolean',
+  ],
+  ['--ppolicy-require-digit', 'DM_PPOLICY_REQUIRE_DIGIT', true, 'boolean'],
+  ['--ppolicy-require-special', 'DM_PPOLICY_REQUIRE_SPECIAL', true, 'boolean'],
+  ['--ldap-users-base', 'DM_LDAP_USERS_BASE', ''],
 ];
 
 export default configArgs;
