@@ -112,6 +112,10 @@
       "import": "./dist/plugins/ldap/organization.js",
       "types": "./dist/src/plugins/ldap/organization.d.ts"
     },
+    "./plugin-ldap-passwordpolicy": {
+      "import": "./dist/plugins/ldap/passwordPolicy.js",
+      "types": "./dist/src/plugins/ldap/passwordPolicy.d.ts"
+    },
     "./plugin-ldap-trash": {
       "import": "./dist/plugins/ldap/trash.js",
       "types": "./dist/src/plugins/ldap/trash.d.ts"
