@@ -426,6 +426,7 @@
     }
   },
   "main": "dist/bin/index.mjs",
+  "types": "./dist/src/bin/index.d.ts",
   "bin": {
     "cleanup-external-users": "bin/cleanup-external-users.mjs",
     "ldap-rest": "bin/index.mjs",
