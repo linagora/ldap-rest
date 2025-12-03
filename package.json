@@ -368,17 +368,49 @@
       "import": "./static/schemas/obm/users.json",
       "require": "./static/schemas/obm/users.json"
     },
+    "./schema-standard-automountmaps": {
+      "import": "./static/schemas/standard/automountMaps.json",
+      "require": "./static/schemas/standard/automountMaps.json"
+    },
     "./schema-standard-devices": {
       "import": "./static/schemas/standard/devices.json",
       "require": "./static/schemas/standard/devices.json"
+    },
+    "./schema-standard-dhcphosts": {
+      "import": "./static/schemas/standard/dhcpHosts.json",
+      "require": "./static/schemas/standard/dhcpHosts.json"
+    },
+    "./schema-standard-dnsrecords": {
+      "import": "./static/schemas/standard/dnsRecords.json",
+      "require": "./static/schemas/standard/dnsRecords.json"
     },
     "./schema-standard-groups": {
       "import": "./static/schemas/standard/groups.json",
       "require": "./static/schemas/standard/groups.json"
     },
+    "./schema-standard-netgroups": {
+      "import": "./static/schemas/standard/netgroups.json",
+      "require": "./static/schemas/standard/netgroups.json"
+    },
     "./schema-standard-organizations": {
       "import": "./static/schemas/standard/organizations.json",
       "require": "./static/schemas/standard/organizations.json"
+    },
+    "./schema-standard-posixaccounts": {
+      "import": "./static/schemas/standard/posixAccounts.json",
+      "require": "./static/schemas/standard/posixAccounts.json"
+    },
+    "./schema-standard-posixgroups": {
+      "import": "./static/schemas/standard/posixGroups.json",
+      "require": "./static/schemas/standard/posixGroups.json"
+    },
+    "./schema-standard-sshpublickeys": {
+      "import": "./static/schemas/standard/sshPublicKeys.json",
+      "require": "./static/schemas/standard/sshPublicKeys.json"
+    },
+    "./schema-standard-sudorules": {
+      "import": "./static/schemas/standard/sudoRules.json",
+      "require": "./static/schemas/standard/sudoRules.json"
     },
     "./schema-standard-users": {
       "import": "./static/schemas/standard/users.json",
