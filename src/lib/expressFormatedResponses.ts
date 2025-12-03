@@ -54,6 +54,7 @@ const _rejectResponse = (
   res: Response,
   message: string
 ): void => {
+  _logger?.warn(`Client error ${code}: ${message}`);
   res.status(code).json({ error: message });
 };
 
