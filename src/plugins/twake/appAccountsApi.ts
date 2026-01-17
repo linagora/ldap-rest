@@ -319,8 +319,8 @@ export default class AppAccountsApi extends DmPlugin {
   private async deleteAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user;
-    const uid = req.params.uid;
+    const username = req.params.user as string;
+    const uid = req.params.uid as string;
 
     try {
       // Validate that uid belongs to this user

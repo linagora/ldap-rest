@@ -500,6 +500,7 @@
     "test:one": "mocha --config .mocharc-one.json"
   },
   "overrides": {
+    "diff": ">=8.0.3",
     "glob": ">=11.0.4"
   },
   "dependencies": {

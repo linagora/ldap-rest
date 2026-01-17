@@ -186,7 +186,7 @@ export default class LdapGroups extends DmPlugin {
     app.post(
       `${this.config.api_prefix}/v1/ldap/groups/:cn/members`,
       asyncHandler(async (req, res) => {
-        const cn = decodeURIComponent(req.params.cn);
+        const cn = decodeURIComponent(req.params.cn as string);
         if (!cn) throw new BadRequestError('cn is required');
         const body = jsonBody(req, res, 'member') as {
           member: string | string[];
@@ -201,8 +201,8 @@ export default class LdapGroups extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/groups/:cn/members/:member`,
       asyncHandler(async (req, res) => {
         if (!wantJson(req, res)) return;
-        const cn = decodeURIComponent(req.params.cn);
-        const member = decodeURIComponent(req.params.member);
+        const cn = decodeURIComponent(req.params.cn as string);
+        const member = decodeURIComponent(req.params.member as string);
         if (!cn || !member) {
           throw new BadRequestError('cn and member are required');
         }
@@ -219,7 +219,7 @@ export default class LdapGroups extends DmPlugin {
         `${this.config.api_prefix}/v1/ldap/groups/:cn/move`,
         asyncHandler(async (req, res) => {
           if (!wantJson(req, res)) return;
-          const cn = decodeURIComponent(req.params.cn);
+          const cn = decodeURIComponent(req.params.cn as string);
           if (!cn) throw new BadRequestError('cn is required');
           const body = jsonBody(req, res, 'targetOrgDn') as {
             targetOrgDn: string;
@@ -241,7 +241,7 @@ export default class LdapGroups extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/groups/:cn/rename`,
       asyncHandler(async (req, res) => {
         if (!wantJson(req, res)) return;
-        const cn = decodeURIComponent(req.params.cn);
+        const cn = decodeURIComponent(req.params.cn as string);
         if (!cn) throw new BadRequestError('cn is required');
         const body = jsonBody(req, res, 'newCn') as {
           newCn: string;
@@ -254,7 +254,7 @@ export default class LdapGroups extends DmPlugin {
 
   async apiGet(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const cn = decodeURIComponent(req.params.cn);
+    const cn = decodeURIComponent(req.params.cn as string);
     try {
       const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
       const result = (await this.ldap.search(
@@ -301,7 +301,7 @@ export default class LdapGroups extends DmPlugin {
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const cn = decodeURIComponent(req.params.cn);
+    const cn = decodeURIComponent(req.params.cn as string);
     if (!cn) throw new BadRequestError('cn is required');
     await tryMethod(res, this.deleteGroup.bind(this), cn);
   }
@@ -309,7 +309,7 @@ export default class LdapGroups extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as postModify | false;
     if (!body) return;
-    const dn = this.fixDn(decodeURIComponent(req.params.cn));
+    const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
     // Filter out fixed fields from schema
     const filteredBody = Object.fromEntries(
