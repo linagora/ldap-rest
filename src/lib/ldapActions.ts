@@ -68,6 +68,7 @@ class ldapActions {
   private attrSignatureCache = new Map<string, string>();
   private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
   private availableConnections: PooledConnection[] = [];
+  private isCleaningUp = false;
 
   constructor(server: DM) {
     this.parent = server;
@@ -187,36 +188,45 @@ class ldapActions {
 
   /**
    * Clean up expired connections from the pool
+   * Uses a flag to prevent concurrent cleanup operations
    */
   private cleanupExpiredConnections(): void {
-    const now = Date.now();
-    const expired: PooledConnection[] = [];
+    // Prevent concurrent cleanup operations
+    if (this.isCleaningUp) return;
+    this.isCleaningUp = true;
 
-    // Clean from availableConnections queue (only these can expire as they're not in use)
-    for (let i = this.availableConnections.length - 1; i >= 0; i--) {
-      const conn = this.availableConnections[i];
-      if (now - conn.createdAt > this.connectionTtl) {
-        expired.push(conn);
-        this.availableConnections.splice(i, 1);
-        // Also remove from main pool
-        const poolIdx = this.connectionPool.indexOf(conn);
-        if (poolIdx !== -1) {
-          this.connectionPool.splice(poolIdx, 1);
+    try {
+      const now = Date.now();
+      const expired: PooledConnection[] = [];
+
+      // Clean from availableConnections queue (only these can expire as they're not in use)
+      for (let i = this.availableConnections.length - 1; i >= 0; i--) {
+        const conn = this.availableConnections[i];
+        if (now - conn.createdAt > this.connectionTtl) {
+          expired.push(conn);
+          this.availableConnections.splice(i, 1);
+          // Also remove from main pool
+          const poolIdx = this.connectionPool.indexOf(conn);
+          if (poolIdx !== -1) {
+            this.connectionPool.splice(poolIdx, 1);
+          }
         }
       }
-    }
 
-    // Unbind expired connections asynchronously
-    for (const conn of expired) {
-      void conn.client.unbind().catch(err => {
-        this.logger.debug(`Error unbinding expired connection: ${String(err)}`);
-      });
-    }
+      // Unbind expired connections asynchronously
+      for (const conn of expired) {
+        void conn.client.unbind().catch(err => {
+          this.logger.debug(`Error unbinding expired connection: ${String(err)}`);
+        });
+      }
 
-    if (expired.length > 0) {
-      this.logger.debug(
-        `Cleaned up ${expired.length} expired LDAP connections`
-      );
+      if (expired.length > 0) {
+        this.logger.debug(
+          `Cleaned up ${expired.length} expired LDAP connections`
+        );
+      }
+    } finally {
+      this.isCleaningUp = false;
     }
   }
 
