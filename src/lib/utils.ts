@@ -90,6 +90,38 @@ export function escapeLdapFilter(value: string): string {
     .replace(/\0/g, '\\00'); // null
 }
 
+/**
+ * Escape special characters in LDAP DN attribute values according to RFC 4514
+ * Prevents LDAP injection attacks by escaping characters that have special meaning in DNs
+ *
+ * @param value - The value to escape
+ * @returns The escaped value safe for use in LDAP DN attribute values
+ *
+ * @example
+ * ```typescript
+ * escapeDnValue('Smith, John')
+ * // => 'Smith\\, John'
+ *
+ * escapeDnValue('user+admin')
+ * // => 'user\\+admin'
+ * ```
+ */
+export function escapeDnValue(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\') // backslash (must be first)
+    .replace(/,/g, '\\,') // comma
+    .replace(/\+/g, '\\+') // plus
+    .replace(/"/g, '\\"') // double quote
+    .replace(/</g, '\\<') // less than
+    .replace(/>/g, '\\>') // greater than
+    .replace(/;/g, '\\;') // semicolon
+    .replace(/=/g, '\\=') // equals (in value only)
+    .replace(/\0/g, '\\00') // null
+    .replace(/^\s/, '\\ ') // leading space
+    .replace(/\s$/, '\\ ') // trailing space
+    .replace(/^#/, '\\#'); // leading hash
+}
+
 // LDAP DN utilities
 
 /**

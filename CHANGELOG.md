@@ -1,6 +1,10 @@
 # Changelog
 
-## v0.1.6
+## v0.1.7 (dev)
+
+- Add default typescript export
+
+## v0.1.6 (2025-12-01)
 
 - Export ldapActions types
 
