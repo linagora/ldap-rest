@@ -18,6 +18,7 @@ import DmPlugin, {
   NotFoundError,
 } from '../../abstract/plugin';
 import type { SearchResult } from '../../lib/ldapActions';
+import { escapeDnValue } from '../../lib/utils';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -159,7 +160,10 @@ export default class PasswordPolicy extends DmPlugin {
     app.get(
       `${prefix}/users/:id/password-status`,
       asyncHandler(async (req: Request, res: Response) => {
-        const status = await this.getPasswordStatus(req.params.id);
+        const userId = Array.isArray(req.params.id)
+          ? req.params.id[0]
+          : req.params.id;
+        const status = await this.getPasswordStatus(userId);
         res.json(status);
       })
     );
@@ -168,7 +172,10 @@ export default class PasswordPolicy extends DmPlugin {
     app.post(
       `${prefix}/users/:id/unlock`,
       asyncHandler(async (req: Request, res: Response) => {
-        await this.unlockAccount(req.params.id);
+        const userId = Array.isArray(req.params.id)
+          ? req.params.id[0]
+          : req.params.id;
+        await this.unlockAccount(userId);
         res.json({ success: true, message: 'Account unlocked' });
       })
     );
@@ -616,6 +623,7 @@ export default class PasswordPolicy extends DmPlugin {
 
   /**
    * Resolve user DN from userId (uid or full DN)
+   * Escapes special characters in userId to prevent LDAP injection
    */
   private resolveUserDn(userId: string): string {
     if (userId.includes('=')) return userId; // Already a DN
@@ -623,7 +631,7 @@ export default class PasswordPolicy extends DmPlugin {
       (this.config.ldap_users_base as string) ||
       (this.config.ldap_base as string);
     const attr = (this.config.ldap_user_main_attribute as string) || 'uid';
-    return `${attr}=${userId},${base}`;
+    return `${attr}=${escapeDnValue(userId)},${base}`;
   }
 
   /**

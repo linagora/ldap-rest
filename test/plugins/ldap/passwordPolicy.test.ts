@@ -16,6 +16,12 @@ describe('PasswordPolicy Plugin', () => {
     await dm.ready;
   });
 
+  afterEach(async () => {
+    if (dm) {
+      await dm.stop();
+    }
+  });
+
   describe('API Endpoints', () => {
     it('should expose GET /password-policy endpoint', async () => {
       const plugin = new PasswordPolicy(dm);
