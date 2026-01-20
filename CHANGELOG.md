@@ -1,8 +1,24 @@
 # Changelog
 
-## v0.1.7 (dev)
+## v0.1.7 (2025-01-20)
 
-- Add default typescript export
+### New Features
+
+- Add `passwordPolicy` plugin for OpenLDAP ppolicy administration
+
+### Improvements
+
+- Add race condition protection to LDAP connection pool cleanup
+- Fix memory leak in Modal: use DisposableComponent for event cleanup
+- Add log before rejections
+- Add some standard schemas (automountMaps, devices, dhcpHosts, dnsRecords,
+  netgroups, posixAccounts, posixGroups, sshPublicKeys, sudoRules)
+
+### Maintenance
+
+- Update dependencies and require diff>=8.0.3
+- Fix links in documentation
+- Improve TypeScript exports
 
 ## v0.1.6 (2025-12-01)
 
