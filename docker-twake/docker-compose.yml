@@ -1,0 +1,117 @@
+services:
+  openldap:
+    image: bitnami/openldap:latest
+    container_name: ldap-rest-openldap
+    ports:
+      - '1389:1389'
+      - '1636:1636'
+    env_file:
+      - .env
+    volumes:
+      - openldap_data:/bitnami/openldap
+    networks:
+      default:
+        aliases:
+          - ldap.twake.local
+    healthcheck:
+      test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost:$${LDAP_PORT_NUMBER} -b "$${LDAP_ROOT}" -D "cn=$${LDAP_ADMIN_USERNAME},$${LDAP_ROOT}" -w "$${LDAP_ADMIN_PASSWORD}"']
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  llng:
+    image: yadd/lemonldap-ng-full:2.21.3-1
+    container_name: ldap-rest-llng
+    environment:
+      - LOGGER=stderr
+      - USERLOGGER=stderr
+      - SSODOMAIN=twake.local
+    ports:
+      - '19876:19876'
+      - '80:80'
+    volumes:
+      - ./config/lmConf-1.json:/var/lib/lemonldap-ng/conf/lmConf-1.json
+    networks:
+      default:
+        aliases:
+          - auth.twake.local
+          - manager.twake.local
+          - reload.twake.local
+          - test1.twake.local
+          - test2.twake.local
+    depends_on:
+      openldap:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost/']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ldap-rest:
+    image: ldap-rest:latest
+    container_name: ldap-rest-api
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - '8081:8081'
+    environment:
+      # Application Configuration
+      - DM_PORT=8081
+      - DM_LOG_LEVEL=info
+      - DM_API_PREFIX=/api
+      - DM_LOGGER=console
+
+      # LDAP Configuration - pointing to openldap service
+      - DM_LDAP_URL=ldap://openldap:1389
+      - DM_LDAP_BASE=dc=example,dc=com
+      - DM_LDAP_DN=cn=admin,dc=example,dc=com
+      - DM_LDAP_PWD=changeme
+      - DM_LDAP_USER_ATTRIBUTE=uid
+
+      # LDAP Connection Pool Settings
+      - DM_LDAP_CACHE_MAX=1000
+      - DM_LDAP_CACHE_TTL=300
+      - DM_LDAP_POOL_SIZE=5
+
+      # Mail Configuration
+      - DM_MAIL_DOMAIN=twake.local
+
+      # Plugins Configuration
+      - DM_PLUGINS=core/static,core/demo/helloworld,core/auth/llng,core/ldap/groups
+
+      # LemonLDAP::NG Integration
+      - DM_LLNG_HANDLER_HOST=http://auth.twake.local
+
+      # Groups Configuration
+      - DM_LDAP_GROUP_BASE=ou=groups,dc=example,dc=com
+
+      # Static files
+      - DM_STATIC_PATH=/app/node_modules/ldap-rest/static
+      - DM_STATIC_NAME=static
+    networks:
+      default:
+        aliases:
+          - api.twake.local
+    depends_on:
+      openldap:
+        condition: service_healthy
+      llng:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8081/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  openldap_data:
+    driver: local
