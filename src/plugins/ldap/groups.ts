@@ -131,9 +131,7 @@ export default class LdapGroups extends DmPlugin {
             // Custom filter syntax - validate strictly to prevent LDAP injection
             // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
             if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
-              throw new BadRequestError(
-                'Invalid match query: contains forbidden characters'
-              );
+              throw new BadRequestError('Invalid match query: contains forbidden characters');
             }
             // Use as-is (backward compatibility for advanced queries)
             args.filter = req.query.match;
