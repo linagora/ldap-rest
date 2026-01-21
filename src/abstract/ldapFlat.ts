@@ -201,7 +201,7 @@ export default abstract class LdapFlat extends DmPlugin {
 
   async apiGet(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const id = decodeURIComponent(req.params.id as string);
+    const id = decodeURIComponent(req.params.id);
     try {
       const dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
       const result = (await this.ldap.search(
@@ -243,14 +243,14 @@ export default abstract class LdapFlat extends DmPlugin {
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const id = decodeURIComponent(req.params.id as string);
+    const id = decodeURIComponent(req.params.id);
     await tryMethod(res, this.deleteEntry.bind(this), id);
   }
 
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
-    const id = decodeURIComponent(req.params.id as string);
+    const id = decodeURIComponent(req.params.id);
     await tryMethod(res, this.modifyEntry.bind(this), id, body);
   }
 
@@ -262,7 +262,7 @@ export default abstract class LdapFlat extends DmPlugin {
       | false;
     if (!body) return;
 
-    const id = decodeURIComponent(req.params.id as string);
+    const id = decodeURIComponent(req.params.id);
     const { targetOrgDn } = body;
 
     if (!targetOrgDn || typeof targetOrgDn !== 'string') {

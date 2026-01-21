@@ -110,7 +110,7 @@ export default class LdapOrganizations extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
       asyncHandler(async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn as string);
+        const dn = decodeURIComponent(req.params.dn);
         const query = req.query.q as string;
         if (!query)
           throw new BadRequestError('query parameter "q" is required');
@@ -176,14 +176,14 @@ export default class LdapOrganizations extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = decodeURIComponent(req.params.dn);
     if (!dn) throw new BadRequestError('dn is required');
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = decodeURIComponent(req.params.dn);
     if (!dn) throw new BadRequestError('dn is required');
     await tryMethod(res, this.deleteOrganization.bind(this), dn);
   }
@@ -196,7 +196,7 @@ export default class LdapOrganizations extends DmPlugin {
       | false;
     if (!body) return;
 
-    const dn = decodeURIComponent(req.params.dn as string);
+    const dn = decodeURIComponent(req.params.dn);
     if (!dn) throw new BadRequestError('dn is required');
 
     const { targetOrgDn } = body;
