@@ -140,10 +140,14 @@ export default abstract class LdapFlat extends DmPlugin {
           req.query.attribute &&
           typeof req.query.attribute === 'string'
         ) {
-          // Escape user input to prevent LDAP injection
+          // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
+          const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
+          if (!attributePattern.test(req.query.attribute)) {
+            throw new BadRequestError('Invalid LDAP attribute name');
+          }
+          // Escape filter value to prevent LDAP injection
           const escapedMatch = escapeLdapFilter(req.query.match);
-          const escapedAttr = escapeLdapFilter(req.query.attribute);
-          args.filter = `(${escapedAttr}=*${escapedMatch}*)`;
+          args.filter = `(${req.query.attribute}=*${escapedMatch}*)`;
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
@@ -739,9 +743,7 @@ export default abstract class LdapFlat extends DmPlugin {
 
     if (attr.test) {
       const regex =
-        typeof attr.test === 'string'
-          ? getCompiledRegex(attr.test)
-          : attr.test;
+        typeof attr.test === 'string' ? getCompiledRegex(attr.test) : attr.test;
       if (Array.isArray(value)) {
         return value.every(v => regex.test(v as string));
       }

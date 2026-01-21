@@ -812,8 +812,9 @@ export default class LdapOrganizations extends DmPlugin {
     // Search for linked entities (users and groups) matching the query
     const topOrg = this.config.ldap_top_organization as string;
     const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
-    // escapedQuery already defined above for LDAP injection prevention
-    const filter = `(&(${this.config.ldap_organization_link_attribute}=${dn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
+    // Escape both dn and query to prevent LDAP injection
+    const escapedDn = escapeLdapFilter(dn);
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );

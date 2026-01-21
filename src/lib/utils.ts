@@ -14,7 +14,9 @@ import { getLogger } from './expressFormatedResponses';
 const logger = getLogger();
 
 // Regex caching utilities - shared across plugins to avoid duplication
-
+// NOTE: This cache is designed for static patterns from schemas, NOT for user input.
+// Using dynamic user-generated patterns would cause unbounded memory growth.
+// Current usage is limited to schema validation patterns which are finite.
 const regexCache = new Map<string, RegExp>();
 
 /**
