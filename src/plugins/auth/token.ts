@@ -47,7 +47,8 @@ export default class AuthToken extends AuthBase {
     const userName = this.tokenMap.get(token);
     if (!userName) {
       // Mask token in logs to prevent credential exposure
-      const maskedToken = token.length > 8 ? `${token.substring(0, 8)}...` : '***';
+      const maskedToken =
+        token.length > 8 ? `${token.substring(0, 8)}...` : '***';
       this.logger.warn(`Unauthorized token: ${maskedToken}`);
       return unauthorized(res);
     }

@@ -221,7 +221,9 @@ class ldapActions {
       // Unbind expired connections asynchronously
       for (const conn of expired) {
         void conn.client.unbind().catch(err => {
-          this.logger.debug(`Error unbinding expired connection: ${String(err)}`);
+          this.logger.debug(
+            `Error unbinding expired connection: ${String(err)}`
+          );
         });
       }
 
@@ -277,7 +279,7 @@ class ldapActions {
         reject(new Error('LDAP connection pool timeout after 30s'));
       }, 30000);
 
-      const resolveWrapper = (conn: PooledConnection) => {
+      const resolveWrapper = (conn: PooledConnection): void => {
         clearTimeout(timeoutId);
         resolve(conn);
       };
@@ -492,9 +494,11 @@ class ldapActions {
       await pooled.client.add(dn, attributes);
       // Invalidate cache for this DN
       this.invalidateCache(dn);
-      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]).catch(err => {
-        this.logger.error(`Hook ldapadddone failed: ${String(err)}`);
-      });
+      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]).catch(
+        err => {
+          this.logger.error(`Hook ldapadddone failed: ${String(err)}`);
+        }
+      );
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -583,7 +587,11 @@ class ldapActions {
         await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
-        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]).catch(err => {
+        void launchHooks(this.parent.hooks.ldapmodifydone, [
+          dn,
+          changes,
+          op,
+        ]).catch(err => {
           this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
         });
         return true;
@@ -598,9 +606,11 @@ class ldapActions {
       }
     } else {
       this.logger.error('No changes to apply');
-      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(err => {
-        this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
-      });
+      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(
+        err => {
+          this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
+        }
+      );
       return false;
     }
   }
@@ -615,9 +625,11 @@ class ldapActions {
     const pooled = await this.acquireConnection();
     try {
       await pooled.client.modifyDN(dn, newRdn);
-      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]).catch(err => {
-        this.logger.error(`Hook ldaprenamedone failed: ${String(err)}`);
-      });
+      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]).catch(
+        err => {
+          this.logger.error(`Hook ldaprenamedone failed: ${String(err)}`);
+        }
+      );
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions

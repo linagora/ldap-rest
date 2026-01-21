@@ -161,7 +161,7 @@ export default class PasswordPolicy extends DmPlugin {
       `${prefix}/users/:id/password-status`,
       asyncHandler(async (req: Request, res: Response) => {
         const userId = Array.isArray(req.params.id)
-          ? req.params.id[0]
+          ? (req.params.id[0] as string)
           : req.params.id;
         const status = await this.getPasswordStatus(userId);
         res.json(status);
@@ -173,7 +173,7 @@ export default class PasswordPolicy extends DmPlugin {
       `${prefix}/users/:id/unlock`,
       asyncHandler(async (req: Request, res: Response) => {
         const userId = Array.isArray(req.params.id)
-          ? req.params.id[0]
+          ? (req.params.id[0] as string)
           : req.params.id;
         await this.unlockAccount(userId);
         res.json({ success: true, message: 'Account unlocked' });

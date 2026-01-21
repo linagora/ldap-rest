@@ -73,7 +73,7 @@ export default class James extends TwakePlugin {
   private async getUserQuota(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user as string;
+    const username = req.params.user;
 
     try {
       // Get user's mail from LDAP (escape username to prevent LDAP injection)
