@@ -65,7 +65,8 @@ class ldapActions {
   private connectionTtl: number; // in milliseconds
   private ldapUrls: string[];
   private currentUrlIndex: number = 0;
-  private attrSignatureCache = new Map<string, string>();
+  // LRU cache for attribute signatures to prevent unbounded memory growth
+  private attrSignatureCache: LRUCache<string, string>;
   private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
   private availableConnections: PooledConnection[] = [];
   private isCleaningUp = false;
@@ -104,6 +105,10 @@ class ldapActions {
     this.logger.info(
       `LDAP search cache initialized: max=${cacheMax}, ttl=${cacheTtl / 1000}s`
     );
+    // Initialize bounded LRU cache for attribute signatures
+    this.attrSignatureCache = new LRUCache<string, string>({
+      max: 1000, // Reasonable limit for attribute signature combinations
+    });
     if (!server.config.ldap_url || server.config.ldap_url.length === 0) {
       throw new Error('LDAP URL is not defined');
     }
@@ -487,7 +492,9 @@ class ldapActions {
       await pooled.client.add(dn, attributes);
       // Invalidate cache for this DN
       this.invalidateCache(dn);
-      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
+      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]).catch(err => {
+        this.logger.error(`Hook ldapadddone failed: ${String(err)}`);
+      });
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -576,7 +583,9 @@ class ldapActions {
         await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
-        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
+        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]).catch(err => {
+          this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
+        });
         return true;
       } catch (error) {
         this.logger.warn(
@@ -589,7 +598,9 @@ class ldapActions {
       }
     } else {
       this.logger.error('No changes to apply');
-      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]);
+      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(err => {
+        this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
+      });
       return false;
     }
   }
@@ -604,7 +615,9 @@ class ldapActions {
     const pooled = await this.acquireConnection();
     try {
       await pooled.client.modifyDN(dn, newRdn);
-      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
+      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]).catch(err => {
+        this.logger.error(`Hook ldaprenamedone failed: ${String(err)}`);
+      });
       return true;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -669,7 +682,9 @@ class ldapActions {
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           throw new Error(`LDAP delete error: ${error}`);
         }
-        void launchHooks(this.parent.hooks.ldapdeletedone, entry);
+        void launchHooks(this.parent.hooks.ldapdeletedone, entry).catch(err => {
+          this.logger.error(`Hook ldapdeletedone failed: ${String(err)}`);
+        });
       }
       return true;
     } finally {

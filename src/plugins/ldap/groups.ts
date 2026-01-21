@@ -30,6 +30,9 @@ import {
 } from '../../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeLdapFilter,
+  escapeRegex,
+  getCompiledRegex,
   launchHooks,
   launchHooksChained,
   transformSchemas,
@@ -50,27 +53,6 @@ export default class LdapGroups extends DmPlugin {
   ldap: ldapActions;
   cn: string;
   schema?: Schema;
-  private regexCache = new Map<string, RegExp>();
-
-  /**
-   * Get a compiled RegExp from cache, or compile and cache it
-   */
-  private getCompiledRegex(pattern: string, flags?: string): RegExp {
-    const key = flags ? `${pattern}:${flags}` : pattern;
-    let regex = this.regexCache.get(key);
-    if (!regex) {
-      regex = new RegExp(pattern, flags);
-      this.regexCache.set(key, regex);
-    }
-    return regex;
-  }
-
-  /**
-   * Escape special regex characters in a string
-   */
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
 
   constructor(server: DM) {
     super(server);
@@ -147,10 +129,13 @@ export default class LdapGroups extends DmPlugin {
             !/^[\w*=()&|]+$/.test(req.query.match))
         )
           throw new BadRequestError('Invalid match query');
-        if (req.query.match)
+        if (req.query.match) {
+          // Escape user input to prevent LDAP injection
+          const escapedMatch = escapeLdapFilter(req.query.match);
           args.filter = /=/.test(req.query.match)
-            ? `${req.query.match}`
-            : `(${this.cn}=${req.query.match})`;
+            ? `(${this.cn}=${escapedMatch})`
+            : `(${this.cn}=${escapedMatch})`;
+        }
         if (req.query.attributes && typeof req.query.attributes === 'string')
           args.attributes = req.query.attributes.split(',');
         const list = await this.listGroups(args);
@@ -791,7 +776,7 @@ export default class LdapGroups extends DmPlugin {
       if (test.items.test) {
         const itemRegex =
           typeof test.items.test === 'string'
-            ? this.getCompiledRegex(test.items.test)
+            ? getCompiledRegex(test.items.test)
             : test.items.test;
         for (let v of value) {
           if (typeof v !== test.items.type)
@@ -812,8 +797,8 @@ export default class LdapGroups extends DmPlugin {
       // Check branch restriction if provided
       if (test.branch && test.branch.length > 0) {
         const isInBranch = test.branch.some(branch => {
-          const branchPattern = this.getCompiledRegex(
-            `,?${this.escapeRegex(branch)}$`,
+          const branchPattern = getCompiledRegex(
+            `,?${escapeRegex(branch)}$`,
             'i'
           );
           return branchPattern.test(dnValue);
@@ -849,7 +834,7 @@ export default class LdapGroups extends DmPlugin {
       if (test.test) {
         const testRegex =
           typeof test.test === 'string'
-            ? this.getCompiledRegex(test.test)
+            ? getCompiledRegex(test.test)
             : test.test;
         if (!testRegex.test(dnValue))
           throw new Error(`Field ${field} has invalid value ${dnValue}`);
@@ -860,7 +845,7 @@ export default class LdapGroups extends DmPlugin {
       if (test.test) {
         const testRegex =
           typeof test.test === 'string'
-            ? this.getCompiledRegex(test.test)
+            ? getCompiledRegex(test.test)
             : test.test;
         if (!testRegex.test(value))
           throw new Error(`Field ${field} has invalid value ${value}`);
