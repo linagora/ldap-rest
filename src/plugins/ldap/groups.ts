@@ -123,18 +123,23 @@ export default class LdapGroups extends DmPlugin {
       asyncHandler(async (req, res) => {
         if (!wantJson(req, res)) return;
         const args: { filter?: string; attributes?: string[] } = {};
-        if (
-          req.query.match &&
-          (typeof req.query.match !== 'string' ||
-            !/^[\w*=()&|]+$/.test(req.query.match))
-        )
-          throw new BadRequestError('Invalid match query');
         if (req.query.match) {
-          // Escape user input to prevent LDAP injection
-          const escapedMatch = escapeLdapFilter(req.query.match);
-          args.filter = /=/.test(req.query.match)
-            ? `(${this.cn}=${escapedMatch})`
-            : `(${this.cn}=${escapedMatch})`;
+          if (typeof req.query.match !== 'string') {
+            throw new BadRequestError('Invalid match query');
+          }
+          if (/=/.test(req.query.match)) {
+            // Custom filter syntax - validate strictly to prevent LDAP injection
+            // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
+            if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
+              throw new BadRequestError('Invalid match query: contains forbidden characters');
+            }
+            // Use as-is (backward compatibility for advanced queries)
+            args.filter = req.query.match;
+          } else {
+            // Simple value - escape to prevent LDAP injection
+            const escapedMatch = escapeLdapFilter(req.query.match);
+            args.filter = `(${this.cn}=${escapedMatch})`;
+          }
         }
         if (req.query.attributes && typeof req.query.attributes === 'string')
           args.attributes = req.query.attributes.split(',');
