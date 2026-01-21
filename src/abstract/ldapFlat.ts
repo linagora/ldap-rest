@@ -28,6 +28,9 @@ import {
 } from '../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeLdapFilter,
+  escapeRegex,
+  getCompiledRegex,
   launchHooks,
   launchHooksChained,
   transformSchemas,
@@ -89,27 +92,6 @@ export default abstract class LdapFlat extends DmPlugin {
   singularName: string;
   pluralName: string;
   hookPrefix: string;
-  private regexCache = new Map<string, RegExp>();
-
-  /**
-   * Get a compiled RegExp from cache, or compile and cache it
-   */
-  protected getCompiledRegex(pattern: string, flags?: string): RegExp {
-    const key = flags ? `${pattern}:${flags}` : pattern;
-    let regex = this.regexCache.get(key);
-    if (!regex) {
-      regex = new RegExp(pattern, flags);
-      this.regexCache.set(key, regex);
-    }
-    return regex;
-  }
-
-  /**
-   * Escape special regex characters in a string
-   */
-  protected escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
 
   constructor(server: DM, config: LdapFlatConfig) {
     super(server);
@@ -158,7 +140,14 @@ export default abstract class LdapFlat extends DmPlugin {
           req.query.attribute &&
           typeof req.query.attribute === 'string'
         ) {
-          args.filter = `(${req.query.attribute}=*${req.query.match}*)`;
+          // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
+          const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
+          if (!attributePattern.test(req.query.attribute)) {
+            throw new BadRequestError('Invalid LDAP attribute name');
+          }
+          // Escape filter value to prevent LDAP injection
+          const escapedMatch = escapeLdapFilter(req.query.match);
+          args.filter = `(${req.query.attribute}=*${escapedMatch}*)`;
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
@@ -717,8 +706,8 @@ export default abstract class LdapFlat extends DmPlugin {
       // Check branch restriction if provided
       if (attr.branch && attr.branch.length > 0) {
         const isInBranch = attr.branch.some(branch => {
-          const branchPattern = this.getCompiledRegex(
-            `,?${this.escapeRegex(branch)}$`,
+          const branchPattern = getCompiledRegex(
+            `,?${escapeRegex(branch)}$`,
             'i'
           );
           return branchPattern.test(dnValue);
@@ -754,9 +743,7 @@ export default abstract class LdapFlat extends DmPlugin {
 
     if (attr.test) {
       const regex =
-        typeof attr.test === 'string'
-          ? this.getCompiledRegex(attr.test)
-          : attr.test;
+        typeof attr.test === 'string' ? getCompiledRegex(attr.test) : attr.test;
       if (Array.isArray(value)) {
         return value.every(v => regex.test(v as string));
       }

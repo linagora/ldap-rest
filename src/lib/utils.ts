@@ -13,6 +13,41 @@ import { getLogger } from './expressFormatedResponses';
 
 const logger = getLogger();
 
+// Regex caching utilities - shared across plugins to avoid duplication
+// NOTE: This cache is designed for static patterns from schemas, NOT for user input.
+// Using dynamic user-generated patterns would cause unbounded memory growth.
+// Current usage is limited to schema validation patterns which are finite.
+const regexCache = new Map<string, RegExp>();
+
+/**
+ * Get a compiled RegExp from cache, or compile and cache it
+ * This avoids recompiling the same regex patterns repeatedly
+ *
+ * @param pattern - The regex pattern string
+ * @param flags - Optional regex flags
+ * @returns The compiled RegExp
+ */
+export function getCompiledRegex(pattern: string, flags?: string): RegExp {
+  const key = flags ? `${pattern}:${flags}` : pattern;
+  let regex = regexCache.get(key);
+  if (!regex) {
+    regex = new RegExp(pattern, flags);
+    regexCache.set(key, regex);
+  }
+  return regex;
+}
+
+/**
+ * Escape special regex characters in a string
+ * Useful when building dynamic regex patterns from user input
+ *
+ * @param str - The string to escape
+ * @returns The escaped string safe for use in RegExp
+ */
+export function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored
 export const launchHooks = async (
   hooks: Function[] | undefined,

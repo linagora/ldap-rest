@@ -19,6 +19,7 @@ import {
 } from '../../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeLdapFilter,
   launchHooksChained,
   transformSchemas,
 } from '../../lib/utils';
@@ -786,12 +787,14 @@ export default class LdapOrganizations extends DmPlugin {
     const result: AttributesList[] = [];
 
     // Search for sub-OUs matching the query
+    // Escape query to prevent LDAP injection
+    const escapedQuery = escapeLdapFilter(query);
     try {
       const subOUs = (await this.server.ldap.search(
         {
           paged: false,
           scope: 'one',
-          filter: `(&(objectClass=organizationalUnit)(|(ou=*${query}*)(description=*${query}*)))`,
+          filter: `(&(objectClass=organizationalUnit)(|(ou=*${escapedQuery}*)(description=*${escapedQuery}*)))`,
         },
         dn
       )) as SearchResult;
@@ -809,7 +812,9 @@ export default class LdapOrganizations extends DmPlugin {
     // Search for linked entities (users and groups) matching the query
     const topOrg = this.config.ldap_top_organization as string;
     const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
-    const filter = `(&(${this.config.ldap_organization_link_attribute}=${dn})(|(uid=*${query}*)(cn=*${query}*)(mail=*${query}*)(sn=*${query}*)(givenName=*${query}*)))`;
+    // Escape both dn and query to prevent LDAP injection
+    const escapedDn = escapeLdapFilter(dn);
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
