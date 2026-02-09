@@ -219,18 +219,19 @@ export default class CalendarResources extends TwakePlugin {
 
   /**
    * Delete user data from Twake Calendar WebAdmin API
-   * @param username - The username to delete data for
+   * Calls POST /users/{mail}?action=deleteData
+   * @param mail - The user's email address
    * @returns Task information or null on error
    */
-  async deleteUserData(username: string): Promise<{ taskId: string } | null> {
+  async deleteUserData(mail: string): Promise<{ taskId: string } | null> {
     const log = {
       plugin: this.name,
       event: 'deleteUserData',
-      username,
+      mail,
     };
 
     try {
-      const url = new URL(`${this.webadminUrl}/users/${username}`);
+      const url = new URL(`${this.webadminUrl}/users/${mail}`);
       url.searchParams.set('action', 'deleteData');
 
       const response = await this.requestLimit(() =>

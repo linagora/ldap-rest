@@ -916,7 +916,7 @@ export default class James extends TwakePlugin {
 
   /**
    * Delete user data via James WebAdmin API
-   * Calls POST /users/{username}?action=deleteData
+   * Calls POST /users/{mail}?action=deleteData
    * Returns task information from the response
    */
   async deleteUserData(

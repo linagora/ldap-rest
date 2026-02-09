@@ -163,26 +163,26 @@ const calendar = this.server.getPlugin(
 ) as CalendarResources;
 ```
 
-### deleteUserData(username)
+### deleteUserData(mail)
 
 Delete all user data from Twake Calendar via WebAdmin API. Useful for GDPR "right to be forgotten" compliance.
 
 **Signature:**
 
 ```typescript
-async deleteUserData(username: string): Promise<{ taskId: string } | null>
+async deleteUserData(mail: string): Promise<{ taskId: string } | null>
 ```
 
 **Parameters:**
 
-- `username` (string): Username to delete data for
+- `mail` (string): User's email address
 
 **Returns:** Task information with `taskId`, or `null` on error.
 
 **Example:**
 
 ```typescript
-const result = await calendar.deleteUserData('jdoe');
+const result = await calendar.deleteUserData('user@example.com');
 if (result) {
   console.log(`Deletion task started: ${result.taskId}`);
 }
