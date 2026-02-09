@@ -915,6 +915,61 @@ export default class James extends TwakePlugin {
   }
 
   /**
+   * Delete user data via James WebAdmin API
+   * Calls POST /users/{username}?action=deleteData
+   * Returns task information from the response
+   */
+  async deleteUserData(
+    mail: string,
+    fromStep?: string
+  ): Promise<{ taskId: string } | null> {
+    const log = {
+      plugin: this.name,
+      event: 'deleteUserData',
+      mail,
+      fromStep,
+    };
+
+    try {
+      const url = new URL(`${this.webadminUrl}/users/${mail}`);
+      url.searchParams.set('action', 'deleteData');
+      if (fromStep) {
+        url.searchParams.set('fromStep', fromStep);
+      }
+
+      const response = await this.requestLimit(() =>
+        fetch(url.toString(), {
+          method: 'POST',
+          headers: this.createHeaders(),
+        })
+      );
+
+      if (!response.ok) {
+        this.logger.error({
+          ...log,
+          http_status: response.status,
+          http_status_text: response.statusText,
+        });
+        return null;
+      }
+
+      const taskInfo = (await response.json()) as { taskId: string };
+
+      this.logger.info({
+        ...log,
+        http_status: response.status,
+        taskId: taskInfo.taskId,
+      });
+
+      return taskInfo;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error({ ...log, error: `${err}` });
+      return null;
+    }
+  }
+
+  /**
    * Type guard to check if delete operation is an AttributesList
    */
   private isAttributesList(
