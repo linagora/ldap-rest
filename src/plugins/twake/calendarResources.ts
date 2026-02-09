@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';

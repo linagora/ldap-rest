@@ -158,7 +158,9 @@ import type { DM } from 'ldap-rest';
 import type CalendarResources from 'ldap-rest/plugin-twake-calendarresources';
 
 // Get the plugin instance from another plugin
-const calendar = this.server.getPlugin('calendarResources') as CalendarResources;
+const calendar = this.server.getPlugin(
+  'calendarResources'
+) as CalendarResources;
 ```
 
 ### deleteUserData(username)
@@ -166,16 +168,19 @@ const calendar = this.server.getPlugin('calendarResources') as CalendarResources
 Delete all user data from Twake Calendar via WebAdmin API. Useful for GDPR "right to be forgotten" compliance.
 
 **Signature:**
+
 ```typescript
 async deleteUserData(username: string): Promise<{ taskId: string } | null>
 ```
 
 **Parameters:**
+
 - `username` (string): Username to delete data for
 
 **Returns:** Task information with `taskId`, or `null` on error.
 
 **Example:**
+
 ```typescript
 const result = await calendar.deleteUserData('jdoe');
 if (result) {
