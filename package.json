@@ -18,335 +18,335 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/bin/index.js",
-      "types": "./dist/src/bin/index.d.ts"
+      "types": "./dist/src/bin/index.d.ts",
+      "import": "./dist/bin/index.js"
     },
     "./hooks": {
       "types": "./dist/src/hooks.d.ts"
     },
     "./plugin": {
-      "import": "./dist/abstract/plugin.js",
-      "types": "./dist/src/abstract/plugin.d.ts"
+      "types": "./dist/src/abstract/plugin.d.ts",
+      "import": "./dist/abstract/plugin.js"
     },
     "./expressformatedresponses": {
-      "import": "./dist/lib/expressFormatedResponses.js",
-      "types": "./dist/src/lib/expressFormatedResponses.d.ts"
+      "types": "./dist/src/lib/expressFormatedResponses.d.ts",
+      "import": "./dist/lib/expressFormatedResponses.js"
     },
     "./ldapactions": {
-      "import": "./dist/lib/ldapActions.js",
-      "types": "./dist/src/lib/ldapActions.d.ts"
+      "types": "./dist/src/lib/ldapActions.d.ts",
+      "import": "./dist/lib/ldapActions.js"
     },
     "./plugin-auth-authzlinid1": {
-      "import": "./dist/plugins/auth/authzLinid1.js",
-      "types": "./dist/src/plugins/auth/authzLinid1.d.ts"
+      "types": "./dist/src/plugins/auth/authzLinid1.d.ts",
+      "import": "./dist/plugins/auth/authzLinid1.js"
     },
     "./plugin-auth-authzperbranch": {
-      "import": "./dist/plugins/auth/authzPerBranch.js",
-      "types": "./dist/src/plugins/auth/authzPerBranch.d.ts"
+      "types": "./dist/src/plugins/auth/authzPerBranch.d.ts",
+      "import": "./dist/plugins/auth/authzPerBranch.js"
     },
     "./plugin-auth-crowdsec": {
-      "import": "./dist/plugins/auth/crowdsec.js",
-      "types": "./dist/src/plugins/auth/crowdsec.d.ts"
+      "types": "./dist/src/plugins/auth/crowdsec.d.ts",
+      "import": "./dist/plugins/auth/crowdsec.js"
     },
     "./plugin-auth-hmac": {
-      "import": "./dist/plugins/auth/hmac.js",
-      "types": "./dist/src/plugins/auth/hmac.d.ts"
+      "types": "./dist/src/plugins/auth/hmac.d.ts",
+      "import": "./dist/plugins/auth/hmac.js"
     },
     "./plugin-auth-llng": {
-      "import": "./dist/plugins/auth/llng.js",
-      "types": "./dist/src/plugins/auth/llng.d.ts"
+      "types": "./dist/src/plugins/auth/llng.d.ts",
+      "import": "./dist/plugins/auth/llng.js"
     },
     "./plugin-auth-openidconnect": {
-      "import": "./dist/plugins/auth/openidconnect.js",
-      "types": "./dist/src/plugins/auth/openidconnect.d.ts"
+      "types": "./dist/src/plugins/auth/openidconnect.d.ts",
+      "import": "./dist/plugins/auth/openidconnect.js"
     },
     "./plugin-auth-ratelimit": {
-      "import": "./dist/plugins/auth/rateLimit.js",
-      "types": "./dist/src/plugins/auth/rateLimit.d.ts"
+      "types": "./dist/src/plugins/auth/rateLimit.d.ts",
+      "import": "./dist/plugins/auth/rateLimit.js"
     },
     "./plugin-auth-token": {
-      "import": "./dist/plugins/auth/token.js",
-      "types": "./dist/src/plugins/auth/token.d.ts"
+      "types": "./dist/src/plugins/auth/token.d.ts",
+      "import": "./dist/plugins/auth/token.js"
     },
     "./plugin-auth-totp": {
-      "import": "./dist/plugins/auth/totp.js",
-      "types": "./dist/src/plugins/auth/totp.d.ts"
+      "types": "./dist/src/plugins/auth/totp.d.ts",
+      "import": "./dist/plugins/auth/totp.js"
     },
     "./plugin-auth-trustedproxy": {
-      "import": "./dist/plugins/auth/trustedProxy.js",
-      "types": "./dist/src/plugins/auth/trustedProxy.d.ts"
+      "types": "./dist/src/plugins/auth/trustedProxy.d.ts",
+      "import": "./dist/plugins/auth/trustedProxy.js"
     },
     "./plugin-configapi": {
-      "import": "./dist/plugins/configApi.js",
-      "types": "./dist/src/plugins/configApi.d.ts"
+      "types": "./dist/src/plugins/configApi.d.ts",
+      "import": "./dist/plugins/configApi.js"
     },
     "./plugin-demo-helloworld": {
-      "import": "./dist/plugins/demo/helloworld.js",
-      "types": "./dist/src/plugins/demo/helloworld.d.ts"
+      "types": "./dist/src/plugins/demo/helloworld.d.ts",
+      "import": "./dist/plugins/demo/helloworld.js"
     },
     "./plugin-ldap-bulkimport": {
-      "import": "./dist/plugins/ldap/bulkImport.js",
-      "types": "./dist/src/plugins/ldap/bulkImport.d.ts"
+      "types": "./dist/src/plugins/ldap/bulkImport.d.ts",
+      "import": "./dist/plugins/ldap/bulkImport.js"
     },
     "./plugin-ldap-departmentsync": {
-      "import": "./dist/plugins/ldap/departmentSync.js",
-      "types": "./dist/src/plugins/ldap/departmentSync.d.ts"
+      "types": "./dist/src/plugins/ldap/departmentSync.d.ts",
+      "import": "./dist/plugins/ldap/departmentSync.js"
     },
     "./plugin-ldap-externalusersingroups": {
-      "import": "./dist/plugins/ldap/externalUsersInGroups.js",
-      "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts"
+      "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts",
+      "import": "./dist/plugins/ldap/externalUsersInGroups.js"
     },
     "./plugin-ldap-flatgeneric": {
-      "import": "./dist/plugins/ldap/flatGeneric.js",
-      "types": "./dist/src/plugins/ldap/flatGeneric.d.ts"
+      "types": "./dist/src/plugins/ldap/flatGeneric.d.ts",
+      "import": "./dist/plugins/ldap/flatGeneric.js"
     },
     "./plugin-ldap-groups": {
-      "import": "./dist/plugins/ldap/groups.js",
-      "types": "./dist/src/plugins/ldap/groups.d.ts"
+      "types": "./dist/src/plugins/ldap/groups.d.ts",
+      "import": "./dist/plugins/ldap/groups.js"
     },
     "./plugin-ldap-onchange": {
-      "import": "./dist/plugins/ldap/onChange.js",
-      "types": "./dist/src/plugins/ldap/onChange.d.ts"
+      "types": "./dist/src/plugins/ldap/onChange.d.ts",
+      "import": "./dist/plugins/ldap/onChange.js"
     },
     "./plugin-ldap-organization": {
-      "import": "./dist/plugins/ldap/organization.js",
-      "types": "./dist/src/plugins/ldap/organization.d.ts"
+      "types": "./dist/src/plugins/ldap/organization.d.ts",
+      "import": "./dist/plugins/ldap/organization.js"
     },
     "./plugin-ldap-passwordpolicy": {
-      "import": "./dist/plugins/ldap/passwordPolicy.js",
-      "types": "./dist/src/plugins/ldap/passwordPolicy.d.ts"
+      "types": "./dist/src/plugins/ldap/passwordPolicy.d.ts",
+      "import": "./dist/plugins/ldap/passwordPolicy.js"
     },
     "./plugin-ldap-trash": {
-      "import": "./dist/plugins/ldap/trash.js",
-      "types": "./dist/src/plugins/ldap/trash.d.ts"
+      "types": "./dist/src/plugins/ldap/trash.d.ts",
+      "import": "./dist/plugins/ldap/trash.js"
     },
     "./plugin-static": {
-      "import": "./dist/plugins/static.js",
-      "types": "./dist/src/plugins/static.d.ts"
+      "types": "./dist/src/plugins/static.d.ts",
+      "import": "./dist/plugins/static.js"
     },
     "./plugin-twake-appaccountsapi": {
-      "import": "./dist/plugins/twake/appAccountsApi.js",
-      "types": "./dist/src/plugins/twake/appAccountsApi.d.ts"
+      "types": "./dist/src/plugins/twake/appAccountsApi.d.ts",
+      "import": "./dist/plugins/twake/appAccountsApi.js"
     },
     "./plugin-twake-appaccountsconsistency": {
-      "import": "./dist/plugins/twake/appAccountsConsistency.js",
-      "types": "./dist/src/plugins/twake/appAccountsConsistency.d.ts"
+      "types": "./dist/src/plugins/twake/appAccountsConsistency.d.ts",
+      "import": "./dist/plugins/twake/appAccountsConsistency.js"
     },
     "./plugin-twake-calendarresources": {
-      "import": "./dist/plugins/twake/calendarResources.js",
-      "types": "./dist/src/plugins/twake/calendarResources.d.ts"
+      "types": "./dist/src/plugins/twake/calendarResources.d.ts",
+      "import": "./dist/plugins/twake/calendarResources.js"
     },
     "./plugin-twake-james": {
-      "import": "./dist/plugins/twake/james.js",
-      "types": "./dist/src/plugins/twake/james.d.ts"
+      "types": "./dist/src/plugins/twake/james.d.ts",
+      "import": "./dist/plugins/twake/james.js"
     },
     "./plugin-weblogs": {
-      "import": "./dist/plugins/weblogs.js",
-      "types": "./dist/src/plugins/weblogs.d.ts"
+      "types": "./dist/src/plugins/weblogs.d.ts",
+      "import": "./dist/plugins/weblogs.js"
     },
     "./abstract-ldapflat": {
-      "import": "./dist/abstract/ldapFlat.js",
-      "types": "./dist/src/abstract/ldapFlat.d.ts"
+      "types": "./dist/src/abstract/ldapFlat.d.ts",
+      "import": "./dist/abstract/ldapFlat.js"
     },
     "./abstract-plugin": {
-      "import": "./dist/abstract/plugin.js",
-      "types": "./dist/src/abstract/plugin.d.ts"
+      "types": "./dist/src/abstract/plugin.d.ts",
+      "import": "./dist/abstract/plugin.js"
     },
     "./abstract-twakeplugin": {
-      "import": "./dist/abstract/twakePlugin.js",
-      "types": "./dist/src/abstract/twakePlugin.d.ts"
+      "types": "./dist/src/abstract/twakePlugin.d.ts",
+      "import": "./dist/abstract/twakePlugin.js"
     },
     "./browser-ldap-group-editor-ldapgroupeditor": {
-      "import": "./static/browser/ldap-group-editor/LdapGroupEditor.js",
-      "types": "./dist/src/browser/ldap-group-editor/LdapGroupEditor.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/LdapGroupEditor.d.ts",
+      "import": "./static/browser/ldap-group-editor/LdapGroupEditor.js"
     },
     "./browser-ldap-group-editor-api-groupapiclient": {
-      "import": "./static/browser/ldap-group-editor/api/GroupApiClient.js",
-      "types": "./dist/src/browser/ldap-group-editor/api/GroupApiClient.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/api/GroupApiClient.d.ts",
+      "import": "./static/browser/ldap-group-editor/api/GroupApiClient.js"
     },
     "./browser-ldap-group-editor-components-creategroupmodal": {
-      "import": "./static/browser/ldap-group-editor/components/CreateGroupModal.js",
-      "types": "./dist/src/browser/ldap-group-editor/components/CreateGroupModal.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/components/CreateGroupModal.d.ts",
+      "import": "./static/browser/ldap-group-editor/components/CreateGroupModal.js"
     },
     "./browser-ldap-group-editor-components-grouppropertyeditor": {
-      "import": "./static/browser/ldap-group-editor/components/GroupPropertyEditor.js",
-      "types": "./dist/src/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/components/GroupPropertyEditor.d.ts",
+      "import": "./static/browser/ldap-group-editor/components/GroupPropertyEditor.js"
     },
     "./browser-ldap-group-editor-components-grouptree": {
-      "import": "./static/browser/ldap-group-editor/components/GroupTree.js",
-      "types": "./dist/src/browser/ldap-group-editor/components/GroupTree.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/components/GroupTree.d.ts",
+      "import": "./static/browser/ldap-group-editor/components/GroupTree.js"
     },
     "./browser-ldap-group-editor-components-movegroupmodal": {
-      "import": "./static/browser/ldap-group-editor/components/MoveGroupModal.js",
-      "types": "./dist/src/browser/ldap-group-editor/components/MoveGroupModal.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/components/MoveGroupModal.d.ts",
+      "import": "./static/browser/ldap-group-editor/components/MoveGroupModal.js"
     },
     "./browser-ldap-group-editor-index": {
-      "import": "./static/browser/ldap-group-editor/index.js",
-      "types": "./dist/src/browser/ldap-group-editor/index.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/index.d.ts",
+      "import": "./static/browser/ldap-group-editor/index.js"
     },
     "./browser-ldap-group-editor-types": {
-      "import": "./static/browser/ldap-group-editor/types.js",
-      "types": "./dist/src/browser/ldap-group-editor/types.d.ts"
+      "types": "./dist/src/browser/ldap-group-editor/types.d.ts",
+      "import": "./static/browser/ldap-group-editor/types.js"
     },
     "./browser-ldap-resource-editor-api-resourceapiclient": {
-      "import": "./static/browser/ldap-resource-editor/api/ResourceApiClient.js",
-      "types": "./dist/src/browser/ldap-resource-editor/api/ResourceApiClient.d.ts"
+      "types": "./dist/src/browser/ldap-resource-editor/api/ResourceApiClient.d.ts",
+      "import": "./static/browser/ldap-resource-editor/api/ResourceApiClient.js"
     },
     "./browser-ldap-resource-editor-cache-cachemanager": {
-      "import": "./static/browser/ldap-resource-editor/cache/CacheManager.js",
-      "types": "./dist/src/browser/ldap-resource-editor/cache/CacheManager.d.ts"
+      "types": "./dist/src/browser/ldap-resource-editor/cache/CacheManager.d.ts",
+      "import": "./static/browser/ldap-resource-editor/cache/CacheManager.js"
     },
     "./browser-ldap-resource-editor-index": {
-      "import": "./static/browser/ldap-resource-editor/index.js",
-      "types": "./dist/src/browser/ldap-resource-editor/index.d.ts"
+      "types": "./dist/src/browser/ldap-resource-editor/index.d.ts",
+      "import": "./static/browser/ldap-resource-editor/index.js"
     },
     "./browser-ldap-resource-editor-types": {
-      "import": "./static/browser/ldap-resource-editor/types.js",
-      "types": "./dist/src/browser/ldap-resource-editor/types.d.ts"
+      "types": "./dist/src/browser/ldap-resource-editor/types.d.ts",
+      "import": "./static/browser/ldap-resource-editor/types.js"
     },
     "./browser-ldap-tree-viewer-ldaptreeviewer": {
-      "import": "./static/browser/ldap-tree-viewer/LdapTreeViewer.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/LdapTreeViewer.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/LdapTreeViewer.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/LdapTreeViewer.js"
     },
     "./browser-ldap-tree-viewer-api-ldapapiclient": {
-      "import": "./static/browser/ldap-tree-viewer/api/LdapApiClient.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/api/LdapApiClient.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/api/LdapApiClient.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/api/LdapApiClient.js"
     },
     "./browser-ldap-tree-viewer-components-treenode": {
-      "import": "./static/browser/ldap-tree-viewer/components/TreeNode.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeNode.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeNode.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/components/TreeNode.js"
     },
     "./browser-ldap-tree-viewer-components-treeroot": {
-      "import": "./static/browser/ldap-tree-viewer/components/TreeRoot.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeRoot.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/components/TreeRoot.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/components/TreeRoot.js"
     },
     "./browser-ldap-tree-viewer-index": {
-      "import": "./static/browser/ldap-tree-viewer/index.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/index.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/index.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/index.js"
     },
     "./browser-ldap-tree-viewer-store-store": {
-      "import": "./static/browser/ldap-tree-viewer/store/Store.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/store/Store.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/store/Store.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/store/Store.js"
     },
     "./browser-ldap-tree-viewer-store-actions": {
-      "import": "./static/browser/ldap-tree-viewer/store/actions.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/store/actions.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/store/actions.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/store/actions.js"
     },
     "./browser-ldap-tree-viewer-store-reducers": {
-      "import": "./static/browser/ldap-tree-viewer/store/reducers.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/store/reducers.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/store/reducers.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/store/reducers.js"
     },
     "./browser-ldap-tree-viewer-types": {
-      "import": "./static/browser/ldap-tree-viewer/types.js",
-      "types": "./dist/src/browser/ldap-tree-viewer/types.d.ts"
+      "types": "./dist/src/browser/ldap-tree-viewer/types.d.ts",
+      "import": "./static/browser/ldap-tree-viewer/types.js"
     },
     "./browser-ldap-unit-editor-ldapuniteditor": {
-      "import": "./static/browser/ldap-unit-editor/LdapUnitEditor.js",
-      "types": "./dist/src/browser/ldap-unit-editor/LdapUnitEditor.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/LdapUnitEditor.d.ts",
+      "import": "./static/browser/ldap-unit-editor/LdapUnitEditor.js"
     },
     "./browser-ldap-unit-editor-api-unitapiclient": {
-      "import": "./static/browser/ldap-unit-editor/api/UnitApiClient.js",
-      "types": "./dist/src/browser/ldap-unit-editor/api/UnitApiClient.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/api/UnitApiClient.d.ts",
+      "import": "./static/browser/ldap-unit-editor/api/UnitApiClient.js"
     },
     "./browser-ldap-unit-editor-components-moveunitmodal": {
-      "import": "./static/browser/ldap-unit-editor/components/MoveUnitModal.js",
-      "types": "./dist/src/browser/ldap-unit-editor/components/MoveUnitModal.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/components/MoveUnitModal.d.ts",
+      "import": "./static/browser/ldap-unit-editor/components/MoveUnitModal.js"
     },
     "./browser-ldap-unit-editor-components-unitpropertyeditor": {
-      "import": "./static/browser/ldap-unit-editor/components/UnitPropertyEditor.js",
-      "types": "./dist/src/browser/ldap-unit-editor/components/UnitPropertyEditor.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/components/UnitPropertyEditor.d.ts",
+      "import": "./static/browser/ldap-unit-editor/components/UnitPropertyEditor.js"
     },
     "./browser-ldap-unit-editor-components-unittree": {
-      "import": "./static/browser/ldap-unit-editor/components/UnitTree.js",
-      "types": "./dist/src/browser/ldap-unit-editor/components/UnitTree.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/components/UnitTree.d.ts",
+      "import": "./static/browser/ldap-unit-editor/components/UnitTree.js"
     },
     "./browser-ldap-unit-editor-index": {
-      "import": "./static/browser/ldap-unit-editor/index.js",
-      "types": "./dist/src/browser/ldap-unit-editor/index.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/index.d.ts",
+      "import": "./static/browser/ldap-unit-editor/index.js"
     },
     "./browser-ldap-unit-editor-types": {
-      "import": "./static/browser/ldap-unit-editor/types.js",
-      "types": "./dist/src/browser/ldap-unit-editor/types.d.ts"
+      "types": "./dist/src/browser/ldap-unit-editor/types.d.ts",
+      "import": "./static/browser/ldap-unit-editor/types.js"
     },
     "./browser-ldap-user-editor-ldapusereditor": {
-      "import": "./static/browser/ldap-user-editor/LdapUserEditor.js",
-      "types": "./dist/src/browser/ldap-user-editor/LdapUserEditor.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/LdapUserEditor.d.ts",
+      "import": "./static/browser/ldap-user-editor/LdapUserEditor.js"
     },
     "./browser-ldap-user-editor-api-userapiclient": {
-      "import": "./static/browser/ldap-user-editor/api/UserApiClient.js",
-      "types": "./dist/src/browser/ldap-user-editor/api/UserApiClient.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/api/UserApiClient.d.ts",
+      "import": "./static/browser/ldap-user-editor/api/UserApiClient.js"
     },
     "./browser-ldap-user-editor-cache-cachemanager": {
-      "import": "./static/browser/ldap-user-editor/cache/CacheManager.js",
-      "types": "./dist/src/browser/ldap-user-editor/cache/CacheManager.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/cache/CacheManager.d.ts",
+      "import": "./static/browser/ldap-user-editor/cache/CacheManager.js"
     },
     "./browser-ldap-user-editor-components-moveusermodal": {
-      "import": "./static/browser/ldap-user-editor/components/MoveUserModal.js",
-      "types": "./dist/src/browser/ldap-user-editor/components/MoveUserModal.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/components/MoveUserModal.d.ts",
+      "import": "./static/browser/ldap-user-editor/components/MoveUserModal.js"
     },
     "./browser-ldap-user-editor-components-pointerfield": {
-      "import": "./static/browser/ldap-user-editor/components/PointerField.js",
-      "types": "./dist/src/browser/ldap-user-editor/components/PointerField.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/components/PointerField.d.ts",
+      "import": "./static/browser/ldap-user-editor/components/PointerField.js"
     },
     "./browser-ldap-user-editor-components-usereditor": {
-      "import": "./static/browser/ldap-user-editor/components/UserEditor.js",
-      "types": "./dist/src/browser/ldap-user-editor/components/UserEditor.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/components/UserEditor.d.ts",
+      "import": "./static/browser/ldap-user-editor/components/UserEditor.js"
     },
     "./browser-ldap-user-editor-components-userlist": {
-      "import": "./static/browser/ldap-user-editor/components/UserList.js",
-      "types": "./dist/src/browser/ldap-user-editor/components/UserList.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/components/UserList.d.ts",
+      "import": "./static/browser/ldap-user-editor/components/UserList.js"
     },
     "./browser-ldap-user-editor-components-usertree": {
-      "import": "./static/browser/ldap-user-editor/components/UserTree.js",
-      "types": "./dist/src/browser/ldap-user-editor/components/UserTree.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/components/UserTree.d.ts",
+      "import": "./static/browser/ldap-user-editor/components/UserTree.js"
     },
     "./browser-ldap-user-editor-index": {
-      "import": "./static/browser/ldap-user-editor/index.js",
-      "types": "./dist/src/browser/ldap-user-editor/index.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/index.d.ts",
+      "import": "./static/browser/ldap-user-editor/index.js"
     },
     "./browser-ldap-user-editor-types": {
-      "import": "./static/browser/ldap-user-editor/types.js",
-      "types": "./dist/src/browser/ldap-user-editor/types.d.ts"
+      "types": "./dist/src/browser/ldap-user-editor/types.d.ts",
+      "import": "./static/browser/ldap-user-editor/types.js"
     },
     "./browser-shared-components-disposablecomponent": {
-      "import": "./static/browser/shared/components/DisposableComponent.js",
-      "types": "./dist/src/browser/shared/components/DisposableComponent.d.ts"
+      "types": "./dist/src/browser/shared/components/DisposableComponent.d.ts",
+      "import": "./static/browser/shared/components/DisposableComponent.js"
     },
     "./browser-shared-components-modal": {
-      "import": "./static/browser/shared/components/Modal.js",
-      "types": "./dist/src/browser/shared/components/Modal.d.ts"
+      "types": "./dist/src/browser/shared/components/Modal.d.ts",
+      "import": "./static/browser/shared/components/Modal.js"
     },
     "./browser-shared-components-statusmessage": {
-      "import": "./static/browser/shared/components/StatusMessage.js",
-      "types": "./dist/src/browser/shared/components/StatusMessage.d.ts"
+      "types": "./dist/src/browser/shared/components/StatusMessage.d.ts",
+      "import": "./static/browser/shared/components/StatusMessage.js"
     },
     "./browser-shared-index": {
-      "import": "./static/browser/shared/index.js",
-      "types": "./dist/src/browser/shared/index.d.ts"
+      "types": "./dist/src/browser/shared/index.d.ts",
+      "import": "./static/browser/shared/index.js"
     },
     "./browser-shared-types-index": {
-      "import": "./static/browser/shared/types/index.js",
-      "types": "./dist/src/browser/shared/types/index.d.ts"
+      "types": "./dist/src/browser/shared/types/index.d.ts",
+      "import": "./static/browser/shared/types/index.js"
     },
     "./browser-shared-utils-dom": {
-      "import": "./static/browser/shared/utils/dom.js",
-      "types": "./dist/src/browser/shared/utils/dom.d.ts"
+      "types": "./dist/src/browser/shared/utils/dom.d.ts",
+      "import": "./static/browser/shared/utils/dom.js"
     },
     "./browser-shared-utils-form": {
-      "import": "./static/browser/shared/utils/form.js",
-      "types": "./dist/src/browser/shared/utils/form.d.ts"
+      "types": "./dist/src/browser/shared/utils/form.d.ts",
+      "import": "./static/browser/shared/utils/form.js"
     },
     "./browser-shared-utils-hmac": {
-      "import": "./static/browser/shared/utils/hmac.js",
-      "types": "./dist/src/browser/shared/utils/hmac.d.ts"
+      "types": "./dist/src/browser/shared/utils/hmac.d.ts",
+      "import": "./static/browser/shared/utils/hmac.js"
     },
     "./browser-shared-utils-schema": {
-      "import": "./static/browser/shared/utils/schema.js",
-      "types": "./dist/src/browser/shared/utils/schema.d.ts"
+      "types": "./dist/src/browser/shared/utils/schema.d.ts",
+      "import": "./static/browser/shared/utils/schema.js"
     },
     "./browser-shared-utils-totp": {
-      "import": "./static/browser/shared/utils/totp.js",
-      "types": "./dist/src/browser/shared/utils/totp.d.ts"
+      "types": "./dist/src/browser/shared/utils/totp.d.ts",
+      "import": "./static/browser/shared/utils/totp.js"
     },
     "./schema-ad-computers": {
       "import": "./static/schemas/ad/computers.json",

@@ -303,6 +303,244 @@ curl http://localhost:8081/api/v1/users/jdoe/quota-usage \
   -H "Authorization: Bearer admin-token"
 ```
 
+## Public Methods
+
+Public methods available on the James plugin instance. Useful for building GDPR workflows, custom integrations, or calling from other plugins.
+
+### Usage
+
+```typescript
+import type { DM } from 'ldap-rest';
+import type James from 'ldap-rest/plugin-twake-james';
+
+// Get the James plugin instance
+const james = server.getPlugin('james') as James;
+```
+
+### deleteUserData(mail, fromStep?)
+
+Delete all user data via James WebAdmin API. Useful for GDPR "right to be forgotten" compliance.
+
+**Signature:**
+
+```typescript
+async deleteUserData(mail: string, fromStep?: string): Promise<{ taskId: string } | null>
+```
+
+**Parameters:**
+
+- `mail` (string): User's email address
+- `fromStep` (string, optional): Resume deletion from a specific step if a previous attempt failed
+
+**Returns:** Task information with `taskId`, or `null` on error.
+
+**Example:**
+
+```typescript
+const result = await james.deleteUserData('user@example.com');
+if (result) {
+  console.log(`Deletion task started: ${result.taskId}`);
+}
+
+// Resume from a failed step
+const resumed = await james.deleteUserData(
+  'user@example.com',
+  'DeleteMailboxesStep'
+);
+```
+
+**Reference:** [James deleteData API](https://james.apache.org/server/manage-webadmin.html#delete-data-of-a-user)
+
+---
+
+### getMailFromDN(dn)
+
+Retrieve the email address for a user given their LDAP DN.
+
+**Signature:**
+
+```typescript
+async getMailFromDN(dn: string): Promise<string | null>
+```
+
+**Parameters:**
+
+- `dn` (string): LDAP Distinguished Name of the user
+
+**Returns:** Email address string, or `null` if not found.
+
+**Example:**
+
+```typescript
+const mail = await james.getMailFromDN('uid=jdoe,ou=users,dc=example,dc=com');
+// Returns: "jdoe@example.com"
+```
+
+---
+
+### getDisplayNameFromDN(dn)
+
+Retrieve the display name for a user given their LDAP DN. Uses fallback logic: `displayName` → `cn` → `givenName sn` → `mail`.
+
+**Signature:**
+
+```typescript
+async getDisplayNameFromDN(dn: string): Promise<string | null>
+```
+
+**Parameters:**
+
+- `dn` (string): LDAP Distinguished Name of the user
+
+**Returns:** Display name string, or `null` if not found.
+
+**Example:**
+
+```typescript
+const name = await james.getDisplayNameFromDN(
+  'uid=jdoe,ou=users,dc=example,dc=com'
+);
+// Returns: "John Doe"
+```
+
+---
+
+### generateSignature(dn)
+
+Generate an HTML email signature for a user using the configured template (`--james-signature-template`).
+
+**Signature:**
+
+```typescript
+async generateSignature(dn: string): Promise<string | null>
+```
+
+**Parameters:**
+
+- `dn` (string): LDAP Distinguished Name of the user
+
+**Returns:** HTML signature string with placeholders replaced, or `null` if no template configured.
+
+**Example:**
+
+```typescript
+// With template: "<p>{displayName}</p><p>{title} - {department}</p>"
+const signature = await james.generateSignature(
+  'uid=jdoe,ou=users,dc=example,dc=com'
+);
+// Returns: "<p>John Doe</p><p>Engineer - IT</p>"
+```
+
+---
+
+### updateJamesIdentity(dn, mail, displayName)
+
+Update a user's JMAP identity in James (name and optional signature).
+
+**Signature:**
+
+```typescript
+async updateJamesIdentity(dn: string, mail: string, displayName: string): Promise<void>
+```
+
+**Parameters:**
+
+- `dn` (string): LDAP Distinguished Name (used for signature generation)
+- `mail` (string): User's email address
+- `displayName` (string): New display name for the identity
+
+**Example:**
+
+```typescript
+await james.updateJamesIdentity(
+  'uid=jdoe,ou=users,dc=example,dc=com',
+  'jdoe@example.com',
+  'John Doe'
+);
+```
+
+---
+
+### getMemberEmails(memberDns)
+
+Retrieve email addresses for multiple LDAP members. Useful for bulk operations on groups.
+
+**Signature:**
+
+```typescript
+async getMemberEmails(memberDns: string[]): Promise<string[]>
+```
+
+**Parameters:**
+
+- `memberDns` (string[]): Array of LDAP Distinguished Names
+
+**Returns:** Array of email addresses (excludes members without mail attribute).
+
+**Example:**
+
+```typescript
+const emails = await james.getMemberEmails([
+  'uid=alice,ou=users,dc=example,dc=com',
+  'uid=bob,ou=users,dc=example,dc=com',
+]);
+// Returns: ["alice@example.com", "bob@example.com"]
+```
+
+---
+
+### getGroupMail(groupDn)
+
+Retrieve the email address for a group given its LDAP DN.
+
+**Signature:**
+
+```typescript
+async getGroupMail(groupDn: string): Promise<string | null>
+```
+
+**Parameters:**
+
+- `groupDn` (string): LDAP Distinguished Name of the group
+
+**Returns:** Group email address, or `null` if not found.
+
+**Example:**
+
+```typescript
+const mail = await james.getGroupMail(
+  'cn=engineering,ou=groups,dc=example,dc=com'
+);
+// Returns: "engineering@example.com"
+```
+
+---
+
+### getGroupMailboxType(groupDn)
+
+Retrieve the mailbox type for a group (mailing list, team mailbox, or simple group).
+
+**Signature:**
+
+```typescript
+async getGroupMailboxType(groupDn: string): Promise<'group' | 'mailingList' | 'teamMailbox' | null>
+```
+
+**Parameters:**
+
+- `groupDn` (string): LDAP Distinguished Name of the group
+
+**Returns:** Mailbox type string, or `null` if not determinable.
+
+**Example:**
+
+```typescript
+const type = await james.getGroupMailboxType(
+  'cn=engineering,ou=groups,dc=example,dc=com'
+);
+// Returns: "mailingList" or "teamMailbox" or "group"
+```
+
 ## James WebAdmin API
 
 ### Endpoints Used

@@ -146,3 +146,46 @@ Ensure `DM_CALENDAR_WEBADMIN_TOKEN` is set and valid. The token is sent as a Bea
 ### Wrong resources being synced
 
 Use `DM_CALENDAR_RESOURCE_BASE` and `DM_CALENDAR_RESOURCE_OBJECTCLASS` to filter which LDAP entries are considered resources.
+
+## Public Methods
+
+Public methods available on the CalendarResources plugin instance.
+
+### Usage
+
+```typescript
+import type { DM } from 'ldap-rest';
+import type CalendarResources from 'ldap-rest/plugin-twake-calendarresources';
+
+// Get the plugin instance from another plugin
+const calendar = this.server.getPlugin(
+  'calendarResources'
+) as CalendarResources;
+```
+
+### deleteUserData(mail)
+
+Delete all user data from Twake Calendar via WebAdmin API. Useful for GDPR "right to be forgotten" compliance.
+
+**Signature:**
+
+```typescript
+async deleteUserData(mail: string): Promise<{ taskId: string } | null>
+```
+
+**Parameters:**
+
+- `mail` (string): User's email address
+
+**Returns:** Task information with `taskId`, or `null` on error.
+
+**Example:**
+
+```typescript
+const result = await calendar.deleteUserData('user@example.com');
+if (result) {
+  console.log(`Deletion task started: ${result.taskId}`);
+}
+```
+
+**Reference:** [Twake Calendar deleteData API](https://github.com/linagora/twake-calendar-side-service/blob/main/docs/apis/webadmin.md#deleting-user-data)

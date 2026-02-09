@@ -1,3 +1,5 @@
+import fetch from 'node-fetch';
+
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';
@@ -213,5 +215,54 @@ export default class CalendarResources extends TwakePlugin {
     // Extract cn or uid from DN
     const match = dn.match(/(?:cn|uid)=([^,]+)/i);
     return match ? match[1] : null;
+  }
+
+  /**
+   * Delete user data from Twake Calendar WebAdmin API
+   * Calls POST /users/{mail}?action=deleteData
+   * @param mail - The user's email address
+   * @returns Task information or null on error
+   */
+  async deleteUserData(mail: string): Promise<{ taskId: string } | null> {
+    const log = {
+      plugin: this.name,
+      event: 'deleteUserData',
+      mail,
+    };
+
+    try {
+      const url = new URL(`${this.webadminUrl}/users/${mail}`);
+      url.searchParams.set('action', 'deleteData');
+
+      const response = await this.requestLimit(() =>
+        fetch(url.toString(), {
+          method: 'POST',
+          headers: this.createHeaders(),
+        })
+      );
+
+      if (!response.ok) {
+        this.logger.error({
+          ...log,
+          http_status: response.status,
+          http_status_text: response.statusText,
+        });
+        return null;
+      }
+
+      const taskInfo = (await response.json()) as { taskId: string };
+
+      this.logger.info({
+        ...log,
+        http_status: response.status,
+        taskId: taskInfo.taskId,
+      });
+
+      return taskInfo;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error({ ...log, error: `${err}` });
+      return null;
+    }
   }
 }

@@ -195,4 +195,36 @@ describe('Calendar Resources Plugin', function () {
     deleteScope.persist(false);
     nock.cleanAll();
   });
+
+  describe('deleteUserData', () => {
+    it('should call POST /users/{mail}?action=deleteData and return taskId', async () => {
+      const deleteDataScope = nock(
+        process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+      )
+        .post('/users/user@test.org?action=deleteData')
+        .reply(201, { taskId: 'calendar-task-123' });
+
+      const result = await calendarResources.deleteUserData('user@test.org');
+
+      expect(result).to.deep.equal({ taskId: 'calendar-task-123' });
+      expect(deleteDataScope.isDone()).to.be.true;
+
+      nock.cleanAll();
+    });
+
+    it('should return null and log error on non-OK response', async () => {
+      const deleteDataScope = nock(
+        process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+      )
+        .post('/users/baduser@test.org?action=deleteData')
+        .reply(400, { error: 'Bad request' });
+
+      const result = await calendarResources.deleteUserData('baduser@test.org');
+
+      expect(result).to.be.null;
+      expect(deleteDataScope.isDone()).to.be.true;
+
+      nock.cleanAll();
+    });
+  });
 });
