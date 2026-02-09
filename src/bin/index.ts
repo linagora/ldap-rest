@@ -32,6 +32,14 @@ import { setLogger } from '../lib/expressFormatedResponses';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
+
+// Internal Express router structure (used to remove error middleware)
+interface ExpressAppInternal {
+  _router?: {
+    stack: Array<{ handle: unknown }>;
+  };
+}
+
 export * from '../lib/utils';
 export { asyncHandler } from '../lib/utils';
 export {
@@ -134,12 +142,10 @@ export class DM {
   setupErrorMiddleware(): void {
     // Remove existing error middleware if already set up
     if (this._errorMiddlewareSetup && this._errorMiddleware) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stack = (this.app as any)._router?.stack;
+      const stack = (this.app as unknown as ExpressAppInternal)._router?.stack;
       if (stack) {
         const index = stack.findIndex(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (layer: any) => layer.handle === this._errorMiddleware
+          layer => layer.handle === this._errorMiddleware
         );
         if (index !== -1) {
           stack.splice(index, 1);
@@ -152,7 +158,7 @@ export class DM {
       err: Error,
       req: Request,
       res: Response,
-      next: NextFunction
+      _next: NextFunction
     ) => {
       const statusCode =
         'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;

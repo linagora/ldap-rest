@@ -273,14 +273,14 @@ class ldapActions {
       'LDAP connection pool full, waiting for available connection'
     );
     return new Promise<PooledConnection>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         const idx = this.waitingResolvers.indexOf(resolveWrapper);
         if (idx !== -1) this.waitingResolvers.splice(idx, 1);
         reject(new Error('LDAP connection pool timeout after 30s'));
       }, 30000);
 
       const resolveWrapper = (conn: PooledConnection) => {
-        clearTimeout(timeoutId);
+        globalThis.clearTimeout(timeoutId);
         resolve(conn);
       };
       this.waitingResolvers.push(resolveWrapper);

@@ -51,7 +51,6 @@ export default class LdapOrganizations extends DmPlugin {
       fs.readFile(this.config.organization_schema, (err, data) => {
         if (err) {
           this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
             `Failed to load organization schema from ${this.config.organization_schema}: ${err}`
           );
         } else {

@@ -70,7 +70,6 @@ export default class LdapGroups extends DmPlugin {
       fs.readFile(this.config.group_schema, (err, data) => {
         if (err) {
           this.logger.error(
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string, @typescript-eslint/restrict-template-expressions
             `Failed to load group schema from ${this.config.group_schema}: ${err}`
           );
         } else {

@@ -79,7 +79,7 @@ export default class AppAccountsApi extends DmPlugin {
   private async listAccounts(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user;
+    const username = req.params.user as string;
 
     try {
       // Get user's mail from LDAP
@@ -162,7 +162,7 @@ export default class AppAccountsApi extends DmPlugin {
   private async createAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user;
+    const username = req.params.user as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { name } = req.body || {};
 
