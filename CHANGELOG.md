@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.8 (2026-02-09)
+
+### New Features
+
+- Add `deleteUserData` method to James plugin for GDPR data deletion
+- Add `deleteUserData` method to Calendar Resources plugin for GDPR data deletion
+
+### Maintenance
+
+- Update dependencies
+- Fix lint errors and improve TypeScript typing
+
 ## v0.1.7 (2025-01-20)
 
 ### New Features
