@@ -15,6 +15,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses';
+import { escapeDnValue } from '../../lib/utils';
 
 interface BulkImportSchema {
   base?: string;
@@ -333,7 +334,7 @@ export default class LdapBulkImport extends DmPlugin {
     if (!mainValue) {
       throw new Error(`Missing main attribute: ${mainAttr}`);
     }
-    const dn = `${mainAttr}=${mainValue as string},${resource.base}`;
+    const dn = `${mainAttr}=${escapeDnValue(mainValue as string)},${resource.base}`;
 
     return { dn, entry };
   }

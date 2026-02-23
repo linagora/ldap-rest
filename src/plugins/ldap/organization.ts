@@ -19,6 +19,7 @@ import {
 } from '../../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeDnValue,
   escapeLdapFilter,
   launchHooksChained,
   transformSchemas,
@@ -159,7 +160,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (!body) return;
 
     const parentDn = body.parentDn || this.config.ldap_top_organization;
-    const dn = `ou=${body.ou},${parentDn}`;
+    const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
     const entry: AttributesList = {
       objectClass: this.config.ldap_organization_class as string[],
       ou: body.ou,

@@ -32,6 +32,7 @@ import type {
   SearchResult,
 } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
+import { escapeDnValue } from '../../lib/utils';
 
 export default class AppAccountsConsistency extends DmPlugin {
   name = 'appAccountsConsistency';
@@ -132,7 +133,7 @@ export default class AppAccountsConsistency extends DmPlugin {
     userDn: string,
     mail: string
   ): Promise<void> {
-    const applicativeDn = `uid=${mail},${this.applicativeAccountBase}`;
+    const applicativeDn = `uid=${escapeDnValue(mail)},${this.applicativeAccountBase}`;
 
     try {
       // Read user attributes
@@ -308,10 +309,10 @@ export default class AppAccountsConsistency extends DmPlugin {
         // Compute new DN based on account type
         let newApplicativeDn: string;
         if (isPrincipalAccount) {
-          newApplicativeDn = `uid=${newMail},${this.applicativeAccountBase}`;
+          newApplicativeDn = `uid=${escapeDnValue(newMail)},${this.applicativeAccountBase}`;
         } else {
           // Keep the same uid for applicative accounts
-          newApplicativeDn = `uid=${oldUid},${this.applicativeAccountBase}`;
+          newApplicativeDn = `uid=${escapeDnValue(oldUid)},${this.applicativeAccountBase}`;
         }
 
         try {
