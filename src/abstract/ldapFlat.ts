@@ -28,12 +28,14 @@ import {
 } from '../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeDnValue,
   escapeLdapFilter,
   escapeRegex,
   getCompiledRegex,
   launchHooks,
   launchHooksChained,
   transformSchemas,
+  validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
 import { BadRequestError, NotFoundError, ConflictError } from '../lib/errors';
@@ -192,7 +194,7 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     try {
-      const dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+      const dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
         dn
@@ -283,9 +285,15 @@ export default abstract class LdapFlat extends DmPlugin {
             `Provided DN "${dn}" does not end with "${expectedSuffix}"`
         );
       }
-      id = id.replace(new RegExp(`^${this.mainAttribute}=([^,]+).*`), '$1');
+      // Extract the RDN value, correctly handling escaped commas
+      // e.g. uid=Smith\,John,ou=users -> id = "Smith\,John"
+      id = id.replace(
+        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        '$1'
+      );
     } else {
-      dn = `${this.mainAttribute}=${id},${this.base}`;
+      validateDnValue(id, this.mainAttribute);
+      dn = `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     }
     await this.validateNewEntry(dn, {
       objectClass: this.objectClass,
@@ -351,7 +359,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async modifyEntry(id: string, changes: ModifyRequest): Promise<boolean> {
-    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}modify`],
@@ -395,10 +403,16 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async renameEntry(id: string, newId: string): Promise<boolean> {
-    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+    if (!/,/.test(id)) {
+      validateDnValue(id, this.mainAttribute);
+    }
+    if (!/,/.test(newId)) {
+      validateDnValue(newId, this.mainAttribute);
+    }
+    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     let newDn = /,/.test(newId)
       ? newId
-      : `${this.mainAttribute}=${newId},${this.base}`;
+      : `${this.mainAttribute}=${escapeDnValue(newId)},${this.base}`;
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
@@ -412,7 +426,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async deleteEntry(id: string): Promise<boolean> {
-    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+    let dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     dn = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}delete`],
       dn
@@ -431,7 +445,7 @@ export default abstract class LdapFlat extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ departmentPath: string; departmentLink: string }> {
-    const dn = /,/.test(id) ? id : `${this.mainAttribute}=${id},${this.base}`;
+    const dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
 
     // Get link and path attribute names from config
     const linkAttr =

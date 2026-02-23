@@ -30,12 +30,14 @@ import {
 } from '../../lib/expressFormatedResponses';
 import {
   asyncHandler,
+  escapeDnValue,
   escapeLdapFilter,
   escapeRegex,
   getCompiledRegex,
   launchHooks,
   launchHooksChained,
   transformSchemas,
+  validateDnValue,
 } from '../../lib/utils';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
@@ -247,7 +249,7 @@ export default class LdapGroups extends DmPlugin {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
     try {
-      const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+      const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
         dn
@@ -323,9 +325,14 @@ export default class LdapGroups extends DmPlugin {
     let dn: string;
     if (new RegExp(`^${this.cn}=`).test(cn)) {
       dn = cn;
-      cn = cn.replace(new RegExp(`^${this.cn}=([^,]+).*`), '$1');
+      // Extract the RDN value, correctly handling escaped commas
+      cn = cn.replace(
+        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        '$1'
+      );
     } else {
-      dn = `${this.cn}=${cn},${this.base}`;
+      validateDnValue(cn, this.cn);
+      dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }
     await this.validateMembers(dn, members);
     await this.validateNewGroup(dn, {
@@ -386,7 +393,7 @@ export default class LdapGroups extends DmPlugin {
       delete?: string[] | AttributesList;
     }
   ): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks.ldapgroupmodify,
@@ -430,8 +437,14 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async renameGroup(cn: string, newCn: string): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
-    let newDn = /,/.test(newCn) ? newCn : `${this.cn}=${newCn},${this.base}`;
+    if (!/,/.test(cn)) {
+      validateDnValue(cn, this.cn);
+    }
+    if (!/,/.test(newCn)) {
+      validateDnValue(newCn, this.cn);
+    }
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    let newDn = /,/.test(newCn) ? newCn : `${this.cn}=${escapeDnValue(newCn)},${this.base}`;
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks.ldapgrouprename,
       [dn, newDn]
@@ -442,7 +455,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteGroup(cn: string): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
     const res = await this.ldap.delete(dn);
     void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
@@ -450,7 +463,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async addMember(cn: string, member: string | string[]): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     if (!Array.isArray(member)) member = [member];
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupaddmember,
@@ -467,7 +480,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteMember(cn: string, member: string): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
@@ -527,7 +540,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<{ success: boolean }> {
     const linkAttr = this.config.ldap_organization_link_attribute as string;
     const pathAttr = this.config.ldap_organization_path_attribute as string;
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${cn},${this.base}`;
+    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
 
     // Get current group to check if it has department attributes
     const currentGroup = (await this.ldap.search(
@@ -670,7 +683,7 @@ export default class LdapGroups extends DmPlugin {
 
   protected fixDn(dn: string): string | false {
     if (!dn) return false;
-    return /,/.test(dn) ? dn : `${this.cn}=${dn},${this.base}`;
+    return /,/.test(dn) ? dn : `${this.cn}=${escapeDnValue(dn)},${this.base}`;
   }
 
   /**

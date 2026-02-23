@@ -12,7 +12,7 @@ import pLimit from 'p-limit';
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
-import { launchHooks, launchHooksChained } from './utils';
+import { escapeDnValue, launchHooks, launchHooksChained } from './utils';
 
 // Typescript interface
 
@@ -706,7 +706,7 @@ class ldapActions {
 
   private setDn(dn: string): string {
     if (!/=/.test(dn)) {
-      dn = `${this.config.ldap_user_main_attribute as string}=${dn},${this.base}`;
+      dn = `${this.config.ldap_user_main_attribute as string}=${escapeDnValue(dn)},${this.base}`;
     } else if (!/,/.test(dn)) {
       dn += `,${this.base}`;
     }

@@ -157,6 +157,45 @@ export function escapeDnValue(value: string): string {
     .replace(/^#/, '\\#'); // leading hash
 }
 
+/**
+ * Validate a value intended for use in LDAP DN attribute values
+ * Rejects control characters and other problematic inputs
+ *
+ * @param value - The value to validate
+ * @param fieldName - Name of the field (for error messages)
+ * @throws Error if the value contains invalid characters
+ *
+ * @example
+ * ```typescript
+ * validateDnValue('valid-user', 'uid');
+ * // => OK
+ *
+ * validateDnValue('user\x00name', 'uid');
+ * // => throws Error: uid contains invalid control characters
+ * ```
+ */
+export function validateDnValue(value: string, fieldName: string): void {
+  if (value == null || typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+
+  if (value.trim().length === 0) {
+    throw new Error(`${fieldName} must be a non-empty string`);
+  }
+
+  // Reject control characters (0x00-0x1F and 0x7F)
+  // These are invisible and can cause issues in logs, LDIF exports, etc.
+  if (/[\x00-\x1F\x7F]/.test(value)) {
+    throw new Error(`${fieldName} contains invalid control characters`);
+  }
+
+  // Reject zero-width and other invisible Unicode characters
+  // U+200B (zero-width space), U+200C-U+200F, U+FEFF (BOM)
+  if (/[\u200B-\u200F\uFEFF]/.test(value)) {
+    throw new Error(`${fieldName} contains invalid invisible characters`);
+  }
+}
+
 // LDAP DN utilities
 
 /**

@@ -12,6 +12,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
+import { escapeDnValue } from '../../lib/utils';
 
 export default class AppAccountsApi extends DmPlugin {
   name = 'appAccountsApi';
@@ -280,7 +281,7 @@ export default class AppAccountsApi extends DmPlugin {
       }
 
       // Create applicative account
-      const applicativeDn = `uid=${newUid},${this.applicativeAccountBase}`;
+      const applicativeDn = `uid=${escapeDnValue(newUid)},${this.applicativeAccountBase}`;
       await this.server.ldap.add(applicativeDn, newAttrs);
 
       this.logger.info(
@@ -289,7 +290,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       // Add password to principal account (uid=mail)
       // The principal account stores all app account passwords for single-point authentication
-      const principalDn = `uid=${mailStr},${this.applicativeAccountBase}`;
+      const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
       try {
         await this.server.ldap.modify(principalDn, {
           // SECURITY NOTE: Cleartext password is intentional - ppolicy hashes before storage
@@ -368,7 +369,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       // Delete password from principal account if available
       if (mailStr && userPassword) {
-        const principalDn = `uid=${mailStr},${this.applicativeAccountBase}`;
+        const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
         try {
           const passwordToDelete = Array.isArray(userPassword)
             ? userPassword[0]
