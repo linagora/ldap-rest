@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import {
   escapeDnValue,
+  unescapeDnValue,
   escapeLdapFilter,
   validateDnValue,
   parseDn,
@@ -46,6 +47,72 @@ describe('LDAP Utils', () => {
 
     it('should handle normal strings without escaping', () => {
       expect(escapeDnValue('normaluser123')).to.equal('normaluser123');
+    });
+  });
+
+  describe('unescapeDnValue', () => {
+    it('should unescape comma in DN values', () => {
+      expect(unescapeDnValue('Smith\\, John')).to.equal('Smith, John');
+    });
+
+    it('should unescape plus sign in DN values', () => {
+      expect(unescapeDnValue('user\\+admin')).to.equal('user+admin');
+    });
+
+    it('should unescape backslash in DN values', () => {
+      expect(unescapeDnValue('path\\\\to\\\\file')).to.equal('path\\to\\file');
+    });
+
+    it('should unescape multiple special characters', () => {
+      expect(unescapeDnValue('a\\,b\\+c\\=d')).to.equal('a,b+c=d');
+    });
+
+    it('should unescape leading space', () => {
+      expect(unescapeDnValue('\\ leadingspace')).to.equal(' leadingspace');
+    });
+
+    it('should unescape trailing space', () => {
+      expect(unescapeDnValue('trailingspace\\ ')).to.equal('trailingspace ');
+    });
+
+    it('should unescape leading hash', () => {
+      expect(unescapeDnValue('\\#comment')).to.equal('#comment');
+    });
+
+    it('should unescape quotes and angle brackets', () => {
+      expect(unescapeDnValue('\\"test\\"')).to.equal('"test"');
+      expect(unescapeDnValue('\\<tag\\>')).to.equal('<tag>');
+    });
+
+    it('should handle hex-encoded characters', () => {
+      expect(unescapeDnValue('user\\00name')).to.equal('user\0name');
+      expect(unescapeDnValue('path\\5cname')).to.equal('path\\name');
+    });
+
+    it('should handle normal strings without changes', () => {
+      expect(unescapeDnValue('normaluser123')).to.equal('normaluser123');
+    });
+
+    it('should be the inverse of escapeDnValue', () => {
+      const original = 'Smith, John+Admin';
+      expect(unescapeDnValue(escapeDnValue(original))).to.equal(original);
+    });
+
+    it('should roundtrip complex values', () => {
+      const values = [
+        'user+admin',
+        'Smith, John',
+        'path\\to\\file',
+        '"quoted"',
+        '<tag>',
+        '#comment',
+        ' leadingspace',
+        'trailingspace ',
+        'a,b+c=d<e>f;g"h',
+      ];
+      for (const val of values) {
+        expect(unescapeDnValue(escapeDnValue(val))).to.equal(val);
+      }
     });
   });
 

@@ -158,6 +158,52 @@ export function escapeDnValue(value: string): string {
 }
 
 /**
+ * Unescape special characters in LDAP DN attribute values according to RFC 4514
+ * Reverses the escaping done by escapeDnValue
+ *
+ * @param value - The escaped value to unescape
+ * @returns The unescaped original value
+ *
+ * @example
+ * ```typescript
+ * unescapeDnValue('Smith\\, John')
+ * // => 'Smith, John'
+ *
+ * unescapeDnValue('user\\+admin')
+ * // => 'user+admin'
+ * ```
+ */
+export function unescapeDnValue(value: string): string {
+  let result = '';
+  let i = 0;
+
+  while (i < value.length) {
+    if (value[i] === '\\' && i + 1 < value.length) {
+      const next = value[i + 1];
+
+      // Handle hex-encoded characters (e.g., \00 for null, \5c for backslash)
+      if (/[0-9a-fA-F]/.test(next) && i + 2 < value.length) {
+        const hex = value.substring(i + 1, i + 3);
+        if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+          result += String.fromCharCode(parseInt(hex, 16));
+          i += 3;
+          continue;
+        }
+      }
+
+      // Handle standard escaped characters
+      result += next;
+      i += 2;
+    } else {
+      result += value[i];
+      i++;
+    }
+  }
+
+  return result;
+}
+
+/**
  * Validate a value intended for use in LDAP DN attribute values
  * Rejects control characters and other problematic inputs
  *

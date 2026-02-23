@@ -11,6 +11,7 @@ import type { Hooks, MaybePromise } from '../hooks';
 export {
   asyncHandler,
   escapeDnValue,
+  unescapeDnValue,
   escapeLdapFilter,
   validateDnValue,
 } from '../lib/utils';
