@@ -325,7 +325,11 @@ export default class LdapGroups extends DmPlugin {
     let dn: string;
     if (new RegExp(`^${this.cn}=`).test(cn)) {
       dn = cn;
-      cn = cn.replace(new RegExp(`^${this.cn}=([^,]+).*`), '$1');
+      // Extract the RDN value, correctly handling escaped commas
+      cn = cn.replace(
+        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        '$1'
+      );
     } else {
       validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
@@ -433,6 +437,12 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async renameGroup(cn: string, newCn: string): Promise<boolean> {
+    if (!/,/.test(cn)) {
+      validateDnValue(cn, this.cn);
+    }
+    if (!/,/.test(newCn)) {
+      validateDnValue(newCn, this.cn);
+    }
     let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     let newDn = /,/.test(newCn) ? newCn : `${this.cn}=${escapeDnValue(newCn)},${this.base}`;
     [dn, newDn] = await launchHooksChained(

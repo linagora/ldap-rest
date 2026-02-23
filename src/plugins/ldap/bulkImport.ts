@@ -330,12 +330,16 @@ export default class LdapBulkImport extends DmPlugin {
 
     // 6. Build DN
     const mainAttr = resource.mainAttribute;
-    const mainValue = entry[mainAttr];
-    if (!mainValue) {
+    const rawMainValue = entry[mainAttr];
+    if (!rawMainValue) {
       throw new Error(`Missing main attribute: ${mainAttr}`);
     }
-    validateDnValue(mainValue as string, mainAttr);
-    const dn = `${mainAttr}=${escapeDnValue(mainValue as string)},${resource.base}`;
+    // Handle array values by taking the first element
+    const mainValue = Array.isArray(rawMainValue)
+      ? String(rawMainValue[0])
+      : String(rawMainValue);
+    validateDnValue(mainValue, mainAttr);
+    const dn = `${mainAttr}=${escapeDnValue(mainValue)},${resource.base}`;
 
     return { dn, entry };
   }

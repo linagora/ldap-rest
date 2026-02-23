@@ -285,7 +285,12 @@ export default abstract class LdapFlat extends DmPlugin {
             `Provided DN "${dn}" does not end with "${expectedSuffix}"`
         );
       }
-      id = id.replace(new RegExp(`^${this.mainAttribute}=([^,]+).*`), '$1');
+      // Extract the RDN value, correctly handling escaped commas
+      // e.g. uid=Smith\,John,ou=users -> id = "Smith\,John"
+      id = id.replace(
+        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        '$1'
+      );
     } else {
       validateDnValue(id, this.mainAttribute);
       dn = `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
@@ -398,6 +403,12 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async renameEntry(id: string, newId: string): Promise<boolean> {
+    if (!/,/.test(id)) {
+      validateDnValue(id, this.mainAttribute);
+    }
+    if (!/,/.test(newId)) {
+      validateDnValue(newId, this.mainAttribute);
+    }
     let dn = /,/.test(id) ? id : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     let newDn = /,/.test(newId)
       ? newId

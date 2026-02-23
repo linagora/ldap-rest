@@ -175,7 +175,11 @@ export function escapeDnValue(value: string): string {
  * ```
  */
 export function validateDnValue(value: string, fieldName: string): void {
-  if (!value || typeof value !== 'string') {
+  if (value == null || typeof value !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+
+  if (value.trim().length === 0) {
     throw new Error(`${fieldName} must be a non-empty string`);
   }
 
