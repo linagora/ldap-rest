@@ -37,6 +37,7 @@ import {
   launchHooks,
   launchHooksChained,
   transformSchemas,
+  validateDnValue,
 } from '../../lib/utils';
 import { BadRequestError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
@@ -326,6 +327,7 @@ export default class LdapGroups extends DmPlugin {
       dn = cn;
       cn = cn.replace(new RegExp(`^${this.cn}=([^,]+).*`), '$1');
     } else {
+      validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }
     await this.validateMembers(dn, members);

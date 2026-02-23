@@ -35,6 +35,7 @@ import {
   launchHooks,
   launchHooksChained,
   transformSchemas,
+  validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
 import { BadRequestError, NotFoundError, ConflictError } from '../lib/errors';
@@ -286,6 +287,7 @@ export default abstract class LdapFlat extends DmPlugin {
       }
       id = id.replace(new RegExp(`^${this.mainAttribute}=([^,]+).*`), '$1');
     } else {
+      validateDnValue(id, this.mainAttribute);
       dn = `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
     }
     await this.validateNewEntry(dn, {
