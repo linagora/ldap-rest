@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.9 (2026-02-23)
+
+### Security
+
+- Add `escapeDnValue()` to all DN constructions to prevent LDAP injection attacks
+- Add `validateDnValue()` to reject control characters and invisible Unicode in DN values
+- Fix DN extraction regex to properly handle escaped commas
+
+### New Features
+
+- Export `escapeDnValue`, `escapeLdapFilter`, and `validateDnValue` utilities for plugins
+
+### Tests
+
+- Add comprehensive test suite for LDAP DN utilities (31 tests)
+
 ## v0.1.8 (2026-02-09)
 
 ### New Features
