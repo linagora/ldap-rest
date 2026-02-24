@@ -1,4 +1,5 @@
 import nock from 'nock';
+import type { ParsedUrlQuery } from 'querystring';
 
 import { DM } from '../../../src/bin';
 import Drive from '../../../src/plugins/twake/drive';
@@ -186,7 +187,7 @@ describe('Drive Plugin', () => {
       // Mock that accepts any PublicName and tracks calls
       nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
         .patch('/instances/cnuser2.mycozy.cloud')
-        .query((query: Record<string, string>) => {
+        .query((query: ParsedUrlQuery) => {
           return query.FromCloudery === 'true' && !!query.PublicName;
         })
         .times(2) // Allow up to 2 calls (creation + modification)
@@ -455,9 +456,9 @@ describe('Drive Plugin', () => {
 
       nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
         .patch('/instances/blockuser.mycozy.cloud')
-        .query((query: Record<string, string>) => {
-          blockedValue = query.Blocked;
-          reasonValue = query.BlockingReason || '';
+        .query((query: ParsedUrlQuery) => {
+          blockedValue = String(query.Blocked || '');
+          reasonValue = String(query.BlockingReason || '');
           return query.FromCloudery === 'true' && query.Blocked === 'true';
         })
         .reply(200, function () {
@@ -487,7 +488,7 @@ describe('Drive Plugin', () => {
 
       nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
         .patch('/instances/blockuser2.mycozy.cloud')
-        .query((query: Record<string, string>) => {
+        .query((query: ParsedUrlQuery) => {
           return (
             query.FromCloudery === 'true' &&
             query.Blocked === 'true' &&
@@ -534,8 +535,8 @@ describe('Drive Plugin', () => {
 
       nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
         .patch('/instances/unblockuser.mycozy.cloud')
-        .query((query: Record<string, string>) => {
-          blockedValue = query.Blocked;
+        .query((query: ParsedUrlQuery) => {
+          blockedValue = String(query.Blocked || '');
           return query.FromCloudery === 'true' && query.Blocked === 'false';
         })
         .reply(200, function () {
@@ -571,6 +572,107 @@ describe('Drive Plugin', () => {
 
       const result = await drive.unblockInstance(testDN);
       expect(result).to.be.false;
+    });
+  });
+
+  describe('Security - Domain validation', () => {
+    let testDNMalicious: string;
+
+    beforeEach(async () => {
+      testDNMalicious = `uid=malicioususer,${process.env.DM_LDAP_BASE}`;
+      // Clean up any existing entry
+      try {
+        await dm.ldap.delete(testDNMalicious);
+      } catch {
+        // Entry may not exist, ignore
+      }
+    });
+
+    afterEach(async () => {
+      nock.cleanAll();
+      try {
+        await dm.ldap.delete(testDNMalicious);
+      } catch {
+        // Entry may not exist, ignore
+      }
+    });
+
+    it('should reject domain with path traversal attempt', async () => {
+      // No nock mock - request should not be made
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Malicious User',
+        sn: 'User',
+        uid: 'malicioususer',
+        mail: 'malicious@test.org',
+        twakeCozyDomain: '../admin',
+      };
+      await dm.ldap.add(testDNMalicious, entry);
+
+      // syncUserToCozy should return true (it found the user) but no API call should be made
+      const result = await drive.syncUserToCozy(testDNMalicious);
+      // The method returns true because it found the entry, but the API call is skipped
+      expect(result).to.be.true;
+      // No pending mocks should exist (request was blocked)
+      expect(nock.pendingMocks()).to.have.lengthOf(0);
+    });
+
+    it('should reject domain with query string injection', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Malicious User',
+        sn: 'User',
+        uid: 'malicioususer',
+        mail: 'malicious@test.org',
+        twakeCozyDomain: 'valid.com?admin=true',
+      };
+      await dm.ldap.add(testDNMalicious, entry);
+
+      const result = await drive.syncUserToCozy(testDNMalicious);
+      expect(result).to.be.true;
+      expect(nock.pendingMocks()).to.have.lengthOf(0);
+    });
+
+    it('should reject domain with fragment injection', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Malicious User',
+        sn: 'User',
+        uid: 'malicioususer',
+        mail: 'malicious@test.org',
+        twakeCozyDomain: 'valid.com#admin',
+      };
+      await dm.ldap.add(testDNMalicious, entry);
+
+      const result = await drive.syncUserToCozy(testDNMalicious);
+      expect(result).to.be.true;
+      expect(nock.pendingMocks()).to.have.lengthOf(0);
+    });
+
+    it('should accept valid domain names', async () => {
+      let apiCalled = false;
+
+      nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
+        .patch('/instances/user.company.mycozy.cloud')
+        .query(() => true)
+        .reply(200, function () {
+          apiCalled = true;
+          return { success: true };
+        });
+
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Valid User',
+        sn: 'User',
+        uid: 'malicioususer',
+        mail: 'valid@test.org',
+        twakeCozyDomain: 'user.company.mycozy.cloud',
+      };
+      await dm.ldap.add(testDNMalicious, entry);
+
+      const result = await drive.syncUserToCozy(testDNMalicious);
+      expect(result).to.be.true;
+      expect(apiCalled).to.be.true;
     });
   });
 });

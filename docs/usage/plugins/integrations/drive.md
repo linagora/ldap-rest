@@ -305,7 +305,7 @@ The `FromCloudery=true` query parameter is always included to:
 The Cozy Admin API uses bearer token authentication:
 
 ```bash
---drive-webadmin-token "your-admin-token"
+--twake-drive-webadmin-token "your-admin-token"
 ```
 
 The plugin automatically adds the `Authorization: Bearer {token}` header to all requests.

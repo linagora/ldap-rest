@@ -39,6 +39,29 @@ export default class Drive extends TwakePlugin {
   }
 
   /**
+   * Validate Cozy domain format to prevent URL injection attacks
+   * @param domain Cozy domain to validate
+   * @returns true if domain format is valid
+   */
+  private isValidCozyDomain(domain: string): boolean {
+    // Allow only valid domain characters (alphanumeric, dots, hyphens)
+    // Reject any path separators, query strings, or fragments
+    // Domain must start and end with alphanumeric, and be between 1-253 chars
+    if (!domain || domain.length > 253) return false;
+    if (
+      domain.includes('/') ||
+      domain.includes('\\') ||
+      domain.includes('?') ||
+      domain.includes('#')
+    ) {
+      return false;
+    }
+    // Valid domain pattern: alphanumeric segments separated by dots
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+    return domainRegex.test(domain);
+  }
+
+  /**
    * Get Cozy domain for a user from LDAP
    * @param dn User's LDAP DN
    * @returns Cozy domain or null if not found
@@ -61,6 +84,19 @@ export default class Drive extends TwakePlugin {
     dn: string,
     params: Record<string, string>
   ): Promise<void> {
+    // Validate cozyDomain to prevent URL injection attacks
+    if (!this.isValidCozyDomain(cozyDomain)) {
+      this.logger.error({
+        plugin: this.name,
+        event: hookname,
+        result: 'error',
+        dn,
+        cozyDomain,
+        error: 'Invalid Cozy domain format (potential URL injection attempt)',
+      });
+      return;
+    }
+
     // Build URL with query parameters
     const url = new URL(`${this.webadminUrl}/instances/${cozyDomain}`);
 
