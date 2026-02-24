@@ -10,7 +10,9 @@ The `twake/drive` plugin automatically synchronizes email address and display na
 
 1. **Twake Drive / Cozy** instance with Admin API enabled
 2. **onChange plugin** loaded to detect LDAP changes
-3. **Cozy domain attribute** configured in LDAP schema (e.g., `twakeCozyDomain`)
+3. **Cozy domain** - either:
+   - Per-user attribute in LDAP schema (e.g., `twakeCozyDomain`), or
+   - Default domain template configured (e.g., `{uid}.mycompany.cloud`)
 
 ## Configuration
 
@@ -35,29 +37,64 @@ DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE="twakeCozyDomain"
 
 ### Parameters
 
-| Parameter                        | Description                                | Default           |
-| -------------------------------- | ------------------------------------------ | ----------------- |
-| `--twake-drive-webadmin-url`     | Cozy Admin API base URL (required)         | -                 |
-| `--twake-drive-webadmin-token`   | Bearer token for Cozy Admin authentication | -                 |
-| `--mail-attribute`               | LDAP attribute for email                   | `mail`            |
-| `--display-name-attribute`       | LDAP attribute for display name            | `displayName`     |
-| `--twake-drive-domain-attribute` | LDAP attribute storing user's Cozy domain  | `twakeCozyDomain` |
-| `--twake-drive-concurrency`      | Maximum concurrent API requests            | `10`              |
+| Parameter                               | Description                                              | Default           |
+| --------------------------------------- | -------------------------------------------------------- | ----------------- |
+| `--twake-drive-webadmin-url`            | Cozy Admin API base URL (required)                       | -                 |
+| `--twake-drive-webadmin-token`          | Bearer token for Cozy Admin authentication               | -                 |
+| `--mail-attribute`                      | LDAP attribute for email                                 | `mail`            |
+| `--display-name-attribute`              | LDAP attribute for display name                          | `displayName`     |
+| `--twake-drive-domain-attribute`        | LDAP attribute storing user's Cozy domain                | `twakeCozyDomain` |
+| `--twake-drive-default-domain-template` | Template for Cozy domain (e.g., `{uid}.mycompany.cloud`) | -                 |
+| `--twake-drive-concurrency`             | Maximum concurrent API requests                          | `10`              |
 
-## LDAP Schema
+## Cozy Domain Resolution
 
-Each user must have a `twakeCozyDomain` attribute (or configured equivalent) containing their Cozy instance domain:
+The plugin determines each user's Cozy domain using the following logic:
+
+1. **Per-user attribute** (if present): Use the `twakeCozyDomain` LDAP attribute value
+2. **Default template** (fallback): Build domain from template with LDAP attribute placeholders
+
+### Per-user Cozy domain attribute
+
+Users can have an explicit `twakeCozyDomain` attribute for custom domains:
 
 ```ldif
 dn: uid=jdoe,ou=users,dc=example,dc=com
-objectClass: inetOrgPerson
-objectClass: twakeAccount
 uid: jdoe
-cn: John Doe
-sn: Doe
 mail: jdoe@example.com
-displayName: John Doe
-twakeCozyDomain: jdoe.mycompany.cloud
+twakeCozyDomain: john-doe.partner.cloud
+```
+
+### Default domain template
+
+Configure a template for users without an explicit attribute. Use `{attribute}` placeholders:
+
+```bash
+--twake-drive-default-domain-template "{uid}.mycompany.cloud"
+```
+
+Users without `twakeCozyDomain` will have their domain built from the template:
+
+- User `uid=jdoe` → Cozy domain `jdoe.mycompany.cloud`
+
+Other template examples:
+
+- `"{mail}"` → use mail attribute directly as domain
+- `"{cn}.cloud.example.com"` → use common name
+
+### Combined usage
+
+Both can be used together. The per-user attribute takes precedence:
+
+```ldif
+# User with custom domain (uses twakeCozyDomain)
+dn: uid=partner1,ou=users,dc=example,dc=com
+uid: partner1
+twakeCozyDomain: partner1.external.cloud
+
+# Regular user (uses default suffix → jdoe.mycompany.cloud)
+dn: uid=jdoe,ou=users,dc=example,dc=com
+uid: jdoe
 ```
 
 ## How It Works

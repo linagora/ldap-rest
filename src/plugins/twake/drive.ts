@@ -24,6 +24,8 @@ export default class Drive extends TwakePlugin {
 
   // Drive-specific configuration attributes
   private cozyDomainAttr: string;
+  private defaultDomainTemplate: string;
+  private templateAttrs: string[];
 
   constructor(server: DM) {
     super(
@@ -36,6 +38,15 @@ export default class Drive extends TwakePlugin {
     // LDAP attribute that stores the Cozy instance domain (e.g., "john.mycozy.cloud")
     this.cozyDomainAttr =
       (this.config.twake_drive_domain_attribute as string) || 'twakeCozyDomain';
+
+    // Default domain template for fallback (e.g., "{uid}.company.cloud")
+    this.defaultDomainTemplate =
+      (this.config.twake_drive_default_domain_template as string) || '';
+
+    // Extract attribute names from template placeholders (e.g., "{uid}" → "uid")
+    this.templateAttrs = this.defaultDomainTemplate
+      ? [...this.defaultDomainTemplate.matchAll(/\{(\w+)\}/g)].map(m => m[1])
+      : [];
   }
 
   /**
@@ -56,19 +67,48 @@ export default class Drive extends TwakePlugin {
     ) {
       return false;
     }
-    // Valid domain pattern: alphanumeric segments separated by dots
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+    // Valid domain pattern: one or more labels separated by dots
+    // Each label must start and end with alphanumeric, may contain hyphens in the middle
+    // Single-label domains (e.g., "localhost", "cozy-server") are allowed for local/search domain resolution
+    const domainRegex =
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
     return domainRegex.test(domain);
   }
 
   /**
    * Get Cozy domain for a user from LDAP
+   * Falls back to template-based domain if attribute not found
    * @param dn User's LDAP DN
    * @returns Cozy domain or null if not found
    */
   async getCozyDomain(dn: string): Promise<string | null> {
-    const entry = await this.ldapGetAttributes(dn, [this.cozyDomainAttr]);
-    return entry ? this.attributeToString(entry[this.cozyDomainAttr]) : null;
+    // Fetch cozy domain attribute + any attributes needed for template
+    const attrsToFetch = [this.cozyDomainAttr, ...this.templateAttrs];
+    const entry = await this.ldapGetAttributes(dn, attrsToFetch);
+
+    // First try the explicit Cozy domain attribute
+    const explicitDomain = entry
+      ? this.attributeToString(entry[this.cozyDomainAttr])
+      : null;
+    if (explicitDomain) {
+      return explicitDomain;
+    }
+
+    // Fallback: use template if configured
+    if (this.defaultDomainTemplate && entry) {
+      let domain = this.defaultDomainTemplate;
+      for (const attr of this.templateAttrs) {
+        const value = this.attributeToString(entry[attr]);
+        if (!value) {
+          // Missing attribute, can't build domain from template
+          return null;
+        }
+        domain = domain.replace(`{${attr}}`, value);
+      }
+      return domain;
+    }
+
+    return null;
   }
 
   /**
@@ -216,7 +256,11 @@ export default class Drive extends TwakePlugin {
      * Handle display name changes
      * Updates the Cozy instance's PublicName parameter
      */
-    onLdapDisplayNameChange: async (dn: string) => {
+    onLdapDisplayNameChange: async (
+      dn: string,
+      _oldDisplayName: string | null,
+      _newDisplayName: string | null
+    ) => {
       // Get Cozy domain and display name
       const entry = await this.ldapGetAttributes(dn, [
         this.cozyDomainAttr,
