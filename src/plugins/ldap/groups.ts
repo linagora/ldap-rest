@@ -249,7 +249,9 @@ export default class LdapGroups extends DmPlugin {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
     try {
-      const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+      const dn = /,/.test(cn)
+        ? cn
+        : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
         dn
@@ -444,7 +446,9 @@ export default class LdapGroups extends DmPlugin {
       validateDnValue(newCn, this.cn);
     }
     let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
-    let newDn = /,/.test(newCn) ? newCn : `${this.cn}=${escapeDnValue(newCn)},${this.base}`;
+    let newDn = /,/.test(newCn)
+      ? newCn
+      : `${this.cn}=${escapeDnValue(newCn)},${this.base}`;
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks.ldapgrouprename,
       [dn, newDn]
@@ -463,7 +467,9 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async addMember(cn: string, member: string | string[]): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = /,/.test(cn)
+      ? cn
+      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     if (!Array.isArray(member)) member = [member];
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupaddmember,
@@ -480,7 +486,9 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteMember(cn: string, member: string): Promise<boolean> {
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = /,/.test(cn)
+      ? cn
+      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
@@ -540,7 +548,9 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<{ success: boolean }> {
     const linkAttr = this.config.ldap_organization_link_attribute as string;
     const pathAttr = this.config.ldap_organization_path_attribute as string;
-    const dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = /,/.test(cn)
+      ? cn
+      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
 
     // Get current group to check if it has department attributes
     const currentGroup = (await this.ldap.search(

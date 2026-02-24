@@ -76,7 +76,9 @@ describe('LDAP Utils', () => {
     });
 
     it('should accept values with allowed special characters', () => {
-      expect(() => validateDnValue('john.doe@example.com', 'mail')).to.not.throw();
+      expect(() =>
+        validateDnValue('john.doe@example.com', 'mail')
+      ).to.not.throw();
       expect(() => validateDnValue('Smith, John', 'cn')).to.not.throw();
       expect(() => validateDnValue("O'Brien", 'sn')).to.not.throw();
     });
@@ -127,21 +129,31 @@ describe('LDAP Utils', () => {
     });
 
     it('should include field name in error message', () => {
-      expect(() => validateDnValue('bad\x00value', 'organizationalUnit')).to.throw(
-        'organizationalUnit contains invalid control characters'
-      );
+      expect(() =>
+        validateDnValue('bad\x00value', 'organizationalUnit')
+      ).to.throw('organizationalUnit contains invalid control characters');
     });
   });
 
   describe('parseDn', () => {
     it('should parse simple DN', () => {
       const parts = parseDn('uid=user,ou=users,dc=example,dc=com');
-      expect(parts).to.deep.equal(['uid=user', 'ou=users', 'dc=example', 'dc=com']);
+      expect(parts).to.deep.equal([
+        'uid=user',
+        'ou=users',
+        'dc=example',
+        'dc=com',
+      ]);
     });
 
     it('should handle escaped commas in DN', () => {
       const parts = parseDn('cn=Smith\\, John,ou=users,dc=example,dc=com');
-      expect(parts).to.deep.equal(['cn=Smith\\, John', 'ou=users', 'dc=example', 'dc=com']);
+      expect(parts).to.deep.equal([
+        'cn=Smith\\, John',
+        'ou=users',
+        'dc=example',
+        'dc=com',
+      ]);
     });
   });
 
@@ -159,14 +171,19 @@ describe('LDAP Utils', () => {
 
   describe('getRdn', () => {
     it('should return first RDN component', () => {
-      expect(getRdn('uid=user,ou=users,dc=example,dc=com')).to.equal('uid=user');
+      expect(getRdn('uid=user,ou=users,dc=example,dc=com')).to.equal(
+        'uid=user'
+      );
     });
   });
 
   describe('isChildOf', () => {
     it('should return true for direct child', () => {
       expect(
-        isChildOf('uid=user,ou=users,dc=example,dc=com', 'ou=users,dc=example,dc=com')
+        isChildOf(
+          'uid=user,ou=users,dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
       ).to.be.true;
     });
 
@@ -178,7 +195,10 @@ describe('LDAP Utils', () => {
 
     it('should return false for unrelated DNs', () => {
       expect(
-        isChildOf('uid=user,ou=users,dc=example,dc=com', 'ou=groups,dc=example,dc=com')
+        isChildOf(
+          'uid=user,ou=users,dc=example,dc=com',
+          'ou=groups,dc=example,dc=com'
+        )
       ).to.be.false;
     });
   });
