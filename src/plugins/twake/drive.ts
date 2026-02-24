@@ -1,8 +1,8 @@
 /**
- * Twake Drive (Cozy) Plugin
+ * Twake Drive Plugin
  *
- * Synchronizes LDAP user changes with Cozy/Twake Drive via Admin API.
- * Propagates email address and display name changes.
+ * Synchronizes LDAP user changes with Twake Drive via Admin API.
+ * Propagates email address, display name, and disk quota changes.
  *
  * @see https://docs.cozy.io/en/cozy-stack/admin/
  */
@@ -26,6 +26,7 @@ export default class Drive extends TwakePlugin {
   private cozyDomainAttr: string;
   private defaultDomainTemplate: string;
   private templateAttrs: string[];
+  private driveQuotaAttr: string;
 
   constructor(server: DM) {
     super(
@@ -47,6 +48,10 @@ export default class Drive extends TwakePlugin {
     this.templateAttrs = this.defaultDomainTemplate
       ? [...this.defaultDomainTemplate.matchAll(/\{(\w+)\}/g)].map(m => m[1])
       : [];
+
+    // LDAP attribute that stores the drive quota in bytes
+    this.driveQuotaAttr =
+      (this.config.drive_quota_attribute as string) || 'twakeDriveQuota';
   }
 
   /**
@@ -299,6 +304,38 @@ export default class Drive extends TwakePlugin {
         PublicName: displayName,
       });
     },
+
+    /**
+     * Handle drive quota changes
+     * Updates the Twake Drive instance's DiskQuota parameter
+     */
+    onLdapDriveQuotaChange: async (
+      dn: string,
+      oldDriveQuota: number | null,
+      newDriveQuota: number | null
+    ) => {
+      // Skip if newQuota is null (quota was deleted)
+      if (newDriveQuota === null) {
+        this.logger.debug(
+          `Skipping drive quota change for ${dn}: quota was deleted`
+        );
+        return;
+      }
+
+      // Get Twake Drive domain for this user
+      const cozyDomain = await this.getCozyDomain(dn);
+      if (!cozyDomain) {
+        this.logger.debug(
+          `Skipping drive quota change for ${dn}: no Twake Drive domain attribute (${this.cozyDomainAttr})`
+        );
+        return;
+      }
+
+      // Update Twake Drive instance disk quota (in bytes)
+      await this.updateCozyInstance('onLdapDriveQuotaChange', cozyDomain, dn, {
+        DiskQuota: String(newDriveQuota),
+      });
+    },
   };
 
   /**
@@ -351,7 +388,18 @@ export default class Drive extends TwakePlugin {
   }
 
   /**
-   * Public method to manually sync a user to Cozy
+   * Public method to get drive quota from DN (in bytes)
+   * Useful for external integrations
+   */
+  async getDriveQuotaFromDN(dn: string): Promise<number | null> {
+    const entry = await this.ldapGetAttributes(dn, [this.driveQuotaAttr]);
+    if (!entry) return null;
+    const quota = this.attributeToString(entry[this.driveQuotaAttr]);
+    return quota ? Number(quota) : null;
+  }
+
+  /**
+   * Public method to manually sync a user to Twake Drive
    * Useful for initial sync or manual refresh
    */
   async syncUserToCozy(dn: string): Promise<boolean> {
@@ -359,6 +407,7 @@ export default class Drive extends TwakePlugin {
       this.cozyDomainAttr,
       this.mailAttr,
       this.displayNameAttr,
+      this.driveQuotaAttr,
       'cn',
       'givenName',
       'sn',
@@ -371,16 +420,20 @@ export default class Drive extends TwakePlugin {
 
     const cozyDomain = this.attributeToString(entry[this.cozyDomainAttr]);
     if (!cozyDomain) {
-      this.logger.error(`Cannot sync user: no Cozy domain attribute for ${dn}`);
+      this.logger.error(
+        `Cannot sync user: no Twake Drive domain attribute for ${dn}`
+      );
       return false;
     }
 
     const mail = this.attributeToString(entry[this.mailAttr]);
     const displayName = this.getDisplayNameFromAttributes(entry);
+    const driveQuota = this.attributeToString(entry[this.driveQuotaAttr]);
 
     const params: Record<string, string> = {};
     if (mail) params.Email = mail;
     if (displayName) params.PublicName = displayName;
+    if (driveQuota) params.DiskQuota = driveQuota;
 
     if (Object.keys(params).length === 0) {
       this.logger.warn(`No attributes to sync for ${dn}`);

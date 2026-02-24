@@ -304,6 +304,145 @@ describe('Drive Plugin', () => {
     });
   });
 
+  describe('Drive quota change propagation', () => {
+    let testDNQuota: string;
+
+    beforeEach(async () => {
+      testDNQuota = `uid=drivequotauser,${process.env.DM_LDAP_BASE}`;
+      // Clean up any existing entry
+      try {
+        await dm.ldap.delete(testDNQuota);
+      } catch {
+        // Entry may not exist, ignore
+      }
+    });
+
+    afterEach(async () => {
+      try {
+        await dm.ldap.delete(testDNQuota);
+      } catch {
+        // Entry may not exist, ignore
+      }
+    });
+
+    it('should update Twake Drive instance when drive quota changes', async () => {
+      let apiCalled = false;
+      let diskQuotaValue = '';
+
+      nock(process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL)
+        .patch('/instances/quotauser.twake.cloud')
+        .query((query: ParsedUrlQuery) => {
+          diskQuotaValue = String(query.DiskQuota || '');
+          return query.FromCloudery === 'true' && !!query.DiskQuota;
+        })
+        .reply(200, function () {
+          apiCalled = true;
+          return { success: true };
+        });
+
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Quota User',
+        sn: 'User',
+        uid: 'drivequotauser',
+        mail: 'quota@test.org',
+        twakeCozyDomain: 'quotauser.twake.cloud',
+        twakeDriveQuota: '1073741824', // 1GB in bytes
+      };
+      let res = await dm.ldap.add(testDNQuota, entry);
+      expect(res).to.be.true;
+
+      // Modify drive quota to 5GB
+      res = await dm.ldap.modify(testDNQuota, {
+        replace: { twakeDriveQuota: '5368709120' },
+      });
+      expect(res).to.be.true;
+
+      // Wait for onChange hook to execute
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      expect(apiCalled).to.be.true;
+      expect(diskQuotaValue).to.equal('5368709120');
+    });
+
+    it('should skip drive quota change when user has no Twake Drive domain', async () => {
+      let apiCalled = false;
+      const noTwakeScope = nock(
+        process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL
+      )
+        .patch(/\/instances\/.*/)
+        .reply(200, { success: true });
+
+      noTwakeScope.on('request', () => {
+        apiCalled = true;
+      });
+
+      // Create user without twakeCozyDomain (but with twakeWhitePages for schema)
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'No Twake User',
+        sn: 'User',
+        uid: 'drivequotauser',
+        mail: 'notwake@test.org',
+        twakeDriveQuota: '1073741824',
+      };
+      let res = await dm.ldap.add(testDNQuota, entry);
+      expect(res).to.be.true;
+
+      // Modify drive quota
+      res = await dm.ldap.modify(testDNQuota, {
+        replace: { twakeDriveQuota: '5368709120' },
+      });
+      expect(res).to.be.true;
+
+      // Wait for onChange hook to execute
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // API should NOT be called
+      expect(apiCalled).to.be.false;
+    });
+
+    it('should skip drive quota change when quota is deleted', async () => {
+      let apiCalled = false;
+      const deleteScope = nock(
+        process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL
+      )
+        .patch(/\/instances\/.*/)
+        .query((query: ParsedUrlQuery) => {
+          return !!query.DiskQuota;
+        })
+        .reply(200, { success: true });
+
+      deleteScope.on('request', () => {
+        apiCalled = true;
+      });
+
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Delete Quota User',
+        sn: 'User',
+        uid: 'drivequotauser',
+        mail: 'deletequota@test.org',
+        twakeCozyDomain: 'deletequota.twake.cloud',
+        twakeDriveQuota: '1073741824',
+      };
+      let res = await dm.ldap.add(testDNQuota, entry);
+      expect(res).to.be.true;
+
+      // Delete drive quota attribute
+      res = await dm.ldap.modify(testDNQuota, {
+        delete: ['twakeDriveQuota'],
+      });
+      expect(res).to.be.true;
+
+      // Wait for onChange hook to execute
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // API should NOT be called for quota deletion
+      expect(apiCalled).to.be.false;
+    });
+  });
+
   describe('Public methods', () => {
     it('getCozyDomain should return the Cozy domain attribute', async () => {
       const entry = {
@@ -396,16 +535,46 @@ describe('Drive Plugin', () => {
       expect(mail).to.equal('mailuser@test.org');
     });
 
+    it('getDriveQuotaFromDN should return the drive quota in bytes', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+        cn: 'Quota User',
+        sn: 'User',
+        uid: 'testdriveuser',
+        mail: 'quota@test.org',
+        twakeDriveQuota: '5368709120',
+      };
+      await dm.ldap.add(testDN, entry);
+
+      const quota = await drive.getDriveQuotaFromDN(testDN);
+      expect(quota).to.equal(5368709120);
+    });
+
+    it('getDriveQuotaFromDN should return null if attribute is missing', async () => {
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'No Quota User',
+        sn: 'User',
+        uid: 'testdriveuser',
+        mail: 'noquota@test.org',
+      };
+      await dm.ldap.add(testDN, entry);
+
+      const quota = await drive.getDriveQuotaFromDN(testDN);
+      expect(quota).to.be.null;
+    });
+
     it('syncUserToCozy should manually sync user attributes', async () => {
       let apiCalled = false;
       const syncScope = nock(
         process.env.DM_TWAKE_DRIVE_WEBADMIN_URL || TWAKE_DRIVE_WEBADMIN_URL
       )
-        .patch('/instances/syncuser.mycozy.cloud')
+        .patch('/instances/syncuser.twake.cloud')
         .query({
           FromCloudery: 'true',
           Email: 'sync@test.org',
           PublicName: 'Sync User',
+          DiskQuota: '1073741824',
         })
         .reply(200, { success: true });
 
@@ -419,7 +588,8 @@ describe('Drive Plugin', () => {
         sn: 'User',
         uid: 'testdriveuser',
         mail: 'sync@test.org',
-        twakeCozyDomain: 'syncuser.mycozy.cloud',
+        twakeCozyDomain: 'syncuser.twake.cloud',
+        twakeDriveQuota: '1073741824',
       };
       await dm.ldap.add(testDN, entry);
 

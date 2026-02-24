@@ -26,6 +26,7 @@ const events: {
   alias_attribute: 'onLdapAliasChange',
   forward_attribute: 'onLdapForwardChange',
   display_name_attribute: 'onLdapDisplayNameChange',
+  drive_quota_attribute: 'onLdapDriveQuotaChange',
 };
 
 class OnLdapChange extends DmPlugin {
@@ -184,6 +185,20 @@ class OnLdapChange extends DmPlugin {
             dn,
             changes
           );
+        } else if (hookName === 'onLdapDriveQuotaChange') {
+          // Drive quota change - expects numbers, no mail needed
+          const [oldValue, newValue] =
+            changes[this.config[configParam] as string] || [];
+          const oldQuota = oldValue ? Number(oldValue) : null;
+          const newQuota = newValue ? Number(newValue) : null;
+          if (oldQuota !== newQuota) {
+            void launchHooks(
+              this.server.hooks.onLdapDriveQuotaChange,
+              dn,
+              oldQuota,
+              newQuota
+            );
+          }
         }
       }
     }

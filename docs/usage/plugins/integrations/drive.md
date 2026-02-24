@@ -1,10 +1,11 @@
-# Twake Drive (Cozy) Plugin
+# Twake Drive Plugin
 
-Synchronize LDAP user changes with Twake Drive (Cozy) via Admin API.
+Synchronize LDAP user changes with Twake Drive via Admin API.
 
 ## Overview
 
-The `twake/drive` plugin automatically synchronizes email address and display name changes from LDAP to [Twake Drive](https://twake.app/) (powered by [Cozy](https://cozy.io/)). It listens to `onChange` hooks and updates Cozy instances via the Admin API.
+The `twake/drive` plugin automatically synchronizes email address, display name, and disk quota changes from LDAP to [Twake Drive](https://twake.app/).
+It listens to `onChange` hooks and updates Twake Drive instances via the Admin API.
 
 ## Prerequisites
 
@@ -17,14 +18,16 @@ The `twake/drive` plugin automatically synchronizes email address and display na
 ## Configuration
 
 ```bash
---plugin core/ldap/onChange \
---plugin core/ldap/flatGeneric \
---plugin twake/drive \
---ldap-flat-schema ./static/schemas/twake/users.json \
---mail-attribute mail \
---twake-drive-domain-attribute twakeCozyDomain \
---twake-drive-webadmin-url http://cozy-admin:6060 \
---twake-drive-webadmin-token "your-admin-token"
+npx ldap-rest \
+    --plugin core/ldap/onChange \
+    --plugin core/ldap/flatGeneric \
+    --plugin twake/drive \
+    --ldap-flat-schema ./static/schemas/twake/users.json \
+    --mail-attribute mail \
+    --twake-drive-domain-attribute twakeCozyDomain \
+    --twake-drive-webadmin-url http://cozy-admin:6060 \
+    --twake-drive-webadmin-token "your-admin-token" \
+    ...
 ```
 
 **Environment Variables:**
@@ -37,15 +40,16 @@ DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE="twakeCozyDomain"
 
 ### Parameters
 
-| Parameter                               | Description                                              | Default           |
-| --------------------------------------- | -------------------------------------------------------- | ----------------- |
-| `--twake-drive-webadmin-url`            | Cozy Admin API base URL (required)                       | -                 |
-| `--twake-drive-webadmin-token`          | Bearer token for Cozy Admin authentication               | -                 |
-| `--mail-attribute`                      | LDAP attribute for email                                 | `mail`            |
-| `--display-name-attribute`              | LDAP attribute for display name                          | `displayName`     |
-| `--twake-drive-domain-attribute`        | LDAP attribute storing user's Cozy domain                | `twakeCozyDomain` |
-| `--twake-drive-default-domain-template` | Template for Cozy domain (e.g., `{uid}.mycompany.cloud`) | -                 |
-| `--twake-drive-concurrency`             | Maximum concurrent API requests                          | `10`              |
+| Parameter                               | Description                                                   | Default           |
+| --------------------------------------- | ------------------------------------------------------------- | ----------------- |
+| `--twake-drive-webadmin-url`            | Twake Drive Admin API base URL (required)                     | -                 |
+| `--twake-drive-webadmin-token`          | Bearer token for Admin authentication                         | -                 |
+| `--mail-attribute`                      | LDAP attribute for email                                      | `mail`            |
+| `--display-name-attribute`              | LDAP attribute for display name                               | `displayName`     |
+| `--drive-quota-attribute`               | LDAP attribute for disk quota (in bytes)                      | `twakeDriveQuota` |
+| `--twake-drive-domain-attribute`        | LDAP attribute storing user's Twake Drive domain              | `twakeCozyDomain` |
+| `--twake-drive-default-domain-template` | Template for Twake Drive domain (e.g., `{uid}.company.cloud`) | -                 |
+| `--twake-drive-concurrency`             | Maximum concurrent API requests                               | `10`              |
 
 ## Cozy Domain Resolution
 
@@ -155,6 +159,37 @@ If `displayName` is not set, the plugin uses fallback logic:
 2. `cn` (Common Name)
 3. `givenName` + `sn` (First Name + Last Name)
 
+### Disk Quota Changes
+
+When a user's drive quota changes:
+
+1. **LDAP modify operation**
+
+   ```bash
+   PUT /api/v1/ldap/users/jdoe
+   {
+     "replace": {
+       "twakeDriveQuota": "5368709120"
+     }
+   }
+   ```
+
+2. **onChange plugin** triggers `onLdapDriveQuotaChange` hook
+
+3. **Drive plugin** updates Twake Drive instance:
+
+   ```http
+   PATCH /instances/jdoe.company.cloud?DiskQuota=5368709120&FromCloudery=true
+   ```
+
+4. **Twake Drive** updates the instance disk quota
+
+**Note:** The quota value is in bytes. Common values:
+
+- 1 GB = `1073741824`
+- 5 GB = `5368709120`
+- 10 GB = `10737418240`
+
 ## Public Methods
 
 Public methods available on the Drive plugin instance:
@@ -228,9 +263,30 @@ const mail = await drive.getMailFromDN('uid=jdoe,ou=users,dc=example,dc=com');
 
 ---
 
+### getDriveQuotaFromDN(dn)
+
+Retrieve the drive quota for a user (in bytes).
+
+**Signature:**
+
+```typescript
+async getDriveQuotaFromDN(dn: string): Promise<number | null>
+```
+
+**Example:**
+
+```typescript
+const quota = await drive.getDriveQuotaFromDN(
+  'uid=jdoe,ou=users,dc=example,dc=com'
+);
+// Returns: 5368709120 (5 GB)
+```
+
+---
+
 ### syncUserToCozy(dn)
 
-Manually synchronize a user's attributes to their Cozy instance. Useful for initial sync or manual refresh.
+Manually synchronize a user's attributes (email, display name, disk quota) to their Twake Drive instance. Useful for initial sync or manual refresh.
 
 **Signature:**
 
@@ -305,11 +361,12 @@ await drive.unblockInstance('uid=jdoe,ou=users,dc=example,dc=com');
 
 ### Endpoints Used
 
-| Operation       | Endpoint                                                                | Method |
-| --------------- | ----------------------------------------------------------------------- | ------ |
-| Update email    | `/instances/{domain}?Email={email}&FromCloudery=true`                   | PATCH  |
-| Update name     | `/instances/{domain}?PublicName={name}&FromCloudery=true`               | PATCH  |
-| Combined update | `/instances/{domain}?Email={email}&PublicName={name}&FromCloudery=true` | PATCH  |
+| Operation       | Endpoint                                                                                  | Method |
+| --------------- | ----------------------------------------------------------------------------------------- | ------ |
+| Update email    | `/instances/{domain}?Email={email}&FromCloudery=true`                                     | PATCH  |
+| Update name     | `/instances/{domain}?PublicName={name}&FromCloudery=true`                                 | PATCH  |
+| Update quota    | `/instances/{domain}?DiskQuota={bytes}&FromCloudery=true`                                 | PATCH  |
+| Combined update | `/instances/{domain}?Email={email}&PublicName={name}&DiskQuota={bytes}&FromCloudery=true` | PATCH  |
 
 ### Available Cozy Parameters
 
