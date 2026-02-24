@@ -149,6 +149,12 @@ export interface Config {
   james_mailing_list_branch?: string[];
   james_mailbox_type_attribute?: string;
 
+  // Drive (Cozy) plugin
+  twake_drive_webadmin_url?: string;
+  twake_drive_webadmin_token?: string;
+  twake_drive_concurrency?: number;
+  twake_drive_domain_attribute?: string;
+
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
   calendar_webadmin_token?: string;
@@ -378,6 +384,16 @@ const configArgs: ConfigTemplate = [
     '--james-mailbox-type-attribute',
     'DM_JAMES_MAILBOX_TYPE_ATTRIBUTE',
     'twakeMailboxType',
+  ],
+
+  // Drive (Cozy) plugin
+  ['--twake-drive-webadmin-url', 'DM_TWAKE_DRIVE_WEBADMIN_URL', ''],
+  ['--twake-drive-webadmin-token', 'DM_TWAKE_DRIVE_WEBADMIN_TOKEN', ''],
+  ['--twake-drive-concurrency', 'DM_TWAKE_DRIVE_CONCURRENCY', 10, 'number'],
+  [
+    '--twake-drive-domain-attribute',
+    'DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE',
+    'twakeCozyDomain',
   ],
 
   // Calendar Resources plugin
