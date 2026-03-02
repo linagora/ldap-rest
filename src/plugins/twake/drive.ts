@@ -55,6 +55,28 @@ export default class Drive extends TwakePlugin {
   }
 
   /**
+   * Override createHeaders to use Basic Auth for Cozy Admin API
+   * Cozy uses Basic Auth with empty username and password as the token
+   * @param contentType Optional Content-Type header value
+   * @returns Headers object with Basic Auth
+   */
+  protected override createHeaders(contentType?: string): {
+    Authorization?: string;
+    'Content-Type'?: string;
+  } {
+    const headers: { Authorization?: string; 'Content-Type'?: string } = {};
+    if (this.webadminToken) {
+      // Cozy Admin API uses Basic Auth with empty username
+      const basicAuth = Buffer.from(`:${this.webadminToken}`).toString('base64');
+      headers.Authorization = `Basic ${basicAuth}`;
+    }
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+    return headers;
+  }
+
+  /**
    * Validate Cozy domain format to prevent URL injection attacks
    * @param domain Cozy domain to validate
    * @returns true if domain format is valid
