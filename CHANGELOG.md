@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.2.1 (2026-03-02)
+
+### Bug Fixes
+
+- Fix Twake Drive plugin authentication: use Basic Auth instead of Bearer token
+  for Cozy Admin API compatibility
+
 ## v0.2.0 (2026-03-02)
 
 ### New Features
