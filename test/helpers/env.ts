@@ -60,6 +60,19 @@ export const LDAP_AND_JAMES_ENV_VARS = [
 ] as const;
 
 /**
+ * Drive/Cozy environment variables
+ */
+export const DRIVE_ENV_VARS = ['DM_TWAKE_DRIVE_WEBADMIN_URL'] as const;
+
+/**
+ * Combined LDAP and Drive environment variables
+ */
+export const LDAP_AND_DRIVE_ENV_VARS = [
+  ...LDAP_ENV_VARS,
+  ...DRIVE_ENV_VARS,
+] as const;
+
+/**
  * Check if external LDAP is configured (i.e., all required env vars are set)
  * Used to determine if we should use external LDAP or start embedded LDAP
  * @returns true if external LDAP is configured

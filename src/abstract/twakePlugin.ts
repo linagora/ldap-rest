@@ -53,6 +53,13 @@ export abstract class TwakePlugin extends DmPlugin {
       throw new Error(`Twake plugin: ${urlConfig} is required`);
     }
 
+    // Warn if authentication token is not configured
+    if (!this.webadminToken) {
+      this.logger.warn(
+        `Twake plugin: No authentication token configured (${tokenConfig}) - requests will be unauthenticated`
+      );
+    }
+
     // Initialize concurrency limiter
     const concurrency =
       typeof this.config[concurrencyConfig] === 'number'

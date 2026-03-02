@@ -138,6 +138,7 @@ export interface Config {
   alias_attribute?: string;
   forward_attribute?: string;
   display_name_attribute?: string;
+  drive_quota_attribute?: string;
 
   // James plugin
   james_webadmin_url?: string;
@@ -148,6 +149,13 @@ export interface Config {
   james_init_delay?: number;
   james_mailing_list_branch?: string[];
   james_mailbox_type_attribute?: string;
+
+  // Drive (Cozy) plugin
+  twake_drive_webadmin_url?: string;
+  twake_drive_webadmin_token?: string;
+  twake_drive_concurrency?: number;
+  twake_drive_domain_attribute?: string;
+  twake_drive_default_domain_template?: string;
 
   // Calendar Resources plugin
   calendar_webadmin_url?: string;
@@ -247,6 +255,7 @@ const configArgs: ConfigTemplate = [
   ['--alias-attribute', 'DM_ALIAS_ATTRIBUTE', 'mailAlternateAddress'],
   ['--forward-attribute', 'DM_FORWARD_ATTRIBUTE', 'mailForwardingAddress'],
   ['--display-name-attribute', 'DM_DISPLAY_NAME_ATTRIBUTE', 'displayName'],
+  ['--drive-quota-attribute', 'DM_DRIVE_QUOTA_ATTRIBUTE', 'twakeDriveQuota'],
 
   // Default classes to insert into LDAP
   [
@@ -378,6 +387,21 @@ const configArgs: ConfigTemplate = [
     '--james-mailbox-type-attribute',
     'DM_JAMES_MAILBOX_TYPE_ATTRIBUTE',
     'twakeMailboxType',
+  ],
+
+  // Drive (Cozy) plugin
+  ['--twake-drive-webadmin-url', 'DM_TWAKE_DRIVE_WEBADMIN_URL', ''],
+  ['--twake-drive-webadmin-token', 'DM_TWAKE_DRIVE_WEBADMIN_TOKEN', ''],
+  ['--twake-drive-concurrency', 'DM_TWAKE_DRIVE_CONCURRENCY', 10, 'number'],
+  [
+    '--twake-drive-domain-attribute',
+    'DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE',
+    'twakeCozyDomain',
+  ],
+  [
+    '--twake-drive-default-domain-template',
+    'DM_TWAKE_DRIVE_DEFAULT_DOMAIN_TEMPLATE',
+    '',
   ],
 
   // Calendar Resources plugin

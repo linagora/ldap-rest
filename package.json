@@ -136,6 +136,10 @@
       "types": "./dist/src/plugins/twake/calendarResources.d.ts",
       "import": "./dist/plugins/twake/calendarResources.js"
     },
+    "./plugin-twake-drive": {
+      "types": "./dist/src/plugins/twake/drive.d.ts",
+      "import": "./dist/plugins/twake/drive.js"
+    },
     "./plugin-twake-james": {
       "types": "./dist/src/plugins/twake/james.d.ts",
       "import": "./dist/plugins/twake/james.js"

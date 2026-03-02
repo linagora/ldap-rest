@@ -107,6 +107,11 @@ export interface Hooks {
     oldDisplayName: string | null,
     newDisplayName: string | null
   ) => MaybePromise<void>;
+  onLdapDriveQuotaChange?: (
+    dn: string,
+    oldDriveQuota: number | null,
+    newDriveQuota: number | null
+  ) => MaybePromise<void>;
 
   /** externalUsersInGroup */
   externaluserentry?: ChainedHook<[string, AttributesList]>;
