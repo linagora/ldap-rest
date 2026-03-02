@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.2.0 (2026-03-02)
+
+### New Features
+
+- Add `twake/drive` plugin for Twake Drive (Cozy) integration:
+  - Propagate email address changes to Twake Drive via Admin API
+  - Propagate display name changes with fallback logic (displayName → cn → givenName+sn)
+  - Propagate disk quota changes (`twakeDriveQuota` attribute)
+  - Support domain template for flexible domain generation (e.g., `{uid}.company.cloud`)
+  - Public methods: `blockInstance()`, `unblockInstance()`, `syncUserToCozy()`,
+    `getCozyDomain()`, `getDisplayNameFromDN()`, `getMailFromDN()`, `getDriveQuotaFromDN()`
+  - Add `onLdapDriveQuotaChange` hook for drive quota change detection
+  - Add `--drive-quota-attribute` configuration option
+
+### Security
+
+- Update dependencies
+- Add domain validation to prevent URL injection attacks in Twake Drive plugin
+- Add warning log when authentication token is not configured for Twake plugins
+
+### Documentation
+
+- Add comprehensive documentation for Twake Drive plugin
+
 ## v0.1.9 (2026-02-23)
 
 ### Security
