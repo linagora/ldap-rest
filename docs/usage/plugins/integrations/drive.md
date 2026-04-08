@@ -357,6 +357,26 @@ async unblockInstance(dn: string): Promise<boolean>
 await drive.unblockInstance('uid=jdoe,ou=users,dc=example,dc=com');
 ```
 
+---
+
+### deleteInstance(dn)
+
+Delete a Cozy instance and all its data.
+
+**Signature:**
+
+```typescript
+async deleteInstance(dn: string): Promise<boolean>
+```
+
+Calls `DELETE /instances/:domain` on the Cozy Admin API. Returns `true` if the instance was successfully deleted or if the instance was not found (404). Returns `false` on error.
+
+**Example:**
+
+```typescript
+await drive.deleteInstance('uid=jdoe,ou=users,dc=example,dc=com');
+```
+
 ## Cozy Admin API
 
 ### Endpoints Used
@@ -367,6 +387,7 @@ await drive.unblockInstance('uid=jdoe,ou=users,dc=example,dc=com');
 | Update name     | `/instances/{domain}?PublicName={name}&FromCloudery=true`                                 | PATCH  |
 | Update quota    | `/instances/{domain}?DiskQuota={bytes}&FromCloudery=true`                                 | PATCH  |
 | Combined update | `/instances/{domain}?Email={email}&PublicName={name}&DiskQuota={bytes}&FromCloudery=true` | PATCH  |
+| Delete instance | `/instances/{domain}`                                                                     | DELETE |
 
 ### Available Cozy Parameters
 
@@ -567,8 +588,7 @@ await drive.syncUserToCozy('uid=jdoe,ou=users,dc=example,dc=com');
 
 1. **One-way sync**: LDAP → Cozy only. Cozy changes don't sync back to LDAP.
 2. **No instance creation**: Plugin doesn't create Cozy instances, only updates existing ones.
-3. **No user deletion**: Plugin doesn't delete Cozy instances when LDAP users are deleted.
-4. **Domain required**: Users must have the `twakeCozyDomain` attribute to be synced.
+3. **Domain required**: Users must have the `twakeCozyDomain` attribute to be synced.
 
 ## Troubleshooting
 

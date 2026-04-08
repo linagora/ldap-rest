@@ -67,7 +67,9 @@ export default class Drive extends TwakePlugin {
     const headers: { Authorization?: string; 'Content-Type'?: string } = {};
     if (this.webadminToken) {
       // Cozy Admin API uses Basic Auth with empty username
-      const basicAuth = Buffer.from(`:${this.webadminToken}`).toString('base64');
+      const basicAuth = Buffer.from(`:${this.webadminToken}`).toString(
+        'base64'
+      );
       headers.Authorization = `Basic ${basicAuth}`;
     }
     if (contentType) {
@@ -504,5 +506,90 @@ export default class Drive extends TwakePlugin {
       Blocked: 'false',
     });
     return true;
+  }
+
+  /**
+   * Delete a Cozy instance and all its data
+   * Calls DELETE /instances/:domain on the Cozy Admin API
+   * @param dn User's LDAP DN
+   * @returns true if successful, false otherwise
+   */
+  async deleteInstance(dn: string): Promise<boolean> {
+    const cozyDomain = await this.getCozyDomain(dn);
+    if (!cozyDomain) {
+      this.logger.error(`Cannot delete instance: no Cozy domain for ${dn}`);
+      return false;
+    }
+
+    if (!this.isValidCozyDomain(cozyDomain)) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'deleteInstance',
+        result: 'error',
+        dn,
+        cozyDomain,
+        error: 'Invalid Cozy domain format (potential URL injection attempt)',
+      });
+      return false;
+    }
+
+    const url = `${this.webadminUrl}/instances/${cozyDomain}`;
+
+    return this.requestLimit(async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: this.createHeaders(),
+        });
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            this.logger.info({
+              plugin: this.name,
+              event: 'deleteInstance',
+              result: 'ignored',
+              dn,
+              cozyDomain,
+              http_status: 404,
+              message:
+                'Cozy instance not found (already deleted or never created)',
+            });
+            return true;
+          }
+          this.logger.error({
+            plugin: this.name,
+            event: 'deleteInstance',
+            result: 'error',
+            dn,
+            cozyDomain,
+            http_status: res.status,
+            http_status_text: res.statusText,
+            url,
+          });
+          return false;
+        }
+
+        this.logger.info({
+          plugin: this.name,
+          event: 'deleteInstance',
+          result: 'success',
+          dn,
+          cozyDomain,
+          http_status: res.status,
+        });
+        return true;
+      } catch (err) {
+        this.logger.error({
+          plugin: this.name,
+          event: 'deleteInstance',
+          result: 'error',
+          dn,
+          cozyDomain,
+          error: err,
+          url,
+        });
+        return false;
+      }
+    });
   }
 }
