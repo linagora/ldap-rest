@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.2 (2026-04-08)
+
+### New Features
+
+- Update Twake-Drive plugin to be add a data deletion method
+
+### Security
+
+- Update dependencies
+
 ## v0.2.1 (2026-03-02)
 
 ### Bug Fixes
