@@ -261,6 +261,24 @@ describe('AuthHmac', () => {
 
       expect(res.status).to.equal(401);
     });
+
+    it('should accept bodyless POST signed with empty body hash', async () => {
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        undefined
+      );
+      const authHeader = createAuthHeader(serviceId, timestamp, signature);
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', authHeader);
+
+      expect(res.status).to.not.equal(401);
+    });
   });
 
   describe('Multiple services', () => {

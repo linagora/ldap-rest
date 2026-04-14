@@ -175,15 +175,24 @@ export default class AuthHmac extends AuthBase {
 
   /**
    * Calculate SHA256 hash of request body
-   * Returns empty string for GET/DELETE/HEAD methods
+   *
+   * Returns empty string when no body was sent on the wire. bodyParser.json()
+   * populates `req.body` as `{}` for empty POSTs with a JSON content-type, so
+   * gating on `req.body` alone would hash `"{}"` for bodyless endpoints like
+   * `/users/:id/disable` — while the client, having sent no body, signs with
+   * an empty body hash. We key off Content-Length to match the wire exactly.
    */
   private calculateBodyHash(req: DmRequest): string {
     const method = req.method.toUpperCase();
 
-    // No body for these methods
     if (method === 'GET' || method === 'DELETE' || method === 'HEAD') return '';
 
-    // Hash the body if present
+    const contentLength = parseInt(
+      (req.headers['content-length'] as string | undefined) ?? '0',
+      10
+    );
+    if (!contentLength) return '';
+
     if (req.body) {
       const bodyString =
         typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
