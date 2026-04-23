@@ -36,6 +36,14 @@
       "types": "./dist/src/lib/ldapActions.d.ts",
       "import": "./dist/lib/ldapActions.js"
     },
+    "./plugin-auth-authzdynamic": {
+      "types": "./dist/src/plugins/auth/authzDynamic.d.ts",
+      "import": "./dist/plugins/auth/authzDynamic.js"
+    },
+    "./plugin-auth-authzdynamichash": {
+      "types": "./dist/src/plugins/auth/authzDynamicHash.d.ts",
+      "import": "./dist/plugins/auth/authzDynamicHash.js"
+    },
     "./plugin-auth-authzlinid1": {
       "types": "./dist/src/plugins/auth/authzLinid1.d.ts",
       "import": "./dist/plugins/auth/authzLinid1.js"

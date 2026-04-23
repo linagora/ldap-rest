@@ -115,6 +115,14 @@ export interface Config {
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
+  // auth/authzDynamic (LDAP-backed tokens + per-branch ACL)
+  authz_dynamic_base?: string;
+  authz_dynamic_cache_ttl?: number;
+  authz_dynamic_token_attribute?: string;
+  authz_dynamic_config_attribute?: string;
+  authz_dynamic_tenant_attribute?: string;
+  authz_dynamic_reload_endpoint?: boolean;
+
   // auth/authzLinid1
   authz_local_admin_attribute?: string;
 
@@ -475,6 +483,31 @@ const configArgs: ConfigTemplate = [
     'DM_AUTHZ_PER_BRANCH_CACHE_TTL',
     60,
     'number',
+  ],
+
+  // Auth authzDynamic plugin
+  ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
+  ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],
+  [
+    '--authz-dynamic-token-attribute',
+    'DM_AUTHZ_DYNAMIC_TOKEN_ATTRIBUTE',
+    'userPassword',
+  ],
+  [
+    '--authz-dynamic-config-attribute',
+    'DM_AUTHZ_DYNAMIC_CONFIG_ATTRIBUTE',
+    'description',
+  ],
+  [
+    '--authz-dynamic-tenant-attribute',
+    'DM_AUTHZ_DYNAMIC_TENANT_ATTRIBUTE',
+    'cn',
+  ],
+  [
+    '--authz-dynamic-reload-endpoint',
+    'DM_AUTHZ_DYNAMIC_RELOAD_ENDPOINT',
+    false,
+    'boolean',
   ],
 
   // Auth authzLinid1 plugin
