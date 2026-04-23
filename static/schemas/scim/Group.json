@@ -1,0 +1,31 @@
+{
+  "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+  "name": "Group",
+  "description": "Group (RFC 7643)",
+  "attributes": [
+    {
+      "name": "displayName",
+      "type": "string",
+      "multiValued": false,
+      "required": true,
+      "caseExact": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "uniqueness": "server"
+    },
+    {
+      "name": "members",
+      "type": "complex",
+      "multiValued": true,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "subAttributes": [
+        { "name": "value", "type": "string" },
+        { "name": "$ref", "type": "reference" },
+        { "name": "display", "type": "string" },
+        { "name": "type", "type": "string" }
+      ]
+    }
+  ]
+}

@@ -144,4 +144,23 @@ export interface Hooks {
   getOrganisationTop?: ChainedHook<
     [Request | undefined, AttributesList | null]
   >;
+
+  /**
+   * SCIM plugin hooks (typed dynamically via the index signature above)
+   *
+   * - scimusercreate:      ChainedHook<[ScimUser, Request?]>     — pre-create, can mutate
+   * - scimusercreatedone:  VoidHook<[ScimUser]>                   — post-create
+   * - scimuserupdate:      ChainedHook<[string, ScimUser, Request?]>
+   * - scimuserupdatedone:  VoidHook<[string, ScimUser]>
+   * - scimuserdelete:      ChainedHook<[string, Request?]>
+   * - scimuserdeletedone:  VoidHook<[string]>
+   * - scimgroupcreate:     ChainedHook<[ScimGroup, Request?]>
+   * - scimgroupcreatedone: VoidHook<[ScimGroup]>
+   * - scimgroupupdate:     ChainedHook<[string, ScimGroup, Request?]>
+   * - scimgroupupdatedone: VoidHook<[string, ScimGroup]>
+   * - scimgroupdelete:     ChainedHook<[string, Request?]>
+   * - scimgroupdeletedone: VoidHook<[string]>
+   * - scimbulkrequest:     ChainedHook<[BulkRequest, Request?]>
+   * - scimbulkdone:        VoidHook<[BulkResponse]>
+   */
 }

@@ -188,6 +188,26 @@ export interface Config {
   ppolicy_require_special?: boolean;
   ldap_users_base?: string;
 
+  // SCIM plugin
+  scim_prefix?: string;
+  scim_user_base?: string;
+  scim_group_base?: string;
+  scim_user_base_template?: string;
+  scim_group_base_template?: string;
+  scim_base_map?: string;
+  scim_user_object_class?: string[];
+  scim_user_rdn_attribute?: string;
+  scim_group_object_class?: string[];
+  scim_group_rdn_attribute?: string;
+  scim_id_attribute?: string;
+  scim_user_mapping?: string;
+  scim_group_mapping?: string;
+  scim_max_results?: number;
+  scim_bulk_max_operations?: number;
+  scim_bulk_max_payload_size?: number;
+  scim_etag?: boolean;
+  scim_base_url?: string;
+
   // Accept additional config keys for non core plugins
   [key: string]:
     | string
@@ -533,6 +553,48 @@ const configArgs: ConfigTemplate = [
   ['--ppolicy-require-digit', 'DM_PPOLICY_REQUIRE_DIGIT', true, 'boolean'],
   ['--ppolicy-require-special', 'DM_PPOLICY_REQUIRE_SPECIAL', true, 'boolean'],
   ['--ldap-users-base', 'DM_LDAP_USERS_BASE', ''],
+
+  // SCIM plugin
+  ['--scim-prefix', 'DM_SCIM_PREFIX', '/scim/v2'],
+  ['--scim-user-base', 'DM_SCIM_USER_BASE', ''],
+  ['--scim-group-base', 'DM_SCIM_GROUP_BASE', ''],
+  ['--scim-user-base-template', 'DM_SCIM_USER_BASE_TEMPLATE', ''],
+  ['--scim-group-base-template', 'DM_SCIM_GROUP_BASE_TEMPLATE', ''],
+  ['--scim-base-map', 'DM_SCIM_BASE_MAP', ''],
+  [
+    '--scim-user-object-class',
+    'DM_SCIM_USER_OBJECT_CLASSES',
+    ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+    'array',
+    '--scim-user-object-classes',
+  ],
+  ['--scim-user-rdn-attribute', 'DM_SCIM_USER_RDN_ATTRIBUTE', 'uid'],
+  [
+    '--scim-group-object-class',
+    'DM_SCIM_GROUP_OBJECT_CLASSES',
+    ['top', 'groupOfNames'],
+    'array',
+    '--scim-group-object-classes',
+  ],
+  ['--scim-group-rdn-attribute', 'DM_SCIM_GROUP_RDN_ATTRIBUTE', 'cn'],
+  ['--scim-id-attribute', 'DM_SCIM_ID_ATTRIBUTE', 'rdn'],
+  ['--scim-user-mapping', 'DM_SCIM_USER_MAPPING', ''],
+  ['--scim-group-mapping', 'DM_SCIM_GROUP_MAPPING', ''],
+  ['--scim-max-results', 'DM_SCIM_MAX_RESULTS', 200, 'number'],
+  [
+    '--scim-bulk-max-operations',
+    'DM_SCIM_BULK_MAX_OPERATIONS',
+    100,
+    'number',
+  ],
+  [
+    '--scim-bulk-max-payload-size',
+    'DM_SCIM_BULK_MAX_PAYLOAD_SIZE',
+    1048576,
+    'number',
+  ],
+  ['--scim-etag', 'DM_SCIM_ETAG', false, 'boolean'],
+  ['--scim-base-url', 'DM_SCIM_BASE_URL', ''],
 ];
 
 export default configArgs;
