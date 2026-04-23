@@ -32,6 +32,7 @@ import type { SearchOptions } from 'ldapts';
 import { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
+import { ForbiddenError } from '../../lib/errors';
 import type {
   AttributesList,
   AttributeValue,
@@ -109,7 +110,9 @@ export default class AuthzDynamic extends AuthBase {
 
   private tokens: TokenEntry[] = [];
   private lastLoad = 0;
+  private lastFailure = 0;
   private readonly cacheTtlMs: number;
+  private readonly failureBackoffMs: number;
   private readonly base: string;
   private readonly tokenAttr: string;
   private readonly configAttr: string;
@@ -122,6 +125,9 @@ export default class AuthzDynamic extends AuthBase {
     this.base = (this.config.authz_dynamic_base as string) || '';
     this.cacheTtlMs =
       ((this.config.authz_dynamic_cache_ttl as number) || 60) * 1000;
+    // Backoff window after a failed reload, so that LDAP outages don't turn
+    // into a per-request retry storm. Defaults to max(1/4 × TTL, 5s).
+    this.failureBackoffMs = Math.max(Math.floor(this.cacheTtlMs / 4), 5000);
     this.tokenAttr =
       (this.config.authz_dynamic_token_attribute as string) || 'userPassword';
     this.configAttr =
@@ -140,6 +146,12 @@ export default class AuthzDynamic extends AuthBase {
   api(app: Express): void {
     // Register the AuthBase middleware (runs authMethod per request).
     super.api(app);
+
+    // The `serverError()` helper and DM's core error middleware both check
+    // for the `[authz-forbidden]` marker (added to ForbiddenError messages
+    // thrown by our hooks). Downstream plugins that wrap LDAP errors into
+    // plain `new Error(...)` drop the original `statusCode`; the marker
+    // preserves the semantic 403 across those wraps.
 
     if (this.reloadEndpoint) {
       const prefix = this.config.api_prefix || '/api';
@@ -188,16 +200,18 @@ export default class AuthzDynamic extends AuthBase {
         const hash = asString(entry[this.tokenAttr] as AttributeValue) || '';
         if (!hash) continue; // skip container OUs / entries without secret
 
-        const tenant =
-          this.tenantAttr === 'cn'
-            ? cn
-            : asString(entry[this.tenantAttr] as AttributeValue) || cn;
+        // Tenant: prefer the `tenant` field in the JSON config, fall back to
+        // the configured tenant attribute (default `cn`).
+        let tenantFromJson: string | undefined;
 
         let bases: BranchAcl[] = [];
         const cfgRaw = asString(entry[this.configAttr] as AttributeValue);
         if (cfgRaw) {
           try {
             const parsed = JSON.parse(cfgRaw) as TokenConfig;
+            if (parsed && typeof parsed.tenant === 'string' && parsed.tenant) {
+              tenantFromJson = parsed.tenant;
+            }
             if (parsed && Array.isArray(parsed.bases)) {
               bases = parsed.bases
                 .filter(b => b && typeof b.dn === 'string' && b.dn.length > 0)
@@ -215,25 +229,48 @@ export default class AuthzDynamic extends AuthBase {
           }
         }
 
+        const tenantFromAttr =
+          this.tenantAttr === 'cn'
+            ? cn
+            : asString(entry[this.tenantAttr] as AttributeValue) || cn;
+        const tenant = tenantFromJson || tenantFromAttr;
+
         next.push({ dn, cn, tenant, hash, bases });
       }
 
       this.tokens = next;
       this.lastLoad = Date.now();
+      this.lastFailure = 0;
       this.logger.info(
         `authzDynamic: loaded ${next.length} token(s) from ${this.base}`
       );
     } catch (err) {
+      this.lastFailure = Date.now();
       this.logger.error(
         `authzDynamic: failed to load tokens from ${this.base}: ${String(err)}`
       );
     }
   }
 
-  /** Ensure the cache is fresh (blocks if reloading). */
+  /**
+   * Ensure the cache is fresh (blocks if reloading).
+   *
+   * On a bootstrap or successful reload the cache is valid for
+   * `cacheTtlMs`. If the load fails, we still refuse to retry on every
+   * request — `failureBackoffMs` (default 1/4 of TTL, min 5 s) keeps the
+   * previous snapshot in use and shields LDAP from a thundering-herd
+   * during an outage.
+   */
   private async ensureFresh(): Promise<void> {
-    const age = Date.now() - this.lastLoad;
-    if (this.lastLoad > 0 && age < this.cacheTtlMs) return;
+    const now = Date.now();
+    if (this.lastLoad > 0 && now - this.lastLoad < this.cacheTtlMs) return;
+    // Under a current failure window, stick with the previous snapshot.
+    if (
+      this.lastFailure > 0 &&
+      now - this.lastFailure < this.failureBackoffMs
+    ) {
+      return;
+    }
     if (this.loading) return this.loading;
     this.loading = this.reload().finally(() => {
       this.loading = undefined;
@@ -242,6 +279,15 @@ export default class AuthzDynamic extends AuthBase {
   }
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
+    // If an earlier auth plugin already identified the caller, treat that as
+    // authoritative: we only enrich the request with a token/ACL if we can
+    // find a matching entry, but we do not refuse a request that already
+    // carries a `req.user` set by another middleware. This keeps the plugin
+    // composable (e.g. trustedProxy + authzDynamic for admin bypass).
+    if (req.user) {
+      next();
+      return;
+    }
     void this.ensureFresh()
       .then(() => {
         const header = req.headers['authorization'];
@@ -364,9 +410,13 @@ export default class AuthzDynamic extends AuthBase {
   }
 
   /**
-   * Throw if the token cannot perform `permission` on a DN located at
-   * `branchOrDn`. Any ACL entry that is `branchOrDn` itself or a parent of it
-   * (sub-branch match) qualifies.
+   * Throw a ForbiddenError (403) if the token cannot perform `permission` on
+   * the branch containing `branchOrDn`. Any ACL entry that is `branchOrDn`
+   * itself or a parent of it (sub-branch match) qualifies.
+   *
+   * The client-facing message omits the target DN to avoid leaking tenant
+   * topology through authorization failures; the full context is still
+   * logged server-side at debug level for operators.
    */
   private requireBranchPermission(
     token: TokenEntry,
@@ -377,8 +427,15 @@ export default class AuthzDynamic extends AuthBase {
       if (!isAtOrUnder(branchOrDn, acl.dn)) continue;
       if (acl[permission]) return;
     }
-    throw new Error(
-      `authzDynamic: token "${token.tenant}" has no ${permission} permission on ${branchOrDn}`
+    this.logger.debug(
+      `authzDynamic: token "${token.tenant}" denied ${permission} on ${branchOrDn}`
+    );
+    // A marker in the message lets our Express error middleware recognise
+    // this failure even after intermediate plugins (e.g. ldapGroups) wrap
+    // the error into a plain `new Error(...)` — which would otherwise drop
+    // `statusCode` and surface as a 500.
+    throw new ForbiddenError(
+      `[authz-forbidden] Token does not have ${permission} permission on this branch`
     );
   }
 

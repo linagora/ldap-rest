@@ -157,11 +157,15 @@ describe('authzDynamic (integration)', function () {
       .expect(200);
   });
 
-  it('forbids a listing on a branch outside the token ACL', async () => {
+  it('forbids a listing on a branch outside the token ACL with 403', async () => {
     const res = await supertest(server.app)
       .get('/api/v1/ldap/groups')
-      .set('Authorization', `Bearer ${foreignToken}`);
-    expect(res.status).to.be.oneOf([403, 500]);
+      .set('Authorization', `Bearer ${foreignToken}`)
+      .expect(403);
+    expect(res.body.error).to.match(/permission/i);
+    // Never leak the tenant name or target DN in the client-facing message
+    expect(res.body.error).to.not.match(/foreign/);
+    expect(res.body.error).to.not.match(/ou=/);
   });
 
   it('allows a write on a permitted branch', async () => {
@@ -173,13 +177,14 @@ describe('authzDynamic (integration)', function () {
       .expect(200);
   });
 
-  it('forbids a write on a branch outside the token ACL', async () => {
+  it('forbids a write on a branch outside the token ACL with 403', async () => {
     const res = await supertest(server.app)
       .post('/api/v1/ldap/groups')
       .set('Authorization', `Bearer ${foreignToken}`)
       .set('Content-Type', 'application/json')
-      .send({ cn: 'should-not-be-created' });
-    expect(res.status).to.be.oneOf([403, 500]);
+      .send({ cn: 'should-not-be-created' })
+      .expect(403);
+    expect(res.body.error).to.match(/permission/i);
   });
 
   it('exposes a stable token count via getConfigApiData()', () => {

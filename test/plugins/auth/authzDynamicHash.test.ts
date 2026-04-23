@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import {
   verifyLdapPassword,
   ssha,
+  sshaHash,
 } from '../../../src/plugins/auth/authzDynamicHash';
 
 function ldapify(prefix: string, digest: Buffer): string {
@@ -119,11 +120,57 @@ describe('verifyLdapPassword', () => {
   });
 });
 
-describe('ssha helper', () => {
-  it('produces an {SSHA} hash round-trippable with verifyLdapPassword', () => {
+describe('ssha / sshaHash helpers', () => {
+  it('ssha() produces an {SSHA} hash round-trippable with verifyLdapPassword', () => {
     const hash = ssha('round-trip');
     expect(hash).to.match(/^\{SSHA\}/);
     expect(verifyLdapPassword('round-trip', hash)).to.be.true;
     expect(verifyLdapPassword('round-tripp', hash)).to.be.false;
+  });
+
+  it('sshaHash("sha512", ...) produces a strong {SSHA512} hash', () => {
+    const hash = sshaHash('sha512', 'strong');
+    expect(hash).to.match(/^\{SSHA512\}/);
+    expect(verifyLdapPassword('strong', hash)).to.be.true;
+    expect(verifyLdapPassword('weak', hash)).to.be.false;
+  });
+
+  it('sshaHash("sha256", ...) produces an {SSHA256} hash', () => {
+    const hash = sshaHash('sha256', 'medium');
+    expect(hash).to.match(/^\{SSHA256\}/);
+    expect(verifyLdapPassword('medium', hash)).to.be.true;
+  });
+});
+
+describe('canonical base64 validation (security)', () => {
+  // Node's Buffer.from(str, 'base64') silently drops non-base64 characters.
+  // Without strict validation, a crafted hash could be decoded with a
+  // shorter effective payload than the stored scheme expects. These tests
+  // assert that malformed or non-canonical inputs are REFUSED.
+  const honestSsha = ssha('s3cret');
+  // Extract just the payload portion to mutate.
+  const payload = honestSsha.replace('{SSHA}', '');
+
+  it('rejects base64 with length not divisible by 4', () => {
+    // Strip one char so length%4 !== 0 (and not a valid base64 alphabet
+    // position).
+    const tampered = '{SSHA}' + payload.slice(0, -1);
+    expect(verifyLdapPassword('s3cret', tampered)).to.be.false;
+  });
+
+  it('rejects base64 containing garbage characters', () => {
+    const tampered = '{SSHA}' + payload.slice(0, 4) + '!!@@' + payload.slice(8);
+    expect(verifyLdapPassword('s3cret', tampered)).to.be.false;
+  });
+
+  it('rejects base64 with extra whitespace', () => {
+    const tampered = '{SSHA}' + payload.replace(/[A-Za-z0-9]/, ' ');
+    expect(verifyLdapPassword('s3cret', tampered)).to.be.false;
+  });
+
+  it('rejects base64 with non-canonical padding', () => {
+    // Adding explicit padding that changes the re-encoded form
+    const tampered = '{SSHA}' + payload + '===';
+    expect(verifyLdapPassword('s3cret', tampered)).to.be.false;
   });
 });

@@ -160,16 +160,30 @@ export class DM {
       res: Response,
       _next: NextFunction
     ) => {
-      const statusCode =
+      let statusCode =
         'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
+
+      // Recognise the authz-forbidden marker embedded by authz plugins so a
+      // 403 survives being wrapped into a plain Error by downstream callers
+      // (which otherwise drops `statusCode` and surfaces as a 500).
+      let clientMessage = err.message;
+      if (statusCode === 500 && /\[authz-forbidden\]/.test(err.message)) {
+        statusCode = 403;
+        clientMessage = 'Token does not have permission on this branch';
+      } else if (
+        statusCode === 403 &&
+        /\[authz-forbidden\]/.test(err.message)
+      ) {
+        clientMessage = 'Token does not have permission on this branch';
+      }
 
       // Client error (4xx) - log as warning and return error message
       if (statusCode >= 400 && statusCode < 500) {
         this.logger.warn(
-          `Client error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`
+          `Client error ${statusCode} in request ${req.method} ${req.path}: ${clientMessage}`
         );
         if (!res.headersSent) {
-          return res.status(statusCode).json({ error: err.message });
+          return res.status(statusCode).json({ error: clientMessage });
         }
         return;
       }
