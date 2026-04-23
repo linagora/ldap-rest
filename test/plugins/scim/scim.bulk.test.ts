@@ -9,6 +9,8 @@ describe('SCIM Bulk (integration)', function () {
   let plugin: Scim;
   let userBase: string;
   let groupBase: string;
+  let savedUserBase: string | undefined;
+  let savedGroupBase: string | undefined;
 
   before(async function () {
     if (
@@ -24,12 +26,21 @@ describe('SCIM Bulk (integration)', function () {
     const baseDn = process.env.DM_LDAP_BASE;
     userBase = `ou=users,${baseDn}`;
     groupBase = `ou=groups,${baseDn}`;
+    savedUserBase = process.env.DM_SCIM_USER_BASE;
+    savedGroupBase = process.env.DM_SCIM_GROUP_BASE;
     process.env.DM_SCIM_USER_BASE = userBase;
     process.env.DM_SCIM_GROUP_BASE = groupBase;
     server = new DM();
     plugin = new Scim(server);
     await plugin.api(server.app);
     await server.ready;
+  });
+
+  after(() => {
+    if (savedUserBase === undefined) delete process.env.DM_SCIM_USER_BASE;
+    else process.env.DM_SCIM_USER_BASE = savedUserBase;
+    if (savedGroupBase === undefined) delete process.env.DM_SCIM_GROUP_BASE;
+    else process.env.DM_SCIM_GROUP_BASE = savedGroupBase;
   });
 
   afterEach(async () => {

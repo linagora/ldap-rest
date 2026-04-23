@@ -17,6 +17,7 @@ import type { DmRequest } from '../../lib/auth/base';
 import {
   escapeDnValue,
   escapeLdapFilter,
+  isChildOf,
   launchHooks,
   launchHooksChained,
   validateDnValue,
@@ -217,28 +218,14 @@ export class ScimUsers {
       );
     }
 
-    let page = entries.slice(startIndex - 1, startIndex - 1 + count);
+    const page = entries.slice(startIndex - 1, startIndex - 1 + count);
 
-    // Optional sort (client-side on the current page)
-    if (query.sortBy) {
-      const order = query.sortOrder === 'descending' ? -1 : 1;
-      const sortBy = query.sortBy;
-      const toSortable = (v: unknown): string => {
-        if (v == null) return '';
-        if (typeof v === 'string') return v;
-        if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-        if (Array.isArray(v)) return toSortable(v[0]);
-        return '';
-      };
-      page = [...page].sort((a, b) => {
-        const av = (a as unknown as Record<string, unknown>)[sortBy];
-        const bv = (b as unknown as Record<string, unknown>)[sortBy];
-        if (av == null && bv == null) return 0;
-        if (av == null) return -order;
-        if (bv == null) return order;
-        return toSortable(av).localeCompare(toSortable(bv)) * order;
-      });
-    }
+    // sortBy / sortOrder are parsed for backwards compatibility but not
+    // applied — see ServiceProviderConfig.sort.supported = false. Full sort
+    // support would require mapping SCIM paths back to LDAP attributes and
+    // issuing a server-side ordered search.
+    void query.sortBy;
+    void query.sortOrder;
 
     const resources = page.map(e =>
       ldapToScimUser(e as AttributesList, this.mapping, this.ctx(req))
@@ -404,9 +391,13 @@ export class ScimUsers {
    */
   async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
     if (!value) return undefined;
-    // If value already looks like a DN, return as-is
-    if (/[=,]/.test(value) && value.includes('=')) return value;
     const base = this.baseResolver.userBase(req);
+    // Client-supplied DN: only accept when it falls under the tenant's base,
+    // otherwise a client could reference an entry outside its own subtree.
+    if (value.includes('=') && value.includes(',')) {
+      if (isChildOf(value, base)) return value;
+      return undefined;
+    }
     const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
       const res = (await this.ldap.search(

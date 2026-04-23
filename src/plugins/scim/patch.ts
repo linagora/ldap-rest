@@ -8,11 +8,15 @@
  *  - op: add / remove / replace
  *  - simple paths:  "displayName", "userName"
  *  - sub-attribute paths: "name.familyName"
- *  - multi-valued paths: "emails", "emails[primary eq true]"
+ *  - multi-valued paths: "emails"
+ *  - Group member ops via filtered path: `members[value eq "alice"]`
  *  - implicit path (op.value is an object)
  *
- * Multi-valued member operations for Groups are handled by a caller-provided
- * hook (resolveMemberRef) because they require a lookup (SCIM id → DN).
+ * Complex filtered paths on multi-valued attributes OTHER than `members`
+ * (e.g. `emails[type eq "work"]`) are rejected with `invalidPath`: the
+ * plugin only knows how to map them for member-type resolution. Filtered
+ * member operations for Groups are handled via the caller-provided
+ * `resolveMemberRef` hook (SCIM id → LDAP DN lookup).
  */
 import type {
   AttributesList,
@@ -43,15 +47,67 @@ function normalizeOp(op: string): 'add' | 'remove' | 'replace' {
   throw scimInvalidValue(`Unknown patch op '${op}'`);
 }
 
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const ATTR_NAME_RE = /^[A-Za-z_$:][\w$:]*$/;
+
+function assertSafeKey(key: string): void {
+  if (FORBIDDEN_KEYS.has(key)) {
+    throw scimInvalidPath(`Forbidden attribute name '${key}'`);
+  }
+}
+
+/**
+ * Split a SCIM PATCH path into top / filter / sub components without relying
+ * on a lookahead-heavy regex (CodeQL flagged the previous pattern for
+ * polynomial backtracking on crafted `$.…` inputs). Each segment is then
+ * validated against a strict linear regex.
+ */
 function parsePath(path: string): {
   top: string;
   sub?: string;
   filter?: string;
 } {
-  // "emails[primary eq true].value" or "emails" or "name.familyName"
-  const m = /^([A-Za-z_$:][\w.$:]*?)(?:\[(.+?)\])?(?:\.(.+))?$/.exec(path);
-  if (!m) throw scimInvalidPath(`Malformed path '${path}'`);
-  return { top: m[1], filter: m[2], sub: m[3] };
+  if (typeof path !== 'string' || path.length === 0 || path.length > 512) {
+    throw scimInvalidPath(`Malformed path '${String(path)}'`);
+  }
+  let top: string;
+  let filter: string | undefined;
+  let sub: string | undefined;
+  const bracketStart = path.indexOf('[');
+  if (bracketStart >= 0) {
+    const bracketEnd = path.lastIndexOf(']');
+    if (bracketEnd <= bracketStart) {
+      throw scimInvalidPath(`Malformed path '${path}'`);
+    }
+    top = path.slice(0, bracketStart);
+    filter = path.slice(bracketStart + 1, bracketEnd);
+    const rest = path.slice(bracketEnd + 1);
+    if (rest.length > 0) {
+      if (rest[0] !== '.') {
+        throw scimInvalidPath(`Malformed path '${path}'`);
+      }
+      sub = rest.slice(1);
+    }
+  } else {
+    const dot = path.indexOf('.');
+    if (dot >= 0) {
+      top = path.slice(0, dot);
+      sub = path.slice(dot + 1);
+    } else {
+      top = path;
+    }
+  }
+  if (!ATTR_NAME_RE.test(top)) {
+    throw scimInvalidPath(`Malformed path '${path}'`);
+  }
+  assertSafeKey(top);
+  if (sub != null) {
+    if (!ATTR_NAME_RE.test(sub)) {
+      throw scimInvalidPath(`Malformed sub-attribute in '${path}'`);
+    }
+    assertSafeKey(sub);
+  }
+  return { top, filter, sub };
 }
 
 function coerceValue(v: unknown): string | string[] | undefined {
@@ -59,7 +115,24 @@ function coerceValue(v: unknown): string | string[] | undefined {
   if (typeof v === 'string') return v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (Array.isArray(v)) {
-    return v.map(x => (typeof x === 'string' ? x : String(x)));
+    return v.map(x => {
+      if (typeof x === 'string') return x;
+      if (typeof x === 'number' || typeof x === 'boolean') return String(x);
+      if (
+        x &&
+        typeof x === 'object' &&
+        !Array.isArray(x) &&
+        'value' in x &&
+        (typeof (x as { value: unknown }).value === 'string' ||
+          typeof (x as { value: unknown }).value === 'number' ||
+          typeof (x as { value: unknown }).value === 'boolean')
+      ) {
+        return String((x as { value: unknown }).value);
+      }
+      throw scimInvalidValue(
+        `Unsupported array element in PATCH value: ${JSON.stringify(x)}`
+      );
+    });
   }
   return undefined;
 }
@@ -211,7 +284,14 @@ async function applyOperation(
     }
   }
 
-  // Regular SCIM attributes
+  // Regular SCIM attributes — reject bracket-filtered paths on anything other
+  // than `members` (already handled above): without real sub-filter semantics
+  // we would silently misapply the operation to the primary value.
+  if (filter) {
+    throw scimInvalidPath(
+      `Complex multi-valued filters are only supported on 'members' (got '${op.path}')`
+    );
+  }
   const ldapAttr = sub
     ? scimPathToLdapAttribute(`${top}.${sub}`, ctx.mapping)
     : scimPathToLdapAttribute(top, ctx.mapping);
@@ -282,10 +362,15 @@ export function applyPatchToResource<T extends Record<string, unknown>>(
         typeof op.value === 'object' &&
         !Array.isArray(op.value)
       ) {
-        for (const [k, v] of Object.entries(op.value)) out[k] = v;
+        for (const [k, v] of Object.entries(op.value)) {
+          assertSafeKey(k);
+          out[k] = v;
+        }
       }
       continue;
     }
+    // parsePath rejects forbidden keys (__proto__, constructor, prototype)
+    // so the bracket / dot assignments below are safe from prototype pollution.
     const { top, sub } = parsePath(op.path);
     if (operation === 'remove') {
       if (sub) {
@@ -299,7 +384,11 @@ export function applyPatchToResource<T extends Record<string, unknown>>(
       continue;
     }
     if (sub) {
-      const obj = (out[top] as Record<string, unknown>) || {};
+      const existing = out[top];
+      const obj: Record<string, unknown> =
+        existing && typeof existing === 'object' && !Array.isArray(existing)
+          ? { ...(existing as Record<string, unknown>) }
+          : (Object.create(null) as Record<string, unknown>);
       obj[sub] = op.value;
       out[top] = obj;
     } else {

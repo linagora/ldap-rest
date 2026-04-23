@@ -160,7 +160,6 @@ export interface Hooks {
    * - scimgroupupdatedone: VoidHook<[string, ScimGroup]>
    * - scimgroupdelete:     ChainedHook<[string, Request?]>
    * - scimgroupdeletedone: VoidHook<[string]>
-   * - scimbulkrequest:     ChainedHook<[BulkRequest, Request?]>
    * - scimbulkdone:        VoidHook<[BulkResponse]>
    */
 }

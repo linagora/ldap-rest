@@ -17,6 +17,7 @@ import type { DmRequest } from '../../lib/auth/base';
 import {
   escapeDnValue,
   escapeLdapFilter,
+  isChildOf,
   launchHooks,
   launchHooksChained,
   validateDnValue,
@@ -56,6 +57,8 @@ export interface GroupListQuery {
   filter?: string;
   startIndex?: number;
   count?: number;
+  // sortBy / sortOrder accepted for parser compatibility but not honoured
+  // (ServiceProviderConfig advertises sort.supported = false).
   sortBy?: string;
   sortOrder?: 'ascending' | 'descending';
 }
@@ -458,8 +461,11 @@ export class ScimGroups {
   /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */
   async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
     if (!value) return undefined;
-    if (/[=,]/.test(value) && value.includes('=')) return value;
     const base = this.baseResolver.groupBase(req);
+    if (value.includes('=') && value.includes(',')) {
+      if (isChildOf(value, base)) return value;
+      return undefined;
+    }
     const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
       const res = (await this.ldap.search(

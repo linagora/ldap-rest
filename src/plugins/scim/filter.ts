@@ -245,15 +245,14 @@ class Parser {
       const path = attrTok.value;
 
       // Complex multi-valued: path '[' filter ']'
+      // These require sub-attribute scope binding (e.g. emails[value eq "x"]
+      // should constrain 'value' to the same email entry as the primary
+      // match). We do not implement that yet — rejecting upfront is safer
+      // than silently applying the filter to the wrong attribute.
       if (this.peek().kind === 'LBRACK') {
-        this.consume();
-        // Inside: temporarily switch to sub-attribute resolution?
-        // We flatten as: treat filter values as referring to the same LDAP attr
-        // For simple cases like emails[type eq "work"], we currently ignore
-        // sub-attribute filtering and fall back to presence of primary LDAP attr.
-        const inner = this.parseOr();
-        this.expect('RBRACK');
-        return inner;
+        throw scimInvalidFilter(
+          `Complex multi-valued filters ('${path}[...]') are not supported; use 'and' at top level instead`
+        );
       }
 
       const op = this.consume();
@@ -304,10 +303,15 @@ class Parser {
   }
 
   private resolvePath(path: string): string {
-    // 'id' is always mapped to the id attribute semantics: leave as `id` for
-    // caller to resolve (handler translates `id` equality into DN search).
-    if (path === 'id') return 'id';
-    // 'active' → presence of pwdAccountLockedTime
+    // `id` is only supported via the top-level short-circuit `id eq "..."`
+    // handled by `scimFilterToLdap()`. Any other use would leak as a literal
+    // `id` into the emitted LDAP filter.
+    if (path === 'id') {
+      throw scimInvalidFilter(
+        "filter on 'id' only supports 'eq' with a string value"
+      );
+    }
+    // 'active' → presence of pwdAccountLockedTime (emitted in emitComparison)
     if (path === 'active') return 'active';
 
     const ldapAttr = scimPathToLdapAttribute(path, this.mapping);

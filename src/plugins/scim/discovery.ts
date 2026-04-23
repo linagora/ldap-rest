@@ -77,7 +77,7 @@ export class ScimDiscovery {
         primary: schemes.length === 0,
       });
     }
-    if (this.loadedPlugins['authOpenIdConnect']) {
+    if (this.loadedPlugins['openidconnect']) {
       schemes.push({
         name: 'OpenID Connect',
         description: 'OIDC-issued access token.',
@@ -121,7 +121,10 @@ export class ScimDiscovery {
         maxResults: (this.config.scim_max_results as number) || 200,
       },
       changePassword: { supported: false },
-      sort: { supported: true },
+      // Sorting is parsed for backwards compatibility but not consistently
+      // applied server-side (see Users/Groups list handlers). We advertise
+      // it as unsupported to avoid clients depending on stale guarantees.
+      sort: { supported: false },
       etag: { supported: Boolean(this.config.scim_etag) },
       authenticationSchemes: this.authSchemes(),
       meta: {
