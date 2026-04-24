@@ -59,7 +59,9 @@ describe('LdapFlat base-scope guard', function () {
         throw new Error('expected BadRequestError');
       } catch (err) {
         expect(err).to.be.instanceOf(BadRequestError);
-        expect((err as Error).message).to.match(/must be in the branch/i);
+        expect((err as Error).message).to.match(
+          /must be a direct child of/i
+        );
       }
     });
 
@@ -178,13 +180,13 @@ describe('LdapFlat base-scope guard', function () {
     it('rejects a partial DN (prefix without base) rather than producing a malformed DN', () => {
       // Regression caught during review: "cn=foo" starts with the main
       // attribute but is not a full DN. It must be rejected cleanly by the
-      // suffix check, not silently re-escaped into `cn=cn\=foo,<base>` with
-      // an attribute value that no longer matches the RDN.
+      // guard, not silently re-escaped into `cn=cn\=foo,<base>` with an
+      // attribute value that no longer matches the RDN.
       expect(() =>
         (
           instance as unknown as { resolveDn: (id: string) => string }
         ).resolveDn('cn=foo')
-      ).to.throw(BadRequestError, /must be in the branch/i);
+      ).to.throw(BadRequestError, /must be a direct child of/i);
     });
 
     it('does not misclassify a main-attribute value containing a comma as a DN', () => {
@@ -197,6 +199,70 @@ describe('LdapFlat base-scope guard', function () {
         instance as unknown as { resolveDn: (id: string) => string }
       ).resolveDn(valueWithComma);
       expect(dn).to.equal(`cn=Smith\\, John,${TITLE_BRANCH}`);
+    });
+  });
+
+  describe('escape-aware DN parsing (guards against RFC 4514 tricks)', () => {
+    const callResolve = (dn: string) =>
+      (
+        instance as unknown as { resolveDn: (id: string) => string }
+      ).resolveDn(dn);
+
+    it('rejects a DN whose textual tail matches the base via an escaped comma in the first RDN', () => {
+      // Attack: `cn=pwn\,ou=twakeTitle,ou=nomenclature,<BASE>` textually
+      // ends with `,ou=twakeTitle,ou=nomenclature,<BASE>`, so a naive
+      // `endsWith` check would accept it. But per RFC 4514 `\,` is a
+      // literal comma inside the first RDN value, so the entry's real
+      // parent is `ou=nomenclature,<BASE>` — a sibling of the titles
+      // branch. Passing this DN through to ldapts would let a titles-API
+      // caller create/read/modify/delete entries outside the titles
+      // branch.
+      const malicious = `cn=pwn\\,ou=twakeTitle,ou=nomenclature,${BASE}`;
+      expect(() => callResolve(malicious)).to.throw(
+        BadRequestError,
+        /must be a direct child of/i
+      );
+    });
+
+    it('rejects a DN whose tail matches via a deeply nested escaped comma', () => {
+      // Same trick, one RDN deeper: the entry's real parent would be
+      // `ou=other,<BASE>`, still outside the titles branch.
+      const malicious = `cn=pwn\\,deep,ou=other,ou=twakeTitle,ou=nomenclature,${BASE}`;
+      expect(() => callResolve(malicious)).to.throw(
+        BadRequestError,
+        /must be a direct child of/i
+      );
+    });
+
+    it('rejects an HTTP DELETE with an escaped-comma bypass payload', async () => {
+      // End-to-end: the decodeURIComponent'd path parameter must not reach
+      // ldap.delete with a DN whose real parent is outside the branch.
+      const malicious = `cn=pwn\\,ou=twakeTitle,ou=nomenclature,${BASE}`;
+      const res = await request.delete(
+        `/api/v1/ldap/titles/${enc(malicious)}`
+      );
+      expect(res.status).to.equal(400);
+    });
+
+    it('rejects an HTTP POST add with an escaped-comma bypass payload', async () => {
+      const malicious = `cn=pwn\\,ou=twakeTitle,ou=nomenclature,${BASE}`;
+      const res = await request
+        .post('/api/v1/ldap/titles')
+        .send({ cn: malicious });
+      expect(res.status).to.equal(400);
+    });
+
+    it('still accepts a legitimate direct child of the base', () => {
+      const dn = `cn=ValidTitle,${TITLE_BRANCH}`;
+      expect(callResolve(dn)).to.equal(dn);
+    });
+
+    it('still accepts a direct child with an escaped comma in the RDN value', () => {
+      // `cn=Smith\, John,<TITLE_BRANCH>` is a legitimate in-branch DN with a
+      // literal comma inside the cn value. The parent is the branch, not a
+      // sibling, so the guard must NOT reject it.
+      const dn = `cn=Smith\\, John,${TITLE_BRANCH}`;
+      expect(callResolve(dn)).to.equal(dn);
     });
   });
 });
