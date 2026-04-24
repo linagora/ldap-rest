@@ -85,25 +85,39 @@ export function writeScimErrorFromException(
   err: unknown,
   fallbackStatus = 500
 ): void {
+  // Authz plugins (e.g. core/auth/authzDynamic) embed a `[authz-forbidden]`
+  // marker in the thrown message so a 403 can be recognised even after
+  // intermediate callers wrap the error. Strip the marker before emitting
+  // a client-facing message so the internal token never leaks.
+  const sanitize = (s: string): string =>
+    /\[authz-forbidden\]/.test(s)
+      ? 'Token does not have permission on this branch'
+      : s;
+
   if (err instanceof ScimError) {
-    writeScimError(res, err.statusCode, err.message, err.scimType);
+    writeScimError(res, err.statusCode, sanitize(err.message), err.scimType);
     return;
   }
   if (err instanceof HttpError) {
-    writeScimError(res, err.statusCode, err.message);
+    writeScimError(res, err.statusCode, sanitize(err.message));
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
+  // Wrapped authz-forbidden (no HttpError instance but marker is in the msg)
+  if (/\[authz-forbidden\]/.test(message)) {
+    writeScimError(res, 403, 'Token does not have permission on this branch');
+    return;
+  }
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) {
     writeScimError(res, 404, 'Resource not found');
     return;
   }
   if (ldapCode === 68) {
-    writeScimError(res, 409, message, 'uniqueness');
+    writeScimError(res, 409, sanitize(message), 'uniqueness');
     return;
   }
-  writeScimError(res, fallbackStatus, message || 'Internal error');
+  writeScimError(res, fallbackStatus, sanitize(message) || 'Internal error');
 }
 
 /**

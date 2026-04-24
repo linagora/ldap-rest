@@ -48,6 +48,9 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
   let tokensOu: string;
   const acmeSecret = 'e2e-acme-secret-xxxxxxxx';
   const globexSecret = 'e2e-globex-secret-yyyyyyyy';
+  // Third token: granted Users, denied Groups — exercises authzDynamic's
+  // in-scope branch denial (vs. the SCIM-level isolation checked elsewhere).
+  const usersOnlySecret = 'e2e-users-only-secret-zzzzzzzz';
 
   // Env vars we mutate and must restore
   const envKeys = [
@@ -152,8 +155,22 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
       }
     }
 
-    // Two tokens, scoped to their tenant sub-trees.
-    await server.ldap.add(`cn=e2e-acme,${tokensOu}`, {
+    // Two tokens, scoped to their tenant sub-trees. Use a delete-then-add
+    // upsert so a previous run that failed before `after` could run doesn't
+    // leave the suite stuck on EntryAlreadyExists.
+    const upsert = async (
+      dn: string,
+      attrs: Record<string, unknown>
+    ): Promise<void> => {
+      try {
+        await server.ldap.delete(dn);
+      } catch {
+        /* not present — fine */
+      }
+      await server.ldap.add(dn, attrs as never);
+    };
+
+    await upsert(`cn=e2e-acme,${tokensOu}`, {
       objectClass: ['top', 'inetOrgPerson'],
       cn: 'e2e-acme',
       sn: 'e2e-acme',
@@ -176,7 +193,7 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
         ],
       }),
     });
-    await server.ldap.add(`cn=e2e-globex,${tokensOu}`, {
+    await upsert(`cn=e2e-globex,${tokensOu}`, {
       objectClass: ['top', 'inetOrgPerson'],
       cn: 'e2e-globex',
       sn: 'e2e-globex',
@@ -199,6 +216,26 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
         ],
       }),
     });
+    // Third token: users-only ACL, used below to exercise authzDynamic's
+    // in-scope branch denial (no permission on groups → 403).
+    await upsert(`cn=e2e-users-only,${tokensOu}`, {
+      objectClass: ['top', 'inetOrgPerson'],
+      cn: 'e2e-users-only',
+      sn: 'e2e-users-only',
+      userPassword: ssha(usersOnlySecret),
+      description: JSON.stringify({
+        tenant: 'e2e-acme',
+        bases: [
+          {
+            dn: `ou=users,ou=e2e-acme,${baseDn}`,
+            read: true,
+            write: true,
+            delete: true,
+          },
+          // Deliberately NO entry for ou=groups — Group ops must be denied.
+        ],
+      }),
+    });
 
     await authz.reload();
   });
@@ -216,6 +253,7 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
         // Token entries
         `cn=e2e-acme,${tokensOu}`,
         `cn=e2e-globex,${tokensOu}`,
+        `cn=e2e-users-only,${tokensOu}`,
         // Tenant OUs (order matters: children before parents)
         `ou=users,ou=e2e-acme,${baseDn}`,
         `ou=groups,ou=e2e-acme,${baseDn}`,
@@ -410,7 +448,7 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
     });
   });
 
-  describe('Cross-tenant isolation via authz hooks', () => {
+  describe('Cross-tenant isolation via SCIM base resolution and reference checks', () => {
     it('acme cannot GET a user that lives in globex by id (404)', async () => {
       // Seed bob only in globex.
       await supertest(server.app)
@@ -507,7 +545,10 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
         .expect(201);
 
       const foreignDn = `uid=bob,ou=users,ou=e2e-globex,${baseDn}`;
-      await supertest(server.app)
+      // SCIM Groups PATCH returns 200 with the updated resource on success.
+      // We assert the 200 explicitly so a silent 4xx/5xx does NOT let the
+      // test pass merely because the GET shows an untouched group.
+      const patchRes = await supertest(server.app)
         .patch('/scim/v2/Groups/engineering')
         .set('Authorization', `Bearer ${acmeSecret}`)
         .set('Content-Type', 'application/scim+json')
@@ -520,9 +561,20 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
               value: [{ value: foreignDn }],
             },
           ],
-        });
+        })
+        .expect(200);
+      // The PATCH response already shows members: the foreign DN must not
+      // appear even in the immediate reply.
+      const patchMembers =
+        (patchRes.body.members as Array<{ value: string }> | undefined) || [];
+      for (const m of patchMembers) {
+        expect(m.value, 'foreign DN leaked in PATCH response').to.not.equal(
+          foreignDn
+        );
+      }
 
-      // Whatever the status, the foreign DN MUST NOT appear in the members.
+      // Re-fetch as a secondary confirmation (guards against a stale-read
+      // cache masking the real LDAP state).
       const after = await supertest(server.app)
         .get('/scim/v2/Groups/engineering')
         .set('Authorization', `Bearer ${acmeSecret}`)
@@ -539,6 +591,50 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
       } catch {
         /* ignore */
       }
+    });
+  });
+
+  describe('authzDynamic in-scope branch denial (per-tenant ACL)', () => {
+    // The `e2e-users-only` token lives in the acme tenant but its ACL only
+    // grants permission on ou=users — NOT ou=groups. This exercises the
+    // authz hook wiring: the tenant base resolver happily constructs a
+    // Groups DN under the tenant branch, then the ldap*request hooks check
+    // the ACL and must deny.
+
+    it('users-only token CAN manage Users in its tenant (sanity)', async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Authorization', `Bearer ${usersOnlySecret}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'alice',
+          name: { familyName: 'Scoped' },
+        })
+        .expect(201);
+    });
+
+    it('users-only token is DENIED on Groups list with 403', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Groups')
+        .set('Authorization', `Bearer ${usersOnlySecret}`)
+        .expect(403);
+      expect(res.body.detail || res.body.error).to.match(/permission/i);
+    });
+
+    it('users-only token is DENIED on Groups create with 403', async () => {
+      const res = await supertest(server.app)
+        .post('/scim/v2/Groups')
+        .set('Authorization', `Bearer ${usersOnlySecret}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'should-not-exist',
+        })
+        .expect(403);
+      // Neither the tenant name nor the internal marker should leak.
+      const payload = JSON.stringify(res.body);
+      expect(payload).to.not.match(/\[authz-forbidden\]/);
     });
   });
 
@@ -565,12 +661,13 @@ describe('SCIM + authzDynamic — multi-tenant E2E', function () {
     it('authzDynamic features expose token count but no tenant DNs', () => {
       const data = authz.getConfigApiData();
       expect(data.enabled).to.be.true;
-      // Exactly the two seeded tokens; nothing else.
-      expect(data.tokenCount).to.equal(2);
+      // Three seeded tokens: acme, globex, users-only.
+      expect(data.tokenCount).to.equal(3);
       // No hashes or per-token DNs leak through the config API.
       expect(JSON.stringify(data)).to.not.match(/\{SSHA\}/);
       expect(JSON.stringify(data)).to.not.match(/cn=e2e-acme/);
       expect(JSON.stringify(data)).to.not.match(/cn=e2e-globex/);
+      expect(JSON.stringify(data)).to.not.match(/cn=e2e-users-only/);
     });
 
     it('SCIM features advertise the per-tenant base template', () => {
