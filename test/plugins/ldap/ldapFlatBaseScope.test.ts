@@ -175,6 +175,18 @@ describe('LdapFlat base-scope guard', function () {
       expect(res.status).to.equal(200);
     });
 
+    it('rejects a partial DN (prefix without base) rather than producing a malformed DN', () => {
+      // Regression caught during review: "cn=foo" starts with the main
+      // attribute but is not a full DN. It must be rejected cleanly by the
+      // suffix check, not silently re-escaped into `cn=cn\=foo,<base>` with
+      // an attribute value that no longer matches the RDN.
+      expect(() =>
+        (
+          instance as unknown as { resolveDn: (id: string) => string }
+        ).resolveDn('cn=foo')
+      ).to.throw(BadRequestError, /must be in the branch/i);
+    });
+
     it('does not misclassify a main-attribute value containing a comma as a DN', () => {
       // Regression caught during review: with a naive comma-based heuristic,
       // values like "Smith, John" (legitimate for a cn-based branch) would be
