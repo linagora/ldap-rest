@@ -41,26 +41,26 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 
 ### CLI / environment
 
-| Argument | Environment | Default | Description |
-|---|---|---|---|
-| `--scim-prefix` | `DM_SCIM_PREFIX` | `/scim/v2` | Base URL path for all SCIM endpoints |
-| `--scim-user-base` | `DM_SCIM_USER_BASE` | `{ldap_base}` | LDAP branch containing users |
-| `--scim-group-base` | `DM_SCIM_GROUP_BASE` | `{ldap_base}` | LDAP branch containing groups |
-| `--scim-user-base-template` | `DM_SCIM_USER_BASE_TEMPLATE` | — | DN template with `{user}` placeholder (see *multi-tenant*) |
-| `--scim-group-base-template` | `DM_SCIM_GROUP_BASE_TEMPLATE` | — | Same for groups |
-| `--scim-base-map` | `DM_SCIM_BASE_MAP` | — | Path to JSON file mapping authenticated user → `{userBase, groupBase}` |
-| `--scim-user-object-class` | `DM_SCIM_USER_OBJECT_CLASSES` | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users |
-| `--scim-user-rdn-attribute` | `DM_SCIM_USER_RDN_ATTRIBUTE` | `uid` | RDN attribute for Users |
-| `--scim-group-object-class` | `DM_SCIM_GROUP_OBJECT_CLASSES` | `top, groupOfNames` | Object classes for created Groups |
-| `--scim-group-rdn-attribute` | `DM_SCIM_GROUP_RDN_ATTRIBUTE` | `cn` | RDN attribute for Groups |
-| `--scim-id-attribute` | `DM_SCIM_ID_ATTRIBUTE` | `rdn` | `rdn` (default) or `entryUUID` for SCIM `id` |
-| `--scim-user-mapping` | `DM_SCIM_USER_MAPPING` | — | Path to JSON mapping override |
-| `--scim-group-mapping` | `DM_SCIM_GROUP_MAPPING` | — | Same for Groups |
-| `--scim-max-results` | `DM_SCIM_MAX_RESULTS` | `200` | Hard cap on list results |
-| `--scim-bulk-max-operations` | `DM_SCIM_BULK_MAX_OPERATIONS` | `100` | Max `/Bulk` operations per request |
-| `--scim-bulk-max-payload-size` | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE` | `1048576` | Max `/Bulk` payload size in bytes |
-| `--scim-etag` | `DM_SCIM_ETAG` | `false` | Advertise ETag support in discovery (not yet implemented) |
-| `--scim-base-url` | `DM_SCIM_BASE_URL` | auto from request | Override external base URL for `meta.location` values |
+| Argument                       | Environment                     | Default                                            | Description                                                            |
+| ------------------------------ | ------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
+| `--scim-prefix`                | `DM_SCIM_PREFIX`                | `/scim/v2`                                         | Base URL path for all SCIM endpoints                                   |
+| `--scim-user-base`             | `DM_SCIM_USER_BASE`             | `{ldap_base}`                                      | LDAP branch containing users                                           |
+| `--scim-group-base`            | `DM_SCIM_GROUP_BASE`            | `{ldap_base}`                                      | LDAP branch containing groups                                          |
+| `--scim-user-base-template`    | `DM_SCIM_USER_BASE_TEMPLATE`    | —                                                  | DN template with `{user}` placeholder (see _multi-tenant_)             |
+| `--scim-group-base-template`   | `DM_SCIM_GROUP_BASE_TEMPLATE`   | —                                                  | Same for groups                                                        |
+| `--scim-base-map`              | `DM_SCIM_BASE_MAP`              | —                                                  | Path to JSON file mapping authenticated user → `{userBase, groupBase}` |
+| `--scim-user-object-class`     | `DM_SCIM_USER_OBJECT_CLASSES`   | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users                                       |
+| `--scim-user-rdn-attribute`    | `DM_SCIM_USER_RDN_ATTRIBUTE`    | `uid`                                              | RDN attribute for Users                                                |
+| `--scim-group-object-class`    | `DM_SCIM_GROUP_OBJECT_CLASSES`  | `top, groupOfNames`                                | Object classes for created Groups                                      |
+| `--scim-group-rdn-attribute`   | `DM_SCIM_GROUP_RDN_ATTRIBUTE`   | `cn`                                               | RDN attribute for Groups                                               |
+| `--scim-id-attribute`          | `DM_SCIM_ID_ATTRIBUTE`          | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                           |
+| `--scim-user-mapping`          | `DM_SCIM_USER_MAPPING`          | —                                                  | Path to JSON mapping override                                          |
+| `--scim-group-mapping`         | `DM_SCIM_GROUP_MAPPING`         | —                                                  | Same for Groups                                                        |
+| `--scim-max-results`           | `DM_SCIM_MAX_RESULTS`           | `200`                                              | Hard cap on list results                                               |
+| `--scim-bulk-max-operations`   | `DM_SCIM_BULK_MAX_OPERATIONS`   | `100`                                              | Max `/Bulk` operations per request                                     |
+| `--scim-bulk-max-payload-size` | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE` | `1048576`                                          | Max `/Bulk` payload size in bytes                                      |
+| `--scim-etag`                  | `DM_SCIM_ETAG`                  | `false`                                            | Advertise ETag support in discovery (not yet implemented)              |
+| `--scim-base-url`              | `DM_SCIM_BASE_URL`              | auto from request                                  | Override external base URL for `meta.location` values                  |
 
 ### Authentication
 
@@ -77,39 +77,39 @@ For Okta / Entra, load `core/auth/token` with a provisioning token.
 
 All responses have `Content-Type: application/scim+json`.
 
-| Method | Path | Description |
-|---|---|---|
-| GET  | `/Users` | List Users (filter, pagination, sort) |
-| GET  | `/Users/{id}` | Get a User |
-| POST | `/Users` | Create a User |
-| PUT  | `/Users/{id}` | Replace a User |
-| PATCH| `/Users/{id}` | Partial update (add/remove/replace) |
-| DELETE | `/Users/{id}` | Delete a User |
-| GET/POST/PUT/PATCH/DELETE | `/Groups[/{id}]` | Same operations on Groups |
-| POST | `/Bulk` | Batch operations with `bulkId` refs |
-| GET  | `/ServiceProviderConfig` | Capabilities |
-| GET  | `/ResourceTypes` / `/ResourceTypes/{name}` | Resource metadata |
-| GET  | `/Schemas` / `/Schemas/{urn}` | Schema definitions |
+| Method                    | Path                                       | Description                           |
+| ------------------------- | ------------------------------------------ | ------------------------------------- |
+| GET                       | `/Users`                                   | List Users (filter, pagination, sort) |
+| GET                       | `/Users/{id}`                              | Get a User                            |
+| POST                      | `/Users`                                   | Create a User                         |
+| PUT                       | `/Users/{id}`                              | Replace a User                        |
+| PATCH                     | `/Users/{id}`                              | Partial update (add/remove/replace)   |
+| DELETE                    | `/Users/{id}`                              | Delete a User                         |
+| GET/POST/PUT/PATCH/DELETE | `/Groups[/{id}]`                           | Same operations on Groups             |
+| POST                      | `/Bulk`                                    | Batch operations with `bulkId` refs   |
+| GET                       | `/ServiceProviderConfig`                   | Capabilities                          |
+| GET                       | `/ResourceTypes` / `/ResourceTypes/{name}` | Resource metadata                     |
+| GET                       | `/Schemas` / `/Schemas/{urn}`              | Schema definitions                    |
 
 ### Default mapping (LDAP ⇄ SCIM User)
 
-| SCIM | LDAP |
-|---|---|
-| `id` | `uid` (or `entryUUID`) |
-| `userName` | `uid` |
-| `externalId` | `employeeNumber` |
-| `name.familyName` | `sn` |
-| `name.givenName` | `givenName` |
-| `name.formatted` | `cn` |
-| `displayName` | `displayName` |
-| `title` | `title` |
-| `preferredLanguage` | `preferredLanguage` |
-| `emails[primary=true].value` | `mail` |
-| `emails[primary=false].value` | `mailAlternateAddress` |
-| `phoneNumbers[primary=true].value` | `telephoneNumber` |
-| `phoneNumbers[primary=false].value` | `mobile` |
-| `active` | pseudo (false if `pwdAccountLockedTime` is set) |
-| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp` |
+| SCIM                                 | LDAP                                            |
+| ------------------------------------ | ----------------------------------------------- |
+| `id`                                 | `uid` (or `entryUUID`)                          |
+| `userName`                           | `uid`                                           |
+| `externalId`                         | `employeeNumber`                                |
+| `name.familyName`                    | `sn`                                            |
+| `name.givenName`                     | `givenName`                                     |
+| `name.formatted`                     | `cn`                                            |
+| `displayName`                        | `displayName`                                   |
+| `title`                              | `title`                                         |
+| `preferredLanguage`                  | `preferredLanguage`                             |
+| `emails[primary=true].value`         | `mail`                                          |
+| `emails[primary=false].value`        | `mailAlternateAddress`                          |
+| `phoneNumbers[primary=true].value`   | `telephoneNumber`                               |
+| `phoneNumbers[primary=false].value`  | `mobile`                                        |
+| `active`                             | pseudo (false if `pwdAccountLockedTime` is set) |
+| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp`           |
 
 Override with `--scim-user-mapping /path/to/user-mapping.json` (same schema as
 `static/schemas/scim/default-mapping.json`).
@@ -135,16 +135,16 @@ and `--scim-group-mapping`.
 
 Each element of `entries` is a `MappingEntry` with the following optional fields:
 
-| Field | Purpose |
-|---|---|
-| `scim` | **Required.** Top-level SCIM attribute name (`userName`, `displayName`, `emails`, …). |
-| `ldap` | Simple 1:1 mapping to an LDAP attribute. |
-| `ldapPrimary` | For multi-valued SCIM attributes (`emails`, `phoneNumbers`, …), the LDAP attribute that stores the *primary* value. |
-| `ldapSecondary` | LDAP attribute that stores the *non-primary* values of the same SCIM attribute (array). |
-| `sub` | Object that maps SCIM sub-attributes to LDAP attributes. Used for complex SCIM values like `name.familyName` → `sn`. |
-| `multi` | `"array"` or `"single"` (default) — hints array serialization for `ldap`. |
-| `readOnly` | `true` to skip this attribute on write (create/update ignore it). |
-| `operational` | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only. |
+| Field           | Purpose                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `scim`          | **Required.** Top-level SCIM attribute name (`userName`, `displayName`, `emails`, …).                                |
+| `ldap`          | Simple 1:1 mapping to an LDAP attribute.                                                                             |
+| `ldapPrimary`   | For multi-valued SCIM attributes (`emails`, `phoneNumbers`, …), the LDAP attribute that stores the _primary_ value.  |
+| `ldapSecondary` | LDAP attribute that stores the _non-primary_ values of the same SCIM attribute (array).                              |
+| `sub`           | Object that maps SCIM sub-attributes to LDAP attributes. Used for complex SCIM values like `name.familyName` → `sn`. |
+| `multi`         | `"array"` or `"single"` (default) — hints array serialization for `ldap`.                                            |
+| `readOnly`      | `true` to skip this attribute on write (create/update ignore it).                                                    |
+| `operational`   | `true` for LDAP operational attributes (e.g. `entryUUID`) — loaded on read only.                                     |
 
 ### Merging
 
@@ -235,15 +235,15 @@ mapping file describes the internal translation.
 SCIM filters are translated to LDAP filters (RFC 4515). Values are always escaped
 via `escapeLdapFilter()` — no LDAP injection is possible.
 
-| SCIM | LDAP |
-|---|---|
-| `userName eq "alice"` | `(uid=alice)` |
-| `name.familyName sw "Du"` | `(sn=Du*)` |
-| `emails.value co "@example.com"` | `(mail=*@example.com*)` |
-| `displayName pr` | `(displayName=*)` |
-| `active eq true` | `(!(pwdAccountLockedTime=*))` |
-| `a eq "x" and b eq "y"` | `(&(a=x)(b=y))` |
-| `not (a eq "x")` | `(!(a=x))` |
+| SCIM                             | LDAP                          |
+| -------------------------------- | ----------------------------- |
+| `userName eq "alice"`            | `(uid=alice)`                 |
+| `name.familyName sw "Du"`        | `(sn=Du*)`                    |
+| `emails.value co "@example.com"` | `(mail=*@example.com*)`       |
+| `displayName pr`                 | `(displayName=*)`             |
+| `active eq true`                 | `(!(pwdAccountLockedTime=*))` |
+| `a eq "x" and b eq "y"`          | `(&(a=x)(b=y))`               |
+| `not (a eq "x")`                 | `(!(a=x))`                    |
 
 Unknown SCIM attributes raise `400 invalidFilter`.
 
@@ -259,13 +259,13 @@ without any client-visible distinction.
 Whichever auth plugin runs before SCIM must set `req.user` to a string that
 identifies the caller. Supported out of the box:
 
-| Auth plugin | `req.user` value |
-|---|---|
-| `core/auth/token` | the `name` field of `--auth-token "id:secret:name"` |
-| `core/auth/openidconnect` | the subject / preferred_username from the OIDC token |
-| `core/auth/hmac` | the HMAC key id |
-| `core/auth/trustedProxy` | the value of `--trusted-proxy-auth-header` (default `Auth-User`) |
-| `core/auth/llng` | the LemonLDAP::NG user id |
+| Auth plugin               | `req.user` value                                                 |
+| ------------------------- | ---------------------------------------------------------------- |
+| `core/auth/token`         | the `name` field of `--auth-token "id:secret:name"`              |
+| `core/auth/openidconnect` | the subject / preferred_username from the OIDC token             |
+| `core/auth/hmac`          | the HMAC key id                                                  |
+| `core/auth/trustedProxy`  | the value of `--trusted-proxy-auth-header` (default `Auth-User`) |
+| `core/auth/llng`          | the LemonLDAP::NG user id                                        |
 
 In the examples below we use `core/auth/token`, but any of the above works the
 same way — the SCIM plugin only reads `req.user`.
@@ -292,15 +292,15 @@ Create `/etc/ldap-rest/scim-tenants.json`:
 ```json
 {
   "okta-acme": {
-    "userBase":  "ou=users,ou=acme,dc=example,dc=com",
+    "userBase": "ou=users,ou=acme,dc=example,dc=com",
     "groupBase": "ou=groups,ou=acme,dc=example,dc=com"
   },
   "entra-globex": {
-    "userBase":  "ou=users,ou=globex,dc=example,dc=com",
+    "userBase": "ou=users,ou=globex,dc=example,dc=com",
     "groupBase": "ou=groups,ou=globex,dc=example,dc=com"
   },
   "*": {
-    "userBase":  "ou=users,dc=example,dc=com",
+    "userBase": "ou=users,dc=example,dc=com",
     "groupBase": "ou=groups,dc=example,dc=com"
   }
 }
@@ -486,9 +486,14 @@ Response shape (truncated):
         "defaultMapping": "/static/schemas/scim/default-mapping.json"
       },
       "capabilities": {
-        "patch": true, "bulk": true, "filter": true, "sort": true,
-        "etag": false, "changePassword": false,
-        "maxResults": 200, "bulkMaxOperations": 100,
+        "patch": true,
+        "bulk": true,
+        "filter": true,
+        "sort": true,
+        "etag": false,
+        "changePassword": false,
+        "maxResults": 200,
+        "bulkMaxOperations": 100,
         "bulkMaxPayloadSize": 1048576
       },
       "resourceTypes": [
@@ -497,16 +502,33 @@ Response shape (truncated):
           "endpoint": "/scim/v2/Users",
           "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
           "rdnAttribute": "uid",
-          "objectClass": ["top", "inetOrgPerson", "organizationalPerson", "person"],
-          "filterableAttributes": ["userName", "externalId", "name", "displayName", "...", "id", "active"],
-          "mapping": [ /* same shape as default-mapping.json */ ]
+          "objectClass": [
+            "top",
+            "inetOrgPerson",
+            "organizationalPerson",
+            "person"
+          ],
+          "filterableAttributes": [
+            "userName",
+            "externalId",
+            "name",
+            "displayName",
+            "...",
+            "id",
+            "active"
+          ],
+          "mapping": [
+            /* same shape as default-mapping.json */
+          ]
         },
         {
           "id": "Group",
           "endpoint": "/scim/v2/Groups",
           "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
           "rdnAttribute": "cn",
-          "mapping": [ /* ... */ ]
+          "mapping": [
+            /* ... */
+          ]
         }
       ],
       "idStrategy": "rdn",
