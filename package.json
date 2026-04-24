@@ -120,6 +120,50 @@
       "types": "./dist/src/plugins/ldap/trash.d.ts",
       "import": "./dist/plugins/ldap/trash.js"
     },
+    "./plugin-scim-baseresolver": {
+      "types": "./dist/src/plugins/scim/baseResolver.d.ts",
+      "import": "./dist/plugins/scim/baseResolver.js"
+    },
+    "./plugin-scim-bulk": {
+      "types": "./dist/src/plugins/scim/bulk.d.ts",
+      "import": "./dist/plugins/scim/bulk.js"
+    },
+    "./plugin-scim-discovery": {
+      "types": "./dist/src/plugins/scim/discovery.d.ts",
+      "import": "./dist/plugins/scim/discovery.js"
+    },
+    "./plugin-scim-errors": {
+      "types": "./dist/src/plugins/scim/errors.d.ts",
+      "import": "./dist/plugins/scim/errors.js"
+    },
+    "./plugin-scim-filter": {
+      "types": "./dist/src/plugins/scim/filter.d.ts",
+      "import": "./dist/plugins/scim/filter.js"
+    },
+    "./plugin-scim-groups": {
+      "types": "./dist/src/plugins/scim/groups.d.ts",
+      "import": "./dist/plugins/scim/groups.js"
+    },
+    "./plugin-scim-mapping": {
+      "types": "./dist/src/plugins/scim/mapping.d.ts",
+      "import": "./dist/plugins/scim/mapping.js"
+    },
+    "./plugin-scim-patch": {
+      "types": "./dist/src/plugins/scim/patch.d.ts",
+      "import": "./dist/plugins/scim/patch.js"
+    },
+    "./plugin-scim-scim": {
+      "types": "./dist/src/plugins/scim/scim.d.ts",
+      "import": "./dist/plugins/scim/scim.js"
+    },
+    "./plugin-scim-types": {
+      "types": "./dist/src/plugins/scim/types.d.ts",
+      "import": "./dist/plugins/scim/types.js"
+    },
+    "./plugin-scim-users": {
+      "types": "./dist/src/plugins/scim/users.d.ts",
+      "import": "./dist/plugins/scim/users.js"
+    },
     "./plugin-static": {
       "types": "./dist/src/plugins/static.d.ts",
       "import": "./dist/plugins/static.js"
@@ -375,6 +419,18 @@
     "./schema-obm-users": {
       "import": "./static/schemas/obm/users.json",
       "require": "./static/schemas/obm/users.json"
+    },
+    "./schema-scim-group": {
+      "import": "./static/schemas/scim/Group.json",
+      "require": "./static/schemas/scim/Group.json"
+    },
+    "./schema-scim-user": {
+      "import": "./static/schemas/scim/User.json",
+      "require": "./static/schemas/scim/User.json"
+    },
+    "./schema-scim-default-mapping": {
+      "import": "./static/schemas/scim/default-mapping.json",
+      "require": "./static/schemas/scim/default-mapping.json"
     },
     "./schema-standard-automountmaps": {
       "import": "./static/schemas/standard/automountMaps.json",

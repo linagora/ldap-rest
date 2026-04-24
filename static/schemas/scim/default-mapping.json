@@ -1,0 +1,48 @@
+{
+  "_comment": "Default LDAP <-> SCIM mapping for inetOrgPerson (User) and groupOfNames (Group). Override individual entries via --scim-user-mapping / --scim-group-mapping with a file using this shape.",
+  "user": {
+    "resourceType": "User",
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "entries": [
+      { "scim": "userName", "ldap": "uid" },
+      { "scim": "externalId", "ldap": "employeeNumber" },
+      {
+        "scim": "name",
+        "sub": {
+          "familyName": "sn",
+          "givenName": "givenName",
+          "formatted": "cn",
+          "middleName": "initials"
+        }
+      },
+      { "scim": "displayName", "ldap": "displayName" },
+      { "scim": "title", "ldap": "title" },
+      { "scim": "preferredLanguage", "ldap": "preferredLanguage" },
+      {
+        "scim": "emails",
+        "ldapPrimary": "mail",
+        "ldapSecondary": "mailAlternateAddress",
+        "multi": "array"
+      },
+      {
+        "scim": "phoneNumbers",
+        "ldapPrimary": "telephoneNumber",
+        "ldapSecondary": "mobile",
+        "multi": "array"
+      }
+    ]
+  },
+  "group": {
+    "resourceType": "Group",
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+    "entries": [
+      { "scim": "displayName", "ldap": "cn" },
+      {
+        "scim": "externalId",
+        "ldap": "entryUUID",
+        "operational": true,
+        "readOnly": true
+      }
+    ]
+  }
+}

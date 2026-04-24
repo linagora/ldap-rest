@@ -1,0 +1,147 @@
+{
+  "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+  "name": "User",
+  "description": "User Account (RFC 7643)",
+  "attributes": [
+    {
+      "name": "userName",
+      "type": "string",
+      "multiValued": false,
+      "required": true,
+      "caseExact": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "uniqueness": "server"
+    },
+    {
+      "name": "name",
+      "type": "complex",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "subAttributes": [
+        { "name": "formatted", "type": "string" },
+        { "name": "familyName", "type": "string" },
+        { "name": "givenName", "type": "string" },
+        { "name": "middleName", "type": "string" },
+        { "name": "honorificPrefix", "type": "string" },
+        { "name": "honorificSuffix", "type": "string" }
+      ]
+    },
+    {
+      "name": "displayName",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "nickName",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "userType",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "preferredLanguage",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "locale",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "timezone",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "active",
+      "type": "boolean",
+      "multiValued": false,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default"
+    },
+    {
+      "name": "password",
+      "type": "string",
+      "multiValued": false,
+      "required": false,
+      "mutability": "writeOnly",
+      "returned": "never"
+    },
+    {
+      "name": "emails",
+      "type": "complex",
+      "multiValued": true,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "subAttributes": [
+        { "name": "value", "type": "string" },
+        { "name": "display", "type": "string" },
+        { "name": "type", "type": "string" },
+        { "name": "primary", "type": "boolean" }
+      ]
+    },
+    {
+      "name": "phoneNumbers",
+      "type": "complex",
+      "multiValued": true,
+      "required": false,
+      "mutability": "readWrite",
+      "returned": "default",
+      "subAttributes": [
+        { "name": "value", "type": "string" },
+        { "name": "display", "type": "string" },
+        { "name": "type", "type": "string" },
+        { "name": "primary", "type": "boolean" }
+      ]
+    },
+    {
+      "name": "groups",
+      "type": "complex",
+      "multiValued": true,
+      "required": false,
+      "mutability": "readOnly",
+      "returned": "default",
+      "subAttributes": [
+        { "name": "value", "type": "string" },
+        { "name": "$ref", "type": "reference" },
+        { "name": "display", "type": "string" },
+        { "name": "type", "type": "string" }
+      ]
+    }
+  ]
+}
