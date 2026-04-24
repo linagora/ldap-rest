@@ -194,9 +194,7 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     try {
-      const dn = /,/.test(id)
-        ? id
-        : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+      const dn = this.resolveDn(id);
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
         dn
@@ -271,31 +269,58 @@ export default abstract class LdapFlat extends DmPlugin {
     });
   }
 
+  /**
+   * Resolve an id (either an RDN value or a full DN) into a DN inside this
+   * instance's base branch.
+   *
+   * A value is treated as a full DN only when it starts with
+   * `mainAttribute=`; otherwise it is treated as a raw RDN value and escaped.
+   * This matters for cn-based branches where values like `Smith, John` are
+   * legal and must not be misclassified as DNs.
+   *
+   * When the id is a full DN we enforce that it terminates with `,this.base`
+   * (comparison is case-insensitive, matching LDAP semantics). Without this
+   * check a caller scoped to one resource could address entries outside that
+   * scope by passing a full DN from a sibling branch.
+   *
+   * @throws BadRequestError if the provided DN is not under this.base
+   */
+  protected resolveDn(id: string): string {
+    const dnPrefix = new RegExp(
+      `^${escapeRegex(this.mainAttribute)}=`,
+      'i'
+    );
+    if (dnPrefix.test(id)) {
+      const expectedSuffix = `,${this.base}`;
+      if (!id.toLowerCase().endsWith(expectedSuffix.toLowerCase())) {
+        throw new BadRequestError(
+          `DN must be in the branch "${this.base}". ` +
+            `Provided DN "${id}" does not end with "${expectedSuffix}"`
+        );
+      }
+      return id;
+    }
+    return `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+  }
+
   async addEntry(
     id: string,
     additional: AttributesList = {},
     req?: Request
   ): Promise<boolean> {
     let dn: string;
-    if (new RegExp(`^${this.mainAttribute}=`).test(id)) {
+    if (new RegExp(`^${this.mainAttribute}=`, 'i').test(id)) {
       // DN provided - validate it's in the correct flat branch
-      dn = id;
-      const expectedSuffix = `,${this.base}`;
-      if (!dn.endsWith(expectedSuffix)) {
-        throw new BadRequestError(
-          `DN must be in the flat branch "${this.base}". ` +
-            `Provided DN "${dn}" does not end with "${expectedSuffix}"`
-        );
-      }
+      dn = this.resolveDn(id);
       // Extract the RDN value, correctly handling escaped commas
       // e.g. uid=Smith\,John,ou=users -> id = "Smith\,John"
       id = id.replace(
-        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
         '$1'
       );
     } else {
       validateDnValue(id, this.mainAttribute);
-      dn = `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+      dn = this.resolveDn(id);
     }
     await this.validateNewEntry(dn, {
       objectClass: this.objectClass,
@@ -361,9 +386,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async modifyEntry(id: string, changes: ModifyRequest): Promise<boolean> {
-    let dn = /,/.test(id)
-      ? id
-      : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+    let dn = this.resolveDn(id);
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}modify`],
@@ -413,12 +436,8 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!/,/.test(newId)) {
       validateDnValue(newId, this.mainAttribute);
     }
-    let dn = /,/.test(id)
-      ? id
-      : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
-    let newDn = /,/.test(newId)
-      ? newId
-      : `${this.mainAttribute}=${escapeDnValue(newId)},${this.base}`;
+    let dn = this.resolveDn(id);
+    let newDn = this.resolveDn(newId);
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
@@ -432,9 +451,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async deleteEntry(id: string): Promise<boolean> {
-    let dn = /,/.test(id)
-      ? id
-      : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+    let dn = this.resolveDn(id);
     dn = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}delete`],
       dn
@@ -453,9 +470,7 @@ export default abstract class LdapFlat extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ departmentPath: string; departmentLink: string }> {
-    const dn = /,/.test(id)
-      ? id
-      : `${this.mainAttribute}=${escapeDnValue(id)},${this.base}`;
+    const dn = this.resolveDn(id);
 
     // Get link and path attribute names from config
     const linkAttr =
