@@ -93,16 +93,28 @@ export const tooManyRequests = (
 
 // We don't want to publish the real error in server responses
 export const serverError = (res: Response, err: unknown): void => {
-  const statusCode =
+  const message = err instanceof Error ? err.message : String(err);
+  let statusCode =
     err instanceof Error && 'statusCode' in err
       ? (err as { statusCode: number }).statusCode
       : 500;
 
+  // Upstream plugins sometimes wrap errors as `new Error(\`...: ${err}\`)`,
+  // dropping any `statusCode` the original carried. Authz plugins can embed
+  // `[authz-forbidden]` in the thrown message so the final serializer still
+  // knows to emit a proper 403 instead of falling back to 500.
+  if (statusCode === 500 && /\[authz-forbidden\]/.test(message)) {
+    statusCode = 403;
+  }
+
   // Client error (4xx) - log as warning and return error message
   if (statusCode >= 400 && statusCode < 500) {
-    const message = err instanceof Error ? err.message : 'Bad request';
-    _logger.warn(`Client error ${statusCode}: ${message}`);
-    res.status(statusCode).json({ error: message });
+    const clientMessage =
+      statusCode === 403 && /\[authz-forbidden\]/.test(message)
+        ? 'Token does not have permission on this branch'
+        : message;
+    _logger.warn(`Client error ${statusCode}: ${clientMessage}`);
+    res.status(statusCode).json({ error: clientMessage });
     return;
   }
 
