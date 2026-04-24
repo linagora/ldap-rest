@@ -40,8 +40,11 @@ describe('LdapFlat base-scope guard', function () {
     instance = plugin.instances[0];
     BASE = process.env.DM_LDAP_BASE as string;
     TITLE_BRANCH = `ou=twakeTitle,ou=nomenclature,${BASE}`;
-    // A DN that sits OUTSIDE the title branch — representative of the bypass
-    FOREIGN_DN = `uid=admin,ou=users,${BASE}`;
+    // A DN that sits OUTSIDE the title branch — representative of the bypass.
+    // We use the same RDN attribute (cn) as the title branch so the guard's
+    // DN-detection triggers; different-attribute DNs are handled by the escape
+    // path and tested separately below.
+    FOREIGN_DN = `cn=hijacked,ou=users,${BASE}`;
   });
 
   /**
@@ -82,7 +85,7 @@ describe('LdapFlat base-scope guard', function () {
 
     it('renameEntry rejects a source DN outside the branch', async () => {
       try {
-        await instance.renameEntry(FOREIGN_DN, 'cn=new');
+        await instance.renameEntry(FOREIGN_DN, 'NewTitleName');
         throw new Error('expected BadRequestError');
       } catch (err) {
         expect(err).to.be.instanceOf(BadRequestError);
@@ -90,8 +93,10 @@ describe('LdapFlat base-scope guard', function () {
     });
 
     it('renameEntry rejects a target DN outside the branch', async () => {
+      // Source is a valid in-branch DN so the rejection comes from the target.
+      const validSource = `cn=some-existing,${TITLE_BRANCH}`;
       try {
-        await instance.renameEntry('cn=existing', FOREIGN_DN);
+        await instance.renameEntry(validSource, FOREIGN_DN);
         throw new Error('expected BadRequestError');
       } catch (err) {
         expect(err).to.be.instanceOf(BadRequestError);
@@ -168,6 +173,18 @@ describe('LdapFlat base-scope guard', function () {
       const res = await request.get(`/api/v1/ldap/titles/${enc(mixedCase)}`);
       // LDAP will resolve it (case-insensitive compare) — the guard must not block it
       expect(res.status).to.equal(200);
+    });
+
+    it('does not misclassify a main-attribute value containing a comma as a DN', () => {
+      // Regression caught during review: with a naive comma-based heuristic,
+      // values like "Smith, John" (legitimate for a cn-based branch) would be
+      // treated as DNs and rejected by the suffix check. The guard must only
+      // trigger when the id actually starts with `mainAttribute=`.
+      const valueWithComma = 'Smith, John';
+      const dn = (
+        instance as unknown as { resolveDn: (id: string) => string }
+      ).resolveDn(valueWithComma);
+      expect(dn).to.equal(`cn=Smith\\, John,${TITLE_BRANCH}`);
     });
   });
 });

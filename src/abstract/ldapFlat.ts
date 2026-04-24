@@ -273,17 +273,24 @@ export default abstract class LdapFlat extends DmPlugin {
    * Resolve an id (either an RDN value or a full DN) into a DN inside this
    * instance's base branch.
    *
-   * When the id already looks like a DN (contains a comma) we enforce that it
-   * terminates with `,this.base`. Without this check a caller with access to a
-   * route scoped to one branch could address entries outside that scope by
-   * passing a full DN from a sibling branch.
+   * A value is treated as a full DN only when it starts with
+   * `mainAttribute=`; otherwise it is treated as a raw RDN value and escaped.
+   * This matters for cn-based branches where values like `Smith, John` are
+   * legal and must not be misclassified as DNs.
    *
-   * DN components are compared case-insensitively to match LDAP semantics.
+   * When the id is a full DN we enforce that it terminates with `,this.base`
+   * (comparison is case-insensitive, matching LDAP semantics). Without this
+   * check a caller scoped to one resource could address entries outside that
+   * scope by passing a full DN from a sibling branch.
    *
-   * @throws BadRequestError if the DN is not under this.base
+   * @throws BadRequestError if the provided DN is not under this.base
    */
   protected resolveDn(id: string): string {
-    if (/,/.test(id)) {
+    const dnPrefix = new RegExp(
+      `^${escapeRegex(this.mainAttribute)}=`,
+      'i'
+    );
+    if (dnPrefix.test(id)) {
       const expectedSuffix = `,${this.base}`;
       if (!id.toLowerCase().endsWith(expectedSuffix.toLowerCase())) {
         throw new BadRequestError(
