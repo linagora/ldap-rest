@@ -13,6 +13,7 @@ This guide will help you create powerful, production-ready plugins for LDAP-Rest
 - [Configuration Best Practices](#configuration-best-practices)
 - [Complete Plugin Example](#complete-plugin-example)
 - [Testing Your Plugin](#testing-your-plugin)
+- [Documenting REST endpoints (OpenAPI)](./openapi.md)
 
 ---
 

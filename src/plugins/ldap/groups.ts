@@ -48,6 +48,74 @@ export interface postAdd {
 }
 export type postModify = ModifyRequest;
 
+/**
+ * Shared OpenAPI schemas surfaced by this plugin. Picked up by
+ * scripts/generate-openapi.ts and merged into `components.schemas`.
+ *
+ * @openapi-component
+ * Group:
+ *   type: object
+ *   description: An LDAP group entry (groupOfNames / groupOfUniqueNames).
+ *   required: [dn, cn]
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: Fully-qualified distinguished name of the entry.
+ *       example: cn=admins,ou=groups,dc=example,dc=com
+ *     cn:
+ *       type: string
+ *       description: Common name (RDN attribute) of the group.
+ *       example: admins
+ *     description:
+ *       type: string
+ *       example: Server administrators
+ *     member:
+ *       type: array
+ *       items: { type: string }
+ *       description: DNs of the group's members.
+ *       example:
+ *         - uid=alice,ou=users,dc=example,dc=com
+ *         - uid=bob,ou=users,dc=example,dc=com
+ * GroupCreate:
+ *   type: object
+ *   required: [cn]
+ *   properties:
+ *     cn:
+ *       type: string
+ *       description: Common name of the new group.
+ *     description:
+ *       type: string
+ *     member:
+ *       type: array
+ *       items: { type: string }
+ *       description: Initial members (DNs).
+ *   example:
+ *     cn: admins
+ *     description: Server administrators
+ *     member:
+ *       - uid=alice,ou=users,dc=example,dc=com
+ * GroupModify:
+ *   type: object
+ *   description: |
+ *     Partial update. Each provided attribute is replaced wholesale. Use
+ *     the dedicated `/members` endpoints to add/remove members one at a
+ *     time without supplying the full list.
+ *   properties:
+ *     description: { type: string }
+ *     member:
+ *       type: array
+ *       items: { type: string }
+ *   example:
+ *     description: Updated description
+ * Error:
+ *   type: object
+ *   properties:
+ *     error: { type: string }
+ *     code: { type: integer }
+ *   example:
+ *     error: Group not found
+ *     code: 404
+ */
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';
   roles: Role[] = ['api', 'configurable'] as const;
@@ -118,6 +186,48 @@ export default class LdapGroups extends DmPlugin {
    */
 
   api(app: Express): void {
+    /**
+     * @openapi
+     * summary: List groups
+     * description: |
+     *   Returns every group under the configured group base. The optional
+     *   `match` query supports either a raw LDAP filter (when it contains
+     *   `=`) or a simple value matched against the RDN attribute.
+     * parameters:
+     *   - in: query
+     *     name: match
+     *     schema: { type: string }
+     *     description: LDAP filter or simple value.
+     *     example: admin*
+     *   - in: query
+     *     name: attributes
+     *     schema: { type: string }
+     *     description: Comma-separated list of attributes to return.
+     *     example: cn,description,member
+     * responses:
+     *   '200':
+     *     description: Group list.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/Group' }
+     *         example:
+     *           - dn: cn=admins,ou=groups,dc=example,dc=com
+     *             cn: admins
+     *             description: Server administrators
+     *             member:
+     *               - uid=alice,ou=users,dc=example,dc=com
+     *           - dn: cn=editors,ou=groups,dc=example,dc=com
+     *             cn: editors
+     *             description: Content editors
+     *             member: []
+     *   '400':
+     *     description: Invalid `match` query.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // List groups
     app.get(
       `${this.config.api_prefix}/v1/ldap/groups`,
@@ -151,30 +261,134 @@ export default class LdapGroups extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Get group by CN
+     * description: |
+     *   The `:cn` segment may be either the group's RDN value (e.g.
+     *   `admins`) or its full DN. Returns the raw LDAP entry.
+     * responses:
+     *   '200':
+     *     description: Group entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Group' }
+     *         example:
+     *           dn: cn=admins,ou=groups,dc=example,dc=com
+     *           cn: admins
+     *           description: Server administrators
+     *           member:
+     *             - uid=alice,ou=users,dc=example,dc=com
+     *   '404':
+     *     description: Group not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Get group by cn or DN
     app.get(
       `${this.config.api_prefix}/v1/ldap/groups/:cn`,
       asyncHandler(async (req, res) => this.apiGet(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Create group
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/GroupCreate' }
+     * responses:
+     *   '200':
+     *     description: Group created.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Add group
     app.post(
       `${this.config.api_prefix}/v1/ldap/groups`,
       asyncHandler(async (req, res) => this.apiAdd(req, res, this.cn))
     );
 
+    /**
+     * @openapi
+     * summary: Delete group
+     * responses:
+     *   '200':
+     *     description: Group deleted.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Group not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Delete group
     app.delete(
       `${this.config.api_prefix}/v1/ldap/groups/:cn`,
       asyncHandler(async (req, res) => this.apiDelete(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Modify group
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/GroupModify' }
+     * responses:
+     *   '200':
+     *     description: Group updated.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Group not found.
+     */
     // Modify group
     app.put(
       `${this.config.api_prefix}/v1/ldap/groups/:cn`,
       asyncHandler(async (req, res) => this.apiModify(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Add members to group
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema:
+     *         type: object
+     *         required: [member]
+     *         properties:
+     *           member:
+     *             oneOf:
+     *               - type: string
+     *               - type: array
+     *                 items: { type: string }
+     *             description: One DN or a list of DNs to add.
+     *       example:
+     *         member:
+     *           - uid=carol,ou=users,dc=example,dc=com
+     *           - uid=dave,ou=users,dc=example,dc=com
+     * responses:
+     *   '200':
+     *     description: Members added.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     */
     // Add member to group
     app.post(
       `${this.config.api_prefix}/v1/ldap/groups/:cn/members`,
@@ -189,6 +403,20 @@ export default class LdapGroups extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Remove member from group
+     * description: |
+     *   `:member` is the URL-encoded DN of the member to remove.
+     * responses:
+     *   '200':
+     *     description: Member removed.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Group or member not found.
+     */
     // Delete member from group
     app.delete(
       `${this.config.api_prefix}/v1/ldap/groups/:cn/members/:member`,
@@ -208,6 +436,33 @@ export default class LdapGroups extends DmPlugin {
       this.config.ldap_organization_link_attribute &&
       this.config.ldap_organization_path_attribute
     ) {
+      /**
+       * @openapi
+       * summary: Move group to another organization
+       * description: |
+       *   Only registered when both
+       *   `--ldap-organization-link-attribute` and
+       *   `--ldap-organization-path-attribute` are configured.
+       * requestBody:
+       *   required: true
+       *   content:
+       *     application/json:
+       *       schema:
+       *         type: object
+       *         required: [targetOrgDn]
+       *         properties:
+       *           targetOrgDn:
+       *             type: string
+       *             description: DN of the destination organization.
+       *       example:
+       *         targetOrgDn: ou=engineering,ou=organizations,dc=example,dc=com
+       * responses:
+       *   '200':
+       *     description: Group moved.
+       *     content:
+       *       application/json:
+       *         example: { success: true }
+       */
       app.post(
         `${this.config.api_prefix}/v1/ldap/groups/:cn/move`,
         asyncHandler(async (req, res) => {
@@ -229,6 +484,29 @@ export default class LdapGroups extends DmPlugin {
       );
     }
 
+    /**
+     * @openapi
+     * summary: Rename group (change CN)
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema:
+     *         type: object
+     *         required: [newCn]
+     *         properties:
+     *           newCn:
+     *             type: string
+     *             description: New CN value (RDN attribute).
+     *       example:
+     *         newCn: site-admins
+     * responses:
+     *   '200':
+     *     description: Group renamed.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     */
     // Rename group (change cn)
     app.post(
       `${this.config.api_prefix}/v1/ldap/groups/:cn/rename`,
