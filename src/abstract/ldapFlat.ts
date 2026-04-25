@@ -302,7 +302,7 @@ export default abstract class LdapFlat extends DmPlugin {
       if (!hasParent || parent.toLowerCase() !== this.base.toLowerCase()) {
         throw new BadRequestError(
           `DN must be a direct child of "${this.base}". ` +
-            `Provided DN "${id}" has parent "${hasParent ? parent : ''}"`
+            `Provided DN "${id}" has parent "${hasParent ? parent : '<none>'}"`
         );
       }
       return id;

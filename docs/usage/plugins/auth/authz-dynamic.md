@@ -16,10 +16,7 @@ each SCIM client (or REST API consumer) is scoped to its own subtree.
    (timing-safe comparison).
 3. On a match, the plugin sets `req.user` to the tenant name and records the
    token's ACL in an `AsyncLocalStorage` context.
-4. Downstream LDAP operations (via `ldapActions.search / add / modify /
-delete / rename`) trigger authz hooks that read the active token from the
-   async context and throw if the requested DN is outside the allowed
-   branches.
+4. Downstream LDAP operations (via `ldapActions.search / add / modify / delete / rename`) trigger authz hooks that read the active token from the async context and throw if the requested DN is outside the allowed branches.
 5. The cache refreshes on a TTL (default 60 s) or on demand via a protected
    reload endpoint.
 
