@@ -32,6 +32,7 @@ import {
   escapeLdapFilter,
   escapeRegex,
   getCompiledRegex,
+  getParentDn,
   launchHooks,
   launchHooksChained,
   transformSchemas,
@@ -278,12 +279,15 @@ export default abstract class LdapFlat extends DmPlugin {
    * This matters for cn-based branches where values like `Smith, John` are
    * legal and must not be misclassified as DNs.
    *
-   * When the id is a full DN we enforce that it terminates with `,this.base`
-   * (comparison is case-insensitive, matching LDAP semantics). Without this
-   * check a caller scoped to one resource could address entries outside that
-   * scope by passing a full DN from a sibling branch.
+   * When the id is a full DN we enforce that its parent equals this.base
+   * (LdapFlat entries are, by definition, direct children of the base).
+   * The comparison is done on the parsed RDN components so escape-aware
+   * payloads like `cn=pwn\,ou=titles,ou=nomenclature,dc=example,dc=com`
+   * cannot sneak past a naive textual suffix check: `\,` is a literal comma
+   * inside the first RDN's value, so the actual parent of that DN is
+   * `ou=nomenclature,dc=example,dc=com` — one level above the expected base.
    *
-   * @throws BadRequestError if the provided DN is not under this.base
+   * @throws BadRequestError if the provided DN is not a direct child of this.base
    */
   protected resolveDn(id: string): string {
     const dnPrefix = new RegExp(
@@ -291,11 +295,14 @@ export default abstract class LdapFlat extends DmPlugin {
       'i'
     );
     if (dnPrefix.test(id)) {
-      const expectedSuffix = `,${this.base}`;
-      if (!id.toLowerCase().endsWith(expectedSuffix.toLowerCase())) {
+      const parent = getParentDn(id);
+      // If the DN has a single RDN, getParentDn returns the DN itself; treat
+      // that as "missing parent" rather than "parent equals base".
+      const hasParent = parent !== id;
+      if (!hasParent || parent.toLowerCase() !== this.base.toLowerCase()) {
         throw new BadRequestError(
-          `DN must be in the branch "${this.base}". ` +
-            `Provided DN "${id}" does not end with "${expectedSuffix}"`
+          `DN must be a direct child of "${this.base}". ` +
+            `Provided DN "${id}" has parent "${hasParent ? parent : '<none>'}"`
         );
       }
       return id;

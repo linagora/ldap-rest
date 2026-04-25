@@ -16,10 +16,7 @@ each SCIM client (or REST API consumer) is scoped to its own subtree.
    (timing-safe comparison).
 3. On a match, the plugin sets `req.user` to the tenant name and records the
    token's ACL in an `AsyncLocalStorage` context.
-4. Downstream LDAP operations (via `ldapActions.search / add / modify /
-   delete / rename`) trigger authz hooks that read the active token from the
-   async context and throw if the requested DN is outside the allowed
-   branches.
+4. Downstream LDAP operations (via `ldapActions.search / add / modify / delete / rename`) trigger authz hooks that read the active token from the async context and throw if the requested DN is outside the allowed branches.
 5. The cache refreshes on a TTL (default 60 s) or on demand via a protected
    reload endpoint.
 
@@ -39,14 +36,14 @@ node lib/bin/index.js \
 
 ### CLI / environment
 
-| Argument | Environment | Default | Purpose |
-|---|---|---|---|
-| `--authz-dynamic-base` | `DM_AUTHZ_DYNAMIC_BASE` | — (required) | LDAP branch that contains the token entries |
-| `--authz-dynamic-cache-ttl` | `DM_AUTHZ_DYNAMIC_CACHE_TTL` | `60` | Cache refresh interval in seconds |
-| `--authz-dynamic-token-attribute` | `DM_AUTHZ_DYNAMIC_TOKEN_ATTRIBUTE` | `userPassword` | Attribute holding the hashed bearer token |
-| `--authz-dynamic-config-attribute` | `DM_AUTHZ_DYNAMIC_CONFIG_ATTRIBUTE` | `description` | Attribute holding the JSON ACL document |
-| `--authz-dynamic-tenant-attribute` | `DM_AUTHZ_DYNAMIC_TENANT_ATTRIBUTE` | `cn` | Attribute from which `req.user` is read |
-| `--authz-dynamic-reload-endpoint` | `DM_AUTHZ_DYNAMIC_RELOAD_ENDPOINT` | `false` | Register `POST /api/v1/authz-dynamic/reload` for manual cache refresh |
+| Argument                           | Environment                         | Default        | Purpose                                                               |
+| ---------------------------------- | ----------------------------------- | -------------- | --------------------------------------------------------------------- |
+| `--authz-dynamic-base`             | `DM_AUTHZ_DYNAMIC_BASE`             | — (required)   | LDAP branch that contains the token entries                           |
+| `--authz-dynamic-cache-ttl`        | `DM_AUTHZ_DYNAMIC_CACHE_TTL`        | `60`           | Cache refresh interval in seconds                                     |
+| `--authz-dynamic-token-attribute`  | `DM_AUTHZ_DYNAMIC_TOKEN_ATTRIBUTE`  | `userPassword` | Attribute holding the hashed bearer token                             |
+| `--authz-dynamic-config-attribute` | `DM_AUTHZ_DYNAMIC_CONFIG_ATTRIBUTE` | `description`  | Attribute holding the JSON ACL document                               |
+| `--authz-dynamic-tenant-attribute` | `DM_AUTHZ_DYNAMIC_TENANT_ATTRIBUTE` | `cn`           | Attribute from which `req.user` is read                               |
+| `--authz-dynamic-reload-endpoint`  | `DM_AUTHZ_DYNAMIC_RELOAD_ENDPOINT`  | `false`        | Register `POST /api/v1/authz-dynamic/reload` for manual cache refresh |
 
 ## Token entry shape
 
@@ -92,14 +89,14 @@ description: {
 
 Handled by a constant-time verifier (`authzDynamicHash.ts`):
 
-| Scheme | Notes |
-|---|---|
-| `{SSHA}` | salted SHA-1 — OpenLDAP default, recommended minimum |
-| `{SHA}` | unsalted SHA-1 — legacy |
-| `{SSHA256}` / `{SHA256}` | salted / unsalted SHA-256 |
-| `{SSHA512}` / `{SHA512}` | salted / unsalted SHA-512 |
-| `{SMD5}` / `{MD5}` | salted / unsalted MD5 — legacy, avoid |
-| `{CLEARTEXT}` / `{PLAIN}` / no prefix | cleartext — test environments only |
+| Scheme                                | Notes                                                |
+| ------------------------------------- | ---------------------------------------------------- |
+| `{SSHA}`                              | salted SHA-1 — OpenLDAP default, recommended minimum |
+| `{SHA}`                               | unsalted SHA-1 — legacy                              |
+| `{SSHA256}` / `{SHA256}`              | salted / unsalted SHA-256                            |
+| `{SSHA512}` / `{SHA512}`              | salted / unsalted SHA-512                            |
+| `{SMD5}` / `{MD5}`                    | salted / unsalted MD5 — legacy, avoid                |
+| `{CLEARTEXT}` / `{PLAIN}` / no prefix | cleartext — test environments only                   |
 
 To generate an `{SSHA}` hash with OpenLDAP tools: `slappasswd -h '{SSHA}'`.
 To generate programmatically, `ssha(token)` is also exported from
