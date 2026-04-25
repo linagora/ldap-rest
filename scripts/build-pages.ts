@@ -168,6 +168,41 @@ function renderLanding(introMarkdown: string): string {
   }
   pre code { background: transparent; padding: 0; }
   ul, ol { padding-left: 1.5em; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 0 0 2.5rem;
+  }
+  .card {
+    display: block;
+    padding: 1.25rem 1.25rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-muted);
+    color: var(--fg);
+    text-decoration: none;
+    transition: border-color 120ms, transform 120ms;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .card .title {
+    margin: 0 0 0.25rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .card .title::after {
+    content: " →";
+    color: var(--fg-muted);
+  }
+  .card p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--fg-muted);
+  }
   footer {
     border-top: 1px solid var(--border);
     color: var(--fg-muted);
@@ -192,6 +227,20 @@ function renderLanding(introMarkdown: string): string {
   </div>
 </header>
 <main>
+  <section class="cards" aria-label="Quick links">
+    <a class="card" href="./api/">
+      <p class="title">API reference</p>
+      <p>Browse every REST endpoint with Redoc — searchable, request/response schemas, no setup.</p>
+    </a>
+    <a class="card" href="${REPO_URL}#documentation">
+      <p class="title">Documentation</p>
+      <p>Usage guides, configuration, plugin development and authentication setup on GitHub.</p>
+    </a>
+    <a class="card" href="${REPO_URL}">
+      <p class="title">Source code</p>
+      <p>linagora/ldap-rest — issues, releases, and contribution guide.</p>
+    </a>
+  </section>
   <article id="intro"><p>Loading…</p></article>
 </main>
 <footer>
