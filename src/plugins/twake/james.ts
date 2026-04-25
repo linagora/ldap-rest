@@ -14,6 +14,53 @@ import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { escapeLdapFilter } from '../../lib/utils';
 
+/**
+ * OpenAPI schemas specific to the James integration.
+ *
+ * @openapi-component
+ * JamesQuotaUsage:
+ *   type: object
+ *   description: |
+ *     Quota information for a mailbox user as returned by the James
+ *     WebAdmin API (`GET /quota/users/{mail}`). Contains separate
+ *     counters for message count and storage size.
+ *   properties:
+ *     count:
+ *       type: object
+ *       description: Message-count quota.
+ *       properties:
+ *         used:
+ *           type: integer
+ *           description: Number of messages currently stored.
+ *           example: 142
+ *         max:
+ *           type: integer
+ *           nullable: true
+ *           description: |
+ *             Maximum number of messages allowed. `null` means unlimited.
+ *           example: 10000
+ *     size:
+ *       type: object
+ *       description: Storage-size quota (bytes).
+ *       properties:
+ *         used:
+ *           type: integer
+ *           description: Bytes currently used.
+ *           example: 524288000
+ *         max:
+ *           type: integer
+ *           nullable: true
+ *           description: |
+ *             Maximum bytes allowed. `null` means unlimited.
+ *           example: 2147483648
+ *   example:
+ *     count:
+ *       used: 142
+ *       max: 10000
+ *     size:
+ *       used: 524288000
+ *       max: 2147483648
+ */
 export default class James extends TwakePlugin {
   name = 'james';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -56,6 +103,60 @@ export default class James extends TwakePlugin {
   api(app: Express): void {
     const apiPrefix = this.config.api_prefix || '/api';
 
+    /**
+     * @openapi
+     * summary: Get user quota usage
+     * description: |
+     *   Returns the current mailbox quota counters (message count and
+     *   storage size) for the given user. Requires the Apache James
+     *   integration to be configured (`james_webadmin_url`,
+     *   `james_webadmin_token`). The quota data is fetched live from
+     *   the James WebAdmin API.
+     * tags:
+     *   - Apache James Integration
+     * responses:
+     *   '200':
+     *     description: Quota information retrieved successfully.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/JamesQuotaUsage' }
+     *         example:
+     *           count:
+     *             used: 142
+     *             max: 10000
+     *           size:
+     *             used: 524288000
+     *             max: 2147483648
+     *   '400':
+     *     description: User has no mail attribute configured in LDAP.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *         example:
+     *           error: User alice has no mail attribute
+     *           code: 400
+     *   '404':
+     *     description: User not found in LDAP, or quota entry absent in James.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *         example:
+     *           error: User alice not found
+     *           code: 404
+     *   '502':
+     *     description: James WebAdmin API is unreachable or returned an error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *         example:
+     *           error: "Failed to retrieve quota from James: Bad Gateway"
+     *           code: 502
+     *   '500':
+     *     description: Unexpected internal error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Get quota usage and limits for a user
     app.get(
       `${apiPrefix}/v1/users/:user/quota-usage`,

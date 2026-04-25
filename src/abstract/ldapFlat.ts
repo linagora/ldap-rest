@@ -85,6 +85,113 @@ export interface LdapFlatConfig {
   hookPrefix: string;
 }
 
+/**
+ * Generic OpenAPI schemas for the flat LDAP-entry CRUD surface.
+ * Every concrete plugin that extends LdapFlat (users, mailgroups, …)
+ * exposes these shapes, with `mainAttribute` and concrete attribute
+ * names varying per instance.
+ *
+ * @openapi-component
+ * FlatEntry:
+ *   type: object
+ *   description: |
+ *     A single LDAP entry from a flat branch. The `dn` field is always
+ *     present; all other fields depend on the concrete plugin's schema
+ *     (e.g. `uid`, `cn`, `mail`, `sn` for users).
+ *   required: [dn]
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: Fully-qualified distinguished name of the entry.
+ *       example: uid=alice,ou=users,dc=example,dc=com
+ *   additionalProperties:
+ *     oneOf:
+ *       - type: string
+ *       - type: array
+ *         items: { type: string }
+ *   example:
+ *     dn: uid=alice,ou=users,dc=example,dc=com
+ *     uid: alice
+ *     cn: Alice Smith
+ *     sn: Smith
+ *     mail: alice@example.com
+ * FlatList:
+ *   type: object
+ *   description: |
+ *     A map of entries returned by the LIST endpoint, keyed by the
+ *     entry's `mainAttribute` value (e.g. the `uid` for users). This
+ *     is the `LdapList` shape (`Record<string, FlatEntry>`).
+ *   additionalProperties:
+ *     $ref: '#/components/schemas/FlatEntry'
+ *   example:
+ *     alice:
+ *       dn: uid=alice,ou=users,dc=example,dc=com
+ *       uid: alice
+ *       cn: Alice Smith
+ *       mail: alice@example.com
+ *     bob:
+ *       dn: uid=bob,ou=users,dc=example,dc=com
+ *       uid: bob
+ *       cn: Bob Jones
+ *       mail: bob@example.com
+ * FlatCreate:
+ *   type: object
+ *   description: |
+ *     Body for creating a new entry. The plugin's `mainAttribute` field
+ *     (e.g. `uid`) is required and used to build the DN. All other
+ *     attributes are plugin-specific; unknown attributes are accepted
+ *     unless the plugin's schema is in strict mode.
+ *   additionalProperties: true
+ *   example:
+ *     uid: carol
+ *     cn: Carol White
+ *     sn: White
+ *     mail: carol@example.com
+ * FlatModify:
+ *   type: object
+ *   description: |
+ *     Partial-update body. Supports `add`, `replace`, and `delete`
+ *     maps matching the LDAP modify operation. The `mainAttribute`
+ *     (e.g. `uid`) cannot be changed through this endpoint — use the
+ *     rename API instead.
+ *   properties:
+ *     add:
+ *       type: object
+ *       description: Attributes whose values are appended.
+ *       additionalProperties: true
+ *     replace:
+ *       type: object
+ *       description: Attributes whose values are replaced wholesale.
+ *       additionalProperties: true
+ *     delete:
+ *       description: |
+ *         Attributes (or specific values) to remove. Either an array
+ *         of attribute names or a map of attribute → value(s).
+ *       oneOf:
+ *         - type: array
+ *           items: { type: string }
+ *         - type: object
+ *           additionalProperties: true
+ *   example:
+ *     replace:
+ *       mail: carol.white@example.com
+ *       cn: Carol White-Smith
+ * FlatMoveRequest:
+ *   type: object
+ *   description: |
+ *     Body for moving an entry to a different organisational unit.
+ *     Requires `ldap_organization_link_attribute` and
+ *     `ldap_organization_path_attribute` to be defined in the plugin's
+ *     schema.
+ *   required: [targetOrgDn]
+ *   properties:
+ *     targetOrgDn:
+ *       type: string
+ *       description: DN of the destination organisational unit.
+ *       example: ou=engineering,ou=departments,dc=example,dc=com
+ *   example:
+ *     targetOrgDn: ou=engineering,ou=departments,dc=example,dc=com
+ */
 export default abstract class LdapFlat extends DmPlugin {
   base: string;
   ldap: ldapActions;
@@ -131,6 +238,72 @@ export default abstract class LdapFlat extends DmPlugin {
    * API routes
    */
   api(app: Express): void {
+    /**
+     * @openapi
+     * summary: List entries
+     * description: |
+     *   Returns all entries in the flat LDAP branch, keyed by their
+     *   `mainAttribute` value (e.g. `uid` for users). The optional
+     *   `match` and `attribute` query parameters filter results using
+     *   a substring LDAP search (`attribute=*match*`). The `attributes`
+     *   parameter limits which LDAP attributes are returned.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     *   - in: query
+     *     name: match
+     *     required: false
+     *     schema: { type: string }
+     *     description: |
+     *       Substring to match. Must be used together with `attribute`.
+     *       The resulting LDAP filter is `(attribute=*match*)`.
+     *     example: alice
+     *   - in: query
+     *     name: attribute
+     *     required: false
+     *     schema: { type: string }
+     *     description: |
+     *       LDAP attribute name to match against (used with `match`).
+     *     example: cn
+     *   - in: query
+     *     name: attributes
+     *     required: false
+     *     schema: { type: string }
+     *     description: |
+     *       Comma-separated list of LDAP attributes to include in each
+     *       returned entry. Omit to return all attributes.
+     *     example: uid,cn,mail
+     * responses:
+     *   '200':
+     *     description: Map of entries keyed by mainAttribute value.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatList' }
+     *         example:
+     *           alice:
+     *             dn: uid=alice,ou=users,dc=example,dc=com
+     *             uid: alice
+     *             cn: Alice Smith
+     *             mail: alice@example.com
+     *           bob:
+     *             dn: uid=bob,ou=users,dc=example,dc=com
+     *             uid: bob
+     *             cn: Bob Jones
+     *             mail: bob@example.com
+     *   '400':
+     *     description: Invalid LDAP attribute name in `attribute` parameter.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // List entries
     app.get(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
@@ -160,30 +333,251 @@ export default abstract class LdapFlat extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Get entry by ID or DN
+     * description: |
+     *   Returns a single entry identified by its `mainAttribute` value
+     *   (e.g. a `uid`) or by its full DN. If the value starts with
+     *   `mainAttribute=` it is treated as a DN; otherwise it is treated
+     *   as a raw RDN value.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * responses:
+     *   '200':
+     *     description: The requested entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatEntry' }
+     *         example:
+     *           dn: uid=alice,ou=users,dc=example,dc=com
+     *           uid: alice
+     *           cn: Alice Smith
+     *           sn: Smith
+     *           mail: alice@example.com
+     *   '400':
+     *     description: The supplied DN is not a direct child of the configured base.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *         example:
+     *           error: user not found
+     *           code: 404
+     */
     // Get entry by id or DN
     app.get(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       asyncHandler(async (req, res) => this.apiGet(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Create entry
+     * description: |
+     *   Creates a new entry in the flat LDAP branch. The `mainAttribute`
+     *   field (e.g. `uid`) is required and used to construct the DN.
+     *   Returns the newly created entry on success (HTTP 201).
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/FlatCreate' }
+     *       example:
+     *         uid: carol
+     *         cn: Carol White
+     *         sn: White
+     *         mail: carol@example.com
+     * responses:
+     *   '201':
+     *     description: Entry created; returns the new entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatEntry' }
+     *         example:
+     *           dn: uid=carol,ou=users,dc=example,dc=com
+     *           uid: carol
+     *           cn: Carol White
+     *           sn: White
+     *           mail: carol@example.com
+     *   '400':
+     *     description: Missing required field or validation error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: Entry already exists.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Add entry
     app.post(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
       asyncHandler(async (req, res) => this.apiAdd(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Delete entry
+     * description: |
+     *   Permanently removes the entry identified by `id` from the LDAP
+     *   branch. The `id` may be either a `mainAttribute` value or the
+     *   entry's full DN.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * responses:
+     *   '200':
+     *     description: Entry deleted.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Delete entry
     app.delete(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       asyncHandler(async (req, res) => this.apiDelete(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Modify entry
+     * description: |
+     *   Applies a partial update to the entry identified by `id`. The
+     *   body follows the LDAP modify structure: `add`, `replace`, and/or
+     *   `delete` maps. The `mainAttribute` (e.g. `uid`) cannot be
+     *   changed through this endpoint.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/FlatModify' }
+     *       example:
+     *         replace:
+     *           mail: alice.smith@example.com
+     *           cn: Alice M. Smith
+     * responses:
+     *   '200':
+     *     description: Entry updated.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error or attempt to modify a fixed attribute.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Modify entry
     app.put(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       asyncHandler(async (req, res) => this.apiModify(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Move entry to another organisation
+     * description: |
+     *   Moves the entry to a different organisational unit by updating
+     *   the configured department-link and department-path attributes
+     *   (`ldap_organization_link_attribute` and
+     *   `ldap_organization_path_attribute`). The plugin's schema must
+     *   declare both attributes; otherwise the request is rejected with
+     *   400.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/FlatMoveRequest' }
+     *       example:
+     *         targetOrgDn: ou=engineering,ou=departments,dc=example,dc=com
+     * responses:
+     *   '200':
+     *     description: Entry moved; returns the new department path and link.
+     *     content:
+     *       application/json:
+     *         example:
+     *           success: true
+     *           departmentPath: /engineering
+     *           departmentLink: ou=engineering,ou=departments,dc=example,dc=com
+     *   '400':
+     *     description: |
+     *       Missing or invalid `targetOrgDn`, or schema does not support
+     *       the move operation.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Entry or target organisation not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Move entry to different organization
     app.post(
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
@@ -290,10 +684,7 @@ export default abstract class LdapFlat extends DmPlugin {
    * @throws BadRequestError if the provided DN is not a direct child of this.base
    */
   protected resolveDn(id: string): string {
-    const dnPrefix = new RegExp(
-      `^${escapeRegex(this.mainAttribute)}=`,
-      'i'
-    );
+    const dnPrefix = new RegExp(`^${escapeRegex(this.mainAttribute)}=`, 'i');
     if (dnPrefix.test(id)) {
       const parent = getParentDn(id);
       // If the DN has a single RDN, getParentDn returns the DN itself; treat

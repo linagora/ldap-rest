@@ -106,12 +106,21 @@ class OpenAPIGenerator {
     ['appAccountsApi', 'App Accounts'],
     ['hello', 'Demo'],
     ['authzDynamic', 'Authorization (Dynamic)'],
+    ['james', 'Apache James Integration'],
+    // Abstract LdapFlat exposes the generic per-resource CRUD surface;
+    // every concrete flat plugin (users, mailgroups, …) inherits from it.
+    ['LdapFlat', 'Entities'],
   ]);
 
   // Recognized plugin base classes (anything ultimately deriving from
   // DmPlugin via these). Without this, plugins extending an intermediate
-  // base (e.g. AuthBase) would be silently skipped.
-  private readonly pluginBaseClasses = new Set(['DmPlugin', 'AuthBase']);
+  // base (e.g. AuthBase, TwakePlugin) would be silently skipped.
+  private readonly pluginBaseClasses = new Set([
+    'DmPlugin',
+    'AuthBase',
+    'AuthzBase',
+    'TwakePlugin',
+  ]);
 
   constructor(private rootDir: string) {
     // Create TypeScript program
@@ -136,11 +145,14 @@ class OpenAPIGenerator {
   }
 
   /**
-   * Analyze all plugin files
+   * Analyze all plugin files. Walks `src/plugins/` for concrete plugins
+   * plus `src/abstract/` so abstract bases like LdapFlat (which carries
+   * the generic per-resource CRUD routes inherited by every flat
+   * plugin) are documented too.
    */
   public analyze(): void {
-    const pluginsDir = path.join(this.rootDir, 'src', 'plugins');
-    this.analyzeDirectory(pluginsDir);
+    this.analyzeDirectory(path.join(this.rootDir, 'src', 'plugins'));
+    this.analyzeDirectory(path.join(this.rootDir, 'src', 'abstract'));
   }
 
   private analyzeDirectory(dir: string): void {
@@ -462,7 +474,11 @@ class OpenAPIGenerator {
         .replace(/\$\{this\.config\.static_name\}/g, 'static') // No leading slash
         .replace(/\$\{[^}]*static_name[^}]*\}/g, 'static')
         .replace(/\$\{resourceName\}/g, '{resource}')
-        .replace(/\$\{[^}]*resourceName[^}]*\}/g, '{resource}');
+        .replace(/\$\{[^}]*resourceName[^}]*\}/g, '{resource}')
+        // LdapFlat instances each have a different `this.pluralName`;
+        // the spec describes the generic shape with a `{resource}`
+        // placeholder.
+        .replace(/\$\{this\.pluralName\}/g, '{resource}');
 
       // Substitute any remaining `${name}` from the local-const map we
       // built from the api() body (e.g. `const prefix = this.scimPrefix`).
