@@ -57,6 +57,71 @@ interface BulkImportResult {
   };
 }
 
+/**
+ * Shared OpenAPI schemas surfaced by this plugin. Picked up by
+ * scripts/generate-openapi.ts and merged into `components.schemas`.
+ *
+ * @openapi-component
+ * BulkImportResult:
+ *   type: object
+ *   description: Summary returned after a bulk import operation.
+ *   required: [success, total, created, updated, skipped, failed, errors, details]
+ *   properties:
+ *     success:
+ *       type: boolean
+ *       description: True when no fatal error aborted the import early.
+ *     total:
+ *       type: integer
+ *       description: Total number of CSV data rows (excluding header).
+ *       example: 42
+ *     created:
+ *       type: integer
+ *       description: Entries successfully created (or counted in dry-run).
+ *       example: 38
+ *     updated:
+ *       type: integer
+ *       description: Existing entries updated.
+ *       example: 2
+ *     skipped:
+ *       type: integer
+ *       description: Existing entries skipped because `updateExisting` was false.
+ *       example: 1
+ *     failed:
+ *       type: integer
+ *       description: Rows that caused an error.
+ *       example: 1
+ *     errors:
+ *       type: array
+ *       items:
+ *         type: object
+ *         required: [line, error]
+ *         properties:
+ *           line:
+ *             type: integer
+ *             description: 1-based CSV line number (2 = first data row).
+ *           identifier:
+ *             type: string
+ *             description: Value of the main attribute for the failing row (if known).
+ *           error:
+ *             type: string
+ *             description: Error message.
+ *       example:
+ *         - line: 5
+ *           identifier: bob
+ *           error: 'Missing required attribute: mail'
+ *     details:
+ *       type: object
+ *       required: [duration, linesProcessed]
+ *       properties:
+ *         duration:
+ *           type: string
+ *           description: Wall-clock time for the import (e.g. `1.2s`).
+ *           example: 1.2s
+ *         linesProcessed:
+ *           type: integer
+ *           description: Total data rows attempted.
+ *           example: 42
+ */
 export default class LdapBulkImport extends DmPlugin {
   name = 'ldapBulkImport';
   roles: Role[] = ['configurable'] as const;
@@ -131,12 +196,106 @@ export default class LdapBulkImport extends DmPlugin {
 
   api(app: Express): void {
     for (const [resourceName, resource] of this.resources) {
+      /**
+       * @openapi
+       * summary: Download CSV import template
+       * description: |
+       *   Returns a CSV file with the header row listing all editable columns for
+       *   the `{resource}` type. Fixed, calculated, and organization-path columns
+       *   are excluded because they are injected automatically during import.
+       *
+       *   Use this template as the starting point for a bulk import file.
+       * responses:
+       *   '200':
+       *     description: CSV template file.
+       *     content:
+       *       text/csv:
+       *         schema: { type: string }
+       *         example: |
+       *           cn,sn,givenName,mail,organizationDn
+       *   '404':
+       *     description: Resource type not found.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/Error' }
+       */
       // GET CSV template
       app.get(
         `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
         (req, res) => this.getTemplate(req, res, resource)
       );
 
+      /**
+       * @openapi
+       * summary: Bulk import from CSV
+       * description: |
+       *   Accepts a multipart/form-data upload containing a CSV file and optional
+       *   control flags. Each data row is mapped to an LDAP entry using the resource
+       *   schema. Multi-valued attributes can be expressed with semicolons
+       *   (`val1;val2;val3`). An `organizationDn` column (not listed in the template
+       *   header) may be provided to set the organization link and path attributes
+       *   automatically.
+       *
+       *   **Dry-run mode** (`dryRun=true`) validates and counts rows without writing
+       *   to LDAP. `continueOnError` (default `true`) keeps processing subsequent rows
+       *   after an individual row fails.
+       * requestBody:
+       *   required: true
+       *   content:
+       *     multipart/form-data:
+       *       schema:
+       *         type: object
+       *         required: [file]
+       *         properties:
+       *           file:
+       *             type: string
+       *             format: binary
+       *             description: CSV file to import (max 10 MB by default).
+       *           dryRun:
+       *             type: boolean
+       *             description: |
+       *               When true, validate and count rows without writing to LDAP.
+       *           updateExisting:
+       *             type: boolean
+       *             description: |
+       *               When true, existing entries are updated (replace). When false
+       *               (default), they are skipped.
+       *           continueOnError:
+       *             type: boolean
+       *             default: true
+       *             description: |
+       *               Continue processing subsequent rows after a row-level error.
+       * responses:
+       *   '200':
+       *     description: Import result summary.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/BulkImportResult' }
+       *         example:
+       *           success: true
+       *           total: 10
+       *           created: 9
+       *           updated: 0
+       *           skipped: 0
+       *           failed: 1
+       *           errors:
+       *             - line: 7
+       *               identifier: charlie
+       *               error: 'Missing required attribute: mail'
+       *           details:
+       *             duration: 0.8s
+       *             linesProcessed: 10
+       *   '400':
+       *     description: No file uploaded or malformed request.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/Error' }
+       *   '500':
+       *     description: Unexpected server error.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/Error' }
+       */
       // POST bulk import
       app.post(
         `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}`,

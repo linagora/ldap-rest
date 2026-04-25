@@ -136,6 +136,184 @@ interface LdapPolicyEntry {
   pwdAllowUserChange?: string;
 }
 
+/**
+ * Shared OpenAPI schemas surfaced by this plugin. Picked up by
+ * scripts/generate-openapi.ts and merged into `components.schemas`.
+ *
+ * @openapi-component
+ * PasswordPolicy:
+ *   type: object
+ *   description: |
+ *     Active OpenLDAP ppolicy configuration. All duration fields are in
+ *     **seconds**. Absent fields mean the policy attribute is not set.
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: DN of the ppolicy entry.
+ *       example: cn=default,ou=policies,dc=example,dc=com
+ *     pwdMaxAge:
+ *       type: integer
+ *       description: Maximum password age in seconds (0 = never expires).
+ *       example: 7776000
+ *     pwdMinAge:
+ *       type: integer
+ *       description: Minimum password age in seconds before it may be changed.
+ *       example: 0
+ *     pwdInHistory:
+ *       type: integer
+ *       description: Number of previous passwords stored.
+ *       example: 5
+ *     pwdCheckQuality:
+ *       type: integer
+ *       description: Password quality enforcement level (0-2).
+ *       example: 1
+ *     pwdMinLength:
+ *       type: integer
+ *       description: Minimum password length.
+ *       example: 12
+ *     pwdMaxFailure:
+ *       type: integer
+ *       description: Maximum bind failures before lockout.
+ *       example: 5
+ *     pwdLockout:
+ *       type: boolean
+ *       description: Whether account lockout is enabled.
+ *       example: true
+ *     pwdLockoutDuration:
+ *       type: integer
+ *       description: Lockout duration in seconds (0 = permanent until admin reset).
+ *       example: 300
+ *     pwdGraceAuthNLimit:
+ *       type: integer
+ *       description: Number of grace logins allowed after password expires.
+ *       example: 0
+ *     pwdExpireWarning:
+ *       type: integer
+ *       description: Seconds before expiry at which a warning is issued.
+ *       example: 1209600
+ *     pwdMustChange:
+ *       type: boolean
+ *       description: If true, users must change their password after an admin reset.
+ *       example: true
+ *     pwdAllowUserChange:
+ *       type: boolean
+ *       description: Whether users are allowed to change their own password.
+ *       example: true
+ * PasswordStatus:
+ *   type: object
+ *   description: Current password status for a specific user account.
+ *   required: [dn, passwordSet, isExpired, isExpiringSoon, mustChange, isLocked, failureCount, graceLoginsUsed]
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: Fully-qualified DN of the user.
+ *       example: uid=alice,ou=users,dc=example,dc=com
+ *     passwordSet:
+ *       type: boolean
+ *       description: Whether a userPassword attribute is present.
+ *       example: true
+ *     lastChanged:
+ *       type: string
+ *       format: date-time
+ *       nullable: true
+ *       description: ISO-8601 timestamp of last password change, or null if never set.
+ *       example: '2026-01-15T10:00:00.000Z'
+ *     expiresAt:
+ *       type: string
+ *       format: date-time
+ *       nullable: true
+ *       description: ISO-8601 expiry timestamp, or null if no max age is configured.
+ *       example: '2026-04-15T10:00:00.000Z'
+ *     daysUntilExpiration:
+ *       type: integer
+ *       nullable: true
+ *       description: Remaining days until expiry (negative means already expired).
+ *       example: 80
+ *     isExpired:
+ *       type: boolean
+ *       example: false
+ *     isExpiringSoon:
+ *       type: boolean
+ *       description: True when expiry is within the configured warning window.
+ *       example: false
+ *     mustChange:
+ *       type: boolean
+ *       description: True when `pwdReset` is set (admin forced change).
+ *       example: false
+ *     isLocked:
+ *       type: boolean
+ *       description: True when the account is currently locked.
+ *       example: false
+ *     lockedAt:
+ *       type: string
+ *       format: date-time
+ *       nullable: true
+ *       description: ISO-8601 timestamp of lockout, or null.
+ *       example: null
+ *     failureCount:
+ *       type: integer
+ *       description: Number of recorded bind failures still within the window.
+ *       example: 0
+ *     graceLoginsUsed:
+ *       type: integer
+ *       description: Number of grace logins already consumed.
+ *       example: 0
+ * ExpiringAccount:
+ *   type: object
+ *   description: User whose password is expiring within the warning window.
+ *   required: [dn, expiresAt, daysUntilExpiration]
+ *   properties:
+ *     dn: { type: string, example: uid=bob,ou=users,dc=example,dc=com }
+ *     uid: { type: string, example: bob }
+ *     displayName: { type: string, example: Bob Builder }
+ *     mail: { type: string, example: bob@example.com }
+ *     expiresAt:
+ *       type: string
+ *       format: date-time
+ *       example: '2026-05-01T08:00:00.000Z'
+ *     daysUntilExpiration: { type: integer, example: 6 }
+ * LockedAccount:
+ *   type: object
+ *   description: User account that is currently locked.
+ *   required: [dn, failureCount]
+ *   properties:
+ *     dn: { type: string, example: uid=charlie,ou=users,dc=example,dc=com }
+ *     uid: { type: string, example: charlie }
+ *     displayName: { type: string, example: Charlie Chaplin }
+ *     mail: { type: string, example: charlie@example.com }
+ *     lockedAt:
+ *       type: string
+ *       format: date-time
+ *       nullable: true
+ *       example: '2026-04-24T14:30:00.000Z'
+ *     failureCount: { type: integer, example: 5 }
+ * PasswordValidationRequest:
+ *   type: object
+ *   required: [password]
+ *   properties:
+ *     password:
+ *       type: string
+ *       format: password
+ *       description: The candidate password to validate.
+ *       example: 'S3cur3P@ss!'
+ *     dn:
+ *       type: string
+ *       description: Optional user DN for context (not used in local validation).
+ *       example: uid=alice,ou=users,dc=example,dc=com
+ * PasswordValidationResponse:
+ *   type: object
+ *   required: [valid, errors]
+ *   properties:
+ *     valid:
+ *       type: boolean
+ *       description: True when the password meets all complexity rules.
+ *       example: true
+ *     errors:
+ *       type: array
+ *       items: { type: string }
+ *       description: List of failed rule descriptions (empty when valid).
+ *       example: []
+ */
 export default class PasswordPolicy extends DmPlugin {
   name = 'ldapPasswordPolicy';
   roles: Role[] = ['api', 'configurable'];
@@ -147,6 +325,32 @@ export default class PasswordPolicy extends DmPlugin {
   api(app: Express): void {
     const prefix = `${this.config.api_prefix}/v1`;
 
+    /**
+     * @openapi
+     * summary: Get password policy
+     * description: |
+     *   Returns the active OpenLDAP ppolicy configuration read from the DN
+     *   configured via `--ppolicy-default-dn`, or discovered by searching for
+     *   `objectClass=pwdPolicy` when that option is absent.
+     *   Results are cached for 60 seconds.
+     * responses:
+     *   '200':
+     *     description: Active password policy.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/PasswordPolicy' }
+     *         example:
+     *           dn: cn=default,ou=policies,dc=example,dc=com
+     *           pwdMinLength: 12
+     *           pwdMaxAge: 7776000
+     *           pwdMaxFailure: 5
+     *           pwdLockout: true
+     *           pwdLockoutDuration: 300
+     *           pwdMustChange: true
+     *           pwdAllowUserChange: true
+     *           pwdInHistory: 5
+     *           pwdGraceAuthNLimit: 0
+     */
     // GET /password-policy - configuration
     app.get(
       `${prefix}/password-policy`,
@@ -156,6 +360,38 @@ export default class PasswordPolicy extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Get user password status
+     * description: |
+     *   Returns the current password state for user `:id`. The `id` may be
+     *   a plain `uid` value or a full DN. The response is computed from the
+     *   user's ppolicy operational attributes combined with the active policy.
+     * responses:
+     *   '200':
+     *     description: Password status for the user.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/PasswordStatus' }
+     *         example:
+     *           dn: uid=alice,ou=users,dc=example,dc=com
+     *           passwordSet: true
+     *           lastChanged: '2026-01-15T10:00:00.000Z'
+     *           expiresAt: '2026-04-15T10:00:00.000Z'
+     *           daysUntilExpiration: 80
+     *           isExpired: false
+     *           isExpiringSoon: false
+     *           mustChange: false
+     *           isLocked: false
+     *           lockedAt: null
+     *           failureCount: 0
+     *           graceLoginsUsed: 0
+     *   '404':
+     *     description: User not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // GET /users/:id/password-status
     app.get(
       `${prefix}/users/:id/password-status`,
@@ -168,6 +404,25 @@ export default class PasswordPolicy extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Unlock user account
+     * description: |
+     *   Removes the `pwdAccountLockedTime` and `pwdFailureTime` operational
+     *   attributes from the user entry, effectively clearing the lockout state.
+     *   If the account was not locked the operation still succeeds (idempotent).
+     * responses:
+     *   '200':
+     *     description: Account unlocked (or was already unlocked).
+     *     content:
+     *       application/json:
+     *         example: { success: true, message: Account unlocked }
+     *   '404':
+     *     description: User not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // POST /users/:id/unlock
     app.post(
       `${prefix}/users/:id/unlock`,
@@ -180,6 +435,41 @@ export default class PasswordPolicy extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: List accounts with expiring passwords
+     * description: |
+     *   Scans the user base for accounts whose password will expire within
+     *   `days` days. Results are sorted ascending by `daysUntilExpiration`.
+     *   Returns an empty list when no `pwdMaxAge` is configured.
+     * parameters:
+     *   - in: query
+     *     name: days
+     *     schema: { type: integer, default: 14 }
+     *     description: Warning window in days (defaults to `--ppolicy-warn-days` or 14).
+     *     example: 7
+     * responses:
+     *   '200':
+     *     description: List of expiring accounts with their warning window.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: object
+     *           properties:
+     *             warningDays: { type: integer, example: 7 }
+     *             users:
+     *               type: array
+     *               items: { $ref: '#/components/schemas/ExpiringAccount' }
+     *         example:
+     *           warningDays: 7
+     *           users:
+     *             - dn: uid=bob,ou=users,dc=example,dc=com
+     *               uid: bob
+     *               displayName: Bob Builder
+     *               mail: bob@example.com
+     *               expiresAt: '2026-05-01T08:00:00.000Z'
+     *               daysUntilExpiration: 6
+     */
     // GET /password-policy/expiring-soon
     app.get(
       `${prefix}/password-policy/expiring-soon`,
@@ -193,6 +483,34 @@ export default class PasswordPolicy extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: List locked accounts
+     * description: |
+     *   Returns all user entries in the user base that have a
+     *   `pwdAccountLockedTime` attribute set, regardless of whether the
+     *   lockout has expired. Use the `/unlock` endpoint to clear individual
+     *   lockouts.
+     * responses:
+     *   '200':
+     *     description: List of locked accounts.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: object
+     *           properties:
+     *             accounts:
+     *               type: array
+     *               items: { $ref: '#/components/schemas/LockedAccount' }
+     *         example:
+     *           accounts:
+     *             - dn: uid=charlie,ou=users,dc=example,dc=com
+     *               uid: charlie
+     *               displayName: Charlie Chaplin
+     *               mail: charlie@example.com
+     *               lockedAt: '2026-04-24T14:30:00.000Z'
+     *               failureCount: 5
+     */
     // GET /password-policy/locked-accounts
     app.get(
       `${prefix}/password-policy/locked-accounts`,
@@ -204,6 +522,36 @@ export default class PasswordPolicy extends DmPlugin {
 
     // POST /password/validate (optional)
     if (this.config.ppolicy_validate_complexity) {
+      /**
+       * @openapi
+       * summary: Validate password complexity
+       * description: |
+       *   Validates a candidate password against the locally-configured complexity
+       *   rules (`--ppolicy-min-length`, `--ppolicy-require-uppercase`, etc.).
+       *   This endpoint is only registered when `--ppolicy-validate-complexity` is
+       *   enabled. It does **not** call LDAP — it runs a local rule check only.
+       * requestBody:
+       *   required: true
+       *   content:
+       *     application/json:
+       *       schema: { $ref: '#/components/schemas/PasswordValidationRequest' }
+       * responses:
+       *   '200':
+       *     description: Validation result.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/PasswordValidationResponse' }
+       *         example:
+       *           valid: false
+       *           errors:
+       *             - Minimum 12 characters required
+       *             - At least one special character required
+       *   '400':
+       *     description: Missing `password` field.
+       *     content:
+       *       application/json:
+       *         schema: { $ref: '#/components/schemas/Error' }
+       */
       app.post(
         `${prefix}/password/validate`,
         // eslint-disable-next-line @typescript-eslint/require-await

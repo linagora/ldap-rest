@@ -14,6 +14,69 @@ import type { SearchResult } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { escapeDnValue } from '../../lib/utils';
 
+/**
+ * @openapi-component
+ * AppAccount:
+ *   type: object
+ *   description: |
+ *     An application-specific identity attached to a user.  App accounts
+ *     allow a single principal user to authenticate as different named
+ *     "devices" or "applications" each with its own credential, while
+ *     sharing the same mail address.
+ *   required: [uid]
+ *   properties:
+ *     uid:
+ *       type: string
+ *       description: |
+ *         Unique identifier of the app account.  Format:
+ *         `<username>_c<8-digits>` (e.g. `alice_c04729183`).
+ *       example: alice_c04729183
+ *     name:
+ *       type: string
+ *       description: Human-readable label (stored as LDAP `description`).
+ *       example: Work laptop
+ *   example:
+ *     uid: alice_c04729183
+ *     name: Work laptop
+ * AppAccountCreated:
+ *   type: object
+ *   description: |
+ *     Response returned when a new app account is successfully created.
+ *     The one-time cleartext password is included here and never returned
+ *     again — callers must store it immediately.
+ *   required: [uid, pwd, mail]
+ *   properties:
+ *     uid:
+ *       type: string
+ *       description: Identifier of the newly created app account.
+ *       example: alice_c04729183
+ *     pwd:
+ *       type: string
+ *       description: |
+ *         One-time cleartext password generated for this account.
+ *         Format: 6 blocks of 4 characters separated by `-`
+ *         (e.g. `Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@`).
+ *         OpenLDAP hashes it via ppolicy before storage.
+ *       example: Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@
+ *     mail:
+ *       type: string
+ *       description: Mail address of the principal account this app account belongs to.
+ *       example: alice@example.com
+ *   example:
+ *     uid: alice_c04729183
+ *     pwd: Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@
+ *     mail: alice@example.com
+ * AppAccountCreate:
+ *   type: object
+ *   description: Request body for creating a new app account.
+ *   properties:
+ *     name:
+ *       type: string
+ *       description: Optional human-readable label for the new account.
+ *       example: Work laptop
+ *   example:
+ *     name: Work laptop
+ */
 export default class AppAccountsApi extends DmPlugin {
   name = 'appAccountsApi';
   roles: Role[] = ['api', 'configurable'] as const;
@@ -51,18 +114,125 @@ export default class AppAccountsApi extends DmPlugin {
   api(app: Express): void {
     const apiPrefix = this.config.api_prefix || '/api';
 
+    /**
+     * @openapi
+     * summary: List app accounts for a user
+     * description: |
+     *   Returns all application-specific accounts belonging to `:user`.
+     *   Only entries whose `uid` starts with `<username>_` are included;
+     *   the principal account (whose uid equals the user's mail address)
+     *   is always filtered out.
+     *
+     *   Results are sorted alphabetically by `uid`.
+     * responses:
+     *   '200':
+     *     description: List of app accounts.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/AppAccount' }
+     *         example:
+     *           - uid: alice_c04729183
+     *             name: Work laptop
+     *           - uid: alice_c09812345
+     *             name: Mobile phone
+     *   '404':
+     *     description: User not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // List applicative accounts for a user
     app.get(
       `${apiPrefix}/v1/users/:user/app-accounts`,
       (req: Request, res: Response) => this.listAccounts(req, res)
     );
 
+    /**
+     * @openapi
+     * summary: Create an app account for a user
+     * description: |
+     *   Creates a new application-specific identity under the configured
+     *   applicative-account LDAP branch.  The server generates a random
+     *   uid (`<username>_c<8-digits>`) and a cryptographically secure
+     *   password, then:
+     *
+     *   1. Copies `cn`, `sn`, `givenName`, `mail`, and `displayName` from
+     *      the principal user entry.
+     *   2. Adds the cleartext password to the principal account
+     *      (`uid=<mail>`) so single-point authentication still works.
+     *
+     *   Returns a `400` if the user has already reached the server-side
+     *   maximum number of app accounts (`max_app_accounts`, default 5).
+     *
+     *   **The generated password is returned only once** — store it
+     *   immediately.
+     * requestBody:
+     *   required: false
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/AppAccountCreate' }
+     *       example:
+     *         name: Work laptop
+     * responses:
+     *   '200':
+     *     description: App account created — includes the one-time password.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/AppAccountCreated' }
+     *         example:
+     *           uid: alice_c04729183
+     *           pwd: Ab3@-xYz!-9pQ#-Sv4$-mN8!-pQ5@
+     *           mail: alice@example.com
+     *   '400':
+     *     description: User has no mail attribute or maximum account limit reached.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: User not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Create a new applicative account
     app.post(
       `${apiPrefix}/v1/users/:user/app-accounts`,
       (req: Request, res: Response) => this.createAccount(req, res)
     );
 
+    /**
+     * @openapi
+     * summary: Delete an app account
+     * description: |
+     *   Deletes the app account identified by `:uid` and removes its
+     *   password from the principal account (`uid=<mail>`).
+     *
+     *   The `:uid` must start with `<user>_` — attempting to delete an
+     *   account that belongs to a different user returns `403`.
+     *
+     *   The operation is **idempotent**: if the account does not exist,
+     *   the response is still `200` with the `uid` echoed back.
+     * responses:
+     *   '200':
+     *     description: App account deleted (or was already absent).
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: object
+     *           properties:
+     *             uid:
+     *               type: string
+     *               description: UID of the deleted account.
+     *         example:
+     *           uid: alice_c04729183
+     *   '403':
+     *     description: The `:uid` does not belong to `:user`.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Delete an applicative account
     app.delete(
       `${apiPrefix}/v1/users/:user/app-accounts/:uid`,

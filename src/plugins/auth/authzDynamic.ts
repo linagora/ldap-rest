@@ -155,6 +155,51 @@ export default class AuthzDynamic extends AuthBase {
 
     if (this.reloadEndpoint) {
       const prefix = this.config.api_prefix || '/api';
+      /**
+       * @openapi
+       * summary: Reload the authz-dynamic token cache
+       * description: |
+       *   Forces an immediate reload of all token entries from the LDAP
+       *   branch configured via `--authz-dynamic-base`.
+       *
+       *   **Conditional registration:** this endpoint is only added to the
+       *   router when the server was started with
+       *   `--authz-dynamic-reload-endpoint true`.  It will be absent
+       *   (404) otherwise.
+       *
+       *   **Authentication required:** the request must carry a valid
+       *   `Authorization: Bearer <token>` header that matches an existing
+       *   entry in the token cache.  An unauthenticated or unrecognised
+       *   token receives a `401` response.
+       *
+       *   On success the response includes the number of tokens now held
+       *   in the in-memory cache.  This count can be used to verify that
+       *   the expected entries are present after adding or removing tokens
+       *   in LDAP.
+       * security:
+       *   - BearerAuth: []
+       * responses:
+       *   '200':
+       *     description: Cache reloaded successfully.
+       *     content:
+       *       application/json:
+       *         schema:
+       *           type: object
+       *           required: [success, tokens]
+       *           properties:
+       *             success:
+       *               type: boolean
+       *               example: true
+       *             tokens:
+       *               type: integer
+       *               description: Number of token entries now in the cache.
+       *               example: 3
+       *         example:
+       *           success: true
+       *           tokens: 3
+       *   '401':
+       *     description: Missing, invalid, or unrecognised bearer token.
+       */
       app.post(
         `${prefix}/v1/authz-dynamic/reload`,
         asyncHandler(async (req, res) => {

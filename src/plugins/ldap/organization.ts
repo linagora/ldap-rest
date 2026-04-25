@@ -32,6 +32,96 @@ import {
 } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
 
+/**
+ * Shared OpenAPI schemas surfaced by this plugin. Picked up by
+ * scripts/generate-openapi.ts and merged into `components.schemas`.
+ *
+ * @openapi-component
+ * Organization:
+ *   type: object
+ *   description: An LDAP organizational unit entry.
+ *   required: [dn, ou]
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: Fully-qualified distinguished name of the entry.
+ *       example: ou=Engineering,ou=organizations,dc=example,dc=com
+ *     ou:
+ *       type: string
+ *       description: Organizational unit name (RDN attribute).
+ *       example: Engineering
+ *     o:
+ *       type: string
+ *       description: Organization display name.
+ *       example: Engineering Department
+ *     l:
+ *       type: string
+ *       description: Locality / city.
+ *       example: Paris
+ *     description:
+ *       type: string
+ *       example: Software engineering division
+ *     organizationLink:
+ *       type: string
+ *       description: DN of the parent organization (link attribute).
+ *       example: ou=organizations,dc=example,dc=com
+ *     organizationPath:
+ *       type: string
+ *       description: |
+ *         Human-readable slash-separated path to this node, used by the
+ *         UI tree. Set automatically on creation and move.
+ *       example: Engineering / Backend
+ *     member:
+ *       type: array
+ *       items: { type: string }
+ *       description: DNs of entries linked to this organization.
+ *       example:
+ *         - uid=alice,ou=users,dc=example,dc=com
+ * OrgSummary:
+ *   type: object
+ *   description: Lightweight organization reference (used in node lists).
+ *   required: [dn, ou]
+ *   properties:
+ *     dn: { type: string, example: ou=HR,ou=organizations,dc=example,dc=com }
+ *     ou: { type: string, example: HR }
+ *     description: { type: string }
+ *     objectClass:
+ *       type: array
+ *       items: { type: string }
+ *       example: [top, organizationalUnit]
+ * OrganizationCreate:
+ *   type: object
+ *   required: [ou]
+ *   properties:
+ *     ou:
+ *       type: string
+ *       description: Name of the new organizational unit.
+ *       example: Marketing
+ *     parentDn:
+ *       type: string
+ *       description: |
+ *         DN of the parent organizational unit. Defaults to the configured
+ *         top organization when omitted.
+ *       example: ou=organizations,dc=example,dc=com
+ *     description: { type: string }
+ *     l: { type: string }
+ *   example:
+ *     ou: Marketing
+ *     parentDn: ou=organizations,dc=example,dc=com
+ *     description: Marketing division
+ * OrganizationModify:
+ *   type: object
+ *   description: |
+ *     Partial update. Any provided attribute is replaced wholesale.
+ *     `ou` cannot be changed via this endpoint — use the move endpoint
+ *     to relocate the node within the tree.
+ *   properties:
+ *     description: { type: string }
+ *     l: { type: string }
+ *     o: { type: string }
+ *   example:
+ *     description: Updated description for Marketing
+ */
 export default class LdapOrganizations extends DmPlugin {
   name = 'ldapOrganizations';
   roles: Role[] = ['api', 'consistency', 'configurable'] as const;
@@ -77,6 +167,30 @@ export default class LdapOrganizations extends DmPlugin {
    * @param app Express application
    */
   api(app: Express): void {
+    /**
+     * @openapi
+     * summary: Get top organization
+     * description: |
+     *   Returns the single root organizational unit configured via
+     *   `--ldap-top-organization`. Authorization plugins may filter the result
+     *   to only the branches the caller has access to.
+     * responses:
+     *   '200':
+     *     description: Top organization entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Organization' }
+     *         example:
+     *           dn: ou=organizations,dc=example,dc=com
+     *           ou: organizations
+     *           description: Root organization
+     *           objectClass: [top, organizationalUnit]
+     *   '404':
+     *     description: Top organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Simple method to get top organization
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/top`,
@@ -85,6 +199,31 @@ export default class LdapOrganizations extends DmPlugin {
       }
     );
 
+    /**
+     * @openapi
+     * summary: Get organization by DN
+     * description: |
+     *   The `:dn` segment must be the URL-encoded fully-qualified DN of the
+     *   organizational unit (e.g. `ou=Engineering%2Cou=organizations%2Cdc%3Dexample%2Cdc%3Dcom`).
+     *   Returns a 404 when the DN does not exist or does not have
+     *   `objectClass=organizationalUnit`.
+     * responses:
+     *   '200':
+     *     description: Organization entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Organization' }
+     *         example:
+     *           dn: ou=Engineering,ou=organizations,dc=example,dc=com
+     *           ou: Engineering
+     *           description: Software engineering division
+     *           objectClass: [top, organizationalUnit]
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Get organization by DN
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
@@ -94,6 +233,47 @@ export default class LdapOrganizations extends DmPlugin {
       }
     );
 
+    /**
+     * @openapi
+     * summary: List subnodes of an organization
+     * description: |
+     *   Returns up to `ldap_organization_max_subnodes` (default 50) entries
+     *   that are either direct child organizational units **or** entries (users,
+     *   groups) whose organization-link attribute points to `:dn`.
+     *
+     *   When the result is truncated a special sentinel entry with
+     *   `objectClass: [moreIndicator]` is appended that carries `_totalCount`
+     *   and `_displayedCount` fields.
+     * parameters:
+     *   - in: query
+     *     name: objectClass
+     *     schema: { type: string }
+     *     description: |
+     *       Filter linked entities by objectClass (e.g. `inetOrgPerson`,
+     *       `groupOfNames`). Pass `organizationalUnit` to return only child OUs.
+     *     example: inetOrgPerson
+     * responses:
+     *   '200':
+     *     description: List of subnodes.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: ou=Backend,ou=Engineering,ou=organizations,dc=example,dc=com
+     *             ou: Backend
+     *             objectClass: [top, organizationalUnit]
+     *           - dn: uid=alice,ou=users,dc=example,dc=com
+     *             uid: alice
+     *             cn: Alice Smith
+     *             objectClass: [top, inetOrgPerson]
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Get subnodes of an organization
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
@@ -108,6 +288,39 @@ export default class LdapOrganizations extends DmPlugin {
       }
     );
 
+    /**
+     * @openapi
+     * summary: Search subnodes of an organization
+     * description: |
+     *   Full-text search across child OUs and linked entries (users, groups)
+     *   of `:dn`. The `q` parameter is matched against `ou`, `description`,
+     *   `uid`, `cn`, `sn`, `givenName`, and `mail`. Results are not paginated.
+     * parameters:
+     *   - in: query
+     *     name: q
+     *     required: true
+     *     schema: { type: string }
+     *     description: Search query matched against common attributes.
+     *     example: alice
+     * responses:
+     *   '200':
+     *     description: Matching entries.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: uid=alice,ou=users,dc=example,dc=com
+     *             uid: alice
+     *             cn: Alice Smith
+     *             mail: alice@example.com
+     *   '400':
+     *     description: Query parameter `q` missing.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Search in organization subnodes
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
@@ -125,24 +338,149 @@ export default class LdapOrganizations extends DmPlugin {
       })
     );
 
+    /**
+     * @openapi
+     * summary: Create organization
+     * description: |
+     *   Creates a new organizational unit. The `ou` field becomes the RDN.
+     *   `parentDn` controls where in the tree the node is placed; it defaults
+     *   to the configured top organization.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/OrganizationCreate' }
+     * responses:
+     *   '200':
+     *     description: Organization created.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error (missing `ou`, invalid DN value, …).
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: Organization already exists.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Add organization
     app.post(
       `${this.config.api_prefix}/v1/ldap/organizations`,
       asyncHandler(async (req, res) => this.apiAdd(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Modify organization
+     * description: |
+     *   Partial attribute update. Each key in the body replaces the existing
+     *   value for that attribute. The `ou` RDN and the organization path/link
+     *   attributes cannot be changed through this endpoint.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/OrganizationModify' }
+     * responses:
+     *   '200':
+     *     description: Organization updated.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Modify organization
     app.put(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       asyncHandler(async (req, res) => this.apiModify(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Delete organization
+     * description: |
+     *   Deletes the organizational unit identified by `:dn`. The operation is
+     *   rejected with **409 Conflict** when any entry still references this
+     *   organization via the organization-link attribute (i.e. the OU is not
+     *   empty).
+     * responses:
+     *   '200':
+     *     description: Organization deleted.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: Organization is not empty.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Delete organization
     app.delete(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       asyncHandler(async (req, res) => this.apiDelete(req, res))
     );
 
+    /**
+     * @openapi
+     * summary: Move organization to another parent
+     * description: |
+     *   Performs an LDAP `modifyDN` to relocate the organizational unit `:dn`
+     *   under `targetOrgDn`. The new DN is returned in the response.
+     *   Moving into a descendant or the current parent is rejected.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema:
+     *         type: object
+     *         required: [targetOrgDn]
+     *         properties:
+     *           targetOrgDn:
+     *             type: string
+     *             description: DN of the destination organizational unit.
+     *       example:
+     *         targetOrgDn: ou=divisions,ou=organizations,dc=example,dc=com
+     * responses:
+     *   '200':
+     *     description: Organization moved. Returns the new DN.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: object
+     *           properties:
+     *             newDn: { type: string }
+     *         example:
+     *           newDn: ou=Engineering,ou=divisions,ou=organizations,dc=example,dc=com
+     *   '400':
+     *     description: Invalid target (circular move, same location, …).
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Source or target organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
     // Move organization to a different parent
     app.post(
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
