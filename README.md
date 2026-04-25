@@ -2,7 +2,7 @@
 
 # LDAP-Rest
 
-Lite LinID directory manager is a lightweight directory manager that provides LDAP integration through a plugin-based architecture.
+**ldap-rest** is a lightweight directory manager that provides LDAP integration through a plugin-based architecture.
 This system enables directory management operations with configurable authentication, extensible functionality through events/hooks,
 and extensible REST API.
 
