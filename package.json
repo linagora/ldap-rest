@@ -552,6 +552,7 @@
     "build:dev": "./.dev.mk builddev",
     "build:docker": "./.dev.mk builddocker",
     "build:dockerfile": "./.dev.mk Dockerfile",
+    "build:pages": "tsx scripts/build-pages.ts",
     "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
     "build:watch": "rollup -c --watch",
     "check": "npm run check:ts && npm run lint && npm run format:check",
