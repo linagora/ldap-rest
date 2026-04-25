@@ -491,6 +491,21 @@ class OpenAPIGenerator {
     // tags, security, …) without us having to add ad-hoc heuristics.
     const overrides = this.extractRouteOverrides(callExpr, sourceFile);
 
+    // Strict opt-in: routes without an `@openapi` block are excluded from
+    // the spec. The published doc should reflect intentionally-documented
+    // surface only, not auto-extracted noise. We log a warning so authors
+    // notice when a new route slips in without documentation.
+    if (Object.keys(overrides).length === 0) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(
+        callExpr.getStart()
+      );
+      console.warn(
+        `⚠️  Skipping undocumented route: ${method.toUpperCase()} ${pathTemplate} ` +
+          `(${path.relative(this.rootDir, sourceFile.fileName)}:${line + 1})`
+      );
+      return null;
+    }
+
     const route: OpenAPIRoute = {
       method,
       path: pathTemplate,

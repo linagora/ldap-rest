@@ -123,9 +123,14 @@ domain (`Group`, `ScimUser`, `PasswordPolicy`) to avoid collisions.
   indentation as long as it's even within the block.
 - **Multiline strings.** Use YAML block scalars (`description: |`) for
   paragraphs and code samples — they round-trip cleanly through Redoc.
-- **No annotation? No problem.** Routes without an `@openapi` block still
-  appear in the spec with the existing generic placeholders. Add detail
-  incrementally.
+- **Annotation is opt-in.** Routes without an `@openapi` block are
+  **excluded** from the published spec — the generator prints a
+  `⚠️  Skipping undocumented route` warning so the author notices, but
+  the route does not surface in Redoc. The published doc therefore
+  reflects intentionally-documented API surface only, not every Express
+  call we happened to find.
+- **A plugin with zero annotated routes disappears entirely** from the
+  spec, by the same rule.
 
 ## Regenerate locally
 
