@@ -11,6 +11,7 @@
 import * as ts from 'typescript';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -88,6 +89,7 @@ class OpenAPIGenerator {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private routes: Map<string, OpenAPIRoute[]> = new Map();
+  private components: Record<string, unknown> = {};
   private pluginTags: Map<string, string> = new Map([
     ['ldapGroups', 'Groups'],
     ['ldapOrganizations', 'Organizations'],
@@ -158,6 +160,10 @@ class OpenAPIGenerator {
   private analyzeFile(filePath: string): void {
     const sourceFile = this.program.getSourceFile(filePath);
     if (!sourceFile) return;
+
+    // Pull `@openapi-component` schemas defined anywhere in the file into
+    // the global `components.schemas` registry.
+    this.collectComponentsFromFile(sourceFile);
 
     // Visit all nodes in the file
     ts.forEachChild(sourceFile, node => this.visitNode(node, sourceFile));
@@ -479,16 +485,19 @@ class OpenAPIGenerator {
     // Extract parameters from path
     const pathParams = this.extractPathParameters(pathTemplate);
 
-    // Extract JSDoc comments if any
-    const leadingComments = this.getLeadingComments(callExpr, sourceFile);
-    const summary = this.extractSummaryFromComments(leadingComments);
-    const description = this.extractDescriptionFromComments(leadingComments);
+    // Pull any `@openapi` YAML overrides authored above the route. These
+    // are merged on top of the generated defaults below, so a plugin can
+    // override anything (summary, parameters, requestBody, responses,
+    // tags, security, …) without us having to add ad-hoc heuristics.
+    const overrides = this.extractRouteOverrides(callExpr, sourceFile);
 
     const route: OpenAPIRoute = {
       method,
       path: pathTemplate,
-      summary: summary || this.generateSummary(method, pathTemplate),
-      description,
+      summary:
+        (overrides.summary as string | undefined) ||
+        this.generateSummary(method, pathTemplate),
+      description: overrides.description as string | undefined,
       parameters: pathParams,
       responses: {
         '200': {
@@ -571,6 +580,37 @@ class OpenAPIGenerator {
       };
     }
 
+    // Deep-merge author-provided overrides last so YAML wins over every
+    // generated default. We strip the `summary`/`description` keys because
+    // they were already consumed when constructing `route`.
+    if (Object.keys(overrides).length > 0) {
+      const { summary: _s, description: _d, ...rest } = overrides;
+
+      // Special-case: if the author lists `parameters`, concatenate them
+      // with the auto-generated path parameters (deduplicated by `in`+
+      // `name`). Path params are mandatory in OpenAPI, so silently
+      // dropping them when a route only adds query params would be a
+      // footgun. The override still wins on duplicates.
+      if (Array.isArray(rest.parameters) && route.parameters) {
+        const seen = new Set(
+          (rest.parameters as Array<{ in?: string; name?: string }>).map(
+            p => `${p.in}:${p.name}`
+          )
+        );
+        const merged = [
+          ...route.parameters.filter(p => !seen.has(`${p.in}:${p.name}`)),
+          ...(rest.parameters as OpenAPIRoute['parameters']),
+        ];
+        rest.parameters = merged as unknown as Record<string, unknown>[];
+      }
+
+      const merged = this.deepMerge(
+        route as unknown as Record<string, unknown>,
+        rest
+      );
+      return merged as unknown as OpenAPIRoute;
+    }
+
     return route;
   }
 
@@ -596,19 +636,171 @@ class OpenAPIGenerator {
     const ranges = ts.getLeadingCommentRanges(fullText, node.getFullStart());
     if (!ranges) return '';
 
-    return ranges
-      .map(range => fullText.substring(range.pos, range.end))
+    // Only keep JSDoc-style block comments (`/** ... *\/`). Plain `//`
+    // line comments above a route are author notes — never directives —
+    // and folding them in would let lines like `// Rename group` leak
+    // into the YAML body of an `@openapi` block above them.
+    const jsdocs = ranges
+      .filter(
+        range =>
+          range.kind === ts.SyntaxKind.MultiLineCommentTrivia &&
+          fullText.startsWith('/**', range.pos)
+      )
+      .map(range => fullText.substring(range.pos, range.end));
+
+    // The closest JSDoc block (the last one) is the one annotating this
+    // node; older blocks belong to whatever appeared before.
+    return jsdocs.length > 0 ? jsdocs[jsdocs.length - 1] : '';
+  }
+
+  /**
+   * Strip JSDoc comment delimiters and the leading `*` from each line so
+   * the remaining text is plain YAML/markdown. Handles both `/** ... *\/`
+   * blocks and `// ...` line comments.
+   */
+  private stripCommentDelimiters(comment: string): string {
+    return comment
+      .replace(/^\s*\/\*\*?/, '')
+      .replace(/\*\/\s*$/, '')
+      .split('\n')
+      .map(line => line.replace(/^\s*\*\s?/, '').replace(/^\s*\/\/\s?/, ''))
       .join('\n');
   }
 
-  private extractSummaryFromComments(comments: string): string | undefined {
-    const match = comments.match(/@openapi\s+summary:\s*(.+)/i);
-    return match ? match[1].trim() : undefined;
+  /**
+   * Extract every `@openapi`-style block (including `@openapi-component`)
+   * from a JSDoc comment. Each match returns the directive name and the
+   * YAML body that follows it, up to the next `@`-directive on a fresh
+   * line or the end of the comment.
+   */
+  private extractDirectiveBlocks(comment: string, directive: string): string[] {
+    const stripped = this.stripCommentDelimiters(comment);
+    const lines = stripped.split('\n');
+    const blocks: string[] = [];
+    const startRe = new RegExp(`^\\s*@${directive}\\s*$`);
+    const anyDirective = /^\s*@[\w-]+(\s|$)/;
+
+    for (let i = 0; i < lines.length; i++) {
+      if (!startRe.test(lines[i])) continue;
+      const buf: string[] = [];
+      let j = i + 1;
+      // Drop a single uniform leading indent so YAML alignment survives
+      // the JSDoc star prefix being stripped.
+      while (j < lines.length && !anyDirective.test(lines[j])) {
+        buf.push(lines[j]);
+        j++;
+      }
+      blocks.push(this.dedent(buf.join('\n')));
+      i = j - 1;
+    }
+    return blocks;
   }
 
-  private extractDescriptionFromComments(comments: string): string | undefined {
-    const match = comments.match(/@openapi\s+description:\s*(.+)/i);
-    return match ? match[1].trim() : undefined;
+  private dedent(text: string): string {
+    const lines = text.replace(/\s+$/, '').split('\n');
+    let indent = Infinity;
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const m = line.match(/^( *)/);
+      if (m) indent = Math.min(indent, m[1].length);
+    }
+    if (!isFinite(indent) || indent === 0) return lines.join('\n');
+    return lines.map(l => l.slice(indent)).join('\n');
+  }
+
+  private parseYamlBlock(block: string, where: string): unknown | undefined {
+    if (!block.trim()) return undefined;
+    try {
+      return yaml.load(block);
+    } catch (err) {
+      console.warn(
+        `⚠️  Failed to parse YAML in ${where}: ${(err as Error).message}`
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Read every `@openapi` block above a route call: returns a partial
+   * Operation Object (summary, description, parameters, requestBody,
+   * responses, tags, ...) that the generator can deep-merge over its
+   * defaults.
+   */
+  private extractRouteOverrides(
+    callExpr: ts.CallExpression,
+    sourceFile: ts.SourceFile
+  ): Record<string, unknown> {
+    const comments = this.getLeadingComments(callExpr, sourceFile);
+    if (!comments) return {};
+    const blocks = this.extractDirectiveBlocks(comments, 'openapi');
+    let merged: Record<string, unknown> = {};
+    for (const block of blocks) {
+      const parsed = this.parseYamlBlock(
+        block,
+        `route at ${path.relative(this.rootDir, sourceFile.fileName)}:${
+          sourceFile.getLineAndCharacterOfPosition(callExpr.getStart()).line + 1
+        }`
+      );
+      if (parsed && typeof parsed === 'object') {
+        merged = this.deepMerge(merged, parsed as Record<string, unknown>);
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Walk a source file for `@openapi-component` blocks. Each block is a
+   * YAML map of `<SchemaName>: <SchemaDef>` pairs that get merged into
+   * `components.schemas`. Looking at the whole file (not just the class)
+   * lets contributors group related schemas in a single block at the top.
+   */
+  private collectComponentsFromFile(sourceFile: ts.SourceFile): void {
+    const fullText = sourceFile.getFullText();
+    const commentRe = /\/\*\*[\s\S]*?\*\//g;
+    let match: RegExpExecArray | null;
+    while ((match = commentRe.exec(fullText)) !== null) {
+      const blocks = this.extractDirectiveBlocks(match[0], 'openapi-component');
+      for (const block of blocks) {
+        const parsed = this.parseYamlBlock(
+          block,
+          `@openapi-component in ${path.relative(this.rootDir, sourceFile.fileName)}`
+        );
+        if (parsed && typeof parsed === 'object') {
+          Object.assign(this.components, parsed as Record<string, unknown>);
+        }
+      }
+    }
+  }
+
+  /**
+   * Recursively merge `override` over `base`. Arrays are replaced (not
+   * concatenated) so route authors retain full control of e.g. the list
+   * of `parameters`.
+   */
+  private deepMerge<T extends Record<string, unknown>>(
+    base: T,
+    override: Record<string, unknown>
+  ): T {
+    const out: Record<string, unknown> = { ...base };
+    for (const [k, v] of Object.entries(override)) {
+      const existing = out[k];
+      if (
+        v &&
+        typeof v === 'object' &&
+        !Array.isArray(v) &&
+        existing &&
+        typeof existing === 'object' &&
+        !Array.isArray(existing)
+      ) {
+        out[k] = this.deepMerge(
+          existing as Record<string, unknown>,
+          v as Record<string, unknown>
+        );
+      } else {
+        out[k] = v;
+      }
+    }
+    return out as T;
   }
 
   private generateSummary(method: string, path: string): string {
@@ -671,22 +863,25 @@ class OpenAPIGenerator {
       })),
     };
 
-    // Build paths
-    for (const [pluginName, routes] of this.routes) {
+    // Build paths. We carry every route property over (via spread) so any
+    // OpenAPI Operation Object field provided through `@openapi` (e.g.
+    // `security`, `deprecated`, `operationId`) flows through unchanged.
+    for (const [, routes] of this.routes) {
       for (const route of routes) {
         if (!spec.paths[route.path]) {
           spec.paths[route.path] = {};
         }
-
-        spec.paths[route.path][route.method] = {
-          summary: route.summary,
-          description: route.description,
-          tags: route.tags,
-          parameters: route.parameters,
-          requestBody: route.requestBody,
-          responses: route.responses,
-        };
+        const {
+          method,
+          path: _p,
+          ...op
+        } = route as unknown as Record<string, unknown>;
+        spec.paths[route.path][method as string] = op;
       }
+    }
+
+    if (Object.keys(this.components).length > 0) {
+      spec.components = { schemas: this.components };
     }
 
     return spec;
@@ -701,6 +896,11 @@ class OpenAPIGenerator {
     console.log(`✅ OpenAPI spec generated: ${outputPath}`);
     console.log(`   Found ${this.routes.size} plugins`);
     console.log(`   Generated ${Object.keys(spec.paths).length} paths`);
+    if (spec.components?.schemas) {
+      console.log(
+        `   Collected ${Object.keys(spec.components.schemas).length} components`
+      );
+    }
   }
 }
 
