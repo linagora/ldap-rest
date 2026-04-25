@@ -99,7 +99,17 @@ class OpenAPIGenerator {
     ['static', 'Static Files'],
     ['trash', 'Trash'],
     ['externalUsersInGroups', 'External Users'],
+    ['scim', 'SCIM 2.0'],
+    ['ldapPasswordPolicy', 'Password Policy'],
+    ['appAccountsApi', 'App Accounts'],
+    ['hello', 'Demo'],
+    ['authzDynamic', 'Authorization (Dynamic)'],
   ]);
+
+  // Recognized plugin base classes (anything ultimately deriving from
+  // DmPlugin via these). Without this, plugins extending an intermediate
+  // base (e.g. AuthBase) would be silently skipped.
+  private readonly pluginBaseClasses = new Set(['DmPlugin', 'AuthBase']);
 
   constructor(private rootDir: string) {
     // Create TypeScript program
@@ -158,11 +168,12 @@ class OpenAPIGenerator {
     if (ts.isClassDeclaration(node) && node.name) {
       const className = node.name.text;
 
-      // Check if it extends DmPlugin
+      // Check if it extends a recognized plugin base class
       const heritage = node.heritageClauses?.find(
         clause => clause.token === ts.SyntaxKind.ExtendsKeyword
       );
-      if (heritage?.types[0]?.expression.getText(sourceFile) === 'DmPlugin') {
+      const baseName = heritage?.types[0]?.expression.getText(sourceFile);
+      if (baseName && this.pluginBaseClasses.has(baseName)) {
         this.analyzePluginClass(node, sourceFile, className);
       }
     }
@@ -201,21 +212,186 @@ class OpenAPIGenerator {
       pluginName = nameProp.initializer.text;
     }
 
+    // Collect local `const X = ...` declarations within the api() body
+    // so we can substitute `${X}` in route paths (e.g. SCIM uses
+    // `const prefix = this.scimPrefix` then `\`${prefix}/Users\``).
+    const localVars = this.collectLocalStringVars(apiMethod.body, classNode);
+
     // Analyze the api() method body
     const routes = this.extractRoutesFromMethod(
       apiMethod.body,
       sourceFile,
-      pluginName
+      pluginName,
+      localVars
     );
     if (routes.length > 0) {
       this.routes.set(pluginName, routes);
     }
   }
 
+  /**
+   * Walk the api() method body and resolve every top-level
+   * `const X = <string-ish-expr>` to a concrete string value, using class
+   * field initializers as fallbacks. Anything we can't resolve statically is
+   * simply skipped — its `${X}` will remain in the path so the bug is visible.
+   */
+  private collectLocalStringVars(
+    body: ts.Block,
+    classNode: ts.ClassDeclaration
+  ): Map<string, string> {
+    const vars = new Map<string, string>();
+    // Walk recursively so vars declared inside `if (...) { ... }` blocks
+    // (e.g. authzDynamic's optional reload endpoint) still resolve.
+    const visit = (n: ts.Node): void => {
+      if (ts.isVariableStatement(n)) {
+        for (const decl of n.declarationList.declarations) {
+          if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+          const value = this.resolveStringExpression(
+            decl.initializer,
+            classNode,
+            vars
+          );
+          if (value !== undefined) {
+            vars.set(decl.name.text, value);
+          }
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(body);
+    return vars;
+  }
+
+  /**
+   * Best-effort static resolution of an expression to a string. Handles
+   * string literals, simple template literals, `a || b` fallbacks, and
+   * `this.<field>` references resolved against the class's field
+   * initializers. Returns undefined when the value cannot be determined.
+   */
+  private resolveStringExpression(
+    expr: ts.Expression,
+    classNode: ts.ClassDeclaration,
+    locals: Map<string, string>
+  ): string | undefined {
+    if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+      return expr.text;
+    }
+
+    if (ts.isTemplateExpression(expr)) {
+      let out = expr.head.text;
+      for (const span of expr.templateSpans) {
+        const inner = this.resolveStringExpression(
+          span.expression,
+          classNode,
+          locals
+        );
+        if (inner === undefined) return undefined;
+        out += inner + span.literal.text;
+      }
+      return out;
+    }
+
+    if (ts.isIdentifier(expr)) {
+      return locals.get(expr.text);
+    }
+
+    if (ts.isParenthesizedExpression(expr)) {
+      return this.resolveStringExpression(expr.expression, classNode, locals);
+    }
+
+    if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr)) {
+      return this.resolveStringExpression(expr.expression, classNode, locals);
+    }
+
+    if (
+      ts.isBinaryExpression(expr) &&
+      (expr.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+        expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+    ) {
+      // For `a || b` fallbacks the right-hand side is the static default.
+      // Prefer it; fall back to LHS for completeness.
+      return (
+        this.resolveStringExpression(expr.right, classNode, locals) ??
+        this.resolveStringExpression(expr.left, classNode, locals)
+      );
+    }
+
+    if (ts.isPropertyAccessExpression(expr)) {
+      // Hardcoded fallbacks for config knobs whose runtime defaults we know.
+      const text = expr.getText();
+      if (text === 'this.config.api_prefix') return '/api';
+      if (text === 'this.config.scim_prefix') return '/scim/v2';
+
+      // `this.<field>` → look up the class property's initializer.
+      if (
+        expr.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        ts.isIdentifier(expr.name)
+      ) {
+        const fieldName = expr.name.text;
+        const value = this.resolveClassField(classNode, fieldName, locals);
+        if (value !== undefined) return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Resolve a class property to a string by inspecting its declaration
+   * initializer or, if absent, an assignment in the constructor of the
+   * form `this.<field> = <expr>`.
+   */
+  private resolveClassField(
+    classNode: ts.ClassDeclaration,
+    fieldName: string,
+    locals: Map<string, string>
+  ): string | undefined {
+    const prop = classNode.members.find(
+      m =>
+        ts.isPropertyDeclaration(m) &&
+        m.name &&
+        ts.isIdentifier(m.name) &&
+        m.name.text === fieldName
+    ) as ts.PropertyDeclaration | undefined;
+
+    if (prop?.initializer) {
+      const v = this.resolveStringExpression(
+        prop.initializer,
+        classNode,
+        locals
+      );
+      if (v !== undefined) return v;
+    }
+
+    // Look for `this.<field> = ...` assignment in constructor.
+    const ctor = classNode.members.find(m => ts.isConstructorDeclaration(m)) as
+      | ts.ConstructorDeclaration
+      | undefined;
+    if (ctor?.body) {
+      for (const stmt of ctor.body.statements) {
+        if (!ts.isExpressionStatement(stmt)) continue;
+        const e = stmt.expression;
+        if (
+          ts.isBinaryExpression(e) &&
+          e.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isPropertyAccessExpression(e.left) &&
+          e.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
+          ts.isIdentifier(e.left.name) &&
+          e.left.name.text === fieldName
+        ) {
+          const v = this.resolveStringExpression(e.right, classNode, locals);
+          if (v !== undefined) return v;
+        }
+      }
+    }
+    return undefined;
+  }
+
   private extractRoutesFromMethod(
     body: ts.Block,
     sourceFile: ts.SourceFile,
-    pluginName: string
+    pluginName: string,
+    localVars: Map<string, string>
   ): OpenAPIRoute[] {
     const routes: OpenAPIRoute[] = [];
 
@@ -231,7 +407,13 @@ class OpenAPIGenerator {
             obj === 'app' &&
             ['get', 'post', 'put', 'delete', 'patch'].includes(method)
           ) {
-            const route = this.parseRoute(node, method, sourceFile, pluginName);
+            const route = this.parseRoute(
+              node,
+              method,
+              sourceFile,
+              pluginName,
+              localVars
+            );
             if (route) {
               routes.push(route);
             }
@@ -250,7 +432,8 @@ class OpenAPIGenerator {
     callExpr: ts.CallExpression,
     method: OpenAPIRoute['method'],
     sourceFile: ts.SourceFile,
-    pluginName: string
+    pluginName: string,
+    localVars: Map<string, string>
   ): OpenAPIRoute | null {
     if (callExpr.arguments.length < 2) return null;
 
@@ -274,6 +457,13 @@ class OpenAPIGenerator {
         .replace(/\$\{[^}]*static_name[^}]*\}/g, 'static')
         .replace(/\$\{resourceName\}/g, '{resource}')
         .replace(/\$\{[^}]*resourceName[^}]*\}/g, '{resource}');
+
+      // Substitute any remaining `${name}` from the local-const map we
+      // built from the api() body (e.g. `const prefix = this.scimPrefix`).
+      for (const [name, value] of localVars) {
+        const re = new RegExp(`\\$\\{${name}\\}`, 'g');
+        pathTemplate = pathTemplate.replace(re, value);
+      }
     } else if (ts.isStringLiteral(pathArg)) {
       pathTemplate = pathArg.text;
     }
