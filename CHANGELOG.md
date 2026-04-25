@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.3.0 (2026-04-25)
+
+### New Features
+
+- Add `core/scim` plugin: SCIM 2.0 identity provisioning endpoint
+  (`/scim/v2/Users` and `/scim/v2/Groups`), with per-tenant LDAP base
+  resolution via `--scim-user-base-template` / `--scim-group-base-template`
+- Add `core/auth/authzDynamic` plugin: bearer-token authentication and
+  per-branch authorization sourced from a dedicated LDAP branch, with
+  in-memory cache (TTL + optional reload endpoint), constant-time
+  password verification, and `AsyncLocalStorage`-scoped ACL enforcement
+  on every downstream LDAP operation
+
+### Security
+
+- Enforce base-DN scope in `LdapFlat` operations: full DNs must be a
+  direct child of the configured base, blocking sibling-branch access
+  via crafted DNs
+- Reject escaped-comma DN injection in `LdapFlat.resolveDn`: the parent
+  DN check now uses parsed RDN components, so payloads like
+  `cn=pwn\,ou=titles,ou=…` can no longer bypass a textual suffix check
+- Detect DNs by `mainAttribute=` prefix instead of looking for a comma,
+  so RDN values that legally contain commas (e.g. `Smith, John`) are no
+  longer misclassified as DNs
+- Address CodeQL and Copilot findings on the SCIM and authzDynamic
+  plugins
+- Update dependencies
+
 ## v0.2.2 (2026-04-08)
 
 ### New Features
