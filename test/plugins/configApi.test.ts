@@ -143,6 +143,11 @@ describe('ConfigApi Plugin', () => {
     expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getTop'
     );
+    // Regression: getTop must point at the actual /top route, not the
+    // collection root which only accepts POST.
+    expect(response.body.features.ldapOrganizations.endpoints.getTop).to.match(
+      /\/v1\/ldap\/organizations\/top$/
+    );
     expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getSubnodes'
     );

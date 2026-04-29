@@ -21,6 +21,9 @@ import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
+  getParentDn,
+  getRdn,
+  isChildOf,
   launchHooksChained,
   transformSchemas,
   validateDnValue,
@@ -731,7 +734,11 @@ export default class LdapOrganizations extends DmPlugin {
 
       // Search will benefit from cache for repeated validations
       const entries = await this.server.ldap.search(
-        { paged: false, filter: `(ou=${ou})`, scope: 'sub' },
+        {
+          paged: false,
+          filter: `(ou=${escapeLdapFilter(ou)})`,
+          scope: 'sub',
+        },
         this.config.ldap_top_organization
       );
       if ((entries as SearchResult).searchEntries.length === 0)
@@ -887,14 +894,18 @@ export default class LdapOrganizations extends DmPlugin {
 
     // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
     // Need to search from LDAP base, not just organization tree
-    // Extract base DN from top organization (e.g., "dc=example,dc=com" from "ou=organization,dc=example,dc=com")
+    // (e.g., "dc=example,dc=com" from "ou=organizations,dc=example,dc=com")
     const topOrg = this.config.ldap_top_organization as string;
-    const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
-    let filter = `(${this.config.ldap_organization_link_attribute}=${dn})`;
+    const baseDn = getParentDn(topOrg);
+    let filter = `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(
+      dn
+    )})`;
 
     // Add objectClass filter if specified
     if (objectClassFilter) {
-      filter = `(&${filter}(objectClass=${objectClassFilter}))`;
+      filter = `(&${filter}(objectClass=${escapeLdapFilter(
+        objectClassFilter
+      )}))`;
     }
 
     this.server.logger.debug(
@@ -1051,56 +1062,64 @@ export default class LdapOrganizations extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ newDn: string }> {
-    // Validate that target organization exists
+    // Validate that target organization exists.
+    // ldap.search throws on NoSuchObject; treat both that and an empty
+    // result set as "not found" (404).
+    let targetOrg: SearchResult;
     try {
-      const targetOrg = (await this.server.ldap.search(
+      targetOrg = (await this.server.ldap.search(
         { paged: false, scope: 'base' },
         targetOrgDn
       )) as SearchResult;
-
-      if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
-        throw new Error(`Target organization ${targetOrgDn} not found`);
-      }
-
-      // Verify it's actually an organizational unit
-      if (!this.isOu(targetOrg.searchEntries[0])) {
-        throw new Error(`Target ${targetOrgDn} is not an organizational unit`);
-      }
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Invalid target organization: ${err}`);
+      throw new NotFoundError(`Target organization ${targetOrgDn} not found: ${err}`);
+    }
+    if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
+      throw new NotFoundError(`Target organization ${targetOrgDn} not found`);
+    }
+    if (!this.isOu(targetOrg.searchEntries[0])) {
+      throw new BadRequestError(
+        `Target ${targetOrgDn} is not an organizational unit`
+      );
     }
 
     // Extract the RDN (relative DN) from the source DN
     // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
-    const rdn = dn.split(',')[0];
+    const rdn = getRdn(dn);
 
     // Construct the new DN
     const newDn = `${rdn},${targetOrgDn}`;
 
     // Verify the organization to move exists
+    let sourceOrg: SearchResult;
     try {
-      const sourceOrg = (await this.server.ldap.search(
+      sourceOrg = (await this.server.ldap.search(
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;
-
-      if (!sourceOrg.searchEntries || sourceOrg.searchEntries.length === 0) {
-        throw new Error(`Source organization ${dn} not found`);
-      }
     } catch (err) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Source organization not found: ${err}`);
+      throw new NotFoundError(`Source organization not found: ${err}`);
+    }
+    if (!sourceOrg.searchEntries || sourceOrg.searchEntries.length === 0) {
+      throw new NotFoundError(`Source organization ${dn} not found`);
     }
 
     // Prevent moving to itself or creating circular references
     if (newDn === dn) {
-      throw new Error('Cannot move organization to its current location');
+      throw new BadRequestError(
+        'Cannot move organization to its current location'
+      );
     }
-    // Check if target is the source itself or a descendant of the source
-    // A descendant's DN will end with ",<source DN>"
-    if (targetOrgDn === dn || targetOrgDn.endsWith(`,${dn}`)) {
-      throw new Error('Cannot move organization into itself or its descendant');
+    // Reject moving into self or any descendant (case-insensitive DN compare)
+    if (
+      targetOrgDn.toLowerCase() === dn.toLowerCase() ||
+      isChildOf(targetOrgDn, dn)
+    ) {
+      throw new BadRequestError(
+        'Cannot move organization into itself or its descendant'
+      );
     }
 
     // Perform the LDAP modifyDN operation
@@ -1151,7 +1170,7 @@ export default class LdapOrganizations extends DmPlugin {
 
     // Search for linked entities (users and groups) matching the query
     const topOrg = this.config.ldap_top_organization as string;
-    const baseDn = topOrg.replace(/^ou=[^,]+,/, '');
+    const baseDn = getParentDn(topOrg);
     // Escape both dn and query to prevent LDAP injection
     const escapedDn = escapeLdapFilter(dn);
     const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
@@ -1214,7 +1233,7 @@ export default class LdapOrganizations extends DmPlugin {
       schema: this.schema,
       schemaUrl,
       endpoints: {
-        getTop: `${apiPrefix}/v1/ldap/organizations`,
+        getTop: `${apiPrefix}/v1/ldap/organizations/top`,
         get: `${apiPrefix}/v1/ldap/organizations/:dn`,
         getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
         searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
