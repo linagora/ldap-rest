@@ -1283,7 +1283,7 @@ source ~/.test-env && npm run test:dev
 ## Additional Resources
 
 - [Contributing Guide](../../CONTRIBUTING.md) - Git workflow and PR guidelines
-- [Hooks Reference](../../HOOKS.md) - Complete list of available hooks
+- [Hooks Reference](./hooks.md) - Complete list of available hooks
 - [Core Plugin Examples](../../src/plugins/) - Browse existing plugins
 - [Test Examples](../../test/plugins/) - See how core plugins are tested
 
