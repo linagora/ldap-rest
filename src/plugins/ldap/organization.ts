@@ -8,7 +8,7 @@ import LdapOrganizations from './organizations';
 
 // eslint-disable-next-line no-console
 console.warn(
-  '[ldap-rest] DM_PLUGINS=core/ldap/organization is deprecated; use core/ldap/organizations instead.',
+  '[ldap-rest] Plugin `core/ldap/organization` is deprecated; use `core/ldap/organizations` instead.',
 );
 
 export default LdapOrganizations;
