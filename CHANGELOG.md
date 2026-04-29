@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.3.1 (2026-04-29)
+
+### New Features
+
+- OpenAPI generator now parses `@openapi` and `@openapi-component`
+  YAML directives in route JSDoc, so plugins are self-documenting
+  (summary, description, parameters, requestBody, responses, security,
+  tags, reusable component schemas via `$ref`)
+  - it skips routes that have no `@openapi` block and logs a
+    `Skipping undocumented route` warning, so the published
+    reference reflects intentionally-documented endpoints only
+  - it now recognises `TwakePlugin` and `AuthzBase` descendants and
+    walks `src/abstract/`, covering the James plugin and the generic
+    `LdapFlat` CRUD surface (with a `{resource}` path placeholder)
+- Annotate every API-exposing plugin with OpenAPI metadata: SCIM 2.0
+  (Users, Groups, Bulk, Discovery), `ldapOrganizations`, `ldapGroups`,
+  `ldapPasswordPolicy`, `ldapBulkImport`, `twake/appAccountsApi`,
+  `twake/james`, `static`, `configApi`, `hello/helloworld`,
+  `authzDynamic`, plus the abstract `LdapFlat` routes — 51 operations
+  across 10 tags, backed by 30 component schemas
+
+### Documentation
+
+- Add `docs/plugin-development/openapi.md` guide explaining the
+  generator contract and the YAML directives
+- Fix broken link to `hooks.md` in README
+
+### Bug Fixes
+
+- Rename `core/ldap/organization` plugin source file to
+  `organizations.ts` so the documented plugin name
+  `core/ldap/organizations` actually loads; keep the singular path
+  as a deprecated alias that emits a one-time warning at module load
+  (slated for removal at the next major release)
+- Word the plugin-path deprecation warning around the plugin path
+  itself, not around the loading entry point (`DM_PLUGINS`)
+
+### Security
+
+- Harden DN handling and LDAP filter escaping in the
+  `ldapOrganizations` plugin:
+  - `moveOrganization` now uses `getRdn()` / `isChildOf()` instead of
+    `dn.split(',')[0]` and `endsWith()`, so escaped commas,
+    multi-valued RDNs and attribute-name casing differences no longer
+    bypass the descendant / same-location checks
+  - Replace `topOrg.replace(/^ou=[^,]+,/, '')` with `getParentDn()` in
+    both call sites, going through the existing DN parser
+  - `escapeLdapFilter()` the request-controlled `dn` and `objectClass`
+    query parameter in `getOrganisationSubnodes`, and the path segment
+    in `checkDeptPath`, closing LDAP filter injection vectors
+  - Throw `NotFoundError` / `BadRequestError` / `ConflictError`
+    instead of plain `Error`, so HTTP responses carry meaningful 4xx
+    codes (404 / 400 / 409) instead of a generic 500
+  - Stop double-wrapping caught LDAP errors that would otherwise lose
+    their original status code
+- `ConfigApi.getTop` now points at `/v1/ldap/organizations/top` (the
+  actual GET route) instead of the collection root that only accepts
+  POST
+
 ## v0.3.0 (2026-04-25)
 
 ### New Features

@@ -1,6 +1,6 @@
 {
   "name": "ldap-rest",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Light directory manager",
   "keywords": [
     "Identity-Manager"
@@ -119,6 +119,10 @@
     "./plugin-ldap-organization": {
       "types": "./dist/src/plugins/ldap/organization.d.ts",
       "import": "./dist/plugins/ldap/organization.js"
+    },
+    "./plugin-ldap-organizations": {
+      "types": "./dist/src/plugins/ldap/organizations.d.ts",
+      "import": "./dist/plugins/ldap/organizations.js"
     },
     "./plugin-ldap-passwordpolicy": {
       "types": "./dist/src/plugins/ldap/passwordPolicy.d.ts",
