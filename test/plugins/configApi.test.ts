@@ -4,7 +4,7 @@ import { DM } from '../../src/bin';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
-import LdapOrganization from '../../src/plugins/ldap/organization';
+import LdapOrganization from '../../src/plugins/ldap/organizations';
 import Static from '../../src/plugins/static';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -142,6 +142,11 @@ describe('ConfigApi Plugin', () => {
     );
     expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getTop'
+    );
+    // Regression: getTop must point at the actual /top route, not the
+    // collection root which only accepts POST.
+    expect(response.body.features.ldapOrganizations.endpoints.getTop).to.match(
+      /\/v1\/ldap\/organizations\/top$/
     );
     expect(response.body.features.ldapOrganizations.endpoints).to.have.property(
       'getSubnodes'

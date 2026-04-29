@@ -1,0 +1,1247 @@
+import fs from 'fs';
+
+import type { SearchResult } from 'ldapts';
+import type { Express, Request, Response } from 'express';
+
+import DmPlugin, { type Role } from '../../abstract/plugin';
+import { DM } from '../../bin';
+import { Hooks } from '../../hooks';
+import {
+  AttributesList,
+  AttributeValue,
+  ModifyRequest,
+} from '../../lib/ldapActions';
+import {
+  tryMethodData,
+  tryMethod,
+  jsonBody,
+  wantJson,
+} from '../../lib/expressFormatedResponses';
+import {
+  asyncHandler,
+  escapeDnValue,
+  escapeLdapFilter,
+  getParentDn,
+  getRdn,
+  isChildOf,
+  launchHooksChained,
+  transformSchemas,
+  validateDnValue,
+} from '../../lib/utils';
+import {
+  BadRequestError,
+  NotFoundError,
+  ConflictError,
+} from '../../lib/errors';
+import type { Schema } from '../../config/schema';
+
+/**
+ * Shared OpenAPI schemas surfaced by this plugin. Picked up by
+ * scripts/generate-openapi.ts and merged into `components.schemas`.
+ *
+ * @openapi-component
+ * Organization:
+ *   type: object
+ *   description: An LDAP organizational unit entry.
+ *   required: [dn, ou]
+ *   properties:
+ *     dn:
+ *       type: string
+ *       description: Fully-qualified distinguished name of the entry.
+ *       example: ou=Engineering,ou=organizations,dc=example,dc=com
+ *     ou:
+ *       type: string
+ *       description: Organizational unit name (RDN attribute).
+ *       example: Engineering
+ *     o:
+ *       type: string
+ *       description: Organization display name.
+ *       example: Engineering Department
+ *     l:
+ *       type: string
+ *       description: Locality / city.
+ *       example: Paris
+ *     description:
+ *       type: string
+ *       example: Software engineering division
+ *     organizationLink:
+ *       type: string
+ *       description: DN of the parent organization (link attribute).
+ *       example: ou=organizations,dc=example,dc=com
+ *     organizationPath:
+ *       type: string
+ *       description: |
+ *         Human-readable slash-separated path to this node, used by the
+ *         UI tree. Set automatically on creation and move.
+ *       example: Engineering / Backend
+ *     member:
+ *       type: array
+ *       items: { type: string }
+ *       description: DNs of entries linked to this organization.
+ *       example:
+ *         - uid=alice,ou=users,dc=example,dc=com
+ * OrgSummary:
+ *   type: object
+ *   description: Lightweight organization reference (used in node lists).
+ *   required: [dn, ou]
+ *   properties:
+ *     dn: { type: string, example: ou=HR,ou=organizations,dc=example,dc=com }
+ *     ou: { type: string, example: HR }
+ *     description: { type: string }
+ *     objectClass:
+ *       type: array
+ *       items: { type: string }
+ *       example: [top, organizationalUnit]
+ * OrganizationCreate:
+ *   type: object
+ *   required: [ou]
+ *   properties:
+ *     ou:
+ *       type: string
+ *       description: Name of the new organizational unit.
+ *       example: Marketing
+ *     parentDn:
+ *       type: string
+ *       description: |
+ *         DN of the parent organizational unit. Defaults to the configured
+ *         top organization when omitted.
+ *       example: ou=organizations,dc=example,dc=com
+ *     description: { type: string }
+ *     l: { type: string }
+ *   example:
+ *     ou: Marketing
+ *     parentDn: ou=organizations,dc=example,dc=com
+ *     description: Marketing division
+ * OrganizationModify:
+ *   type: object
+ *   description: |
+ *     Partial update. Any provided attribute is replaced wholesale.
+ *     `ou` cannot be changed via this endpoint — use the move endpoint
+ *     to relocate the node within the tree.
+ *   properties:
+ *     description: { type: string }
+ *     l: { type: string }
+ *     o: { type: string }
+ *   example:
+ *     description: Updated description for Marketing
+ */
+export default class LdapOrganizations extends DmPlugin {
+  name = 'ldapOrganizations';
+  roles: Role[] = ['api', 'consistency', 'configurable'] as const;
+  pathAttr: string;
+  linkAttr: string;
+  schema?: Schema;
+
+  constructor(dm: DM) {
+    super(dm);
+    if (!this.config.ldap_top_organization) {
+      throw new Error('Missing --ldap-top-organization');
+    }
+
+    this.pathAttr = this.config.ldap_organization_path_attribute as string;
+    this.linkAttr = this.config.ldap_organization_link_attribute as string;
+
+    // Load organization schema if provided
+    if (this.config.organization_schema) {
+      fs.readFile(this.config.organization_schema, (err, data) => {
+        if (err) {
+          this.logger.error(
+            `Failed to load organization schema from ${this.config.organization_schema}: ${err}`
+          );
+        } else {
+          try {
+            this.schema = JSON.parse(
+              transformSchemas(data.toString(), this.config)
+            ) as Schema;
+            this.logger.debug('Organization schema loaded');
+          } catch (e) {
+            this.logger.error(
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+              `Failed to parse organization schema: ${e}`
+            );
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * API routes for LDAP organizations
+   * @param app Express application
+   */
+  api(app: Express): void {
+    /**
+     * @openapi
+     * summary: Get top organization
+     * description: |
+     *   Returns the single root organizational unit configured via
+     *   `--ldap-top-organization`. Authorization plugins may filter the result
+     *   to only the branches the caller has access to.
+     * responses:
+     *   '200':
+     *     description: Top organization entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Organization' }
+     *         example:
+     *           dn: ou=organizations,dc=example,dc=com
+     *           ou: organizations
+     *           description: Root organization
+     *           objectClass: [top, organizationalUnit]
+     *   '404':
+     *     description: Top organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Simple method to get top organization
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/top`,
+      async (req, res) => {
+        await tryMethodData(res, this.getOrganisationTop.bind(this), req);
+      }
+    );
+
+    /**
+     * @openapi
+     * summary: Get organization by DN
+     * description: |
+     *   The `:dn` segment must be the URL-encoded fully-qualified DN of the
+     *   organizational unit (e.g. `ou=Engineering%2Cou=organizations%2Cdc%3Dexample%2Cdc%3Dcom`).
+     *   Returns a 404 when the DN does not exist or does not have
+     *   `objectClass=organizationalUnit`.
+     * responses:
+     *   '200':
+     *     description: Organization entry.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Organization' }
+     *         example:
+     *           dn: ou=Engineering,ou=organizations,dc=example,dc=com
+     *           ou: Engineering
+     *           description: Software engineering division
+     *           objectClass: [top, organizationalUnit]
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Get organization by DN
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn);
+        await tryMethodData(res, this.getOrganisationByDn.bind(this), dn, req);
+      }
+    );
+
+    /**
+     * @openapi
+     * summary: List subnodes of an organization
+     * description: |
+     *   Returns up to `ldap_organization_max_subnodes` (default 50) entries
+     *   that are either direct child organizational units **or** entries (users,
+     *   groups) whose organization-link attribute points to `:dn`.
+     *
+     *   When the result is truncated a special sentinel entry with
+     *   `objectClass: [moreIndicator]` is appended that carries `_totalCount`
+     *   and `_displayedCount` fields.
+     * parameters:
+     *   - in: query
+     *     name: objectClass
+     *     schema: { type: string }
+     *     description: |
+     *       Filter linked entities by objectClass (e.g. `inetOrgPerson`,
+     *       `groupOfNames`). Pass `organizationalUnit` to return only child OUs.
+     *     example: inetOrgPerson
+     * responses:
+     *   '200':
+     *     description: List of subnodes.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: ou=Backend,ou=Engineering,ou=organizations,dc=example,dc=com
+     *             ou: Backend
+     *             objectClass: [top, organizationalUnit]
+     *           - dn: uid=alice,ou=users,dc=example,dc=com
+     *             uid: alice
+     *             cn: Alice Smith
+     *             objectClass: [top, inetOrgPerson]
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Get subnodes of an organization
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
+      async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn);
+        await tryMethodData(
+          res,
+          this.getOrganisationSubnodes.bind(this),
+          dn,
+          req
+        );
+      }
+    );
+
+    /**
+     * @openapi
+     * summary: Search subnodes of an organization
+     * description: |
+     *   Full-text search across child OUs and linked entries (users, groups)
+     *   of `:dn`. The `q` parameter is matched against `ou`, `description`,
+     *   `uid`, `cn`, `sn`, `givenName`, and `mail`. Results are not paginated.
+     * parameters:
+     *   - in: query
+     *     name: q
+     *     required: true
+     *     schema: { type: string }
+     *     description: Search query matched against common attributes.
+     *     example: alice
+     * responses:
+     *   '200':
+     *     description: Matching entries.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: uid=alice,ou=users,dc=example,dc=com
+     *             uid: alice
+     *             cn: Alice Smith
+     *             mail: alice@example.com
+     *   '400':
+     *     description: Query parameter `q` missing.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Search in organization subnodes
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes/search`,
+      asyncHandler(async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn as string);
+        const query = req.query.q as string;
+        if (!query)
+          throw new BadRequestError('query parameter "q" is required');
+        await tryMethodData(
+          res,
+          this.searchOrganisationSubnodes.bind(this),
+          dn,
+          query
+        );
+      })
+    );
+
+    /**
+     * @openapi
+     * summary: Create organization
+     * description: |
+     *   Creates a new organizational unit. The `ou` field becomes the RDN.
+     *   `parentDn` controls where in the tree the node is placed; it defaults
+     *   to the configured top organization.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/OrganizationCreate' }
+     * responses:
+     *   '200':
+     *     description: Organization created.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error (missing `ou`, invalid DN value, …).
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: Organization already exists.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Add organization
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/organizations`,
+      asyncHandler(async (req, res) => this.apiAdd(req, res))
+    );
+
+    /**
+     * @openapi
+     * summary: Modify organization
+     * description: |
+     *   Partial attribute update. Each key in the body replaces the existing
+     *   value for that attribute. The `ou` RDN and the organization path/link
+     *   attributes cannot be changed through this endpoint.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/OrganizationModify' }
+     * responses:
+     *   '200':
+     *     description: Organization updated.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '400':
+     *     description: Validation error.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Modify organization
+    app.put(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      asyncHandler(async (req, res) => this.apiModify(req, res))
+    );
+
+    /**
+     * @openapi
+     * summary: Delete organization
+     * description: |
+     *   Deletes the organizational unit identified by `:dn`. The operation is
+     *   rejected with **409 Conflict** when any entry still references this
+     *   organization via the organization-link attribute (i.e. the OU is not
+     *   empty).
+     * responses:
+     *   '200':
+     *     description: Organization deleted.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: Organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: Organization is not empty.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Delete organization
+    app.delete(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
+      asyncHandler(async (req, res) => this.apiDelete(req, res))
+    );
+
+    /**
+     * @openapi
+     * summary: Move organization to another parent
+     * description: |
+     *   Performs an LDAP `modifyDN` to relocate the organizational unit `:dn`
+     *   under `targetOrgDn`. The new DN is returned in the response.
+     *   Moving into a descendant or the current parent is rejected.
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema:
+     *         type: object
+     *         required: [targetOrgDn]
+     *         properties:
+     *           targetOrgDn:
+     *             type: string
+     *             description: DN of the destination organizational unit.
+     *       example:
+     *         targetOrgDn: ou=divisions,ou=organizations,dc=example,dc=com
+     * responses:
+     *   '200':
+     *     description: Organization moved. Returns the new DN.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: object
+     *           properties:
+     *             newDn: { type: string }
+     *         example:
+     *           newDn: ou=Engineering,ou=divisions,ou=organizations,dc=example,dc=com
+     *   '400':
+     *     description: Invalid target (circular move, same location, …).
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Source or target organization not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Move organization to a different parent
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/move`,
+      asyncHandler(async (req, res) => this.apiMove(req, res))
+    );
+  }
+
+  async apiAdd(req: Request, res: Response): Promise<void> {
+    const body = jsonBody(req, res, 'ou') as
+      | {
+          ou: string;
+          parentDn?: string;
+          [key: string]: AttributeValue | undefined;
+        }
+      | false;
+    if (!body) return;
+
+    validateDnValue(body.ou, 'ou');
+    const parentDn = body.parentDn || this.config.ldap_top_organization;
+    const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
+    const entry: AttributesList = {
+      objectClass: this.config.ldap_organization_class as string[],
+      ou: body.ou,
+      ...Object.fromEntries(
+        Object.entries(body).filter(
+          ([key]) => key !== 'ou' && key !== 'parentDn'
+        )
+      ),
+    };
+
+    await tryMethod(res, this.addOrganization.bind(this), dn, entry, req);
+  }
+
+  async apiModify(req: Request, res: Response): Promise<void> {
+    const body = jsonBody(req, res) as ModifyRequest | false;
+    if (!body) return;
+    const dn = decodeURIComponent(req.params.dn as string);
+    if (!dn) throw new BadRequestError('dn is required');
+    await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
+  }
+
+  async apiDelete(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+    const dn = decodeURIComponent(req.params.dn as string);
+    if (!dn) throw new BadRequestError('dn is required');
+    await tryMethod(res, this.deleteOrganization.bind(this), dn);
+  }
+
+  async apiMove(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'targetOrgDn') as
+      | { targetOrgDn: string }
+      | false;
+    if (!body) return;
+
+    const dn = decodeURIComponent(req.params.dn as string);
+    if (!dn) throw new BadRequestError('dn is required');
+
+    const { targetOrgDn } = body;
+
+    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
+      throw new BadRequestError(
+        'Missing or invalid targetOrgDn in request body'
+      );
+    }
+
+    await tryMethodData(
+      res,
+      this.moveOrganization.bind(this),
+      dn,
+      targetOrgDn,
+      req
+    );
+  }
+
+  /**
+   * Consistency checks on any entry
+   */
+  hooks: Hooks = {
+    /**
+     * If ldap_organization_link_attribute and/or ldap_organization_path_attribute
+     * are modified, check that:
+     * - the link attribute points to an existing organization dn
+     * - the path attribute is valid (starts with ldap_top_organization and
+     *   each part is separated by ldap_organization_path_separator)
+     *
+     * If an ou is going to be deleted, check that it is empty
+     */
+    ldapaddrequest: async ([dn, entry, req]) => {
+      // Organizations use LDAP hierarchy (DN), not twakeDepartmentLink
+      // Only users/groups have twakeDepartmentLink
+      if (!this.isOu(entry)) {
+        await this.checkDeptLink(entry);
+      }
+      // Only check path for organizations, not for users/groups
+      if (this.isOu(entry)) await this.checkDeptPath(entry);
+      return req !== undefined
+        ? [dn, entry, req]
+        : ([dn, entry] as [string, AttributesList, Request?]);
+    },
+
+    ldapmodifyrequest: async ([dn, changes, op]) => {
+      let fakeEntryL: AttributesList = {};
+      let fakeEntryP: AttributesList = {};
+      let isOrgEntry: boolean | undefined;
+
+      // Determine if this is an organization entry
+      const checkIsOu = async (): Promise<boolean> => {
+        if (isOrgEntry !== undefined) return isOrgEntry;
+        if (changes.replace?.objectClass) {
+          isOrgEntry = this.isOu({ objectClass: changes.replace.objectClass });
+        } else if (changes.add?.objectClass) {
+          isOrgEntry = this.isOu({ objectClass: changes.add.objectClass });
+        } else {
+          const entry = await this.server.ldap.search(
+            { paged: false, scope: 'base' },
+            dn
+          );
+          isOrgEntry =
+            (entry as SearchResult).searchEntries.length > 0 &&
+            this.isOu((entry as SearchResult).searchEntries[0]);
+        }
+        return isOrgEntry;
+      };
+
+      /**
+       * Deletion of path/link attribute is forbidden
+       * - Organizations cannot delete path (they use LDAP hierarchy, not link)
+       * - Users/groups cannot delete link or path
+       */
+      if (changes.delete) {
+        const hasLinkDelete = Array.isArray(changes.delete)
+          ? changes.delete.includes(this.linkAttr)
+          : changes.delete[this.linkAttr];
+        const hasPathDelete = Array.isArray(changes.delete)
+          ? changes.delete.includes(this.pathAttr)
+          : changes.delete[this.pathAttr];
+
+        if (hasLinkDelete || hasPathDelete) {
+          const isOu = await checkIsOu();
+          if (!isOu && hasLinkDelete) {
+            throw new BadRequestError(`An organization link cannot be deleted`);
+          }
+          if (hasPathDelete) {
+            throw new BadRequestError(`An organization path cannot be deleted`);
+          }
+        }
+      }
+
+      /**
+       * If link/path attribute is modified, check its validity
+       * - Organizations: only validate path
+       * - Users/groups: validate both link and path
+       */
+      if (changes.replace) {
+        if (changes.replace[this.linkAttr]) fakeEntryL = { ...changes.replace };
+        if (changes.replace[this.pathAttr]) fakeEntryP = { ...changes.replace };
+      }
+      if (changes.add) {
+        if (changes.add[this.linkAttr])
+          fakeEntryL = { ...fakeEntryL, ...changes.add };
+        if (changes.add[this.pathAttr])
+          fakeEntryP = { ...fakeEntryP, ...changes.add };
+      }
+
+      // Organizations use LDAP hierarchy, not twakeDepartmentLink
+      if (Object.keys(fakeEntryL).length > 0) {
+        const isOu = await checkIsOu();
+        if (!isOu) {
+          await this.checkDeptLink(fakeEntryL);
+        }
+      }
+
+      if (Object.keys(fakeEntryP).length > 0) {
+        const isOu = await checkIsOu();
+        if (isOu) {
+          await this.checkDeptPath(fakeEntryP);
+        }
+      }
+      return [dn, changes, op];
+    },
+
+    ldapdeleterequest: async ([dn]) => {
+      // Deletion of a non empty organization is forbidden
+      if (/^ou=/.test(dn)) await this.isEmptyOrganization(dn);
+      return [dn];
+    },
+
+    ldaprenamerequest: ([dn, newdn]) => {
+      return [dn, newdn];
+    },
+  };
+
+  /**
+   * Check if the department link is valid
+   * @param entry LDAP entry to check
+   */
+  async checkDeptLink(entry: AttributesList): Promise<void> {
+    if (entry[this.linkAttr]) {
+      const linkValue = entry[this.linkAttr];
+      const orgDn = (
+        Array.isArray(linkValue) ? linkValue[0] : linkValue
+      ) as string;
+      // Use scope: 'base' to benefit from LDAP cache
+      const res = await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        orgDn
+      );
+      if ((res as SearchResult).searchEntries.length === 0)
+        throw new NotFoundError(`Organization ${orgDn} does not exist`);
+      if (
+        !new RegExp(`(.*,)?${this.config.ldap_top_organization}`).test(
+          (res as SearchResult).searchEntries[0].dn
+        )
+      )
+        throw new BadRequestError(
+          `Entry ${orgDn} isn't in top organization branch`
+        );
+    }
+  }
+
+  /**
+   * Check if the department path is valid
+   * @param entry LDAP entry to check
+   */
+  async checkDeptPath(entry: AttributesList): Promise<void> {
+    if (entry[this.pathAttr]) {
+      const pathValue = entry[this.pathAttr];
+      const path = (
+        Array.isArray(pathValue) ? pathValue[0] : pathValue
+      ) as string;
+      const sep = this.config.ldap_organization_path_separator || ' / ';
+
+      let matchingPath = path;
+      if (this.isOu(entry)) {
+        const ouValue = entry.ou;
+        const ouName = (
+          Array.isArray(ouValue) ? ouValue[0] : ouValue
+        ) as string;
+        if (!path.startsWith(ouName + sep))
+          throw new BadRequestError(
+            `Organization path must start with its own name followed by separator "${sep}"`
+          );
+        matchingPath = path.slice(ouName.length + sep.length);
+      }
+      const [ou, ouPath] = matchingPath.split(sep, 2);
+
+      // Search will benefit from cache for repeated validations
+      const entries = await this.server.ldap.search(
+        {
+          paged: false,
+          filter: `(ou=${escapeLdapFilter(ou)})`,
+          scope: 'sub',
+        },
+        this.config.ldap_top_organization
+      );
+      if ((entries as SearchResult).searchEntries.length === 0)
+        throw new BadRequestError(`Invalid organization path ${path}`);
+
+      // If ouPath is undefined, this references the top organization
+      // Verify it exists and has no parent path (or matches top org DN)
+      if (!ouPath) {
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const entryDn = entry.dn;
+          const topOrgDn = this.config.ldap_top_organization as string;
+          // Check if this is the top organization (DN matches or is direct child)
+          if (
+            entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
+            entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
+          ) {
+            const pathValue = entry[this.pathAttr];
+            const entryPath = Array.isArray(pathValue)
+              ? (pathValue[0] as string | undefined)
+              : (pathValue as string | undefined);
+            // Top org should either have no path attribute or a simple path (just its name)
+            if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found)
+          throw new BadRequestError(
+            `Invalid organization path ${path}: no matching top-level entry for ${ou}`
+          );
+      } else {
+        // Verify parent organization exists with the specified path
+        let found = false;
+        for (const entry of (entries as SearchResult).searchEntries) {
+          const pathValue = entry[this.pathAttr];
+          const entryPath = Array.isArray(pathValue)
+            ? (pathValue[0] as string)
+            : (pathValue as string);
+          if (entryPath && entryPath === ouPath) {
+            found = true;
+            break;
+          }
+        }
+        if (!found)
+          throw new BadRequestError(
+            `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
+          );
+      }
+    }
+  }
+
+  async isEmptyOrganization(dn: string): Promise<void> {
+    const res = await this.server.ldap.search({
+      paged: false,
+      filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
+    });
+    if ((res as SearchResult).searchEntries.length > 0)
+      throw new ConflictError(`Organization ${dn} is not empty`);
+  }
+
+  /**
+   * Check if entry is an organisation
+   * @param entry LDAP entry to check
+   * @returns True if entry is an organisation, false otherwise
+   */
+  isOu(entry: AttributesList): boolean {
+    if (!entry.objectClass) return false;
+    const entryClasses = (entry.objectClass as string[]).map(c =>
+      c.toLowerCase()
+    );
+    return (this.config.ldap_organization_class as string[])
+      .filter(c => c.toLowerCase() !== 'top')
+      .some(c => entryClasses.includes(c.toLowerCase()));
+  }
+
+  async getOrganisationTop(
+    req?: Request
+  ): Promise<AttributesList | AttributesList[]> {
+    if (!this.config.ldap_top_organization)
+      throw new BadRequestError('No top organization configured');
+
+    // Get default top organization
+    const top = await this.server.ldap.search(
+      { paged: false, scope: 'base' },
+      this.config.ldap_top_organization,
+      req
+    );
+    if ((top as SearchResult).searchEntries.length !== 1)
+      throw new NotFoundError('Top organization not found');
+
+    // Call hook to allow plugins (like authzPerBranch) to modify the result
+    const [, result] = await launchHooksChained(
+      this.registeredHooks.getOrganisationTop,
+      [req, (top as SearchResult).searchEntries[0]]
+    );
+
+    return result;
+  }
+
+  async getOrganisationByDn(
+    dn: string,
+    req?: Request
+  ): Promise<AttributesList> {
+    const org = await this.server.ldap.search(
+      {
+        paged: false,
+        scope: 'base',
+        filter: '(objectClass=organizationalUnit)',
+      },
+      dn,
+      req
+    );
+    if ((org as SearchResult).searchEntries.length !== 1)
+      throw new NotFoundError(`Organization ${dn} not found`);
+    return (org as SearchResult).searchEntries[0];
+  }
+
+  async getOrganisationSubnodes(
+    dn: string,
+    req?: Request
+  ): Promise<AttributesList[]> {
+    const result: AttributesList[] = [];
+    const MAX_LINKED_ENTITIES =
+      this.config.ldap_organization_max_subnodes || 50;
+
+    // Check if objectClass filter is requested via query parameter
+    const objectClassFilter = req?.query?.objectClass as string | undefined;
+
+    // 1. Get direct sub-OUs (children organizational units)
+    if (!objectClassFilter || objectClassFilter === 'organizationalUnit') {
+      try {
+        const subOUs = (await this.server.ldap.search(
+          {
+            paged: false,
+            scope: 'one',
+            filter: '(objectClass=organizationalUnit)',
+          },
+          dn,
+          req
+        )) as SearchResult;
+        this.server.logger.debug(
+          `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
+        );
+        result.push(...subOUs.searchEntries);
+      } catch (err) {
+        // Ignore errors (e.g., if no children exist)
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
+      }
+    }
+
+    // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
+    // Need to search from LDAP base, not just organization tree
+    // (e.g., "dc=example,dc=com" from "ou=organizations,dc=example,dc=com")
+    const topOrg = this.config.ldap_top_organization as string;
+    const baseDn = getParentDn(topOrg);
+    let filter = `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(
+      dn
+    )})`;
+
+    // Add objectClass filter if specified
+    if (objectClassFilter) {
+      filter = `(&${filter}(objectClass=${escapeLdapFilter(
+        objectClassFilter
+      )}))`;
+    }
+
+    this.server.logger.debug(
+      `Searching for linked entities with filter: ${filter} in ${baseDn}`
+    );
+    const subs = await this.server.ldap.search(
+      {
+        paged: true,
+        filter,
+      },
+      baseDn,
+      req
+    );
+    let linkedCount = 0;
+    let totalCount = 0;
+    for await (const sub of subs as AsyncGenerator<SearchResult>) {
+      totalCount += sub.searchEntries.length;
+      const remaining = MAX_LINKED_ENTITIES - linkedCount;
+      if (remaining > 0) {
+        const entriesToAdd = sub.searchEntries.slice(0, remaining);
+        result.push(...entriesToAdd);
+        linkedCount += entriesToAdd.length;
+      }
+    }
+    this.server.logger.debug(
+      `Found ${totalCount} linked entities for ${dn}, returning ${linkedCount}`
+    );
+
+    // Add a special indicator entry if there are more elements
+    if (totalCount > MAX_LINKED_ENTITIES) {
+      result.push({
+        dn: `more-${dn}`,
+        cn: [`... ${totalCount - MAX_LINKED_ENTITIES} more elements`],
+        objectClass: ['moreIndicator'],
+        _isMoreIndicator: 'true',
+        _totalCount: totalCount.toString(),
+        _displayedCount: MAX_LINKED_ENTITIES.toString(),
+      });
+    }
+
+    return result;
+  }
+
+  async addOrganization(
+    dn: string,
+    entry: AttributesList,
+    req?: Request
+  ): Promise<boolean> {
+    // Validate with schema if available
+    this.validateNewOrganization(dn, entry);
+    // Hooks will validate the organization link and path
+    return await this.server.ldap.add(dn, entry, req);
+  }
+
+  async modifyOrganization(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<boolean> {
+    // Validate with schema if available
+    this.validateChanges(dn, changes);
+    // Hooks will validate any changes to organization link and path
+    return await this.server.ldap.modify(dn, changes);
+  }
+
+  validateNewOrganization(dn: string, entry: AttributesList): boolean {
+    if (!this.schema) return true;
+
+    // Check each field
+    for (const [field, value] of Object.entries(entry)) {
+      if (!this._validateOneChange(field, value)) {
+        throw new BadRequestError(`Invalid value for field ${field}`);
+      }
+    }
+
+    // Check required fields
+    for (const [field, test] of Object.entries(this.schema.attributes)) {
+      if (test.required && entry[field] == undefined)
+        throw new BadRequestError(`Missing required field ${field}`);
+    }
+    return true;
+  }
+
+  validateChanges(dn: string, changes: ModifyRequest): boolean {
+    if (!this.schema) return true;
+
+    if (changes.add) {
+      for (const [field, value] of Object.entries(changes.add)) {
+        if (!this._validateOneChange(field, value)) {
+          throw new BadRequestError(`Invalid value for field ${field}`);
+        }
+      }
+    }
+
+    if (changes.replace) {
+      for (const [field, value] of Object.entries(changes.replace)) {
+        if (!this._validateOneChange(field, value)) {
+          throw new BadRequestError(`Invalid value for field ${field}`);
+        }
+      }
+    }
+
+    return true;
+  }
+
+  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+    if (!this.schema) return true;
+    const fieldTest = this.schema.attributes[field];
+    if (!fieldTest) {
+      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      return true;
+    }
+    if (value === null || value === undefined) {
+      if (fieldTest.required) throw new Error(`Field ${field} is required`);
+      return true;
+    }
+
+    // Type validation
+    if (fieldTest.type) {
+      switch (fieldTest.type) {
+        case 'string':
+          if (Array.isArray(value))
+            throw new Error(`Field ${field} must be a single value`);
+          break;
+        case 'array':
+          if (!Array.isArray(value))
+            throw new Error(`Field ${field} must be an array`);
+          break;
+        case 'pointer':
+          // Pointer validation is handled by other hooks
+          break;
+      }
+    }
+
+    // Test/pattern validation
+    if (fieldTest.test) {
+      const valueStr = Array.isArray(value) ? value[0] : value;
+      const regex =
+        typeof fieldTest.test === 'string'
+          ? new RegExp(fieldTest.test)
+          : fieldTest.test;
+      if (!regex.test(String(valueStr)))
+        throw new Error(`Field ${field} does not match required pattern`);
+    }
+
+    return true;
+  }
+
+  /**
+   * Move an organization to a different parent organization
+   * Uses LDAP modifyDN to change the DN hierarchy
+   */
+  async moveOrganization(
+    dn: string,
+    targetOrgDn: string,
+    req?: Request
+  ): Promise<{ newDn: string }> {
+    // Validate that target organization exists.
+    // ldap.search throws on NoSuchObject; treat both that and an empty
+    // result set as "not found" (404).
+    let targetOrg: SearchResult;
+    try {
+      targetOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        targetOrgDn
+      )) as SearchResult;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new NotFoundError(`Target organization ${targetOrgDn} not found: ${err}`);
+    }
+    if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
+      throw new NotFoundError(`Target organization ${targetOrgDn} not found`);
+    }
+    if (!this.isOu(targetOrg.searchEntries[0])) {
+      throw new BadRequestError(
+        `Target ${targetOrgDn} is not an organizational unit`
+      );
+    }
+
+    // Extract the RDN (relative DN) from the source DN
+    // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
+    const rdn = getRdn(dn);
+
+    // Construct the new DN
+    const newDn = `${rdn},${targetOrgDn}`;
+
+    // Verify the organization to move exists
+    let sourceOrg: SearchResult;
+    try {
+      sourceOrg = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new NotFoundError(`Source organization not found: ${err}`);
+    }
+    if (!sourceOrg.searchEntries || sourceOrg.searchEntries.length === 0) {
+      throw new NotFoundError(`Source organization ${dn} not found`);
+    }
+
+    // Prevent moving to itself or creating circular references
+    if (newDn === dn) {
+      throw new BadRequestError(
+        'Cannot move organization to its current location'
+      );
+    }
+    // Reject moving into self or any descendant (case-insensitive DN compare)
+    if (
+      targetOrgDn.toLowerCase() === dn.toLowerCase() ||
+      isChildOf(targetOrgDn, dn)
+    ) {
+      throw new BadRequestError(
+        'Cannot move organization into itself or its descendant'
+      );
+    }
+
+    // Perform the LDAP modifyDN operation
+    try {
+      await this.server.ldap.rename(dn, newDn, req);
+      this.logger.info(`Moved organization from ${dn} to ${newDn}`);
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      throw new Error(`Failed to move organization: ${err}`);
+    }
+
+    return { newDn };
+  }
+
+  async deleteOrganization(dn: string): Promise<boolean> {
+    // Hook will check that organization is empty before deletion
+    return await this.server.ldap.delete(dn);
+  }
+
+  async searchOrganisationSubnodes(
+    dn: string,
+    query: string
+  ): Promise<AttributesList[]> {
+    const result: AttributesList[] = [];
+
+    // Search for sub-OUs matching the query
+    // Escape query to prevent LDAP injection
+    const escapedQuery = escapeLdapFilter(query);
+    try {
+      const subOUs = (await this.server.ldap.search(
+        {
+          paged: false,
+          scope: 'one',
+          filter: `(&(objectClass=organizationalUnit)(|(ou=*${escapedQuery}*)(description=*${escapedQuery}*)))`,
+        },
+        dn
+      )) as SearchResult;
+      this.server.logger.debug(
+        `Found ${subOUs.searchEntries.length} sub-OUs matching "${query}" for ${dn}`
+      );
+      result.push(...subOUs.searchEntries);
+    } catch (err) {
+      this.server.logger.debug(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        `No sub-OUs found matching "${query}" for ${dn}: ${err}`
+      );
+    }
+
+    // Search for linked entities (users and groups) matching the query
+    const topOrg = this.config.ldap_top_organization as string;
+    const baseDn = getParentDn(topOrg);
+    // Escape both dn and query to prevent LDAP injection
+    const escapedDn = escapeLdapFilter(dn);
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
+    this.server.logger.debug(
+      `Searching for linked entities with filter: ${filter} in ${baseDn}`
+    );
+
+    const subs = await this.server.ldap.search(
+      {
+        paged: true,
+        filter,
+      },
+      baseDn
+    );
+
+    let linkedCount = 0;
+    for await (const sub of subs as AsyncGenerator<SearchResult>) {
+      linkedCount += sub.searchEntries.length;
+      result.push(...sub.searchEntries);
+    }
+    this.server.logger.debug(
+      `Found ${linkedCount} linked entities matching "${query}" for ${dn}`
+    );
+
+    return result;
+  }
+
+  /**
+   * Provide configuration for config API
+   */
+  getConfigApiData(): Record<string, unknown> {
+    const apiPrefix = this.config.api_prefix || '/api';
+
+    // Generate schema URL if static plugin is loaded
+    let schemaUrl: string | undefined;
+    if (
+      this.server.loadedPlugins['static'] &&
+      this.config.organization_schema
+    ) {
+      const staticName = this.config.static_name || 'static';
+      const schemasIndex = this.config.organization_schema.indexOf('/schemas/');
+      if (schemasIndex !== -1) {
+        const relativePath =
+          this.config.organization_schema.substring(schemasIndex);
+        schemaUrl = `/${staticName}${relativePath}`;
+      }
+    }
+
+    return {
+      enabled: true,
+      topOrganization: this.config.ldap_top_organization || '',
+      organizationClass: this.config.ldap_organization_class || [
+        'top',
+        'organizationalUnit',
+      ],
+      linkAttribute: this.linkAttr || '',
+      pathAttribute: this.pathAttr || '',
+      pathSeparator: this.config.ldap_organization_path_separator || ' / ',
+      maxSubnodes: this.config.ldap_organization_max_subnodes || 50,
+      schema: this.schema,
+      schemaUrl,
+      endpoints: {
+        getTop: `${apiPrefix}/v1/ldap/organizations/top`,
+        get: `${apiPrefix}/v1/ldap/organizations/:dn`,
+        getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
+        searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
+        create: `${apiPrefix}/v1/ldap/organizations`,
+        update: `${apiPrefix}/v1/ldap/organizations/:dn`,
+        move: `${apiPrefix}/v1/ldap/organizations/:dn/move`,
+        delete: `${apiPrefix}/v1/ldap/organizations/:dn`,
+      },
+    };
+  }
+}

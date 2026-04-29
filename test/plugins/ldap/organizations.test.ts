@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import LdapOrganizations from '../../../src/plugins/ldap/organization';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
@@ -463,7 +463,7 @@ describe('LDAP Organizations Plugin', function () {
         await plugin.moveOrganization(childOrgDn, invalidTarget);
         expect.fail('Should have thrown error');
       } catch (e) {
-        expect((e as Error).message).to.match(/Invalid target organization/);
+        expect((e as Error).message).to.match(/Target organization .* not found/);
       }
     });
 
@@ -826,7 +826,7 @@ describe('LDAP Organizations Plugin', function () {
         expect(res.text).to.match(/Missing or invalid targetOrgDn/);
       });
 
-      it('should return error when target does not exist', async () => {
+      it('should return 404 when target does not exist', async () => {
         const res = await request
           .post(
             `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
@@ -836,11 +836,11 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`,
           });
 
-        expect(res.status).to.equal(500);
-        expect(res.body.error).to.equal('check logs');
+        expect(res.status).to.equal(404);
+        expect(res.body.error).to.match(/Target organization .* not found/);
       });
 
-      it('should return error when source does not exist', async () => {
+      it('should return 404 when source does not exist', async () => {
         const res = await request
           .post(
             `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${parentOrgDn}`)}/move`
@@ -850,11 +850,11 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn,
           });
 
-        expect(res.status).to.equal(500);
-        expect(res.body.error).to.equal('check logs');
+        expect(res.status).to.equal(404);
+        expect(res.body.error).to.match(/Source organization/);
       });
 
-      it('should return error for circular move', async () => {
+      it('should return 400 for circular move', async () => {
         const res = await request
           .post(
             `/api/v1/ldap/organizations/${encodeURIComponent(parentOrgDn)}/move`
@@ -864,11 +864,11 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: childOrgDn,
           });
 
-        expect(res.status).to.equal(500);
-        expect(res.body.error).to.equal('check logs');
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.match(/itself or its descendant/);
       });
 
-      it('should return error when moving to same location', async () => {
+      it('should return 400 when moving to same location', async () => {
         const res = await request
           .post(
             `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
@@ -878,8 +878,48 @@ describe('LDAP Organizations Plugin', function () {
             targetOrgDn: parentOrgDn,
           });
 
-        expect(res.status).to.equal(500);
-        expect(res.body.error).to.equal('check logs');
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.match(/current location/);
+      });
+
+      it('should reject move into self when DNs differ only in case', async () => {
+        // Same DN but different attribute-name casing — must still be
+        // recognised as the same node, not as a child of itself.
+        const upperCased = childOrgDn.replace(/^ou=/, 'OU=');
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({ targetOrgDn: upperCased });
+
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.match(/itself or its descendant|current location/);
+      });
+    });
+
+    describe('GET /api/v1/ldap/organizations/:dn/subnodes (LDAP injection)', () => {
+      beforeEach(async () => {
+        await plugin.server.ldap.add(testOrgDn, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: 'testorg',
+        });
+      });
+
+      it('should escape LDAP filter metacharacters in objectClass query', async () => {
+        // Without escaping, "*)(uid=*" would close the link-attribute
+        // clause and inject `(uid=*)` — leaking unrelated entries.
+        // With escaping, the value is treated as a literal objectClass
+        // and the search returns an empty result set without errors.
+        const res = await request
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(testOrgDn)}/subnodes`
+          )
+          .query({ objectClass: '*)(uid=*' })
+          .set('Accept', 'application/json');
+
+        expect(res.status).to.equal(200);
+        expect(res.body).to.be.an('array').that.is.empty;
       });
     });
   });

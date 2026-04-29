@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import { DM } from '../../../src/bin';
-import LdapOrganizations from '../../../src/plugins/ldap/organization';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
