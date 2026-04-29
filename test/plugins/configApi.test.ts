@@ -4,7 +4,7 @@ import { DM } from '../../src/bin';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
-import LdapOrganization from '../../src/plugins/ldap/organization';
+import LdapOrganization from '../../src/plugins/ldap/organizations';
 import Static from '../../src/plugins/static';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';

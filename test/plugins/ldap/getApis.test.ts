@@ -3,7 +3,7 @@ import supertest from 'supertest';
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import LdapOrganizations from '../../../src/plugins/ldap/organization';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 
 describe('GET APIs for individual entities', function () {
   let server: DM;

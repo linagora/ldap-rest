@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import LdapOrganizations from '../../../src/plugins/ldap/organization';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
