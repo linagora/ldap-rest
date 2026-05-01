@@ -51,7 +51,6 @@ export default class CozyProvision extends DmPlugin {
 
   private publisher: RabbitPublisher | null = null;
   private publisherInit: Promise<RabbitPublisher | null> | null = null;
-  private shutdownRegistered = false;
 
   constructor(server: DM) {
     super(server);
@@ -298,7 +297,9 @@ export default class CozyProvision extends DmPlugin {
         await client.init();
         this.publisher = client;
         this.logger.info(
-          `${this.name}: connected to RabbitMQ at ${this.rabbitmqUrl}`
+          `${this.name}: connected to RabbitMQ at ${redactAmqpUrl(
+            this.rabbitmqUrl
+          )}`
         );
         return client;
       } catch (err) {
@@ -349,12 +350,13 @@ export default class CozyProvision extends DmPlugin {
   }
 
   private registerShutdown(): void {
-    if (this.shutdownRegistered) return;
-    this.shutdownRegistered = true;
     const shutdown = (): void => {
       const pub = this.publisher;
-      if (!pub) return;
+      // Clear both: a closed client must not be returned by a still-pending
+      // initialisation promise.
       this.publisher = null;
+      this.publisherInit = null;
+      if (!pub) return;
       pub.close().catch((err: unknown) => {
         this.logger.warn({
           plugin: this.name,
@@ -364,9 +366,48 @@ export default class CozyProvision extends DmPlugin {
         });
       });
     };
-
-    process.once('SIGTERM', shutdown);
-
-    process.once('SIGINT', shutdown);
+    registerProcessShutdown(shutdown);
   }
+}
+
+/**
+ * Strip credentials from an AMQP URL before logging — `amqp://user:pass@host`
+ * becomes `amqp://host`. Falls back to `amqp://[broker]` if the URL cannot
+ * be parsed (e.g. malformed config).
+ */
+function redactAmqpUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.username = '';
+    u.password = '';
+    return u.toString();
+  } catch {
+    return 'amqp://[broker]';
+  }
+}
+
+/**
+ * Registers a single SIGTERM/SIGINT handler at the process level. Each plugin
+ * instance contributes one callback that fans out from the shared handler, so
+ * we don't accumulate per-instance listeners (which would trip
+ * MaxListenersExceededWarning when many DM instances are created in tests).
+ */
+const shutdownCallbacks: Array<() => void> = [];
+let processShutdownInstalled = false;
+
+function registerProcessShutdown(cb: () => void): void {
+  shutdownCallbacks.push(cb);
+  if (processShutdownInstalled) return;
+  processShutdownInstalled = true;
+  const fanOut = (): void => {
+    for (const fn of shutdownCallbacks.splice(0)) {
+      try {
+        fn();
+      } catch {
+        // Hooks must never throw during shutdown.
+      }
+    }
+  };
+  process.once('SIGTERM', fanOut);
+  process.once('SIGINT', fanOut);
 }

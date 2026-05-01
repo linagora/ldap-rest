@@ -174,6 +174,17 @@ export interface Config {
   calendar_resource_creator?: string;
   calendar_resource_domain?: string;
 
+  // Cozy provisioning plugin
+  cozy_admin_url?: string;
+  cozy_admin_user?: string;
+  cozy_admin_passphrase?: string;
+  cozy_org_id?: string;
+  cozy_org_domain?: string;
+  cozy_default_locale?: string;
+  cozy_auth_exchange?: string;
+  cozy_b2b_exchange?: string;
+  rabbitmq_url?: string;
+
   // Applicative Accounts plugin
   applicative_account_base?: string;
   max_app_accounts?: number;
@@ -445,6 +456,17 @@ const configArgs: ConfigTemplate = [
   ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
   ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
 
+  // Cozy provisioning plugin (twake/cozyProvision)
+  ['--cozy-admin-url', 'DM_COZY_ADMIN_URL', ''],
+  ['--cozy-admin-user', 'DM_COZY_ADMIN_USER', 'admin'],
+  ['--cozy-admin-passphrase', 'DM_COZY_ADMIN_PASSPHRASE', ''],
+  ['--cozy-org-id', 'DM_COZY_ORG_ID', ''],
+  ['--cozy-org-domain', 'DM_COZY_ORG_DOMAIN', ''],
+  ['--cozy-default-locale', 'DM_COZY_DEFAULT_LOCALE', 'fr'],
+  ['--cozy-auth-exchange', 'DM_COZY_AUTH_EXCHANGE', 'auth'],
+  ['--cozy-b2b-exchange', 'DM_COZY_B2B_EXCHANGE', 'b2b'],
+  ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
+
   // Applicative Accounts plugin
   ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
   ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
@@ -614,12 +636,7 @@ const configArgs: ConfigTemplate = [
   ['--scim-user-mapping', 'DM_SCIM_USER_MAPPING', ''],
   ['--scim-group-mapping', 'DM_SCIM_GROUP_MAPPING', ''],
   ['--scim-max-results', 'DM_SCIM_MAX_RESULTS', 200, 'number'],
-  [
-    '--scim-bulk-max-operations',
-    'DM_SCIM_BULK_MAX_OPERATIONS',
-    100,
-    'number',
-  ],
+  ['--scim-bulk-max-operations', 'DM_SCIM_BULK_MAX_OPERATIONS', 100, 'number'],
   [
     '--scim-bulk-max-payload-size',
     'DM_SCIM_BULK_MAX_PAYLOAD_SIZE',
