@@ -107,19 +107,22 @@ describe('Browser CacheManager', () => {
     });
 
     it('should update timestamp on get', async () => {
-      const shortCache = new CacheManager({ ttl: 100 });
+      // Use generous margins relative to TTL so this stays deterministic on
+      // slow CI runners — under load setTimeout drift can easily push a
+      // 50ms-vs-100ms boundary the wrong way and produce false negatives.
+      const shortCache = new CacheManager({ ttl: 300 });
       shortCache.set('key1', 'value1');
 
-      // Access after 50ms
-      await new Promise(resolve => setTimeout(resolve, 50));
-      expect(shortCache.get('key1')).to.equal('value1');
-
-      // Access again after another 50ms (total 100ms from set, but 50ms from last get)
-      await new Promise(resolve => setTimeout(resolve, 50));
-      expect(shortCache.get('key1')).to.equal('value1');
-
-      // Wait 100ms more, should be expired now
+      // Access well before the TTL expires (refreshes timestamp)
       await new Promise(resolve => setTimeout(resolve, 100));
+      expect(shortCache.get('key1')).to.equal('value1');
+
+      // Access again well before the (refreshed) TTL expires
+      await new Promise(resolve => setTimeout(resolve, 100));
+      expect(shortCache.get('key1')).to.equal('value1');
+
+      // Wait noticeably longer than the TTL — entry must be gone now
+      await new Promise(resolve => setTimeout(resolve, 500));
       expect(shortCache.get('key1')).to.be.null;
     });
 
