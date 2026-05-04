@@ -52,6 +52,10 @@
       "types": "./dist/src/plugins/auth/authzPerBranch.d.ts",
       "import": "./dist/plugins/auth/authzPerBranch.js"
     },
+    "./plugin-auth-authzperroute": {
+      "types": "./dist/src/plugins/auth/authzPerRoute.d.ts",
+      "import": "./dist/plugins/auth/authzPerRoute.js"
+    },
     "./plugin-auth-crowdsec": {
       "types": "./dist/src/plugins/auth/crowdsec.d.ts",
       "import": "./dist/plugins/auth/crowdsec.js"
