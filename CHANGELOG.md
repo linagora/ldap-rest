@@ -2,19 +2,20 @@
 
 ## Unreleased
 
+## v0.3.2 (2026-05-04)
+
 ### New Features
 
 - New plugin `core/twake/cozyProvision`: hooks the SCIM lifecycle to
   provision a Cozy instance after user creation and to publish
   `auth` / `user.created` and `b2b` / `domain.user.deleted` events
-  on RabbitMQ. Reads `cozy_admin_url`, `cozy_admin_passphrase`,
-  `cozy_org_id`, `cozy_org_domain` and `rabbitmq_url` from config.
-  - Cozy admin call uses HTTP Basic with the configured passphrase;
-    `409 Conflict` is treated as idempotent success
-  - `@linagora/rabbitmq-client` is declared as an `optionalDependency`:
-    if not installed at runtime, AMQP publishes are skipped with a
-    one-time warning
-  - `workplaceFqdn` is composed as `${id}.${cozy_org_domain}`
+  on RabbitMQ.
+- New plugin `core/auth/authzPerRoute`: restricts requests by HTTP method
+  and path glob based on `req.user`
+
+### Tests
+
+- Widen TTL margins in `cache-manager` tests to deflake CI
 
 ## v0.3.1 (2026-04-29)
 
