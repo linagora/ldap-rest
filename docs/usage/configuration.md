@@ -239,9 +239,9 @@ Maintains consistency of department links when organizations are renamed/moved. 
 
 #### `core/auth/authzPerRoute`
 
-| CLI                  | Env                   | Default | Description                                                      |
-| -------------------- | --------------------- | ------- | ---------------------------------------------------------------- |
-| `--authz-per-route`  | `DM_AUTHZ_PER_ROUTE`  | `[]`    | Per-user route ACL rules (see [docs](plugins/auth/authz-per-route.md)) |
+| CLI                 | Env                   | Default | Description                                                            |
+| ------------------- | --------------------- | ------- | ---------------------------------------------------------------------- |
+| `--authz-per-route` | `DM_AUTHZ_PER_ROUTES` | `[]`    | Per-user route ACL rules (see [docs](plugins/auth/authz-per-route.md)) |
 
 #### `core/auth/authzLinid1`
 

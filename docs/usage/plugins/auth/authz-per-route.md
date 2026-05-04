@@ -38,7 +38,7 @@ sequencing.
 ### Environment Variable
 
 ```bash
-DM_AUTHZ_PER_ROUTE="full-access:*,updt-only:POST:/api/v1/ldap/updt,updt-only:GET:/api/v1/ldap/updt/**"
+DM_AUTHZ_PER_ROUTES="full-access:*,updt-only:POST:/api/v1/ldap/updt,updt-only:GET:/api/v1/ldap/updt/**"
 ```
 
 Multiple values are comma-separated. Repeating `--authz-per-route` on the CLI
@@ -91,13 +91,13 @@ one-level:GET:/api/v1/ldap/users/*
 
 ### Glob pattern quick reference
 
-| Pattern              | Matches                                       | Does NOT match                          |
-| -------------------- | --------------------------------------------- | --------------------------------------- |
-| `/api/hello`         | `/api/hello`                                  | `/api/hello/sub`                        |
-| `/api/hello**`       | `/api/hello`, `/api/hello/sub`, `/api/hello/sub/deep` | `/api/hell`                   |
-| `/api/hello/**`      | `/api/hello/sub`, `/api/hello/sub/deep`       | `/api/hello`                            |
-| `/api/hello/*`       | `/api/hello/sub`                              | `/api/hello`, `/api/hello/sub/deep`     |
-| `/api/hello.bak`     | `/api/hello.bak`                              | `/api/helloXbak` (`.` is literal)       |
+| Pattern          | Matches                                               | Does NOT match                      |
+| ---------------- | ----------------------------------------------------- | ----------------------------------- |
+| `/api/hello`     | `/api/hello`                                          | `/api/hello/sub`                    |
+| `/api/hello**`   | `/api/hello`, `/api/hello/sub`, `/api/hello/sub/deep` | `/api/hell`                         |
+| `/api/hello/**`  | `/api/hello/sub`, `/api/hello/sub/deep`               | `/api/hello`                        |
+| `/api/hello/*`   | `/api/hello/sub`                                      | `/api/hello`, `/api/hello/sub/deep` |
+| `/api/hello.bak` | `/api/hello.bak`                                      | `/api/helloXbak` (`.` is literal)   |
 
 ## Behavior
 
@@ -112,7 +112,7 @@ one-level:GET:/api/v1/ldap/users/*
 
 ```bash
 DM_AUTH_TOKENS="tok-admin:admin,tok-ro:reader"
-DM_AUTHZ_PER_ROUTE="admin:*,reader:GET:/api/v1/ldap/users**,reader:GET:/api/v1/ldap/groups**"
+DM_AUTHZ_PER_ROUTES="admin:*,reader:GET:/api/v1/ldap/users**,reader:GET:/api/v1/ldap/groups**"
 
 npx ldap-rest \
   --plugin core/auth/token \

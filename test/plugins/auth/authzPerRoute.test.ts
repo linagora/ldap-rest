@@ -13,7 +13,7 @@ describe('AuthzPerRoute', () => {
     before(async () => {
       // full:tok-full → wildcard; updt:tok-updt → GET /api/hello only
       process.env.DM_AUTH_TOKENS = 'tok-full:full,tok-updt:updt';
-      process.env.DM_AUTHZ_PER_ROUTE = 'full:*,updt:GET:/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES = 'full:*,updt:GET:/api/hello';
       const dm = new DM();
       await dm.ready;
       // Auth must be registered before authz
@@ -25,7 +25,7 @@ describe('AuthzPerRoute', () => {
 
     after(() => {
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('wildcard user can reach /api/hello', async () => {
@@ -58,7 +58,7 @@ describe('AuthzPerRoute', () => {
 
     before(async () => {
       process.env.DM_AUTH_TOKENS = 'tok-known:known,tok-unknown:unknown';
-      process.env.DM_AUTHZ_PER_ROUTE = 'known:*';
+      process.env.DM_AUTHZ_PER_ROUTES = 'known:*';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -69,7 +69,7 @@ describe('AuthzPerRoute', () => {
 
     after(() => {
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('known user → 200', async () => {
@@ -92,7 +92,7 @@ describe('AuthzPerRoute', () => {
 
     before(async () => {
       delete process.env.DM_AUTH_TOKENS;
-      process.env.DM_AUTHZ_PER_ROUTE = 'someuser:*';
+      process.env.DM_AUTHZ_PER_ROUTES = 'someuser:*';
       const dm = new DM();
       await dm.ready;
       // Only authz + helloWorld, no auth plugin → req.user stays unset
@@ -102,7 +102,7 @@ describe('AuthzPerRoute', () => {
     });
 
     after(() => {
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('unauthenticated request passes through authz middleware → 200', async () => {
@@ -117,7 +117,7 @@ describe('AuthzPerRoute', () => {
     before(async () => {
       process.env.DM_AUTH_TOKENS = 'tok-full:full';
       // "badentry" has no colon → invalid and should be skipped
-      process.env.DM_AUTHZ_PER_ROUTE = 'badentry,full:*';
+      process.env.DM_AUTHZ_PER_ROUTES = 'badentry,full:*';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -128,7 +128,7 @@ describe('AuthzPerRoute', () => {
 
     after(() => {
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('still starts and valid rules work', async () => {
@@ -145,7 +145,7 @@ describe('AuthzPerRoute', () => {
     before(async () => {
       process.env.DM_AUTH_TOKENS = 'tok-any:any';
       // any method on /api/hello (exact glob — no wildcards in path)
-      process.env.DM_AUTHZ_PER_ROUTE = 'any:*:/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES = 'any:*:/api/hello';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -156,7 +156,7 @@ describe('AuthzPerRoute', () => {
 
     after(() => {
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('method wildcard * allows GET', async () => {
@@ -253,7 +253,7 @@ describe('AuthzPerRoute', () => {
       // "foo?bar" contains a question-mark — invalid glob, rule must be skipped.
       // Deliberately avoid ';' here because the config parser uses ';' as array
       // separator when present in the env-var value, which would mangle the entry.
-      process.env.DM_AUTHZ_PER_ROUTE = 'validuser:GET:foo?bar,validuser:GET:/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES = 'validuser:GET:foo?bar,validuser:GET:/api/hello';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -264,7 +264,7 @@ describe('AuthzPerRoute', () => {
 
     after(() => {
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('plugin starts and valid rule still works', async () => {
@@ -290,7 +290,7 @@ describe('AuthzPerRoute', () => {
 
     it('entry with leading/trailing whitespace around user parses correctly (wildcard)', async () => {
       process.env.DM_AUTH_TOKENS = 'tok-ws:user';
-      process.env.DM_AUTHZ_PER_ROUTE = 'placeholder';
+      process.env.DM_AUTHZ_PER_ROUTES = 'placeholder';
       const dm = new DM();
       await dm.ready;
       // Inject the whitespace-containing entry directly, bypassing env-var splitting
@@ -301,12 +301,12 @@ describe('AuthzPerRoute', () => {
       const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-ws');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('entry with space before path trims correctly → 200', async () => {
       process.env.DM_AUTH_TOKENS = 'tok-sp:user';
-      process.env.DM_AUTHZ_PER_ROUTE = 'placeholder';
+      process.env.DM_AUTHZ_PER_ROUTES = 'placeholder';
       const dm = new DM();
       await dm.ready;
       // Inject the entry with a space before the path
@@ -317,12 +317,12 @@ describe('AuthzPerRoute', () => {
       const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-sp');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('entry with unknown method is ignored → user has no rules → 403', async () => {
       process.env.DM_AUTH_TOKENS = 'tok-bogus:user';
-      process.env.DM_AUTHZ_PER_ROUTE = 'user:BOGUS:/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES = 'user:BOGUS:/api/hello';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -331,12 +331,12 @@ describe('AuthzPerRoute', () => {
       const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-bogus');
       expect(res.status).to.equal(403);
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('entry with empty method after trim is ignored → 403', async () => {
       process.env.DM_AUTH_TOKENS = 'tok-em:user';
-      process.env.DM_AUTHZ_PER_ROUTE = 'user::/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES = 'user::/api/hello';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -345,12 +345,12 @@ describe('AuthzPerRoute', () => {
       const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-em');
       expect(res.status).to.equal(403);
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
 
     it('entry with empty user is ignored; other rules still apply', async () => {
       process.env.DM_AUTH_TOKENS = 'tok-eu:realuser';
-      process.env.DM_AUTHZ_PER_ROUTE = ':GET:/api/hello,realuser:*';
+      process.env.DM_AUTHZ_PER_ROUTES = ':GET:/api/hello,realuser:*';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -359,7 +359,7 @@ describe('AuthzPerRoute', () => {
       const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-eu');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
-      delete process.env.DM_AUTHZ_PER_ROUTE;
+      delete process.env.DM_AUTHZ_PER_ROUTES;
     });
   });
 });
