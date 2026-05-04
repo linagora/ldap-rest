@@ -196,6 +196,10 @@
       "types": "./dist/src/plugins/twake/calendarResources.d.ts",
       "import": "./dist/plugins/twake/calendarResources.js"
     },
+    "./plugin-twake-cozyprovision": {
+      "types": "./dist/src/plugins/twake/cozyProvision.d.ts",
+      "import": "./dist/plugins/twake/cozyProvision.js"
+    },
     "./plugin-twake-drive": {
       "types": "./dist/src/plugins/twake/drive.d.ts",
       "import": "./dist/plugins/twake/drive.js"
@@ -635,6 +639,7 @@
     "typescript": "^5.9.2"
   },
   "optionalDependencies": {
+    "@linagora/rabbitmq-client": "^0.1.2",
     "express-openid-connect": "^2.19.2",
     "lemonldap-ng-handler": "^0.7.3",
     "re2": "^1.22.1"
