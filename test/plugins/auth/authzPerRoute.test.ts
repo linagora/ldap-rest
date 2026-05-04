@@ -281,4 +281,85 @@ describe('AuthzPerRoute', () => {
       expect(res.status).to.equal(403);
     });
   });
+
+  describe('parseEntry — trim and validation', () => {
+    // These tests inject entries directly into dm.config to bypass the env-var
+    // parser (which splits on whitespace). This simulates CLI usage where the
+    // shell preserves spaces inside quoted arguments, e.g.:
+    //   --authz-per-route " user :*"
+
+    it('entry with leading/trailing whitespace around user parses correctly (wildcard)', async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-ws:user';
+      process.env.DM_AUTHZ_PER_ROUTE = 'placeholder';
+      const dm = new DM();
+      await dm.ready;
+      // Inject the whitespace-containing entry directly, bypassing env-var splitting
+      (dm.config as Record<string, unknown>).authz_per_route = [' user :*'];
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-ws');
+      expect(res.status).to.equal(200);
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+
+    it('entry with space before path trims correctly → 200', async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-sp:user';
+      process.env.DM_AUTHZ_PER_ROUTE = 'placeholder';
+      const dm = new DM();
+      await dm.ready;
+      // Inject the entry with a space before the path
+      (dm.config as Record<string, unknown>).authz_per_route = ['user:GET: /api/hello'];
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-sp');
+      expect(res.status).to.equal(200);
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+
+    it('entry with unknown method is ignored → user has no rules → 403', async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-bogus:user';
+      process.env.DM_AUTHZ_PER_ROUTE = 'user:BOGUS:/api/hello';
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-bogus');
+      expect(res.status).to.equal(403);
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+
+    it('entry with empty method after trim is ignored → 403', async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-em:user';
+      process.env.DM_AUTHZ_PER_ROUTE = 'user::/api/hello';
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-em');
+      expect(res.status).to.equal(403);
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+
+    it('entry with empty user is ignored; other rules still apply', async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-eu:realuser';
+      process.env.DM_AUTHZ_PER_ROUTE = ':GET:/api/hello,realuser:*';
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-eu');
+      expect(res.status).to.equal(200);
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+  });
 });

@@ -5,5 +5,6 @@
   "core/auth/rateLimit",
   "core/auth/token",
   "core/auth/llng",
-  "core/auth/openidconnect"
+  "core/auth/openidconnect",
+  "core/auth/authzPerRoute"
 ]

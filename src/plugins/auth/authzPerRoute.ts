@@ -80,7 +80,7 @@ export default class AuthzPerRoute extends DmPlugin {
   }
 
   private parseEntry(entry: string): void {
-    const parts = entry.split(':');
+    const parts = entry.split(':').map((p) => p.trim());
 
     if (parts.length < 2) {
       this.logger.warn(`authzPerRoute: ignoring invalid rule entry: ${entry}`);
@@ -88,6 +88,11 @@ export default class AuthzPerRoute extends DmPlugin {
     }
 
     const user = parts[0];
+
+    if (!user) {
+      this.logger.warn(`authzPerRoute: ignoring rule with empty user: ${entry}`);
+      return;
+    }
 
     // "<user>:*" — full wildcard
     if (parts.length === 2 && parts[1] === '*') {
@@ -98,8 +103,17 @@ export default class AuthzPerRoute extends DmPlugin {
     // "<user>:<METHOD>:<pathGlob>"
     if (parts.length >= 3) {
       const method = parts[1].toUpperCase();
-      // Rejoin in case the glob itself contains colons
-      const pathPattern = parts.slice(2).join(':');
+      const VALID_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', '*']);
+      if (!method || !VALID_METHODS.has(method)) {
+        this.logger.warn(`authzPerRoute: ignoring rule with invalid method "${parts[1]}" in entry: ${entry}`);
+        return;
+      }
+      // Rejoin in case the glob itself contains colons, then trim
+      const pathPattern = parts.slice(2).join(':').trim();
+      if (!pathPattern) {
+        this.logger.warn(`authzPerRoute: ignoring rule with empty path pattern in entry: ${entry}`);
+        return;
+      }
       let pathRe: RegExp;
       try {
         pathRe = globToRegex(pathPattern);

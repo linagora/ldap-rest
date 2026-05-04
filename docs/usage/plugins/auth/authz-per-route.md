@@ -7,10 +7,18 @@ This plugin complements `authzPerBranch` (LDAP-branch ACL) and `authzDynamic`
 (LDAP-backed tokens): whereas those operate at the LDAP-branch level,
 `authzPerRoute` works at the HTTP route level and needs no LDAP connection.
 
-## Loading Order
+## Plugin loading order
 
-**`authzPerRoute` must be loaded _after_ the auth plugin** (e.g. `core/auth/token`),
-because it reads `req.user` which is set by the auth middleware.
+`authzPerRoute` MUST run **after** the authentication plugin (so `req.user` is set)
+AND **before** any API route plugin (so its Express middleware is registered before
+the routes it protects).
+
+When loaded via the CLI plugin loader, plugins not listed in
+`src/plugins/priority.json` are loaded in parallel — this can race with API route
+registration and result in an authorization bypass. To guarantee correct ordering,
+`core/auth/authzPerRoute` is included in the priority list and loads sequentially
+after the other auth plugins. If you build a custom loader, ensure equivalent
+sequencing.
 
 ```bash
 --plugin core/auth/token \
