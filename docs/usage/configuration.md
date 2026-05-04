@@ -27,6 +27,7 @@ All LDAP-Rest configuration options.
     - [core/auth/openidconnect](#coreauthopenidconnect)
   - [Authorization Plugins](#authorization-plugins)
     - [core/auth/authzPerBranch](#coreauthauthzperbranch)
+    - [core/auth/authzPerRoute](#coreauthauthzperroute)
     - [core/auth/authzLinid1](#coreauthauthzlinid1)
   - [Security Plugins](#security-plugins)
     - [core/auth/rateLimit](#coreauthratelimit)
@@ -235,6 +236,12 @@ Maintains consistency of department links when organizations are renamed/moved. 
 | ------------------------------ | ------------------------------- | ------------------------------------------------ | --------------------------- |
 | `--authz-per-branch-config`    | `DM_AUTHZ_PER_BRANCH_CONFIG`    | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON) |
 | `--authz-per-branch-cache-ttl` | `DM_AUTHZ_PER_BRANCH_CACHE_TTL` | `60`                                             | Cache TTL (seconds)         |
+
+#### `core/auth/authzPerRoute`
+
+| CLI                  | Env                   | Default | Description                                                      |
+| -------------------- | --------------------- | ------- | ---------------------------------------------------------------- |
+| `--authz-per-route`  | `DM_AUTHZ_PER_ROUTE`  | `[]`    | Per-user route ACL rules (see [docs](plugins/auth/authz-per-route.md)) |
 
 #### `core/auth/authzLinid1`
 

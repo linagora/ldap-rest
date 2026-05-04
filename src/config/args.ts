@@ -111,6 +111,9 @@ export interface Config {
   oidc_client_secret?: string;
   base_url?: string;
 
+  // auth/authzPerRoute
+  authz_per_route?: string[];
+
   // auth/authzPerBranch
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
@@ -490,6 +493,9 @@ const configArgs: ConfigTemplate = [
   // Auth HMAC plugin
   ['--auth-hmac', 'DM_AUTH_HMAC', [], 'array', '--auth-hmacs'],
   ['--auth-hmac-window', 'DM_AUTH_HMAC_WINDOW', 120000, 'number'],
+
+  // Auth authzPerRoute plugin
+  ['--authz-per-route', 'DM_AUTHZ_PER_ROUTE', [], 'array', '--authz-per-routes'],
 
   // Auth authzPerBranch plugin
   [
