@@ -2,7 +2,7 @@ import { DM } from '../../../src/bin';
 import type { Express } from 'express';
 import request from 'supertest';
 import AuthToken from '../../../src/plugins/auth/token';
-import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
+import AuthzPerRoute, { globToRegex } from '../../../src/plugins/auth/authzPerRoute';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { expect } from 'chai';
 
@@ -144,7 +144,7 @@ describe('AuthzPerRoute', () => {
 
     before(async () => {
       process.env.DM_AUTH_TOKENS = 'tok-any:any';
-      // any method on /api/hello
+      // any method on /api/hello (exact glob — no wildcards in path)
       process.env.DM_AUTHZ_PER_ROUTE = 'any:*:/api/hello';
       const dm = new DM();
       await dm.ready;
@@ -164,6 +164,74 @@ describe('AuthzPerRoute', () => {
         .get('/api/hello')
         .set('Authorization', 'Bearer tok-any');
       expect(res.status).to.equal(200);
+    });
+  });
+
+  describe('globToRegex — glob semantics', () => {
+    describe('* (single segment wildcard)', () => {
+      it('matches one path segment', () => {
+        const re = globToRegex('/api/*');
+        expect(re.test('/api/hello')).to.equal(true);
+      });
+
+      it('does NOT cross a slash (no multi-segment match)', () => {
+        const re = globToRegex('/api/*');
+        expect(re.test('/api/hello/world')).to.equal(false);
+      });
+
+      it('does NOT match the prefix without a segment', () => {
+        const re = globToRegex('/api/*');
+        expect(re.test('/api')).to.equal(false);
+      });
+    });
+
+    describe('** (multi-segment wildcard)', () => {
+      it('matches a single segment', () => {
+        const re = globToRegex('/api/**');
+        expect(re.test('/api/hello')).to.equal(true);
+      });
+
+      it('crosses slashes (matches multiple segments)', () => {
+        const re = globToRegex('/api/**');
+        expect(re.test('/api/hello/world')).to.equal(true);
+      });
+
+      it('does NOT match the prefix alone (** must consume at least something)', () => {
+        const re = globToRegex('/api/**');
+        expect(re.test('/api')).to.equal(false);
+      });
+    });
+
+    describe('** appended directly to a prefix', () => {
+      it('matches the exact prefix', () => {
+        const re = globToRegex('/api/hello**');
+        expect(re.test('/api/hello')).to.equal(true);
+      });
+
+      it('matches the prefix with sub-paths', () => {
+        const re = globToRegex('/api/hello**');
+        expect(re.test('/api/hello/sub')).to.equal(true);
+        expect(re.test('/api/hello/sub/deep')).to.equal(true);
+      });
+
+      it('does NOT match a shorter string', () => {
+        const re = globToRegex('/api/hello**');
+        expect(re.test('/api/hell')).to.equal(false);
+      });
+    });
+
+    describe('regex metacharacters in glob are treated literally', () => {
+      it('. matches only a literal dot, not any character', () => {
+        const re = globToRegex('/api/hello.bak');
+        expect(re.test('/api/hello.bak')).to.equal(true);
+        expect(re.test('/api/helloXbak')).to.equal(false);
+      });
+
+      it('+ in pattern is literal', () => {
+        const re = globToRegex('/path+extra');
+        expect(re.test('/path+extra')).to.equal(true);
+        expect(re.test('/pathextra')).to.equal(false);
+      });
     });
   });
 });

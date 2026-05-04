@@ -24,13 +24,13 @@ because it reads `req.user` which is set by the auth middleware.
 ```bash
 --authz-per-route "full-access:*" \
 --authz-per-route "updt-only:POST:/api/v1/ldap/updt" \
---authz-per-route "updt-only:GET:/api/v1/ldap/updt(/.*)?"
+--authz-per-route "updt-only:GET:/api/v1/ldap/updt/**"
 ```
 
 ### Environment Variable
 
 ```bash
-DM_AUTHZ_PER_ROUTE="full-access:*,updt-only:POST:/api/v1/ldap/updt,updt-only:GET:/api/v1/ldap/updt(/.*)?
+DM_AUTHZ_PER_ROUTE="full-access:*,updt-only:POST:/api/v1/ldap/updt,updt-only:GET:/api/v1/ldap/updt/**"
 ```
 
 Multiple values are comma-separated. Repeating `--authz-per-route` on the CLI
@@ -40,17 +40,20 @@ is equivalent.
 
 Each entry has one of two forms:
 
-| Form                          | Meaning                                                      |
-| ----------------------------- | ------------------------------------------------------------ |
-| `<user>:*`                    | Full wildcard — allow any method on any path                 |
-| `<user>:<METHOD>:<pathRegex>` | Allow only the given HTTP method on paths matching the regex |
+| Form                         | Meaning                                                     |
+| ---------------------------- | ----------------------------------------------------------- |
+| `<user>:*`                   | Full wildcard — allow any method on any path                |
+| `<user>:<METHOD>:<pathGlob>` | Allow only the given HTTP method on paths matching the glob |
 
 - `<user>` — the value of `req.user` as set by the auth plugin.
 - `<METHOD>` — an HTTP verb (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`,
   `OPTIONS`) or `*` (any verb).
-- `<pathRegex>` — a JavaScript regular expression. The plugin auto-anchors it
-  with `^…$`, so `/api/hello` matches exactly `/api/hello`, while
-  `/api/hello(/.*)?` also matches sub-paths.
+- `<pathGlob>` — a glob pattern (not a regex). Patterns are implicitly
+  anchored start-to-end. Rules:
+  - `*` matches any sequence of characters **except** `/` (one path segment).
+  - `**` matches any sequence of characters **including** `/` (multiple segments).
+  - All other characters are matched literally — regex special characters (`.`, `+`,
+    `?`, etc.) have no special meaning.
 
 A user may have multiple entries; access is granted if **any** rule matches
 (logical OR).
@@ -61,16 +64,29 @@ A user may have multiple entries; access is granted if **any** rule matches
 # admin token: full access
 full-access:*
 
-# read-only token: GET only on /api/hello
+# read-only token: GET only on exactly /api/hello
 reader:GET:/api/hello
 
-# update token: POST or GET on a specific path and its sub-paths
+# update token: POST on exact path, GET on that path and all sub-paths
 updt:POST:/api/v1/ldap/updt
-updt:GET:/api/v1/ldap/updt(/.*)?
+updt:GET:/api/v1/ldap/updt**
 
-# any method on a path
-any-method:*:/api/v1/ldap/users
+# any method on a path and all sub-paths
+any-method:*:/api/v1/ldap/users**
+
+# match one level deep only (not /api/v1/ldap/users/uid=bob/sub)
+one-level:GET:/api/v1/ldap/users/*
 ```
+
+### Glob pattern quick reference
+
+| Pattern              | Matches                                       | Does NOT match                          |
+| -------------------- | --------------------------------------------- | --------------------------------------- |
+| `/api/hello`         | `/api/hello`                                  | `/api/hello/sub`                        |
+| `/api/hello**`       | `/api/hello`, `/api/hello/sub`, `/api/hello/sub/deep` | `/api/hell`                   |
+| `/api/hello/**`      | `/api/hello/sub`, `/api/hello/sub/deep`       | `/api/hello`                            |
+| `/api/hello/*`       | `/api/hello/sub`                              | `/api/hello`, `/api/hello/sub/deep`     |
+| `/api/hello.bak`     | `/api/hello.bak`                              | `/api/helloXbak` (`.` is literal)       |
 
 ## Behavior
 
@@ -85,7 +101,7 @@ any-method:*:/api/v1/ldap/users
 
 ```bash
 DM_AUTH_TOKENS="tok-admin:admin,tok-ro:reader"
-DM_AUTHZ_PER_ROUTE="admin:*,reader:GET:/api/v1/ldap/users,reader:GET:/api/v1/ldap/groups"
+DM_AUTHZ_PER_ROUTE="admin:*,reader:GET:/api/v1/ldap/users**,reader:GET:/api/v1/ldap/groups**"
 
 npx ldap-rest \
   --plugin core/auth/token \

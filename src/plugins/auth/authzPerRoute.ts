@@ -13,6 +13,27 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import { forbidden } from '../../lib/expressFormatedResponses';
 import type { DmRequest } from '../../lib/auth/base';
 
+// Convert a glob pattern to a RegExp. '*' matches one path segment ([^/]*),
+// '**' matches any sequence including '/' (.*). All other characters are escaped.
+export function globToRegex(glob: string): RegExp {
+  let out = '';
+  let i = 0;
+  while (i < glob.length) {
+    if (glob[i] === '*' && glob[i + 1] === '*') {
+      out += '.*';
+      i += 2;
+    } else if (glob[i] === '*') {
+      out += '[^/]*';
+      i += 1;
+    } else {
+      const c = glob[i];
+      out += /[.+?^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
+      i += 1;
+    }
+  }
+  return new RegExp(`^${out}$`);
+}
+
 interface WildcardRule {
   kind: 'wildcard';
 }
@@ -66,17 +87,17 @@ export default class AuthzPerRoute extends DmPlugin {
       return;
     }
 
-    // "<user>:<METHOD>:<pathRegex>"
+    // "<user>:<METHOD>:<pathGlob>"
     if (parts.length >= 3) {
       const method = parts[1].toUpperCase();
-      // Rejoin in case the regex itself contains colons
-      const pathRegexStr = parts.slice(2).join(':');
+      // Rejoin in case the glob itself contains colons
+      const pathPattern = parts.slice(2).join(':');
       let pathRe: RegExp;
       try {
-        pathRe = new RegExp(`^${pathRegexStr}$`);
+        pathRe = globToRegex(pathPattern);
       } catch {
         this.logger.warn(
-          `authzPerRoute: ignoring entry with invalid regex "${pathRegexStr}" in rule: ${entry}`
+          `authzPerRoute: ignoring entry with invalid glob "${pathPattern}" in rule: ${entry}`
         );
         return;
       }
