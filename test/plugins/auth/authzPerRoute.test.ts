@@ -233,5 +233,52 @@ describe('AuthzPerRoute', () => {
         expect(re.test('/pathextra')).to.equal(false);
       });
     });
+
+    describe('whitelist validation', () => {
+      it('throws on semicolon in glob', () => {
+        expect(() => globToRegex('foo;bar')).to.throw(/Invalid glob pattern/);
+      });
+
+      it('throws on space in glob', () => {
+        expect(() => globToRegex('foo bar')).to.throw(/Invalid glob pattern/);
+      });
+    });
+  });
+
+  describe('Malformed glob in rule is ignored (no crash)', () => {
+    let app: Express;
+
+    before(async () => {
+      process.env.DM_AUTH_TOKENS = 'tok-valid:validuser';
+      // "foo?bar" contains a question-mark — invalid glob, rule must be skipped.
+      // Deliberately avoid ';' here because the config parser uses ';' as array
+      // separator when present in the env-var value, which would mangle the entry.
+      process.env.DM_AUTHZ_PER_ROUTE = 'validuser:GET:foo?bar,validuser:GET:/api/hello';
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('authToken', new AuthToken(dm));
+      await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
+      await dm.registerPlugin('helloWorld', new HelloWorld(dm));
+      app = dm.app;
+    });
+
+    after(() => {
+      delete process.env.DM_AUTH_TOKENS;
+      delete process.env.DM_AUTHZ_PER_ROUTE;
+    });
+
+    it('plugin starts and valid rule still works', async () => {
+      const res = await request(app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-valid');
+      expect(res.status).to.equal(200);
+    });
+
+    it('malformed-glob rule does not grant access (returns 403 on unmatched path)', async () => {
+      const res = await request(app)
+        .get('/some/other/path')
+        .set('Authorization', 'Bearer tok-valid');
+      expect(res.status).to.equal(403);
+    });
   });
 });

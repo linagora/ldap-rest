@@ -13,25 +13,33 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import { forbidden } from '../../lib/expressFormatedResponses';
 import type { DmRequest } from '../../lib/auth/base';
 
+// Whitelist of characters permitted in a glob pattern.
+// Covers all characters needed for typical REST paths: alphanumerics, slash,
+// underscore, hyphen, dot, plus, and the glob wildcards (*).
+// Any pattern containing characters outside this set is rejected.
+const ALLOWED_GLOB_CHARS = /^[\w/.\-+*]*$/;
+
 // Convert a glob pattern to a RegExp. '*' matches one path segment ([^/]*),
 // '**' matches any sequence including '/' (.*). All other characters are escaped.
+//
+// Security: the pattern is validated against ALLOWED_GLOB_CHARS before any
+// regex construction, providing a whitelist guard recognised by CodeQL's
+// js/regex-injection query. Only the sanitised, escaped string flows into
+// new RegExp.
+//
+// Throws if the glob contains characters outside the allowed set.
 export function globToRegex(glob: string): RegExp {
-  let out = '';
-  let i = 0;
-  while (i < glob.length) {
-    if (glob[i] === '*' && glob[i + 1] === '*') {
-      out += '.*';
-      i += 2;
-    } else if (glob[i] === '*') {
-      out += '[^/]*';
-      i += 1;
-    } else {
-      const c = glob[i];
-      out += /[.+?^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
-      i += 1;
-    }
+  if (!ALLOWED_GLOB_CHARS.test(glob)) {
+    throw new Error(`Invalid glob pattern: "${glob}" — only [a-zA-Z0-9_/.\-+*] are allowed`);
   }
-  return new RegExp(`^${out}$`);
+  // Escape every regex-significant character first (producing a safe string).
+  // Among the whitelisted chars only `.` and `+` are regex metacharacters;
+  // `*` is also flagged by the broad escape set and will be escaped too.
+  const escaped = glob.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+  // After escaping: `**` → `\*\*`, `*` → `\*`.
+  // Restore glob semantics on the already-sanitised string.
+  const pattern = escaped.replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*');
+  return new RegExp(`^${pattern}$`);
 }
 
 interface WildcardRule {

@@ -54,6 +54,9 @@ Each entry has one of two forms:
   - `**` matches any sequence of characters **including** `/` (multiple segments).
   - All other characters are matched literally — regex special characters (`.`, `+`,
     `?`, etc.) have no special meaning.
+  - **Allowed characters:** alphanumerics (`a-z`, `A-Z`, `0-9`), `/`, `_`, `-`,
+    `.`, `+`, and `*`. Globs containing any other character (e.g. `;`, space,
+    `?`) are rejected at startup with a warning and the rule is skipped.
 
 A user may have multiple entries; access is granted if **any** rule matches
 (logical OR).
