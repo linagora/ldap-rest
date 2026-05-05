@@ -184,6 +184,7 @@ export interface Config {
   cozy_org_id?: string;
   cozy_org_domain?: string;
   cozy_default_locale?: string;
+  cozy_context_name?: string;
   cozy_auth_exchange?: string;
   cozy_b2b_exchange?: string;
   rabbitmq_url?: string;
@@ -466,6 +467,7 @@ const configArgs: ConfigTemplate = [
   ['--cozy-org-id', 'DM_COZY_ORG_ID', ''],
   ['--cozy-org-domain', 'DM_COZY_ORG_DOMAIN', ''],
   ['--cozy-default-locale', 'DM_COZY_DEFAULT_LOCALE', 'fr'],
+  ['--cozy-context-name', 'DM_COZY_CONTEXT_NAME', 'default'],
   ['--cozy-auth-exchange', 'DM_COZY_AUTH_EXCHANGE', 'auth'],
   ['--cozy-b2b-exchange', 'DM_COZY_B2B_EXCHANGE', 'b2b'],
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],

@@ -78,6 +78,7 @@ describe('CozyProvision plugin', () => {
           Email: 'alice@twake.local',
           OrgID: 'twp-test',
           OrgDomain: 'twake.local',
+          ContextName: 'default',
         })
         .matchHeader('authorization', /^Basic /)
         .reply(201, { ok: true });
