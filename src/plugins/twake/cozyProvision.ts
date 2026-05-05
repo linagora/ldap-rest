@@ -146,6 +146,11 @@ export default class CozyProvision extends DmPlugin {
     if (this.cozyOrgDomain) params.set('OrgDomain', this.cozyOrgDomain);
     if (this.cozyContextName) params.set('ContextName', this.cozyContextName);
     if (this.cozyApps) params.set('Apps', this.cozyApps);
+    // Set the cozy instance's OIDCID to the user's SCIM userName so the
+    // sub claim from the OP after authentication matches the instance and
+    // cozy-stack's OIDC callback succeeds. Without this the callback fails
+    // with `Invalid sub: <sub> != ""`.
+    params.set('OIDCID', id);
 
     const url = `${this.cozyAdminUrl}/instances?${params.toString()}`;
     const auth = Buffer.from(
