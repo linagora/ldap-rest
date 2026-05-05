@@ -339,7 +339,7 @@ export class ScimGroups {
     }
 
     const created = await this.get(req, rdn);
-    void launchHooks(this.hooks.scimgroupcreatedone, [created]);
+    void launchHooks(this.hooks.scimgroupcreatedone, created);
     return created;
   }
 
@@ -386,7 +386,7 @@ export class ScimGroups {
     await this.ldap.modify(dn, changes);
 
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimgroupupdatedone, [id, updated]);
+    void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;
   }
 
@@ -442,7 +442,7 @@ export class ScimGroups {
 
     await this.ldap.modify(dn, changes);
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimgroupupdatedone, [id, updated]);
+    void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;
   }
 
@@ -455,7 +455,7 @@ export class ScimGroups {
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
     await this.ldap.delete(dn);
-    void launchHooks(this.hooks.scimgroupdeletedone, [finalId]);
+    void launchHooks(this.hooks.scimgroupdeletedone, finalId);
   }
 
   /** Used internally and by Bulk to resolve a Group SCIM reference to a DN. */
