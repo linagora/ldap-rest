@@ -76,6 +76,7 @@ describe('CozyProvision plugin', () => {
           Domain: 'alice.twake.local',
           Locale: 'fr',
           Email: 'alice@twake.local',
+          PublicName: 'alice',
           OrgID: 'twp-test',
           OrgDomain: 'twake.local',
           ContextName: 'default',
@@ -105,10 +106,34 @@ describe('CozyProvision plugin', () => {
       expect(call.routingKey).to.equal('user.created');
       expect(call.message).to.deep.include({
         twakeId: 'alice',
+        domain: 'twake.local',
         internalEmail: 'alice@twake.local',
         organizationDomain: 'twake.local',
         workplaceFqdn: 'alice.twake.local',
       });
+    });
+
+    it('uses SCIM displayName / name as PublicName when provided', async () => {
+      const scope = nock(COZY_URL)
+        .post('/instances')
+        .query(q => q.PublicName === 'Khaled Ferjani' && q.Phone === '+33600000000')
+        .reply(201, { ok: true })
+        .patch('/instances/khaled.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'khaled',
+        displayName: 'Khaled Ferjani',
+        phoneNumbers: [{ value: '+33600000000', primary: true }],
+      };
+
+      const hook = plugin.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+      expect(scope.isDone()).to.be.true;
     });
 
     it('forwards primary phoneNumber as mobile when provided', async () => {

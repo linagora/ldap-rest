@@ -136,6 +136,10 @@ export default class CozyProvision extends DmPlugin {
     params.set('Locale', this.extractLocale(user));
     const email = this.extractPrimaryEmail(user);
     if (email) params.set('Email', email);
+    const publicName = this.extractPublicName(user);
+    if (publicName) params.set('PublicName', publicName);
+    const phone = this.extractPrimaryPhone(user);
+    if (phone) params.set('Phone', phone);
     if (this.cozyOrgId) params.set('OrgID', this.cozyOrgId);
     if (this.cozyOrgDomain) params.set('OrgDomain', this.cozyOrgDomain);
     if (this.cozyContextName) params.set('ContextName', this.cozyContextName);
@@ -267,6 +271,7 @@ export default class CozyProvision extends DmPlugin {
 
     const message: Record<string, unknown> = {
       twakeId: id,
+      domain: this.cozyOrgDomain,
       organizationDomain: this.cozyOrgDomain,
       workplaceFqdn: `${id}.${this.cozyOrgDomain}`,
     };
@@ -404,6 +409,33 @@ export default class CozyProvision extends DmPlugin {
     const primary = phones.find(p => p.primary);
     const value = (primary || phones[0]).value;
     return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  /**
+   * Best-effort display name for the cozy instance's `public_name` setting,
+   * which downstream features (org-contact sync, sharing, mailer, …) read
+   * from the instance settings document. Without it cozy-stack's
+   * SyncCreatedOrgContact bails with "missing public_name in settings".
+   *
+   * Order of preference: SCIM displayName → name.formatted →
+   * givenName + familyName → userName/id.
+   */
+  private extractPublicName(user: ScimUser): string | null {
+    if (
+      typeof user.displayName === 'string' &&
+      user.displayName.trim().length > 0
+    ) {
+      return user.displayName.trim();
+    }
+    const formatted = user.name?.formatted;
+    if (typeof formatted === 'string' && formatted.trim().length > 0) {
+      return formatted.trim();
+    }
+    const given = user.name?.givenName?.trim() ?? '';
+    const family = user.name?.familyName?.trim() ?? '';
+    const composed = `${given} ${family}`.trim();
+    if (composed.length > 0) return composed;
+    return this.extractId(user);
   }
 
   private extractLocale(user: ScimUser): string {
