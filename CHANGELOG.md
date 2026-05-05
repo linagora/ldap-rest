@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.4 (2026-05-05)
+
+### Bug Fixes
+
+- `core/twake/cozyProvision`: a series of fixes so SCIM-provisioned
+  users land on a usable Cozy instance
+
 ## v0.3.3 (2026-05-05)
 
 ### Bug Fixes
