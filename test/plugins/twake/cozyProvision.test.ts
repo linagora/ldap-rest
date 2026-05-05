@@ -100,7 +100,7 @@ describe('CozyProvision plugin', () => {
       expect(call.exchange).to.equal('auth');
       expect(call.routingKey).to.equal('user.created');
       expect(call.message).to.deep.include({
-        sub: 'alice',
+        twakeId: 'alice',
         email: 'alice@twake.local',
         organizationDomain: 'twake.local',
         workplaceFqdn: 'alice.twake.local',
