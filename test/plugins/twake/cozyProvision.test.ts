@@ -81,7 +81,10 @@ describe('CozyProvision plugin', () => {
           ContextName: 'default',
         })
         .matchHeader('authorization', /^Basic /)
-        .reply(201, { ok: true });
+        .reply(201, { ok: true })
+        .patch('/instances/alice.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
 
       const user: ScimUser = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -95,7 +98,7 @@ describe('CozyProvision plugin', () => {
       ) => Promise<void>;
       await hook(user);
 
-      expect(scope.isDone(), 'cozy admin POST').to.be.true;
+      expect(scope.isDone(), 'cozy admin POST + PATCH').to.be.true;
       expect(plugin.stub.calls).to.have.length(1);
       const call = plugin.stub.calls[0];
       expect(call.exchange).to.equal('auth');
@@ -112,7 +115,10 @@ describe('CozyProvision plugin', () => {
       const scope = nock(COZY_URL)
         .post('/instances')
         .query(true)
-        .reply(409, { error: 'already exists' });
+        .reply(409, { error: 'already exists' })
+        .patch('/instances/bob.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
 
       const user: ScimUser = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -153,7 +159,10 @@ describe('CozyProvision plugin', () => {
       const scope = nock(COZY_URL)
         .post('/instances')
         .query(q => q.Locale === 'en')
-        .reply(201, { ok: true });
+        .reply(201, { ok: true })
+        .patch('/instances/dave.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
 
       const user: ScimUser = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
