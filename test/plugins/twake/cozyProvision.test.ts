@@ -170,10 +170,7 @@ describe('CozyProvision plugin', () => {
       const scope = nock(COZY_URL)
         .post('/instances')
         .query(true)
-        .reply(409, { error: 'already exists' })
-        .patch('/instances/bob.twake.local')
-        .query({ OnboardingFinished: 'true' })
-        .reply(200, { ok: true });
+        .reply(409, { error: 'already exists' });
 
       const user: ScimUser = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -186,6 +183,31 @@ describe('CozyProvision plugin', () => {
       await hook(user);
 
       expect(scope.isDone()).to.be.true;
+      expect(plugin.stub.calls).to.have.length(1);
+      expect(plugin.stub.calls[0].routingKey).to.equal('user.created');
+    });
+
+    it('does not fail the hook when the onboarding PATCH errors', async () => {
+      const scope = nock(COZY_URL)
+        .post('/instances')
+        .query(true)
+        .reply(201, { ok: true })
+        .patch('/instances/heidi.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(500, { error: 'boom' });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'heidi',
+      };
+
+      const hook = plugin.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+
+      expect(scope.isDone()).to.be.true;
+      // Publish still happens — PATCH failure must not abort the flow.
       expect(plugin.stub.calls).to.have.length(1);
       expect(plugin.stub.calls[0].routingKey).to.equal('user.created');
     });

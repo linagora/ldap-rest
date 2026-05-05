@@ -172,7 +172,6 @@ export default class CozyProvision extends DmPlugin {
             result: 'already_exists',
             http_status: res.status,
           });
-          await this.markInstanceOnboarded(domain);
           return true;
         }
         this.logger.error({
@@ -256,9 +255,10 @@ export default class CozyProvision extends DmPlugin {
   /**
    * Publish user.created on the `auth` topic exchange. Payload matches what
    * cozy-stack's stack.user.created consumer expects: a `twakeId` identifier,
-   * an optional email, and the organizationDomain so the consumer can match
-   * the instance. Sending `sub` instead causes cozy-stack to nack the message
-   * with "missing twakeId".
+   * the `organizationDomain` so the consumer can match the instance, and
+   * optional `internalEmail` / `mobile` fields used for org-contact-sync.
+   * Sending `sub` instead of `twakeId`, or `email` instead of `internalEmail`,
+   * causes cozy-stack to nack the message.
    */
   private async publishUserCreated(user: ScimUser): Promise<void> {
     const publisher = await this.getPublisher();
