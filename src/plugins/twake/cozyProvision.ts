@@ -46,6 +46,7 @@ export default class CozyProvision extends DmPlugin {
   private readonly cozyOrgDomain: string;
   private readonly cozyDefaultLocale: string;
   private readonly cozyContextName: string;
+  private readonly cozyApps: string;
   private readonly rabbitmqUrl: string;
   private readonly authExchange: string;
   private readonly b2bExchange: string;
@@ -69,6 +70,7 @@ export default class CozyProvision extends DmPlugin {
       (this.config.cozy_default_locale as string) || 'fr';
     this.cozyContextName =
       (this.config.cozy_context_name as string) || 'default';
+    this.cozyApps = (this.config.cozy_apps as string) ?? '';
     this.rabbitmqUrl = (this.config.rabbitmq_url as string) || '';
     this.authExchange = (this.config.cozy_auth_exchange as string) || 'auth';
     this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
@@ -143,6 +145,7 @@ export default class CozyProvision extends DmPlugin {
     if (this.cozyOrgId) params.set('OrgID', this.cozyOrgId);
     if (this.cozyOrgDomain) params.set('OrgDomain', this.cozyOrgDomain);
     if (this.cozyContextName) params.set('ContextName', this.cozyContextName);
+    if (this.cozyApps) params.set('Apps', this.cozyApps);
 
     const url = `${this.cozyAdminUrl}/instances?${params.toString()}`;
     const auth = Buffer.from(

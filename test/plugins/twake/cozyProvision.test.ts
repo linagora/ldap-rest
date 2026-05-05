@@ -80,6 +80,7 @@ describe('CozyProvision plugin', () => {
           OrgID: 'twp-test',
           OrgDomain: 'twake.local',
           ContextName: 'default',
+          Apps: 'home,drive,settings,notes,dataproxy',
         })
         .matchHeader('authorization', /^Basic /)
         .reply(201, { ok: true })
@@ -111,6 +112,50 @@ describe('CozyProvision plugin', () => {
         organizationDomain: 'twake.local',
         workplaceFqdn: 'alice.twake.local',
       });
+    });
+
+    it('respects cozy_apps override', async () => {
+      dm.config.cozy_apps = 'home,drive';
+      const p = new TestableCozyProvision(dm);
+      const scope = nock(COZY_URL)
+        .post('/instances')
+        .query(q => q.Apps === 'home,drive')
+        .reply(201, { ok: true })
+        .patch('/instances/ivy.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'ivy',
+      };
+      const hook = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it('omits Apps query param when cozy_apps is empty', async () => {
+      dm.config.cozy_apps = '';
+      const p = new TestableCozyProvision(dm);
+      const scope = nock(COZY_URL)
+        .post('/instances')
+        .query(q => !('Apps' in q))
+        .reply(201, { ok: true })
+        .patch('/instances/jack.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'jack',
+      };
+      const hook = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+      expect(scope.isDone()).to.be.true;
     });
 
     it('uses SCIM displayName / name as PublicName when provided', async () => {
