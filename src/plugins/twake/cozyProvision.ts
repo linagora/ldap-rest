@@ -192,9 +192,11 @@ export default class CozyProvision extends DmPlugin {
   }
 
   /**
-   * Publish user.created on the `auth` topic exchange. Payload mirrors what
-   * cozy-stack expects: a sub identifier, an optional email, and the
-   * organizationDomain so consumers can match the instance.
+   * Publish user.created on the `auth` topic exchange. Payload matches what
+   * cozy-stack's stack.user.created consumer expects: a `twakeId` identifier,
+   * an optional email, and the organizationDomain so the consumer can match
+   * the instance. Sending `sub` instead causes cozy-stack to nack the message
+   * with "missing twakeId".
    */
   private async publishUserCreated(user: ScimUser): Promise<void> {
     const publisher = await this.getPublisher();
@@ -205,7 +207,7 @@ export default class CozyProvision extends DmPlugin {
     const email = this.extractPrimaryEmail(user);
 
     const message: Record<string, unknown> = {
-      sub: id,
+      twakeId: id,
       organizationDomain: this.cozyOrgDomain,
       workplaceFqdn: `${id}.${this.cozyOrgDomain}`,
     };
@@ -219,13 +221,13 @@ export default class CozyProvision extends DmPlugin {
         result: 'success',
         exchange: this.authExchange,
         routingKey: 'user.created',
-        sub: id,
+        twakeId: id,
       });
     } catch (err) {
       this.logger.error({
         plugin: this.name,
         event: 'publishUserCreated',
-        sub: id,
+        twakeId: id,
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         error: `${err}`,
       });
