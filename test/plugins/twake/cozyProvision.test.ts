@@ -81,6 +81,7 @@ describe('CozyProvision plugin', () => {
           OrgDomain: 'twake.local',
           ContextName: 'default',
           Apps: 'home,drive,settings,notes,dataproxy',
+          OIDCID: 'alice',
         })
         .matchHeader('authorization', /^Basic /)
         .reply(201, { ok: true })
