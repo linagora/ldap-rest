@@ -105,9 +105,39 @@ describe('CozyProvision plugin', () => {
       expect(call.routingKey).to.equal('user.created');
       expect(call.message).to.deep.include({
         twakeId: 'alice',
-        email: 'alice@twake.local',
+        internalEmail: 'alice@twake.local',
         organizationDomain: 'twake.local',
         workplaceFqdn: 'alice.twake.local',
+      });
+    });
+
+    it('forwards primary phoneNumber as mobile when provided', async () => {
+      nock(COZY_URL)
+        .post('/instances')
+        .query(true)
+        .reply(201, { ok: true })
+        .patch('/instances/grace.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'grace',
+        phoneNumbers: [
+          { value: '+33600000000', primary: true },
+          { value: '+33700000000' },
+        ],
+      };
+
+      const hook = plugin.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+
+      expect(plugin.stub.calls).to.have.length(1);
+      expect(plugin.stub.calls[0].message).to.deep.include({
+        twakeId: 'grace',
+        mobile: '+33600000000',
       });
     });
 
