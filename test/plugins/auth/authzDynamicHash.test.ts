@@ -80,7 +80,8 @@ describe('verifyLdapPassword', () => {
   describe('{SHA256}', () => {
     it('accepts the correct password', () => {
       const digest = crypto.createHash('sha256').update('s3cret').digest();
-      expect(verifyLdapPassword('s3cret', ldapify('SHA256', digest))).to.be.true;
+      expect(verifyLdapPassword('s3cret', ldapify('SHA256', digest))).to.be
+        .true;
     });
   });
 

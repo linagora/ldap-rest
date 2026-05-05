@@ -30,7 +30,9 @@ const ALLOWED_GLOB_CHARS = /^[\w/.\-+*]*$/;
 // Throws if the glob contains characters outside the allowed set.
 export function globToRegex(glob: string): RegExp {
   if (!ALLOWED_GLOB_CHARS.test(glob)) {
-    throw new Error(`Invalid glob pattern: "${glob}" — only [a-zA-Z0-9_/.\-+*] are allowed`);
+    throw new Error(
+      `Invalid glob pattern: "${glob}" — only [a-zA-Z0-9_/.\-+*] are allowed`
+    );
   }
   // Escape every regex-significant character first (producing a safe string).
   // Among the whitelisted chars only `.` and `+` are regex metacharacters;
@@ -69,7 +71,7 @@ export default class AuthzPerRoute extends DmPlugin {
 
     const summary = [...this.rules.entries()]
       .map(([user, rules]) => {
-        const hasWildcard = rules.some((r) => r.kind === 'wildcard');
+        const hasWildcard = rules.some(r => r.kind === 'wildcard');
         return `${user}: ${hasWildcard ? 'full access' : `${rules.length} rule${rules.length !== 1 ? 's' : ''}`}`;
       })
       .join(', ');
@@ -80,7 +82,7 @@ export default class AuthzPerRoute extends DmPlugin {
   }
 
   private parseEntry(entry: string): void {
-    const parts = entry.split(':').map((p) => p.trim());
+    const parts = entry.split(':').map(p => p.trim());
 
     if (parts.length < 2) {
       this.logger.warn(`authzPerRoute: ignoring invalid rule entry: ${entry}`);
@@ -90,7 +92,9 @@ export default class AuthzPerRoute extends DmPlugin {
     const user = parts[0];
 
     if (!user) {
-      this.logger.warn(`authzPerRoute: ignoring rule with empty user: ${entry}`);
+      this.logger.warn(
+        `authzPerRoute: ignoring rule with empty user: ${entry}`
+      );
       return;
     }
 
@@ -103,15 +107,28 @@ export default class AuthzPerRoute extends DmPlugin {
     // "<user>:<METHOD>:<pathGlob>"
     if (parts.length >= 3) {
       const method = parts[1].toUpperCase();
-      const VALID_METHODS = new Set(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', '*']);
+      const VALID_METHODS = new Set([
+        'GET',
+        'POST',
+        'PUT',
+        'DELETE',
+        'PATCH',
+        'HEAD',
+        'OPTIONS',
+        '*',
+      ]);
       if (!method || !VALID_METHODS.has(method)) {
-        this.logger.warn(`authzPerRoute: ignoring rule with invalid method "${parts[1]}" in entry: ${entry}`);
+        this.logger.warn(
+          `authzPerRoute: ignoring rule with invalid method "${parts[1]}" in entry: ${entry}`
+        );
         return;
       }
       // Rejoin in case the glob itself contains colons, then trim
       const pathPattern = parts.slice(2).join(':').trim();
       if (!pathPattern) {
-        this.logger.warn(`authzPerRoute: ignoring rule with empty path pattern in entry: ${entry}`);
+        this.logger.warn(
+          `authzPerRoute: ignoring rule with empty path pattern in entry: ${entry}`
+        );
         return;
       }
       let pathRe: RegExp;

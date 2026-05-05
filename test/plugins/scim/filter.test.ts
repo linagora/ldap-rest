@@ -50,17 +50,11 @@ describe('SCIM filter parser', () => {
 
   describe('logic combinators', () => {
     it('and combines', () => {
-      const r = scimFilterToLdap(
-        'userName eq "alice" and displayName pr',
-        m
-      );
+      const r = scimFilterToLdap('userName eq "alice" and displayName pr', m);
       expect(r.ldapFilter).to.equal('(&(uid=alice)(displayName=*))');
     });
     it('or combines', () => {
-      const r = scimFilterToLdap(
-        'userName eq "alice" or userName eq "bob"',
-        m
-      );
+      const r = scimFilterToLdap('userName eq "alice" or userName eq "bob"', m);
       expect(r.ldapFilter).to.equal('(|(uid=alice)(uid=bob))');
     });
     it('not negates', () => {
@@ -72,9 +66,7 @@ describe('SCIM filter parser', () => {
         '(userName eq "a" or userName eq "b") and displayName pr',
         m
       );
-      expect(r.ldapFilter).to.equal(
-        '(&(|(uid=a)(uid=b))(displayName=*))'
-      );
+      expect(r.ldapFilter).to.equal('(&(|(uid=a)(uid=b))(displayName=*))');
     });
   });
 

@@ -2,7 +2,9 @@ import { DM } from '../../../src/bin';
 import type { Express } from 'express';
 import request from 'supertest';
 import AuthToken from '../../../src/plugins/auth/token';
-import AuthzPerRoute, { globToRegex } from '../../../src/plugins/auth/authzPerRoute';
+import AuthzPerRoute, {
+  globToRegex,
+} from '../../../src/plugins/auth/authzPerRoute';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { expect } from 'chai';
 
@@ -253,7 +255,8 @@ describe('AuthzPerRoute', () => {
       // "foo?bar" contains a question-mark — invalid glob, rule must be skipped.
       // Deliberately avoid ';' here because the config parser uses ';' as array
       // separator when present in the env-var value, which would mangle the entry.
-      process.env.DM_AUTHZ_PER_ROUTES = 'validuser:GET:foo?bar,validuser:GET:/api/hello';
+      process.env.DM_AUTHZ_PER_ROUTES =
+        'validuser:GET:foo?bar,validuser:GET:/api/hello';
       const dm = new DM();
       await dm.ready;
       await dm.registerPlugin('authToken', new AuthToken(dm));
@@ -298,7 +301,9 @@ describe('AuthzPerRoute', () => {
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
-      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-ws');
+      const res = await request(dm.app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-ws');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
       delete process.env.DM_AUTHZ_PER_ROUTES;
@@ -310,11 +315,15 @@ describe('AuthzPerRoute', () => {
       const dm = new DM();
       await dm.ready;
       // Inject the entry with a space before the path
-      (dm.config as Record<string, unknown>).authz_per_route = ['user:GET: /api/hello'];
+      (dm.config as Record<string, unknown>).authz_per_route = [
+        'user:GET: /api/hello',
+      ];
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
-      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-sp');
+      const res = await request(dm.app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-sp');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
       delete process.env.DM_AUTHZ_PER_ROUTES;
@@ -328,7 +337,9 @@ describe('AuthzPerRoute', () => {
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
-      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-bogus');
+      const res = await request(dm.app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-bogus');
       expect(res.status).to.equal(403);
       delete process.env.DM_AUTH_TOKENS;
       delete process.env.DM_AUTHZ_PER_ROUTES;
@@ -342,7 +353,9 @@ describe('AuthzPerRoute', () => {
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
-      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-em');
+      const res = await request(dm.app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-em');
       expect(res.status).to.equal(403);
       delete process.env.DM_AUTH_TOKENS;
       delete process.env.DM_AUTHZ_PER_ROUTES;
@@ -356,7 +369,9 @@ describe('AuthzPerRoute', () => {
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
-      const res = await request(dm.app).get('/api/hello').set('Authorization', 'Bearer tok-eu');
+      const res = await request(dm.app)
+        .get('/api/hello')
+        .set('Authorization', 'Bearer tok-eu');
       expect(res.status).to.equal(200);
       delete process.env.DM_AUTH_TOKENS;
       delete process.env.DM_AUTHZ_PER_ROUTES;

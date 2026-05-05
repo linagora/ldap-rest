@@ -138,9 +138,7 @@ describe('authzDynamic (integration)', function () {
   });
 
   it('rejects requests without a Bearer token', async () => {
-    await supertest(server.app)
-      .get('/api/v1/ldap/groups')
-      .expect(401);
+    await supertest(server.app).get('/api/v1/ldap/groups').expect(401);
   });
 
   it('rejects requests with an unknown token', async () => {
@@ -220,9 +218,7 @@ describe('authzDynamic (integration)', function () {
         .set('Authorization', `Bearer ${rolling}`)
         .expect(200);
     } finally {
-      await plugin.server.ldap
-        .delete(`cn=rolling,${tokensOu}`)
-        .catch(() => {});
+      await plugin.server.ldap.delete(`cn=rolling,${tokensOu}`).catch(() => {});
       await plugin.reload();
     }
   });

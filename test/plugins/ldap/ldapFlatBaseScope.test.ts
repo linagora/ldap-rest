@@ -59,9 +59,7 @@ describe('LdapFlat base-scope guard', function () {
         throw new Error('expected BadRequestError');
       } catch (err) {
         expect(err).to.be.instanceOf(BadRequestError);
-        expect((err as Error).message).to.match(
-          /must be a direct child of/i
-        );
+        expect((err as Error).message).to.match(/must be a direct child of/i);
       }
     });
 
@@ -204,9 +202,9 @@ describe('LdapFlat base-scope guard', function () {
 
   describe('escape-aware DN parsing (guards against RFC 4514 tricks)', () => {
     const callResolve = (dn: string) =>
-      (
-        instance as unknown as { resolveDn: (id: string) => string }
-      ).resolveDn(dn);
+      (instance as unknown as { resolveDn: (id: string) => string }).resolveDn(
+        dn
+      );
 
     it('rejects a DN whose textual tail matches the base via an escaped comma in the first RDN', () => {
       // Attack: `cn=pwn\,ou=twakeTitle,ou=nomenclature,<BASE>` textually
@@ -238,9 +236,7 @@ describe('LdapFlat base-scope guard', function () {
       // End-to-end: the decodeURIComponent'd path parameter must not reach
       // ldap.delete with a DN whose real parent is outside the branch.
       const malicious = `cn=pwn\\,ou=twakeTitle,ou=nomenclature,${BASE}`;
-      const res = await request.delete(
-        `/api/v1/ldap/titles/${enc(malicious)}`
-      );
+      const res = await request.delete(`/api/v1/ldap/titles/${enc(malicious)}`);
       expect(res.status).to.equal(400);
     });
 

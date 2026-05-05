@@ -101,9 +101,9 @@ describe('SCIM Bulk (integration)', function () {
     const group = await supertest(server.app)
       .get('/scim/v2/Groups/bulk-g1')
       .expect(200);
-    const found = (
-      group.body.members as { value: string }[] | undefined
-    )?.some(m => m.value === 'bulk-u1');
+    const found = (group.body.members as { value: string }[] | undefined)?.some(
+      m => m.value === 'bulk-u1'
+    );
     expect(found, 'group should contain bulk-u1').to.be.true;
   });
 

@@ -110,14 +110,11 @@ describe('SCIM PATCH applicator', () => {
     const req = await patchToModifyRequest(
       {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-        Operations: [
-          { op: 'remove', path: 'members[value eq "alice"]' },
-        ],
+        Operations: [{ op: 'remove', path: 'members[value eq "alice"]' }],
       },
       {
         mapping: DEFAULT_USER_MAPPING,
-        resolveMemberRef: async v =>
-          `uid=${v},ou=users,dc=example,dc=com`,
+        resolveMemberRef: async v => `uid=${v},ou=users,dc=example,dc=com`,
       }
     );
     expect(req.delete).to.deep.equal({
@@ -176,9 +173,7 @@ describe('SCIM PATCH applicator', () => {
         }
       );
       expect(r.displayName).to.equal('New');
-      expect(
-        (r.name as Record<string, unknown>).givenName
-      ).to.equal('Alice');
+      expect((r.name as Record<string, unknown>).givenName).to.equal('Alice');
       expect(r.userName).to.be.undefined;
     });
   });

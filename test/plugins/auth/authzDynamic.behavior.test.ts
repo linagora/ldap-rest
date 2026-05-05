@@ -190,7 +190,10 @@ describe('authzDynamic behavioural regressions', function () {
       // with an unreachable base.
       const hijack = new AuthzDynamic({
         ...server,
-        config: { ...server.config, authz_dynamic_base: `ou=does-not-exist,${baseDn}` },
+        config: {
+          ...server.config,
+          authz_dynamic_base: `ou=does-not-exist,${baseDn}`,
+        },
         logger: server.logger,
         hooks: server.hooks,
         ldap: server.ldap,

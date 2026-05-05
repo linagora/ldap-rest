@@ -92,9 +92,7 @@ describe('SCIM security hardening', () => {
         await patchToModifyRequest(
           {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-            Operations: [
-              { op: 'add', path: 'name.__proto__', value: 'leak' },
-            ],
+            Operations: [{ op: 'add', path: 'name.__proto__', value: 'leak' }],
           },
           { mapping: DEFAULT_USER_MAPPING }
         );
@@ -149,9 +147,7 @@ describe('SCIM security hardening', () => {
         await patchToModifyRequest(
           {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-            Operations: [
-              { op: 'add', path: 'emails[broken', value: 'x' },
-            ],
+            Operations: [{ op: 'add', path: 'emails[broken', value: 'x' }],
           },
           { mapping: DEFAULT_USER_MAPPING }
         );
@@ -239,9 +235,9 @@ describe('SCIM security hardening', () => {
     });
 
     it('rejects id pr', () => {
-      expect(() =>
-        scimFilterToLdap('id pr', DEFAULT_USER_MAPPING)
-      ).to.throw(ScimError);
+      expect(() => scimFilterToLdap('id pr', DEFAULT_USER_MAPPING)).to.throw(
+        ScimError
+      );
     });
 
     it('rejects id co "..."', () => {

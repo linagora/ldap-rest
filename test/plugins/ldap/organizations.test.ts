@@ -463,7 +463,9 @@ describe('LDAP Organizations Plugin', function () {
         await plugin.moveOrganization(childOrgDn, invalidTarget);
         expect.fail('Should have thrown error');
       } catch (e) {
-        expect((e as Error).message).to.match(/Target organization .* not found/);
+        expect((e as Error).message).to.match(
+          /Target organization .* not found/
+        );
       }
     });
 
@@ -894,7 +896,9 @@ describe('LDAP Organizations Plugin', function () {
           .send({ targetOrgDn: upperCased });
 
         expect(res.status).to.equal(400);
-        expect(res.body.error).to.match(/itself or its descendant|current location/);
+        expect(res.body.error).to.match(
+          /itself or its descendant|current location/
+        );
       });
     });
 

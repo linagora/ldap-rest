@@ -39,10 +39,8 @@ describe('SCIM baseResolver', () => {
   it('applies {user} template', () => {
     const br = new BaseResolver(
       cfg({
-        scim_user_base_template:
-          'ou=users,ou={user},dc=example,dc=com',
-        scim_group_base_template:
-          'ou=groups,ou={user},dc=example,dc=com',
+        scim_user_base_template: 'ou=users,ou={user},dc=example,dc=com',
+        scim_group_base_template: 'ou=groups,ou={user},dc=example,dc=com',
       })
     );
     expect(br.userBase({ user: 'tenant1' })).to.equal(
@@ -63,10 +61,7 @@ describe('SCIM baseResolver', () => {
   });
 
   it('uses map file for explicit user match', () => {
-    const mapFile = path.join(
-      os.tmpdir(),
-      `scim-base-map-${Date.now()}.json`
-    );
+    const mapFile = path.join(os.tmpdir(), `scim-base-map-${Date.now()}.json`);
     fs.writeFileSync(
       mapFile,
       JSON.stringify({
@@ -79,12 +74,8 @@ describe('SCIM baseResolver', () => {
     );
     try {
       const br = new BaseResolver(cfg({ scim_base_map: mapFile }));
-      expect(br.userBase({ user: 'alice' })).to.equal(
-        'ou=alice-users,dc=ex'
-      );
-      expect(br.groupBase({ user: 'alice' })).to.equal(
-        'ou=alice-groups,dc=ex'
-      );
+      expect(br.userBase({ user: 'alice' })).to.equal('ou=alice-users,dc=ex');
+      expect(br.groupBase({ user: 'alice' })).to.equal('ou=alice-groups,dc=ex');
       // Unknown user falls back to wildcard
       expect(br.userBase({ user: 'other' })).to.equal('ou=any-users,dc=ex');
     } finally {

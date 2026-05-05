@@ -215,9 +215,7 @@ describe('SCIM Users (integration)', function () {
       await supertest(server.app)
         .delete('/scim/v2/Users/scim-alice')
         .expect(204);
-      await supertest(server.app)
-        .get('/scim/v2/Users/scim-alice')
-        .expect(404);
+      await supertest(server.app).get('/scim/v2/Users/scim-alice').expect(404);
     });
   });
 
@@ -245,7 +243,10 @@ describe('SCIM Users (integration)', function () {
 
     it('filters by userName eq', async () => {
       const res = await supertest(server.app)
-        .get('/scim/v2/Users?filter=' + encodeURIComponent('userName eq "scim-alice"'))
+        .get(
+          '/scim/v2/Users?filter=' +
+            encodeURIComponent('userName eq "scim-alice"')
+        )
         .expect(200);
       expect(res.body.totalResults).to.equal(1);
       expect(res.body.Resources[0].userName).to.equal('scim-alice');

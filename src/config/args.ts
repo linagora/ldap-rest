@@ -517,7 +517,13 @@ const configArgs: ConfigTemplate = [
   ['--auth-hmac-window', 'DM_AUTH_HMAC_WINDOW', 120000, 'number'],
 
   // Auth authzPerRoute plugin
-  ['--authz-per-route', 'DM_AUTHZ_PER_ROUTES', [], 'array', '--authz-per-routes'],
+  [
+    '--authz-per-route',
+    'DM_AUTHZ_PER_ROUTES',
+    [],
+    'array',
+    '--authz-per-routes',
+  ],
 
   // Auth authzPerBranch plugin
   [

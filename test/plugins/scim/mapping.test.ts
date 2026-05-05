@@ -78,7 +78,11 @@ describe('SCIM mapping', () => {
         {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: 'alice',
-          name: { familyName: 'Doe', givenName: 'Alice', formatted: 'Alice Doe' },
+          name: {
+            familyName: 'Doe',
+            givenName: 'Alice',
+            formatted: 'Alice Doe',
+          },
           displayName: 'Alice',
           emails: [
             { value: 'alice@example.com', primary: true },
@@ -157,9 +161,9 @@ describe('SCIM mapping', () => {
 
   describe('scimPathToLdapAttribute', () => {
     it('resolves simple attribute', () => {
-      expect(scimPathToLdapAttribute('userName', DEFAULT_USER_MAPPING)).to.equal(
-        'uid'
-      );
+      expect(
+        scimPathToLdapAttribute('userName', DEFAULT_USER_MAPPING)
+      ).to.equal('uid');
     });
     it('resolves sub-attribute', () => {
       expect(
@@ -172,9 +176,8 @@ describe('SCIM mapping', () => {
       ).to.equal('mail');
     });
     it('returns undefined for unknown path', () => {
-      expect(
-        scimPathToLdapAttribute('unknown.attr', DEFAULT_USER_MAPPING)
-      ).to.be.undefined;
+      expect(scimPathToLdapAttribute('unknown.attr', DEFAULT_USER_MAPPING)).to
+        .be.undefined;
     });
   });
 
