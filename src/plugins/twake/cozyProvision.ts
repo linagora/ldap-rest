@@ -263,13 +263,15 @@ export default class CozyProvision extends DmPlugin {
     const id = this.extractId(user);
     if (!id) return;
     const email = this.extractPrimaryEmail(user);
+    const mobile = this.extractPrimaryPhone(user);
 
     const message: Record<string, unknown> = {
       twakeId: id,
       organizationDomain: this.cozyOrgDomain,
       workplaceFqdn: `${id}.${this.cozyOrgDomain}`,
     };
-    if (email) message.email = email;
+    if (email) message.internalEmail = email;
+    if (mobile) message.mobile = mobile;
 
     try {
       await publisher.publish(this.authExchange, 'user.created', message);
@@ -393,6 +395,14 @@ export default class CozyProvision extends DmPlugin {
     if (!emails || emails.length === 0) return null;
     const primary = emails.find(e => e.primary);
     const value = (primary || emails[0]).value;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  private extractPrimaryPhone(user: ScimUser): string | null {
+    const phones = user.phoneNumbers;
+    if (!phones || phones.length === 0) return null;
+    const primary = phones.find(p => p.primary);
+    const value = (primary || phones[0]).value;
     return typeof value === 'string' && value.length > 0 ? value : null;
   }
 
