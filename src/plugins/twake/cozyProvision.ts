@@ -168,6 +168,7 @@ export default class CozyProvision extends DmPlugin {
             result: 'already_exists',
             http_status: res.status,
           });
+          await this.markInstanceOnboarded(domain);
           return true;
         }
         this.logger.error({
@@ -183,6 +184,7 @@ export default class CozyProvision extends DmPlugin {
         result: 'success',
         http_status: res.status,
       });
+      await this.markInstanceOnboarded(domain);
       return true;
     } catch (err) {
       this.logger.error({
@@ -192,6 +194,58 @@ export default class CozyProvision extends DmPlugin {
         error: `${err}`,
       });
       return false;
+    }
+  }
+
+  /**
+   * PATCH /instances/<domain>?OnboardingFinished=true on the cozy admin API.
+   *
+   * SCIM-provisioned users have no signup flow to complete (the admin already
+   * provisioned them), so the per-user instance should land directly in the
+   * onboarded state. Without this PATCH the instance stays in onboarding and
+   * the user gets dropped onto a setup wizard at first OIDC login.
+   */
+  private async markInstanceOnboarded(domain: string): Promise<void> {
+    const url = `${this.cozyAdminUrl}/instances/${encodeURIComponent(
+      domain
+    )}?OnboardingFinished=true`;
+    const auth = Buffer.from(
+      `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
+    ).toString('base64');
+    const log = {
+      plugin: this.name,
+      event: 'markInstanceOnboarded',
+      domain,
+    };
+    try {
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: 'application/json',
+        },
+      });
+      if (!res.ok) {
+        this.logger.error({
+          ...log,
+          result: 'error',
+          http_status: res.status,
+          http_status_text: res.statusText,
+        });
+        return;
+      }
+      this.logger.info({
+        ...log,
+        result: 'success',
+        http_status: res.status,
+      });
+    } catch (err) {
+      this.logger.error({
+        ...log,
+        result: 'error',
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
     }
   }
 
