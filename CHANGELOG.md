@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.3.3 (2026-05-05)
+
+### Bug Fixes
+
+- `core/scim`: pass hook payloads as spread args to `launchHooks`
+  instead of wrapping them in an array. SCIM `*done` hooks
+- `core/twake/cozyProvision`: rename the user identifier in the
+  `auth/user.created` message body from `sub` to `twakeId`
 
 ## v0.3.2 (2026-05-04)
 
