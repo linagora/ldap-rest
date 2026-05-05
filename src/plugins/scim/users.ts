@@ -273,7 +273,7 @@ export class ScimUsers {
     }
 
     const created = await this.get(req, rdn);
-    void launchHooks(this.hooks.scimusercreatedone, [created]);
+    void launchHooks(this.hooks.scimusercreatedone, created);
     return created;
   }
 
@@ -345,7 +345,7 @@ export class ScimUsers {
     }
 
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimuserupdatedone, [id, updated]);
+    void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;
   }
 
@@ -369,7 +369,7 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     await this.ldap.modify(dn, changes);
     const updated = await this.get(req, id);
-    void launchHooks(this.hooks.scimuserupdatedone, [id, updated]);
+    void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;
   }
 
@@ -382,7 +382,7 @@ export class ScimUsers {
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
     await this.ldap.delete(dn);
-    void launchHooks(this.hooks.scimuserdeletedone, [finalId]);
+    void launchHooks(this.hooks.scimuserdeletedone, finalId);
   }
 
   /**

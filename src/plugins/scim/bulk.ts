@@ -93,7 +93,7 @@ export class ScimBulk {
       schemas: [SCHEMA_BULK_RESPONSE],
       Operations: responses,
     };
-    void launchHooks(this.hooks.scimbulkdone, [bulkResp]);
+    void launchHooks(this.hooks.scimbulkdone, bulkResp);
     return bulkResp;
   }
 
