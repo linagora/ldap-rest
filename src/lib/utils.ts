@@ -48,7 +48,20 @@ export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// launchHooks launches hooks asynchroniously, errors are reported and ignored
+// launchHooks launches hooks asynchroniously, errors are reported and ignored.
+//
+// Calling convention: VARIADIC. The trailing args are spread into each hook:
+//     launchHooks(hooks, a, b)   →   hook(a, b)
+//
+// Do NOT pre-pack arguments into an array — `launchHooks(hooks, [a, b])`
+// becomes `hook([a, b])` and any hook reading `a.foo` silently no-ops.
+// (See PR #66 for the SCIM bug this caused.)
+//
+// Mirror the hook's declared signature:
+//     VoidHook<[A, B]>           (variadic)        → launchHooks(hooks, a, b)
+//     (args: [A, B]) => void     (packed-tuple)    → launchHooks(hooks, [a, b])
+// LDAP "*done" hooks still use the packed-tuple form; SCIM "*done" hooks use
+// VoidHook. Check src/hooks.ts before adding a new call site.
 export const launchHooks = async (
   hooks: Function[] | undefined,
   ...args: unknown[]
@@ -66,9 +79,12 @@ export const launchHooks = async (
   }
 };
 
-// launchHooksChained give the uniq argument (may be an array if you need to pas more than one arg)
-// to each hook and collect the changes if any
-// Any error stops the process
+// launchHooksChained threads a single value through each hook, collecting the
+// returned (possibly modified) value. Any error stops the chain.
+//
+// Calling convention: SINGLE PACKED ARG. If a chained hook needs several
+// inputs, pack them in a tuple — that is what `ChainedHook<[A, B]>` declares.
+// Unlike launchHooks, the arg is NOT spread; passing `[a, b]` is correct here.
 export const launchHooksChained = async <T>(
   hooks: Function[] | undefined,
   args: T
