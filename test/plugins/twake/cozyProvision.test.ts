@@ -315,12 +315,17 @@ describe('CozyProvision plugin', () => {
   });
 
   describe('scimuserdeletedone', () => {
-    it('publishes domain.user.deleted with composed workplaceFqdn', async () => {
+    it('DELETEs the cozy instance and publishes domain.user.deleted', async () => {
+      const scope = nock(COZY_URL)
+        .delete('/instances/eve.twake.local')
+        .reply(204);
+
       const hook = plugin.hooks?.scimuserdeletedone as (
         id: string
       ) => Promise<void>;
       await hook('eve');
 
+      expect(scope.isDone()).to.equal(true);
       expect(plugin.stub.calls).to.have.length(1);
       const call = plugin.stub.calls[0];
       expect(call.exchange).to.equal('b2b');
@@ -329,6 +334,35 @@ describe('CozyProvision plugin', () => {
         workplaceFqdn: 'eve.twake.local',
         domain: 'twake.local',
       });
+    });
+
+    it('treats 404 from cozy admin as success and still publishes', async () => {
+      const scope = nock(COZY_URL)
+        .delete('/instances/ghost.twake.local')
+        .reply(404);
+
+      const hook = plugin.hooks?.scimuserdeletedone as (
+        id: string
+      ) => Promise<void>;
+      await hook('ghost');
+
+      expect(scope.isDone()).to.equal(true);
+      expect(plugin.stub.calls).to.have.length(1);
+      expect(plugin.stub.calls[0].routingKey).to.equal('domain.user.deleted');
+    });
+
+    it('does not publish when the destroy errors', async () => {
+      const scope = nock(COZY_URL)
+        .delete('/instances/broken.twake.local')
+        .reply(500, { error: 'server error' });
+
+      const hook = plugin.hooks?.scimuserdeletedone as (
+        id: string
+      ) => Promise<void>;
+      await hook('broken');
+
+      expect(scope.isDone()).to.equal(true);
+      expect(plugin.stub.calls).to.have.length(0);
     });
   });
 
