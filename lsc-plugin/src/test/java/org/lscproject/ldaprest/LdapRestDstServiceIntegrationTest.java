@@ -8,6 +8,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.delete;
 import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.put;
@@ -180,6 +181,32 @@ class LdapRestDstServiceIntegrationTest {
         m.setLscAttributeModifications(Collections.singletonList(
                 del("member", "uid=alice,ou=users,dc=ex,dc=org")));
         assertTrue(groupsService().apply(m));
+    }
+
+    @Test
+    void updateGroupAttributeWideDeleteOnMemberFetchesAndRemovesAll() throws Exception {
+        // Reconcile: GET the group, parse "member" array, fire one DELETE per member.
+        server.stubFor(get(urlEqualTo("/api/v1/ldap/groups/admins"))
+                .willReturn(aResponse().withStatus(200).withBody(
+                        "{\"cn\":\"admins\",\"member\":["
+                        + "\"uid=alice,ou=users,dc=ex,dc=org\","
+                        + "\"uid=bob,ou=users,dc=ex,dc=org\"]}")));
+        server.stubFor(delete(urlEqualTo("/api/v1/ldap/groups/admins/members/uid%3Dalice%2Cou%3Dusers%2Cdc%3Dex%2Cdc%3Dorg"))
+                .willReturn(aResponse().withStatus(200)));
+        server.stubFor(delete(urlEqualTo("/api/v1/ldap/groups/admins/members/uid%3Dbob%2Cou%3Dusers%2Cdc%3Dex%2Cdc%3Dorg"))
+                .willReturn(aResponse().withStatus(200)));
+
+        LscModifications m = lm(LscModificationType.UPDATE_OBJECT, "cn=admins,ou=groups,dc=ex,dc=org");
+        // attribute-wide DELETE: empty values list
+        m.setLscAttributeModifications(Collections.singletonList(
+                new LscDatasetModification(LscDatasetModificationType.DELETE_VALUES,
+                        "member", Collections.emptyList())));
+        assertTrue(groupsService().apply(m));
+
+        server.verify(deleteRequestedFor(urlEqualTo(
+                "/api/v1/ldap/groups/admins/members/uid%3Dalice%2Cou%3Dusers%2Cdc%3Dex%2Cdc%3Dorg")));
+        server.verify(deleteRequestedFor(urlEqualTo(
+                "/api/v1/ldap/groups/admins/members/uid%3Dbob%2Cou%3Dusers%2Cdc%3Dex%2Cdc%3Dorg")));
     }
 
     @Test

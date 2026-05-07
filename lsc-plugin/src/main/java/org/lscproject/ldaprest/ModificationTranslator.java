@@ -258,6 +258,32 @@ public class ModificationTranslator {
     }
 
     /**
+     * Extract the {@code member} attribute values from a ldap-rest group
+     * response body. Accepts the value as either an array of strings
+     * (the common case) or a single string. Returns an empty list if
+     * the response has no {@code member} field.
+     */
+    static List<Object> readMembers(String json) throws LscServiceException {
+        if (json == null || json.isEmpty()) return Collections.emptyList();
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = MAPPER.readTree(json);
+            com.fasterxml.jackson.databind.JsonNode m = root.get("member");
+            if (m == null || m.isNull()) return Collections.emptyList();
+            List<Object> out = new ArrayList<>();
+            if (m.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode v : m) {
+                    if (v != null && !v.isNull()) out.add(v.asText());
+                }
+            } else if (m.isTextual()) {
+                out.add(m.asText());
+            }
+            return out;
+        } catch (JsonProcessingException e) {
+            throw new LscServiceException("failed to parse group response JSON: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Lower-case a DN attribute type for comparison; trivial helper
      * exposed for {@link LdapRestDstService}.
      */

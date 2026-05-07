@@ -153,17 +153,18 @@ public class LdapRestDstService implements IWritableService {
                         break;
                     case DELETE_VALUES:
                         if (values.isEmpty()) {
-                            // attribute-wide delete on `member` — would mean
-                            // "remove all members". ldap-rest has no clear-
-                            // members endpoint, and we don't fetch the
-                            // current list (destination-only). Refuse loudly
-                            // rather than silently drop.
-                            throw new LscServiceException(
-                                "attribute-wide DELETE on group 'member' is not supported by this plugin; "
-                                + "emit explicit DELETE_VALUES with the current member list "
-                                + "or use REPLACE_VALUES with the new (possibly empty) member list");
+                            // attribute-wide delete on `member` — best-effort
+                            // reconciliation: GET the group, list its current
+                            // members, and queue them all for deletion. If the
+                            // GET fails we surface a clear error rather than
+                            // silently no-op.
+                            List<Object> current = fetchCurrentMembers(lm.getMainIdentifier());
+                            LOG.info("attribute-wide DELETE on group 'member' for {}: removing {} current member(s) via reconciliation",
+                                    lm.getMainIdentifier(), current.size());
+                            removedMembers.addAll(current);
+                        } else {
+                            removedMembers.addAll(values);
                         }
-                        removedMembers.addAll(values);
                         break;
                     case REPLACE_VALUES:
                         replaceMembers = true;
@@ -216,6 +217,17 @@ public class LdapRestDstService implements IWritableService {
             }
         }
         return true;
+    }
+
+    /**
+     * GET the group at {@code groupDn}, parse its JSON, and return the
+     * current {@code member} list. Used to reconcile attribute-wide
+     * DELETE on {@code member} when LSC emits no explicit value list.
+     */
+    private List<Object> fetchCurrentMembers(String groupDn) throws LscServiceException {
+        String path = mapper.itemPath(groupDn);
+        HttpResponse<String> resp = client.get(path);
+        return ModificationTranslator.readMembers(resp.body());
     }
 
     private boolean doDelete(LscModifications lm) throws LscServiceException {

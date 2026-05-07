@@ -275,4 +275,29 @@ class ModificationTranslatorTest {
         body.put("b", "two");
         assertEquals("{\"a\":1,\"b\":\"two\"}", ModificationTranslator.writeJson(body));
     }
+
+    @Test
+    void readMembersFromArray() throws Exception {
+        java.util.List<Object> members = ModificationTranslator.readMembers(
+                "{\"cn\":\"admins\",\"member\":[\"uid=alice,ou=users\",\"uid=bob,ou=users\"]}");
+        assertEquals(2, members.size());
+        assertEquals("uid=alice,ou=users", members.get(0));
+        assertEquals("uid=bob,ou=users", members.get(1));
+    }
+
+    @Test
+    void readMembersFromSingleString() throws Exception {
+        java.util.List<Object> members = ModificationTranslator.readMembers(
+                "{\"member\":\"uid=alice,ou=users\"}");
+        assertEquals(1, members.size());
+        assertEquals("uid=alice,ou=users", members.get(0));
+    }
+
+    @Test
+    void readMembersHandlesMissingField() throws Exception {
+        assertEquals(0, ModificationTranslator.readMembers("{\"cn\":\"admins\"}").size());
+        assertEquals(0, ModificationTranslator.readMembers("{}").size());
+        assertEquals(0, ModificationTranslator.readMembers("").size());
+        assertEquals(0, ModificationTranslator.readMembers(null).size());
+    }
 }
