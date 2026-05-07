@@ -50,6 +50,7 @@ export default class CozyProvision extends DmPlugin {
   private readonly rabbitmqUrl: string;
   private readonly authExchange: string;
   private readonly b2bExchange: string;
+  private readonly cozyAdminAuthHeader: string;
 
   private publisher: RabbitPublisher | null = null;
   private publisherInit: Promise<RabbitPublisher | null> | null = null;
@@ -74,6 +75,9 @@ export default class CozyProvision extends DmPlugin {
     this.rabbitmqUrl = (this.config.rabbitmq_url as string) || '';
     this.authExchange = (this.config.cozy_auth_exchange as string) || 'auth';
     this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
+    this.cozyAdminAuthHeader = `Basic ${Buffer.from(
+      `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
+    ).toString('base64')}`;
 
     if (!this.cozyAdminUrl) {
       this.logger.warn(
@@ -102,7 +106,10 @@ export default class CozyProvision extends DmPlugin {
       }
     },
     scimuserdeletedone: async (id: string): Promise<void> => {
-      await this.publishUserDeleted(id);
+      const ok = await this.destroyCozyInstance(id);
+      if (ok) {
+        await this.publishUserDeleted(id);
+      }
     },
   };
 
@@ -153,9 +160,6 @@ export default class CozyProvision extends DmPlugin {
     params.set('OIDCID', id);
 
     const url = `${this.cozyAdminUrl}/instances?${params.toString()}`;
-    const auth = Buffer.from(
-      `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
-    ).toString('base64');
 
     const log = {
       plugin: this.name,
@@ -169,7 +173,7 @@ export default class CozyProvision extends DmPlugin {
       const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Basic ${auth}`,
+          Authorization: this.cozyAdminAuthHeader,
           Accept: 'application/json',
         },
       });
@@ -220,9 +224,6 @@ export default class CozyProvision extends DmPlugin {
     const url = `${this.cozyAdminUrl}/instances/${encodeURIComponent(
       domain
     )}?OnboardingFinished=true`;
-    const auth = Buffer.from(
-      `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
-    ).toString('base64');
     const log = {
       plugin: this.name,
       event: 'markInstanceOnboarded',
@@ -232,7 +233,7 @@ export default class CozyProvision extends DmPlugin {
       const res = await fetch(url, {
         method: 'PATCH',
         headers: {
-          Authorization: `Basic ${auth}`,
+          Authorization: this.cozyAdminAuthHeader,
           Accept: 'application/json',
         },
       });
@@ -257,6 +258,69 @@ export default class CozyProvision extends DmPlugin {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         error: `${err}`,
       });
+    }
+  }
+
+  /**
+   * DELETE /instances/<domain> on the cozy-stack admin API. The SCIM delete
+   * hook only removed the LDAP entry; without this, a subsequent re-import
+   * of the same userName re-attaches to a stale cozy instance whose
+   * per-user state (oidc_id, sharings, contacts, ...) no longer matches
+   * the operator's intent. A 404 from cozy-stack is treated as success so
+   * the lifecycle stays idempotent.
+   */
+  private async destroyCozyInstance(id: string): Promise<boolean> {
+    if (!this.cozyAdminUrl) return false;
+    if (!this.cozyOrgDomain) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'destroyCozyInstance',
+        id,
+        message: 'cozy_org_domain not configured — cannot compose Domain',
+      });
+      return false;
+    }
+
+    const domain = `${id}.${this.cozyOrgDomain}`;
+    const url = `${this.cozyAdminUrl}/instances/${encodeURIComponent(domain)}`;
+    const log = {
+      plugin: this.name,
+      event: 'destroyCozyInstance',
+      id,
+      domain,
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: this.cozyAdminAuthHeader,
+          Accept: 'application/json',
+        },
+      });
+      if (res.ok || res.status === 404) {
+        this.logger.info({
+          ...log,
+          result: res.ok ? 'success' : 'not_found',
+          http_status: res.status,
+        });
+        return true;
+      }
+      this.logger.error({
+        ...log,
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+      });
+      return false;
+    } catch (err) {
+      this.logger.error({
+        ...log,
+        result: 'error',
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        error: `${err}`,
+      });
+      return false;
     }
   }
 
