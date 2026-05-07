@@ -26,9 +26,24 @@ class ResourceMapperTest {
     }
 
     @Test
-    void rdnValueHandlesEscapedComma() {
-        assertEquals("Doe\\, John",
+    void rdnValueUnescapesRfc4514EscapedComma() {
+        // ldap-rest expects the unescaped logical value in :id path params;
+        // the server re-escapes it via escapeDnValue. Returning the still-
+        // escaped form would double-escape on the wire.
+        assertEquals("Doe, John",
                 ResourceMapper.rdnValue("cn=Doe\\, John,ou=users,dc=ex,dc=org"));
+    }
+
+    @Test
+    void rdnValueUnescapesHexEscape() {
+        // \2c is an RFC 4514 hex escape for ','
+        assertEquals("Doe, John",
+                ResourceMapper.rdnValue("cn=Doe\\2c John,ou=users,dc=ex,dc=org"));
+    }
+
+    @Test
+    void rdnValueUnescapesBackslash() {
+        assertEquals("a\\b", ResourceMapper.rdnValue("cn=a\\\\b,ou=x"));
     }
 
     @Test

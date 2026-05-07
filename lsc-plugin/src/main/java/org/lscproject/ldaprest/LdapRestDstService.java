@@ -117,13 +117,13 @@ public class LdapRestDstService implements IWritableService {
     }
 
     private boolean doUpdate(LscModifications lm) throws LscServiceException {
-        String body = translator.buildUpdateBody(lm);
         // For UPDATE on group, member-mutating attributes must use
         // the dedicated /members endpoints; ldap-rest itself enforces
         // this. We split the payload accordingly.
         if (mapper.getFamily() == ResourceMapper.Family.GROUPS) {
             return doGroupUpdate(lm);
         }
+        String body = translator.buildUpdateBody(lm);
         String path = mapper.itemPath(lm.getMainIdentifier());
         HttpResponse<String> resp = client.put(path, body);
         LOG.debug("UPDATE {} -> {}", path, resp.statusCode());
@@ -152,6 +152,17 @@ public class LdapRestDstService implements IWritableService {
                         addedMembers.addAll(values);
                         break;
                     case DELETE_VALUES:
+                        if (values.isEmpty()) {
+                            // attribute-wide delete on `member` — would mean
+                            // "remove all members". ldap-rest has no clear-
+                            // members endpoint, and we don't fetch the
+                            // current list (destination-only). Refuse loudly
+                            // rather than silently drop.
+                            throw new LscServiceException(
+                                "attribute-wide DELETE on group 'member' is not supported by this plugin; "
+                                + "emit explicit DELETE_VALUES with the current member list "
+                                + "or use REPLACE_VALUES with the new (possibly empty) member list");
+                        }
                         removedMembers.addAll(values);
                         break;
                     case REPLACE_VALUES:
@@ -301,7 +312,7 @@ public class LdapRestDstService implements IWritableService {
                     cfg.resourceType = text;
                     break;
                 case "apiPrefix":
-                    if (!text.isEmpty()) cfg.apiPrefix = text;
+                    if (!text.isEmpty()) cfg.apiPrefix = normaliseApiPrefix(text);
                     break;
                 case "timeoutMs":
                     if (!text.isEmpty()) {
@@ -309,6 +320,9 @@ public class LdapRestDstService implements IWritableService {
                             cfg.timeoutMs = Long.parseLong(text);
                         } catch (NumberFormatException nfe) {
                             throw new LscServiceException("invalid <timeoutMs>: " + text);
+                        }
+                        if (cfg.timeoutMs <= 0) {
+                            throw new LscServiceException("<timeoutMs> must be > 0, got: " + cfg.timeoutMs);
                         }
                     }
                     break;
@@ -318,6 +332,9 @@ public class LdapRestDstService implements IWritableService {
                             cfg.retries = Integer.parseInt(text);
                         } catch (NumberFormatException nfe) {
                             throw new LscServiceException("invalid <retries>: " + text);
+                        }
+                        if (cfg.retries < 0) {
+                            throw new LscServiceException("<retries> must be >= 0, got: " + cfg.retries);
                         }
                     }
                     break;
@@ -366,6 +383,19 @@ public class LdapRestDstService implements IWritableService {
         throw new LscServiceException(
                 "ldap-rest plugin: <auth> needs either <bearer> or both "
                         + "<hmacServiceId> and <hmacSecret>");
+    }
+
+    /**
+     * Normalise {@code <apiPrefix>}: ensure leading {@code /}, strip
+     * trailing {@code /}. So {@code "api"}, {@code "/api"}, {@code "/api/"}
+     * all become {@code "/api"}. Also accepts the empty prefix {@code "/"}.
+     */
+    static String normaliseApiPrefix(String raw) {
+        String s = raw.trim();
+        if (s.isEmpty() || "/".equals(s)) return "";
+        if (!s.startsWith("/")) s = "/" + s;
+        while (s.length() > 1 && s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        return s;
     }
 
     /**

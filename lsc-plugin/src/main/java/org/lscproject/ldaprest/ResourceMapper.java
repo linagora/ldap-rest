@@ -134,10 +134,43 @@ public class ResourceMapper {
         Objects.requireNonNull(dn, "dn");
         String firstRdn = firstRdn(dn);
         int eq = firstRdn.indexOf('=');
-        if (eq < 0) {
-            return firstRdn.trim();
+        String raw = eq < 0 ? firstRdn : firstRdn.substring(eq + 1);
+        return unescapeRdn(raw.trim());
+    }
+
+    /**
+     * Unescape RFC 4514 escapes in an RDN value: {@code \,} → {@code ,},
+     * {@code \\} → {@code \}, {@code \=} → {@code =}, hex pairs
+     * {@code \xx} → byte. The result is the *logical* identifier value
+     * that ldap-rest expects in path params (the server re-escapes it
+     * itself via {@code escapeDnValue}). Returning the still-escaped
+     * form would double-escape on the wire.
+     */
+    static String unescapeRdn(String s) {
+        if (s.indexOf('\\') < 0) return s;
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c != '\\' || i + 1 >= s.length()) {
+                out.append(c);
+                continue;
+            }
+            char n = s.charAt(i + 1);
+            if (isHex(n) && i + 2 < s.length() && isHex(s.charAt(i + 2))) {
+                int hi = Character.digit(n, 16);
+                int lo = Character.digit(s.charAt(i + 2), 16);
+                out.append((char) ((hi << 4) | lo));
+                i += 2;
+            } else {
+                out.append(n);
+                i += 1;
+            }
         }
-        return firstRdn.substring(eq + 1).trim();
+        return out.toString();
+    }
+
+    private static boolean isHex(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
     /** Return the parent DN (everything after the first unescaped comma) or {@code ""}. */

@@ -32,14 +32,24 @@ trap cleanup EXIT
 log "building images and starting backing services"
 $COMPOSE up -d --build ldap-source ldap-target ldap-rest
 
-log "waiting for healthchecks"
-for i in $(seq 1 60); do
-    if $COMPOSE ps --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
-        if [ "$($COMPOSE ps --status running --format '{{.Service}}' | sort -u | wc -l)" -ge 3 ]; then
-            break
+log "waiting for healthchecks (each service must report 'healthy', not just 'running')"
+deadline=$(( $(date +%s) + 180 ))
+for svc in ldap-source ldap-target ldap-rest; do
+    while :; do
+        cid=$($COMPOSE ps -q "$svc" 2>/dev/null)
+        if [ -n "$cid" ]; then
+            health=$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)
+            if [ "$health" = "healthy" ]; then
+                log "  $svc: healthy"
+                break
+            fi
         fi
-    fi
-    sleep 2
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            fail "$svc never reached healthy state (last status: $health)"
+            exit 1
+        fi
+        sleep 2
+    done
 done
 
 log "starting lsc container"

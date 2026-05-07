@@ -62,8 +62,9 @@ services:
       DM_MAIL_DOMAIN: 'target.example.com'
       DM_PORT: '8081'
       DM_LOG_LEVEL: 'info'
-      DM_PLUGINS: 'core/static,core/helloworld,auth/token,ldap/users,ldap/groups,ldap/organizations'
+      DM_PLUGINS: 'core/static,core/auth/token,core/ldap/flatGeneric,core/ldap/groups,core/ldap/organization'
       DM_API_PREFIX: '/api'
+      DM_LDAP_FLAT_SCHEMA: '/app/node_modules/ldap-rest/static/schemas/standard/users.json'
       DM_AUTH_TOKENS: 'lsc-it-token-please-change-me-32chars:lsc-tester'
       DM_AUTHZ_PER_BRANCH_CONFIG: '{"default":{"read":true,"write":true,"delete":true}}'
     ports:
