@@ -8,6 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 
+import javax.naming.InvalidNameException;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
+
 /**
  * Routes LSC operations to the right ldap-rest endpoint depending on
  * the configured resource type, and parses LSC-style DNs into
@@ -117,95 +121,76 @@ public class ResourceMapper {
     }
 
     /**
-     * Extract the RDN value from a DN. Examples:
+     * Extract the unescaped RDN value from a DN, parsed via
+     * {@link javax.naming.ldap.LdapName} / {@link javax.naming.ldap.Rdn}
+     * so all RFC 4514 / RFC 2253 escapes are handled correctly
+     * ({@code \,}, {@code \\}, {@code \=}, hex {@code \xx}, leading/trailing
+     * spaces, hex-string DER values, etc.).
+     *
+     * <p>Examples:</p>
      * <ul>
      *     <li>{@code uid=alice,ou=users,dc=ex,dc=org} → {@code alice}</li>
-     *     <li>{@code cn=admins,ou=groups,dc=ex,dc=org} → {@code admins}</li>
-     *     <li>{@code alice} → {@code alice} (already an RDN value)</li>
+     *     <li>{@code cn=Doe\, John,ou=users,dc=ex,dc=org} → {@code Doe, John}</li>
+     *     <li>{@code cn=Doe\2c John,ou=users,dc=ex,dc=org} → {@code Doe, John}</li>
+     *     <li>{@code alice} → {@code alice} (bare value passthrough)</li>
      * </ul>
      *
-     * <p>This is a deliberately simple parser: split on the first
-     * unescaped comma, then on the first {@code =}. Backslash escapes
-     * are honoured. It does not normalise attribute types or unescape
-     * special characters in values beyond removing leading/trailing
-     * whitespace.</p>
+     * <p>The result is the *logical* identifier value that ldap-rest
+     * expects in path params (the server re-escapes it itself via
+     * {@code escapeDnValue}). Returning the escaped form would
+     * double-escape on the wire.</p>
      */
     public static String rdnValue(String dn) {
         Objects.requireNonNull(dn, "dn");
-        String firstRdn = firstRdn(dn);
-        int eq = firstRdn.indexOf('=');
-        String raw = eq < 0 ? firstRdn : firstRdn.substring(eq + 1);
-        return unescapeRdn(raw.trim());
+        String trimmed = dn.trim();
+        if (trimmed.isEmpty()) return trimmed;
+        try {
+            LdapName name = new LdapName(trimmed);
+            if (name.isEmpty()) return trimmed;
+            Rdn rdn = name.getRdn(name.size() - 1);
+            Object v = rdn.getValue();
+            return v == null ? "" : v.toString();
+        } catch (InvalidNameException e) {
+            // Bare value (e.g. "alice") is not a valid DN — fall through
+            // and return it as-is. Same for anything LdapName refuses.
+            return trimmed;
+        }
     }
 
     /**
-     * Unescape RFC 4514 escapes in an RDN value: {@code \,} → {@code ,},
-     * {@code \\} → {@code \}, {@code \=} → {@code =}, hex pairs
-     * {@code \xx} → byte. The result is the *logical* identifier value
-     * that ldap-rest expects in path params (the server re-escapes it
-     * itself via {@code escapeDnValue}). Returning the still-escaped
-     * form would double-escape on the wire.
+     * Return the parent DN (everything but the leftmost RDN), or {@code ""}
+     * if {@code dn} has no parent (single RDN or bare value). Uses
+     * {@link LdapName} so escape rules are RFC 4514 compliant.
      */
-    static String unescapeRdn(String s) {
-        if (s.indexOf('\\') < 0) return s;
-        StringBuilder out = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c != '\\' || i + 1 >= s.length()) {
-                out.append(c);
-                continue;
-            }
-            char n = s.charAt(i + 1);
-            if (isHex(n) && i + 2 < s.length() && isHex(s.charAt(i + 2))) {
-                int hi = Character.digit(n, 16);
-                int lo = Character.digit(s.charAt(i + 2), 16);
-                out.append((char) ((hi << 4) | lo));
-                i += 2;
-            } else {
-                out.append(n);
-                i += 1;
-            }
-        }
-        return out.toString();
-    }
-
-    private static boolean isHex(char c) {
-        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-    }
-
-    /** Return the parent DN (everything after the first unescaped comma) or {@code ""}. */
     public static String parentDn(String dn) {
         Objects.requireNonNull(dn, "dn");
-        int idx = indexOfUnescapedComma(dn);
-        if (idx < 0) {
+        String trimmed = dn.trim();
+        if (trimmed.isEmpty()) return "";
+        try {
+            LdapName name = new LdapName(trimmed);
+            if (name.size() <= 1) return "";
+            return name.getPrefix(name.size() - 1).toString();
+        } catch (InvalidNameException e) {
             return "";
         }
-        return dn.substring(idx + 1).trim();
     }
 
-    /** Return the first RDN component (before the first unescaped comma). */
+    /**
+     * Return the first RDN component (e.g. {@code uid=alice}) of a DN,
+     * in its canonical RFC 4514 form. Used internally for diagnostics;
+     * for the unescaped value alone use {@link #rdnValue(String)}.
+     */
     public static String firstRdn(String dn) {
-        int idx = indexOfUnescapedComma(dn);
-        return idx < 0 ? dn.trim() : dn.substring(0, idx).trim();
-    }
-
-    private static int indexOfUnescapedComma(String dn) {
-        boolean escaped = false;
-        for (int i = 0; i < dn.length(); i++) {
-            char c = dn.charAt(i);
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (c == ',') {
-                return i;
-            }
+        Objects.requireNonNull(dn, "dn");
+        String trimmed = dn.trim();
+        if (trimmed.isEmpty()) return "";
+        try {
+            LdapName name = new LdapName(trimmed);
+            if (name.isEmpty()) return trimmed;
+            return name.getRdn(name.size() - 1).toString();
+        } catch (InvalidNameException e) {
+            return trimmed;
         }
-        return -1;
     }
 
     static String encode(String s) {

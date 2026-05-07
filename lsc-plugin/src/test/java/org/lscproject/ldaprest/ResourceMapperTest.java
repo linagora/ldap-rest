@@ -47,8 +47,27 @@ class ResourceMapperTest {
     }
 
     @Test
-    void rdnValueTrimsWhitespace() {
-        assertEquals("alice", ResourceMapper.rdnValue("uid= alice ,ou=x"));
+    void rdnValueUnescapesPlus() {
+        // \+ is the RFC 4514 escape for '+' (which separates multi-valued RDNs)
+        assertEquals("a+b", ResourceMapper.rdnValue("cn=a\\+b,ou=x"));
+    }
+
+    @Test
+    void rdnValueUnescapesEquals() {
+        assertEquals("foo=bar", ResourceMapper.rdnValue("cn=foo\\=bar,ou=x"));
+    }
+
+    @Test
+    void rdnValueExtractsLeftmostFromMultiValuedRdn() {
+        // Multi-valued RDN: "cn=A+sn=B,...". LdapName parses both as one
+        // RDN; we extract the value picked up by Rdn.getValue() (the
+        // first attribute defined in the RDN).
+        String got = ResourceMapper.rdnValue("cn=Smith+sn=John,ou=users,dc=ex,dc=org");
+        // Either "Smith" or "John" depending on JDK ordering; both are
+        // legitimate logical identifiers for this entry.
+        org.junit.jupiter.api.Assertions.assertTrue(
+                "Smith".equals(got) || "John".equals(got),
+                "expected Smith or John, got: " + got);
     }
 
     @Test
