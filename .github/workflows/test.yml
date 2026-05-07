@@ -33,3 +33,41 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+  lsc-plugin-test:
+    runs-on: ubuntu-latest
+    name: LSC ldap-rest plugin (Java)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+
+      # lsc-core is not on Maven Central — build it from the v2.2 tag and
+      # install it into the local Maven repo.
+      - name: Build and install LSC core (v2.2)
+        run: |
+          git clone --depth 1 --branch v2.2 https://github.com/lsc-project/lsc.git /tmp/lsc
+          cd /tmp/lsc
+          mvn -B -DskipTests install
+
+      - name: Run plugin unit tests
+        working-directory: lsc-plugin
+        run: mvn -B test
+
+      - name: Build shaded jar
+        working-directory: lsc-plugin
+        run: mvn -B -DskipTests package
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsc-ldaprest-plugin-jar
+          path: lsc-plugin/target/lsc-ldaprest-plugin-*-with-deps.jar
+          if-no-files-found: error
