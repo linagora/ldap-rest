@@ -536,4 +536,49 @@ describe('AuthHmac', () => {
       expect(res.status).to.equal(401);
     });
   });
+
+  /**
+   * Cross-implementation contract test.
+   *
+   * The lsc-plugin/ Java client computes HMAC signatures the same way the
+   * server here does. Both sides hard-code this same vector — if either side
+   * changes the signing string format, the body hashing rule, or the
+   * timestamp encoding, this test fails AND the matching Java test
+   * (LdapRestAuthTest#hmacReproducibleSignature / hmacCrossImplVector) fails
+   * on the other side. Keep them in sync.
+   *
+   * Vector:
+   *   secret    = "test-secret-min-32-chars-long-xxx"
+   *   method    = "POST"
+   *   path      = "/api/v1/ldap/users"
+   *   timestamp = 1700000000000
+   *   body      = '{"uid":"alice"}'
+   *   expected  = "65b065ff10ab2a54de0ab4db485c5744fcdd32a98e2fd24a8cef5240b43bbc94"
+   */
+  describe('Cross-impl vector (lsc-plugin compatibility)', () => {
+    const secret = 'test-secret-min-32-chars-long-xxx';
+    const method = 'POST';
+    const path = '/api/v1/ldap/users';
+    const timestamp = 1700000000000;
+    const body = '{"uid":"alice"}';
+    const expectedSignature =
+      '65b065ff10ab2a54de0ab4db485c5744fcdd32a98e2fd24a8cef5240b43bbc94';
+
+    it('Node helper must produce the same signature as the Java plugin', () => {
+      const sig = generateHmacSignature(secret, method, path, timestamp, body);
+      expect(sig).to.equal(expectedSignature);
+    });
+
+    it('intermediate values match the documented format', () => {
+      const bodyHash = createHash('sha256').update(body).digest('hex');
+      expect(bodyHash).to.equal(
+        'c9bfac238b197ff8c303f8186d216e1422495890f852043cbac3810d1d867822'
+      );
+      const signingString = `${method}|${path}|${timestamp}|${bodyHash}`;
+      const sig = createHmac('sha256', secret)
+        .update(signingString)
+        .digest('hex');
+      expect(sig).to.equal(expectedSignature);
+    });
+  });
 });
