@@ -1,0 +1,43 @@
+# LSC runner image with the ldap-rest plugin preinstalled.
+# Builds LSC from source (release tag v2.2) since lsc-project/lsc is not
+# published to Maven Central and there is no maintained official Docker image.
+
+FROM eclipse-temurin:11-jdk AS lsc-build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates maven \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch v2.2 https://github.com/lsc-project/lsc.git /src/lsc
+WORKDIR /src/lsc
+RUN mvn -B -DskipTests package
+
+FROM eclipse-temurin:11-jdk AS plugin-build
+RUN apt-get update && apt-get install -y --no-install-recommends maven \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=lsc-build /root/.m2 /root/.m2
+COPY --from=lsc-build /src/lsc /src/lsc
+RUN cd /src/lsc && mvn -B -DskipTests install
+COPY pom.xml /src/plugin/pom.xml
+COPY src /src/plugin/src
+WORKDIR /src/plugin
+RUN mvn -B -DskipTests package
+
+FROM eclipse-temurin:11-jre
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ldap-utils curl jq ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# LSC distribution layout: /opt/lsc/{bin,lib,etc}
+ENV LSC_HOME=/opt/lsc
+RUN mkdir -p $LSC_HOME/bin $LSC_HOME/lib $LSC_HOME/etc
+
+# Copy LSC core jars + dependencies
+COPY --from=lsc-build /src/lsc/target/lsc-core-2.2.jar $LSC_HOME/lib/
+COPY --from=lsc-build /src/lsc/target/dependency/ $LSC_HOME/lib/
+# Copy the lsc launcher script if present in the build, or provide a wrapper
+COPY --from=lsc-build /src/lsc/bin/lsc $LSC_HOME/bin/lsc
+
+# Copy our plugin (with-deps shaded jar so Jackson is bundled)
+COPY --from=plugin-build /src/plugin/target/lsc-ldaprest-plugin-0.1.0-SNAPSHOT-with-deps.jar $LSC_HOME/lib/
+
+ENV PATH="$LSC_HOME/bin:$PATH"
+WORKDIR $LSC_HOME
