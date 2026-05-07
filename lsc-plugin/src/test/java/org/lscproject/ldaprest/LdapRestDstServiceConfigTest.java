@@ -136,4 +136,58 @@ class LdapRestDstServiceConfigTest {
         assertEquals(3, cfg.retries);
         assertEquals("/api", cfg.apiPrefix);
     }
+
+    @Test
+    void rejectsZeroOrNegativeTimeout() throws Exception {
+        for (String bad : new String[] {"0", "-1", "-10000"}) {
+            TaskType task = taskWithConfig(
+                    "<baseUrl>https://api.test</baseUrl>"
+                            + "<resourceType>users</resourceType>"
+                            + "<auth><bearer>t</bearer></auth>"
+                            + "<timeoutMs>" + bad + "</timeoutMs>");
+            LscServiceException ex = assertThrows(LscServiceException.class,
+                    () -> LdapRestDstService.parseConfig(task),
+                    "expected rejection for timeoutMs=" + bad);
+            assertTrue(ex.getMessage().contains("timeoutMs"),
+                    "message should mention timeoutMs, got: " + ex.getMessage());
+        }
+    }
+
+    @Test
+    void rejectsNegativeRetries() throws Exception {
+        TaskType task = taskWithConfig(
+                "<baseUrl>https://api.test</baseUrl>"
+                        + "<resourceType>users</resourceType>"
+                        + "<auth><bearer>t</bearer></auth>"
+                        + "<retries>-1</retries>");
+        LscServiceException ex = assertThrows(LscServiceException.class,
+                () -> LdapRestDstService.parseConfig(task));
+        assertTrue(ex.getMessage().contains("retries"),
+                "message should mention retries, got: " + ex.getMessage());
+    }
+
+    @Test
+    void acceptsZeroRetries() throws Exception {
+        // 0 retries is valid (= no retry, single attempt)
+        TaskType task = taskWithConfig(
+                "<baseUrl>https://api.test</baseUrl>"
+                        + "<resourceType>users</resourceType>"
+                        + "<auth><bearer>t</bearer></auth>"
+                        + "<retries>0</retries>");
+        LdapRestDstService.Config cfg = LdapRestDstService.parseConfig(task);
+        assertEquals(0, cfg.retries);
+    }
+
+    @Test
+    void rejectsNonNumericTimeout() throws Exception {
+        TaskType task = taskWithConfig(
+                "<baseUrl>https://api.test</baseUrl>"
+                        + "<resourceType>users</resourceType>"
+                        + "<auth><bearer>t</bearer></auth>"
+                        + "<timeoutMs>fast</timeoutMs>");
+        LscServiceException ex = assertThrows(LscServiceException.class,
+                () -> LdapRestDstService.parseConfig(task));
+        assertTrue(ex.getMessage().contains("timeoutMs"),
+                "message should mention timeoutMs, got: " + ex.getMessage());
+    }
 }
