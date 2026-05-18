@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.3.5 (2026-05-18)
+
+### Bug Fixes
+
+- `core/twake/appAccountsConsistency`: rename the config key
+  `ldap_operational_attributes` to `ldap_operational_attribute`, matching
+  the documented CLI/env option `--ldap-operational-attribute`, so the
+  configured operational-attribute list is actually applied. Also strip
+  `dn` unconditionally from entries before `ldap.add`, preventing
+  `LDAP add error: UndefinedTypeError: dn` failures when the operational
+  attribute list is misconfigured
+- `core/twake/cozyProvision`: destroy the Cozy instance on SCIM delete
+  via `DELETE /instances/<domain>` on the Cozy admin API before
+  publishing the `b2b` / `domain.user.deleted` event. A 404 is treated
+  as success so the lifecycle stays idempotent, and the b2b event is
+  emitted even when the destroy fails so peer instances still drop
+  their contact cards. Avoids leftover instances silently re-attaching
+  on re-import
+- `core/twake/cozyProvision`: set `OIDCID` on `POST /instances` to the
+  SCIM `userName`, so the OIDC callback no longer fails with
+  `Invalid sub: <sub> != ""` for SCIM-provisioned users
+
+### Build
+
+- Docker image now uses `node:24-alpine` instead of `node:22-alpine`
+
+### Dependencies
+
+- Update `express-rate-limit` to 8.5.2, `fast-xml-builder` and other
+  transitive deps
+
 ## v0.3.4 (2026-05-05)
 
 ### Bug Fixes
