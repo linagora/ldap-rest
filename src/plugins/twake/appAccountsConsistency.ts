@@ -55,7 +55,7 @@ export default class AppAccountsConsistency extends DmPlugin {
     this.applicativeAccountBase = this.config
       .applicative_account_base as string;
     this.operationalAttributes =
-      (this.config.ldap_operational_attributes as string[]) || [];
+      (this.config.ldap_operational_attribute as string[]) || [];
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -74,6 +74,10 @@ export default class AppAccountsConsistency extends DmPlugin {
    * @returns true if the attribute should be excluded
    */
   private shouldExcludeAttribute(key: string): boolean {
+    // `dn` is the entry's distinguished name, never a real attribute — exclude
+    // it unconditionally so that a misconfigured operational attribute list
+    // cannot lead to "LDAP add error: UndefinedTypeError: dn" failures.
+    if (key === 'dn') return true;
     return this.operationalAttributes.includes(key);
   }
 

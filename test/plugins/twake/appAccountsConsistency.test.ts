@@ -77,8 +77,8 @@ describe('App Accounts Consistency Plugin', function () {
     dm.config.mail_attribute = 'mail';
     // Set operational attributes - use default list from config/args.ts
     // This is needed because test environment doesn't load config from env/cli
-    if (!dm.config.ldap_operational_attributes) {
-      dm.config.ldap_operational_attributes = [
+    if (!dm.config.ldap_operational_attribute) {
+      dm.config.ldap_operational_attribute = [
         'dn',
         'controls',
         'structuralObjectClass',

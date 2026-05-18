@@ -193,7 +193,7 @@ export interface Config {
   // Applicative Accounts plugin
   applicative_account_base?: string;
   max_app_accounts?: number;
-  ldap_operational_attributes?: string[];
+  ldap_operational_attribute?: string[];
 
   // Trash plugin
   trash_base?: string;
