@@ -11,10 +11,17 @@ interface PublishCall {
   message: Record<string, unknown>;
 }
 
-class StubPublisher {
+/**
+ * Stand-in for the shared `rabbitmq` plugin, injected into the DM's
+ * loaded-plugin registry so cozyProvision publishes through it without a
+ * real broker.
+ */
+class StubRabbitMq {
+  name = 'rabbitmq';
   calls: PublishCall[] = [];
-  closed = false;
-  async init(): Promise<void> {}
+  isAvailable(): boolean {
+    return true;
+  }
   async publish(
     exchange: string,
     routingKey: string,
@@ -22,23 +29,14 @@ class StubPublisher {
   ): Promise<void> {
     this.calls.push({ exchange, routingKey, message });
   }
-  async close(): Promise<void> {
-    this.closed = true;
-  }
-}
-
-class TestableCozyProvision extends CozyProvision {
-  stub = new StubPublisher();
-  protected async getPublisher(): Promise<StubPublisher> {
-    return this.stub;
-  }
 }
 
 const COZY_URL = 'http://cozyt:6060';
 
 describe('CozyProvision plugin', () => {
   let dm: DM;
-  let plugin: TestableCozyProvision;
+  let plugin: CozyProvision;
+  let rabbit: StubRabbitMq;
 
   before(() => {
     nock.disableNetConnect();
@@ -61,7 +59,10 @@ describe('CozyProvision plugin', () => {
     // overrides actual broker access.
     dm.config.rabbitmq_url = 'amqp://guest:guest@rabbitmq:5672/';
     await dm.ready;
-    plugin = new TestableCozyProvision(dm);
+    rabbit = new StubRabbitMq();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    plugin = new CozyProvision(dm);
   });
 
   afterEach(() => {
@@ -102,8 +103,8 @@ describe('CozyProvision plugin', () => {
       await hook(user);
 
       expect(scope.isDone(), 'cozy admin POST + PATCH').to.be.true;
-      expect(plugin.stub.calls).to.have.length(1);
-      const call = plugin.stub.calls[0];
+      expect(rabbit.calls).to.have.length(1);
+      const call = rabbit.calls[0];
       expect(call.exchange).to.equal('auth');
       expect(call.routingKey).to.equal('user.created');
       expect(call.message).to.deep.include({
@@ -117,7 +118,7 @@ describe('CozyProvision plugin', () => {
 
     it('respects cozy_apps override', async () => {
       dm.config.cozy_apps = 'home,drive';
-      const p = new TestableCozyProvision(dm);
+      const p = new CozyProvision(dm);
       const scope = nock(COZY_URL)
         .post('/instances')
         .query(q => q.Apps === 'home,drive')
@@ -139,7 +140,7 @@ describe('CozyProvision plugin', () => {
 
     it('omits Apps query param when cozy_apps is empty', async () => {
       dm.config.cozy_apps = '';
-      const p = new TestableCozyProvision(dm);
+      const p = new CozyProvision(dm);
       const scope = nock(COZY_URL)
         .post('/instances')
         .query(q => !('Apps' in q))
@@ -205,8 +206,8 @@ describe('CozyProvision plugin', () => {
       ) => Promise<void>;
       await hook(user);
 
-      expect(plugin.stub.calls).to.have.length(1);
-      expect(plugin.stub.calls[0].message).to.deep.include({
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message).to.deep.include({
         twakeId: 'grace',
         mobile: '+33600000000',
       });
@@ -229,8 +230,8 @@ describe('CozyProvision plugin', () => {
       await hook(user);
 
       expect(scope.isDone()).to.be.true;
-      expect(plugin.stub.calls).to.have.length(1);
-      expect(plugin.stub.calls[0].routingKey).to.equal('user.created');
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].routingKey).to.equal('user.created');
     });
 
     it('does not fail the hook when the onboarding PATCH errors', async () => {
@@ -254,8 +255,8 @@ describe('CozyProvision plugin', () => {
 
       expect(scope.isDone()).to.be.true;
       // Publish still happens — PATCH failure must not abort the flow.
-      expect(plugin.stub.calls).to.have.length(1);
-      expect(plugin.stub.calls[0].routingKey).to.equal('user.created');
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].routingKey).to.equal('user.created');
     });
 
     it('skips publish when cozy admin returns a hard error', async () => {
@@ -275,7 +276,7 @@ describe('CozyProvision plugin', () => {
       await hook(user);
 
       expect(scope.isDone()).to.be.true;
-      expect(plugin.stub.calls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
     });
 
     it('uses user.locale when present', async () => {
@@ -310,7 +311,7 @@ describe('CozyProvision plugin', () => {
       ) => Promise<void>;
       await hook(user);
       // No HTTP call expected, no publish either
-      expect(plugin.stub.calls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
     });
   });
 
@@ -326,8 +327,8 @@ describe('CozyProvision plugin', () => {
       await hook('eve');
 
       expect(scope.isDone()).to.equal(true);
-      expect(plugin.stub.calls).to.have.length(1);
-      const call = plugin.stub.calls[0];
+      expect(rabbit.calls).to.have.length(1);
+      const call = rabbit.calls[0];
       expect(call.exchange).to.equal('b2b');
       expect(call.routingKey).to.equal('domain.user.deleted');
       expect(call.message).to.deep.equal({
@@ -347,8 +348,8 @@ describe('CozyProvision plugin', () => {
       await hook('ghost');
 
       expect(scope.isDone()).to.equal(true);
-      expect(plugin.stub.calls).to.have.length(1);
-      expect(plugin.stub.calls[0].routingKey).to.equal('domain.user.deleted');
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].routingKey).to.equal('domain.user.deleted');
     });
 
     it('does not publish when the destroy errors', async () => {
@@ -362,7 +363,7 @@ describe('CozyProvision plugin', () => {
       await hook('broken');
 
       expect(scope.isDone()).to.equal(true);
-      expect(plugin.stub.calls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
     });
   });
 
@@ -373,7 +374,10 @@ describe('CozyProvision plugin', () => {
       dm2.config.cozy_org_domain = 'twake.local';
       dm2.config.rabbitmq_url = 'amqp://x';
       await dm2.ready;
-      const p = new TestableCozyProvision(dm2);
+      const rabbit2 = new StubRabbitMq();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dm2.loadedPlugins['rabbitmq'] = rabbit2 as any;
+      const p = new CozyProvision(dm2);
 
       const user: ScimUser = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -385,7 +389,7 @@ describe('CozyProvision plugin', () => {
       await hook(user);
 
       // No nock expectation set, no HTTP call attempted; no publish either.
-      expect(p.stub.calls).to.have.length(0);
+      expect(rabbit2.calls).to.have.length(0);
     });
   });
 });

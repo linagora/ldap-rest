@@ -12,9 +12,10 @@
  *   - scimuserdeletedone: publish `b2b` / `domain.user.deleted` so peer
  *     instances can clean up the deleted user's contact card.
  *
- * The RabbitMQ client (`@linagora/rabbitmq-client`) is declared as an
- * optional dependency: if it is not installed at runtime, AMQP publishes
- * are silently skipped and a one-time warning is logged.
+ * AMQP transport is provided by the shared `rabbitmq` plugin (declared as a
+ * dependency). This plugin builds the lifecycle messages and hands them to
+ * that plugin to publish; the broker connection, optional-dependency import,
+ * and "broker absent ⇒ skip" handling all live there.
  */
 import { Buffer } from 'buffer';
 
@@ -23,21 +24,14 @@ import fetch from 'node-fetch';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
+import type RabbitMq from '../rabbitmq';
 import type { ScimUser } from '../scim/types';
-
-interface RabbitPublisher {
-  init(): Promise<void>;
-  publish(
-    exchange: string,
-    routingKey: string,
-    message: Record<string, unknown>
-  ): Promise<void>;
-  close(clearSubscriptions?: boolean): Promise<void>;
-}
 
 export default class CozyProvision extends DmPlugin {
   name = 'cozyProvision';
   roles: Role[] = ['consistency'] as const;
+
+  dependencies = { rabbitmq: 'core/rabbitmq' };
 
   private readonly cozyAdminUrl: string;
   private readonly cozyAdminPassphrase: string;
@@ -47,13 +41,9 @@ export default class CozyProvision extends DmPlugin {
   private readonly cozyDefaultLocale: string;
   private readonly cozyContextName: string;
   private readonly cozyApps: string;
-  private readonly rabbitmqUrl: string;
   private readonly authExchange: string;
   private readonly b2bExchange: string;
   private readonly cozyAdminAuthHeader: string;
-
-  private publisher: RabbitPublisher | null = null;
-  private publisherInit: Promise<RabbitPublisher | null> | null = null;
 
   constructor(server: DM) {
     super(server);
@@ -72,7 +62,6 @@ export default class CozyProvision extends DmPlugin {
     this.cozyContextName =
       (this.config.cozy_context_name as string) || 'default';
     this.cozyApps = (this.config.cozy_apps as string) ?? '';
-    this.rabbitmqUrl = (this.config.rabbitmq_url as string) || '';
     this.authExchange = (this.config.cozy_auth_exchange as string) || 'auth';
     this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
     this.cozyAdminAuthHeader = `Basic ${Buffer.from(
@@ -89,13 +78,6 @@ export default class CozyProvision extends DmPlugin {
         `${this.name}: cozy_org_domain is empty — workplaceFqdn cannot be composed`
       );
     }
-    if (!this.rabbitmqUrl) {
-      this.logger.warn(
-        `${this.name}: rabbitmq_url is empty — AMQP publishes will be skipped`
-      );
-    }
-
-    this.registerShutdown();
   }
 
   hooks: Hooks = {
@@ -333,8 +315,8 @@ export default class CozyProvision extends DmPlugin {
    * causes cozy-stack to nack the message.
    */
   private async publishUserCreated(user: ScimUser): Promise<void> {
-    const publisher = await this.getPublisher();
-    if (!publisher) return;
+    const rabbitmq = this.rabbitmq();
+    if (!rabbitmq) return;
 
     const id = this.extractId(user);
     if (!id) return;
@@ -351,7 +333,7 @@ export default class CozyProvision extends DmPlugin {
     if (mobile) message.mobile = mobile;
 
     try {
-      await publisher.publish(this.authExchange, 'user.created', message);
+      await rabbitmq.publish(this.authExchange, 'user.created', message);
       this.logger.info({
         plugin: this.name,
         event: 'publishUserCreated',
@@ -376,8 +358,8 @@ export default class CozyProvision extends DmPlugin {
    * instances can drop the deleted user's contact card.
    */
   private async publishUserDeleted(id: string): Promise<void> {
-    const publisher = await this.getPublisher();
-    if (!publisher) return;
+    const rabbitmq = this.rabbitmq();
+    if (!rabbitmq) return;
     if (!this.cozyOrgDomain) {
       this.logger.error({
         plugin: this.name,
@@ -395,7 +377,7 @@ export default class CozyProvision extends DmPlugin {
     };
 
     try {
-      await publisher.publish(this.b2bExchange, 'domain.user.deleted', message);
+      await rabbitmq.publish(this.b2bExchange, 'domain.user.deleted', message);
       this.logger.info({
         plugin: this.name,
         event: 'publishUserDeleted',
@@ -416,45 +398,12 @@ export default class CozyProvision extends DmPlugin {
   }
 
   /**
-   * Lazy-init the AMQP publisher. The `@linagora/rabbitmq-client` dependency
-   * is optional — if the package or the broker is unreachable, return null
-   * so callers can no-op cleanly.
-   *
-   * Override this in tests to inject a stub publisher.
+   * Resolve the shared `rabbitmq` plugin (declared as a dependency, so it loads
+   * first). Returns null and warns once if it is absent, letting the publish
+   * paths no-op cleanly.
    */
-  protected async getPublisher(): Promise<RabbitPublisher | null> {
-    if (this.publisher) return this.publisher;
-    if (!this.rabbitmqUrl) return null;
-    if (this.publisherInit) return this.publisherInit;
-
-    this.publisherInit = (async (): Promise<RabbitPublisher | null> => {
-      try {
-        const mod = await import('@linagora/rabbitmq-client');
-        const client = new mod.RabbitMQClient({
-          url: this.rabbitmqUrl,
-        }) as unknown as RabbitPublisher;
-        await client.init();
-        this.publisher = client;
-        this.logger.info(
-          `${this.name}: connected to RabbitMQ at ${redactAmqpUrl(
-            this.rabbitmqUrl
-          )}`
-        );
-        return client;
-      } catch (err) {
-        this.logger.warn({
-          plugin: this.name,
-          event: 'rabbitmq_init',
-          message:
-            '@linagora/rabbitmq-client unavailable or broker unreachable — AMQP publishes disabled',
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          error: `${err}`,
-        });
-        return null;
-      }
-    })();
-
-    return this.publisherInit;
+  private rabbitmq(): RabbitMq | null {
+    return this.requirePlugin<RabbitMq>('rabbitmq');
   }
 
   private extractId(user: ScimUser): string | null {
@@ -522,66 +471,4 @@ export default class CozyProvision extends DmPlugin {
     }
     return this.cozyDefaultLocale;
   }
-
-  private registerShutdown(): void {
-    const shutdown = (): void => {
-      const pub = this.publisher;
-      // Clear both: a closed client must not be returned by a still-pending
-      // initialisation promise.
-      this.publisher = null;
-      this.publisherInit = null;
-      if (!pub) return;
-      pub.close().catch((err: unknown) => {
-        this.logger.warn({
-          plugin: this.name,
-          event: 'shutdown',
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          error: `${err}`,
-        });
-      });
-    };
-    registerProcessShutdown(shutdown);
-  }
-}
-
-/**
- * Strip credentials from an AMQP URL before logging — `amqp://user:pass@host`
- * becomes `amqp://host`. Falls back to `amqp://[broker]` if the URL cannot
- * be parsed (e.g. malformed config).
- */
-function redactAmqpUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    u.username = '';
-    u.password = '';
-    return u.toString();
-  } catch {
-    return 'amqp://[broker]';
-  }
-}
-
-/**
- * Registers a single SIGTERM/SIGINT handler at the process level. Each plugin
- * instance contributes one callback that fans out from the shared handler, so
- * we don't accumulate per-instance listeners (which would trip
- * MaxListenersExceededWarning when many DM instances are created in tests).
- */
-const shutdownCallbacks: Array<() => void> = [];
-let processShutdownInstalled = false;
-
-function registerProcessShutdown(cb: () => void): void {
-  shutdownCallbacks.push(cb);
-  if (processShutdownInstalled) return;
-  processShutdownInstalled = true;
-  const fanOut = (): void => {
-    for (const fn of shutdownCallbacks.splice(0)) {
-      try {
-        fn();
-      } catch {
-        // Hooks must never throw during shutdown.
-      }
-    }
-  };
-  process.once('SIGTERM', fanOut);
-  process.once('SIGINT', fanOut);
 }
