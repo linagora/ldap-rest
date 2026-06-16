@@ -99,4 +99,27 @@ export default abstract class DmPlugin {
   opNumber(): number {
     return this.server.operationSequence++;
   }
+
+  /** Names already warned about by requirePlugin, so each warns at most once. */
+  private missingPluginsWarned?: Set<string>;
+
+  /**
+   * Resolve a sibling plugin by its registry name (the value of its `name`
+   * property). Declare it in `dependencies` so it loads first. Returns null and
+   * logs a single warning if it is absent, letting the caller no-op cleanly
+   * rather than throw. Use this instead of indexing `server.loadedPlugins`
+   * directly so consumers share one typed, log-once lookup.
+   */
+  protected requirePlugin<T extends DmPlugin>(name: string): T | null {
+    const plugin = this.server.loadedPlugins[name] as T | undefined;
+    if (plugin) return plugin;
+    if (!this.missingPluginsWarned) this.missingPluginsWarned = new Set();
+    if (!this.missingPluginsWarned.has(name)) {
+      this.missingPluginsWarned.add(name);
+      this.logger.warn(
+        `${this.name}: required plugin '${name}' is not loaded — its features will be skipped`
+      );
+    }
+    return null;
+  }
 }

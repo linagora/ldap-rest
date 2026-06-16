@@ -136,6 +136,10 @@
       "types": "./dist/src/plugins/ldap/trash.d.ts",
       "import": "./dist/plugins/ldap/trash.js"
     },
+    "./plugin-rabbitmq": {
+      "types": "./dist/src/plugins/rabbitmq.d.ts",
+      "import": "./dist/plugins/rabbitmq.js"
+    },
     "./plugin-scim-baseresolver": {
       "types": "./dist/src/plugins/scim/baseResolver.d.ts",
       "import": "./dist/plugins/scim/baseResolver.js"
