@@ -83,6 +83,116 @@ describe('SCIM baseResolver', () => {
     }
   });
 
+  describe('header-based base', () => {
+    function reqWithHeader(name: string, value: string): { user?: string } {
+      const headers: Record<string, string> = { [name.toLowerCase()]: value };
+      return {
+        get(n: string): string | undefined {
+          return headers[n.toLowerCase()];
+        },
+      } as unknown as { user?: string };
+    }
+
+    it('honors a header base under the allowed root', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=users,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=b2b,dc=example,dc=com',
+        })
+      );
+      const req = reqWithHeader(
+        'x-org-base',
+        'ou=users,ou=acme,ou=b2b,dc=example,dc=com'
+      );
+      expect(br.userBase(req)).to.equal(
+        'ou=users,ou=acme,ou=b2b,dc=example,dc=com'
+      );
+    });
+
+    it('ignores a header base outside the allowed root', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=users,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=b2b,dc=example,dc=com',
+        })
+      );
+      const req = reqWithHeader('x-org-base', 'ou=evil,dc=other,dc=com');
+      expect(br.userBase(req)).to.equal('ou=users,dc=example,dc=com');
+    });
+
+    it('ignores the header when no root is configured', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=b2b,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          // no scim_base_header_root → header path disabled
+        })
+      );
+      const req = reqWithHeader('x-org-base', 'ou=acme,ou=b2b,dc=example,dc=com');
+      expect(br.userBase(req)).to.equal('ou=b2b,dc=example,dc=com');
+    });
+
+    it('ignores a header value containing control characters', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=users,dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=b2b,dc=example,dc=com',
+        })
+      );
+      const req = reqWithHeader(
+        'x-org-base',
+        'ou=a\u0000x,ou=b2b,dc=example,dc=com'
+      );
+      expect(br.userBase(req)).to.equal('ou=users,dc=example,dc=com');
+    });
+
+    it('an explicit map entry wins over the header', () => {
+      const mapFile = path.join(
+        os.tmpdir(),
+        `scim-base-map-hdr-${Date.now()}.json`
+      );
+      fs.writeFileSync(
+        mapFile,
+        JSON.stringify({ alice: { userBase: 'ou=pinned,ou=b2b,dc=example,dc=com' } })
+      );
+      try {
+        const br = new BaseResolver(
+          cfg({
+            scim_user_base: 'ou=b2b,dc=example,dc=com',
+            scim_user_base_header: 'x-org-base',
+            scim_base_header_root: 'ou=b2b,dc=example,dc=com',
+            scim_base_map: mapFile,
+          })
+        );
+        const req = reqWithHeader(
+          'x-org-base',
+          'ou=acme,ou=b2b,dc=example,dc=com'
+        );
+        (req as { user?: string }).user = 'alice';
+        expect(br.userBase(req)).to.equal('ou=pinned,ou=b2b,dc=example,dc=com');
+      } finally {
+        fs.unlinkSync(mapFile);
+      }
+    });
+
+    it('takes precedence over the template', () => {
+      const br = new BaseResolver(
+        cfg({
+          scim_user_base: 'ou=b2b,dc=example,dc=com',
+          scim_user_base_template: 'ou={user},dc=example,dc=com',
+          scim_user_base_header: 'x-org-base',
+          scim_base_header_root: 'ou=b2b,dc=example,dc=com',
+        })
+      );
+      const req = reqWithHeader('x-org-base', 'ou=acme,ou=b2b,dc=example,dc=com');
+      (req as { user?: string }).user = 'tenant1';
+      expect(br.userBase(req)).to.equal('ou=acme,ou=b2b,dc=example,dc=com');
+    });
+  });
+
   it('resolution order: map > template > static', () => {
     const mapFile = path.join(
       os.tmpdir(),
