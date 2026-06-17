@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.3.6 (2026-06-17)
+
+### New Features
+
+- New plugin `core/twake/clouderyProvision`: hooks the SCIM lifecycle to
+  provision a Cloudery instance on user create and tear it down on delete.
+  It writes the returned workspace FQDN and organization id back onto the
+  LDAP entry, and publishes the `user.created` and
+  `domain.user.deleted` events. Provisioning is gated on workflow success,
+  and the deletion event is only emitted once the instance is actually
+  destroyed
+- `core/scim/baseResolver`: support resolving the SCIM insertion base from
+  a request header, gated to a configured root and never overriding an
+  explicit per-user map entry, so one shared auth token can serve every
+  organization
+- New shared `rabbitmq` plugin, extracted from `cozyProvision`, so any
+  plugin can publish lifecycle events on a common connection
+- New `lsc-plugin`: an LSC destination plugin (Java) that routes sync
+  writes through ldap-rest's HTTP API instead of binding LDAP directly, so
+  they benefit from ACL, schema validation, audit, and the downstream
+  provisioning hooks. Supports Bearer and HMAC-SHA256 auth and maps the
+  CREATE/UPDATE/DELETE/MODRDN operations onto the matching endpoints
+
+### Build
+
+- `rollup`: resolve external builtins and dependency subpaths
+
+### Dependencies
+
+- Update dependencies
+
 ## v0.3.5 (2026-05-18)
 
 ### Bug Fixes
