@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.3.7 (2026-06-17)
+
+### New Features
+
+- `core/twake/cozyProvision` and `core/twake/clouderyProvision`: the
+  RabbitMQ routing keys for the user-created and user-deleted events are
+  now configurable via `--cozy-user-created-routing-key`
+  (`DM_COZY_USER_CREATED_ROUTING_KEY`) and
+  `--cozy-user-deleted-routing-key` (`DM_COZY_USER_DELETED_ROUTING_KEY`),
+  defaulting to `user.created` and `domain.user.deleted`
+
 ## v0.3.6 (2026-06-17)
 
 ### New Features
