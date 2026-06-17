@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 import fs from 'fs';
+import { builtinModules } from 'module';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
@@ -41,24 +42,7 @@ const commonPlugins = dir => [
     }),
 ];
 
-const external = [
-  // Builtins modules
-  'fs',
-  'path',
-  'os',
-  'crypto',
-  'events',
-  'stream',
-  'util',
-  'buffer',
-  'querystring',
-  'url',
-  'http',
-  'https',
-  'net',
-  'tls',
-  'zlib',
-
+const externalPackages = [
   // binary modules
   're2',
 
@@ -66,6 +50,16 @@ const external = [
   ...(pkg.dependencies ? Object.keys(pkg.dependencies) : []),
   ...(pkg.optionalDependencies ? Object.keys(pkg.optionalDependencies) : []),
 ];
+
+// Mark as external: all Node builtins (with or without the `node:` prefix and
+// their subpaths, e.g. `timers/promises`), plus declared dependencies and their
+// subpaths (e.g. `csv-parse/sync`).
+const external = id => {
+  const bare = id.replace(/^node:/, '');
+  if (builtinModules.includes(bare) || builtinModules.includes(bare.split('/')[0]))
+    return true;
+  return externalPackages.some(dep => id === dep || id.startsWith(`${dep}/`));
+};
 
 async function getPluginEntries() {
   return (await fg('src/plugins/**/*.ts'))

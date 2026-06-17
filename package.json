@@ -200,6 +200,10 @@
       "types": "./dist/src/plugins/twake/calendarResources.d.ts",
       "import": "./dist/plugins/twake/calendarResources.js"
     },
+    "./plugin-twake-clouderyprovision": {
+      "types": "./dist/src/plugins/twake/clouderyProvision.d.ts",
+      "import": "./dist/plugins/twake/clouderyProvision.js"
+    },
     "./plugin-twake-cozyprovision": {
       "types": "./dist/src/plugins/twake/cozyProvision.d.ts",
       "import": "./dist/plugins/twake/cozyProvision.js"
