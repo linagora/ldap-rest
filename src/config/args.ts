@@ -188,6 +188,8 @@ export interface Config {
   cozy_apps?: string;
   cozy_auth_exchange?: string;
   cozy_b2b_exchange?: string;
+  cozy_user_created_routing_key?: string;
+  cozy_user_deleted_routing_key?: string;
   cloudery_manager_url?: string;
   cloudery_manager_token?: string;
   cloudery_offer?: string;
@@ -486,6 +488,16 @@ const configArgs: ConfigTemplate = [
   ['--cozy-apps', 'DM_COZY_APPS', 'home,drive,settings,notes,dataproxy'],
   ['--cozy-auth-exchange', 'DM_COZY_AUTH_EXCHANGE', 'auth'],
   ['--cozy-b2b-exchange', 'DM_COZY_B2B_EXCHANGE', 'b2b'],
+  [
+    '--cozy-user-created-routing-key',
+    'DM_COZY_USER_CREATED_ROUTING_KEY',
+    'user.created',
+  ],
+  [
+    '--cozy-user-deleted-routing-key',
+    'DM_COZY_USER_DELETED_ROUTING_KEY',
+    'domain.user.deleted',
+  ],
 
   // clouderyProvision plugin
   ['--cloudery-manager-url', 'DM_CLOUDERY_MANAGER_URL', ''],

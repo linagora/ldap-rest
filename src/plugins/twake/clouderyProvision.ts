@@ -69,6 +69,8 @@ export default class ClouderyProvision extends DmPlugin {
   private readonly rdnAttribute: string;
   private readonly authExchange: string;
   private readonly b2bExchange: string;
+  private readonly userCreatedRoutingKey: string;
+  private readonly userDeletedRoutingKey: string;
   private readonly pollIntervalMs: number;
   private readonly maxPollAttempts: number;
 
@@ -104,6 +106,10 @@ export default class ClouderyProvision extends DmPlugin {
     this.rdnAttribute = (cfg.scim_user_rdn_attribute as string) || 'uid';
     this.authExchange = (cfg.cozy_auth_exchange as string) || 'auth';
     this.b2bExchange = (cfg.cozy_b2b_exchange as string) || 'b2b';
+    this.userCreatedRoutingKey =
+      (cfg.cozy_user_created_routing_key as string) || 'user.created';
+    this.userDeletedRoutingKey =
+      (cfg.cozy_user_deleted_routing_key as string) || 'domain.user.deleted';
     this.pollIntervalMs =
       Number(cfg.cloudery_workflow_poll_interval_ms) || 2000;
     this.maxPollAttempts = Number(cfg.cloudery_workflow_max_attempts) || 60;
@@ -468,7 +474,11 @@ export default class ClouderyProvision extends DmPlugin {
     if (p.mobile) message.mobile = p.mobile;
 
     try {
-      await rabbitmq.publish(this.authExchange, 'user.created', message);
+      await rabbitmq.publish(
+        this.authExchange,
+        this.userCreatedRoutingKey,
+        message
+      );
     } catch (err) {
       this.logger.error({
         plugin: this.name,
@@ -487,7 +497,7 @@ export default class ClouderyProvision extends DmPlugin {
     const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
     if (!rabbitmq) return;
     try {
-      await rabbitmq.publish(this.b2bExchange, 'domain.user.deleted', {
+      await rabbitmq.publish(this.b2bExchange, this.userDeletedRoutingKey, {
         workplaceFqdn: fqdn,
         domain,
       });

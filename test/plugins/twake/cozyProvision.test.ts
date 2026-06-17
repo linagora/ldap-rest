@@ -116,6 +116,33 @@ describe('CozyProvision plugin', () => {
       });
     });
 
+    it('publishes with a configured routing key', async () => {
+      dm.config.cozy_user_created_routing_key = 'custom.user.created';
+      const p = new CozyProvision(dm);
+      const scope = nock(COZY_URL)
+        .post('/instances')
+        .query(true)
+        .reply(201, { ok: true })
+        .patch('/instances/ivy.twake.local')
+        .query({ OnboardingFinished: 'true' })
+        .reply(200, { ok: true });
+
+      const user: ScimUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'ivy',
+      };
+
+      const hook = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await hook(user);
+
+      expect(scope.isDone()).to.be.true;
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].exchange).to.equal('auth');
+      expect(rabbit.calls[0].routingKey).to.equal('custom.user.created');
+    });
+
     it('respects cozy_apps override', async () => {
       dm.config.cozy_apps = 'home,drive';
       const p = new CozyProvision(dm);

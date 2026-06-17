@@ -251,6 +251,31 @@ describe('ClouderyProvision plugin', () => {
       expect(ldap.modifyCalls[0].dn).to.equal(`uid=john.doe,${orgBase}`);
     });
 
+    it('publishes with a configured routing key', async () => {
+      dm.config.cozy_user_created_routing_key = 'custom.user.created';
+      const p = new ClouderyProvision(dm);
+      nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const pre = p.hooks?.scimusercreate as (
+        a: [ScimUser, unknown]
+      ) => Promise<unknown>;
+      await pre([user, makeReq('acme123')]);
+      const done = p.hooks?.scimusercreatedone as (u: ScimUser) => Promise<void>;
+      await done(user);
+
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].exchange).to.equal('auth');
+      expect(rabbit.calls[0].routingKey).to.equal('custom.user.created');
+    });
+
     it('is inert for users outside the configured B2B branch', async () => {
       dm.config.scim_user_base = 'ou=users,dc=twake,dc=local'; // not under b2b
       const p = new ClouderyProvision(dm);

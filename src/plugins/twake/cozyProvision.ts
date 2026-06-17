@@ -43,6 +43,8 @@ export default class CozyProvision extends DmPlugin {
   private readonly cozyApps: string;
   private readonly authExchange: string;
   private readonly b2bExchange: string;
+  private readonly userCreatedRoutingKey: string;
+  private readonly userDeletedRoutingKey: string;
   private readonly cozyAdminAuthHeader: string;
 
   constructor(server: DM) {
@@ -64,6 +66,11 @@ export default class CozyProvision extends DmPlugin {
     this.cozyApps = (this.config.cozy_apps as string) ?? '';
     this.authExchange = (this.config.cozy_auth_exchange as string) || 'auth';
     this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
+    this.userCreatedRoutingKey =
+      (this.config.cozy_user_created_routing_key as string) || 'user.created';
+    this.userDeletedRoutingKey =
+      (this.config.cozy_user_deleted_routing_key as string) ||
+      'domain.user.deleted';
     this.cozyAdminAuthHeader = `Basic ${Buffer.from(
       `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
     ).toString('base64')}`;
@@ -333,13 +340,17 @@ export default class CozyProvision extends DmPlugin {
     if (mobile) message.mobile = mobile;
 
     try {
-      await rabbitmq.publish(this.authExchange, 'user.created', message);
+      await rabbitmq.publish(
+        this.authExchange,
+        this.userCreatedRoutingKey,
+        message
+      );
       this.logger.info({
         plugin: this.name,
         event: 'publishUserCreated',
         result: 'success',
         exchange: this.authExchange,
-        routingKey: 'user.created',
+        routingKey: this.userCreatedRoutingKey,
         twakeId: id,
       });
     } catch (err) {
@@ -377,13 +388,17 @@ export default class CozyProvision extends DmPlugin {
     };
 
     try {
-      await rabbitmq.publish(this.b2bExchange, 'domain.user.deleted', message);
+      await rabbitmq.publish(
+        this.b2bExchange,
+        this.userDeletedRoutingKey,
+        message
+      );
       this.logger.info({
         plugin: this.name,
         event: 'publishUserDeleted',
         result: 'success',
         exchange: this.b2bExchange,
-        routingKey: 'domain.user.deleted',
+        routingKey: this.userDeletedRoutingKey,
         workplaceFqdn: message.workplaceFqdn,
       });
     } catch (err) {
