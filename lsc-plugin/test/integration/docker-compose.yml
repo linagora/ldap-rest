@@ -1,0 +1,101 @@
+version: '3.8'
+
+# End-to-end integration test stack for the lsc-ldaprest-plugin.
+# Spins up:
+#   - ldap-source : OpenLDAP populated from ldif/source-seed.ldif (LSC reads from this)
+#   - ldap-target : empty OpenLDAP, written to by ldap-rest
+#   - ldap-rest   : ldap-rest service backed by ldap-target, Bearer token auth
+#   - lsc         : LSC + the plugin jar, runs the sync task on demand
+
+services:
+  ldap-source:
+    image: osixia/openldap:1.5.0
+    container_name: lsc-it-ldap-source
+    environment:
+      LDAP_ORGANISATION: 'Source Org'
+      LDAP_DOMAIN: 'source.example.com'
+      LDAP_ADMIN_PASSWORD: 'admin'
+      LDAP_TLS: 'false'
+    volumes:
+      - ./ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+    healthcheck:
+      test: ['CMD', 'ldapsearch', '-x', '-H', 'ldap://localhost', '-b', 'dc=source,dc=example,dc=com', '-D', 'cn=admin,dc=source,dc=example,dc=com', '-w', 'admin']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - lsc-it
+
+  ldap-target:
+    image: osixia/openldap:1.5.0
+    container_name: lsc-it-ldap-target
+    environment:
+      LDAP_ORGANISATION: 'Target Org'
+      LDAP_DOMAIN: 'target.example.com'
+      LDAP_ADMIN_PASSWORD: 'admin'
+      LDAP_TLS: 'false'
+    healthcheck:
+      test: ['CMD', 'ldapsearch', '-x', '-H', 'ldap://localhost', '-b', 'dc=target,dc=example,dc=com', '-D', 'cn=admin,dc=target,dc=example,dc=com', '-w', 'admin']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - lsc-it
+
+  ldap-rest:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+    container_name: lsc-it-ldap-rest
+    depends_on:
+      ldap-target:
+        condition: service_healthy
+    environment:
+      DM_LDAP_URL: 'ldap://ldap-target:389'
+      DM_LDAP_BASE: 'dc=target,dc=example,dc=com'
+      DM_LDAP_DN: 'cn=admin,dc=target,dc=example,dc=com'
+      DM_LDAP_PWD: 'admin'
+      DM_LDAP_USER_ATTRIBUTE: 'uid'
+      DM_LDAP_USERS_BASE: 'ou=users,dc=target,dc=example,dc=com'
+      DM_LDAP_GROUP_BASE: 'ou=groups,dc=target,dc=example,dc=com'
+      DM_LDAP_TOP_ORGANIZATION: 'dc=target,dc=example,dc=com'
+      DM_MAIL_DOMAIN: 'target.example.com'
+      DM_PORT: '8081'
+      DM_LOG_LEVEL: 'info'
+      DM_PLUGINS: 'core/static,core/auth/token,core/ldap/flatGeneric,core/ldap/groups,core/ldap/organization'
+      DM_API_PREFIX: '/api'
+      DM_LDAP_FLAT_SCHEMA: '/app/node_modules/ldap-rest/static/schemas/standard/users.json'
+      DM_AUTH_TOKENS: 'lsc-it-token-please-change-me-32chars:lsc-tester'
+      DM_AUTHZ_PER_BRANCH_CONFIG: '{"default":{"read":true,"write":true,"delete":true}}'
+    ports:
+      - '18081:8081'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:8081/api/health']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - lsc-it
+
+  lsc:
+    build:
+      context: .
+      dockerfile: Dockerfile.lsc
+    container_name: lsc-it-runner
+    depends_on:
+      ldap-source:
+        condition: service_healthy
+      ldap-rest:
+        condition: service_healthy
+    volumes:
+      - ./lsc:/etc/lsc:ro
+      - ./logs:/var/log/lsc
+    environment:
+      LDAP_REST_TOKEN: 'lsc-it-token-please-change-me-32chars'
+    networks:
+      - lsc-it
+    command: ['tail', '-f', '/dev/null']
+
+networks:
+  lsc-it:
+    driver: bridge

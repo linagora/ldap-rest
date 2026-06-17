@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LSC integration test config: sync users from ldap-source to ldap-rest.
+  The destination is our pluginDestinationService — it ignores the bound
+  LDAP connection at runtime and uses baseUrl + token instead. We still
+  declare a real LDAP connection because LSC validates the schema.
+-->
+<lsc xmlns="http://lsc-project.org/XSD/lsc-core-2.1.xsd">
+
+    <connections>
+        <ldapConnection>
+            <name>src-ldap</name>
+            <url>ldap://ldap-source:389/dc=source,dc=example,dc=com</url>
+            <username>cn=admin,dc=source,dc=example,dc=com</username>
+            <password>admin</password>
+            <authentication>SIMPLE</authentication>
+            <referral>IGNORE</referral>
+            <derefAliases>NEVER</derefAliases>
+            <version>VERSION_3</version>
+            <pageSize>-1</pageSize>
+            <factory>com.sun.jndi.ldap.LdapCtxFactory</factory>
+            <tlsActivated>false</tlsActivated>
+        </ldapConnection>
+
+        <ldapConnection>
+            <name>dst-ldap-rest-stub</name>
+            <url>ldap://ldap-target:389/dc=target,dc=example,dc=com</url>
+            <username>cn=admin,dc=target,dc=example,dc=com</username>
+            <password>admin</password>
+            <authentication>SIMPLE</authentication>
+            <referral>IGNORE</referral>
+            <derefAliases>NEVER</derefAliases>
+            <version>VERSION_3</version>
+            <pageSize>-1</pageSize>
+            <factory>com.sun.jndi.ldap.LdapCtxFactory</factory>
+            <tlsActivated>false</tlsActivated>
+        </ldapConnection>
+    </connections>
+
+    <tasks>
+        <task>
+            <name>users-task</name>
+            <bean>org.lsc.beans.SimpleBean</bean>
+
+            <ldapSourceService>
+                <name>src-users</name>
+                <connection reference="src-ldap"/>
+                <baseDn>ou=users,dc=source,dc=example,dc=com</baseDn>
+                <pivotAttributes>
+                    <string>uid</string>
+                </pivotAttributes>
+                <fetchedAttributes>
+                    <string>uid</string>
+                    <string>cn</string>
+                    <string>sn</string>
+                    <string>givenName</string>
+                    <string>mail</string>
+                </fetchedAttributes>
+                <getAllFilter><![CDATA[(objectClass=inetOrgPerson)]]></getAllFilter>
+                <getOneFilter><![CDATA[(&(objectClass=inetOrgPerson)(uid={uid}))]]></getOneFilter>
+                <cleanFilter><![CDATA[(&(objectClass=inetOrgPerson)(uid={uid}))]]></cleanFilter>
+            </ldapSourceService>
+
+            <pluginDestinationService implementationClass="org.lscproject.ldaprest.LdapRestDstService">
+                <name>dst-ldap-rest</name>
+                <connection reference="dst-ldap-rest-stub"/>
+                <baseUrl>http://ldap-rest:8081</baseUrl>
+                <apiPrefix>/api</apiPrefix>
+                <resourceType>users</resourceType>
+                <auth>
+                    <bearer>${LDAP_REST_TOKEN}</bearer>
+                </auth>
+                <timeoutMs>10000</timeoutMs>
+                <retries>3</retries>
+            </pluginDestinationService>
+
+            <propertiesBasedSyncOptions>
+                <mainIdentifier>"uid=" + srcBean.getDatasetFirstValueById("uid") + ",ou=users,dc=target,dc=example,dc=com"</mainIdentifier>
+                <defaultDelimiter>;</defaultDelimiter>
+                <defaultPolicy>FORCE</defaultPolicy>
+                <conditions>
+                    <create>true</create>
+                    <update>true</update>
+                    <delete>true</delete>
+                    <changeId>true</changeId>
+                </conditions>
+                <dataset>
+                    <name>uid</name>
+                    <policy>FORCE</policy>
+                    <createValues>
+                        <string>srcBean.getDatasetFirstValueById("uid")</string>
+                    </createValues>
+                    <forceValues>
+                        <string>srcBean.getDatasetFirstValueById("uid")</string>
+                    </forceValues>
+                </dataset>
+                <dataset>
+                    <name>cn</name>
+                    <policy>FORCE</policy>
+                    <forceValues>
+                        <string>srcBean.getDatasetFirstValueById("cn")</string>
+                    </forceValues>
+                </dataset>
+                <dataset>
+                    <name>sn</name>
+                    <policy>FORCE</policy>
+                    <forceValues>
+                        <string>srcBean.getDatasetFirstValueById("sn")</string>
+                    </forceValues>
+                </dataset>
+                <dataset>
+                    <name>givenName</name>
+                    <policy>FORCE</policy>
+                    <forceValues>
+                        <string>srcBean.getDatasetFirstValueById("givenName")</string>
+                    </forceValues>
+                </dataset>
+                <dataset>
+                    <name>mail</name>
+                    <policy>FORCE</policy>
+                    <forceValues>
+                        <string>srcBean.getDatasetFirstValueById("mail")</string>
+                    </forceValues>
+                </dataset>
+            </propertiesBasedSyncOptions>
+        </task>
+    </tasks>
+
+</lsc>

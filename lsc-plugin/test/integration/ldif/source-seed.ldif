@@ -1,0 +1,69 @@
+dn: ou=users,dc=source,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=source,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=users,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Smith
+sn: Smith
+givenName: Alice
+mail: alice@source.example.com
+
+dn: uid=bob,ou=users,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Jones
+sn: Jones
+givenName: Bob
+mail: bob@source.example.com
+
+dn: uid=carol,ou=users,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol White
+sn: White
+givenName: Carol
+mail: carol@source.example.com
+
+dn: uid=dave,ou=users,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+uid: dave
+cn: Dave Brown
+sn: Brown
+givenName: Dave
+mail: dave@source.example.com
+
+dn: uid=eve,ou=users,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+uid: eve
+cn: Eve Black
+sn: Black
+givenName: Eve
+mail: eve@source.example.com
+
+dn: cn=admins,ou=groups,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: admins
+description: Server administrators
+member: uid=alice,ou=users,dc=source,dc=example,dc=com
+member: uid=bob,ou=users,dc=source,dc=example,dc=com
+
+dn: cn=users,ou=groups,dc=source,dc=example,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: users
+description: Regular users
+member: uid=carol,ou=users,dc=source,dc=example,dc=com
+member: uid=dave,ou=users,dc=source,dc=example,dc=com
+member: uid=eve,ou=users,dc=source,dc=example,dc=com
