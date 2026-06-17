@@ -50,20 +50,20 @@ several resource families.
 
 ## Operation mapping
 
-| LSC operation     | ldap-rest call                                                            |
-|-------------------|---------------------------------------------------------------------------|
-| CREATE flat       | `POST /api/v1/ldap/{resource}` body `{ <attrs> }`                         |
-| UPDATE flat       | `PUT /api/v1/ldap/{resource}/{id}` body `{ add?, replace?, delete? }`     |
-| DELETE flat       | `DELETE /api/v1/ldap/{resource}/{id}`                                     |
-| MODRDN flat       | `POST /api/v1/ldap/{resource}/{id}/move` body `{ targetOrgDn }`           |
-| CREATE group      | `POST /api/v1/ldap/groups`                                                |
-| UPDATE group      | `PUT /api/v1/ldap/groups/{cn}` + member POST/DELETE                       |
-| DELETE group      | `DELETE /api/v1/ldap/groups/{cn}`                                         |
-| RENAME group      | `POST /api/v1/ldap/groups/{cn}/rename` body `{ newCn }`                   |
-| CREATE org        | `POST /api/v1/ldap/organizations`                                         |
-| UPDATE org        | `PUT /api/v1/ldap/organizations/{dn}`                                     |
-| DELETE org        | `DELETE /api/v1/ldap/organizations/{dn}`                                  |
-| MODRDN org        | `POST /api/v1/ldap/organizations/{dn}/move`                               |
+| LSC operation | ldap-rest call                                                        |
+| ------------- | --------------------------------------------------------------------- |
+| CREATE flat   | `POST /api/v1/ldap/{resource}` body `{ <attrs> }`                     |
+| UPDATE flat   | `PUT /api/v1/ldap/{resource}/{id}` body `{ add?, replace?, delete? }` |
+| DELETE flat   | `DELETE /api/v1/ldap/{resource}/{id}`                                 |
+| MODRDN flat   | `POST /api/v1/ldap/{resource}/{id}/move` body `{ targetOrgDn }`       |
+| CREATE group  | `POST /api/v1/ldap/groups`                                            |
+| UPDATE group  | `PUT /api/v1/ldap/groups/{cn}` + member POST/DELETE                   |
+| DELETE group  | `DELETE /api/v1/ldap/groups/{cn}`                                     |
+| RENAME group  | `POST /api/v1/ldap/groups/{cn}/rename` body `{ newCn }`               |
+| CREATE org    | `POST /api/v1/ldap/organizations`                                     |
+| UPDATE org    | `PUT /api/v1/ldap/organizations/{dn}`                                 |
+| DELETE org    | `DELETE /api/v1/ldap/organizations/{dn}`                              |
+| MODRDN org    | `POST /api/v1/ldap/organizations/{dn}/move`                           |
 
 ## Limitations
 

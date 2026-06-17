@@ -40,10 +40,7 @@ class StubLdap {
   modifyCalls: ModifyCall[] = [];
   // entry returned by a base-scope search keyed by dn
   entries: Record<string, Record<string, unknown>> = {};
-  async modify(
-    dn: string,
-    changes: Record<string, unknown>
-  ): Promise<boolean> {
+  async modify(dn: string, changes: Record<string, unknown>): Promise<boolean> {
     this.modifyCalls.push({ dn, changes });
     return true;
   }
@@ -177,9 +174,7 @@ describe('ClouderyProvision plugin', () => {
 
       // fqdn written back to the dedicated attribute on the user entry
       expect(ldap.modifyCalls).to.have.length(1);
-      expect(ldap.modifyCalls[0].dn).to.equal(
-        `uid=john.doe,${USER_BASE}`
-      );
+      expect(ldap.modifyCalls[0].dn).to.equal(`uid=john.doe,${USER_BASE}`);
       expect(ldap.modifyCalls[0].changes).to.deep.equal({
         replace: {
           twakeWorkspaceUrl: 'johndoeacme123.twake.app',

@@ -130,7 +130,10 @@ describe('SCIM baseResolver', () => {
           // no scim_base_header_root → header path disabled
         })
       );
-      const req = reqWithHeader('x-org-base', 'ou=acme,ou=b2b,dc=example,dc=com');
+      const req = reqWithHeader(
+        'x-org-base',
+        'ou=acme,ou=b2b,dc=example,dc=com'
+      );
       expect(br.userBase(req)).to.equal('ou=b2b,dc=example,dc=com');
     });
 
@@ -156,7 +159,9 @@ describe('SCIM baseResolver', () => {
       );
       fs.writeFileSync(
         mapFile,
-        JSON.stringify({ alice: { userBase: 'ou=pinned,ou=b2b,dc=example,dc=com' } })
+        JSON.stringify({
+          alice: { userBase: 'ou=pinned,ou=b2b,dc=example,dc=com' },
+        })
       );
       try {
         const br = new BaseResolver(
@@ -187,7 +192,10 @@ describe('SCIM baseResolver', () => {
           scim_base_header_root: 'ou=b2b,dc=example,dc=com',
         })
       );
-      const req = reqWithHeader('x-org-base', 'ou=acme,ou=b2b,dc=example,dc=com');
+      const req = reqWithHeader(
+        'x-org-base',
+        'ou=acme,ou=b2b,dc=example,dc=com'
+      );
       (req as { user?: string }).user = 'tenant1';
       expect(br.userBase(req)).to.equal('ou=acme,ou=b2b,dc=example,dc=com');
     });

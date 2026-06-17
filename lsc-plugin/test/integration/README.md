@@ -6,12 +6,12 @@ plugin under test. No mocks.
 
 ## Stack
 
-| Service       | Image                          | Role                                      |
-|---------------|--------------------------------|-------------------------------------------|
-| `ldap-source` | `osixia/openldap:1.5.0`        | LDAP source seeded from `ldif/source-seed.ldif` |
-| `ldap-target` | `osixia/openldap:1.5.0`        | Empty LDAP target written by ldap-rest    |
+| Service       | Image                            | Role                                               |
+| ------------- | -------------------------------- | -------------------------------------------------- |
+| `ldap-source` | `osixia/openldap:1.5.0`          | LDAP source seeded from `ldif/source-seed.ldif`    |
+| `ldap-target` | `osixia/openldap:1.5.0`          | Empty LDAP target written by ldap-rest             |
 | `ldap-rest`   | built from `../../../Dockerfile` | ldap-rest service, Bearer auth, `/api/v1/ldap/...` |
-| `lsc`         | built from `Dockerfile.lsc`    | LSC v2.2 + plugin jar in classpath        |
+| `lsc`         | built from `Dockerfile.lsc`      | LSC v2.2 + plugin jar in classpath                 |
 
 ## Run
 

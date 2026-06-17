@@ -163,7 +163,9 @@ describe('CozyProvision plugin', () => {
     it('uses SCIM displayName / name as PublicName when provided', async () => {
       const scope = nock(COZY_URL)
         .post('/instances')
-        .query(q => q.PublicName === 'Khaled Ferjani' && q.Phone === '+33600000000')
+        .query(
+          q => q.PublicName === 'Khaled Ferjani' && q.Phone === '+33600000000'
+        )
         .reply(201, { ok: true })
         .patch('/instances/khaled.twake.local')
         .query({ OnboardingFinished: 'true' })
