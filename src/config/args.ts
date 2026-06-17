@@ -188,6 +188,17 @@ export interface Config {
   cozy_apps?: string;
   cozy_auth_exchange?: string;
   cozy_b2b_exchange?: string;
+  cloudery_manager_url?: string;
+  cloudery_manager_token?: string;
+  cloudery_offer?: string;
+  cloudery_domain?: string;
+  cloudery_user_branch?: string;
+  cloudery_org_id_header?: string;
+  cloudery_fqdn_attribute?: string;
+  cloudery_org_id_attribute?: string;
+  cloudery_default_locale?: string;
+  cloudery_workflow_poll_interval_ms?: number;
+  cloudery_workflow_max_attempts?: number;
   rabbitmq_url?: string;
 
   // Applicative Accounts plugin
@@ -218,6 +229,9 @@ export interface Config {
   scim_group_base?: string;
   scim_user_base_template?: string;
   scim_group_base_template?: string;
+  scim_user_base_header?: string;
+  scim_group_base_header?: string;
+  scim_base_header_root?: string;
   scim_base_map?: string;
   scim_user_object_class?: string[];
   scim_user_rdn_attribute?: string;
@@ -472,6 +486,41 @@ const configArgs: ConfigTemplate = [
   ['--cozy-apps', 'DM_COZY_APPS', 'home,drive,settings,notes,dataproxy'],
   ['--cozy-auth-exchange', 'DM_COZY_AUTH_EXCHANGE', 'auth'],
   ['--cozy-b2b-exchange', 'DM_COZY_B2B_EXCHANGE', 'b2b'],
+
+  // clouderyProvision plugin
+  ['--cloudery-manager-url', 'DM_CLOUDERY_MANAGER_URL', ''],
+  ['--cloudery-manager-token', 'DM_CLOUDERY_MANAGER_TOKEN', ''],
+  ['--cloudery-offer', 'DM_CLOUDERY_OFFER', 'b2b_twake_default'],
+  ['--cloudery-domain', 'DM_CLOUDERY_DOMAIN', ''],
+  ['--cloudery-user-branch', 'DM_CLOUDERY_USER_BRANCH', ''],
+  [
+    '--cloudery-org-id-header',
+    'DM_CLOUDERY_ORG_ID_HEADER',
+    'x-cloudery-org-id',
+  ],
+  [
+    '--cloudery-fqdn-attribute',
+    'DM_CLOUDERY_FQDN_ATTRIBUTE',
+    'twakeWorkspaceUrl',
+  ],
+  [
+    '--cloudery-org-id-attribute',
+    'DM_CLOUDERY_ORG_ID_ATTRIBUTE',
+    'twakeOrganizationId',
+  ],
+  ['--cloudery-default-locale', 'DM_CLOUDERY_DEFAULT_LOCALE', 'en'],
+  [
+    '--cloudery-workflow-poll-interval-ms',
+    'DM_CLOUDERY_WORKFLOW_POLL_INTERVAL_MS',
+    2000,
+    'number',
+  ],
+  [
+    '--cloudery-workflow-max-attempts',
+    'DM_CLOUDERY_WORKFLOW_MAX_ATTEMPTS',
+    60,
+    'number',
+  ],
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
 
   // Applicative Accounts plugin
@@ -632,6 +681,9 @@ const configArgs: ConfigTemplate = [
   ['--scim-user-base-template', 'DM_SCIM_USER_BASE_TEMPLATE', ''],
   ['--scim-group-base-template', 'DM_SCIM_GROUP_BASE_TEMPLATE', ''],
   ['--scim-base-map', 'DM_SCIM_BASE_MAP', ''],
+  ['--scim-user-base-header', 'DM_SCIM_USER_BASE_HEADER', ''],
+  ['--scim-group-base-header', 'DM_SCIM_GROUP_BASE_HEADER', ''],
+  ['--scim-base-header-root', 'DM_SCIM_BASE_HEADER_ROOT', ''],
   [
     '--scim-user-object-class',
     'DM_SCIM_USER_OBJECT_CLASSES',
