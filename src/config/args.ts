@@ -196,8 +196,12 @@ export interface Config {
   cloudery_domain?: string;
   cloudery_user_branch?: string;
   cloudery_org_id_header?: string;
+  cloudery_org_role_header?: string;
+  cloudery_default_org_role?: string;
   cloudery_fqdn_attribute?: string;
   cloudery_org_id_attribute?: string;
+  cloudery_org_role_attribute?: string;
+  cloudery_phones_attribute?: string;
   cloudery_default_locale?: string;
   cloudery_workflow_poll_interval_ms?: number;
   cloudery_workflow_max_attempts?: number;
@@ -511,6 +515,12 @@ const configArgs: ConfigTemplate = [
     'x-cloudery-org-id',
   ],
   [
+    '--cloudery-org-role-header',
+    'DM_CLOUDERY_ORG_ROLE_HEADER',
+    'x-cloudery-org-role',
+  ],
+  ['--cloudery-default-org-role', 'DM_CLOUDERY_DEFAULT_ORG_ROLE', 'member'],
+  [
     '--cloudery-fqdn-attribute',
     'DM_CLOUDERY_FQDN_ATTRIBUTE',
     'twakeWorkspaceUrl',
@@ -519,6 +529,16 @@ const configArgs: ConfigTemplate = [
     '--cloudery-org-id-attribute',
     'DM_CLOUDERY_ORG_ID_ATTRIBUTE',
     'twakeOrganizationId',
+  ],
+  [
+    '--cloudery-org-role-attribute',
+    'DM_CLOUDERY_ORG_ROLE_ATTRIBUTE',
+    'twakeOrganizationRole',
+  ],
+  [
+    '--cloudery-phones-attribute',
+    'DM_CLOUDERY_PHONES_ATTRIBUTE',
+    'twakePhones',
   ],
   ['--cloudery-default-locale', 'DM_CLOUDERY_DEFAULT_LOCALE', 'en'],
   [

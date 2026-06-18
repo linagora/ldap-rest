@@ -52,10 +52,11 @@ class StubLdap {
 }
 
 // Express-like request stub: carries the org id / base headers and the token.
-function makeReq(orgId?: string, orgBase?: string): unknown {
+function makeReq(orgId?: string, orgBase?: string, role?: string): unknown {
   const headers: Record<string, string> = {};
   if (orgId) headers['x-cloudery-org-id'] = orgId;
   if (orgBase) headers['x-cloudery-org-base'] = orgBase;
+  if (role) headers['x-cloudery-org-role'] = role;
   return {
     user: 'b2b-token',
     headers,
@@ -172,13 +173,22 @@ describe('ClouderyProvision plugin', () => {
       expect(body.domain).to.equal('twake.app');
       expect(body.email).to.equal('john.doe@acme.com');
 
-      // fqdn written back to the dedicated attribute on the user entry
+      // role/phones are NOT sent to Cloudery; they are stamped on the entry
+      expect(body).to.not.have.property('twakeOrganizationRole');
+      expect(body).to.not.have.property('twakePhones');
+
+      // fqdn, org id, role (default member) and phones written to the entry for
+      // the admin panel to read
       expect(ldap.modifyCalls).to.have.length(1);
       expect(ldap.modifyCalls[0].dn).to.equal(`uid=john.doe,${USER_BASE}`);
       expect(ldap.modifyCalls[0].changes).to.deep.equal({
         replace: {
           twakeWorkspaceUrl: 'johndoeacme123.twake.app',
           twakeOrganizationId: 'acme123',
+          twakeOrganizationRole: 'member',
+          twakePhones: JSON.stringify([
+            { number: '+33600000000', primary: true },
+          ]),
         },
       });
 
@@ -229,8 +239,129 @@ describe('ClouderyProvision plugin', () => {
         replace: {
           twakeWorkspaceUrl: 'johndoeacme123.twake.app',
           twakeOrganizationId: 'acme123',
+          twakeOrganizationRole: 'member',
+          twakePhones: JSON.stringify([
+            { number: '+33600000000', primary: true },
+          ]),
         },
       });
+    });
+
+    it('omits twakePhones when the user has no phone numbers', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const { phoneNumbers: _omitted, ...noPhoneUser } = user;
+      await create(noPhoneUser as ScimUser, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeOrganizationRole).to.equal('member');
+      expect(changes.replace).to.not.have.property('twakePhones');
+    });
+
+    it('uses the role from the request header when supplied', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      await create(user, makeReq('acme123', undefined, 'owner'));
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeOrganizationRole).to.equal('owner');
+    });
+
+    it('falls back to the default role for an unknown header value', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      await create(user, makeReq('acme123', undefined, 'superuser'));
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeOrganizationRole).to.equal('member');
+    });
+
+    it('normalises an invalid configured default role to member', async () => {
+      dm.config.cloudery_default_org_role = 'Administrator';
+      const p = new ClouderyProvision(dm);
+      nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const pre = p.hooks?.scimusercreate as (
+        a: [ScimUser, unknown]
+      ) => Promise<unknown>;
+      await pre([user, makeReq('acme123')]);
+      const done = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await done(user);
+
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeOrganizationRole).to.equal('member');
+    });
+
+    it('trims whitespace and casing from a header role and phone numbers', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const spacedUser: ScimUser = {
+        ...user,
+        phoneNumbers: [{ value: '  +33600000000  ', primary: true }],
+      };
+      await create(spacedUser, makeReq('acme123', undefined, '  ADMIN  '));
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeOrganizationRole).to.equal('admin');
+      expect(changes.replace.twakePhones).to.equal(
+        JSON.stringify([{ number: '+33600000000', primary: true }])
+      );
     });
 
     it('inserts under the org branch supplied by the base header', async () => {
@@ -268,7 +399,9 @@ describe('ClouderyProvision plugin', () => {
         a: [ScimUser, unknown]
       ) => Promise<unknown>;
       await pre([user, makeReq('acme123')]);
-      const done = p.hooks?.scimusercreatedone as (u: ScimUser) => Promise<void>;
+      const done = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
       await done(user);
 
       expect(rabbit.calls).to.have.length(1);
