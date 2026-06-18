@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.10 (2026-06-18)
+
+### Bug Fixes
+
+- `sync-app-accounts`: fix the bulk backfill CLI, which previously could
+  not create any principal account and never returned control. A
+  base-scoped search on a missing entry raises `noSuchObject` instead of
+  returning an empty set, so it is now treated as "absent" and the missing
+  principal is created. Attributes that come back as empty arrays (a
+  requested-but-absent attribute) are skipped to avoid `add` errors
+  (`no values for attribute type`). The script now fails fast with a clear
+  message when `applicative_account_base` does not exist, drops a broken
+  `unbind()` teardown call, and exits cleanly once finished (pooled LDAP
+  connections were keeping the process alive after the summary)
+
 ## v0.3.9 (2026-06-18)
 
 ### Bug Fixes

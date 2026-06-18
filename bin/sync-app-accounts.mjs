@@ -38,6 +38,11 @@ Environment variables:
   process.exit(0);
 }
 
+// A base-scoped LDAP search on a non-existent entry returns noSuchObject (32)
+// rather than an empty result set, so callers must treat it as "absent".
+const isNoSuchObject = err =>
+  err?.code === 32 || /no such object|0x20/i.test(err?.message || '');
+
 async function syncAppAccounts() {
   const dm = new DM();
   await dm.ready;
@@ -54,6 +59,20 @@ async function syncAppAccounts() {
   if (!userBase) {
     dm.logger.error('DM_LDAP_BASE is not configured');
     process.exit(1);
+  }
+
+  // Fail fast with a clear message if the applicative branch is missing,
+  // instead of letting the orphan scan abort with a raw NoSuchObjectError.
+  try {
+    await dm.ldap.search({ scope: 'base', paged: false }, applicativeBase);
+  } catch (err) {
+    if (isNoSuchObject(err)) {
+      dm.logger.error(
+        `Applicative base ${applicativeBase} does not exist. Create it first (e.g. an organizationalUnit entry) before running this sync.`
+      );
+      process.exit(1);
+    }
+    throw err;
   }
 
   if (!quiet) {
@@ -101,15 +120,26 @@ async function syncAppAccounts() {
       if (!mail) continue;
 
       try {
-        // Check if principal account exists
+        // Check if principal account exists. A base search on a missing entry
+        // throws noSuchObject rather than returning an empty set, so we treat
+        // that exception as "absent" and fall through to creation.
         const principalDn = `uid=${mail},${applicativeBase}`;
-        const principalResult = await dm.ldap.search(
-          {
-            scope: 'base',
-            paged: false,
-          },
-          principalDn
-        );
+        let principalResult;
+        try {
+          principalResult = await dm.ldap.search(
+            {
+              scope: 'base',
+              paged: false,
+            },
+            principalDn
+          );
+        } catch (err) {
+          if (isNoSuchObject(err)) {
+            principalResult = { searchEntries: [] };
+          } else {
+            throw err;
+          }
+        }
 
         if (
           !principalResult.searchEntries ||
@@ -136,17 +166,23 @@ async function syncAppAccounts() {
               'displayName',
             ];
             for (const attr of attrsToCopy) {
-              if (user[attr]) {
-                const value = user[attr];
-                if (Array.isArray(value)) {
-                  attrs[attr] = value.map(v =>
-                    Buffer.isBuffer(v) ? v.toString() : String(v)
-                  );
-                } else {
-                  attrs[attr] = Buffer.isBuffer(value)
-                    ? value.toString()
-                    : String(value);
-                }
+              const value = user[attr];
+              // Skip absent values. A requested-but-missing attribute comes
+              // back as an empty array (truthy in JS), which would otherwise
+              // produce an `add` with no values → ProtocolError "no values for
+              // attribute type".
+              if (value === undefined || value === null || value === '') {
+                continue;
+              }
+              if (Array.isArray(value)) {
+                if (value.length === 0) continue;
+                attrs[attr] = value.map(v =>
+                  Buffer.isBuffer(v) ? v.toString() : String(v)
+                );
+              } else {
+                attrs[attr] = Buffer.isBuffer(value)
+                  ? value.toString()
+                  : String(value);
               }
             }
 
@@ -265,12 +301,19 @@ async function syncAppAccounts() {
     dm.logger.error('Error during synchronization:', err);
     process.exit(1);
   } finally {
-    await dm.ldap.unbind();
+    // ldapActions exposes no public unbind; pooled connections are released on
+    // process exit. Guard so this teardown never throws if the method is absent.
+    if (typeof dm.ldap.unbind === 'function') {
+      await dm.ldap.unbind();
+    }
   }
 }
 
-// Run the sync
-syncAppAccounts().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// Run the sync. Pooled LDAP connections keep the event loop alive, so exit
+// explicitly once the sync resolves instead of hanging.
+syncAppAccounts()
+  .then(() => process.exit(0))
+  .catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
