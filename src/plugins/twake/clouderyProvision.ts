@@ -13,6 +13,14 @@
  * the core `BaseResolver` (also from a header). The operator supplies the email
  * in the SCIM body, `org_domain` is its domain, and `slug` = `oidc` =
  * normalizeNickname(userName) + orgId (dots stripped).
+ *
+ * Alongside the FQDN, the post-create write stamps two attributes the admin
+ * panel reads off the user entry: `twakeOrganizationRole` and (when present)
+ * `twakePhones`. The role is per-request via a header, so a single batch import
+ * can be all members and the next all admins; it accepts `admin`, `owner`, or
+ * `member` and falls back to `cloudery_default_org_role` (`member`) when the
+ * header is absent or unknown. `twakePhones` holds the SCIM phone numbers as the
+ * JSON the panel expects: `[{ "number": "+33...", "primary": true }]`.
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -38,6 +46,7 @@ interface ClouderyInstanceResponse {
 interface CreateContext {
   orgId: string;
   email: string;
+  role: string;
   base: string;
   ts: number;
 }
@@ -51,6 +60,10 @@ interface DeleteContext {
 // leak its captured context; prune anything older than this.
 const STASH_TTL_MS = 5 * 60 * 1000;
 
+// Roles the admin panel recognises for the `twakeOrganizationRole` attribute;
+// anything else from the header is rejected in favour of the configured default.
+const VALID_ORG_ROLES = new Set(['admin', 'owner', 'member']);
+
 export default class ClouderyProvision extends DmPlugin {
   name = 'clouderyProvision';
   roles: Role[] = ['consistency'] as const;
@@ -63,8 +76,12 @@ export default class ClouderyProvision extends DmPlugin {
   private readonly clouderyDomain: string;
   private readonly userBranch: string;
   private readonly orgIdHeader: string;
+  private readonly orgRoleHeader: string;
+  private readonly defaultOrgRole: string;
   private readonly fqdnAttribute: string;
   private readonly orgIdAttribute: string;
+  private readonly orgRoleAttribute: string;
+  private readonly phonesAttribute: string;
   private readonly defaultLocale: string;
   private readonly rdnAttribute: string;
   private readonly authExchange: string;
@@ -98,10 +115,33 @@ export default class ClouderyProvision extends DmPlugin {
     this.orgIdHeader = (
       (cfg.cloudery_org_id_header as string) || 'x-cloudery-org-id'
     ).toLowerCase();
+    this.orgRoleHeader = (
+      (cfg.cloudery_org_role_header as string) || 'x-cloudery-org-role'
+    ).toLowerCase();
+    // The default is the fallback for an absent/unknown header, so it must be a
+    // valid, lower-cased role itself; otherwise a misconfigured default would
+    // bypass the same validation resolveRole() applies to header values.
+    const configuredRole =
+      (cfg.cloudery_default_org_role as string) || 'member';
+    const normalizedRole = configuredRole.trim().toLowerCase();
+    if (VALID_ORG_ROLES.has(normalizedRole)) {
+      this.defaultOrgRole = normalizedRole;
+    } else {
+      this.defaultOrgRole = 'member';
+      this.logger.warn(
+        `${this.name}: cloudery_default_org_role "${configuredRole}" is not one of ${[
+          ...VALID_ORG_ROLES,
+        ].join(', ')} — using "member"`
+      );
+    }
     this.fqdnAttribute =
       (cfg.cloudery_fqdn_attribute as string) || 'twakeWorkspaceUrl';
     this.orgIdAttribute =
       (cfg.cloudery_org_id_attribute as string) || 'twakeOrganizationId';
+    this.orgRoleAttribute =
+      (cfg.cloudery_org_role_attribute as string) || 'twakeOrganizationRole';
+    this.phonesAttribute =
+      (cfg.cloudery_phones_attribute as string) || 'twakePhones';
     this.defaultLocale = (cfg.cloudery_default_locale as string) || 'en';
     this.rdnAttribute = (cfg.scim_user_rdn_attribute as string) || 'uid';
     this.authExchange = (cfg.cozy_auth_exchange as string) || 'auth';
@@ -190,6 +230,7 @@ export default class ClouderyProvision extends DmPlugin {
     this.createStash.set(cleanEmail.toLowerCase(), {
       orgId: orgId.trim(),
       email: cleanEmail,
+      role: this.resolveRole(req, userName),
       base,
       ts: Date.now(),
     });
@@ -214,6 +255,7 @@ export default class ClouderyProvision extends DmPlugin {
     const orgDomain = emailDomain(email);
     const slug = normalizeNickname(userName) + ctx.orgId;
     const mobile = this.extractPrimaryPhone(user);
+    const phones = this.extractPhones(user);
     const publicName = this.extractPublicName(user) || userName;
 
     const log = {
@@ -265,13 +307,19 @@ export default class ClouderyProvision extends DmPlugin {
 
     const fqdn = instance.fqdn;
     const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
+    // Role and phones live on the user entry for the admin panel to read; they
+    // are not part of the Cloudery create payload. Phones are stored as the JSON
+    // the panel expects ([{ number, primary }]) and only when present.
+    const replace: Record<string, string> = {
+      [this.fqdnAttribute]: fqdn,
+      [this.orgIdAttribute]: ctx.orgId,
+      [this.orgRoleAttribute]: ctx.role,
+    };
+    if (phones.length > 0) {
+      replace[this.phonesAttribute] = JSON.stringify(phones);
+    }
     try {
-      await this.server.ldap.modify(dn, {
-        replace: {
-          [this.fqdnAttribute]: fqdn,
-          [this.orgIdAttribute]: ctx.orgId,
-        },
-      });
+      await this.server.ldap.modify(dn, { replace });
     } catch (err) {
       // Instance exists, so still publish; the write failure would break the
       // later delete lookup, so surface it.
@@ -528,6 +576,27 @@ export default class ClouderyProvision extends DmPlugin {
     return typeof q === 'string' && q.length > 0 ? q : undefined;
   }
 
+  /**
+   * Per-request org role from the header (so one batch import can be all admins
+   * and the next all members), validated against {@link VALID_ORG_ROLES}. An
+   * absent or unknown role falls back to the configured default rather than
+   * failing the import.
+   */
+  private resolveRole(req: ReqWithUser | undefined, userName: string): string {
+    const raw = this.readHeader(req, this.orgRoleHeader)?.trim().toLowerCase();
+    if (!raw) return this.defaultOrgRole;
+    if (!VALID_ORG_ROLES.has(raw)) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        message: `Unknown ${this.orgRoleHeader} "${raw}" — falling back to ${this.defaultOrgRole}`,
+      });
+      return this.defaultOrgRole;
+    }
+    return raw;
+  }
+
   private isAtOrUnder(dn: string, parent: string): boolean {
     return (
       dn.trim().toLowerCase() === parent.trim().toLowerCase() ||
@@ -564,6 +633,17 @@ export default class ClouderyProvision extends DmPlugin {
     const primary = phones.find(p => p.primary);
     const value = (primary || phones[0]).value;
     return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  /** All phone numbers, shaped for the `twakePhones` attribute the panel reads. */
+  private extractPhones(
+    user: ScimUser
+  ): { number: string; primary: boolean }[] {
+    const phones = user.phoneNumbers;
+    if (!phones || phones.length === 0) return [];
+    return phones
+      .filter(p => typeof p.value === 'string' && p.value.trim().length > 0)
+      .map(p => ({ number: p.value.trim(), primary: Boolean(p.primary) }));
   }
 
   private extractPublicName(user: ScimUser): string | null {
