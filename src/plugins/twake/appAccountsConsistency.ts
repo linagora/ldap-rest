@@ -120,7 +120,7 @@ export default class AppAccountsConsistency extends DmPlugin {
       // change) when the applicative branch sits under `ldap_base`.
       if (this.isInApplicativeBranch(dn)) {
         this.logger.debug(
-          `${this.name}: Ignoring mail change for ${dn} (in applicative branch)`
+          `${this.name}: Ignoring mail change event originating in the applicative branch`
         );
         return;
       }
