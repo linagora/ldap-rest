@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.8 (2026-06-18)
+
+### Improvements
+
+- `core/twake/clouderyProvision`: provisioned users now carry their
+  organization role and phone numbers. The role is read from a request
+  header (`--cloudery-org-role-header`, `DM_CLOUDERY_ORG_ROLE_HEADER`,
+  default `x-cloudery-org-role`), falling back to
+  `--cloudery-default-org-role` (`DM_CLOUDERY_DEFAULT_ORG_ROLE`, default
+  `member`), and is written back to the LDAP entry under
+  `--cloudery-org-role-attribute` (`DM_CLOUDERY_ORG_ROLE_ATTRIBUTE`,
+  default `twakeOrganizationRole`). Phone numbers are taken from
+  `--cloudery-phones-attribute` (`DM_CLOUDERY_PHONES_ATTRIBUTE`, default
+  `twakePhones`) and sent during provisioning
+
 ## v0.3.7 (2026-06-17)
 
 ### New Features

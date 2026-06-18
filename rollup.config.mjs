@@ -56,7 +56,10 @@ const externalPackages = [
 // subpaths (e.g. `csv-parse/sync`).
 const external = id => {
   const bare = id.replace(/^node:/, '');
-  if (builtinModules.includes(bare) || builtinModules.includes(bare.split('/')[0]))
+  if (
+    builtinModules.includes(bare) ||
+    builtinModules.includes(bare.split('/')[0])
+  )
     return true;
   return externalPackages.some(dep => id === dep || id.startsWith(`${dep}/`));
 };
