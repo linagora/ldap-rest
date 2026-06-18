@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.9 (2026-06-18)
+
+### Bug Fixes
+
+- `core/twake/appAccountsConsistency`: ignore mail-change events whose DN
+  originates in the applicative branch (`applicative_account_base`). Those
+  entries are outputs of the plugin, never source users, so reacting to the
+  plugin's own writes caused idempotent `AlreadyExists` churn and, during a
+  mail change, a re-entrant deletion cascade that could drop a user's app
+  accounts. This makes it safe to nest `applicative_account_base` under
+  `ldap_base`
+
 ## v0.3.8 (2026-06-18)
 
 ### Improvements
