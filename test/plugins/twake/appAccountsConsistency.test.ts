@@ -674,6 +674,64 @@ describe('App Accounts Consistency Plugin', function () {
     });
   });
 
+  describe('Re-entrance guard', () => {
+    it('should ignore mail-change events originating in the applicative branch (no cascade)', async function () {
+      this.timeout(10000);
+
+      // Create user → principal applicative account is auto-created
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+      });
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Create two app accounts directly, as the API plugin would
+      const appAccount1DN = `uid=testuser-${timestamp}_c11111111,${applicativeBase}`;
+      const appAccount2DN = `uid=testuser-${timestamp}_c22222222,${applicativeBase}`;
+      const appAccounts: [string, string][] = [
+        [appAccount1DN, `testuser-${timestamp}_c11111111`],
+        [appAccount2DN, `testuser-${timestamp}_c22222222`],
+      ];
+      for (const [dn, uid] of appAccounts) {
+        await dm.ldap.add(dn, {
+          objectClass: 'inetOrgPerson',
+          uid,
+          cn: 'Test User',
+          sn: 'User',
+          mail: `testuser-${timestamp}@example.com`,
+          userPassword: 'A1b2@-C3d4$-E5f6!-G7h8#-J9k0%-L1m2@',
+        });
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Simulate the hook firing for a DELETE on the principal account, whose DN
+      // sits in the applicative branch. Without the guard this would call
+      // deleteApplicativeAccount(mail) and cascade-delete every entry matching
+      // the mail (principal + both app accounts).
+      await appAccountsConsistency.hooks.onLdapMailChange!(
+        testApplicativeDN,
+        `testuser-${timestamp}@example.com`,
+        null
+      );
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // The guard must have made it a no-op: all entries are still present.
+      for (const dn of [testApplicativeDN, appAccount1DN, appAccount2DN]) {
+        const result = await dm.ldap.search(
+          { scope: 'base', paged: false },
+          dn
+        );
+        expect(
+          (result as any).searchEntries,
+          `${dn} should still exist (no cascade)`
+        ).to.have.lengthOf(1);
+      }
+    });
+  });
+
   describe('Configuration', () => {
     it('should throw error if applicative_account_base is not configured', () => {
       const dmTest = new DM();
