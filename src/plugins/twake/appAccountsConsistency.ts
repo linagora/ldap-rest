@@ -81,6 +81,30 @@ export default class AppAccountsConsistency extends DmPlugin {
     return this.operationalAttributes.includes(key);
   }
 
+  /**
+   * Whether a DN belongs to the applicative branch this plugin manages.
+   *
+   * Entries under `applicative_account_base` are *outputs* of this plugin
+   * (principal and app accounts), never source users. Since every LDAP write
+   * re-fires the change hooks — including our own writes — we must ignore
+   * events originating in this branch. Otherwise creating/renaming/deleting an
+   * applicative entry would re-enter `onLdapMailChange` and cause spurious
+   * `AlreadyExists` attempts or a re-entrant deletion cascade during a mail
+   * change.
+   *
+   * @param dn - The DN that changed
+   * @returns true if `dn` is the applicative base itself or sits below it
+   */
+  private isInApplicativeBranch(dn: string): boolean {
+    // Loose DN normalisation: lowercase and collapse the optional whitespace
+    // around RDN separators so `uid=x, ou=AppAccounts ,dc=stg` still matches.
+    const norm = (s: string): string =>
+      s.toLowerCase().replace(/\s*,\s*/g, ',').trim();
+    const base = norm(this.applicativeAccountBase);
+    const target = norm(dn);
+    return target === base || target.endsWith(`,${base}`);
+  }
+
   hooks: Hooks = {
     /**
      * Handle mail changes, including creation (null → mail) and deletion (mail → null)
@@ -90,6 +114,17 @@ export default class AppAccountsConsistency extends DmPlugin {
       oldMail: AttributeValue | null,
       newMail: AttributeValue | null
     ) => {
+      // Ignore changes on our own applicative entries: they are managed by
+      // this plugin, never source users. This prevents re-entrant hook firing
+      // (idempotent AlreadyExists churn, or a deletion cascade during a mail
+      // change) when the applicative branch sits under `ldap_base`.
+      if (this.isInApplicativeBranch(dn)) {
+        this.logger.debug(
+          `${this.name}: Ignoring mail change event originating in the applicative branch`
+        );
+        return;
+      }
+
       try {
         const oldMailStr =
           oldMail !== null && oldMail !== undefined
