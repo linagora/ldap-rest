@@ -414,12 +414,18 @@ export function normalizeDn(dn: string): string {
     .map(rdn =>
       rdn
         .split('+')
-        .map(atav =>
-          atav
-            .trim()
-            .replace(/\s*=\s*/, '=')
-            .toLowerCase()
-        )
+        .map(atav => {
+          // Split on the first `=` (the type/value separator — attribute types
+          // never contain `=`, and value `=` are escaped as `\=`) and trim each
+          // side. Done with indexOf rather than a `\s*=\s*` regex to avoid the
+          // polynomial scan a regex incurs on untrusted DN strings (ReDoS).
+          const eq = atav.indexOf('=');
+          const normalized =
+            eq === -1
+              ? atav.trim()
+              : `${atav.slice(0, eq).trim()}=${atav.slice(eq + 1).trim()}`;
+          return normalized.toLowerCase();
+        })
         .sort()
         .join('+')
     )
