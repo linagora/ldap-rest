@@ -1,9 +1,28 @@
 # Changelog
 
-## v0.3.10 (2026-06-18)
+## v0.3.10 (2026-06-19)
 
 ### Bug Fixes
 
+- `core/twake/appAccountsApi`: drop the unused `core/auth/token` dependency
+  (#83). It auto-loaded the token-auth plugin and registered its global
+  middleware, forcing Bearer auth on the app-accounts endpoints and
+  returning `401` under HMAC-only deployments. The plugin never reads
+  `req.user` or the token, so the dependency enabled nothing; the endpoints
+  now use the deployment's configured authentication like every other API
+  plugin
+- `core/twake/appAccountsConsistency`: harden the re-entrancy guard so that
+  deleting a single app account no longer cascades into deleting the user's
+  other app accounts and principal entry (#84). The guard compared the
+  configured `applicative_account_base` as a plain string suffix, which
+  false-negatived on DN-format differences (case, whitespace around
+  separators, escaped commas, multi-valued RDN ordering) returned by the
+  server, letting the plugin's own delete event slip through and trigger the
+  delete-by-mail cascade. It now relies on new `normalizeDn` / `isDnInBranch`
+  helpers in `lib/utils` for a robust RDN-by-RDN comparison (`normalizeDn`
+  avoids a ReDoS-prone regex flagged by CodeQL). The previously
+  load-time-skipped `appAccounts*` test suites now actually run in CI, plus a
+  regression test covering the single-delete case
 - `sync-app-accounts`: fix the bulk backfill CLI, which previously could
   not create any principal account and never returned control. A
   base-scoped search on a missing entry raises `noSuchObject` instead of
