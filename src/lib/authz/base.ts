@@ -117,7 +117,7 @@ export default abstract class AuthzBase extends DmPlugin {
             );
             if (!sourcePermissions.read) {
               throw new Error(
-                `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+                `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
               );
             }
           }
@@ -131,7 +131,7 @@ export default abstract class AuthzBase extends DmPlugin {
           );
           if (!sourcePermissions.read) {
             throw new Error(
-              `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+              `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
             );
           }
         }
@@ -145,7 +145,7 @@ export default abstract class AuthzBase extends DmPlugin {
         const destPermissions = await this.getUserPermissions(user, destBranch);
         if (!destPermissions.write) {
           throw new Error(
-            `User ${req!.user} does not have write permission for destination branch ${destBranch}`
+            `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
           );
         }
       } else {
@@ -155,7 +155,7 @@ export default abstract class AuthzBase extends DmPlugin {
 
         if (!permissions.write) {
           throw new Error(
-            `User ${req!.user} does not have write permission for branch ${branchToCheck}`
+            `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
           );
         }
       }
@@ -198,7 +198,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // Check write permission
       if (!permissions.write) {
         throw new Error(
-          `User ${req!.user} does not have write permission for branch ${branchToCheck}`
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
         );
       }
 
@@ -230,7 +230,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // Check read permission
       if (!permissions.read) {
         throw new Error(
-          `User ${req!.user} does not have read permission for branch ${base}`
+          `[authz-forbidden] User ${req!.user} does not have read permission for branch ${base}`
         );
       }
 
@@ -317,7 +317,7 @@ export default abstract class AuthzBase extends DmPlugin {
       );
       if (!sourcePermissions.read) {
         throw new Error(
-          `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+          `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
         );
       }
 
@@ -325,11 +325,40 @@ export default abstract class AuthzBase extends DmPlugin {
       const destPermissions = await this.getUserPermissions(user, destBranch);
       if (!destPermissions.write) {
         throw new Error(
-          `User ${req!.user} does not have write permission for destination branch ${destBranch}`
+          `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
         );
       }
 
       return [oldDn, newDn, req];
+    },
+
+    ldapdeleterequest: async ([dn, req]: [
+      string | string[],
+      DmRequest?,
+    ]): Promise<[string | string[], DmRequest?]> => {
+      if (this.shouldSkipAuthorization(req)) {
+        return [dn, req];
+      }
+
+      const user = await this.resolveUser(req!.user!);
+      if (!user) {
+        this.logger.warn(`User ${req!.user} could not be resolved`);
+        return [dn, req];
+      }
+
+      // Check delete permission on the branch of every target entry.
+      const targets = Array.isArray(dn) ? dn : [dn];
+      for (const target of targets) {
+        const branchToCheck = this.extractBranchDn(target);
+        const permissions = await this.getUserPermissions(user, branchToCheck);
+        if (!permissions.delete) {
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${branchToCheck}`
+          );
+        }
+      }
+
+      return [dn, req];
     },
   };
 }

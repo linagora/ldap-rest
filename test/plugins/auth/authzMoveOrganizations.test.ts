@@ -221,8 +221,10 @@ describe('Authorization for Organization Move', function () {
         targetOrgDn: getParentOrg2Dn(),
       });
 
-    expect(res.status).to.equal(500);
-    expect(res.body.error).to.equal('check logs');
+    expect(res.status).to.equal(403);
+    expect(res.body.error).to.equal(
+      'Token does not have permission on this branch'
+    );
   });
 
   it('should reject move when user lacks write access to destination', async () => {
@@ -245,8 +247,10 @@ describe('Authorization for Organization Move', function () {
           targetOrgDn: siblingOrgDn,
         });
 
-      expect(res.status).to.equal(500);
-      expect(res.body.error).to.equal('check logs');
+      expect(res.status).to.equal(403);
+      expect(res.body.error).to.equal(
+        'Token does not have permission on this branch'
+      );
     } finally {
       await server.ldap.delete(siblingOrgDn);
     }

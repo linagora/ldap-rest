@@ -6,6 +6,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import { Entry } from 'ldapts';
+import type { Request } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
@@ -108,7 +109,7 @@ class OnLdapChange extends DmPlugin {
     /**
      * Before deletion, capture entry to trigger notify with proper changes
      */
-    ldapdeleterequest: async (dn: string | string[]) => {
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
       const dns = Array.isArray(dn) ? dn : [dn];
 
       for (const userDn of dns) {
@@ -129,7 +130,7 @@ class OnLdapChange extends DmPlugin {
           // Entry might not exist, ignore
         }
       }
-      return dn;
+      return [dn, req] as [string | string[], Request?];
     },
 
     /**

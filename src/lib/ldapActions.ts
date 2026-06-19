@@ -671,17 +671,17 @@ class ldapActions {
   /*
     LDAP delete
    */
-  async delete(dn: string | string[]): Promise<boolean> {
+  async delete(dn: string | string[], req?: Request): Promise<boolean> {
     if (Array.isArray(dn)) {
       dn = dn.map(d => this.setDn(d));
     } else {
       dn = this.setDn(dn);
     }
     if (!Array.isArray(dn)) dn = [dn];
-    dn = (await launchHooksChained(
-      this.parent?.hooks.ldapdeleterequest,
-      dn
-    )) as string | string[];
+    [dn] = (await launchHooksChained(this.parent?.hooks.ldapdeleterequest, [
+      dn,
+      req,
+    ])) as [string | string[], Request?];
 
     const pooled = await this.acquireConnection();
     try {

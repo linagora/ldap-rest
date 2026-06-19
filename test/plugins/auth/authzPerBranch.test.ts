@@ -416,9 +416,11 @@ describe('AuthzPerBranch', function () {
           .set('X-Test-User', 'testuser1')
           .set('Accept', 'application/json');
 
-        expect(res.status).to.equal(500);
+        expect(res.status).to.equal(403);
         expect(res.body).to.have.property('error');
-        expect(res.body.error).to.equal('check logs');
+        expect(res.body.error).to.equal(
+          'Token does not have permission on this branch'
+        );
       });
 
       it('should allow search in authorized branch', async function () {

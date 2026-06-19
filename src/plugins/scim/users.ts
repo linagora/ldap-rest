@@ -264,7 +264,7 @@ export class ScimUsers {
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
     try {
-      await this.ldap.add(dn, attributes);
+      await this.ldap.add(dn, attributes, req);
     } catch (err) {
       if (extractLdapCode(err) === 68) {
         throw scimUniqueness(`User ${rdn} already exists`);
@@ -338,7 +338,7 @@ export class ScimUsers {
 
     if (changes.replace || changes.delete) {
       try {
-        await this.ldap.modify(dn, changes);
+        await this.ldap.modify(dn, changes, req);
       } catch (err) {
         if (extractLdapCode(err) !== 16) throw err;
       }
@@ -381,7 +381,7 @@ export class ScimUsers {
     ] as [string, DmRequest]);
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
-    await this.ldap.delete(dn);
+    await this.ldap.delete(dn, req);
     void launchHooks(this.hooks.scimuserdeletedone, finalId);
   }
 

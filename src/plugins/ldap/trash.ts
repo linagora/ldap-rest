@@ -12,6 +12,8 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 
+import type { Request } from 'express';
+
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
@@ -198,7 +200,7 @@ class TrashPlugin extends DmPlugin {
      * This is a chained hook that receives a DN or array of DNs
      * and can modify or filter them before deletion
      */
-    ldapdeleterequest: async (dn: string | string[]) => {
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
       // Convert to array for easier processing
       const dnsToProcess = Array.isArray(dn) ? dn : [dn];
       const dnsToDelete: string[] = [];
@@ -266,7 +268,10 @@ class TrashPlugin extends DmPlugin {
       // Return the list of DNs that should still be deleted normally
       // If input was an array, return array; if single string, return string or undefined
       // Returning undefined indicates no deletion should occur (all handled by trash)
-      return Array.isArray(dn) ? dnsToDelete : (dnsToDelete[0] ?? undefined);
+      return [
+        Array.isArray(dn) ? dnsToDelete : (dnsToDelete[0] ?? undefined),
+        req,
+      ] as [string | string[], Request?];
     },
   };
 }

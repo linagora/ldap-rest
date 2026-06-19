@@ -667,10 +667,13 @@ export default class LdapOrganizations extends DmPlugin {
       return [dn, changes, op];
     },
 
-    ldapdeleterequest: async ([dn]) => {
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
       // Deletion of a non empty organization is forbidden
-      if (/^ou=/.test(dn)) await this.isEmptyOrganization(dn);
-      return [dn];
+      const targets = Array.isArray(dn) ? dn : [dn];
+      for (const target of targets) {
+        if (/^ou=/.test(target)) await this.isEmptyOrganization(target);
+      }
+      return [dn, req] as [string | string[], Request?];
     },
 
     ldaprenamerequest: ([dn, newdn]) => {

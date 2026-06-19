@@ -204,8 +204,10 @@ describe('Authorization for Group Move', function () {
         targetOrgDn: getOrg2Dn(),
       });
 
-    expect(res.status).to.equal(500);
-    expect(res.body.error).to.equal('check logs');
+    expect(res.status).to.equal(403);
+    expect(res.body.error).to.equal(
+      'Token does not have permission on this branch'
+    );
   });
 
   it('should reject move when user lacks write access to destination', async () => {
@@ -217,8 +219,10 @@ describe('Authorization for Group Move', function () {
         targetOrgDn: getOrg2Dn(),
       });
 
-    expect(res.status).to.equal(500);
-    expect(res.body.error).to.equal('check logs');
+    expect(res.status).to.equal(403);
+    expect(res.body.error).to.equal(
+      'Token does not have permission on this branch'
+    );
   });
 
   it('should allow move when user has full access', async () => {

@@ -353,7 +353,7 @@ describe('LDAP Organizations Plugin', function () {
         // Since twakeDepartmentLink may not exist in schema,
         // verify that hook allows deletion when no entries link to org
         const result = await plugin.hooks.ldapdeleterequest?.([testOrgDn]);
-        expect(result).to.deep.equal([testOrgDn]);
+        expect(result).to.deep.equal([testOrgDn, undefined]);
       });
 
       it('should allow deletion of empty organization', async () => {
@@ -363,13 +363,13 @@ describe('LDAP Organizations Plugin', function () {
         });
 
         const result = await plugin.hooks.ldapdeleterequest?.([testOrgDn]);
-        expect(result).to.deep.equal([testOrgDn]);
+        expect(result).to.deep.equal([testOrgDn, undefined]);
       });
 
       it('should allow deletion of non-organization entries', async () => {
         const dn = `cn=test,${process.env.DM_LDAP_BASE}`;
         const result = await plugin.hooks.ldapdeleterequest?.([dn]);
-        expect(result).to.deep.equal([dn]);
+        expect(result).to.deep.equal([dn, undefined]);
       });
     });
 

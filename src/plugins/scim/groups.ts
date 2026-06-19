@@ -330,7 +330,7 @@ export class ScimGroups {
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
     try {
-      await this.ldap.add(dn, attributes);
+      await this.ldap.add(dn, attributes, req);
     } catch (err) {
       if (extractLdapCode(err) === 68) {
         throw scimUniqueness(`Group ${rdn} already exists`);
@@ -383,7 +383,7 @@ export class ScimGroups {
       changes.replace![k] = v;
     }
     changes.replace!.member = memberDns;
-    await this.ldap.modify(dn, changes);
+    await this.ldap.modify(dn, changes, req);
 
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
@@ -440,7 +440,7 @@ export class ScimGroups {
       }
     }
 
-    await this.ldap.modify(dn, changes);
+    await this.ldap.modify(dn, changes, req);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;
@@ -454,7 +454,7 @@ export class ScimGroups {
     ] as [string, DmRequest]);
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
-    await this.ldap.delete(dn);
+    await this.ldap.delete(dn, req);
     void launchHooks(this.hooks.scimgroupdeletedone, finalId);
   }
 
