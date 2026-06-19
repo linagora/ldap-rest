@@ -420,17 +420,20 @@ export default class AuthzDynamic extends AuthBase {
       return [dn, changes, opNumber, req];
     },
 
-    // The delete hook carries no `req`, but AsyncLocalStorage still gives us
-    // the active token. Enforce delete permission on every target DN's parent
-    // branch.
-    ldapdeleterequest: (dn: string | string[]): string | string[] => {
-      const token = authzContext.getStore();
-      if (!token) return dn;
+    // Prefer the request-borne token; fall back to AsyncLocalStorage's active
+    // token for callers that do not thread `req`. Enforce delete permission on
+    // every target DN's parent branch.
+    ldapdeleterequest: ([dn, req]: [string | string[], DmRequest?]): [
+      string | string[],
+      DmRequest?,
+    ] => {
+      const token = this.activeToken(req);
+      if (!token) return [dn, req];
       const list = Array.isArray(dn) ? dn : [dn];
       for (const target of list) {
         this.requireBranchPermission(token, getParentDn(target), 'delete');
       }
-      return dn;
+      return [dn, req];
     },
 
     ldaprenamerequest: ([oldDn, newDn, req]: [string, string, DmRequest?]): [

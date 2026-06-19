@@ -163,7 +163,7 @@ export default class LdapGroups extends DmPlugin {
    * Catch all deletion to remove deleted users from groups
    */
   hooks: Hooks = {
-    ldapdeleterequest: async dn => {
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
       let _dn = dn;
       if (!Array.isArray(_dn)) {
         _dn = [_dn];
@@ -177,7 +177,7 @@ export default class LdapGroups extends DmPlugin {
       ).catch(err => {
         this.logger.error('Failed to process user deletion in groups:', err);
       });
-      return dn;
+      return [dn, req] as [string | string[], Request?];
     },
   };
 
