@@ -9,6 +9,11 @@ import AuthToken from '../../../src/plugins/auth/token';
 describe('App Accounts API Plugin', function () {
   const timestamp = Date.now();
   const testUser = `testuser-${timestamp}`;
+  // App-account endpoints key on the principal email (the `:user` path param),
+  // not the LDAP uid.
+  const principalEmail = `${testUser}@example.com`;
+  // Generated app-account uids are prefixed from the (sanitized) `:user` value.
+  const appUidPrefix = principalEmail.replace(/[^A-Za-z0-9_-]/g, '_');
   let applicativeBase: string;
   let userBase: string;
   let testUserDN: string;
@@ -115,13 +120,13 @@ describe('App Accounts API Plugin', function () {
   describe('GET /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .get(`/api/v1/users/${testUser}/app-accounts`)
+        .get(`/api/v1/users/${principalEmail}/app-accounts`)
         .expect(401);
     });
 
     it('should return 404 for non-existent user', async () => {
       const res = await request(dm.app)
-        .get('/api/v1/users/nonexistent/app-accounts')
+        .get('/api/v1/users/nonexistent@example.com/app-accounts')
         .set('Authorization', `Bearer ${testToken}`)
         .expect(404);
 
@@ -142,7 +147,7 @@ describe('App Accounts API Plugin', function () {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .get(`/api/v1/users/${testUser}/app-accounts`)
+        .get(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -165,20 +170,20 @@ describe('App Accounts API Plugin', function () {
 
       // Create app accounts via API
       const res1 = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Phone' })
         .expect(200);
 
       const res2 = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Laptop' })
         .expect(200);
 
       // List accounts
       const listRes = await request(dm.app)
-        .get(`/api/v1/users/${testUser}/app-accounts`)
+        .get(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -201,14 +206,14 @@ describe('App Accounts API Plugin', function () {
   describe('POST /api/v1/users/:user/app-accounts', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .send({ name: 'Test' })
         .expect(401);
     });
 
     it('should return 404 for non-existent user', async () => {
       const res = await request(dm.app)
-        .post('/api/v1/users/nonexistent/app-accounts')
+        .post('/api/v1/users/nonexistent@example.com/app-accounts')
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Test' })
         .expect(404);
@@ -230,7 +235,7 @@ describe('App Accounts API Plugin', function () {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Device' })
         .expect(200);
@@ -238,7 +243,7 @@ describe('App Accounts API Plugin', function () {
       expect(res.body).to.have.property('uid');
       expect(res.body).to.have.property('pwd');
       expect(res.body).to.have.property('mail');
-      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(res.body.uid).to.match(new RegExp(`^${appUidPrefix}_c\\d{8}$`));
       expect(res.body.pwd).to.match(
         /^[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+$/
       );
@@ -270,12 +275,12 @@ describe('App Accounts API Plugin', function () {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const res = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({})
         .expect(200);
 
-      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(res.body.uid).to.match(new RegExp(`^${appUidPrefix}_c\\d{8}$`));
 
       // Verify no description attribute
       const searchRes = await dm.ldap.search(
@@ -331,20 +336,20 @@ describe('App Accounts API Plugin', function () {
 
       // Create 2 accounts (should succeed)
       await request(dmTest.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 1' })
         .expect(200);
 
       await request(dmTest.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 2' })
         .expect(200);
 
       // Third should fail
       const res = await request(dmTest.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Device 3' })
         .expect(400);
@@ -356,17 +361,45 @@ describe('App Accounts API Plugin', function () {
   describe('DELETE /api/v1/users/:user/app-accounts/:uid', () => {
     it('should return 401 without authorization', async () => {
       const res = await request(dm.app)
-        .delete(`/api/v1/users/${testUser}/app-accounts/${testUser}_c12345678`)
+        .delete(
+          `/api/v1/users/${principalEmail}/app-accounts/${testUser}_c12345678`
+        )
         .expect(401);
     });
 
-    it('should return 403 if uid does not belong to user', async () => {
+    it('should return 403 when the account belongs to a different principal', async () => {
+      // Create the user and one app account owned by its principal mail
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `${testUser}@example.com`,
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const createRes = await request(dm.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'My Device' })
+        .expect(200);
+
+      const uid = createRes.body.uid;
+
+      // A different principal must not be able to delete it
       const res = await request(dm.app)
-        .delete(`/api/v1/users/${testUser}/app-accounts/otheruser_c12345678`)
+        .delete(`/api/v1/users/intruder@example.com/app-accounts/${uid}`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(403);
 
       expect(res.body.error).to.match(/does not belong/i);
+
+      // ...and the account must still exist
+      const survivor = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        `uid=${uid},${applicativeBase}`
+      );
+      expect((survivor as any).searchEntries).to.have.lengthOf(1);
     });
 
     it('should delete an app account', async () => {
@@ -383,7 +416,7 @@ describe('App Accounts API Plugin', function () {
 
       // Create app account
       const createRes = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'My Device' })
         .expect(200);
@@ -402,7 +435,7 @@ describe('App Accounts API Plugin', function () {
 
       // Delete account
       const deleteRes = await request(dm.app)
-        .delete(`/api/v1/users/${testUser}/app-accounts/${uid}`)
+        .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid}`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -425,7 +458,9 @@ describe('App Accounts API Plugin', function () {
 
     it('should be idempotent (deleting non-existent account succeeds)', async () => {
       const res = await request(dm.app)
-        .delete(`/api/v1/users/${testUser}/app-accounts/${testUser}_c99999999`)
+        .delete(
+          `/api/v1/users/${principalEmail}/app-accounts/${testUser}_c99999999`
+        )
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -449,12 +484,12 @@ describe('App Accounts API Plugin', function () {
 
       // Create two app accounts through the real API
       const created1 = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Phone' })
         .expect(200);
       const created2 = await request(dm.app)
-        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
         .set('Authorization', `Bearer ${testToken}`)
         .send({ name: 'Laptop' })
         .expect(200);
@@ -464,7 +499,7 @@ describe('App Accounts API Plugin', function () {
 
       // Delete ONLY the first one
       await request(dm.app)
-        .delete(`/api/v1/users/${testUser}/app-accounts/${uid1}`)
+        .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid1}`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(200);
 
@@ -500,6 +535,193 @@ describe('App Accounts API Plugin', function () {
         (principal as any).searchEntries,
         'principal applicative account must survive a single-account delete'
       ).to.have.lengthOf(1);
+    });
+  });
+
+  // Regression: two users sharing the SAME uid under different subtrees, with
+  // distinct mails. App-account operations key on the unique mail, so they must
+  // resolve to the matching principal and never cross-contaminate.
+  describe('uid collisions across subtrees (regression)', () => {
+    const sharedUid = `collide-${timestamp}`;
+    const mailA = `${sharedUid}-a@example.com`;
+    const mailB = `${sharedUid}-b@example.com`;
+    let ouA: string;
+    let ouB: string;
+    let dnA: string;
+    let dnB: string;
+
+    beforeEach(async function () {
+      if (!process.env.DM_LDAP_BASE) this.skip();
+
+      ouA = `ou=orga-${timestamp},${process.env.DM_LDAP_BASE}`;
+      ouB = `ou=orgb-${timestamp},${process.env.DM_LDAP_BASE}`;
+      dnA = `uid=${sharedUid},${ouA}`;
+      dnB = `uid=${sharedUid},${ouB}`;
+
+      for (const ou of [ouA, ouB]) {
+        try {
+          await dm.ldap.add(ou, {
+            objectClass: ['organizationalUnit', 'top'],
+            ou: ou.split(',')[0].replace('ou=', ''),
+          });
+        } catch (err) {
+          // Ignore if already exists
+        }
+      }
+
+      await dm.ldap.add(dnA, {
+        objectClass: 'inetOrgPerson',
+        uid: sharedUid,
+        cn: 'Collide A',
+        sn: 'A',
+        mail: mailA,
+      });
+      await dm.ldap.add(dnB, {
+        objectClass: 'inetOrgPerson',
+        uid: sharedUid,
+        cn: 'Collide B',
+        sn: 'B',
+        mail: mailB,
+      });
+
+      // Let the consistency plugin create both principal accounts
+      await new Promise(resolve => setTimeout(resolve, 200));
+    });
+
+    afterEach(async () => {
+      try {
+        const result = await dm.ldap.search(
+          {
+            scope: 'sub',
+            filter: `(|(mail=${mailA})(mail=${mailB})(uid=${sharedUid}_*))`,
+            paged: false,
+          },
+          applicativeBase
+        );
+        for (const entry of (result as any).searchEntries || []) {
+          try {
+            await dm.ldap.delete(entry.dn);
+          } catch (e) {
+            // Ignore
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
+      for (const dn of [dnA, dnB, ouA, ouB]) {
+        try {
+          await dm.ldap.delete(dn);
+        } catch (e) {
+          // Ignore
+        }
+      }
+    });
+
+    it('attaches each app account to the matching principal, not the same-uid user', async () => {
+      const a = await request(dm.app)
+        .post(`/api/v1/users/${mailA}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'A device' })
+        .expect(200);
+
+      const b = await request(dm.app)
+        .post(`/api/v1/users/${mailB}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'B device' })
+        .expect(200);
+
+      // Each app account belongs to its own principal mail
+      expect(a.body.mail).to.equal(mailA);
+      expect(b.body.mail).to.equal(mailB);
+
+      // Listing by one mail never surfaces the other principal's account
+      const listA = await request(dm.app)
+        .get(`/api/v1/users/${mailA}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+      const uidsA = listA.body.map((acc: any) => acc.uid);
+      expect(uidsA).to.include(a.body.uid);
+      expect(uidsA).to.not.include(b.body.uid);
+
+      const listB = await request(dm.app)
+        .get(`/api/v1/users/${mailB}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+      const uidsB = listB.body.map((acc: any) => acc.uid);
+      expect(uidsB).to.include(b.body.uid);
+      expect(uidsB).to.not.include(a.body.uid);
+
+      // The same-uid principal cannot delete the other's account
+      await request(dm.app)
+        .delete(`/api/v1/users/${mailA}/app-accounts/${b.body.uid}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(403);
+    });
+  });
+
+  // Legacy opt-in: app_accounts_user_attribute='uid' restores the pre-#89
+  // contract where `:user` is the LDAP uid and app-uids stay `<uid>_c<digits>`.
+  describe('legacy uid key mode (app_accounts_user_attribute=uid)', () => {
+    let dmUid: DM;
+
+    beforeEach(async function () {
+      this.timeout(10000);
+      if (!process.env.DM_LDAP_BASE) this.skip();
+
+      dmUid = new DM();
+      dmUid.config.ldap_base = process.env.DM_LDAP_BASE;
+      dmUid.config.auth_token = [testToken];
+      dmUid.config.applicative_account_base = applicativeBase;
+      dmUid.config.mail_attribute = 'mail';
+      dmUid.config.app_accounts_user_attribute = 'uid';
+      await dmUid.ready;
+
+      await dmUid.registerPlugin('authToken', new AuthToken(dmUid));
+      await dmUid.registerPlugin('onLdapChange', new OnChange(dmUid));
+      await dmUid.registerPlugin(
+        'appAccountsConsistency',
+        new AppAccountsConsistency(dmUid)
+      );
+      await dmUid.registerPlugin('appAccountsApi', new AppAccountsApi(dmUid));
+
+      await dmUid.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `${testUser}@example.com`,
+      });
+      await new Promise(resolve => setTimeout(resolve, 200));
+    });
+
+    it('resolves :user by uid and keeps the <uid>_c<digits> format', async () => {
+      // The mail is NOT accepted as :user in uid mode.
+      await request(dmUid.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'Mail device' })
+        .expect(404);
+
+      // The uid is.
+      const created = await request(dmUid.app)
+        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'My Device' })
+        .expect(200);
+      expect(created.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(created.body.mail).to.equal(`${testUser}@example.com`);
+
+      // Listing and deleting work through the uid as well.
+      const list = await request(dmUid.app)
+        .get(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+      expect(list.body.map((a: any) => a.uid)).to.include(created.body.uid);
+
+      await request(dmUid.app)
+        .delete(`/api/v1/users/${testUser}/app-accounts/${created.body.uid}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
     });
   });
 

@@ -210,6 +210,12 @@ export interface Config {
   // Applicative Accounts plugin
   applicative_account_base?: string;
   max_app_accounts?: number;
+  // LDAP attribute used to resolve the `:user` path param of the app-account
+  // endpoints to the principal entry. Defaults to the mail attribute, which is
+  // globally unique (see #88). Set to `uid` to restore the pre-#89 contract
+  // where `:user` is the LDAP uid — only safe when uid is unique directory-wide.
+  // Generated app-account uids are prefixed from this (unique) value, sanitized.
+  app_accounts_user_attribute?: string;
   ldap_operational_attribute?: string[];
 
   // Trash plugin
