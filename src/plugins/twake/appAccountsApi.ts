@@ -12,7 +12,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { escapeDnValue } from '../../lib/utils';
+import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 /**
  * @openapi-component
@@ -29,7 +29,8 @@ import { escapeDnValue } from '../../lib/utils';
  *       type: string
  *       description: |
  *         Unique identifier of the app account.  Format:
- *         `<username>_c<8-digits>` (e.g. `alice_c04729183`).
+ *         `<uid>_c<8-digits>`, where `<uid>` is the principal's LDAP uid
+ *         (not the `:user` path param, which is the mail). e.g. `alice_c04729183`.
  *       example: alice_c04729183
  *     name:
  *       type: string
@@ -117,10 +118,11 @@ export default class AppAccountsApi extends DmPlugin {
      * @openapi
      * summary: List app accounts for a user
      * description: |
-     *   Returns all application-specific accounts belonging to `:user`.
-     *   Only entries whose `uid` starts with `<username>_` are included;
-     *   the principal account (whose uid equals the user's mail address)
-     *   is always filtered out.
+     *   Returns all application-specific accounts belonging to `:user`, where
+     *   `:user` is the principal account email (globally unique). Ownership is
+     *   resolved by the mail attribute, not the LDAP `uid`, which may repeat
+     *   under different subtrees of the directory. The principal account
+     *   (whose uid equals the mail address) is always filtered out.
      *
      *   Results are sorted alphabetically by `uid`.
      * responses:
@@ -206,10 +208,11 @@ export default class AppAccountsApi extends DmPlugin {
      * summary: Delete an app account
      * description: |
      *   Deletes the app account identified by `:uid` and removes its
-     *   password from the principal account (`uid=<mail>`).
+     *   password from the principal account (`uid=<mail>`). `:user` is the
+     *   principal account email.
      *
-     *   The `:uid` must start with `<user>_` — attempting to delete an
-     *   account that belongs to a different user returns `403`.
+     *   The target account's mail must match `:user` — attempting to delete an
+     *   account that belongs to a different principal returns `403`.
      *
      *   The operation is **idempotent**: if the account does not exist,
      *   the response is still `200` with the `uid` echoed back.
@@ -244,36 +247,79 @@ export default class AppAccountsApi extends DmPlugin {
   }
 
   /**
+   * Resolve the principal user entry by its (globally unique) mail address.
+   *
+   * App accounts are keyed on the principal mail, never the LDAP `uid`: the
+   * same `uid` may repeat under different subtrees of the directory, so a
+   * `uid`-based lookup could resolve to an arbitrary same-named user.
+   *
+   * On failure (no match, or an ambiguous mail) this writes the HTTP error
+   * response and returns null, so callers can simply `return` when it does.
+   *
+   * @param principalEmail - The principal account email (the `:user` path param)
+   * @param res - The Express response, used to emit error statuses
+   * @param attributes - Optional attribute projection for the search
+   * @returns The single matching LDAP entry, or null when none/ambiguous
+   */
+  private async resolvePrincipal(
+    principalEmail: string,
+    res: Response,
+    attributes?: string[]
+  ): Promise<SearchResult['searchEntries'][number] | null> {
+    const result = await this.server.ldap.search(
+      {
+        scope: 'sub',
+        filter: `(${this.mailAttr}=${escapeLdapFilter(principalEmail)})`,
+        paged: false,
+        ...(attributes ? { attributes } : {}),
+      },
+      this.config.ldap_base || ''
+    );
+
+    // The applicative branch lives under ldap_base and its entries (the
+    // principal account and the app accounts) carry the same mail, so exclude
+    // them: only a real user entry can be the principal.
+    const entries = ((result as SearchResult).searchEntries || []).filter(
+      entry => !isDnInBranch(entry.dn, this.applicativeAccountBase)
+    );
+
+    if (entries.length === 0) {
+      res.status(404).json({ error: `User ${principalEmail} not found` });
+      return null;
+    }
+
+    if (entries.length > 1) {
+      this.logger.error(
+        `${this.name}: Ambiguous principal lookup for ${principalEmail}: ${entries.length} entries share this mail`
+      );
+      res
+        .status(409)
+        .json({ error: `Multiple users share mail ${principalEmail}` });
+      return null;
+    }
+
+    return entries[0];
+  }
+
+  /**
    * List applicative accounts for a user
    */
   private async listAccounts(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user as string;
+    const principalEmail = req.params.user as string;
 
     try {
-      // Get user's mail from LDAP
-      const userResult = await this.server.ldap.search(
-        {
-          scope: 'sub',
-          filter: `(uid=${username})`,
-          paged: false,
-          attributes: [this.mailAttr],
-        },
-        this.config.ldap_base || ''
-      );
-
-      const userEntry = (userResult as SearchResult).searchEntries?.[0];
-      if (!userEntry) {
-        res.status(404).json({ error: `User ${username} not found` });
-        return;
-      }
+      const userEntry = await this.resolvePrincipal(principalEmail, res, [
+        this.mailAttr,
+      ]);
+      if (!userEntry) return;
 
       const mail = userEntry[this.mailAttr];
       if (!mail) {
         res
           .status(400)
-          .json({ error: `User ${username} has no mail attribute` });
+          .json({ error: `User ${principalEmail} has no mail attribute` });
         return;
       }
 
@@ -283,7 +329,7 @@ export default class AppAccountsApi extends DmPlugin {
       const accountsResult = await this.server.ldap.search(
         {
           scope: 'sub',
-          filter: `(${this.mailAttr}=${mailStr})`,
+          filter: `(${this.mailAttr}=${escapeLdapFilter(mailStr)})`,
           paged: false,
         },
         this.applicativeAccountBase
@@ -291,13 +337,14 @@ export default class AppAccountsApi extends DmPlugin {
 
       const accounts = (accountsResult as SearchResult).searchEntries || [];
 
-      // Filter out the principal account (uid=mail) and extract uid and name
+      // Ownership is the (unique) mail match above; the only non-app entry
+      // sharing it is the principal account (uid=mail), dropped here. Compare
+      // case-insensitively, as LDAP uid/mail matching is.
       const appAccounts = accounts
         .filter(entry => {
           const uid = entry.uid;
           const uidStr = Array.isArray(uid) ? String(uid[0]) : String(uid);
-          // Keep only applicative accounts (user_cXXXXXXXX format)
-          return uidStr !== mailStr && uidStr.startsWith(`${username}_`);
+          return uidStr.toLowerCase() !== mailStr.toLowerCase();
         })
         .map(entry => {
           const uid = entry.uid;
@@ -319,7 +366,7 @@ export default class AppAccountsApi extends DmPlugin {
       res.json(appAccounts);
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to list accounts for ${username}:`,
+        `${this.name}: Failed to list accounts for ${principalEmail}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });
@@ -332,42 +379,43 @@ export default class AppAccountsApi extends DmPlugin {
   private async createAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user as string;
+    const principalEmail = req.params.user as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { name } = req.body || {};
 
     try {
-      // Get user's mail and attributes from LDAP
-      const userResult = await this.server.ldap.search(
-        {
-          scope: 'sub',
-          filter: `(uid=${username})`,
-          paged: false,
-        },
-        this.config.ldap_base || ''
-      );
-
-      const userEntry = (userResult as SearchResult).searchEntries?.[0];
-      if (!userEntry) {
-        res.status(404).json({ error: `User ${username} not found` });
-        return;
-      }
+      const userEntry = await this.resolvePrincipal(principalEmail, res);
+      if (!userEntry) return;
 
       const mail = userEntry[this.mailAttr];
       if (!mail) {
         res
           .status(400)
-          .json({ error: `User ${username} has no mail attribute` });
+          .json({ error: `User ${principalEmail} has no mail attribute` });
         return;
       }
 
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
-      // Check existing accounts count
+      // The app-account uid keeps the documented `<uid>_c<digits>` format, so
+      // it is prefixed with the principal's short uid resolved from the entry,
+      // not the `:user` path param (which is the mail).
+      const uidAttr = userEntry.uid;
+      if (!uidAttr) {
+        res
+          .status(400)
+          .json({ error: `User ${principalEmail} has no uid attribute` });
+        return;
+      }
+      const shortUid = Array.isArray(uidAttr)
+        ? String(uidAttr[0])
+        : String(uidAttr);
+
+      // Check existing accounts count (scoped by the unique principal mail)
       const accountsResult = await this.server.ldap.search(
         {
           scope: 'sub',
-          filter: `(${this.mailAttr}=${mailStr})`,
+          filter: `(${this.mailAttr}=${escapeLdapFilter(mailStr)})`,
           paged: false,
         },
         this.applicativeAccountBase
@@ -377,7 +425,7 @@ export default class AppAccountsApi extends DmPlugin {
       const existingAppAccounts = accounts.filter(entry => {
         const uid = entry.uid;
         const uidStr = Array.isArray(uid) ? String(uid[0]) : String(uid);
-        return uidStr !== mailStr && uidStr.startsWith(`${username}_`);
+        return uidStr.toLowerCase() !== mailStr.toLowerCase();
       });
 
       if (existingAppAccounts.length >= this.maxAppAccounts) {
@@ -402,11 +450,11 @@ export default class AppAccountsApi extends DmPlugin {
         existingAppAccounts.some(entry => {
           const uid = entry.uid;
           const uidStr = Array.isArray(uid) ? String(uid[0]) : String(uid);
-          return uidStr === `${username}_${accountId}`;
+          return uidStr === `${shortUid}_${accountId}`;
         })
       );
 
-      const newUid = `${username}_${accountId}`;
+      const newUid = `${shortUid}_${accountId}`;
       const newPassword = this.generatePassword();
 
       // Build attributes for new applicative account
@@ -454,7 +502,7 @@ export default class AppAccountsApi extends DmPlugin {
       await this.server.ldap.add(applicativeDn, newAttrs);
 
       this.logger.info(
-        `${this.name}: Created applicative account ${applicativeDn} for user ${username}`
+        `${this.name}: Created applicative account ${applicativeDn} for user ${principalEmail}`
       );
 
       // Add password to principal account (uid=mail)
@@ -476,7 +524,7 @@ export default class AppAccountsApi extends DmPlugin {
       res.json({ uid: newUid, pwd: newPassword, mail: mailStr });
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to create account for ${username}:`,
+        `${this.name}: Failed to create account for ${principalEmail}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });
@@ -489,23 +537,15 @@ export default class AppAccountsApi extends DmPlugin {
   private async deleteAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const username = req.params.user as string;
+    const principalEmail = req.params.user as string;
     const uid = req.params.uid as string;
 
     try {
-      // Validate that uid belongs to this user
-      if (!uid.startsWith(`${username}_`)) {
-        res.status(403).json({
-          error: `Account ${uid} does not belong to user ${username}`,
-        });
-        return;
-      }
-
       // Search for the applicative account
       const accountResult = await this.server.ldap.search(
         {
           scope: 'sub',
-          filter: `(uid=${uid})`,
+          filter: `(uid=${escapeLdapFilter(uid)})`,
           paged: false,
         },
         this.applicativeAccountBase
@@ -521,13 +561,6 @@ export default class AppAccountsApi extends DmPlugin {
         return;
       }
 
-      const userPassword = accountEntry.userPassword;
-      if (!userPassword) {
-        this.logger.warn(
-          `${this.name}: Account ${uid} has no userPassword attribute`
-        );
-      }
-
       // Get mail from account to find principal account
       const mail = accountEntry[this.mailAttr];
       const mailStr = mail
@@ -536,8 +569,25 @@ export default class AppAccountsApi extends DmPlugin {
           : String(mail)
         : null;
 
+      // Ownership: the account's mail must match the principal email. Mail is
+      // the unique owner key; the uid prefix is not, as the same short uid may
+      // repeat under different subtrees of the directory.
+      if (!mailStr || mailStr.toLowerCase() !== principalEmail.toLowerCase()) {
+        res.status(403).json({
+          error: `Account ${uid} does not belong to user ${principalEmail}`,
+        });
+        return;
+      }
+
+      const userPassword = accountEntry.userPassword;
+      if (!userPassword) {
+        this.logger.warn(
+          `${this.name}: Account ${uid} has no userPassword attribute`
+        );
+      }
+
       // Delete password from principal account if available
-      if (mailStr && userPassword) {
+      if (userPassword) {
         const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
         try {
           const passwordToDelete = Array.isArray(userPassword)
@@ -566,7 +616,7 @@ export default class AppAccountsApi extends DmPlugin {
       res.json({ uid });
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to delete account ${uid} for ${username}:`,
+        `${this.name}: Failed to delete account ${uid} for ${principalEmail}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });
