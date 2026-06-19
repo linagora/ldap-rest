@@ -202,6 +202,23 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     expect(entries).to.have.lengthOf(0);
   });
 
+  it('reader (write denied) is DENIED update (PUT) with 403', async () => {
+    await createUser('writer', 'alice').expect(201);
+
+    // reader has read (GET resolves) but not write → modify hook denies (403).
+    const res = await supertest(server.app)
+      .put('/scim/v2/Users/alice')
+      .set('x-scim-user', 'reader')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'alice',
+        name: { familyName: 'Hax' },
+      })
+      .expect(403);
+    expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+  });
+
   it('reader (delete denied) CANNOT delete a user, writer CAN', async () => {
     await createUser('writer', 'alice').expect(201);
 

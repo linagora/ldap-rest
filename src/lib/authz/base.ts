@@ -117,7 +117,7 @@ export default abstract class AuthzBase extends DmPlugin {
             );
             if (!sourcePermissions.read) {
               throw new Error(
-                `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+                `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
               );
             }
           }
@@ -131,7 +131,7 @@ export default abstract class AuthzBase extends DmPlugin {
           );
           if (!sourcePermissions.read) {
             throw new Error(
-              `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+              `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
             );
           }
         }
@@ -145,7 +145,7 @@ export default abstract class AuthzBase extends DmPlugin {
         const destPermissions = await this.getUserPermissions(user, destBranch);
         if (!destPermissions.write) {
           throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+            `User ${req!.user} does not have write permission for destination branch ${destBranch}`
           );
         }
       } else {
@@ -317,7 +317,7 @@ export default abstract class AuthzBase extends DmPlugin {
       );
       if (!sourcePermissions.read) {
         throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+          `User ${req!.user} does not have read permission for source branch ${sourceBranch}`
         );
       }
 
@@ -325,7 +325,7 @@ export default abstract class AuthzBase extends DmPlugin {
       const destPermissions = await this.getUserPermissions(user, destBranch);
       if (!destPermissions.write) {
         throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+          `User ${req!.user} does not have write permission for destination branch ${destBranch}`
         );
       }
 
