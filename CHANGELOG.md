@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.4.0 (2026-06-19)
+
+### Breaking Changes
+
+- `core/twake/appAccountsApi`: the `:user` path param of the app-account
+  endpoints is now resolved against the **mail** attribute (globally unique) by
+  default, instead of the LDAP `uid`. `uid` is not unique across the directory,
+  so the previous lookup could create/list/delete app accounts against the
+  wrong same-named user (#88). Callers must now pass the principal email as
+  `:user`. Set `app_accounts_user_attribute=uid`
+  (`DM_APP_ACCOUNTS_USER_ATTRIBUTE=uid`) to restore the previous `:user = uid`
+  contract — only safe where uid is unique directory-wide. Generated
+  app-account uids are now prefixed from the (sanitized) resolved `:user`
+  value: `<sanitized-mail>_c<digits>` by default, still `<uid>_c<digits>` in
+  uid mode
+- Authorization denials from `core/auth/authzPerBranch` now return **403** for
+  every operation (read, write, move, delete); previously read and move
+  denials surfaced as `500`. This aligns it with `core/auth/authzDynamic`
+
+### Bug Fixes
+
+- SCIM writes now honour `core/auth/authzPerBranch` (#80). `core/scim` did not
+  propagate the authenticated request down to the LDAP action layer, so the
+  `ldap{add,modify,delete}request` authorization hooks ran without `req.user`
+  and `shouldSkipAuthorization` allowed the write unconditionally — an identity
+  restricted to one branch could create or delete entries in any branch via
+  SCIM. The request is now threaded through every SCIM `ldap.add/modify/delete`.
+  `ldap.delete` also gained a `req` argument and `AuthzBase` now implements a
+  `ldapdeleterequest` hook (it enforced no delete permission before). The
+  `authzDynamic` path was unaffected (it reads its token from AsyncLocalStorage)
+- `core/twake/appAccountsApi`: escape LDAP filter metacharacters in principal
+  and uid lookups, reject ambiguous principal lookups with `409` instead of
+  silently using the first match, and guarantee a generated app-account uid is
+  unique across the whole applicative branch (prevents cross-user collisions in
+  the shared branch)
+
 ## v0.3.10 (2026-06-19)
 
 ### Bug Fixes
