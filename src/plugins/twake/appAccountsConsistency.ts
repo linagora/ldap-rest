@@ -32,7 +32,7 @@ import type {
   SearchResult,
 } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
-import { escapeDnValue } from '../../lib/utils';
+import { escapeDnValue, isDnInBranch } from '../../lib/utils';
 
 export default class AppAccountsConsistency extends DmPlugin {
   name = 'appAccountsConsistency';
@@ -96,13 +96,11 @@ export default class AppAccountsConsistency extends DmPlugin {
    * @returns true if `dn` is the applicative base itself or sits below it
    */
   private isInApplicativeBranch(dn: string): boolean {
-    // Loose DN normalisation: lowercase and collapse the optional whitespace
-    // around RDN separators so `uid=x, ou=AppAccounts ,dc=stg` still matches.
-    const norm = (s: string): string =>
-      s.toLowerCase().replace(/\s*,\s*/g, ',').trim();
-    const base = norm(this.applicativeAccountBase);
-    const target = norm(dn);
-    return target === base || target.endsWith(`,${base}`);
+    // Robust, RDN-by-RDN comparison (case/whitespace/escape-insensitive). A raw
+    // string suffix match can false-negative on real-world DN formatting
+    // differences between the configured base and what the LDAP server returns,
+    // which would let a re-entrant delete event slip through and cascade.
+    return isDnInBranch(dn, this.applicativeAccountBase);
   }
 
   hooks: Hooks = {

@@ -389,6 +389,82 @@ export function isChildOf(dn: string, parentDn: string): boolean {
 }
 
 /**
+ * Normalize a DN into a canonical, comparable form.
+ *
+ * Parses the DN into RDNs (honouring escaped commas via {@link parseDn}), then
+ * for each RDN lowercases it, collapses the optional whitespace around the `=`
+ * of every attribute-value assertion, and sorts the assertions of a
+ * multi-valued RDN so their ordering is irrelevant. The RDNs are re-joined with
+ * `,`. Empty components (e.g. from a trailing separator) are dropped.
+ *
+ * This makes equality / suffix comparisons robust to case, surrounding
+ * whitespace and multi-valued RDN ordering — unlike a raw string match.
+ *
+ * @param dn - The DN to normalize
+ * @returns The canonical form
+ *
+ * @example
+ * ```typescript
+ * normalizeDn('UID=x, ou=AppAccounts ,dc=Example,dc=com')
+ * // => 'uid=x,ou=appaccounts,dc=example,dc=com'
+ * ```
+ */
+export function normalizeDn(dn: string): string {
+  return parseDn(dn)
+    .map(rdn =>
+      rdn
+        .split('+')
+        .map(atav => {
+          // Split on the first `=` (the type/value separator — attribute types
+          // never contain `=`, and value `=` are escaped as `\=`) and trim each
+          // side. Done with indexOf rather than a `\s*=\s*` regex to avoid the
+          // polynomial scan a regex incurs on untrusted DN strings (ReDoS).
+          const eq = atav.indexOf('=');
+          const normalized =
+            eq === -1
+              ? atav.trim()
+              : `${atav.slice(0, eq).trim()}=${atav.slice(eq + 1).trim()}`;
+          return normalized.toLowerCase();
+        })
+        .sort()
+        .join('+')
+    )
+    .filter(rdn => rdn.length > 0)
+    .join(',');
+}
+
+/**
+ * Check whether a DN is a branch base itself or sits anywhere below it.
+ *
+ * Comparison is done RDN by RDN on the {@link normalizeDn} form, so it is
+ * robust to case, whitespace and escaped separators. A naive string suffix
+ * match can give a false negative (e.g. `ou=AppAccounts` vs `ou=appaccounts`,
+ * or `uid=x, ou=…` with stray whitespace), which is exactly what lets a
+ * re-entrant LDAP change event slip through a branch guard.
+ *
+ * Unlike {@link isChildOf}, this returns true when `dn` equals `base` as well.
+ *
+ * @param dn - The candidate DN
+ * @param base - The branch base DN
+ * @returns true if `dn` equals `base` or is a descendant of it
+ *
+ * @example
+ * ```typescript
+ * isDnInBranch('uid=x,ou=app,dc=e,dc=c', 'ou=app,dc=e,dc=c') // => true
+ * isDnInBranch('ou=app,dc=e,dc=c', 'ou=app,dc=e,dc=c')       // => true
+ * isDnInBranch('uid=x,ou=users,dc=e,dc=c', 'ou=app,dc=e,dc=c') // => false
+ * ```
+ */
+export function isDnInBranch(dn: string, base: string): boolean {
+  const baseParts = normalizeDn(base).split(',').filter(Boolean);
+  if (baseParts.length === 0) return false;
+  const dnParts = normalizeDn(dn).split(',').filter(Boolean);
+  if (dnParts.length < baseParts.length) return false;
+  const tail = dnParts.slice(dnParts.length - baseParts.length);
+  return tail.every((part, i) => part === baseParts[i]);
+}
+
+/**
  * Wrapper for async Express route handlers to catch errors and pass them to error middleware
  * This ensures that errors in async routes are properly handled and don't crash the server
  *
