@@ -29,9 +29,10 @@ import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
  *       type: string
  *       description: |
  *         Unique identifier of the app account.  Format:
- *         `<uid>_c<8-digits>`, where `<uid>` is the principal's LDAP uid
- *         (not the `:user` path param, which is the mail). e.g. `alice_c04729183`.
- *       example: alice_c04729183
+ *         `<prefix>_c<8-digits>`, where `<prefix>` is the `:user` path param
+ *         (the resolution value — the mail by default) sanitized into a
+ *         uid-safe token (e.g. `alice@example.com` -> `alice_example_com`).
+ *       example: alice_example_com_c04729183
  *     name:
  *       type: string
  *       description: Human-readable label (stored as LDAP `description`).
@@ -88,6 +89,12 @@ export default class AppAccountsApi extends DmPlugin {
   private applicativeAccountBase: string;
   private maxAppAccounts: number;
   private mailAttr: string;
+  // Attribute used to resolve the `:user` path param to the principal entry.
+  // Defaults to the (unique) mail attribute; set to `uid` for the legacy
+  // pre-#89 contract where `:user` is the LDAP uid. The app-account uid is
+  // prefixed from this (unique) `:user` value, sanitized — so with uid it stays
+  // `<uid>_c<digits>`, and with mail it becomes `<sanitized-mail>_c<digits>`.
+  private userAttr: string;
 
   constructor(server: DM) {
     super(server);
@@ -96,6 +103,8 @@ export default class AppAccountsApi extends DmPlugin {
       .applicative_account_base as string;
     this.maxAppAccounts = (this.config.max_app_accounts as number) || 5;
     this.mailAttr = (this.config.mail_attribute as string) || 'mail';
+    this.userAttr =
+      (this.config.app_accounts_user_attribute as string) || this.mailAttr;
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -104,7 +113,7 @@ export default class AppAccountsApi extends DmPlugin {
     }
 
     this.logger.info(
-      `${this.name}: initialized with applicative_account_base=${this.applicativeAccountBase}, max_app_accounts=${this.maxAppAccounts}`
+      `${this.name}: initialized with applicative_account_base=${this.applicativeAccountBase}, max_app_accounts=${this.maxAppAccounts}, user_attribute=${this.userAttr}`
     );
   }
 
@@ -156,8 +165,8 @@ export default class AppAccountsApi extends DmPlugin {
      * description: |
      *   Creates a new application-specific identity under the configured
      *   applicative-account LDAP branch.  The server generates a random
-     *   uid (`<username>_c<8-digits>`) and a cryptographically secure
-     *   password, then:
+     *   uid (`<prefix>_c<8-digits>`, prefix derived from `:user`) and a
+     *   cryptographically secure password, then:
      *
      *   1. Copies `cn`, `sn`, `givenName`, `mail`, and `displayName` from
      *      the principal user entry.
@@ -247,29 +256,31 @@ export default class AppAccountsApi extends DmPlugin {
   }
 
   /**
-   * Resolve the principal user entry by its (globally unique) mail address.
+   * Resolve the principal user entry from the `:user` path param.
    *
-   * App accounts are keyed on the principal mail, never the LDAP `uid`: the
-   * same `uid` may repeat under different subtrees of the directory, so a
-   * `uid`-based lookup could resolve to an arbitrary same-named user.
+   * `:user` is matched against the configured resolution attribute
+   * (`app_accounts_user_attribute`, default the mail attribute). Mail is
+   * globally unique; resolving by the LDAP `uid` instead is only safe when uid
+   * is unique directory-wide, as the same `uid` may repeat under different
+   * subtrees and resolve to an arbitrary same-named user (see #88).
    *
-   * On failure (no match, or an ambiguous mail) this writes the HTTP error
+   * On failure (no match, or an ambiguous one) this writes the HTTP error
    * response and returns null, so callers can simply `return` when it does.
    *
-   * @param principalEmail - The principal account email (the `:user` path param)
+   * @param principal - The `:user` path param value
    * @param res - The Express response, used to emit error statuses
    * @param attributes - Optional attribute projection for the search
    * @returns The single matching LDAP entry, or null when none/ambiguous
    */
   private async resolvePrincipal(
-    principalEmail: string,
+    principal: string,
     res: Response,
     attributes?: string[]
   ): Promise<SearchResult['searchEntries'][number] | null> {
     const result = await this.server.ldap.search(
       {
         scope: 'sub',
-        filter: `(${this.mailAttr}=${escapeLdapFilter(principalEmail)})`,
+        filter: `(${this.userAttr}=${escapeLdapFilter(principal)})`,
         paged: false,
         ...(attributes ? { attributes } : {}),
       },
@@ -284,17 +295,17 @@ export default class AppAccountsApi extends DmPlugin {
     );
 
     if (entries.length === 0) {
-      res.status(404).json({ error: `User ${principalEmail} not found` });
+      res.status(404).json({ error: `User ${principal} not found` });
       return null;
     }
 
     if (entries.length > 1) {
       this.logger.error(
-        `${this.name}: Ambiguous principal lookup for ${principalEmail}: ${entries.length} entries share this mail`
+        `${this.name}: Ambiguous principal lookup for ${principal}: ${entries.length} entries share ${this.userAttr}`
       );
-      res
-        .status(409)
-        .json({ error: `Multiple users share mail ${principalEmail}` });
+      res.status(409).json({
+        error: `Multiple users share ${this.userAttr} ${principal}`,
+      });
       return null;
     }
 
@@ -307,10 +318,10 @@ export default class AppAccountsApi extends DmPlugin {
   private async listAccounts(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const principalEmail = req.params.user as string;
+    const principal = req.params.user as string;
 
     try {
-      const userEntry = await this.resolvePrincipal(principalEmail, res, [
+      const userEntry = await this.resolvePrincipal(principal, res, [
         this.mailAttr,
       ]);
       if (!userEntry) return;
@@ -319,7 +330,7 @@ export default class AppAccountsApi extends DmPlugin {
       if (!mail) {
         res
           .status(400)
-          .json({ error: `User ${principalEmail} has no mail attribute` });
+          .json({ error: `User ${principal} has no mail attribute` });
         return;
       }
 
@@ -366,7 +377,7 @@ export default class AppAccountsApi extends DmPlugin {
       res.json(appAccounts);
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to list accounts for ${principalEmail}:`,
+        `${this.name}: Failed to list accounts for ${principal}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });
@@ -379,39 +390,32 @@ export default class AppAccountsApi extends DmPlugin {
   private async createAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const principalEmail = req.params.user as string;
+    const principal = req.params.user as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { name } = req.body || {};
 
     try {
-      const userEntry = await this.resolvePrincipal(principalEmail, res);
+      const userEntry = await this.resolvePrincipal(principal, res);
       if (!userEntry) return;
 
       const mail = userEntry[this.mailAttr];
       if (!mail) {
         res
           .status(400)
-          .json({ error: `User ${principalEmail} has no mail attribute` });
+          .json({ error: `User ${principal} has no mail attribute` });
         return;
       }
 
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
-      // The app-account uid keeps the documented `<uid>_c<digits>` format, so
-      // it is prefixed with the principal's short uid resolved from the entry,
-      // not the `:user` path param (which is the mail).
-      const uidAttr = userEntry.uid;
-      if (!uidAttr) {
-        res
-          .status(400)
-          .json({ error: `User ${principalEmail} has no uid attribute` });
-        return;
-      }
-      const shortUid = Array.isArray(uidAttr)
-        ? String(uidAttr[0])
-        : String(uidAttr);
+      // The app-account uid is prefixed from the (unique) `:user` value, not
+      // from the entry's `uid`: the same `uid` may repeat across users, so a
+      // uid-based prefix could collide in the shared applicative branch. The
+      // value is sanitized into a uid-safe token; uniqueness is still enforced
+      // globally below, so a lossy sanitization can never produce a clash.
+      const prefix = this.appUidPrefix(principal);
 
-      // Check existing accounts count (scoped by the unique principal mail)
+      // Enforce the per-user limit, scoped by the unique principal mail.
       const accountsResult = await this.server.ldap.search(
         {
           scope: 'sub',
@@ -435,26 +439,20 @@ export default class AppAccountsApi extends DmPlugin {
         return;
       }
 
-      // Generate unique account ID
-      let accountId: string;
+      // Generate a uid that is unique across the whole applicative branch (not
+      // just within this principal), so distinct principals can never collide.
+      let newUid: string;
       let attempts = 0;
       do {
-        accountId = this.generateAccountId();
+        newUid = `${prefix}_${this.generateAccountId()}`;
         attempts++;
         if (attempts > 100) {
           throw new Error(
             'Failed to generate unique account ID after 100 attempts'
           );
         }
-      } while (
-        existingAppAccounts.some(entry => {
-          const uid = entry.uid;
-          const uidStr = Array.isArray(uid) ? String(uid[0]) : String(uid);
-          return uidStr === `${shortUid}_${accountId}`;
-        })
-      );
+      } while (await this.uidExists(newUid));
 
-      const newUid = `${shortUid}_${accountId}`;
       const newPassword = this.generatePassword();
 
       // Build attributes for new applicative account
@@ -502,7 +500,7 @@ export default class AppAccountsApi extends DmPlugin {
       await this.server.ldap.add(applicativeDn, newAttrs);
 
       this.logger.info(
-        `${this.name}: Created applicative account ${applicativeDn} for user ${principalEmail}`
+        `${this.name}: Created applicative account ${applicativeDn} for user ${principal}`
       );
 
       // Add password to principal account (uid=mail)
@@ -524,11 +522,37 @@ export default class AppAccountsApi extends DmPlugin {
       res.json({ uid: newUid, pwd: newPassword, mail: mailStr });
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to create account for ${principalEmail}:`,
+        `${this.name}: Failed to create account for ${principal}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });
     }
+  }
+
+  /**
+   * Derive a uid-safe prefix for app-account uids from the (unique) `:user`
+   * value. Characters awkward in a uid/RDN (e.g. `@` and `.` in a mail) are
+   * replaced with `_`. Sanitization may be lossy, but app-account uids are made
+   * unique across the whole branch at creation time, so this never collides.
+   */
+  private appUidPrefix(principal: string): string {
+    return principal.replace(/[^A-Za-z0-9_-]/g, '_');
+  }
+
+  /**
+   * Whether a uid already exists anywhere under the applicative branch.
+   */
+  private async uidExists(uid: string): Promise<boolean> {
+    const result = await this.server.ldap.search(
+      {
+        scope: 'sub',
+        filter: `(uid=${escapeLdapFilter(uid)})`,
+        paged: false,
+        attributes: ['uid'],
+      },
+      this.applicativeAccountBase
+    );
+    return ((result as SearchResult).searchEntries || []).length > 0;
   }
 
   /**
@@ -537,7 +561,7 @@ export default class AppAccountsApi extends DmPlugin {
   private async deleteAccount(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const principalEmail = req.params.user as string;
+    const principal = req.params.user as string;
     const uid = req.params.uid as string;
 
     try {
@@ -569,12 +593,35 @@ export default class AppAccountsApi extends DmPlugin {
           : String(mail)
         : null;
 
-      // Ownership: the account's mail must match the principal email. Mail is
-      // the unique owner key; the uid prefix is not, as the same short uid may
-      // repeat under different subtrees of the directory.
-      if (!mailStr || mailStr.toLowerCase() !== principalEmail.toLowerCase()) {
+      // Ownership: the account's mail must match the principal's mail (the
+      // unique owner key — the uid prefix is not, as the same short uid may
+      // repeat under different subtrees). When `:user` is itself the mail we
+      // compare directly; otherwise we resolve `:user` to the principal entry
+      // and read its mail.
+      let principalMail = principal;
+      if (this.userAttr !== this.mailAttr) {
+        const principalEntry = await this.resolvePrincipal(principal, res, [
+          this.mailAttr,
+        ]);
+        if (!principalEntry) return;
+        const pm = principalEntry[this.mailAttr];
+        const pmStr = pm
+          ? Array.isArray(pm)
+            ? String(pm[0])
+            : String(pm)
+          : null;
+        if (!pmStr) {
+          res
+            .status(400)
+            .json({ error: `User ${principal} has no mail attribute` });
+          return;
+        }
+        principalMail = pmStr;
+      }
+
+      if (!mailStr || mailStr.toLowerCase() !== principalMail.toLowerCase()) {
         res.status(403).json({
-          error: `Account ${uid} does not belong to user ${principalEmail}`,
+          error: `Account ${uid} does not belong to user ${principal}`,
         });
         return;
       }
@@ -616,7 +663,7 @@ export default class AppAccountsApi extends DmPlugin {
       res.json({ uid });
     } catch (error) {
       this.logger.error(
-        `${this.name}: Failed to delete account ${uid} for ${principalEmail}:`,
+        `${this.name}: Failed to delete account ${uid} for ${principal}:`,
         error
       );
       res.status(500).json({ error: 'Internal server error' });

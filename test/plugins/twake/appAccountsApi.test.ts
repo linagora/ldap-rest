@@ -12,6 +12,8 @@ describe('App Accounts API Plugin', function () {
   // App-account endpoints key on the principal email (the `:user` path param),
   // not the LDAP uid.
   const principalEmail = `${testUser}@example.com`;
+  // Generated app-account uids are prefixed from the (sanitized) `:user` value.
+  const appUidPrefix = principalEmail.replace(/[^A-Za-z0-9_-]/g, '_');
   let applicativeBase: string;
   let userBase: string;
   let testUserDN: string;
@@ -241,7 +243,7 @@ describe('App Accounts API Plugin', function () {
       expect(res.body).to.have.property('uid');
       expect(res.body).to.have.property('pwd');
       expect(res.body).to.have.property('mail');
-      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(res.body.uid).to.match(new RegExp(`^${appUidPrefix}_c\\d{8}$`));
       expect(res.body.pwd).to.match(
         /^[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+-[\w!@#$%]+$/
       );
@@ -278,7 +280,7 @@ describe('App Accounts API Plugin', function () {
         .send({})
         .expect(200);
 
-      expect(res.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(res.body.uid).to.match(new RegExp(`^${appUidPrefix}_c\\d{8}$`));
 
       // Verify no description attribute
       const searchRes = await dm.ldap.search(
@@ -654,6 +656,72 @@ describe('App Accounts API Plugin', function () {
         .delete(`/api/v1/users/${mailA}/app-accounts/${b.body.uid}`)
         .set('Authorization', `Bearer ${testToken}`)
         .expect(403);
+    });
+  });
+
+  // Legacy opt-in: app_accounts_user_attribute='uid' restores the pre-#89
+  // contract where `:user` is the LDAP uid and app-uids stay `<uid>_c<digits>`.
+  describe('legacy uid key mode (app_accounts_user_attribute=uid)', () => {
+    let dmUid: DM;
+
+    beforeEach(async function () {
+      this.timeout(10000);
+      if (!process.env.DM_LDAP_BASE) this.skip();
+
+      dmUid = new DM();
+      dmUid.config.ldap_base = process.env.DM_LDAP_BASE;
+      dmUid.config.auth_token = [testToken];
+      dmUid.config.applicative_account_base = applicativeBase;
+      dmUid.config.mail_attribute = 'mail';
+      dmUid.config.app_accounts_user_attribute = 'uid';
+      await dmUid.ready;
+
+      await dmUid.registerPlugin('authToken', new AuthToken(dmUid));
+      await dmUid.registerPlugin('onLdapChange', new OnChange(dmUid));
+      await dmUid.registerPlugin(
+        'appAccountsConsistency',
+        new AppAccountsConsistency(dmUid)
+      );
+      await dmUid.registerPlugin('appAccountsApi', new AppAccountsApi(dmUid));
+
+      await dmUid.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `${testUser}@example.com`,
+      });
+      await new Promise(resolve => setTimeout(resolve, 200));
+    });
+
+    it('resolves :user by uid and keeps the <uid>_c<digits> format', async () => {
+      // The mail is NOT accepted as :user in uid mode.
+      await request(dmUid.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'Mail device' })
+        .expect(404);
+
+      // The uid is.
+      const created = await request(dmUid.app)
+        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'My Device' })
+        .expect(200);
+      expect(created.body.uid).to.match(new RegExp(`^${testUser}_c\\d{8}$`));
+      expect(created.body.mail).to.equal(`${testUser}@example.com`);
+
+      // Listing and deleting work through the uid as well.
+      const list = await request(dmUid.app)
+        .get(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+      expect(list.body.map((a: any) => a.uid)).to.include(created.body.uid);
+
+      await request(dmUid.app)
+        .delete(`/api/v1/users/${testUser}/app-accounts/${created.body.uid}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
     });
   });
 
