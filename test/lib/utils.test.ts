@@ -8,6 +8,8 @@ import {
   getParentDn,
   getRdn,
   isChildOf,
+  normalizeDn,
+  isDnInBranch,
 } from '../../src/lib/utils';
 
 describe('LDAP Utils', () => {
@@ -267,6 +269,93 @@ describe('LDAP Utils', () => {
           'ou=groups,dc=example,dc=com'
         )
       ).to.be.false;
+    });
+  });
+
+  describe('normalizeDn', () => {
+    it('should lowercase and drop whitespace around separators', () => {
+      expect(normalizeDn('UID=x, ou=AppAccounts ,dc=Example,dc=com')).to.equal(
+        'uid=x,ou=appaccounts,dc=example,dc=com'
+      );
+    });
+
+    it('should collapse whitespace around the = of an RDN', () => {
+      expect(normalizeDn('ou = AppAccounts , dc = example')).to.equal(
+        'ou=appaccounts,dc=example'
+      );
+    });
+
+    it('should order multi-valued RDN assertions deterministically', () => {
+      expect(normalizeDn('ou=b+cn=a,dc=example')).to.equal(
+        normalizeDn('cn=a+ou=b,dc=example')
+      );
+    });
+
+    it('should preserve escaped commas as a single RDN', () => {
+      expect(normalizeDn('cn=Smith\\, John,ou=users')).to.equal(
+        'cn=smith\\, john,ou=users'
+      );
+    });
+  });
+
+  describe('isDnInBranch', () => {
+    it('should return true for a descendant', () => {
+      expect(
+        isDnInBranch(
+          'uid=alice_c1,ou=appAccounts,dc=example,dc=com',
+          'ou=appAccounts,dc=example,dc=com'
+        )
+      ).to.be.true;
+    });
+
+    it('should return true for the base itself', () => {
+      expect(
+        isDnInBranch(
+          'ou=appAccounts,dc=example,dc=com',
+          'ou=appAccounts,dc=example,dc=com'
+        )
+      ).to.be.true;
+    });
+
+    it('should be insensitive to case and whitespace (the cascade-guard hardening)', () => {
+      expect(
+        isDnInBranch(
+          'uid=alice_c1, ou=AppAccounts, dc=example, dc=com',
+          'ou=appaccounts,dc=example,dc=com'
+        )
+      ).to.be.true;
+    });
+
+    it('should tolerate a trailing newline/space in the configured base', () => {
+      expect(
+        isDnInBranch(
+          'uid=alice_c1,ou=appAccounts,dc=example,dc=com',
+          'ou=appAccounts,dc=example,dc=com\n'
+        )
+      ).to.be.true;
+    });
+
+    it('should return false for a different branch', () => {
+      expect(
+        isDnInBranch(
+          'uid=user,ou=users,dc=example,dc=com',
+          'ou=appAccounts,dc=example,dc=com'
+        )
+      ).to.be.false;
+    });
+
+    it('should not match on a non-aligned suffix', () => {
+      // "accounts,dc=example,dc=com" is a raw-string suffix but NOT an RDN-aligned one
+      expect(
+        isDnInBranch(
+          'uid=x,ou=otheraccounts,dc=example,dc=com',
+          'ou=accounts,dc=example,dc=com'
+        )
+      ).to.be.false;
+    });
+
+    it('should return false when base is empty', () => {
+      expect(isDnInBranch('uid=x,ou=a,dc=c', '')).to.be.false;
     });
   });
 });

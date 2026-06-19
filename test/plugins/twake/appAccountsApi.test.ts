@@ -7,21 +7,6 @@ import OnChange from '../../../src/plugins/ldap/onChange';
 import AuthToken from '../../../src/plugins/auth/token';
 
 describe('App Accounts API Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping App Accounts API tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   const timestamp = Date.now();
   const testUser = `testuser-${timestamp}`;
   let applicativeBase: string;
@@ -34,6 +19,13 @@ describe('App Accounts API Plugin', function () {
 
   beforeEach(async function () {
     this.timeout(10000);
+
+    // The global test setup (test/setup.ts) provides an LDAP server — either an
+    // external one (env vars set) or an embedded Docker one whose env vars are
+    // exported in the root beforeAll hook. Skip only if neither is available.
+    if (!process.env.DM_LDAP_BASE) {
+      this.skip();
+    }
 
     dm = new DM();
     dm.config.ldap_base = process.env.DM_LDAP_BASE;
@@ -438,6 +430,76 @@ describe('App Accounts API Plugin', function () {
         .expect(200);
 
       expect(res.body.uid).to.equal(`${testUser}_c99999999`);
+    });
+
+    // Regression test for issue #84: deleting ONE app account must not cascade
+    // into deleting the user's other app accounts (or the principal entry).
+    it('should NOT cascade-delete the other app accounts (issue #84)', async function () {
+      this.timeout(15000);
+
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `${testUser}@example.com`,
+      });
+      // Let the consistency plugin create the principal applicative account
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Create two app accounts through the real API
+      const created1 = await request(dm.app)
+        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'Phone' })
+        .expect(200);
+      const created2 = await request(dm.app)
+        .post(`/api/v1/users/${testUser}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 'Laptop' })
+        .expect(200);
+
+      const uid1 = created1.body.uid as string;
+      const uid2 = created2.body.uid as string;
+
+      // Delete ONLY the first one
+      await request(dm.app)
+        .delete(`/api/v1/users/${testUser}/app-accounts/${uid1}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+
+      // Give the async onLdapMailChange hook time to (wrongly) cascade
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // The deleted account is gone...
+      try {
+        await dm.ldap.search(
+          { scope: 'base', paged: false },
+          `uid=${uid1},${applicativeBase}`
+        );
+        expect.fail(`${uid1} should have been deleted`);
+      } catch (err: any) {
+        expect(err.message || err.code).to.match(/No such object|0x20/i);
+      }
+
+      // ...but the second app account and the principal entry MUST survive.
+      const survivor = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        `uid=${uid2},${applicativeBase}`
+      );
+      expect(
+        (survivor as any).searchEntries,
+        `${uid2} must survive a single-account delete (no cascade)`
+      ).to.have.lengthOf(1);
+
+      const principal = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        `uid=${testUser}@example.com,${applicativeBase}`
+      );
+      expect(
+        (principal as any).searchEntries,
+        'principal applicative account must survive a single-account delete'
+      ).to.have.lengthOf(1);
     });
   });
 

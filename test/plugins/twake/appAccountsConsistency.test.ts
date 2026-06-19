@@ -4,21 +4,6 @@ import OnChange from '../../../src/plugins/ldap/onChange';
 import { expect } from 'chai';
 
 describe('App Accounts Consistency Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping App Accounts Consistency tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let testCounter = 0;
   let timestamp: number;
   let applicativeBase: string;
@@ -30,6 +15,13 @@ describe('App Accounts Consistency Plugin', function () {
 
   beforeEach(async function () {
     this.timeout(10000);
+
+    // The global test setup (test/setup.ts) provides an LDAP server — either an
+    // external one (env vars set) or an embedded Docker one whose env vars are
+    // exported in the root beforeAll hook. Skip only if neither is available.
+    if (!process.env.DM_LDAP_BASE) {
+      this.skip();
+    }
 
     // Generate unique timestamp for each test to avoid interference
     timestamp = Date.now() + testCounter++;
