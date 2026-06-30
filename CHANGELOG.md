@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.4.1 (2026-06-30)
+
+### Features
+
+- `plugins/twake/clouderyProvision`: provisioned B2B users are now marked as
+  pending invitation. On provisioning, the configurable invited attribute
+  (`twakeInvited` by default, set via `cloudery_invited_attribute` /
+  `DM_CLOUDERY_INVITED_ATTRIBUTE`) is written as `"TRUE"` on the user entry;
+  the registration app clears it to `"FALSE"` once onboarding completes (#90)
+
 ## v0.4.0 (2026-06-19)
 
 ### Breaking Changes
