@@ -186,6 +186,7 @@ describe('ClouderyProvision plugin', () => {
           twakeWorkspaceUrl: 'johndoeacme123.twake.app',
           twakeOrganizationId: 'acme123',
           twakeOrganizationRole: 'member',
+          twakeInvited: 'TRUE',
           twakePhones: JSON.stringify([
             { number: '+33600000000', primary: true },
           ]),
@@ -240,11 +241,62 @@ describe('ClouderyProvision plugin', () => {
           twakeWorkspaceUrl: 'johndoeacme123.twake.app',
           twakeOrganizationId: 'acme123',
           twakeOrganizationRole: 'member',
+          twakeInvited: 'TRUE',
           twakePhones: JSON.stringify([
             { number: '+33600000000', primary: true },
           ]),
         },
       });
+    });
+
+    it('marks the user as invited (twakeInvited=TRUE) on the entry', async () => {
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeInvited).to.equal('TRUE');
+    });
+
+    it('uses the configured attribute name for the invited flag', async () => {
+      dm.config.cloudery_invited_attribute = 'customInvited';
+      const p = new ClouderyProvision(dm);
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const pre = p.hooks?.scimusercreate as (
+        a: [ScimUser, unknown]
+      ) => Promise<unknown>;
+      await pre([user, makeReq('acme123')]);
+      const done = p.hooks?.scimusercreatedone as (
+        u: ScimUser
+      ) => Promise<void>;
+      await done(user);
+
+      expect(scope.isDone()).to.equal(true);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.customInvited).to.equal('TRUE');
+      expect(changes.replace).to.not.have.property('twakeInvited');
     });
 
     it('omits twakePhones when the user has no phone numbers', async () => {

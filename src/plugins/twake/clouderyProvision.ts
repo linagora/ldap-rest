@@ -82,6 +82,7 @@ export default class ClouderyProvision extends DmPlugin {
   private readonly orgIdAttribute: string;
   private readonly orgRoleAttribute: string;
   private readonly phonesAttribute: string;
+  private readonly invitedAttribute: string;
   private readonly defaultLocale: string;
   private readonly rdnAttribute: string;
   private readonly authExchange: string;
@@ -142,6 +143,8 @@ export default class ClouderyProvision extends DmPlugin {
       (cfg.cloudery_org_role_attribute as string) || 'twakeOrganizationRole';
     this.phonesAttribute =
       (cfg.cloudery_phones_attribute as string) || 'twakePhones';
+    this.invitedAttribute =
+      (cfg.cloudery_invited_attribute as string) || 'twakeInvited';
     this.defaultLocale = (cfg.cloudery_default_locale as string) || 'en';
     this.rdnAttribute = (cfg.scim_user_rdn_attribute as string) || 'uid';
     this.authExchange = (cfg.cozy_auth_exchange as string) || 'auth';
@@ -310,10 +313,14 @@ export default class ClouderyProvision extends DmPlugin {
     // Role and phones live on the user entry for the admin panel to read; they
     // are not part of the Cloudery create payload. Phones are stored as the JSON
     // the panel expects ([{ number, primary }]) and only when present.
+    // twakeInvited marks the member as pending invitation (the string "TRUE",
+    // its schema is a Directory String); the registration app clears it to
+    // "FALSE" once onboarding completes.
     const replace: Record<string, string> = {
       [this.fqdnAttribute]: fqdn,
       [this.orgIdAttribute]: ctx.orgId,
       [this.orgRoleAttribute]: ctx.role,
+      [this.invitedAttribute]: 'TRUE',
     };
     if (phones.length > 0) {
       replace[this.phonesAttribute] = JSON.stringify(phones);
