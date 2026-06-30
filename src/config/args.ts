@@ -202,6 +202,7 @@ export interface Config {
   cloudery_org_id_attribute?: string;
   cloudery_org_role_attribute?: string;
   cloudery_phones_attribute?: string;
+  cloudery_invited_attribute?: string;
   cloudery_default_locale?: string;
   cloudery_workflow_poll_interval_ms?: number;
   cloudery_workflow_max_attempts?: number;
@@ -545,6 +546,11 @@ const configArgs: ConfigTemplate = [
     '--cloudery-phones-attribute',
     'DM_CLOUDERY_PHONES_ATTRIBUTE',
     'twakePhones',
+  ],
+  [
+    '--cloudery-invited-attribute',
+    'DM_CLOUDERY_INVITED_ATTRIBUTE',
+    'twakeInvited',
   ],
   ['--cloudery-default-locale', 'DM_CLOUDERY_DEFAULT_LOCALE', 'en'],
   [
