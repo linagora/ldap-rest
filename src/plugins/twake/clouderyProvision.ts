@@ -544,9 +544,10 @@ export default class ClouderyProvision extends DmPlugin {
         return;
       }
       const mail = entry ? firstValue(entry.mail) : undefined;
+      const domain = mail ? emailDomain(mail) : '';
       this.deleteStash.set(id, {
         fqdn,
-        domain: mail ? emailDomain(mail) : '',
+        domain,
       });
       this.logger.info({
         plugin: this.name,
@@ -554,7 +555,7 @@ export default class ClouderyProvision extends DmPlugin {
         id,
         dn,
         fqdn,
-        domain: mail ? emailDomain(mail) : '',
+        domain,
         result: 'stashed',
       });
     } catch (err) {
@@ -722,9 +723,9 @@ export default class ClouderyProvision extends DmPlugin {
           });
         }
       } catch (err) {
-          this.logger.info({
-            plugin: this.name,
-            event: 'waitForWorkflow',
+        this.logger.info({
+          plugin: this.name,
+          event: 'waitForWorkflow',
           workflow: workflowId,
           attempt,
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
