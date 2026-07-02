@@ -169,6 +169,22 @@ export default class ClouderyProvision extends DmPlugin {
         `${this.name}: cloudery_user_branch is empty — no users will be provisioned`
       );
     }
+    this.logger.info({
+      plugin: this.name,
+      event: 'init',
+      managerUrl: this.managerUrl || undefined,
+      userBranch: this.userBranch || undefined,
+      orgIdHeader: this.orgIdHeader,
+      orgRoleHeader: this.orgRoleHeader,
+      defaultOrgRole: this.defaultOrgRole,
+      fqdnAttribute: this.fqdnAttribute,
+      orgIdAttribute: this.orgIdAttribute,
+      orgRoleAttribute: this.orgRoleAttribute,
+      phonesAttribute: this.phonesAttribute,
+      invitedAttribute: this.invitedAttribute,
+      pollIntervalMs: this.pollIntervalMs,
+      maxPollAttempts: this.maxPollAttempts,
+    });
   }
 
   hooks: Hooks = {
@@ -195,12 +211,49 @@ export default class ClouderyProvision extends DmPlugin {
   /** Pre-create: stash the request-derived context for the post-create hook. */
   private captureCreate(user: ScimUser, req?: ReqWithUser): void {
     this.pruneStash();
-    if (!this.managerUrl || !this.userBranch) return;
     const userName = this.extractId(user);
-    if (!userName) return;
-
     const base = this.baseResolver.userBase(req);
-    if (!this.isAtOrUnder(base, this.userBranch)) return;
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureCreate',
+      userName: userName || undefined,
+      base,
+      hasManagerUrl: Boolean(this.managerUrl),
+      hasUserBranch: Boolean(this.userBranch),
+    });
+    if (!this.managerUrl || !this.userBranch) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName: userName || undefined,
+        base,
+        result: 'skipped',
+        reason: 'missing_configuration',
+      });
+      return;
+    }
+    if (!userName) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        base,
+        result: 'skipped',
+        reason: 'missing_user_name',
+      });
+      return;
+    }
+
+    if (!this.isAtOrUnder(base, this.userBranch)) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureCreate',
+        userName,
+        base,
+        result: 'skipped',
+        reason: 'outside_b2b_branch',
+      });
+      return;
+    }
 
     const orgId = this.readHeader(req, this.orgIdHeader);
     if (!orgId) {
@@ -230,12 +283,23 @@ export default class ClouderyProvision extends DmPlugin {
     // Trim what we stash: leading/trailing whitespace in the email or org id
     // would otherwise leak into org_domain / internal_email / slug downstream.
     const cleanEmail = email.trim();
+    const role = this.resolveRole(req, userName);
     this.createStash.set(cleanEmail.toLowerCase(), {
       orgId: orgId.trim(),
       email: cleanEmail,
-      role: this.resolveRole(req, userName),
+      role,
       base,
       ts: Date.now(),
+    });
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureCreate',
+      userName,
+      base,
+      orgId: orgId.trim(),
+      email: cleanEmail,
+      role,
+      result: 'stashed',
     });
   }
 
@@ -246,13 +310,55 @@ export default class ClouderyProvision extends DmPlugin {
    */
   private async provision(user: ScimUser): Promise<void> {
     const userName = this.extractId(user);
-    if (!userName) return;
+    this.logger.info({
+      plugin: this.name,
+      event: 'provision',
+      userName: userName || undefined,
+    });
+    if (!userName) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        result: 'skipped',
+        reason: 'missing_user_name',
+      });
+      return;
+    }
     const lookupEmail = this.extractPrimaryEmail(user);
-    if (!lookupEmail) return;
+    if (!lookupEmail) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        result: 'skipped',
+        reason: 'missing_primary_email',
+      });
+      return;
+    }
     const key = lookupEmail.trim().toLowerCase();
     const ctx = this.createStash.get(key);
-    if (!ctx) return;
+    if (!ctx) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        email: lookupEmail.trim(),
+        result: 'skipped',
+        reason: 'no_stashed_context',
+      });
+      return;
+    }
     this.createStash.delete(key);
+    this.logger.info({
+      plugin: this.name,
+      event: 'provision',
+      userName,
+      email: ctx.email,
+      orgId: ctx.orgId,
+      base: ctx.base,
+      role: ctx.role,
+      result: 'context_loaded',
+    });
 
     const email = ctx.email;
     const orgDomain = emailDomain(email);
@@ -271,6 +377,13 @@ export default class ClouderyProvision extends DmPlugin {
 
     let instance: ClouderyInstanceResponse;
     try {
+      this.logger.info({
+        ...log,
+        result: 'creating_instance',
+        orgDomain,
+        email,
+        mobile: mobile || undefined,
+      });
       instance = await this.createInstance({
         email,
         publicName,
@@ -326,7 +439,18 @@ export default class ClouderyProvision extends DmPlugin {
       replace[this.phonesAttribute] = JSON.stringify(phones);
     }
     try {
+      this.logger.info({
+        ...log,
+        result: 'writing_fqdn',
+        dn,
+        hasPhones: phones.length > 0,
+      });
       await this.server.ldap.modify(dn, { replace });
+      this.logger.info({
+        ...log,
+        result: 'written_fqdn',
+        dn,
+      });
     } catch (err) {
       // Instance exists, so still publish; the write failure would break the
       // later delete lookup, so surface it.
@@ -356,12 +480,47 @@ export default class ClouderyProvision extends DmPlugin {
    * FQDN means this user was not provisioned here.
    */
   private async captureDelete(id: string, req?: ReqWithUser): Promise<void> {
-    if (!this.managerUrl || !this.userBranch) return;
     const base = this.baseResolver.userBase(req);
-    if (!this.isAtOrUnder(base, this.userBranch)) return;
+    this.logger.info({
+      plugin: this.name,
+      event: 'captureDelete',
+      id,
+      base,
+      hasManagerUrl: Boolean(this.managerUrl),
+      hasUserBranch: Boolean(this.userBranch),
+    });
+    if (!this.managerUrl || !this.userBranch) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        base,
+        result: 'skipped',
+        reason: 'missing_configuration',
+      });
+      return;
+    }
+    if (!this.isAtOrUnder(base, this.userBranch)) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        base,
+        result: 'skipped',
+        reason: 'outside_b2b_branch',
+      });
+      return;
+    }
 
     const dn = `${this.rdnAttribute}=${escapeDnValue(id)},${base}`;
     try {
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        dn,
+        result: 'searching',
+      });
       const res = (await this.server.ldap.search(
         {
           paged: false,
@@ -373,11 +532,30 @@ export default class ClouderyProvision extends DmPlugin {
       const entry = res.searchEntries?.[0];
       const stored = entry ? firstValue(entry[this.fqdnAttribute]) : undefined;
       const fqdn = stored ? extractFqdn(stored) : undefined;
-      if (!fqdn) return;
+      if (!fqdn) {
+        this.logger.info({
+          plugin: this.name,
+          event: 'captureDelete',
+          id,
+          dn,
+          result: 'skipped',
+          reason: 'missing_fqdn',
+        });
+        return;
+      }
       const mail = entry ? firstValue(entry.mail) : undefined;
       this.deleteStash.set(id, {
         fqdn,
         domain: mail ? emailDomain(mail) : '',
+      });
+      this.logger.info({
+        plugin: this.name,
+        event: 'captureDelete',
+        id,
+        dn,
+        fqdn,
+        domain: mail ? emailDomain(mail) : '',
+        result: 'stashed',
       });
     } catch (err) {
       this.logger.warn({
@@ -392,8 +570,22 @@ export default class ClouderyProvision extends DmPlugin {
 
   /** Post-delete: delete the Cloudery instance by FQDN and publish the event. */
   private async deprovision(id: string): Promise<void> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'deprovision',
+      id,
+    });
     const ctx = this.deleteStash.get(id);
-    if (!ctx) return;
+    if (!ctx) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'deprovision',
+        id,
+        result: 'skipped',
+        reason: 'no_stashed_context',
+      });
+      return;
+    }
     this.deleteStash.delete(id);
 
     const log = {
@@ -404,8 +596,10 @@ export default class ClouderyProvision extends DmPlugin {
     };
     let deleted = false;
     try {
+      this.logger.info({ ...log, result: 'resolving_uuid' });
       const uuid = await this.findInstanceUuidByFqdn(ctx.fqdn);
       if (uuid) {
+        this.logger.info({ ...log, result: 'deleting_instance', uuid });
         await this.deleteInstance(uuid);
         deleted = true;
         this.logger.info({ ...log, result: 'deleted', uuid });
@@ -434,6 +628,11 @@ export default class ClouderyProvision extends DmPlugin {
   private async createInstance(
     payload: Record<string, unknown>
   ): Promise<ClouderyInstanceResponse> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'createInstance',
+      url: `${this.managerUrl}/api/v1/instances`,
+    });
     const res = await fetch(`${this.managerUrl}/api/v1/instances`, {
       method: 'POST',
       headers: {
@@ -443,13 +642,36 @@ export default class ClouderyProvision extends DmPlugin {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'createInstance',
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+      });
       throw new Error(`Cloudery createInstance HTTP ${res.status}`);
     }
-    return (await res.json()) as ClouderyInstanceResponse;
+    const data = (await res.json()) as ClouderyInstanceResponse;
+    this.logger.info({
+      plugin: this.name,
+      event: 'createInstance',
+      result: 'success',
+      id: data.id,
+      fqdn: data.fqdn,
+      workflow: data.workflow,
+    });
+    return data;
   }
 
   /** Poll the workflow until it succeeds. Returns false on failure/timeout. */
   private async waitForWorkflow(workflowId: string): Promise<boolean> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'waitForWorkflow',
+      workflow: workflowId,
+      maxPollAttempts: this.maxPollAttempts,
+      pollIntervalMs: this.pollIntervalMs,
+    });
     for (let attempt = 1; attempt <= this.maxPollAttempts; attempt++) {
       try {
         const res = await fetch(
@@ -460,27 +682,82 @@ export default class ClouderyProvision extends DmPlugin {
         );
         if (res.ok) {
           const data = (await res.json()) as { status?: string };
-          if (data.status === 'succeeded') return true;
+          this.logger.info({
+            plugin: this.name,
+            event: 'waitForWorkflow',
+            workflow: workflowId,
+            attempt,
+            status: data.status,
+          });
+          if (data.status === 'succeeded') {
+            this.logger.info({
+              plugin: this.name,
+              event: 'waitForWorkflow',
+              workflow: workflowId,
+              attempt,
+              result: 'success',
+            });
+            return true;
+          }
           if (data.status === 'failed' || data.status === 'error') {
+            this.logger.warn({
+              plugin: this.name,
+              event: 'waitForWorkflow',
+              workflow: workflowId,
+              attempt,
+              result: 'failed',
+              status: data.status,
+            });
             return false;
           }
+        } else {
+          this.logger.info({
+            plugin: this.name,
+            event: 'waitForWorkflow',
+            workflow: workflowId,
+            attempt,
+            result: 'http_error',
+            http_status: res.status,
+            http_status_text: res.statusText,
+          });
         }
       } catch (err) {
-        this.logger.warn({
-          plugin: this.name,
-          event: 'waitForWorkflow',
+          this.logger.info({
+            plugin: this.name,
+            event: 'waitForWorkflow',
           workflow: workflowId,
           attempt,
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           error: `${err}`,
         });
       }
-      if (attempt < this.maxPollAttempts) await sleep(this.pollIntervalMs);
+      if (attempt < this.maxPollAttempts) {
+        this.logger.info({
+          plugin: this.name,
+          event: 'waitForWorkflow',
+          workflow: workflowId,
+          attempt,
+          result: 'retrying',
+        });
+        await sleep(this.pollIntervalMs);
+      }
     }
+    this.logger.info({
+      plugin: this.name,
+      event: 'waitForWorkflow',
+      workflow: workflowId,
+      result: 'timeout',
+      maxPollAttempts: this.maxPollAttempts,
+    });
     return false;
   }
 
   private async findInstanceUuidByFqdn(fqdn: string): Promise<string | null> {
+    this.logger.info({
+      plugin: this.name,
+      event: 'findInstanceUuidByFqdn',
+      fqdn,
+    });
     const url = new URL(`${this.managerUrl}/api/v2/instances`);
     url.searchParams.set('fqdn', fqdn);
     url.searchParams.append('only', '_id');
@@ -488,9 +765,27 @@ export default class ClouderyProvision extends DmPlugin {
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
-    if (!res.ok) throw new Error(`Cloudery searchInstances HTTP ${res.status}`);
+    if (!res.ok) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'findInstanceUuidByFqdn',
+        fqdn,
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+      });
+      throw new Error(`Cloudery searchInstances HTTP ${res.status}`);
+    }
     const data = (await res.json()) as { items?: { _id: string }[] };
-    return data.items && data.items.length > 0 ? data.items[0]._id : null;
+    const uuid = data.items && data.items.length > 0 ? data.items[0]._id : null;
+    this.logger.info({
+      plugin: this.name,
+      event: 'findInstanceUuidByFqdn',
+      fqdn,
+      result: uuid ? 'found' : 'not_found',
+      uuid: uuid || undefined,
+    });
+    return uuid;
   }
 
   private async deleteInstance(uuid: string): Promise<void> {
@@ -498,11 +793,34 @@ export default class ClouderyProvision extends DmPlugin {
       `${this.managerUrl}/api/v1/instances/${encodeURIComponent(uuid)}`
     );
     url.searchParams.set('user_request', 'true');
+    this.logger.info({
+      plugin: this.name,
+      event: 'deleteInstance',
+      uuid,
+      url: url.toString(),
+    });
     const res = await fetch(url.toString(), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
-    if (!res.ok) throw new Error(`Cloudery deleteInstance HTTP ${res.status}`);
+    if (!res.ok) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'deleteInstance',
+        uuid,
+        result: 'error',
+        http_status: res.status,
+        http_status_text: res.statusText,
+      });
+      throw new Error(`Cloudery deleteInstance HTTP ${res.status}`);
+    }
+    this.logger.info({
+      plugin: this.name,
+      event: 'deleteInstance',
+      uuid,
+      result: 'success',
+      http_status: res.status,
+    });
   }
 
   /* ------------------------------ Publishing ------------------------------ */
@@ -516,7 +834,24 @@ export default class ClouderyProvision extends DmPlugin {
     mobile: string | null;
   }): Promise<void> {
     const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
-    if (!rabbitmq) return;
+    this.logger.info({
+      plugin: this.name,
+      event: 'publishUserCreated',
+      twakeId: p.twakeId,
+      orgId: p.orgId,
+      orgDomain: p.orgDomain,
+      hasRabbitmq: Boolean(rabbitmq),
+    });
+    if (!rabbitmq) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserCreated',
+        twakeId: p.twakeId,
+        result: 'skipped',
+        reason: 'missing_rabbitmq',
+      });
+      return;
+    }
 
     const message: Record<string, unknown> = {
       twakeId: p.twakeId,
@@ -534,6 +869,14 @@ export default class ClouderyProvision extends DmPlugin {
         this.userCreatedRoutingKey,
         message
       );
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserCreated',
+        twakeId: p.twakeId,
+        exchange: this.authExchange,
+        routingKey: this.userCreatedRoutingKey,
+        result: 'success',
+      });
     } catch (err) {
       this.logger.error({
         plugin: this.name,
@@ -550,11 +893,35 @@ export default class ClouderyProvision extends DmPlugin {
     domain: string
   ): Promise<void> {
     const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
-    if (!rabbitmq) return;
+    this.logger.info({
+      plugin: this.name,
+      event: 'publishUserDeleted',
+      workplaceFqdn: fqdn,
+      domain,
+      hasRabbitmq: Boolean(rabbitmq),
+    });
+    if (!rabbitmq) {
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserDeleted',
+        workplaceFqdn: fqdn,
+        result: 'skipped',
+        reason: 'missing_rabbitmq',
+      });
+      return;
+    }
     try {
       await rabbitmq.publish(this.b2bExchange, this.userDeletedRoutingKey, {
         workplaceFqdn: fqdn,
         domain,
+      });
+      this.logger.info({
+        plugin: this.name,
+        event: 'publishUserDeleted',
+        workplaceFqdn: fqdn,
+        exchange: this.b2bExchange,
+        routingKey: this.userDeletedRoutingKey,
+        result: 'success',
       });
     } catch (err) {
       this.logger.error({
@@ -591,7 +958,16 @@ export default class ClouderyProvision extends DmPlugin {
    */
   private resolveRole(req: ReqWithUser | undefined, userName: string): string {
     const raw = this.readHeader(req, this.orgRoleHeader)?.trim().toLowerCase();
-    if (!raw) return this.defaultOrgRole;
+    if (!raw) {
+      this.logger.debug({
+        plugin: this.name,
+        event: 'resolveRole',
+        userName,
+        result: 'default',
+        role: this.defaultOrgRole,
+      });
+      return this.defaultOrgRole;
+    }
     if (!VALID_ORG_ROLES.has(raw)) {
       this.logger.warn({
         plugin: this.name,
@@ -599,8 +975,24 @@ export default class ClouderyProvision extends DmPlugin {
         userName,
         message: `Unknown ${this.orgRoleHeader} "${raw}" — falling back to ${this.defaultOrgRole}`,
       });
+      this.logger.debug({
+        plugin: this.name,
+        event: 'resolveRole',
+        userName,
+        input: raw,
+        result: 'default',
+        role: this.defaultOrgRole,
+      });
       return this.defaultOrgRole;
     }
+    this.logger.debug({
+      plugin: this.name,
+      event: 'resolveRole',
+      userName,
+      input: raw,
+      result: 'accepted',
+      role: raw,
+    });
     return raw;
   }
 
@@ -614,7 +1006,9 @@ export default class ClouderyProvision extends DmPlugin {
   private pruneStash(): void {
     const cutoff = Date.now() - STASH_TTL_MS;
     for (const [key, ctx] of this.createStash) {
-      if (ctx.ts < cutoff) this.createStash.delete(key);
+      if (ctx.ts < cutoff) {
+        this.createStash.delete(key);
+      }
     }
   }
 
