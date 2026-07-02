@@ -643,12 +643,14 @@ export default class ClouderyProvision extends DmPlugin {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
+      const body = await res.text().catch(() => '');
       this.logger.error({
         plugin: this.name,
         event: 'createInstance',
         result: 'error',
         http_status: res.status,
         http_status_text: res.statusText,
+        body: body || undefined,
       });
       throw new Error(`Cloudery createInstance HTTP ${res.status}`);
     }
@@ -712,6 +714,7 @@ export default class ClouderyProvision extends DmPlugin {
             return false;
           }
         } else {
+          const body = await res.text().catch(() => '');
           this.logger.info({
             plugin: this.name,
             event: 'waitForWorkflow',
@@ -720,6 +723,7 @@ export default class ClouderyProvision extends DmPlugin {
             result: 'http_error',
             http_status: res.status,
             http_status_text: res.statusText,
+            body: body || undefined,
           });
         }
       } catch (err) {
@@ -767,6 +771,7 @@ export default class ClouderyProvision extends DmPlugin {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
     if (!res.ok) {
+      const body = await res.text().catch(() => '');
       this.logger.error({
         plugin: this.name,
         event: 'findInstanceUuidByFqdn',
@@ -774,6 +779,7 @@ export default class ClouderyProvision extends DmPlugin {
         result: 'error',
         http_status: res.status,
         http_status_text: res.statusText,
+        body: body || undefined,
       });
       throw new Error(`Cloudery searchInstances HTTP ${res.status}`);
     }
@@ -805,6 +811,7 @@ export default class ClouderyProvision extends DmPlugin {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
     if (!res.ok) {
+      const body = await res.text().catch(() => '');
       this.logger.error({
         plugin: this.name,
         event: 'deleteInstance',
@@ -812,6 +819,7 @@ export default class ClouderyProvision extends DmPlugin {
         result: 'error',
         http_status: res.status,
         http_status_text: res.statusText,
+        body: body || undefined,
       });
       throw new Error(`Cloudery deleteInstance HTTP ${res.status}`);
     }
