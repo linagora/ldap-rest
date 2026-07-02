@@ -64,6 +64,11 @@ const STASH_TTL_MS = 5 * 60 * 1000;
 // anything else from the header is rejected in favour of the configured default.
 const VALID_ORG_ROLES = new Set(['admin', 'owner', 'member']);
 
+// Cap on the manager API error body we log: enough to carry the actual error
+// message, bounded so a large HTML error page (repeated across poll attempts)
+// can't bloat the logs.
+const MAX_LOG_BODY_LEN = 1000;
+
 export default class ClouderyProvision extends DmPlugin {
   name = 'clouderyProvision';
   roles: Role[] = ['consistency'] as const;
@@ -643,7 +648,10 @@ export default class ClouderyProvision extends DmPlugin {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
       this.logger.error({
         plugin: this.name,
         event: 'createInstance',
@@ -714,7 +722,10 @@ export default class ClouderyProvision extends DmPlugin {
             return false;
           }
         } else {
-          const body = await res.text().catch(() => '');
+          const body = (await res.text().catch(() => '')).slice(
+            0,
+            MAX_LOG_BODY_LEN
+          );
           this.logger.info({
             plugin: this.name,
             event: 'waitForWorkflow',
@@ -771,7 +782,10 @@ export default class ClouderyProvision extends DmPlugin {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
       this.logger.error({
         plugin: this.name,
         event: 'findInstanceUuidByFqdn',
@@ -811,7 +825,10 @@ export default class ClouderyProvision extends DmPlugin {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      const body = (await res.text().catch(() => '')).slice(
+        0,
+        MAX_LOG_BODY_LEN
+      );
       this.logger.error({
         plugin: this.name,
         event: 'deleteInstance',
