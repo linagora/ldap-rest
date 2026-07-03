@@ -187,6 +187,7 @@ describe('ClouderyProvision plugin', () => {
           twakeOrganizationId: 'acme123',
           twakeOrganizationRole: 'member',
           twakeInvited: 'TRUE',
+          cn: 'john.doe',
           twakePhones: JSON.stringify([
             { number: '+33600000000', primary: true },
           ]),
@@ -242,6 +243,7 @@ describe('ClouderyProvision plugin', () => {
           twakeOrganizationId: 'acme123',
           twakeOrganizationRole: 'member',
           twakeInvited: 'TRUE',
+          cn: 'john.doe',
           twakePhones: JSON.stringify([
             { number: '+33600000000', primary: true },
           ]),

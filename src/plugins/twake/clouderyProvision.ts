@@ -439,6 +439,9 @@ export default class ClouderyProvision extends DmPlugin {
       [this.orgIdAttribute]: ctx.orgId,
       [this.orgRoleAttribute]: ctx.role,
       [this.invitedAttribute]: 'TRUE',
+      // Force cn to the userName for B2B provisioning; the core SCIM mapping
+      // sets cn from name.formatted, which is not what we want here.
+      cn: userName,
     };
     if (phones.length > 0) {
       replace[this.phonesAttribute] = JSON.stringify(phones);
