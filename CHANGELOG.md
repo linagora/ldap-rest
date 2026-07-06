@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.2 (2026-07-06)
+
+### Bug Fixes
+
+- `plugins/twake/clouderyProvision`: force `cn` to the `userName` when
+  provisioning B2B users. The core SCIM mapping sets `cn` from
+  `name.formatted`, which is not the desired value for B2B provisioning (#93)
+
+### Misc
+
+- `plugins/twake/clouderyProvision`: added detailed provisioning logs
+
 ## v0.4.1 (2026-06-30)
 
 ### Features
