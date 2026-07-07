@@ -380,53 +380,90 @@ export default class ClouderyProvision extends DmPlugin {
       slug,
     };
 
-    let instance: ClouderyInstanceResponse;
+    // Idempotency guard. The instance slug is deterministic
+    // (normalizeNickname(userName) + orgId), so its FQDN is `${slug}.${domain}`.
+    // If an instance for that FQDN already exists (e.g. the user is re-imported
+    // after their LDAP entry was recreated while the Cloudery instance survived),
+    // reuse it. Creating unconditionally makes Cloudery mint a numbered
+    // duplicate (slug2). Fail open: if the lookup errors, fall through to create
+    // rather than block provisioning.
+    // Lowercase to the canonical DNS form. Cloudery stores the instance FQDN
+    // lowercased and `normalizeNickname` does not fold case, so a mixed-case
+    // userName would otherwise make this computed key miss the existing instance
+    // (defeating the guard) and, on the reuse path, persist a non-canonical FQDN
+    // that the later deprovision lookup could not resolve.
+    const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
+    let existingUuid: string | null = null;
     try {
-      this.logger.info({
-        ...log,
-        result: 'creating_instance',
-        orgDomain,
-        email,
-        mobile: mobile || undefined,
-      });
-      instance = await this.createInstance({
-        email,
-        publicName,
-        locale: this.extractLocale(user),
-        oidc: slug,
-        phone: mobile || '',
-        slug,
-        public_name: publicName,
-        offer: this.offer,
-        domain: this.clouderyDomain,
-        skip_email_validation: true,
-        internal_email: email,
-        org_domain: orgDomain,
-        org_id: ctx.orgId,
-      });
+      existingUuid = await this.findInstanceUuidByFqdn(expectedFqdn);
     } catch (err) {
-      this.logger.error({
+      this.logger.warn({
         ...log,
-        result: 'error',
+        result: 'existence_lookup_failed',
+        fqdn: expectedFqdn,
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
         error: `${err}`,
       });
-      return;
     }
 
-    const ready = instance.workflow
-      ? await this.waitForWorkflow(instance.workflow)
-      : true;
-    if (!ready) {
-      this.logger.error({
+    let fqdn: string;
+    if (existingUuid) {
+      this.logger.info({
         ...log,
-        result: 'workflow_failed',
-        workflow: instance.workflow,
+        result: 'instance_exists',
+        fqdn: expectedFqdn,
+        uuid: existingUuid,
       });
-      return;
-    }
+      fqdn = expectedFqdn;
+    } else {
+      let instance: ClouderyInstanceResponse;
+      try {
+        this.logger.info({
+          ...log,
+          result: 'creating_instance',
+          orgDomain,
+          email,
+          mobile: mobile || undefined,
+        });
+        instance = await this.createInstance({
+          email,
+          publicName,
+          locale: this.extractLocale(user),
+          oidc: slug,
+          phone: mobile || '',
+          slug,
+          public_name: publicName,
+          offer: this.offer,
+          domain: this.clouderyDomain,
+          skip_email_validation: true,
+          internal_email: email,
+          org_domain: orgDomain,
+          org_id: ctx.orgId,
+        });
+      } catch (err) {
+        this.logger.error({
+          ...log,
+          result: 'error',
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          error: `${err}`,
+        });
+        return;
+      }
 
-    const fqdn = instance.fqdn;
+      const ready = instance.workflow
+        ? await this.waitForWorkflow(instance.workflow)
+        : true;
+      if (!ready) {
+        this.logger.error({
+          ...log,
+          result: 'workflow_failed',
+          workflow: instance.workflow,
+        });
+        return;
+      }
+
+      fqdn = instance.fqdn;
+    }
     const dn = `${this.rdnAttribute}=${escapeDnValue(userName)},${ctx.base}`;
     // Role and phones live on the user entry for the admin panel to read; they
     // are not part of the Cloudery create payload. Phones are stored as the JSON

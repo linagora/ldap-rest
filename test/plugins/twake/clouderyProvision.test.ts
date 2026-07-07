@@ -210,6 +210,36 @@ describe('ClouderyProvision plugin', () => {
       });
     });
 
+    it('skips instance creation when an instance for the slug already exists', async () => {
+      // Re-import scenario: the LDAP entry was recreated but the Cloudery
+      // instance for this slug survived. The plugin must reuse it instead of
+      // letting Cloudery mint a numbered duplicate (slug2). Note: no POST
+      // /api/v1/instances is registered, so any create attempt fails the test.
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [{ _id: 'existing-uuid' }] });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone(), 'cloudery existence lookup').to.equal(true);
+
+      // The existing instance's fqdn is written back and the entry announced,
+      // so registration can skip its own creation and downstream stays linked.
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(ldap.modifyCalls[0].dn).to.equal(`uid=john.doe,${USER_BASE}`);
+      const changes = ldap.modifyCalls[0].changes as {
+        replace: Record<string, unknown>;
+      };
+      expect(changes.replace.twakeWorkspaceUrl).to.equal(
+        'johndoeacme123.twake.app'
+      );
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message.workplaceFqdn).to.equal(
+        'johndoeacme123.twake.app'
+      );
+    });
+
     it('trims whitespace in the email and org id before use', async () => {
       let body: Record<string, unknown> = {};
       const scope = nock(CLOUDERY)
