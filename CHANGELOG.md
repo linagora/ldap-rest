@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.3 (2026-07-08)
+
+### Bug Fixes
+
+- `plugins/twake/clouderyProvision`: skip instance creation when an instance
+  already exists for the computed FQDN. The instance slug is deterministic, so
+  when a user is re-imported after their LDAP entry was recreated while the
+  Cloudery instance survived, the existing instance is now reused instead of
+  letting Cloudery mint a numbered duplicate (`slug2`). The existence lookup
+  fails open: if it errors, provisioning falls through to create as before (#94)
+
+### Misc
+
+- Dockerfile: add the missing `DM_CLOUDERY_INVITED_ATTRIBUTE="twakeInvited"`
+  environment default, backing the invited-attribute feature introduced in
+  v0.4.1
+
 ## v0.4.2 (2026-07-06)
 
 ### Bug Fixes
