@@ -1,0 +1,125 @@
+name: Release
+
+# Tag-driven release: publish to npm (via OIDC Trusted Publishing) and cut a
+# matching GitHub Release. Push a `vX.Y.Z` tag and both happen. The GitHub
+# Release is gated on a successful npm publish, so the two can never disagree.
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+# Serialize releases: a later tag must not race an in-flight publish and win
+# the `latest` dist-tag. Never cancel a publish mid-flight.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # id-token: write authenticates to npm through OIDC (Trusted Publishing):
+    # no long-lived NPM_TOKEN to store or rotate, and a provenance attestation
+    # is attached to every release for free.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+      # registry-url is intentionally omitted: it makes setup-node write an
+      # .npmrc carrying a dummy auth token that can shadow OIDC. npmjs.org is
+      # already the default registry, so OIDC publishing works without it.
+
+      # Trusted Publishing requires npm >= 11.5.1, newer than the version
+      # bundled with Node 22.
+      - name: Update npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build package
+        run: npm run build
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag v$TAG does not match package.json version $PKG."
+            echo "Bump the version in package.json before pushing the tag."
+            exit 1
+          fi
+          echo "Tag matches package.json version: $PKG"
+
+      - name: Verify package entry points exist
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = require("./package.json");
+            const files = new Set();
+            for (const v of Object.values(p.exports || {})) {
+              if (v && typeof v === "object") {
+                if (v.import) files.add(v.import);
+                if (v.types) files.add(v.types);
+              }
+            }
+            for (const b of Object.values(p.bin || {})) files.add(b);
+            const missing = [...files].filter((f) => !fs.existsSync(f));
+            if (missing.length) {
+              console.error("Missing entry files:\n  " + missing.join("\n  "));
+              process.exit(1);
+            }
+            console.log("Verified " + files.size + " package entry files");
+          '
+
+      - name: Pack tarball
+        run: npm pack
+
+      - name: Publish to npm
+        run: |
+          # Keep prereleases (e.g. v1.2.3-rc.1) off the `latest` dist-tag.
+          case "$GITHUB_REF_NAME" in
+            *-*) NPM_TAG=next ;;
+            *)   NPM_TAG=latest ;;
+          esac
+          npm publish --access public --tag "$NPM_TAG"
+
+      - name: Upload release tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: ldap-rest-*.tgz
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download release tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: ldap-rest-*.tgz
