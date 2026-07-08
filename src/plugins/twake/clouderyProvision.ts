@@ -196,6 +196,7 @@ export default class ClouderyProvision extends DmPlugin {
     scimusercreate: (
       args: [ScimUser, ReqWithUser?]
     ): [ScimUser, ReqWithUser?] => {
+      this.normalizeUserName(args[0]);
       this.captureCreate(args[0], args[1]);
       return args;
     },
@@ -205,6 +206,7 @@ export default class ClouderyProvision extends DmPlugin {
     scimuserdelete: async (
       args: [string, ReqWithUser?]
     ): Promise<[string, ReqWithUser?]> => {
+      args[0] = args[0].toLowerCase();
       await this.captureDelete(args[0], args[1]);
       return args;
     },
@@ -1075,6 +1077,14 @@ export default class ClouderyProvision extends DmPlugin {
       if (ctx.ts < cutoff) {
         this.createStash.delete(key);
       }
+    }
+  }
+
+  // Lowercase userName in place; the core derives the uid RDN from it after
+  // this hook. Usernames must be lowercase.
+  private normalizeUserName(user: ScimUser): void {
+    if (typeof user.userName === 'string') {
+      user.userName = user.userName.toLowerCase();
     }
   }
 

@@ -127,12 +127,13 @@ describe('ClouderyProvision plugin', () => {
   async function remove(id: string, req: unknown): Promise<void> {
     const pre = plugin.hooks?.scimuserdelete as (
       a: [string, unknown]
-    ) => Promise<unknown>;
-    await pre([id, req]);
+    ) => Promise<[string, unknown]>;
+    // The core deletes the id the hook returns, not the raw one.
+    const [finalId] = await pre([id, req]);
     const done = plugin.hooks?.scimuserdeletedone as (
       i: string
     ) => Promise<void>;
-    await done(id);
+    await done(finalId as string);
   }
 
   const user: ScimUser = {
@@ -208,6 +209,37 @@ describe('ClouderyProvision plugin', () => {
         internalEmail: 'john.doe@acme.com',
         mobile: '+33600000000',
       });
+    });
+
+    it('lowercases an uppercase userName for the uid, slug, cn and twakeId', async () => {
+      let body: Record<string, unknown> = {};
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      const mixedCaseUser: ScimUser = { ...user, userName: 'John.Doe' };
+      await create(mixedCaseUser, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      // the hook lowercases userName, so the core builds a lowercase uid
+      expect(mixedCaseUser.userName).to.equal('john.doe');
+      expect(body.slug).to.equal('johndoeacme123');
+      expect(body.oidc).to.equal('johndoeacme123');
+      expect(ldap.modifyCalls[0].dn).to.equal(`uid=john.doe,${USER_BASE}`);
+      expect(
+        (ldap.modifyCalls[0].changes as { replace: Record<string, unknown> })
+          .replace.cn
+      ).to.equal('john.doe');
+      expect(rabbit.calls[0].message.twakeId).to.equal('john.doe');
     });
 
     it('skips instance creation when an instance for the slug already exists', async () => {
@@ -600,6 +632,32 @@ describe('ClouderyProvision plugin', () => {
         workplaceFqdn: 'johndoeacme123.twake.app',
         domain: 'acme.com',
       });
+    });
+
+    it('lowercases an uppercase id before resolving and deleting the instance', async () => {
+      const dn = `uid=john.doe,${USER_BASE}`;
+      ldap.entries[dn] = {
+        twakeWorkspaceUrl: 'johndoeacme123.twake.app',
+        mail: 'john.doe@acme.com',
+      };
+
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .delete('/api/v1/instances/uuid-1')
+        .query(q => q.user_request === 'true')
+        .reply(200, { workflow: 'wf-del' });
+
+      await remove('John.Doe', makeReq('acme123'));
+
+      expect(scope.isDone(), 'lowercased dn resolved the instance').to.equal(
+        true
+      );
+      expect(rabbit.calls).to.have.length(1);
+      expect(rabbit.calls[0].message.workplaceFqdn).to.equal(
+        'johndoeacme123.twake.app'
+      );
     });
 
     it('skips when the entry has no stored fqdn (not ours)', async () => {
