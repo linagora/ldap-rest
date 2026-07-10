@@ -2,24 +2,33 @@ import fetch from 'node-fetch';
 
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
-import type { AttributesList } from '../../lib/ldapActions';
+import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
 
 /**
- * Plugin to sync LDAP resources with Twake Calendar
+ * Plugin to sync LDAP resources and users with Twake Calendar
  *
  * Monitors a LDAP branch for resources (meeting rooms, equipment, etc.)
- * and automatically creates/updates/deletes them in Twake Calendar via WebAdmin API
+ * and automatically creates/updates/deletes them in Twake Calendar via WebAdmin API.
+ *
+ * Also propagates user identity changes (email, first name, last name) to the
+ * Twake Calendar "registered users" via the WebAdmin API.
  */
 export default class CalendarResources extends TwakePlugin {
   name = 'calendarResources';
   roles: Role[] = ['consistency'] as const;
+
+  dependencies = {
+    onLdapChange: 'core/ldap/onChange',
+  };
 
   // Calendar-specific configuration attributes
   private resourceBase: string;
   private resourceObjectClass: string;
   private resourceCreator: string;
   private resourceDomain: string;
+  private firstnameAttr: string;
+  private lastnameAttr: string;
 
   constructor(server: import('../../bin').DM) {
     super(
@@ -37,6 +46,12 @@ export default class CalendarResources extends TwakePlugin {
       (this.config.calendar_resource_creator as string) || 'admin@example.com';
     this.resourceDomain =
       (this.config.calendar_resource_domain as string) || '';
+
+    // LDAP attributes holding the user's first and last name (for registered users)
+    this.firstnameAttr =
+      (this.config.calendar_firstname_attribute as string) || 'givenName';
+    this.lastnameAttr =
+      (this.config.calendar_lastname_attribute as string) || 'sn';
   }
 
   hooks: Hooks = {
@@ -137,6 +152,46 @@ export default class CalendarResources extends TwakePlugin {
         { resourceId }
       );
     },
+
+    /**
+     * Handle user email changes.
+     * The registered user is keyed by the (old) email in Calendar, so we look
+     * it up by the old address and PATCH it with the new email and names.
+     */
+    onLdapMailChange: async (
+      dn: string,
+      oldmail: AttributeValue | null,
+      newmail: AttributeValue | null
+    ) => {
+      const oldmailStr = this.attributeToString(oldmail);
+      const newmailStr = this.attributeToString(newmail);
+
+      // Skip additions (no previous mail) and deletions (no new mail):
+      // there is nothing to update on the Calendar side in those cases.
+      if (!oldmailStr) {
+        this.logger.debug(
+          `Skipping registered user sync for ${dn}: oldmail is empty (mail added, not changed)`
+        );
+        return;
+      }
+      if (!newmailStr) {
+        this.logger.debug(
+          `Skipping registered user sync for ${dn}: newmail is empty (mail deleted)`
+        );
+        return;
+      }
+
+      await this.syncRegisteredUser('onLdapMailChange', dn, oldmailStr);
+    },
+
+    /**
+     * Handle display name changes (cn / givenName / sn).
+     * The email is unchanged, so the registered user is looked up by its
+     * current mail.
+     */
+    onLdapDisplayNameChange: async (dn: string) => {
+      await this.syncRegisteredUser('onLdapDisplayNameChange', dn);
+    },
   };
 
   /**
@@ -215,6 +270,139 @@ export default class CalendarResources extends TwakePlugin {
     // Extract cn or uid from DN
     const match = dn.match(/(?:cn|uid)=([^,]+)/i);
     return match ? match[1] : null;
+  }
+
+  /**
+   * Synchronize an LDAP user's identity (email, first and last name) to the
+   * Twake Calendar registered users via the WebAdmin API.
+   *
+   * Registered users are keyed by an internal id, and `GET /registeredUsers`
+   * exposes no filter, so we list all registered users, locate the entry by
+   * email, then `PATCH /registeredUsers?id={id}` with the LDAP values.
+   *
+   * @param event Hook name, used for logging
+   * @param dn LDAP DN of the user
+   * @param lookupEmail Email used to locate the existing registered user.
+   *   Defaults to the user's current mail; pass the OLD mail when the email
+   *   itself is changing (Calendar still holds the previous address).
+   */
+  async syncRegisteredUser(
+    event: string,
+    dn: string,
+    lookupEmail?: string
+  ): Promise<void> {
+    const log = {
+      plugin: this.name,
+      event,
+      result: 'error',
+      dn,
+    };
+
+    // Fetch the desired identity values from LDAP
+    const entry = await this.ldapGetAttributes(dn, [
+      this.mailAttr,
+      this.firstnameAttr,
+      this.lastnameAttr,
+    ]);
+    if (!entry) {
+      this.logger.warn({
+        ...log,
+        message: `Cannot sync registered user: entry not found for ${dn}`,
+      });
+      return;
+    }
+
+    const mail = this.attributeToString(entry[this.mailAttr]);
+    if (!mail) {
+      this.logger.warn({
+        ...log,
+        message: `Cannot sync registered user: no mail found for ${dn}`,
+      });
+      return;
+    }
+
+    const firstname = this.attributeToString(entry[this.firstnameAttr]);
+    const lastname = this.attributeToString(entry[this.lastnameAttr]);
+    const searchEmail = lookupEmail || mail;
+
+    try {
+      // Step 1: list registered users and find the one matching searchEmail
+      const listRes = await this.requestLimit(() =>
+        fetch(`${this.webadminUrl}/registeredUsers`, {
+          method: 'GET',
+          headers: this.createHeaders(),
+        })
+      );
+      if (!listRes.ok) {
+        this.logger.error({
+          ...log,
+          step: 'list_registered_users',
+          http_status: listRes.status,
+          http_status_text: listRes.statusText,
+        });
+        return;
+      }
+
+      const users = (await listRes.json()) as Array<{
+        id: string;
+        email: string;
+        firstname?: string;
+        lastname?: string;
+      }>;
+      const existing = users.find(
+        u => u.email?.toLowerCase() === searchEmail.toLowerCase()
+      );
+      if (!existing) {
+        this.logger.warn({
+          ...log,
+          step: 'find_registered_user',
+          searchEmail,
+          message: 'user not registered in Calendar',
+        });
+        return;
+      }
+
+      // Step 2: PATCH the registered user by id with the LDAP values
+      const patchUrl = new URL(`${this.webadminUrl}/registeredUsers`);
+      patchUrl.searchParams.set('id', existing.id);
+
+      const payload: {
+        email: string;
+        firstname?: string;
+        lastname?: string;
+      } = { email: mail };
+      if (firstname) payload.firstname = firstname;
+      if (lastname) payload.lastname = lastname;
+
+      const patchRes = await this.requestLimit(() =>
+        fetch(patchUrl.toString(), {
+          method: 'PATCH',
+          headers: this.createHeaders('application/json'),
+          body: JSON.stringify(payload),
+        })
+      );
+
+      if (!patchRes.ok) {
+        this.logger.error({
+          ...log,
+          step: 'patch_registered_user',
+          id: existing.id,
+          http_status: patchRes.status,
+          http_status_text: patchRes.statusText,
+        });
+      } else {
+        this.logger.info({
+          ...log,
+          result: 'success',
+          id: existing.id,
+          http_status: patchRes.status,
+          ...payload,
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error({ ...log, error: `${err}` });
+    }
   }
 
   /**

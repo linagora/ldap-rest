@@ -176,6 +176,8 @@ export interface Config {
   calendar_resource_objectclass?: string;
   calendar_resource_creator?: string;
   calendar_resource_domain?: string;
+  calendar_firstname_attribute?: string;
+  calendar_lastname_attribute?: string;
 
   // Cozy provisioning plugin
   cozy_admin_url?: string;
@@ -487,6 +489,12 @@ const configArgs: ConfigTemplate = [
   ['--calendar-resource-objectclass', 'DM_CALENDAR_RESOURCE_OBJECTCLASS', ''],
   ['--calendar-resource-creator', 'DM_CALENDAR_RESOURCE_CREATOR', ''],
   ['--calendar-resource-domain', 'DM_CALENDAR_RESOURCE_DOMAIN', ''],
+  [
+    '--calendar-firstname-attribute',
+    'DM_CALENDAR_FIRSTNAME_ATTRIBUTE',
+    'givenName',
+  ],
+  ['--calendar-lastname-attribute', 'DM_CALENDAR_LASTNAME_ATTRIBUTE', 'sn'],
 
   // Cozy provisioning plugin (twake/cozyProvision)
   ['--cozy-admin-url', 'DM_COZY_ADMIN_URL', ''],
