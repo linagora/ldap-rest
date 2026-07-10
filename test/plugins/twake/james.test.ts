@@ -29,9 +29,9 @@ describe('James Plugin', () => {
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       .persist()
       // Mail rename
-      .post('/users/testmail@test.org/rename/t@t.org?action=rename')
+      .post('/users/testmail@test.org/rename/t@t.org?action=rename&force')
       .reply(200, { success: true })
-      .post('/users/primary@test.org/rename/newprimary@test.org?action=rename')
+      .post('/users/primary@test.org/rename/newprimary@test.org?action=rename&force')
       .reply(200, { success: true })
       // Quota
       .put('/quota/users/testmail@test.org/size', '50000000')
@@ -60,7 +60,7 @@ describe('James Plugin', () => {
       .put('/address/aliases/newprimary@test.org/sources/alias2@test.org')
       .reply(204)
       // Identity - testmail@test.org
-      .get('/jmap/identities/testmail@test.org')
+      .get('/users/testmail@test.org/identities')
       .reply(200, [
         {
           id: 'testmail-identity-id',
@@ -68,10 +68,10 @@ describe('James Plugin', () => {
           email: 'testmail@test.org',
         },
       ])
-      .put('/jmap/identities/testmail@test.org/testmail-identity-id')
+      .put('/users/testmail@test.org/identities/testmail-identity-id')
       .reply(200, { success: true })
       // Identity - quotauser@test.org (created in quota test)
-      .get('/jmap/identities/quotauser@test.org')
+      .get('/users/quotauser@test.org/identities')
       .reply(200, [
         {
           id: 'quotauser-identity-id',
@@ -79,10 +79,10 @@ describe('James Plugin', () => {
           email: 'quotauser@test.org',
         },
       ])
-      .put('/jmap/identities/quotauser@test.org/quotauser-identity-id')
+      .put('/users/quotauser@test.org/identities/quotauser-identity-id')
       .reply(200, { success: true })
       // Identity - aliasuser@test.org (created in alias tests)
-      .get('/jmap/identities/aliasuser@test.org')
+      .get('/users/aliasuser@test.org/identities')
       .reply(200, [
         {
           id: 'aliasuser-identity-id',
@@ -90,10 +90,10 @@ describe('James Plugin', () => {
           email: 'aliasuser@test.org',
         },
       ])
-      .put('/jmap/identities/aliasuser@test.org/aliasuser-identity-id')
+      .put('/users/aliasuser@test.org/identities/aliasuser-identity-id')
       .reply(200, { success: true })
       // Identity - primary@test.org (created in mail change test)
-      .get('/jmap/identities/primary@test.org')
+      .get('/users/primary@test.org/identities')
       .reply(200, [
         {
           id: 'primary-identity-id',
@@ -101,10 +101,10 @@ describe('James Plugin', () => {
           email: 'primary@test.org',
         },
       ])
-      .put('/jmap/identities/primary@test.org/primary-identity-id')
+      .put('/users/primary@test.org/identities/primary-identity-id')
       .reply(200, { success: true })
       // Identity - newprimary@test.org (after mail change)
-      .get('/jmap/identities/newprimary@test.org')
+      .get('/users/newprimary@test.org/identities')
       .reply(200, [
         {
           id: 'newprimary-identity-id',
@@ -112,10 +112,10 @@ describe('James Plugin', () => {
           email: 'newprimary@test.org',
         },
       ])
-      .put('/jmap/identities/newprimary@test.org/newprimary-identity-id')
+      .put('/users/newprimary@test.org/identities/newprimary-identity-id')
       .reply(200, { success: true })
       // Identity - t@t.org (after mail change in basic test)
-      .get('/jmap/identities/t@t.org')
+      .get('/users/t@t.org/identities')
       .reply(200, [
         {
           id: 't-identity-id',
@@ -123,10 +123,10 @@ describe('James Plugin', () => {
           email: 't@t.org',
         },
       ])
-      .put('/jmap/identities/t@t.org/t-identity-id')
+      .put('/users/t@t.org/identities/t-identity-id')
       .reply(200, { success: true })
       // Identity - forward@test.org (created in forward tests)
-      .get('/jmap/identities/forward@test.org')
+      .get('/users/forward@test.org/identities')
       .reply(200, [
         {
           id: 'forward-identity-id',
@@ -134,10 +134,10 @@ describe('James Plugin', () => {
           email: 'forward@test.org',
         },
       ])
-      .put('/jmap/identities/forward@test.org/forward-identity-id')
+      .put('/users/forward@test.org/identities/forward-identity-id')
       .reply(200, { success: true })
       // Identity - delegate@test.org (created in delegation tests)
-      .get('/jmap/identities/delegate@test.org')
+      .get('/users/delegate@test.org/identities')
       .reply(200, [
         {
           id: 'delegate-identity-id',
@@ -145,10 +145,10 @@ describe('James Plugin', () => {
           email: 'delegate@test.org',
         },
       ])
-      .put('/jmap/identities/delegate@test.org/delegate-identity-id')
+      .put('/users/delegate@test.org/identities/delegate-identity-id')
       .reply(200, { success: true })
       // Identity - assistant@test.org (created in delegation tests)
-      .get('/jmap/identities/assistant@test.org')
+      .get('/users/assistant@test.org/identities')
       .reply(200, [
         {
           id: 'assistant-identity-id',
@@ -156,10 +156,10 @@ describe('James Plugin', () => {
           email: 'assistant@test.org',
         },
       ])
-      .put('/jmap/identities/assistant@test.org/assistant-identity-id')
+      .put('/users/assistant@test.org/identities/assistant-identity-id')
       .reply(200, { success: true })
       // Identity - assistant1@test.org (created in delegation tests)
-      .get('/jmap/identities/assistant1@test.org')
+      .get('/users/assistant1@test.org/identities')
       .reply(200, [
         {
           id: 'assistant1-identity-id',
@@ -167,10 +167,10 @@ describe('James Plugin', () => {
           email: 'assistant1@test.org',
         },
       ])
-      .put('/jmap/identities/assistant1@test.org/assistant1-identity-id')
+      .put('/users/assistant1@test.org/identities/assistant1-identity-id')
       .reply(200, { success: true })
       // Identity - assistant2@test.org (created in delegation tests)
-      .get('/jmap/identities/assistant2@test.org')
+      .get('/users/assistant2@test.org/identities')
       .reply(200, [
         {
           id: 'assistant2-identity-id',
@@ -178,7 +178,7 @@ describe('James Plugin', () => {
           email: 'assistant2@test.org',
         },
       ])
-      .put('/jmap/identities/assistant2@test.org/assistant2-identity-id')
+      .put('/users/assistant2@test.org/identities/assistant2-identity-id')
       .reply(200, { success: true })
       // Quota API - GET user quota
       .get('/quota/users/quotauser@test.org')
@@ -391,9 +391,9 @@ describe('James Plugin', () => {
       const renameScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename')
+        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename&force')
         .reply(200, { success: true })
-        .get('/jmap/identities/noalias@test.org')
+        .get('/users/noalias@test.org/identities')
         .reply(200, [
           {
             id: 'noalias-identity-id',
@@ -401,9 +401,9 @@ describe('James Plugin', () => {
             email: 'noalias@test.org',
           },
         ])
-        .put('/jmap/identities/noalias@test.org/noalias-identity-id')
+        .put('/users/noalias@test.org/identities/noalias-identity-id')
         .reply(200, { success: true })
-        .get('/jmap/identities/newalias@test.org')
+        .get('/users/newalias@test.org/identities')
         .reply(200, [
           {
             id: 'newalias-identity-id',
@@ -411,7 +411,7 @@ describe('James Plugin', () => {
             email: 'newalias@test.org',
           },
         ])
-        .put('/jmap/identities/newalias@test.org/newalias-identity-id')
+        .put('/users/newalias@test.org/identities/newalias-identity-id')
         .reply(200, { success: true });
 
       try {
@@ -458,9 +458,9 @@ describe('James Plugin', () => {
       const renameScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename')
+        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename&force')
         .reply(200, { success: true })
-        .get('/jmap/identities/noalias@test.org')
+        .get('/users/noalias@test.org/identities')
         .reply(200, [
           {
             id: 'noalias-identity-id',
@@ -468,9 +468,9 @@ describe('James Plugin', () => {
             email: 'noalias@test.org',
           },
         ])
-        .put('/jmap/identities/noalias@test.org/noalias-identity-id')
+        .put('/users/noalias@test.org/identities/noalias-identity-id')
         .reply(200, { success: true })
-        .get('/jmap/identities/newalias@test.org')
+        .get('/users/newalias@test.org/identities')
         .reply(200, [
           {
             id: 'newalias-identity-id',
@@ -478,7 +478,7 @@ describe('James Plugin', () => {
             email: 'newalias@test.org',
           },
         ])
-        .put('/jmap/identities/newalias@test.org/newalias-identity-id')
+        .put('/users/newalias@test.org/identities/newalias-identity-id')
         .reply(200, { success: true });
 
       try {
@@ -516,13 +516,13 @@ describe('James Plugin', () => {
       const forwardScope1 = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .put('/domains/test.org/forwards/forward@test.org/manager@test.org')
+        .put('/address/forwards/forward@test.org/targets/manager@test.org')
         .reply(204);
 
       const forwardScope2 = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .put('/domains/test.org/forwards/forward@test.org/boss@test.org')
+        .put('/address/forwards/forward@test.org/targets/boss@test.org')
         .reply(204);
 
       // Create entry without forwards first
@@ -555,13 +555,13 @@ describe('James Plugin', () => {
       const initialScope1 = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .put('/domains/test.org/forwards/forward@test.org/manager@test.org')
+        .put('/address/forwards/forward@test.org/targets/manager@test.org')
         .reply(204);
 
       const initialScope2 = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .put('/domains/test.org/forwards/forward@test.org/boss@test.org')
+        .put('/address/forwards/forward@test.org/targets/boss@test.org')
         .reply(204);
 
       // Create user without forwards
@@ -591,13 +591,13 @@ describe('James Plugin', () => {
       const deleteScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .delete('/domains/test.org/forwards/forward@test.org/manager@test.org')
+        .delete('/address/forwards/forward@test.org/targets/manager@test.org')
         .reply(204);
 
       const addScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .put('/domains/test.org/forwards/forward@test.org/assistant@test.org')
+        .put('/address/forwards/forward@test.org/targets/assistant@test.org')
         .reply(204);
 
       // Modify forwards: remove manager, keep boss, add assistant
@@ -825,7 +825,7 @@ describe('James Plugin', () => {
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
         .persist()
-        .get(`/jmap/identities/${testMail1}`)
+        .get(`/users/${testMail1}/identities`)
         .reply(200, [
           {
             id: 'identity-id-1',
@@ -833,9 +833,9 @@ describe('James Plugin', () => {
             email: testMail1,
           },
         ])
-        .put(`/jmap/identities/${testMail1}/identity-id-1`)
+        .put(`/users/${testMail1}/identities/identity-id-1`)
         .reply(200, { success: true })
-        .get(`/jmap/identities/${testMail2}`)
+        .get(`/users/${testMail2}/identities`)
         .reply(200, [
           {
             id: 'newuser-identity-id',
@@ -843,7 +843,7 @@ describe('James Plugin', () => {
             email: testMail2,
           },
         ])
-        .put(`/jmap/identities/${testMail2}/newuser-identity-id`)
+        .put(`/users/${testMail2}/identities/newuser-identity-id`)
         .reply(200, { success: true });
     });
 
@@ -958,7 +958,7 @@ describe('James Plugin', () => {
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
         .persist()
-        .get('/jmap/identities/signature@test.org')
+        .get('/users/signature@test.org/identities')
         .reply(200, [
           {
             id: 'signature-identity-id',
@@ -966,7 +966,7 @@ describe('James Plugin', () => {
             email: 'signature@test.org',
           },
         ])
-        .put('/jmap/identities/signature@test.org/signature-identity-id')
+        .put('/users/signature@test.org/identities/signature-identity-id')
         .reply(200, { success: true });
     });
 

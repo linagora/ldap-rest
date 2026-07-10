@@ -40,9 +40,9 @@ describe('James Mailing Lists', () => {
     scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
       .persist()
       // Mock identity sync for all emails (uses regex to match dynamic timestamps)
-      .get(/\/jmap\/identities\/.*@test\.org$/)
+      .get(/\/users\/.*@test\.org\/identities$/)
       .reply(200, uri => {
-        const email = uri.replace('/jmap/identities/', '');
+        const email = uri.replace('/users/', '').replace('/identities', '');
         return [
           {
             id: `${email}-identity-id`,
@@ -51,7 +51,7 @@ describe('James Mailing Lists', () => {
           },
         ];
       })
-      .put(/\/jmap\/identities\/.*@test\.org\/.*-identity-id$/)
+      .put(/\/users\/.*@test\.org\/identities\/.*-identity-id$/)
       .reply(200, { success: true })
       // Create group members
       .put(/\/address\/groups\/list.*@test\.org\/member.*@test\.org$/)

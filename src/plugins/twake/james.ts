@@ -329,10 +329,20 @@ export default class James extends TwakePlugin {
         return;
       }
 
+      // Skip if newmail is empty/null (this is a deletion, not a rename).
+      // Without this guard the URL would target `/rename/null` and James could
+      // rename the mailbox to a literal "null" address.
+      if (!newmailStr) {
+        this.logger.debug(
+          `Skipping mail rename for ${dn}: newmail is empty (mail attribute was deleted, not changed)`
+        );
+        return;
+      }
+
       // Rename the mailbox
       await this.callWebAdminApi(
         'onLdapMailChange',
-        `${this.webadminUrl}/users/${oldmailStr}/rename/${newmailStr}?action=rename`,
+        `${this.webadminUrl}/users/${oldmailStr}/rename/${newmailStr}?action=rename&force`,
         'POST',
         dn,
         null,
@@ -463,7 +473,7 @@ export default class James extends TwakePlugin {
         ...toDelete.map(forward =>
           this.callWebAdminApi(
             'onLdapForwardChange-delete',
-            `${this.webadminUrl}/domains/${domain}/forwards/${mail}/${forward}`,
+            `${this.webadminUrl}/address/forwards/${mail}/targets/${forward}`,
             'DELETE',
             dn,
             null,
@@ -473,7 +483,7 @@ export default class James extends TwakePlugin {
         ...toAdd.map(forward =>
           this.callWebAdminApi(
             'onLdapForwardChange-add',
-            `${this.webadminUrl}/domains/${domain}/forwards/${mail}/${forward}`,
+            `${this.webadminUrl}/address/forwards/${mail}/targets/${forward}`,
             'PUT',
             dn,
             null,
@@ -930,7 +940,7 @@ export default class James extends TwakePlugin {
 
     try {
       // Step 1: Get user identities
-      const identitiesUrl = `${this.webadminUrl}/jmap/identities/${mail}`;
+      const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
       const getRes = await this.requestLimit(() =>
         fetch(identitiesUrl, {
           method: 'GET',
@@ -970,7 +980,7 @@ export default class James extends TwakePlugin {
       const htmlSignature = await this.generateSignature(dn);
 
       // Step 4: Update identity name and signature
-      const updateUrl = `${this.webadminUrl}/jmap/identities/${mail}/${defaultIdentity.id}`;
+      const updateUrl = `${this.webadminUrl}/users/${mail}/identities/${defaultIdentity.id}`;
 
       const updatePayload: {
         id: string;
