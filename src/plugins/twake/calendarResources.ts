@@ -2,7 +2,8 @@ import fetch from 'node-fetch';
 
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
+import type { AttributesList } from '../../lib/ldapActions';
+import type { ChangesToNotify } from '../ldap/onChange';
 import { Hooks } from '../../hooks';
 
 /**
@@ -154,43 +155,36 @@ export default class CalendarResources extends TwakePlugin {
     },
 
     /**
-     * Handle user email changes.
-     * The registered user is keyed by the (old) email in Calendar, so we look
-     * it up by the old address and PATCH it with the new email and names.
+     * Propagate user identity changes to the Calendar registered users.
+     *
+     * A single hook is used (rather than onLdapMailChange /
+     * onLdapDisplayNameChange) so the sync is driven by the *configured* mail,
+     * first name and last name attributes — the display-name hook only fires on
+     * the hard-coded cn/givenName/sn attributes, which would silently ignore a
+     * non-default firstname/lastname attribute.
      */
-    onLdapMailChange: async (
-      dn: string,
-      oldmail: AttributeValue | null,
-      newmail: AttributeValue | null
-    ) => {
-      const oldmailStr = this.attributeToString(oldmail);
-      const newmailStr = this.attributeToString(newmail);
+    onLdapChange: async (dn: string, changes: ChangesToNotify) => {
+      const mailChange = changes[this.mailAttr];
+      if (mailChange) {
+        const oldmail = this.attributeToString(mailChange[0]);
+        const newmail = this.attributeToString(mailChange[1]);
 
-      // Skip additions (no previous mail) and deletions (no new mail):
-      // there is nothing to update on the Calendar side in those cases.
-      if (!oldmailStr) {
-        this.logger.debug(
-          `Skipping registered user sync for ${dn}: oldmail is empty (mail added, not changed)`
-        );
+        // Only a real rename (old and new both present) updates Calendar.
+        // Additions and deletions of the mail attribute are skipped: there is
+        // nothing to rename on the Calendar side.
+        if (oldmail && newmail && oldmail !== newmail) {
+          // The registered user is keyed by the previous email in Calendar, so
+          // look it up by the old address and PATCH it with the new values.
+          await this.syncRegisteredUser('onLdapMailChange', dn, oldmail);
+        }
         return;
       }
-      if (!newmailStr) {
-        this.logger.debug(
-          `Skipping registered user sync for ${dn}: newmail is empty (mail deleted)`
-        );
-        return;
+
+      // Name-only change: sync when a configured name attribute changed. The
+      // email is unchanged, so the user is looked up by its current mail.
+      if (changes[this.firstnameAttr] || changes[this.lastnameAttr]) {
+        await this.syncRegisteredUser('onLdapDisplayNameChange', dn);
       }
-
-      await this.syncRegisteredUser('onLdapMailChange', dn, oldmailStr);
-    },
-
-    /**
-     * Handle display name changes (cn / givenName / sn).
-     * The email is unchanged, so the registered user is looked up by its
-     * current mail.
-     */
-    onLdapDisplayNameChange: async (dn: string) => {
-      await this.syncRegisteredUser('onLdapDisplayNameChange', dn);
     },
   };
 

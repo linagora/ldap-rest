@@ -247,10 +247,9 @@ describe('Calendar Resources Plugin', function () {
       } catch (err) {
         // Ignore if already exists
       }
-      // Creating the entry fires an async onLdapDisplayNameChange (our own
-      // hook); let it settle — it fails harmlessly without a nock scope — so it
-      // cannot consume the interceptors the tests set up below.
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Creating the entry fires onLdapChange with the mail attribute present,
+      // which the plugin treats as an addition and skips — so no stray
+      // /registeredUsers call races with the interceptors set up below.
     });
 
     afterEach(async () => {
@@ -321,11 +320,9 @@ describe('Calendar Resources Plugin', function () {
         });
 
       // LDAP now holds caluser@test.org; Calendar still has old@test.org
-      await calendarResources.hooks.onLdapMailChange!(
-        userDN,
-        'old@test.org',
-        'caluser@test.org'
-      );
+      await calendarResources.hooks.onLdapChange!(userDN, {
+        mail: ['old@test.org', 'caluser@test.org'],
+      });
 
       expect(scope.isDone()).to.be.true;
       expect(patchUri).to.contain('id=abc123');
@@ -349,12 +346,55 @@ describe('Calendar Resources Plugin', function () {
 
     it('skips sync when the mail is added (no previous mail)', async () => {
       // No nock scope: any HTTP call would throw (netConnect disabled)
-      await calendarResources.hooks.onLdapMailChange!(
-        userDN,
-        null,
-        'caluser@test.org'
-      );
+      await calendarResources.hooks.onLdapChange!(userDN, {
+        mail: [null, 'caluser@test.org'],
+      });
       // Reaching here without a thrown unmocked-request error proves no call
+      expect(nock.pendingMocks()).to.have.length(0);
+    });
+
+    it('syncs names when a configured name attribute changes', async () => {
+      let patchBody: Record<string, unknown> | null = null;
+      let patchUri = '';
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .reply(200, [
+          {
+            id: 'nm1',
+            email: 'caluser@test.org',
+            firstname: 'Old',
+            lastname: 'Name',
+          },
+        ])
+        .patch('/registeredUsers', body => {
+          patchBody = body as Record<string, unknown>;
+          return true;
+        })
+        .query(true)
+        .reply(function (uri) {
+          patchUri = uri;
+          return [204];
+        });
+
+      // sn is the default configured lastname attribute
+      await calendarResources.hooks.onLdapChange!(userDN, {
+        sn: ['Name', 'TELLIER'],
+      });
+
+      expect(scope.isDone()).to.be.true;
+      expect(patchUri).to.contain('id=nm1');
+      expect(patchBody).to.deep.equal({
+        email: 'caluser@test.org',
+        firstname: 'Benoit',
+        lastname: 'TELLIER',
+      });
+    });
+
+    it('ignores changes to unrelated attributes', async () => {
+      // No nock scope: any HTTP call would throw (netConnect disabled)
+      await calendarResources.hooks.onLdapChange!(userDN, {
+        description: ['before', 'after'],
+      });
       expect(nock.pendingMocks()).to.have.length(0);
     });
   });
