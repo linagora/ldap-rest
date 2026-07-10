@@ -329,6 +329,16 @@ export default class James extends TwakePlugin {
         return;
       }
 
+      // Skip if newmail is empty/null (this is a deletion, not a rename).
+      // Without this guard the URL would target `/rename/null` and James could
+      // rename the mailbox to a literal "null" address.
+      if (!newmailStr) {
+        this.logger.debug(
+          `Skipping mail rename for ${dn}: newmail is empty (mail attribute was deleted, not changed)`
+        );
+        return;
+      }
+
       // Rename the mailbox
       await this.callWebAdminApi(
         'onLdapMailChange',
