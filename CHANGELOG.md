@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.4.4 (2026-07-10)
+
+### Features
+
+- `plugins/twake/calendarResources`: propagate LDAP user identity changes
+  (email, first name, last name) to the Twake Calendar registered users via the
+  WebAdmin API. Registered users are keyed by an internal id and
+  `GET /registeredUsers` exposes no filter, so the plugin lists the registered
+  users, locates the entry by email, then `PATCH /registeredUsers?id={id}` with
+  the LDAP values. The sync is driven by the configured mail / first name / last
+  name attributes — `--calendar-firstname-attribute` (default `givenName`) and
+  `--calendar-lastname-attribute` (default `sn`) (#100)
+
+### Bug Fixes
+
+- `plugins/twake/james`: use the standard Apache James / Twake-Mail WebAdmin
+  routes. The forwards and JMAP identities calls targeted routes that do not
+  exist and silently returned 404: forwards now use
+  `/address/forwards/{mail}/targets/{forward}` (was
+  `/domains/{domain}/forwards/…`) and identities `/users/{mail}/identities` (was
+  `/jmap/identities/{mail}`). The mailbox rename call also gains the required
+  `force` query parameter and is now skipped when the new mail is empty instead
+  of renaming the mailbox to a literal `null` address (#99)
+- `plugins/scim`: force usernames to lowercase on SCIM user creation (#96)
+
 ## v0.4.3 (2026-07-08)
 
 ### Bug Fixes
