@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.4.5 (2026-07-16)
+
+### Features
+
+- `bin/sync-james`: reconcile mail aliases in addition to quotas, as a catch-up
+  for aliases that were not propagated to James (e.g. when the event-based sync
+  failed).
+
 ## v0.4.4 (2026-07-10)
 
 ### Features
