@@ -1,0 +1,31 @@
+ldap-rest has been deployed as release "{{ .Release.Name }}".
+
+The API is reachable inside the cluster at:
+  http://{{ include "ldap-rest.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress hosts:
+{{- range .Values.ingress.hosts }}
+  - http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+To reach it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ldap-rest.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  # then, e.g. (adjust the prefix to your DM_API_PREFIX, default /api):
+  curl http://localhost:{{ .Values.service.port }}/api/hello
+{{- end }}
+
+Useful commands:
+  # Logs
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/name={{ include "ldap-rest.name" . }} -f
+
+{{- if not .Values.env }}
+
+⚠️  No `env` values set — ldap-rest is running with image defaults
+   (DM_LDAP_URL=ldap://localhost, empty DM_LDAP_BASE). Configure at least
+   DM_LDAP_URL / DM_LDAP_BASE (and DM_LDAP_PWD via `secrets`) for real use.
+{{- end }}
+
+For configuration options, see: https://github.com/linagora/ldap-rest

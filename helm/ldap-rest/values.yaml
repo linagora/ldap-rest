@@ -1,0 +1,153 @@
+# Default values for the ldap-rest Helm chart.
+#
+# ldap-rest is configured entirely through DM_* environment variables (see the
+# project Dockerfile / documentation). Pass them through `env` (plain values)
+# and `secrets` (sensitive values). This keeps the same values interface as the
+# in-house deployment chart, so existing overlays work unchanged.
+
+# -- Override the chart name used in labels
+nameOverride: ""
+# -- Fully override the generated resource name (defaults to the release name)
+fullnameOverride: ""
+
+# -- Number of replicas. ldap-rest is stateless (all state lives in LDAP), so it
+# can be scaled horizontally.
+replicaCount: 1
+
+image:
+  # -- Image repository. Published to both ghcr.io/linagora/ldap-rest and
+  # docker.io/yadd/ldap-rest by the release workflow.
+  repository: ghcr.io/linagora/ldap-rest
+  # -- Image tag. Defaults to the chart appVersion when left empty.
+  tag: ""
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Deployment update strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount
+  create: false
+  # -- Annotations to add to the ServiceAccount
+  annotations: {}
+  # -- Name of the ServiceAccount to use (generated if empty and create=true)
+  name: ""
+
+# -- Extra pod annotations. A checksum of externalFileConfig is always added on
+# top so pods roll automatically when the mounted plugin changes.
+podAnnotations: {}
+
+# -- Pod-level security context. The image runs as the unprivileged `node` user.
+podSecurityContext: {}
+  # fsGroup: 1000
+
+# -- Container-level security context
+securityContext: {}
+  # runAsNonRoot: true
+  # allowPrivilegeEscalation: false
+  # readOnlyRootFilesystem: false
+  # capabilities:
+  #   drop:
+  #     - ALL
+
+service:
+  # -- Service type: ClusterIP, NodePort, LoadBalancer
+  type: ClusterIP
+  # -- Service port. Also used as the container port, so keep it in sync with
+  # DM_PORT if you override the listen port through `env`.
+  port: 8081
+  # -- Annotations
+  annotations: {}
+
+ingress:
+  # -- Enable ingress
+  enabled: false
+  # -- Ingress class name
+  className: ""
+  # -- Ingress annotations
+  annotations: {}
+  # -- Ingress hosts
+  hosts:
+    - host: ldap-rest.local
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration
+  tls: []
+  # - secretName: ldap-rest-tls
+  #   hosts:
+  #     - ldap-rest.local
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 250m
+    memory: 1Gi
+
+# -- Liveness probe. No dedicated HTTP health route exists, so a TCP check on
+# the listen port is used. Set to {} to disable.
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# -- Readiness probe. Set to {} to disable.
+readinessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# -- Node selector
+nodeSelector: {}
+# -- Tolerations
+tolerations: []
+# -- Affinity rules
+affinity: {}
+
+# -- Plain (non-secret) environment variables, as a list of {name, value}.
+# Every ldap-rest setting is a DM_* variable. Example:
+#   env:
+#     - name: DM_LDAP_URL
+#       value: "ldap://openldap"
+#     - name: DM_LDAP_BASE
+#       value: "dc=example,dc=com"
+#     - name: DM_PLUGINS
+#       value: "core/static,core/ldap/flatGeneric"
+env: []
+
+# -- Sensitive environment variables, as a list of env entries. Prefer
+# `valueFrom.secretKeyRef` pointing at a Secret you manage (e.g. via SOPS /
+# External Secrets) rather than inlining values here. Example:
+#   secrets:
+#     - name: DM_LDAP_PWD
+#       valueFrom:
+#         secretKeyRef:
+#           name: ldap-rest-secrets
+#           key: DM_LDAP_PWD
+secrets: []
+
+# -- Inline JavaScript for an external plugin. When set, it is rendered into a
+# ConfigMap and mounted at /app/external/cnb-plugin.js (reference it in
+# DM_PLUGINS as /app/external/cnb-plugin.js).
+externalFileConfig: ""
+
+# -- Extra volumes to add to the pod
+extraVolumes: []
+# -- Extra volume mounts to add to the container
+extraVolumeMounts: []

@@ -1,0 +1,11 @@
+{{- if .Values.externalFileConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ldap-rest.fullname" . }}-external
+  labels:
+    {{- include "ldap-rest.labels" . | nindent 4 }}
+data:
+  cnb-plugin.js: |
+{{ .Values.externalFileConfig | nindent 4 }}
+{{- end }}
