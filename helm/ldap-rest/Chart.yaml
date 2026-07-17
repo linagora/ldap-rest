@@ -1,0 +1,25 @@
+apiVersion: v2
+name: ldap-rest
+description: A Helm chart for deploying ldap-rest — a REST/SCIM API server in front of an LDAP directory
+type: application
+# version and appVersion are overwritten from the git tag by the release
+# workflow (.github/workflows/release.yml). The values here are only a
+# fallback for local `helm package` / `helm install` from a checkout.
+version: 0.4.5
+appVersion: "0.4.5"
+
+home: https://github.com/linagora/ldap-rest
+
+keywords:
+  - ldap
+  - rest
+  - scim
+  - directory
+  - twake
+
+maintainers:
+  - name: yadd
+    url: https://github.com/linagora/ldap-rest
+
+sources:
+  - https://github.com/linagora/ldap-rest
