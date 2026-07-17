@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.4.6 (2026-07-17)
+
+### Features
+
+- docker images amd64 + arm64
+- CI: automated release pipeline triggered on `vX.Y.Z` tags. Each tag now
+  builds and pushes multi-arch (amd64 + arm64) Docker images to
+  `ghcr.io/linagora/ldap-rest` and `docker.io/yadd/ldap-rest`, publishes the
+  Helm chart as an OCI artifact to `oci://ghcr.io/linagora/charts/ldap-rest`,
+  publishes the npm package (via npm OIDC Trusted Publishing, with a provenance
+  attestation), and cuts a matching GitHub Release. Prerelease tags
+  (`vX.Y.Z-rc.N`) are published to the npm `next` dist-tag (#101, #102)
+- `helm/ldap-rest`: Helm chart for deploying ldap-rest on Kubernetes. Derived
+  from the in-house deployment chart (same `env` / `secrets` /
+  `externalFileConfig` values interface) with TCP probes, optional ingress and
+  service account, and standard Helm labels (#101)
+
 ## v0.4.5 (2026-07-16)
 
 ### Features

@@ -53,6 +53,28 @@ LDAP-Rest uses syslog-style log levels:
 
 Use `--log-level notice` for production to see web access logs without general info messages.
 
+## Deployment
+
+### Docker
+
+Multi-arch (amd64/arm64) images are published on each release:
+
+```shell
+docker run -p 8081:8081 ghcr.io/linagora/ldap-rest:latest
+# also available on Docker Hub as yadd/ldap-rest
+```
+
+### Helm
+
+A Helm chart is published as an OCI artifact on each release:
+
+```shell
+helm install ldap-rest oci://ghcr.io/linagora/charts/ldap-rest
+```
+
+See the **[Helm chart README](./helm/ldap-rest/README.md)** for configuration
+(image, `env`/`secrets`, ingress, probes, …).
+
 ## Configuration
 
 See **[Configuration Guide](./docs/usage/configuration.md)** for all CLI options and environment variables.
@@ -67,6 +89,7 @@ Installation, configuration and plugin usage.
 
 - **[Getting Started](./docs/usage/README.md)** - Quick start guide
 - **[Configuration](./docs/usage/configuration.md)** - CLI options and environment variables
+- **[Helm chart](./helm/ldap-rest/README.md)** - Kubernetes deployment
 - **[Plugins](./docs/usage/plugins/README.md)** - Plugin documentation
 - **[Authentication](./docs/usage/plugins/auth/README.md)** - Token, TOTP, HMAC, LemonLDAP::NG, OpenID Connect
 
