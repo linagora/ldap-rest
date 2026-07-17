@@ -549,7 +549,7 @@
       "require": "./static/schemas/twake/users.json"
     }
   },
-  "main": "dist/bin/index.mjs",
+  "main": "dist/bin/index.js",
   "types": "./dist/src/bin/index.d.ts",
   "bin": {
     "cleanup-external-users": "bin/cleanup-external-users.mjs",
