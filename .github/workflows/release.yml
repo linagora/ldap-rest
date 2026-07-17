@@ -313,7 +313,8 @@ jobs:
           if-no-files-found: error
 
   # Cut a GitHub Release, gated on a successful npm publish so the two never
-  # disagree. Notes are auto-generated and the published tarball is attached.
+  # disagree. Release notes come from the matching CHANGELOG.md section; the
+  # published tarball is attached.
   release:
     name: Create GitHub Release
     needs: npm
@@ -322,15 +323,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download release tarball
         uses: actions/download-artifact@v4
         with:
           name: npm-tarball
 
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            /^## v/ {
+              if (inSection) exit
+              hdr = "## v" ver
+              if (substr($0,1,length(hdr))==hdr && (length($0)==length(hdr) || substr($0,length(hdr)+1,1)==" ")) { inSection=1; next }
+            }
+            inSection { print }
+          ' CHANGELOG.md > release-notes.md
+          # Fall back to a link if the version has no CHANGELOG entry.
+          if [ ! -s release-notes.md ]; then
+            echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/v${VERSION}/CHANGELOG.md)." > release-notes.md
+          fi
+          echo "----- release notes -----"; cat release-notes.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: release-notes.md
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: ldap-rest-*.tgz
