@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.7 (2026-07-26)
+
+### Features
+
+- `plugins/weblogs`: let any plugin enrich the access log line. The entry said
+  _that_ a request happened, never _what_ was requested, so on `POST` / `DELETE`
+  routes carrying their parameters in the body the URL alone was useless for
+  auditing. A handler can now set `req.logDetails = { … }` and those fields are
+  merged into the single `notice` entry emitted when the response completes — no
+  second log line to correlate by timestamp. Core fields (`method`, `url`,
+  `status`, `duration`, `ip`, `user`, `error`) always take precedence, so a
+  plugin cannot spoof them (#104)
+
 ## v0.4.6 (2026-07-17)
 
 ### Features
