@@ -52,6 +52,53 @@ Each response is logged when completed at **notice** level (between info and war
 | `responseTime` | Request duration                | `45ms`, `123ms`                   |
 | `error`        | Error message (if applicable)   | `Connection timeout`              |
 
+## Enriching the Log Line From Another Plugin
+
+The standard fields say _that_ a request happened, not _what_ was requested. For
+`POST`/`DELETE` routes carrying their parameters in the body, the URL alone is
+not enough for auditing.
+
+Any plugin can attach extra context to the access log entry by setting
+`req.logDetails` in its handler. Those fields are merged into the single
+`notice` entry emitted when the response completes — no second log line, no
+correlation by timestamp:
+
+```typescript
+app.post('/api/_getldapentries', (req, res) => {
+  req.logDetails = { uids: req.body };
+  // ...
+});
+```
+
+Output:
+
+```json
+{
+  "level": "notice",
+  "message": {
+    "uids": ["jdoe", "asmith"],
+    "method": "POST",
+    "url": "/api/_getldapentries",
+    "status": 200,
+    "duration": 9,
+    "ip": "10.0.9.12",
+    "user": "admin"
+  }
+}
+```
+
+Notes:
+
+- Core fields (`method`, `url`, `status`, `duration`, `ip`, `user`, `error`)
+  always take precedence: a plugin cannot overwrite them.
+- The value must be set **before** the response completes (i.e. before
+  `res.json()` / `res.end()`), since the entry is written on the `finish` event.
+- Only log what identifies the request (uids, mail addresses, target user,
+  action). Do **not** put credentials or free-text personal data there — this
+  line is written at `notice` level, i.e. in production.
+- Keep lists bounded: a request with thousands of uids produces an unreadable
+  log line. Truncate and log the real count alongside.
+
 ## Use Cases
 
 ### 1. Request Monitoring

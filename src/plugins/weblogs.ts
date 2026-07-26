@@ -3,6 +3,20 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin, { type Role } from '../abstract/plugin';
 import { DmRequest } from '../lib/auth/base';
 
+// Extend Express Request so any plugin can enrich the access log line.
+// A handler sets `req.logDetails = { … }` (usually the parameters it received)
+// and those fields are merged into the single "notice" entry emitted when the
+// response completes. Core fields (method, url, status, …) always win, so a
+// plugin cannot overwrite them.
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      logDetails?: Record<string, unknown>;
+    }
+  }
+}
+
 export default class WebLogs extends DmPlugin {
   name = 'weblogs';
   roles: Role[] = ['logging'] as const;
@@ -47,6 +61,8 @@ export default class WebLogs extends DmPlugin {
   ): void {
     const duration = Date.now() - start;
     const _log = {
+      // Spread first: core fields below take precedence over plugin-supplied ones
+      ...(req.logDetails || {}),
       method: req.method,
       url: req.originalUrl,
       status: res.statusCode,
