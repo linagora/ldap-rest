@@ -691,18 +691,33 @@ export default class AppAccountsApi extends DmPlugin {
         await this.server.ldap.modify(principalDn, {
           delete: { userPassword: passwordToDelete },
         });
-      } catch (error) {
-        // Keep the app account: leaving it in place makes the call replayable
-        // once the cause is fixed, whereas deleting it would strand a working
-        // credential on the principal with nothing left pointing at it.
-        this.logger.error(
-          `${this.name}: Failed to delete password from principal account ${principalDn}:`,
-          error
-        );
-        res.status(500).json({
-          error: `Failed to revoke the password of account ${uid}`,
-        });
-        return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        // A value already absent means an earlier attempt did revoke it and
+        // then failed to delete the app account. The credential is gone, which
+        // is all this step guarantees, so carry on: failing here would make the
+        // retry loop forever on a revocation that has nothing left to do.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const message = String(error.message ?? '');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const code: unknown = error.code;
+        if (code === 0x10 || /no ?such ?attribute/i.test(message)) {
+          this.logger.warn(
+            `${this.name}: Password of ${uid} was already absent from principal account ${principalDn}, resuming deletion`
+          );
+        } else {
+          // Keep the app account: leaving it in place makes the call replayable
+          // once the cause is fixed, whereas deleting it would strand a working
+          // credential on the principal with nothing left pointing at it.
+          this.logger.error(
+            `${this.name}: Failed to delete password from principal account ${principalDn}:`,
+            error
+          );
+          res.status(500).json({
+            error: `Failed to revoke the password of account ${uid}`,
+          });
+          return;
+        }
       }
 
       // Delete the applicative account

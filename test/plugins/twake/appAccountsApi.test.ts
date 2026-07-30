@@ -833,6 +833,30 @@ describe('App Accounts API Plugin', function () {
         .true;
     });
 
+    // A previous attempt may have revoked the password and then failed to
+    // delete the app account. Retrying must finish the job, not fail forever on
+    // a revocation that has nothing left to remove.
+    it('DELETE resumes when the password is already gone from the principal', async function () {
+      this.timeout(15000);
+      await createTestUser();
+      const uid = await createAppAccount('Tablet');
+      const appDn = `uid=${uid},${applicativeBase}`;
+      const principalDn = `uid=${principalEmail},${applicativeBase}`;
+
+      // Simulate the earlier partial attempt: principal already cleaned up,
+      // app account still there.
+      await dm.ldap.modify(principalDn, { delete: ['userPassword'] });
+
+      const res = await request(dm.app)
+        .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+
+      expect(res.body.uid).to.equal(uid);
+      expect(await entryExists(appDn), 'app account finally removed').to.be
+        .false;
+    });
+
     it('DELETE keeps the account and returns 500 when revocation fails', async function () {
       this.timeout(15000);
       await createTestUser();

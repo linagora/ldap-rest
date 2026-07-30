@@ -14,9 +14,11 @@
   revocation that silently does not revoke, the kind of defect only an audit
   finds. `POST` now rolls the app account back and returns `500`; `DELETE`
   returns `500` and **keeps** the account so the call stays replayable once the
-  cause is fixed. `userPassword` is also requested explicitly instead of relying
-  on it being returned as part of "all user attributes", and the documentation
-  now states the ACL the bind DN needs on the applicative branch
+  cause is fixed — a password already absent from the principal is treated as
+  revoked, so a retry after a partial failure still completes. `userPassword` is
+  also requested explicitly instead of relying on it being returned as part of
+  "all user attributes", and the documentation now states the ACL the bind DN
+  needs on the applicative branch (#105)
 
 ## v0.4.7 (2026-07-26)
 
