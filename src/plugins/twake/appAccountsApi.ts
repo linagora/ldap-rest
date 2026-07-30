@@ -173,6 +173,11 @@ export default class AppAccountsApi extends DmPlugin {
      *   2. Adds the cleartext password to the principal account
      *      (`uid=<mail>`) so single-point authentication still works.
      *
+     *   Step 2 is not optional: services bind against the principal account,
+     *   so a password absent there would authenticate nowhere. If it fails,
+     *   the app account created in step 1 is rolled back and the call returns
+     *   `500` rather than a credential that does not work.
+     *
      *   Returns a `400` if the user has already reached the server-side
      *   maximum number of app accounts (`max_app_accounts`, default 5).
      *
@@ -225,6 +230,13 @@ export default class AppAccountsApi extends DmPlugin {
      *
      *   The operation is **idempotent**: if the account does not exist,
      *   the response is still `200` with the `uid` echoed back.
+     *
+     *   Revocation requires reading the account's `userPassword` to know which
+     *   of the principal's values to remove. If it cannot be read — typically
+     *   a bind DN without read access on `userPassword` in the applicative
+     *   branch — or if removing it fails, the account is **kept** and the call
+     *   returns `500`, so that the request stays replayable once the cause is
+     *   fixed. It never reports a revocation that did not happen.
      * responses:
      *   '200':
      *     description: App account deleted (or was already absent).
@@ -240,6 +252,13 @@ export default class AppAccountsApi extends DmPlugin {
      *           uid: alice_c04729183
      *   '403':
      *     description: The `:uid` does not belong to `:user`.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '500':
+     *     description: |
+     *       The account password could not be read or could not be removed
+     *       from the principal account; the app account was left in place.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
@@ -512,11 +531,26 @@ export default class AppAccountsApi extends DmPlugin {
           add: { userPassword: newPassword },
         });
       } catch (error) {
-        this.logger.warn(
+        // Services authenticate against the principal account, so a password
+        // that is missing there authenticates nowhere. Returning it anyway
+        // would hand the caller a credential that silently never works: roll
+        // the app account back and report the failure.
+        this.logger.error(
           `${this.name}: Failed to add password to principal account ${principalDn}:`,
           error
         );
-        // Not critical, continue
+        try {
+          await this.server.ldap.delete(applicativeDn);
+        } catch (rollbackError) {
+          this.logger.error(
+            `${this.name}: Failed to roll back applicative account ${applicativeDn}:`,
+            rollbackError
+          );
+        }
+        res.status(500).json({
+          error: 'Failed to register the password on the principal account',
+        });
+        return;
       }
 
       res.json({ uid: newUid, pwd: newPassword, mail: mailStr });
@@ -565,12 +599,16 @@ export default class AppAccountsApi extends DmPlugin {
     const uid = req.params.uid as string;
 
     try {
-      // Search for the applicative account
+      // Search for the applicative account. `userPassword` is requested
+      // explicitly: revocation needs the stored hash to know which of the
+      // principal's values to remove, so this is a hard requirement rather
+      // than a side effect of returning every user attribute.
       const accountResult = await this.server.ldap.search(
         {
           scope: 'sub',
           filter: `(uid=${escapeLdapFilter(uid)})`,
           paged: false,
+          attributes: ['uid', this.mailAttr, 'userPassword'],
         },
         this.applicativeAccountBase
       );
@@ -626,29 +664,59 @@ export default class AppAccountsApi extends DmPlugin {
         return;
       }
 
+      // Revoking means removing this device's value from the principal
+      // account. Without the stored hash we cannot tell which value belongs to
+      // this device, so the credential would keep authenticating after the app
+      // account is gone. An unreadable `userPassword` is indistinguishable from
+      // an absent one (a bind DN lacking read access on it looks the same), so
+      // refuse instead of reporting a revocation that did not happen.
       const userPassword = accountEntry.userPassword;
       if (!userPassword) {
-        this.logger.warn(
-          `${this.name}: Account ${uid} has no userPassword attribute`
+        this.logger.error(
+          `${this.name}: Account ${uid} has no readable userPassword, refusing to delete: ` +
+            'the bind DN needs read access on userPassword in the applicative branch'
         );
+        res.status(500).json({
+          error: `Cannot revoke account ${uid}: its password is not readable`,
+        });
+        return;
       }
 
-      // Delete password from principal account if available
-      if (userPassword) {
-        const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
-        try {
-          const passwordToDelete = Array.isArray(userPassword)
-            ? userPassword[0]
-            : userPassword;
-          await this.server.ldap.modify(principalDn, {
-            delete: { userPassword: passwordToDelete },
-          });
-        } catch (error) {
+      // Delete password from principal account
+      const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
+      try {
+        const passwordToDelete = Array.isArray(userPassword)
+          ? userPassword[0]
+          : userPassword;
+        await this.server.ldap.modify(principalDn, {
+          delete: { userPassword: passwordToDelete },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        // A value already absent means an earlier attempt did revoke it and
+        // then failed to delete the app account. The credential is gone, which
+        // is all this step guarantees, so carry on: failing here would make the
+        // retry loop forever on a revocation that has nothing left to do.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const message = String(error.message ?? '');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const code: unknown = error.code;
+        if (code === 0x10 || /no ?such ?attribute/i.test(message)) {
           this.logger.warn(
+            `${this.name}: Password of ${uid} was already absent from principal account ${principalDn}, resuming deletion`
+          );
+        } else {
+          // Keep the app account: leaving it in place makes the call replayable
+          // once the cause is fixed, whereas deleting it would strand a working
+          // credential on the principal with nothing left pointing at it.
+          this.logger.error(
             `${this.name}: Failed to delete password from principal account ${principalDn}:`,
             error
           );
-          // Not critical, continue
+          res.status(500).json({
+            error: `Failed to revoke the password of account ${uid}`,
+          });
+          return;
         }
       }
 

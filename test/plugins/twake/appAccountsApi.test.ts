@@ -725,6 +725,167 @@ describe('App Accounts API Plugin', function () {
     });
   });
 
+  // The principal account is what services bind against: it holds one
+  // userPassword value per device. Any failure to keep it in sync must surface,
+  // otherwise a created password authenticates nowhere or a deleted device
+  // keeps authenticating.
+  describe('password propagation failures', () => {
+    const createTestUser = async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: testUser,
+        cn: 'Test User',
+        sn: 'User',
+        mail: principalEmail,
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+    };
+
+    const createAppAccount = async (name: string): Promise<string> => {
+      const res = await request(dm.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name })
+        .expect(200);
+      return res.body.uid as string;
+    };
+
+    const entryExists = async (dn: string): Promise<boolean> => {
+      try {
+        const res = await dm.ldap.search({ scope: 'base', paged: false }, dn);
+        return ((res as any).searchEntries || []).length === 1;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    it('POST rolls back and returns 500 when the principal cannot be updated', async function () {
+      this.timeout(15000);
+      await createTestUser();
+
+      // Fail only the `add: userPassword` on the principal account.
+      const realModify = dm.ldap.modify.bind(dm.ldap);
+      let attempted = false;
+      (dm.ldap as any).modify = async (dn: string, changes: any) => {
+        if (dn.startsWith(`uid=${principalEmail},`) && changes?.add) {
+          attempted = true;
+          throw new Error('simulated: no write access on principal');
+        }
+        return realModify(dn, changes);
+      };
+
+      let body: any;
+      try {
+        const res = await request(dm.app)
+          .post(`/api/v1/users/${principalEmail}/app-accounts`)
+          .set('Authorization', `Bearer ${testToken}`)
+          .send({ name: 'Doomed device' })
+          .expect(500);
+        body = res.body;
+      } finally {
+        (dm.ldap as any).modify = realModify;
+      }
+
+      expect(attempted, 'principal update was attempted').to.be.true;
+      expect(body).to.not.have.property('pwd');
+
+      // No orphan app account must survive the failure.
+      const leftovers = await dm.ldap.search(
+        { scope: 'sub', filter: `(uid=${appUidPrefix}_*)`, paged: false },
+        applicativeBase
+      );
+      expect((leftovers as any).searchEntries || []).to.have.lengthOf(0);
+    });
+
+    it('DELETE keeps the account and returns 500 when userPassword is unreadable', async function () {
+      this.timeout(15000);
+      await createTestUser();
+      const uid = await createAppAccount('Phone');
+      const appDn = `uid=${uid},${applicativeBase}`;
+
+      // Reproduce a bind DN without read access on userPassword: the entry is
+      // returned, that attribute simply is not. It is indistinguishable from an
+      // account that has none, and in both cases the server cannot tell which
+      // principal value to revoke.
+      const realSearch = dm.ldap.search.bind(dm.ldap);
+      (dm.ldap as any).search = async (opts: any, base: string) => {
+        const result: any = await realSearch(opts, base);
+        if (base === applicativeBase && result?.searchEntries) {
+          result.searchEntries = result.searchEntries.map((entry: any) => {
+            const { userPassword, ...rest } = entry;
+            return rest;
+          });
+        }
+        return result;
+      };
+
+      try {
+        const res = await request(dm.app)
+          .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid}`)
+          .set('Authorization', `Bearer ${testToken}`)
+          .expect(500);
+        expect(res.body.error).to.match(/not readable/i);
+      } finally {
+        (dm.ldap as any).search = realSearch;
+      }
+
+      expect(await entryExists(appDn), 'app account kept for replay').to.be
+        .true;
+    });
+
+    // A previous attempt may have revoked the password and then failed to
+    // delete the app account. Retrying must finish the job, not fail forever on
+    // a revocation that has nothing left to remove.
+    it('DELETE resumes when the password is already gone from the principal', async function () {
+      this.timeout(15000);
+      await createTestUser();
+      const uid = await createAppAccount('Tablet');
+      const appDn = `uid=${uid},${applicativeBase}`;
+      const principalDn = `uid=${principalEmail},${applicativeBase}`;
+
+      // Simulate the earlier partial attempt: principal already cleaned up,
+      // app account still there.
+      await dm.ldap.modify(principalDn, { delete: ['userPassword'] });
+
+      const res = await request(dm.app)
+        .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid}`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .expect(200);
+
+      expect(res.body.uid).to.equal(uid);
+      expect(await entryExists(appDn), 'app account finally removed').to.be
+        .false;
+    });
+
+    it('DELETE keeps the account and returns 500 when revocation fails', async function () {
+      this.timeout(15000);
+      await createTestUser();
+      const uid = await createAppAccount('Laptop');
+      const appDn = `uid=${uid},${applicativeBase}`;
+
+      const realModify = dm.ldap.modify.bind(dm.ldap);
+      (dm.ldap as any).modify = async (dn: string, changes: any) => {
+        if (dn.startsWith(`uid=${principalEmail},`) && changes?.delete) {
+          throw new Error('simulated: revocation refused');
+        }
+        return realModify(dn, changes);
+      };
+
+      try {
+        const res = await request(dm.app)
+          .delete(`/api/v1/users/${principalEmail}/app-accounts/${uid}`)
+          .set('Authorization', `Bearer ${testToken}`)
+          .expect(500);
+        expect(res.body.error).to.match(/revoke/i);
+      } finally {
+        (dm.ldap as any).modify = realModify;
+      }
+
+      expect(await entryExists(appDn), 'app account kept for replay').to.be
+        .true;
+    });
+  });
+
   describe('Configuration', () => {
     it('should throw error if applicative_account_base is not configured', () => {
       const dmTest = new DM();
