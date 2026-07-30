@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Features
+
+- `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
+  the directory — the phpLDAPadmin-shaped hole in an otherwise business-object
+  API. The high-level plugins answer "who are the users of this group"; nothing
+  answered "what is actually stored under this DN", which is what an
+  administrator needs when the data does not match the model. The plugin serves
+  the root DSE, the parsed schema, any entry by DN (operational attributes
+  included, binary values base64-encoded and flagged), the direct children of a
+  node, and arbitrary searches. Everything goes through `server.ldap`, so the
+  authorization, trash and logging hooks apply unchanged; access is bounded by
+  `--ldap-raw-base` (403 outside), narrowed by the authz plugins, and
+  `--ldap-raw-hidden-attribute` removes attributes from every response. Root DSE
+  and schema are read with the service account — they are directory metadata,
+  and a UI that cannot name and type attributes is useless. The new
+  `lib/ldapSchema` parses RFC 4512 definitions and resolves `SUP` chains, so
+  both sides can tell which attributes an entry must and may carry. The browser
+  library `ldap-browser` ships a tree, a schema-annotated attribute table and a
+  filter search, with a demo page at `/static/ldap-browser.html`
+
 ### Bug fixes
 
 - `plugins/twake/appAccountsApi`: never report a password operation that did not

@@ -190,6 +190,17 @@ Monitors LDAP modifications and triggers hooks for attribute changes. No configu
 
 Maintains consistency of department links when organizations are renamed/moved. No configuration options - uses [core/ldap/organizations](#coreldaporganizations) settings.
 
+#### `core/ldap/raw`
+
+Read-only low-level browsing (root DSE, schema, entries). See [raw plugin](plugins/ldap/raw.md).
+
+| CLI                           | Plural                         | Env                             | Default       | Description                     |
+| ----------------------------- | ------------------------------ | ------------------------------- | ------------- | ------------------------------- |
+| `--ldap-raw-base`             | `--ldap-raw-bases`             | `DM_LDAP_RAW_BASE`              | `--ldap-base` | Subtrees exposed by the API     |
+| `--ldap-raw-hidden-attribute` | `--ldap-raw-hidden-attributes` | `DM_LDAP_RAW_HIDDEN_ATTRIBUTES` | `[]`          | Attributes never returned       |
+| `--ldap-raw-max-results`      |                                | `DM_LDAP_RAW_MAX_RESULTS`       | `200`         | Max entries per search/listing  |
+| `--ldap-raw-schema-cache-ttl` |                                | `DM_LDAP_RAW_SCHEMA_CACHE_TTL`  | `3600`        | Schema cache lifetime (seconds) |
+
 ### Authentication Plugins
 
 #### `core/auth/token`

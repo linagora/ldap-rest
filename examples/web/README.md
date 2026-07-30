@@ -82,6 +82,23 @@ Manage organizational units.
 - Move units
 - Create/delete units
 
+### 🗂️ LDAP Browser (`ldap-browser.html`)
+
+Low-level, read-only view of the directory, in the spirit of phpLDAPadmin.
+
+**Features:**
+
+- Lazy tree of the whole directory
+- Raw entry content, operational attributes included
+- Schema annotations: mandatory attributes, descriptions, unknown attributes flagged
+- LDAP filter search with scope selection
+
+Requires the `core/ldap/raw` plugin:
+
+```bash
+npm start -- --plugin core/ldap/raw
+```
+
 ## Running Examples
 
 1. **Start the server:**
@@ -109,6 +126,7 @@ Manage organizational units.
    http://localhost:8081/static/examples/web/ldap-user-editor.html
    http://localhost:8081/static/examples/web/ldap-group-editor.html
    http://localhost:8081/static/examples/web/ldap-unit-editor.html
+   http://localhost:8081/static/examples/web/ldap-browser.html
    ```
 
 ## Using Browser Libraries in Your Application

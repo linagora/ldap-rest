@@ -6,15 +6,16 @@ LDAP-Rest is extensible through a plugin system. This section documents all avai
 
 LDAP entity management:
 
-| Plugin                                   | Description                                             |
-| ---------------------------------------- | ------------------------------------------------------- |
-| [flat-generic](ldap/flat-generic.md)     | Generic LDAP entity management (users, positions, etc.) |
-| [groups](ldap/groups.md)                 | LDAP group management with member validation            |
-| [organizations](ldap/organizations.md)   | Hierarchical organization management                    |
-| [bulk-import](ldap/bulk-import.md)       | Bulk import from CSV                                    |
-| [trash](ldap/trash.md)                   | Trash system (soft delete)                              |
-| [external-users](ldap/external-users.md) | Automatic external contact creation                     |
-| [on-change](ldap/on-change.md)           | LDAP change detection                                   |
+| Plugin                                   | Description                                               |
+| ---------------------------------------- | --------------------------------------------------------- |
+| [flat-generic](ldap/flat-generic.md)     | Generic LDAP entity management (users, positions, etc.)   |
+| [groups](ldap/groups.md)                 | LDAP group management with member validation              |
+| [organizations](ldap/organizations.md)   | Hierarchical organization management                      |
+| [bulk-import](ldap/bulk-import.md)       | Bulk import from CSV                                      |
+| [trash](ldap/trash.md)                   | Trash system (soft delete)                                |
+| [external-users](ldap/external-users.md) | Automatic external contact creation                       |
+| [on-change](ldap/on-change.md)           | LDAP change detection                                     |
+| [raw](ldap/raw.md)                       | Low-level browsing: root DSE, schema, entries (read-only) |
 
 ## Authentication Plugins
 

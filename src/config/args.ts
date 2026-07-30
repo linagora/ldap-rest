@@ -77,6 +77,12 @@ export interface Config {
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
 
+  // LDAP raw (low-level browsing) plugin
+  ldap_raw_base?: string[];
+  ldap_raw_hidden_attribute?: string[];
+  ldap_raw_max_results?: number;
+  ldap_raw_schema_cache_ttl?: number;
+
   // LDAP Bulk Import plugin
   bulk_import_schemas?: string;
   bulk_import_max_file_size?: string;
@@ -436,6 +442,23 @@ const configArgs: ConfigTemplate = [
     'array',
     '--ldap-flat-schemas',
   ],
+
+  // LDAP raw (low-level browsing) plugin
+  ['--ldap-raw-base', 'DM_LDAP_RAW_BASE', [], 'array', '--ldap-raw-bases'],
+  [
+    '--ldap-raw-hidden-attribute',
+    'DM_LDAP_RAW_HIDDEN_ATTRIBUTES',
+    [],
+    'array',
+    '--ldap-raw-hidden-attributes',
+  ],
+  ['--ldap-raw-max-results', 'DM_LDAP_RAW_MAX_RESULTS', 200, 'number'],
+  [
+    '--ldap-raw-schema-cache-ttl',
+    'DM_LDAP_RAW_SCHEMA_CACHE_TTL',
+    3600,
+    'number',
+  ], // seconds
 
   // LDAP Bulk Import plugin
   ['--bulk-import-schemas', 'DM_BULK_IMPORT_SCHEMAS', ''],

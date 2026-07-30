@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDAP Browser Demo</title>
+
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+
+    <!-- Shared CSS -->
+    <link rel="stylesheet" href="/static/browser/common-demo.css" />
+    <!-- Library CSS -->
+    <link rel="stylesheet" href="/static/browser/ldap-browser.css" />
+
+    <style>
+      :root {
+        --primary-color: #3949ab;
+        --primary-color-dark: #283593;
+      }
+
+      body {
+        background: linear-gradient(135deg, #8ea7e9 0%, #3949ab 100%);
+      }
+
+      .demo-header h1 {
+        color: #3949ab;
+      }
+
+      #ldap-browser {
+        height: 70vh;
+        min-height: 520px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <div class="demo-header">
+        <h1>🗂️ LDAP Browser</h1>
+        <p>
+          Low-level, read-only view of the directory: tree, raw entries and
+          schema
+        </p>
+      </div>
+
+      <div id="status-container"></div>
+
+      <div id="ldap-browser"></div>
+    </div>
+
+    <!-- Shared utilities -->
+    <script src="/static/browser/shared.js"></script>
+    <!-- Library JS -->
+    <script src="/static/browser/ldap-browser.js"></script>
+
+    <script>
+      const { LdapBrowser } = window.LdapBrowser;
+      const { showStatus } = window.MiniDmShared;
+
+      async function initBrowser() {
+        try {
+          const browser = new LdapBrowser({
+            containerId: 'ldap-browser',
+            apiBaseUrl: window.location.origin,
+            onEntrySelected: dn => console.log('Entry selected:', dn),
+            onError: error => {
+              console.error('Browser error:', error);
+              showStatus(
+                'status-container',
+                `Error: ${error.message}`,
+                'error'
+              );
+            },
+          });
+
+          await browser.init();
+          showStatus('status-container', 'LDAP Browser loaded', 'success');
+        } catch (error) {
+          console.error('Failed to initialize browser:', error);
+          showStatus('status-container', `Error: ${error.message}`, 'error');
+        }
+      }
+
+      initBrowser();
+    </script>
+  </body>
+</html>
