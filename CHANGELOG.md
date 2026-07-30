@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- `plugins/twake/appAccountsApi`: never report a password operation that did not
+  happen. Both endpoints kept the principal account — the entry services
+  actually bind against — in sync with a `logger.warn` and a
+  `// Not critical, continue`, so two failures were invisible: a `POST` whose
+  principal update failed returned `200` with a password that authenticates
+  nowhere, and a `DELETE` unable to read the account's `userPassword` deleted
+  the app account while leaving its credential valid on the principal — a
+  revocation that silently does not revoke, the kind of defect only an audit
+  finds. `POST` now rolls the app account back and returns `500`; `DELETE`
+  returns `500` and **keeps** the account so the call stays replayable once the
+  cause is fixed. `userPassword` is also requested explicitly instead of relying
+  on it being returned as part of "all user attributes", and the documentation
+  now states the ACL the bind DN needs on the applicative branch
+
 ## v0.4.7 (2026-07-26)
 
 ### Features

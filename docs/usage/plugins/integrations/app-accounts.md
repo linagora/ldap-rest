@@ -45,6 +45,33 @@ Instead of using a single primary password to access all services that authentic
    - Ensures automatic cleanup when users are deleted
    - Synchronizes mail changes across all app accounts
 3. **Applicative accounts base** configured in LDAP (e.g., `ou=applicative,dc=example,dc=com`)
+4. **Read access on `userPassword`** in that branch, for the bind DN
+   (`--ldap-dn`) - **Required for deletion**
+
+   Revoking an app account means removing _its_ value from the principal
+   account, which holds one `userPassword` per device. The server must read the
+   stored hash to know which value to remove — a salted hash cannot be
+   recomputed. Without that access, `DELETE` returns `500` and keeps the
+   account rather than reporting a revocation that did not happen.
+
+   A typical OpenLDAP ACL, scoped to the applicative branch so that the users'
+   primary passwords stay unreadable:
+
+   ```
+   olcAccess: to dn.subtree="ou=applicative,dc=example,dc=com" attrs=userPassword
+     by dn.exact="cn=ldap-rest,ou=tech,dc=example,dc=com" read
+     by * break
+   ```
+
+   It must precede any broader rule on `userPassword`; OpenLDAP stops at the
+   first matching directive, and `by * break` lets other identities fall
+   through to the following ones.
+
+5. **Uniqueness constraints must not cover the applicative branch.** The
+   principal account and its app accounts intentionally share the same `mail`,
+   so a `slapo-unique` overlay on `mail` has to be scoped to the users branch
+   (`olcUniqueURI: ldap:///ou=users,dc=example,dc=com?mail?sub?`) or every app
+   account creation is rejected.
 
 ## Configuration
 
@@ -181,6 +208,8 @@ Content-Type: application/json
 - `400 Bad Request` - Max accounts limit reached or user has no mail
 - `401 Unauthorized` - Missing or invalid token
 - `404 Not Found` - User not found
+- `500 Internal Server Error` - The password could not be added to the principal
+  account; the app account is rolled back and no password is returned
 
 ### Delete Applicative Account
 
@@ -202,6 +231,9 @@ Authorization: Bearer {token}
 - `200 OK` - Account deleted (or already deleted - idempotent)
 - `401 Unauthorized` - Missing or invalid token
 - `403 Forbidden` - UID does not belong to user
+- `500 Internal Server Error` - The account password could not be read, or could
+  not be removed from the principal account; the app account is kept so the
+  request stays replayable
 
 ## Password Generation
 
