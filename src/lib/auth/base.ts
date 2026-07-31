@@ -26,6 +26,51 @@ function stripTrailingSlashes(path: string): string {
   return path.slice(0, end);
 }
 
+/**
+ * Tell whether a mount prefix covers a request path, with the rule Express
+ * itself applies: on segment boundaries, so `/api/m` covers `/api/m` and
+ * `/api/m/entry` but never `/api/machines`.
+ *
+ * The catch-all uses this to decide what another plugin already guards, so
+ * it must agree with Express exactly — a looser rule here would skip paths
+ * nobody guards.
+ *
+ * @param prefix mount prefix
+ * @param path request path
+ * @returns true when the prefix covers the path
+ */
+export function prefixCoversPath(prefix: string, path: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
+ * Path prefixes claimed by scoped authentication plugins.
+ *
+ * Reads the plugin registry rather than calling a method on the server:
+ * `loadPlugin` builds a plugin loaded with overrides from `{...this}`, a
+ * spread that copies own properties but leaves the prototype behind, so a
+ * `DM` method would be missing on exactly the configuration this feature is
+ * meant for. `loadedPlugins` is a shared reference and stays live as the
+ * remaining plugins register.
+ *
+ * @param loadedPlugins the server's plugin registry
+ * @param except name of the plugin asking, excluded from the result
+ * @returns the prefixes other authentication plugins guard
+ */
+export function claimedPrefixes(
+  loadedPlugins: Record<string, DmPlugin>,
+  except?: string
+): string[] {
+  const claimed: string[] = [];
+  for (const plugin of Object.values(loadedPlugins)) {
+    if (plugin.name === except || !plugin.roles?.includes('auth')) continue;
+    const prefixes = (plugin as DmPlugin & { pathPrefixes?: string[] })
+      .pathPrefixes;
+    if (prefixes?.length) claimed.push(...prefixes);
+  }
+  return claimed;
+}
+
 export default abstract class AuthBase extends DmPlugin {
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
 
@@ -92,7 +137,25 @@ export default abstract class AuthBase extends DmPlugin {
     };
 
     if (prefixes.length === 0) {
-      app.use(middleware);
+      // An unscoped plugin guards everything *no scoped plugin claims*, so
+      // "OIDC here, token everywhere else" needs no list of everywhere else
+      // — which nobody maintains without forgetting a branch. The check runs
+      // per request rather than at mount time: plugins load in any order, and
+      // the claims are only complete once they all have.
+      //
+      // Without this, the two middlewares would both match the scoped branch
+      // and compose as AND: every credential refused, the branch unusable.
+      const catchAll = (
+        req: Request,
+        res: Response,
+        next: () => void
+      ): void => {
+        const claimed = claimedPrefixes(this.server.loadedPlugins, this.name);
+        if (claimed.some(prefix => prefixCoversPath(prefix, req.path)))
+          return next();
+        void middleware(req, res, next);
+      };
+      app.use(catchAll);
       return;
     }
 

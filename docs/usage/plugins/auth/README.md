@@ -59,6 +59,21 @@ ldap-rest \
 
 A token presented on `/api/admin` is refused, and a session presented on `/api/m` is refused too: each authentication plugin only sees the branch it was mounted on. Prefixes match on segment boundaries, so `/api/m` guards `/api/m` and `/api/m/entry` but never `/api/machines`.
 
+### One branch apart, a token on everything else
+
+Leaving a plugin unscoped makes it the **catch-all**: it guards everything no scoped plugin claims. There is no list of "everything else" to write, and none to keep up to date when a route is added:
+
+```bash
+ldap-rest \
+  --plugin 'core/auth/openidconnect:auth-admins:{"auth_path_prefix":"/api/admin"}' \
+  --plugin core/auth/token \
+  --auth-token "…:robot"
+```
+
+`/api/admin` requires the SSO session, everything else requires the token. Loading order does not matter: the subtraction is computed per request, once every plugin has registered.
+
+This is also what keeps the two from colliding. Both middlewares are terminal, so without the subtraction they would both match `/api/admin` and compose as **AND** — the session refused by the token plugin, the token refused by the session plugin, and the branch unusable by anyone.
+
 ### The gap to watch
 
 A route registered **outside every prefix is served without authentication**. That is the price of scoping, and it is silent — the server starts, the API answers. To make it visible, the routes no plugin guards are listed at startup:
@@ -68,7 +83,9 @@ Authentication is restricted to /api/m, /api/admin, so these routes are
 served without authentication: /api/v1/config, /api/v1/ldap/users
 ```
 
-Read that line on every configuration change. Either scope the missing routes to a prefix as well, load one unscoped authentication plugin as a catch-all, or keep them public deliberately. Nothing is reported when no authentication is configured (the server is open on purpose) or when at least one plugin guards every path.
+Read that line on every configuration change. Either scope the missing routes to a prefix as well, add an unscoped plugin as the catch-all, or keep them public deliberately. Nothing is reported when no authentication is configured (the server is open on purpose) or when a catch-all covers what the scoped plugins do not.
+
+Note the converse: with a catch-all there is no public branch at all. Making one API reachable without credentials means scoping every authentication plugin and leaving that branch out — the warning will then name it, which is correct but reads as an oversight rather than a decision.
 
 Note that a prefix scopes **authentication**, not authorization: once past it, a caller reaches everything the branch exposes. Restrict what each population may do with [authz-per-route](authz-per-route.md) or [authz-per-branch](authz-per-branch.md).
 

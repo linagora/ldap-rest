@@ -29,6 +29,7 @@ import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
+import { claimedPrefixes } from '../lib/auth/base';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -145,6 +146,20 @@ export class DM {
         resolve();
       }
     });
+  }
+
+  /**
+   * Path prefixes claimed by scoped authentication plugins.
+   *
+   * An unscoped plugin subtracts these from what it guards, so a
+   * configuration can say "OIDC on /api/admin, token everywhere else"
+   * without anyone maintaining the list of everywhere else.
+   *
+   * @param except name of the plugin asking, excluded from the result
+   * @returns the prefixes other authentication plugins guard
+   */
+  claimedAuthPrefixes(except?: string): string[] {
+    return claimedPrefixes(this.loadedPlugins, except);
   }
 
   /**

@@ -202,6 +202,92 @@ describe('Authentication path scope', () => {
     });
   });
 
+  describe('an unscoped plugin as the catch-all', () => {
+    /**
+     * "OIDC on /api/admin, token everywhere else", without anyone listing
+     * everywhere else. Loading order must not matter, so both are covered.
+     */
+    const scopedFirst: Scope[] = [
+      { name: 'authAdmins', token: adminToken, prefix: ['/api/admin'] },
+      { name: 'authRest', token: machineToken },
+    ];
+    const catchAllFirst: Scope[] = [
+      { name: 'authRest', token: machineToken },
+      { name: 'authAdmins', token: adminToken, prefix: ['/api/admin'] },
+    ];
+
+    for (const [label, scopes] of [
+      ['catch-all loaded first', catchAllFirst],
+      ['scoped plugin loaded first', scopedFirst],
+    ] as const) {
+      describe(label, () => {
+        let app: Express;
+
+        before(async () => {
+          ({ app } = await build([...scopes]));
+        });
+
+        it('should let the catch-all guard everything unclaimed', async () => {
+          expect((await request(app).get('/api/hello')).status).to.equal(401);
+          expect(
+            (
+              await request(app)
+                .get('/api/hello')
+                .set('Authorization', `Bearer ${machineToken}`)
+            ).status
+          ).to.equal(200);
+        });
+
+        it('should leave the claimed branch to its own plugin', async () => {
+          expect(
+            (
+              await request(app)
+                .get('/api/admin/hello')
+                .set('Authorization', `Bearer ${adminToken}`)
+            ).status
+          ).to.equal(200);
+        });
+
+        it('should not let the catch-all credential in on that branch', async () => {
+          // Without the subtraction both middlewares would match and compose
+          // as AND: every credential refused and the branch unusable
+          expect(
+            (
+              await request(app)
+                .get('/api/admin/hello')
+                .set('Authorization', `Bearer ${machineToken}`)
+            ).status
+          ).to.equal(401);
+        });
+
+        it('should still refuse an anonymous request everywhere', async () => {
+          expect((await request(app).get('/api/hello')).status).to.equal(401);
+          expect((await request(app).get('/api/admin/hello')).status).to.equal(
+            401
+          );
+        });
+      });
+    }
+
+    it('should subtract on segment boundaries only', async () => {
+      const { app } = await build([
+        { name: 'authScoped', token: adminToken, prefix: ['/api/m'] },
+        { name: 'authRest', token: machineToken },
+      ]);
+      // `/api/machines` is not below `/api/m`, so the catch-all still guards it
+      const res = await request(app).get('/api/machines');
+      expect(res.status).to.equal(401);
+    });
+
+    it('should report no unauthenticated route', async () => {
+      const { dm } = await build([
+        { name: 'authScoped', token: adminToken, prefix: ['/api/admin'] },
+        { name: 'authRest', token: machineToken },
+      ]);
+      expect(dm.warnUnauthenticatedRoutes()).to.deep.equal([]);
+    });
+  });
+
   describe('unscoped plugins', () => {
     it('should keep guarding every path', async () => {
       const { app } = await build([
