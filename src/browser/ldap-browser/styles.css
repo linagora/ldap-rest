@@ -130,6 +130,8 @@
   padding: 2px 4px;
   border-radius: 4px;
   cursor: pointer;
+  /* Let the label be the part that gives way, not the icons */
+  min-width: 0;
 }
 
 .ldap-browser-tree__node:hover {
@@ -140,8 +142,13 @@
   background: rgba(57, 73, 171, 0.12);
 }
 
+/*
+ * `flex: 0 0 24px` rather than `width`: as a shrinkable flex item the
+ * chevron gave way under a long label, so rows whose entry name overflowed
+ * sat a few pixels left of their siblings and the column of icons zig-zagged.
+ */
 .ldap-browser-tree__toggle {
-  width: 24px;
+  flex: 0 0 24px;
   font-size: 20px;
   color: var(--ldap-browser-muted);
   cursor: pointer;
@@ -156,13 +163,21 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  /* min-width:0 is what lets the text actually ellipsize inside a flex row */
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-family: monospace;
 }
 
+/* The text node itself carries the ellipsis; the icon must never shrink */
+.ldap-browser-tree__label .ldap-browser-tree__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .ldap-browser-tree__label .material-icons {
+  flex: 0 0 auto;
   font-size: 18px;
   color: var(--ldap-browser-muted);
 }

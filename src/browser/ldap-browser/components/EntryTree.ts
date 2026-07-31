@@ -245,7 +245,7 @@ export class EntryTree extends DisposableComponent {
         ${toggle}
         <span class="ldap-browser-tree__label" data-dn="${escapeHtml(dn)}" title="${escapeHtml(dn)}">
           <span class="material-icons">${iconFor(objectClass)}</span>
-          ${escapeHtml(label)}
+          <span class="ldap-browser-tree__name">${escapeHtml(label)}</span>
         </span>
       </div>
       ${sub}
