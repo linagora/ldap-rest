@@ -269,5 +269,50 @@ export default async () => {
         }),
       ],
     },
+    // UMD/ESM bundles for ldap-browser
+    {
+      input: 'src/browser/ldap-browser/index.ts',
+      output: [
+        {
+          file: 'static/browser/ldap-browser.js',
+          format: 'umd',
+          name: 'LdapBrowser',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/ldap-browser.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/ldap-browser.min.js',
+          format: 'umd',
+          name: 'LdapBrowser',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
+          sourceMap: true,
+        }),
+        postcss({
+          extract: 'ldap-browser.css',
+          minimize: true,
+          sourceMap: true,
+        }),
+      ],
+    },
   ];
 };

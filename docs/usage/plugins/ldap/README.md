@@ -14,6 +14,7 @@ Plugins for LDAP entity management.
 | [external-users](external-users.md)   | Contacts                 | Automatic creation                  |
 | [on-change](on-change.md)             | All                      | Change detection                    |
 | [password-policy](password-policy.md) | Password management      | Expiration, Lockout, Unlock         |
+| [raw](raw.md)                         | Whole directory (read)   | Root DSE, Schema, Tree, Raw search  |
 
 ## API Endpoints
 
@@ -60,6 +61,17 @@ POST   /api/v1/users/{id}/unlock                # Unlock locked account
 GET    /api/v1/password-policy/expiring-soon    # List expiring passwords
 GET    /api/v1/password-policy/locked-accounts  # List locked accounts
 POST   /api/v1/password/validate                # Validate complexity (optional)
+```
+
+### Low-level browsing (ldapRaw)
+
+```
+GET    /api/v1/ldap/raw/bases              # Exposed subtrees
+GET    /api/v1/ldap/raw/rootdse            # Server capabilities
+GET    /api/v1/ldap/raw/schema             # Parsed directory schema
+GET    /api/v1/ldap/raw/entry/{dn}         # Read one entry
+GET    /api/v1/ldap/raw/children/{dn}      # Direct children of an entry
+GET    /api/v1/ldap/raw/search             # Raw search (base, scope, filter)
 ```
 
 ### Bulk Import (ldapBulkImport)

@@ -1,0 +1,355 @@
+/**
+ * LDAP Browser - low-level directory browser styles
+ */
+
+.ldap-browser-container {
+  --ldap-browser-primary: #3949ab;
+  --ldap-browser-surface: #ffffff;
+  --ldap-browser-on-surface: rgba(0, 0, 0, 0.87);
+  --ldap-browser-muted: rgba(0, 0, 0, 0.54);
+  --ldap-browser-border: #e0e0e0;
+  --ldap-browser-error: #b00020;
+  --ldap-browser-warning: #b26a00;
+
+  font-family:
+    'Roboto',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+  color: var(--ldap-browser-on-surface);
+}
+
+.ldap-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ldap-browser-surface);
+  border: 1px solid var(--ldap-browser-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Toolbar */
+
+.ldap-browser__toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid var(--ldap-browser-border);
+  flex-wrap: wrap;
+}
+
+/*
+ * Inputs, selects and buttons each size themselves differently from their
+ * padding and font, which left the buttons standing 4px proud of the input.
+ * One explicit height for every control keeps the row on a single line.
+ */
+.ldap-browser__filter,
+.ldap-browser__scope,
+.ldap-browser__base,
+.ldap-browser__search,
+.ldap-browser__refresh {
+  height: 38px;
+  box-sizing: border-box;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.ldap-browser__filter {
+  flex: 1 1 260px;
+  min-width: 180px;
+  padding: 0 12px;
+  font-family: monospace;
+  border: 1px solid var(--ldap-browser-border);
+}
+
+.ldap-browser__scope,
+.ldap-browser__base {
+  padding: 0 8px;
+  border: 1px solid var(--ldap-browser-border);
+  background: var(--ldap-browser-surface);
+}
+
+.ldap-browser__search,
+.ldap-browser__refresh {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  color: #fff;
+  background: var(--ldap-browser-primary);
+  border: none;
+  cursor: pointer;
+}
+
+.ldap-browser__search:hover,
+.ldap-browser__refresh:hover {
+  filter: brightness(1.1);
+}
+
+.ldap-browser__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ldap-browser__tree {
+  flex: 0 0 320px;
+  overflow: auto;
+  padding: 8px;
+  border-right: 1px solid var(--ldap-browser-border);
+}
+
+.ldap-browser__entry {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* Tree */
+
+.ldap-browser-tree,
+.ldap-browser-tree ul {
+  margin: 0;
+  padding: 0 0 0 16px;
+  list-style: none;
+}
+
+.ldap-browser-tree {
+  padding-left: 0;
+}
+
+.ldap-browser-tree__node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  /* Let the label be the part that gives way, not the icons */
+  min-width: 0;
+}
+
+.ldap-browser-tree__node:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.ldap-browser-tree__node--selected {
+  background: rgba(57, 73, 171, 0.12);
+}
+
+/*
+ * `flex: 0 0 24px` rather than `width`: as a shrinkable flex item the
+ * chevron gave way under a long label, so rows whose entry name overflowed
+ * sat a few pixels left of their siblings and the column of icons zig-zagged.
+ */
+.ldap-browser-tree__toggle {
+  flex: 0 0 24px;
+  font-size: 20px;
+  color: var(--ldap-browser-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ldap-browser-tree__toggle--leaf {
+  cursor: default;
+}
+
+.ldap-browser-tree__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* min-width:0 is what lets the text actually ellipsize inside a flex row */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+/* The text node itself carries the ellipsis; the icon must never shrink */
+.ldap-browser-tree__label .ldap-browser-tree__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ldap-browser-tree__label .material-icons {
+  flex: 0 0 auto;
+  font-size: 18px;
+  color: var(--ldap-browser-muted);
+}
+
+.ldap-browser-tree__empty {
+  padding: 2px 4px 2px 28px;
+  color: var(--ldap-browser-muted);
+  font-style: italic;
+}
+
+.ldap-browser-tree__truncated {
+  padding: 2px 4px 2px 28px;
+  color: var(--ldap-browser-warning);
+  font-style: italic;
+}
+
+/* Entry */
+
+.ldap-browser-entry__dn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.ldap-browser-entry__section {
+  margin: 24px 0 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ldap-browser-muted);
+}
+
+.ldap-browser-entry__classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ldap-browser-chip {
+  padding: 2px 10px;
+  font-size: 12px;
+  background: rgba(57, 73, 171, 0.12);
+  border-radius: 12px;
+}
+
+.ldap-browser-chip--unknown {
+  background: rgba(176, 0, 32, 0.12);
+  color: var(--ldap-browser-error);
+}
+
+.ldap-browser-entry__allowed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--ldap-browser-muted);
+}
+
+.ldap-browser-entry__warning {
+  color: var(--ldap-browser-warning);
+}
+
+/*
+ * `table-layout: fixed` is what keeps the two tables (attributes and
+ * operational attributes) in one column grid: with the default `auto`
+ * layout, a long attribute name widens its own table's first column and
+ * the value columns of the two tables no longer line up.
+ */
+.ldap-browser-entry__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ldap-browser-entry__table th {
+  width: 220px;
+  padding: 6px 12px 6px 0;
+  text-align: left;
+  vertical-align: top;
+  font-family: monospace;
+  font-weight: 400;
+  color: var(--ldap-browser-muted);
+  border-bottom: 1px solid var(--ldap-browser-border);
+  /* A name longer than the column wraps rather than pushing it */
+  overflow-wrap: anywhere;
+}
+
+/* A fixed 220px name column eats too much of a narrow panel */
+@media (max-width: 900px) {
+  .ldap-browser-entry__table th {
+    width: 140px;
+  }
+}
+
+.ldap-browser-entry__table td {
+  padding: 6px 0;
+  vertical-align: top;
+  word-break: break-word;
+  border-bottom: 1px solid var(--ldap-browser-border);
+}
+
+.ldap-browser-attr--must {
+  font-weight: 500;
+  color: var(--ldap-browser-on-surface);
+}
+
+.ldap-browser-attr--unknown {
+  color: var(--ldap-browser-error);
+}
+
+.ldap-browser-entry__value {
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+.ldap-browser-entry__binary code {
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  padding: 4px;
+  font-size: 11px;
+  background: #f5f5f5;
+  word-break: break-all;
+}
+
+.ldap-browser-entry__photo {
+  max-width: 160px;
+  max-height: 160px;
+  border-radius: 4px;
+}
+
+.ldap-browser-entry__empty,
+.ldap-browser-entry__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ldap-browser-muted);
+}
+
+.ldap-browser-entry__empty .material-icons {
+  font-size: 56px;
+  margin-bottom: 12px;
+}
+
+.ldap-browser-entry__error,
+.ldap-browser__error {
+  color: var(--ldap-browser-error);
+}
+
+/* Search results */
+
+.ldap-browser__results {
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ldap-browser-border);
+}
+
+.ldap-browser__results ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ldap-browser__results a {
+  font-family: monospace;
+  color: var(--ldap-browser-primary);
+}

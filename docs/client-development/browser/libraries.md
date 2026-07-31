@@ -23,16 +23,23 @@ This guide covers LDAP-Rest's browser libraries for building LDAP management int
   - [Installation](#ldapuniteditor-installation)
   - [Basic Usage](#ldapuniteditor-basic-usage)
   - [Features](#ldapuniteditor-features)
+- [LdapBrowser](#ldapbrowser)
+  - [Installation](#ldapbrowser-installation)
+  - [Basic Usage](#ldapbrowser-basic-usage)
+  - [Configuration Options](#ldapbrowser-configuration-options)
+  - [Public Methods](#ldapbrowser-public-methods)
+  - [RawApiClient and SchemaView](#rawapiclient-and-schemaview)
 
 ---
 
 ## Overview
 
-LDAP-Rest provides three ready-to-use browser libraries for building LDAP management interfaces:
+LDAP-Rest provides four ready-to-use browser libraries for building LDAP management interfaces:
 
 - **LdapTreeViewer** - Interactive hierarchical tree view of LDAP organizations
 - **LdapUserEditor** - Complete user management interface with organization tree, user list, and edit form
 - **LdapUnitEditor** - Organization management interface with create, move, edit, and delete operations
+- **LdapBrowser** - Low-level, read-only directory browser (tree, raw entries, schema), in the spirit of phpLDAPadmin
 
 All libraries are:
 
@@ -1171,6 +1178,140 @@ The LdapUnitEditor requires the following LDAP-Rest API endpoints:
 - `DELETE /api/v1/ldap/organizations/:dn` - Delete organization
 
 See [LDAP Organizations Plugin Documentation](../ldapOrganizations.md) for API details.
+
+---
+
+<a name="ldapbrowser"></a>
+
+## LdapBrowser
+
+A low-level, read-only browser of the directory: lazy tree on the left, raw content of the selected entry on the right, LDAP filter search on top. Attributes are annotated with the directory schema — mandatory attributes are marked, unknown ones are flagged, binary values are shown as base64 (photos as thumbnails).
+
+It consumes the [raw plugin](../../usage/plugins/ldap/raw.md), which must be loaded server-side:
+
+```bash
+ldap-rest --plugin core/ldap/raw --plugin core/static
+```
+
+<a name="ldapbrowser-installation"></a>
+
+### Installation
+
+#### Direct Browser Usage
+
+```html
+<link rel="stylesheet" href="/static/browser/ldap-browser.css" />
+<script src="/static/browser/ldap-browser.js"></script>
+```
+
+The Material Icons font is used for the tree icons:
+
+```html
+<link
+  href="https://fonts.googleapis.com/icon?family=Material+Icons"
+  rel="stylesheet"
+/>
+```
+
+#### With a Bundler
+
+```typescript
+import { LdapBrowser } from 'ldap-rest/browser-ldap-browser-index';
+```
+
+<a name="ldapbrowser-basic-usage"></a>
+
+### Basic Usage
+
+```html
+<div id="ldap-browser" style="height: 70vh"></div>
+
+<script>
+  const { LdapBrowser } = window.LdapBrowser;
+
+  const browser = new LdapBrowser({
+    containerId: 'ldap-browser',
+    apiBaseUrl: window.location.origin,
+    onEntrySelected: dn => console.log('Selected:', dn),
+    onError: error => console.error(error),
+  });
+
+  await browser.init();
+</script>
+```
+
+A ready-made demo page ([`examples/web/ldap-browser.html`](../../../examples/web/ldap-browser.html))
+is served at `/static/examples/web/ldap-browser.html`.
+
+<a name="ldapbrowser-configuration-options"></a>
+
+### Configuration Options
+
+| Option            | Type                     | Default            | Description                             |
+| ----------------- | ------------------------ | ------------------ | --------------------------------------- |
+| `containerId`     | `string`                 | _required_         | id of the element to render into        |
+| `apiBaseUrl`      | `string`                 | `''` (same origin) | Origin of the API                       |
+| `authToken`       | `string`                 | —                  | Sent as `Authorization: Bearer …`       |
+| `initialDn`       | `string`                 | first exposed base | DN selected on startup                  |
+| `onEntrySelected` | `(dn: string) => void`   | —                  | Called whenever an entry is displayed   |
+| `onError`         | `(error: Error) => void` | `console.error`    | Called on any error the browser handles |
+
+<a name="ldapbrowser-public-methods"></a>
+
+### Public Methods
+
+#### `async init(): Promise<void>`
+
+Loads the exposed bases and the schema, builds the interface and opens `initialDn`. Throws when the container does not exist or the API is unreachable. A schema that cannot be read is reported through `onError` but does not prevent browsing — the entry table is then displayed without annotations.
+
+#### `getCurrentDn(): string | null`
+
+DN currently displayed, or `null` before the first selection.
+
+#### `destroy(): void`
+
+Releases the listeners held by the tree.
+
+<a name="rawapiclient-and-schemaview"></a>
+
+### RawApiClient and SchemaView
+
+Both are exported for applications that want the data without the interface:
+
+```typescript
+import { RawApiClient, SchemaView } from 'ldap-rest/browser-ldap-browser-index';
+
+const api = new RawApiClient(window.location.origin);
+const schema = new SchemaView(await api.getSchema());
+
+const entry = await api.getEntry('uid=alice,ou=users,dc=example,dc=com');
+const { must, may } = schema.resolveAttributes(
+  entry.attributes.objectClass.values
+);
+console.log('Mandatory attributes:', must);
+console.log('Allowed attributes:', may);
+
+const { children, truncated } = await api.getChildren('dc=example,dc=com');
+const found = await api.search({
+  base: 'ou=users,dc=example,dc=com',
+  filter: '(mail=*@example.com)',
+  attributes: ['uid', 'mail'],
+});
+```
+
+`SchemaView` resolves the `SUP` chains for you: `resolveAttributes()` walks object class inheritance, `getAttributeSyntax()` walks attribute type inheritance, and `isBinaryAttribute()` / `isImageAttribute()` tell how to render a value.
+
+### API Integration
+
+The browser uses these endpoints:
+
+- `GET /api/v1/ldap/raw/bases` - Exposed subtrees, used as tree roots
+- `GET /api/v1/ldap/raw/schema` - Directory schema
+- `GET /api/v1/ldap/raw/entry/:dn` - Entry content
+- `GET /api/v1/ldap/raw/children/:dn` - Children of a node
+- `GET /api/v1/ldap/raw/search` - Filter search
+
+See [LDAP Raw Plugin Documentation](../../usage/plugins/ldap/raw.md) for API details.
 
 ---
 

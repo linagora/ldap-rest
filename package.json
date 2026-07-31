@@ -132,6 +132,10 @@
       "types": "./dist/src/plugins/ldap/passwordPolicy.d.ts",
       "import": "./dist/plugins/ldap/passwordPolicy.js"
     },
+    "./plugin-ldap-raw": {
+      "types": "./dist/src/plugins/ldap/raw.d.ts",
+      "import": "./dist/plugins/ldap/raw.js"
+    },
     "./plugin-ldap-trash": {
       "types": "./dist/src/plugins/ldap/trash.d.ts",
       "import": "./dist/plugins/ldap/trash.js"
@@ -231,6 +235,34 @@
     "./abstract-twakeplugin": {
       "types": "./dist/src/abstract/twakePlugin.d.ts",
       "import": "./dist/abstract/twakePlugin.js"
+    },
+    "./browser-ldap-browser-ldapbrowser": {
+      "types": "./dist/src/browser/ldap-browser/LdapBrowser.d.ts",
+      "import": "./static/browser/ldap-browser/LdapBrowser.js"
+    },
+    "./browser-ldap-browser-api-rawapiclient": {
+      "types": "./dist/src/browser/ldap-browser/api/RawApiClient.d.ts",
+      "import": "./static/browser/ldap-browser/api/RawApiClient.js"
+    },
+    "./browser-ldap-browser-components-entrytree": {
+      "types": "./dist/src/browser/ldap-browser/components/EntryTree.d.ts",
+      "import": "./static/browser/ldap-browser/components/EntryTree.js"
+    },
+    "./browser-ldap-browser-components-entryview": {
+      "types": "./dist/src/browser/ldap-browser/components/EntryView.d.ts",
+      "import": "./static/browser/ldap-browser/components/EntryView.js"
+    },
+    "./browser-ldap-browser-index": {
+      "types": "./dist/src/browser/ldap-browser/index.d.ts",
+      "import": "./static/browser/ldap-browser/index.js"
+    },
+    "./browser-ldap-browser-schema": {
+      "types": "./dist/src/browser/ldap-browser/schema.d.ts",
+      "import": "./static/browser/ldap-browser/schema.js"
+    },
+    "./browser-ldap-browser-types": {
+      "types": "./dist/src/browser/ldap-browser/types.d.ts",
+      "import": "./static/browser/ldap-browser/types.js"
     },
     "./browser-ldap-group-editor-ldapgroupeditor": {
       "types": "./dist/src/browser/ldap-group-editor/LdapGroupEditor.d.ts",
