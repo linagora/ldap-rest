@@ -197,7 +197,8 @@ Read-only low-level browsing (root DSE, schema, entries). See [raw plugin](plugi
 | CLI                           | Plural                         | Env                             | Default       | Description                     |
 | ----------------------------- | ------------------------------ | ------------------------------- | ------------- | ------------------------------- |
 | `--ldap-raw-base`             | `--ldap-raw-bases`             | `DM_LDAP_RAW_BASE`              | `--ldap-base` | Subtrees exposed by the API     |
-| `--ldap-raw-hidden-attribute` | `--ldap-raw-hidden-attributes` | `DM_LDAP_RAW_HIDDEN_ATTRIBUTES` | `[]`          | Attributes never returned       |
+| `--ldap-raw-hidden-attribute` | `--ldap-raw-hidden-attributes` | `DM_LDAP_RAW_HIDDEN_ATTRIBUTES` | `[]`          | Extra attributes never returned |
+| `--ldap-raw-show-secrets`     |                                | `DM_LDAP_RAW_SHOW_SECRETS`      | `false`       | Serve credential attributes     |
 | `--ldap-raw-max-results`      |                                | `DM_LDAP_RAW_MAX_RESULTS`       | `200`         | Max entries per search/listing  |
 | `--ldap-raw-schema-cache-ttl` |                                | `DM_LDAP_RAW_SCHEMA_CACHE_TTL`  | `3600`        | Schema cache lifetime (seconds) |
 

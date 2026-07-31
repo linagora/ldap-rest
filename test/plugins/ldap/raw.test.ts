@@ -49,11 +49,13 @@ describe('LDAP Raw Plugin', function () {
       tmp.config.ldap_base = saved;
     });
 
-    it('should lowercase hidden attributes', () => {
+    it('should lowercase hidden attributes and add them to the secrets', () => {
       const tmp = new DM();
-      tmp.config.ldap_raw_hidden_attribute = ['userPassword'];
+      tmp.config.ldap_raw_hidden_attribute = ['telephoneNumber'];
       const instance = new LdapRaw(tmp);
-      expect([...instance.hiddenAttributes]).to.deep.equal(['userpassword']);
+      expect(instance.hiddenAttributes.has('telephonenumber')).to.equal(true);
+      // The built-in credential list stays in place
+      expect(instance.hiddenAttributes.has('userpassword')).to.equal(true);
     });
   });
 
@@ -171,27 +173,92 @@ describe('LDAP Raw Plugin', function () {
       expect(res.status).to.equal(403);
     });
 
-    it('should omit hidden attributes', async () => {
+    it('should omit configured hidden attributes', async () => {
       const dn = `uid=rawhidden,ou=users,${base}`;
       await server.ldap.add(dn, {
         objectClass: ['top', 'inetOrgPerson'],
         uid: 'rawhidden',
         cn: 'Raw Hidden',
         sn: 'Hidden',
-        userPassword: 'secret',
+        description: 'to be hidden',
       });
       try {
         const visible = await plugin.getEntry(dn);
-        expect(visible.attributes).to.have.property('userPassword');
+        expect(visible.attributes).to.have.property('description');
 
-        plugin.hiddenAttributes.add('userpassword');
+        plugin.hiddenAttributes.add('description');
         const hidden = await plugin.getEntry(dn);
-        expect(hidden.attributes).to.not.have.property('userPassword');
+        expect(hidden.attributes).to.not.have.property('description');
         expect(hidden.attributes).to.have.property('uid');
       } finally {
-        plugin.hiddenAttributes.delete('userpassword');
+        plugin.hiddenAttributes.delete('description');
         await server.ldap.delete(dn);
       }
+    });
+
+    it('should hide credential attributes by default', async () => {
+      const dn = `uid=rawsecret,ou=users,${base}`;
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'rawsecret',
+        cn: 'Raw Secret',
+        sn: 'Secret',
+        userPassword: 'secret',
+      });
+      try {
+        const entry = await plugin.getEntry(dn);
+        expect(entry.attributes).to.not.have.property('userPassword');
+        expect(entry.attributes).to.have.property('uid');
+
+        // Asking for it explicitly must not get around the filter
+        const asked = await plugin.search(
+          {
+            base: dn,
+            scope: 'base',
+            filter: '(objectClass=*)',
+            attributes: ['uid', 'userPassword'],
+          },
+          undefined
+        );
+        expect(asked.entries[0].attributes).to.not.have.property(
+          'userPassword'
+        );
+        expect(asked.entries[0].attributes).to.have.property('uid');
+
+        // Neither must a search over the branch
+        const found = await plugin.search({
+          base: `ou=users,${base}`,
+          scope: 'sub',
+          filter: '(uid=rawsecret)',
+        });
+        expect(found.entries[0].attributes).to.not.have.property(
+          'userPassword'
+        );
+      } finally {
+        await server.ldap.delete(dn);
+      }
+    });
+
+    it('should serve credential attributes when explicitly allowed', () => {
+      const tmp = new DM();
+      tmp.config.ldap_raw_show_secrets = true;
+      const permissive = new LdapRaw(tmp);
+      expect(permissive.showSecrets).to.equal(true);
+      expect(permissive.hiddenAttributes.has('userpassword')).to.equal(false);
+      expect(permissive.getConfigApiData().showSecrets).to.equal(true);
+    });
+
+    it('should keep hiding credential attributes of other directories', () => {
+      // Samba, Kerberos and AD spellings, not just OpenLDAP's
+      for (const attribute of [
+        'userpassword',
+        'sambantpassword',
+        'krbprincipalkey',
+        'unicodepwd',
+      ])
+        expect(plugin.hiddenAttributes.has(attribute), attribute).to.equal(
+          true
+        );
     });
 
     it('should base64-encode binary values', async () => {

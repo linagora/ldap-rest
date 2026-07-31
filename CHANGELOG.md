@@ -13,8 +13,11 @@
   included, binary values base64-encoded and flagged), the direct children of a
   node, and arbitrary searches. Everything goes through `server.ldap`, so the
   authorization, trash and logging hooks apply unchanged; access is bounded by
-  `--ldap-raw-base` (403 outside), narrowed by the authz plugins, and
-  `--ldap-raw-hidden-attribute` removes attributes from every response. Root DSE
+  `--ldap-raw-base` (403 outside), narrowed by the authz plugins, and credential
+  attributes (`userPassword` and its Samba, Kerberos and AD counterparts) are
+  stripped from every response unless `--ldap-raw-show-secrets` says otherwise —
+  a hash served over HTTP is an offline cracking target, and browsing does not
+  need it. `--ldap-raw-hidden-attribute` adds site-specific ones. Root DSE
   and schema are read with the service account — they are directory metadata,
   and a UI that cannot name and type attributes is useless. The new
   `lib/ldapSchema` parses RFC 4512 definitions and resolves `SUP` chains, so

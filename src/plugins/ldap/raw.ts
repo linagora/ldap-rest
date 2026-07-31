@@ -131,6 +131,32 @@ export interface RawSearchResult {
 const VALID_SCOPES = ['base', 'one', 'sub'] as const;
 type Scope = (typeof VALID_SCOPES)[number];
 
+/**
+ * Attributes holding credential material, hidden unless
+ * `--ldap-raw-show-secrets` says otherwise. A password hash handed over
+ * HTTP is an offline cracking target, and a directory browser has no need
+ * to display one to do its job — so the safe reading is the default and
+ * the permissive one is opt-in. Covers OpenLDAP, Samba, Kerberos and AD
+ * spellings; add site-specific ones with `--ldap-raw-hidden-attribute`.
+ */
+const SECRET_ATTRIBUTES = [
+  'userpassword',
+  'pwdhistory',
+  'sambantpassword',
+  'sambalmpassword',
+  'sambapasswordhistory',
+  'krbprincipalkey',
+  'krbextradata',
+  'krbpwdhistory',
+  'unicodepwd',
+  'dbcspwd',
+  'lmpwdhistory',
+  'ntpwdhistory',
+  'supplementalcredentials',
+  'userpkcs12',
+  'authpassword',
+];
+
 export default class LdapRaw extends DmPlugin {
   name = 'ldapRaw';
   roles: Role[] = ['api'] as const;
@@ -139,6 +165,8 @@ export default class LdapRaw extends DmPlugin {
   bases: string[];
   /** Attributes never returned, whatever the request (lowercase) */
   hiddenAttributes: Set<string>;
+  /** True when credential attributes are served instead of being hidden */
+  showSecrets: boolean;
   /** Maximum entries returned by a search or a children listing */
   maxResults: number;
   private schemaCacheTtl: number;
@@ -159,9 +187,13 @@ export default class LdapRaw extends DmPlugin {
     }
     this.bases = bases;
 
-    this.hiddenAttributes = new Set(
-      (this.config.ldap_raw_hidden_attribute || []).map(a => a.toLowerCase())
-    );
+    this.showSecrets = this.config.ldap_raw_show_secrets === true;
+    this.hiddenAttributes = new Set([
+      ...(this.showSecrets ? [] : SECRET_ATTRIBUTES),
+      ...(this.config.ldap_raw_hidden_attribute || [])
+        .filter(a => a && a.length > 0)
+        .map(a => a.toLowerCase()),
+    ]);
     this.maxResults = this.config.ldap_raw_max_results || 200;
     this.schemaCacheTtl =
       (this.config.ldap_raw_schema_cache_ttl ?? 3600) * 1000;
@@ -169,6 +201,11 @@ export default class LdapRaw extends DmPlugin {
     this.logger.info(
       `LDAP raw API enabled on ${this.bases.join(', ')} (read-only)`
     );
+    if (this.showSecrets)
+      this.logger.warn(
+        'LDAP raw API: --ldap-raw-show-secrets is set, password hashes ' +
+          'and other credential attributes are served over the API'
+      );
   }
 
   /**
@@ -838,6 +875,7 @@ export default class LdapRaw extends DmPlugin {
       readOnly: true,
       maxResults: this.maxResults,
       hiddenAttributes: [...this.hiddenAttributes],
+      showSecrets: this.showSecrets,
     };
   }
 }

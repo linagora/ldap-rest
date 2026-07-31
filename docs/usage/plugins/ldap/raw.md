@@ -18,7 +18,8 @@ The companion browser library is [`ldap-browser`](../../../client-development/br
 ### Environment Variables
 
 - `DM_LDAP_RAW_BASE`: comma-separated subtrees to expose (default: `--ldap-base`)
-- `DM_LDAP_RAW_HIDDEN_ATTRIBUTES`: comma-separated attributes never returned (default: none)
+- `DM_LDAP_RAW_HIDDEN_ATTRIBUTES`: comma-separated attributes never returned, on top of the credential ones (default: none)
+- `DM_LDAP_RAW_SHOW_SECRETS`: serve credential attributes instead of hiding them (default: `false`)
 - `DM_LDAP_RAW_MAX_RESULTS`: maximum entries returned by a search or a children listing (default: `200`)
 - `DM_LDAP_RAW_SCHEMA_CACHE_TTL`: schema cache lifetime in seconds (default: `3600`)
 
@@ -29,7 +30,7 @@ ldap-rest \
   --plugin core/ldap/raw \
   --ldap-raw-base "ou=users,dc=example,dc=com" \
   --ldap-raw-base "ou=groups,dc=example,dc=com" \
-  --ldap-raw-hidden-attribute userPassword \
+  --ldap-raw-hidden-attribute employeeNumber \
   --ldap-raw-max-results 500
 ```
 
@@ -64,7 +65,9 @@ Attribute values are always arrays. A `binary` flag tells whether the values are
 }
 ```
 
-A value is flagged binary when the directory returned octets that are not valid UTF-8, or when the attribute type is binary. A hashed `userPassword` is valid UTF-8 and is therefore returned as readable text — hide it with `--ldap-raw-hidden-attribute userPassword` if that is not wanted.
+A value is flagged binary when the directory returned octets that are not valid UTF-8, or when the attribute type is binary.
+
+Credential attributes are **not** part of the response by default — see [Hidden attributes](#hidden-attributes).
 
 ### Children
 
@@ -153,13 +156,40 @@ The filter is parsed before the search runs, so a malformed one comes back as a 
 
 Inheritance is **not** flattened: a client resolving the attributes of an entry must walk the `sup` chains. `SchemaView` (browser) and `SchemaIndex` (`src/lib/ldapSchema.ts`, server) do it for you.
 
+## Hidden attributes
+
+Attributes holding credential material are stripped from **every** response — entry reads and searches alike — before it leaves the server. Asking for one explicitly (`?attributes=uid,userPassword`) does not get around the filter: the removal happens when the entry is serialised, not when the query is built.
+
+The built-in list covers the usual OpenLDAP, Samba, Kerberos and Active Directory spellings:
+
+```
+userPassword, authPassword, pwdHistory, sambaNTPassword, sambaLMPassword,
+sambaPasswordHistory, krbPrincipalKey, krbExtraData, krbPwdHistory,
+unicodePwd, dbcsPwd, lmPwdHistory, ntPwdHistory, supplementalCredentials,
+userPKCS12
+```
+
+A password hash served over HTTP is an offline cracking target, and browsing a directory does not require reading one — hence hidden by default, visible only on request:
+
+```bash
+--ldap-raw-show-secrets true    # logs a warning at startup
+```
+
+Site-specific attributes are added with `--ldap-raw-hidden-attribute`, which stacks on top of the built-in list rather than replacing it:
+
+```bash
+--ldap-raw-hidden-attribute twakeApiKey --ldap-raw-hidden-attribute employeeNumber
+```
+
+Note that hiding an attribute here keeps it out of the API, not out of the directory: an account able to bind to LDAP directly still reads it. This is a guard against casual exposure through the browsing UI, not an access control — use [authz-per-branch](../auth/authz-per-branch.md) or directory ACLs for that.
+
 ## Security
 
 Access is restricted in three independent layers:
 
 1. **Exposed bases** — any DN outside `--ldap-raw-base` is refused with a 403, whatever the caller's rights.
 2. **Authorization hooks** — every entry read, children listing and search goes through `server.ldap`, so the authorization plugins ([authz-per-branch](../auth/authz-per-branch.md), authz-dynamic, …) apply exactly as on the high-level APIs.
-3. **Hidden attributes** — `--ldap-raw-hidden-attribute` removes attributes from every response, including searches.
+3. **Hidden attributes** — credential attributes, plus anything in `--ldap-raw-hidden-attribute`, are removed from every response, including searches. See [Hidden attributes](#hidden-attributes).
 
 Two exceptions, both deliberate: the **root DSE** and the **schema** are read with the service account, not with the caller's rights. They are directory metadata and carry no user data; reading them with a restricted account would leave the UI unable to name and type attributes. Do not expose this plugin publicly if your directory publishes sensitive information in its root DSE.
 

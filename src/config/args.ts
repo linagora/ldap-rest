@@ -80,6 +80,7 @@ export interface Config {
   // LDAP raw (low-level browsing) plugin
   ldap_raw_base?: string[];
   ldap_raw_hidden_attribute?: string[];
+  ldap_raw_show_secrets?: boolean;
   ldap_raw_max_results?: number;
   ldap_raw_schema_cache_ttl?: number;
 
@@ -452,6 +453,7 @@ const configArgs: ConfigTemplate = [
     'array',
     '--ldap-raw-hidden-attributes',
   ],
+  ['--ldap-raw-show-secrets', 'DM_LDAP_RAW_SHOW_SECRETS', false, 'boolean'],
   ['--ldap-raw-max-results', 'DM_LDAP_RAW_MAX_RESULTS', 200, 'number'],
   [
     '--ldap-raw-schema-cache-ttl',
