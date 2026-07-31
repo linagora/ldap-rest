@@ -42,20 +42,34 @@
   flex-wrap: wrap;
 }
 
+/*
+ * Inputs, selects and buttons each size themselves differently from their
+ * padding and font, which left the buttons standing 4px proud of the input.
+ * One explicit height for every control keeps the row on a single line.
+ */
+.ldap-browser__filter,
+.ldap-browser__scope,
+.ldap-browser__base,
+.ldap-browser__search,
+.ldap-browser__refresh {
+  height: 38px;
+  box-sizing: border-box;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
 .ldap-browser__filter {
   flex: 1 1 260px;
   min-width: 180px;
-  padding: 8px 12px;
+  padding: 0 12px;
   font-family: monospace;
   border: 1px solid var(--ldap-browser-border);
-  border-radius: 4px;
 }
 
 .ldap-browser__scope,
 .ldap-browser__base {
-  padding: 8px;
+  padding: 0 8px;
   border: 1px solid var(--ldap-browser-border);
-  border-radius: 4px;
   background: var(--ldap-browser-surface);
 }
 
@@ -64,11 +78,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 12px;
+  padding: 0 12px;
   color: #fff;
   background: var(--ldap-browser-primary);
   border: none;
-  border-radius: 4px;
   cursor: pointer;
 }
 
@@ -218,9 +231,16 @@
   color: var(--ldap-browser-warning);
 }
 
+/*
+ * `table-layout: fixed` is what keeps the two tables (attributes and
+ * operational attributes) in one column grid: with the default `auto`
+ * layout, a long attribute name widens its own table's first column and
+ * the value columns of the two tables no longer line up.
+ */
 .ldap-browser-entry__table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .ldap-browser-entry__table th {
@@ -232,6 +252,15 @@
   font-weight: 400;
   color: var(--ldap-browser-muted);
   border-bottom: 1px solid var(--ldap-browser-border);
+  /* A name longer than the column wraps rather than pushing it */
+  overflow-wrap: anywhere;
+}
+
+/* A fixed 220px name column eats too much of a narrow panel */
+@media (max-width: 900px) {
+  .ldap-browser-entry__table th {
+    width: 140px;
+  }
 }
 
 .ldap-browser-entry__table td {
