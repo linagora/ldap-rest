@@ -8,6 +8,24 @@ import DmPlugin from '../../abstract/plugin';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { launchHooksChained } from '../../lib/utils';
 
+/**
+ * Drop the trailing slashes of a path prefix.
+ *
+ * Written as a scan rather than a `/\/+$/` replacement: that pattern
+ * backtracks quadratically on a long run of slashes, which CodeQL flags as
+ * a polynomial ReDoS. The value comes from the configuration rather than
+ * from a request, so nothing was exploitable — but a linear scan says what
+ * it does and costs nothing.
+ *
+ * @param path prefix to clean
+ * @returns the prefix without its trailing slashes
+ */
+function stripTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path[end - 1] === '/') end--;
+  return path.slice(0, end);
+}
+
 export default abstract class AuthBase extends DmPlugin {
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
 
@@ -37,7 +55,7 @@ export default abstract class AuthBase extends DmPlugin {
         ? [configured]
         : [];
     return list
-      .map(p => p.trim().replace(/\/+$/, ''))
+      .map(p => stripTrailingSlashes(p.trim()))
       .filter(p => p.length > 0);
   }
 
