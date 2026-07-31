@@ -204,7 +204,7 @@ export default class LdapRaw extends DmPlugin {
       const detail = err instanceof Error ? err.message : String(err);
       throw new BadRequestError(
         `Invalid LDAP filter ${JSON.stringify(filter)}: ${detail}. ` +
-          'A filter must be parenthesised, e.g. (cn=gov) or (|(cn=*gov*)(ou=*gov*))'
+          'A filter must be parenthesised, e.g. (cn=foo) or (|(cn=*foo*)(ou=*foo*))'
       );
     }
   }

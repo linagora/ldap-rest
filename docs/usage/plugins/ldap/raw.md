@@ -114,7 +114,7 @@ The filter is parsed before the search runs, so a malformed one comes back as a 
 
 ```json
 {
-  "error": "Invalid LDAP filter \"gov\": Invalid expression: gov. A filter must be parenthesised, e.g. (cn=gov) or (|(cn=*gov*)(ou=*gov*))"
+  "error": "Invalid LDAP filter \"gov\": Invalid expression: gov. A filter must be parenthesised, e.g. (cn=foo) or (|(cn=*foo*)(ou=*foo*))"
 }
 ```
 

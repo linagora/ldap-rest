@@ -336,17 +336,18 @@ describe('LDAP Raw Plugin', function () {
       expect(res.status).to.equal(400);
       expect(res.body.error).to.contain('Invalid LDAP filter');
       expect(res.body.error).to.contain('gov');
-      // The message must say what a filter looks like
-      expect(res.body.error).to.contain('(cn=gov)');
+      // The message must say what a filter looks like, with a placeholder
+      // that cannot be mistaken for the value the user typed
+      expect(res.body.error).to.contain('(cn=foo)');
     });
 
     it('should accept a well-formed filter', () => {
-      expect(() => plugin.checkFilter('(cn=gov)')).to.not.throw();
+      expect(() => plugin.checkFilter('(cn=foo)')).to.not.throw();
       expect(() =>
-        plugin.checkFilter('(|(cn=*gov*)(ou=*gov*))')
+        plugin.checkFilter('(|(cn=*foo*)(ou=*foo*))')
       ).to.not.throw();
       expect(() => plugin.checkFilter('gov')).to.throw('Invalid LDAP filter');
-      expect(() => plugin.checkFilter('(cn=gov')).to.throw(
+      expect(() => plugin.checkFilter('(cn=foo')).to.throw(
         'Invalid LDAP filter'
       );
     });
