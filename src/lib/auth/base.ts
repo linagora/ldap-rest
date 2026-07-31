@@ -10,8 +10,45 @@ import { launchHooksChained } from '../../lib/utils';
 
 export default abstract class AuthBase extends DmPlugin {
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
+
+  /**
+   * Path prefixes this authentication applies to, empty when it guards the
+   * whole server.
+   *
+   * Loading the same plugin twice with different prefixes lets one server
+   * serve populations that authenticate differently — machines with a token
+   * on one branch of the API, administrators with an SSO session on another:
+   *
+   * ```
+   * --plugin 'core/auth/token:tok:{"auth_path_prefix":"/api/m"}'
+   * --plugin 'core/auth/openidconnect:oidc:{"auth_path_prefix":"/api/admin"}'
+   * ```
+   *
+   * A credential is then only valid on the branch it was scoped to, which is
+   * the point: a leaked machine token buys nothing on the admin API.
+   *
+   * @returns the configured prefixes, without trailing slashes
+   */
+  get pathPrefixes(): string[] {
+    const configured = this.config.auth_path_prefix;
+    const list = Array.isArray(configured)
+      ? configured
+      : configured
+        ? [configured]
+        : [];
+    return list
+      .map(p => p.trim().replace(/\/+$/, ''))
+      .filter(p => p.length > 0);
+  }
+
   api(app: Express): void {
-    app.use(async (req, res, next) => {
+    const prefixes = this.pathPrefixes;
+
+    const middleware = async (
+      req: Request,
+      res: Response,
+      next: () => void
+    ): Promise<void> => {
       try {
         [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [
           req,
@@ -34,6 +71,18 @@ export default abstract class AuthBase extends DmPlugin {
           serverError(res, err as Error);
         }
       });
-    });
+    };
+
+    if (prefixes.length === 0) {
+      app.use(middleware);
+      return;
+    }
+
+    // Express matches a mount path on segment boundaries, so `/api/m` guards
+    // `/api/m` and `/api/m/entry` without ever catching `/api/machines`
+    app.use(prefixes, middleware);
+    this.logger.info(
+      `${this.name}: authentication restricted to ${prefixes.join(', ')}`
+    );
   }
 }

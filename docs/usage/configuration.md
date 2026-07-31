@@ -204,6 +204,14 @@ Read-only low-level browsing (root DSE, schema, entries). See [raw plugin](plugi
 
 ### Authentication Plugins
 
+#### Common to every authentication plugin
+
+| CLI                  | Plural                 | Env                   | Default | Description                                 |
+| -------------------- | ---------------------- | --------------------- | ------- | ------------------------------------------- |
+| `--auth-path-prefix` | `--auth-path-prefixes` | `DM_AUTH_PATH_PREFIX` | `[]`    | Restrict this plugin to these path prefixes |
+
+Empty means the plugin guards every path. Scoping several instances to different prefixes lets one server serve populations that authenticate differently — see [Serving several populations from one server](plugins/auth/README.md#serving-several-populations-from-one-server), including the routes it can leave unauthenticated.
+
 #### `core/auth/token`
 
 | CLI            | Plural          | Env              | Default | Description           |

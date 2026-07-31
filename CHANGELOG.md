@@ -4,6 +4,22 @@
 
 ### Features
 
+- `lib/auth`: `--auth-path-prefix` restricts an authentication plugin to one or
+  more path prefixes. Populations rarely authenticate the same way — machines
+  carry a token, administrators arrive with an SSO session — and until now the
+  only way to serve both was two servers on two ports, because `AuthBase`
+  mounted its middleware on every path and the first plugin loaded decided for
+  everyone. Each plugin can now be scoped, and since any plugin can be loaded
+  twice under its own name, one server hosts `/api/m` behind a token and
+  `/api/admin` behind OIDC. A credential is only valid on the branch it was
+  scoped to: a leaked machine token buys nothing on the administration API.
+  Prefixes match on segment boundaries, so `/api/m` never catches
+  `/api/machines`. The counterpart is that a route outside every prefix is
+  served without authentication, which no error would reveal, so those routes
+  are now listed in a warning at startup
+
+### Features
+
 - `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
   the directory — the phpLDAPadmin-shaped hole in an otherwise business-object
   API. The high-level plugins answer "who are the users of this group"; nothing

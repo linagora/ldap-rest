@@ -43,6 +43,35 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 | **Best For**           | APIs, Scripts | APIs, Enhanced    | Backend Services       | Enterprises with LLNG | Cloud/SaaS, Enterprises with SSO |
 | **Dependencies**       | None          | None              | None                   | lemonldap-ng-handler  | express-openid-connect           |
 
+## Serving several populations from one server
+
+Populations rarely authenticate the same way: machines carry a token, administrators arrive with an SSO session. `--auth-path-prefix` restricts an authentication plugin to one or more path prefixes, so a single server can host both without either credential being valid on the other's branch of the API.
+
+Any plugin can be loaded more than once under a distinct name with its own configuration (`module:name:{json}`), which is what makes this work:
+
+```bash
+ldap-rest \
+  --plugin 'core/auth/token:auth-machines:{"auth_path_prefix":"/api/m","auth_token":"…:robot"}' \
+  --plugin 'core/ldap/raw:raw-machines:{"api_prefix":"/api/m"}' \
+  --plugin 'core/auth/openidconnect:auth-admins:{"auth_path_prefix":"/api/admin"}' \
+  --plugin 'core/ldap/raw:raw-admins:{"api_prefix":"/api/admin"}'
+```
+
+A token presented on `/api/admin` is refused, and a session presented on `/api/m` is refused too: each authentication plugin only sees the branch it was mounted on. Prefixes match on segment boundaries, so `/api/m` guards `/api/m` and `/api/m/entry` but never `/api/machines`.
+
+### The gap to watch
+
+A route registered **outside every prefix is served without authentication**. That is the price of scoping, and it is silent — the server starts, the API answers. To make it visible, the routes no plugin guards are listed at startup:
+
+```
+Authentication is restricted to /api/m, /api/admin, so these routes are
+served without authentication: /api/v1/config, /api/v1/ldap/users
+```
+
+Read that line on every configuration change. Either scope the missing routes to a prefix as well, load one unscoped authentication plugin as a catch-all, or keep them public deliberately. Nothing is reported when no authentication is configured (the server is open on purpose) or when at least one plugin guards every path.
+
+Note that a prefix scopes **authentication**, not authorization: once past it, a caller reaches everything the branch exposes. Restrict what each population may do with [authz-per-route](authz-per-route.md) or [authz-per-branch](authz-per-branch.md).
+
 ## Combining with Authorization
 
 All authentication plugins set `req.user` to the authenticated identity. You can use hooks to implement custom authorization:

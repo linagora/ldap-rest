@@ -33,11 +33,18 @@ import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
 
-// Internal Express router structure (used to remove error middleware)
+// Internal Express router structure (used to remove error middleware and to
+// list the registered routes when checking authentication coverage).
+// Express 5 exposes it as `router`, Express 4 as `_router`.
+interface ExpressRouterStack {
+  stack: Array<{
+    handle: unknown;
+    route?: { path?: string | string[] };
+  }>;
+}
 interface ExpressAppInternal {
-  _router?: {
-    stack: Array<{ handle: unknown }>;
-  };
+  router?: ExpressRouterStack;
+  _router?: ExpressRouterStack;
 }
 
 export * from '../lib/utils';
@@ -129,6 +136,7 @@ export class DM {
         Promise.all(promises)
           .then(() => {
             this.setupErrorMiddleware();
+            this.warnUnauthenticatedRoutes();
             resolve();
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
@@ -137,6 +145,57 @@ export class DM {
         resolve();
       }
     });
+  }
+
+  /**
+   * List the routes no authentication plugin guards, once every plugin is
+   * loaded.
+   *
+   * Scoping authentication to a path prefix is what lets one server host
+   * populations that authenticate differently, but it also means a route
+   * registered outside every prefix is served to anyone. That gap is silent
+   * — the server starts, the API answers — so it is named at startup.
+   *
+   * Nothing is reported when no authentication is configured at all (the
+   * server is open on purpose) or when one plugin guards every path.
+   *
+   * @returns the unguarded route paths, for tests and callers
+   */
+  warnUnauthenticatedRoutes(): string[] {
+    const authPlugins = Object.values(this.loadedPlugins).filter(p =>
+      p.roles?.includes('auth')
+    ) as Array<DmPlugin & { pathPrefixes?: string[] }>;
+    if (authPlugins.length === 0) return [];
+
+    const prefixes: string[] = [];
+    for (const plugin of authPlugins) {
+      // A plugin without prefixes guards everything: nothing can be exposed
+      if (!plugin.pathPrefixes || plugin.pathPrefixes.length === 0) return [];
+      prefixes.push(...plugin.pathPrefixes);
+    }
+
+    const internal = this.app as unknown as ExpressAppInternal;
+    const stack = (internal.router ?? internal._router)?.stack;
+    const paths = new Set<string>();
+    for (const layer of stack || []) {
+      const path = layer.route?.path;
+      if (typeof path === 'string') paths.add(path);
+      else if (Array.isArray(path))
+        path.forEach(p => typeof p === 'string' && paths.add(p));
+    }
+
+    const unguarded = [...paths].filter(
+      path =>
+        !prefixes.some(
+          prefix => path === prefix || path.startsWith(`${prefix}/`)
+        )
+    );
+    if (unguarded.length > 0)
+      this.logger.warn(
+        `Authentication is restricted to ${prefixes.join(', ')}, so these ` +
+          `routes are served without authentication: ${unguarded.sort().join(', ')}`
+      );
+    return unguarded.sort();
   }
 
   setupErrorMiddleware(): void {

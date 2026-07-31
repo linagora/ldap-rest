@@ -97,6 +97,9 @@ export interface Config {
   static_path?: string;
   static_name?: string;
 
+  // auth (all authentication plugins)
+  auth_path_prefix?: string[];
+
   // auth/llng
   llng_ini?: string;
 
@@ -633,6 +636,15 @@ const configArgs: ConfigTemplate = [
 
   // Lemonldap options
   ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
+
+  // Common to every authentication plugin: restrict it to path prefixes
+  [
+    '--auth-path-prefix',
+    'DM_AUTH_PATH_PREFIX',
+    [],
+    'array',
+    '--auth-path-prefixes',
+  ],
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
