@@ -328,6 +328,29 @@ describe('LDAP Raw Plugin', function () {
       expect(res.body.truncated).to.equal(true);
     });
 
+    it('should reject an unparseable filter with an explicit message', async () => {
+      // What a user naturally types into a search box
+      const res = await request
+        .get(`${prefix}/search`)
+        .query({ filter: 'gov' });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.contain('Invalid LDAP filter');
+      expect(res.body.error).to.contain('gov');
+      // The message must say what a filter looks like
+      expect(res.body.error).to.contain('(cn=gov)');
+    });
+
+    it('should accept a well-formed filter', () => {
+      expect(() => plugin.checkFilter('(cn=gov)')).to.not.throw();
+      expect(() =>
+        plugin.checkFilter('(|(cn=*gov*)(ou=*gov*))')
+      ).to.not.throw();
+      expect(() => plugin.checkFilter('gov')).to.throw('Invalid LDAP filter');
+      expect(() => plugin.checkFilter('(cn=gov')).to.throw(
+        'Invalid LDAP filter'
+      );
+    });
+
     it('should reject an invalid scope', async () => {
       const res = await request
         .get(`${prefix}/search`)

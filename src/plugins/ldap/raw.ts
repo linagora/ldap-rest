@@ -16,6 +16,7 @@
  * types even when the caller is restricted to a branch.
  */
 import type { Express, Request } from 'express';
+import { FilterParser } from 'ldapts';
 import type { SearchOptions, SearchResult } from 'ldapts';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
@@ -185,6 +186,27 @@ export default class LdapRaw extends DmPlugin {
     );
     if (!allowed)
       throw new ForbiddenError(`DN ${dn} is outside the exposed bases`);
+  }
+
+  /**
+   * Reject a malformed LDAP filter before it reaches the directory. Parsing
+   * it here turns what would surface as an opaque server error into a 400
+   * naming the offending expression — a search box hands us whatever the
+   * user typed, and `gov` is a filter typo, not a server fault.
+   *
+   * @param filter filter to validate
+   * @throws BadRequestError when the filter cannot be parsed
+   */
+  checkFilter(filter: string): void {
+    try {
+      FilterParser.parseString(filter);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new BadRequestError(
+        `Invalid LDAP filter ${JSON.stringify(filter)}: ${detail}. ` +
+          'A filter must be parenthesised, e.g. (cn=gov) or (|(cn=*gov*)(ou=*gov*))'
+      );
+    }
   }
 
   /**
@@ -505,6 +527,7 @@ export default class LdapRaw extends DmPlugin {
     req?: Request
   ): Promise<RawSearchResult> {
     this.checkDn(options.base);
+    this.checkFilter(options.filter);
     const limit = Math.min(options.limit || this.maxResults, this.maxResults);
 
     // Ask for one entry more than the limit to detect truncation
@@ -671,7 +694,10 @@ export default class LdapRaw extends DmPlugin {
      *               items: { $ref: '#/components/schemas/RawEntry' }
      *             truncated: { type: boolean }
      *   '400':
-     *     description: Invalid scope or missing base.
+     *     description: |
+     *       Invalid scope, invalid limit, or unparseable LDAP filter. The
+     *       message names the offending filter and recalls the expected
+     *       form, e.g. `Invalid LDAP filter "gov"`.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }

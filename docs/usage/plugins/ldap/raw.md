@@ -110,6 +110,14 @@ curl "$URL/api/v1/ldap/raw/search?base=ou=users,dc=example,dc=com&filter=(mail=*
 
 `truncated` is true when the limit cut the result set short.
 
+The filter is parsed before the search runs, so a malformed one comes back as a 400 naming it rather than as a server error — a search box receives whatever the user typed, and `gov` is a typo, not a server fault:
+
+```json
+{
+  "error": "Invalid LDAP filter \"gov\": Invalid expression: gov. A filter must be parenthesised, e.g. (cn=gov) or (|(cn=*gov*)(ou=*gov*))"
+}
+```
+
 ### Schema
 
 ```json
