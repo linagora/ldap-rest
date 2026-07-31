@@ -149,6 +149,29 @@ export class DM {
   }
 
   /**
+   * A view of this server carrying a different configuration, handed to a
+   * plugin loaded with overrides (`module:name:{json}`).
+   *
+   * Everything is shared by reference — the Express app, the hooks, the LDAP
+   * connection, the plugin registry — so the plugin acts on this server; only
+   * `config` differs. The copy is built on this instance's prototype rather
+   * than by spreading it: `{...this}` copies own properties and leaves the
+   * methods behind, so a plugin calling `this.server.anything()` would throw,
+   * and only when configured with overrides — the kind of failure that shows
+   * up in production and not in a test that instantiates the plugin directly.
+   *
+   * @param config configuration the plugin must see
+   * @returns a server view backed by this instance
+   */
+  withConfig(config: Config): DM {
+    return Object.assign(
+      Object.create(Object.getPrototypeOf(this) as object) as DM,
+      this,
+      { config }
+    );
+  }
+
+  /**
    * Path prefixes claimed by scoped authentication plugins.
    *
    * An unscoped plugin subtracts these from what it guards, so a
@@ -381,7 +404,7 @@ export class DM {
           if (overrides) {
             const newConfig = { ...this.config, ...overrides };
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            obj = new pluginModule({ ...this, config: newConfig } as DM);
+            obj = new pluginModule(this.withConfig(newConfig));
           } else {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             obj = new pluginModule(this);

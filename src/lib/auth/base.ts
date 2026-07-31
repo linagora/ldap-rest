@@ -46,12 +46,10 @@ export function prefixCoversPath(prefix: string, path: string): boolean {
 /**
  * Path prefixes claimed by scoped authentication plugins.
  *
- * Reads the plugin registry rather than calling a method on the server:
- * `loadPlugin` builds a plugin loaded with overrides from `{...this}`, a
- * spread that copies own properties but leaves the prototype behind, so a
- * `DM` method would be missing on exactly the configuration this feature is
- * meant for. `loadedPlugins` is a shared reference and stays live as the
- * remaining plugins register.
+ * Takes the registry as an argument rather than reaching for the server, so
+ * `DM` and `AuthBase` share one definition of what "claimed" means. The
+ * registry is a live reference: it keeps filling as the remaining plugins
+ * register, which is why the catch-all consults it per request.
  *
  * @param loadedPlugins the server's plugin registry
  * @param except name of the plugin asking, excluded from the result

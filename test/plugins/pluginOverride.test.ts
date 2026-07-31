@@ -26,6 +26,28 @@ describe('Plugin Override', () => {
     expect(res.body).to.deep.equal({ message: 'Hello', hookResults: [] });
   });
 
+  it('should hand the overridden plugin a usable server', () => {
+    // A configuration override used to be applied by spreading the server,
+    // which dropped its prototype: the plugin got an object carrying the
+    // data but none of the methods, so `this.server.anything()` threw — and
+    // only in that configuration
+    const plugin = dm.loadedPlugins.myHello;
+    expect(plugin, 'overridden plugin').to.not.equal(undefined);
+    expect(plugin.server).to.be.instanceOf(DM);
+    expect(plugin.server.claimedAuthPrefixes()).to.deep.equal([]);
+    expect(plugin.server.registerPlugin).to.be.a('function');
+  });
+
+  it('should share everything but the configuration with the server', () => {
+    const plugin = dm.loadedPlugins.myHello;
+    expect(plugin.server.app).to.equal(dm.app);
+    expect(plugin.server.hooks).to.equal(dm.hooks);
+    expect(plugin.server.loadedPlugins).to.equal(dm.loadedPlugins);
+    expect(plugin.server.config).to.not.equal(dm.config);
+    expect(plugin.server.config.api_prefix).to.equal('/myapi');
+    expect(dm.config.api_prefix).to.equal('/api');
+  });
+
   after(() => {
     delete process.env.NODE_ENV;
     delete process.env.DM_PLUGINS;
