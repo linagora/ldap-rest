@@ -149,6 +149,17 @@ export class DM {
   }
 
   /**
+   * The Express router stack, whatever the Express version calls it: 5
+   * exposes `router`, 4 exposed `_router`.
+   *
+   * @returns the layer stack, or undefined when Express hides it
+   */
+  private routerStack(): ExpressRouterStack['stack'] | undefined {
+    const internal = this.app as unknown as ExpressAppInternal;
+    return (internal.router ?? internal._router)?.stack;
+  }
+
+  /**
    * A view of this server carrying a different configuration, handed to a
    * plugin loaded with overrides (`module:name:{json}`).
    *
@@ -212,8 +223,7 @@ export class DM {
       prefixes.push(...plugin.pathPrefixes);
     }
 
-    const internal = this.app as unknown as ExpressAppInternal;
-    const stack = (internal.router ?? internal._router)?.stack;
+    const stack = this.routerStack();
     const paths = new Set<string>();
     for (const layer of stack || []) {
       const path = layer.route?.path;
@@ -237,9 +247,13 @@ export class DM {
   }
 
   setupErrorMiddleware(): void {
-    // Remove existing error middleware if already set up
+    // Remove existing error middleware if already set up.
+    // Express 5 renamed `_router` to `router`, so this lookup silently found
+    // nothing and the old handler was never removed: one more was appended on
+    // every registerPlugin. Only the first ever ran, so nothing broke — the
+    // stack just kept growing.
     if (this._errorMiddlewareSetup && this._errorMiddleware) {
-      const stack = (this.app as unknown as ExpressAppInternal)._router?.stack;
+      const stack = this.routerStack();
       if (stack) {
         const index = stack.findIndex(
           layer => layer.handle === this._errorMiddleware
@@ -427,7 +441,16 @@ export class DM {
     if (!obj.name) obj.name = pluginName;
     if (name) obj.name = name;
     if (this.loadedPlugins[obj.name]) {
-      this.logger.info(`Plugin ${pluginName} already loaded as ${obj.name}`);
+      // Dropping the instance silently is what makes this expensive to
+      // debug: its api() is never called, so its routes simply do not exist
+      // and every request to them answers 404 with nothing in the log to
+      // explain why. Loading a plugin twice on purpose needs a distinct name.
+      this.logger.warn(
+        `Plugin ${pluginName} not registered: the name "${obj.name}" is ` +
+          'already taken. This instance is dropped and its routes will not ' +
+          'exist. To load the same plugin twice, give each one a name: ' +
+          `--plugin '${pluginName}:${obj.name}2:{…}'`
+      );
       return false;
     }
     this.logger.debug(`Registering plugin ${pluginName} as ${obj.name}`);

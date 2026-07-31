@@ -47,6 +47,31 @@
 
 ### Bug fixes
 
+- `bin`: a plugin loaded with overrides (`module:name:{json}`) received a
+  crippled server. The view was built with `{...this}`, a spread that copies
+  own properties and leaves the prototype behind, so the plugin got the data —
+  config, hooks, app, ldap, registry — and none of the methods: any
+  `this.server.something()` threw, and only in that configuration. No existing
+  plugin had hit it because none called a server method
+
+- `bin`: `setupErrorMiddleware` looked the router stack up as `app._router`,
+  which Express 5 renamed to `app.router`. The lookup silently found nothing,
+  so the previous error handler was never removed and one more was appended on
+  every `registerPlugin`. Only the first ever ran, so nothing broke — the stack
+  just kept growing
+
+- `bin`: registering a plugin under a name already taken was reported at `info`
+  level and the instance was dropped, so its routes simply did not exist and
+  every request to them answered 404 with nothing in the log to explain why. It
+  is now a warning naming the plugin, saying the instance was dropped, and
+  showing how to load the same plugin twice
+
+- `plugins/auth/rateLimit`: warn when `core/auth/trustedProxy` is not loaded.
+  The limiter keys on `X-Forwarded-For`, which a client can set to anything;
+  that is only safe because `trustedProxy` strips the header on requests that
+  do not come from a declared proxy. Without it, rotating the header defeats
+  the limiter entirely and the brute-force protection is decorative
+
 - `plugins/twake/appAccountsApi`: never report a password operation that did not
   happen. Both endpoints kept the principal account — the entry services
   actually bind against — in sync with a `logger.warn` and a
