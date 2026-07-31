@@ -98,7 +98,10 @@ export interface Config {
   static_name?: string;
 
   // auth (all authentication plugins)
-  auth_path_prefix?: string[];
+  // A single prefix is accepted as a bare string: plugin overrides are raw
+  // JSON (`{"auth_path_prefix":"/api/m"}`) and never go through the array
+  // parsing that `--auth-path-prefix` and `DM_AUTH_PATH_PREFIX` apply
+  auth_path_prefix?: string | string[];
 
   // auth/llng
   llng_ini?: string;

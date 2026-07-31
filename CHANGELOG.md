@@ -18,8 +18,6 @@
   served without authentication, which no error would reveal, so those routes
   are now listed in a warning at startup
 
-### Features
-
 - `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
   the directory — the phpLDAPadmin-shaped hole in an otherwise business-object
   API. The high-level plugins answer "who are the users of this group"; nothing

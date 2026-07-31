@@ -22,7 +22,8 @@ describe('Authentication path scope', () => {
   interface Scope {
     name: string;
     token: string;
-    prefix?: string[];
+    /** A bare string is what a plugin override carries: `"/api/m"` */
+    prefix?: string | string[];
   }
 
   /**
@@ -53,7 +54,9 @@ describe('Authentication path scope', () => {
     }
 
     for (const scope of scopes)
-      for (const prefix of scope.prefix || [])
+      for (const prefix of typeof scope.prefix === 'string'
+        ? [scope.prefix]
+        : scope.prefix || [])
         await dm.registerPlugin(
           'core/demo/helloworld',
           new HelloWorld(withConfig({ api_prefix: prefix })),
@@ -131,6 +134,16 @@ describe('Authentication path scope', () => {
       expect((await request(trailing).get('/api/m/hello')).status).to.equal(
         401
       );
+    });
+
+    it('should accept a single prefix given as a bare string', async () => {
+      // The form the documented plugin override produces:
+      // --plugin 'core/auth/token:tok:{"auth_path_prefix":"/api/m"}'
+      const { app: single } = await build([
+        { name: 'authString', token: machineToken, prefix: '/api/m' },
+      ]);
+      expect((await request(single).get('/api/m/hello')).status).to.equal(401);
+      expect((await request(single).get('/api/hello')).status).to.equal(200);
     });
 
     it('should accept several prefixes', async () => {
