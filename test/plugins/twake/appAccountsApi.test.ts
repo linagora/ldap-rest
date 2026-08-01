@@ -6,6 +6,7 @@ import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsis
 import OnChange from '../../../src/plugins/ldap/onChange';
 import AuthToken from '../../../src/plugins/auth/token';
 
+import { waitForEntry } from '../../helpers/waitFor';
 describe('App Accounts API Plugin', function () {
   const timestamp = Date.now();
   const testUser = `testuser-${timestamp}`;
@@ -143,8 +144,8 @@ describe('App Accounts API Plugin', function () {
         mail: `${testUser}@example.com`,
       });
 
-      // Wait for principal account creation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for the hook to create the principal account
+      await waitForEntry(dm, `uid=${principalEmail},${applicativeBase}`);
 
       const res = await request(dm.app)
         .get(`/api/v1/users/${principalEmail}/app-accounts`)
@@ -166,7 +167,7 @@ describe('App Accounts API Plugin', function () {
       });
 
       // Wait for principal account
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForEntry(dm, `uid=${principalEmail},${applicativeBase}`);
 
       // Create app accounts via API
       const res1 = await request(dm.app)
@@ -232,7 +233,7 @@ describe('App Accounts API Plugin', function () {
       });
 
       // Wait for principal account
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await waitForEntry(dm, `uid=${principalEmail},${applicativeBase}`);
 
       const res = await request(dm.app)
         .post(`/api/v1/users/${principalEmail}/app-accounts`)
@@ -480,7 +481,7 @@ describe('App Accounts API Plugin', function () {
         mail: `${testUser}@example.com`,
       });
       // Let the consistency plugin create the principal applicative account
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForEntry(dm, `uid=${principalEmail},${applicativeBase}`);
 
       // Create two app accounts through the real API
       const created1 = await request(dm.app)

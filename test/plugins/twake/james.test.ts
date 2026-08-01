@@ -8,6 +8,7 @@ import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 
+import { waitFor } from '../../helpers/waitFor';
 describe('James Plugin', () => {
   let testDN: string;
   let testDNQuota: string;
@@ -549,7 +550,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for onChange hook to execute (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => forwardScope1.isDone() && forwardScope2.isDone());
 
       // Verify the HTTP calls were made
       expect(forwardScope1.isDone()).to.be.true;
@@ -588,7 +589,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for initial forwards to be created (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => initialScope1.isDone() && initialScope2.isDone());
 
       expect(initialScope1.isDone()).to.be.true;
       expect(initialScope2.isDone()).to.be.true;
@@ -615,7 +616,7 @@ describe('James Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for forward changes to be applied (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => deleteScope.isDone() && addScope.isDone());
 
       // Verify the HTTP calls were made
       expect(deleteScope.isDone()).to.be.true;
@@ -700,7 +701,7 @@ describe('James Plugin', () => {
       });
 
       // Wait for onChange hook to execute (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => apiCalled);
 
       expect(apiCalled).to.be.true;
     });
@@ -753,7 +754,7 @@ describe('James Plugin', () => {
       });
 
       // Wait for remove hook (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => removeApiCalled);
 
       expect(removeApiCalled).to.be.true;
     });
@@ -803,7 +804,7 @@ describe('James Plugin', () => {
       });
 
       // Wait for onChange hook to execute (needs more time with real LDAP)
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => multiAddScope1.isDone() && multiAddScope2.isDone());
 
       expect(multiAddScope1.isDone()).to.be.true;
       expect(multiAddScope2.isDone()).to.be.true;

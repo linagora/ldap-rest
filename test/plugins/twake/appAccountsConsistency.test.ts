@@ -346,7 +346,7 @@ describe('App Accounts Consistency Plugin', function () {
 
       // Delete user (should trigger deletion of all accounts)
       await dm.ldap.delete(testUserDN);
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await waitForNoEntry(dm, appAccount3DN);
 
       // Verify all accounts were deleted
       const accountsToCheck = [
@@ -448,8 +448,8 @@ describe('App Accounts Consistency Plugin', function () {
         replace: { mail: `newemail-${timestamp}@example.com` },
       });
 
-      // Wait for applicative account update (hooks are async)
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait for the hook to move the applicative account
+      await waitForNoEntry(dm, testApplicativeDN);
 
       // Verify old applicative account is deleted
       try {

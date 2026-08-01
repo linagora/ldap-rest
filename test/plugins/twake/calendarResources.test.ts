@@ -6,6 +6,7 @@ import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapFlat from '../../../src/plugins/ldap/flatGeneric';
 
+import { waitFor } from '../../helpers/waitFor';
 describe('Calendar Resources Plugin', function () {
   // Skip all tests if required env vars are not set
   if (
@@ -103,7 +104,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await waitFor(() => calendarApiCalled);
 
     expect(calendarApiCalled).to.be.true;
 
@@ -146,7 +147,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await waitFor(() => calendarApiCalled);
 
     expect(calendarApiCalled).to.be.true;
 
@@ -187,7 +188,7 @@ describe('Calendar Resources Plugin', function () {
     expect(res).to.be.true;
 
     // Wait for async hooks to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await waitFor(() => calendarApiCalled);
 
     expect(calendarApiCalled).to.be.true;
 

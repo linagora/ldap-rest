@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
+import { waitFor } from '../../helpers/waitFor';
 // Default Drive webadmin URL for tests (using nock for mocking)
 const TWAKE_DRIVE_WEBADMIN_URL = 'http://localhost:6060';
 
@@ -101,7 +102,7 @@ describe('Drive Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for onChange hook to execute
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => apiCalled);
 
       expect(apiCalled).to.be.true;
     });
@@ -171,7 +172,7 @@ describe('Drive Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for onChange hook to execute
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => notFoundScope.isDone());
 
       expect(notFoundScope.isDone()).to.be.true;
     });
@@ -261,7 +262,7 @@ describe('Drive Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for onChange hook to execute
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => apiCalled);
 
       expect(apiCalled).to.be.true;
     });
@@ -359,7 +360,7 @@ describe('Drive Plugin', () => {
       expect(res).to.be.true;
 
       // Wait for onChange hook to execute
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => apiCalled);
 
       expect(apiCalled).to.be.true;
       expect(diskQuotaValue).to.equal('5368709120');
