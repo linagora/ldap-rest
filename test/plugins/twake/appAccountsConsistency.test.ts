@@ -3,6 +3,8 @@ import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsis
 import OnChange from '../../../src/plugins/ldap/onChange';
 import { expect } from 'chai';
 
+import { waitForEntry, waitForNoEntry } from '../../helpers/waitFor';
+
 describe('App Accounts Consistency Plugin', function () {
   let testCounter = 0;
   let timestamp: number;
@@ -131,8 +133,8 @@ describe('App Accounts Consistency Plugin', function () {
 
       await dm.ldap.add(testUserDN, userAttrs);
 
-      // Wait a bit for hook to execute
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for the hook to create the applicative account
+      await waitForEntry(dm, testApplicativeDN);
 
       // Verify applicative account was created
       const result = await dm.ldap.search(
@@ -257,8 +259,8 @@ describe('App Accounts Consistency Plugin', function () {
 
       await dm.ldap.add(testUserDN, userAttrs);
 
-      // Wait for applicative account creation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for the hook to create the applicative account
+      await waitForEntry(dm, testApplicativeDN);
 
       // Verify applicative account exists
       let result = await dm.ldap.search(
@@ -273,8 +275,8 @@ describe('App Accounts Consistency Plugin', function () {
       // Delete user
       await dm.ldap.delete(testUserDN);
 
-      // Wait for hook to execute
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for the hook to delete the applicative account
+      await waitForNoEntry(dm, testApplicativeDN);
 
       // Verify applicative account was deleted
       try {
@@ -428,8 +430,8 @@ describe('App Accounts Consistency Plugin', function () {
 
       await dm.ldap.add(testUserDN, userAttrs);
 
-      // Wait for applicative account creation
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for the hook to create the applicative account
+      await waitForEntry(dm, testApplicativeDN);
 
       // Verify applicative account exists
       let result = await dm.ldap.search(
