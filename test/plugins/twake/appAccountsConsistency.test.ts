@@ -788,5 +788,55 @@ describe('App Accounts Consistency Plugin', function () {
         /applicative_account_base configuration is required/
       );
     });
+
+    // An allowlist that omits objectClass or the mail attribute would produce
+    // entries the directory rejects, or entries this plugin can never find
+    // again through its mail-keyed searches. They are forced in.
+    it('should still create a valid entry when the allowlist omits objectClass and mail', async function () {
+      this.timeout(10000);
+
+      const dm2 = new DM();
+      dm2.config.ldap_base = process.env.DM_LDAP_BASE;
+      await dm2.ready;
+      dm2.config.applicative_account_base = applicativeBase;
+      dm2.config.mail_attribute = 'mail';
+      // Neither objectClass nor mail is named here
+      dm2.config.applicative_account_attribute = ['cn', 'sn'];
+
+      await dm2.registerPlugin('onLdapChange', new OnChange(dm2));
+      await dm2.registerPlugin(
+        'appAccountsConsistency',
+        new AppAccountsConsistency(dm2)
+      );
+
+      const userDn = `uid=strict-${timestamp},${userBase}`;
+      const appDn = `uid=strict-${timestamp}@example.com,${applicativeBase}`;
+      try {
+        await dm2.ldap.add(userDn, {
+          objectClass: 'inetOrgPerson',
+          uid: `strict-${timestamp}`,
+          cn: 'Strict User',
+          sn: 'User',
+          mail: `strict-${timestamp}@example.com`,
+        });
+
+        await waitForEntry(dm2, appDn);
+        const result = await dm2.ldap.search(
+          { scope: 'base', paged: false },
+          appDn
+        );
+        const entry = (result as any).searchEntries[0];
+        expect(entry.objectClass).to.contain('inetOrgPerson');
+        expect(entry.mail).to.equal(`strict-${timestamp}@example.com`);
+      } finally {
+        for (const dn of [appDn, userDn]) {
+          try {
+            await dm2.ldap.delete(dn);
+          } catch (err) {
+            // Ignore
+          }
+        }
+      }
+    });
   });
 });

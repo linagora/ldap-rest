@@ -20,7 +20,9 @@
  *
  * When a user is deleted, all corresponding applicative accounts are also deleted.
  *
- * When a user's mail changes, all applicative accounts are updated with the new mail.
+ * When a user's mail changes, the principal account moves to the new address and
+ * the app accounts are deleted: every client has to be reconfigured against the
+ * new address anyway.
  */
 
 import DmPlugin from '../../abstract/plugin';
@@ -33,6 +35,33 @@ import type {
 } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
 import { escapeDnValue, isDnInBranch } from '../../lib/utils';
+
+/**
+ * Whether an error is the directory saying "that entry is not there".
+ *
+ * Checked three ways because only the first is guaranteed: ldapts sets
+ * `code = 32` and `name = 'NoSuchObjectError'` on the error, but a wrapper
+ * that rebuilds the error (or a second copy of ldapts in the tree) can drop
+ * one of them. The message it builds ends in `Code: 0x20` — note that it is
+ * hex, so a `Code: 32` substring never matches, and neither does
+ * `NoSuchObject`: the text is "The target object cannot be found."
+ *
+ * @param err - The error thrown by an LDAP operation
+ * @returns true when the entry was already absent
+ */
+function isNoSuchObject(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const { code, name, message } = err as {
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+  };
+  return (
+    code === 0x20 ||
+    name === 'NoSuchObjectError' ||
+    (typeof message === 'string' && message.includes('Code: 0x20'))
+  );
+}
 
 export default class AppAccountsConsistency extends DmPlugin {
   name = 'appAccountsConsistency';
@@ -57,12 +86,23 @@ export default class AppAccountsConsistency extends DmPlugin {
       .applicative_account_base as string;
     this.operationalAttributes =
       (this.config.ldap_operational_attribute as string[]) || [];
-    // The mail attribute is what the applicative entry is keyed on, so it is
-    // always copied whatever the configured list says.
-    this.copiedAttributes = new Set([
-      ...((this.config.applicative_account_attribute as string[]) || []),
-      this.mailAttr,
-    ]);
+    // `objectClass` and the mail attribute are not optional: without the first
+    // the directory rejects the `add`, without the second the entry cannot be
+    // found again by the mail-keyed searches this plugin runs. Force them in
+    // rather than let a partial list produce entries that fail to create or
+    // become invisible — but say so, because silently ignoring configuration
+    // is how an operator ends up debugging the wrong file.
+    const configured =
+      (this.config.applicative_account_attribute as string[]) || [];
+    const required = ['objectClass', this.mailAttr];
+    const missing = required.filter(attr => !configured.includes(attr));
+    if (configured.length > 0 && missing.length > 0) {
+      this.logger.warn(
+        `${this.name}: applicative_account_attribute omits ${missing.join(', ')} — ` +
+          'copied anyway, an applicative entry cannot be created without them'
+      );
+    }
+    this.copiedAttributes = new Set([...configured, ...required]);
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -112,14 +152,8 @@ export default class AppAccountsConsistency extends DmPlugin {
     try {
       await this.server.ldap.delete(dn);
       this.logger.info(`${this.name}: Deleted applicative account ${dn}`);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (deleteError: any) {
-      if (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        deleteError.code === 0x20 ||
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        deleteError.message?.includes('NoSuchObject')
-      ) {
+    } catch (deleteError) {
+      if (isNoSuchObject(deleteError)) {
         this.logger.debug(
           `${this.name}: Applicative account ${dn} already deleted`
         );
@@ -132,7 +166,8 @@ export default class AppAccountsConsistency extends DmPlugin {
   /**
    * Select the attributes to copy from a user entry into an applicative entry.
    *
-   * An allowlist (`--applicative-account-attribute`, plus the mail attribute):
+   * An allowlist (`--applicative-account-attribute`, plus `objectClass` and the
+   * mail attribute, which are forced in by the constructor):
    * the applicative branch is only ever read to bind with `uid` and
    * `userPassword`, so anything else the user entry happens to carry —
    * recovery addresses, e2ee key material, whatever the schema grows next —
@@ -322,35 +357,17 @@ export default class AppAccountsConsistency extends DmPlugin {
       for (const entry of searchEntries) {
         const applicativeDn = entry.dn;
         try {
-          await this.server.ldap.delete(applicativeDn);
-          this.logger.info(
-            `${this.name}: Deleted applicative account ${applicativeDn}`
+          await this.deleteApplicativeEntry(applicativeDn);
+        } catch (deleteError) {
+          this.logger.error(
+            `${this.name}: Failed to delete applicative account ${applicativeDn}:`,
+            deleteError
           );
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (deleteError: any) {
-          // Ignore NoSuchObjectError (already deleted - idempotent)
-          if (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            deleteError.code === 0x20 ||
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            deleteError.message?.includes('NoSuchObject')
-          ) {
-            this.logger.debug(
-              `${this.name}: Applicative account ${applicativeDn} already deleted`
-            );
-          } else {
-            this.logger.error(
-              `${this.name}: Failed to delete applicative account ${applicativeDn}:`,
-              deleteError
-            );
-          }
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error) {
       // Ignore NoSuchObjectError if the applicative account base doesn't exist
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-      if (error.code === 0x20 || error.message?.includes('NoSuchObject')) {
+      if (isNoSuchObject(error)) {
         this.logger.debug(
           `${this.name}: Applicative account base does not exist or no accounts found for mail ${mail}`
         );
