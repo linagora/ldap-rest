@@ -4,6 +4,20 @@
 
 ### Features
 
+- build: `npm run coverage` and `npm run coverage:check`. Nothing measured
+  coverage before — no tool, no script, no CI step, while `npm run clean`
+  deleted a `coverage/` directory nothing ever produced — so the figure was
+  unknown to everyone and no pull request could show a regression. It is 86.6%
+  of statements and 78.1% of branches on server code; the gate sits two to
+  three points below and runs the suite once rather than twice. Files holding
+  only type declarations are excluded, since they report 0% and mean nothing,
+  and so are the browser libraries: the suite has no DOM, they sit around 24%,
+  and a single global number would average two unrelated situations into one
+  nobody can act on. `npm run coverage` still reports them, so the gap stays
+  visible
+
+### Features
+
 - `lib/auth`: `--auth-path-prefix` restricts an authentication plugin to one or
   more path prefixes. Populations rarely authenticate the same way — machines
   carry a token, administrators arrive with an SSO session — and until now the
