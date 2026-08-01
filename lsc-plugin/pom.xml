@@ -21,7 +21,7 @@
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lsc.version>2.2</lsc.version>
-        <jackson.version>2.17.2</jackson.version>
+        <jackson.version>2.22.1</jackson.version>
         <junit.version>5.10.2</junit.version>
         <wiremock.version>3.9.1</wiremock.version>
     </properties>
