@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { expect } from 'chai';
 
-import { DM } from '../../../src/bin';
+import { DM, type Config } from '../../../src/bin';
 import AuthToken from '../../../src/plugins/auth/token';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 
@@ -38,8 +38,8 @@ describe('Authentication path scope', () => {
     await dm.ready;
 
     /** Clone the server with an overridden configuration, as loadPlugin does */
-    const withConfig = (overrides: Record<string, unknown>): DM =>
-      ({ ...dm, config: { ...dm.config, ...overrides } }) as DM;
+    const withConfig = (overrides: Partial<Config>): DM =>
+      dm.withConfig({ ...dm.config, ...overrides });
 
     for (const scope of scopes) {
       const plugin = new AuthToken(
@@ -71,6 +71,127 @@ describe('Authentication path scope', () => {
     );
     return { app: dm.app, dm };
   }
+
+  describe('registration order', () => {
+    /**
+     * Authentication used to be a middleware each plugin mounted itself, so
+     * a plugin registering after the routes it guarded never ran for them —
+     * and the catch-all, stepping aside for that branch, turned the hole into
+     * anonymous access. The dispatcher is mounted before any plugin loads, so
+     * this ordering must no longer matter.
+     *
+     * @returns the app, with the API registered before its authentication
+     */
+    async function routesBeforeAuth(): Promise<Express> {
+      const dm = new DM();
+      await dm.ready;
+      const withConfig = (o: Partial<Config>): DM =>
+        dm.withConfig({ ...dm.config, ...o });
+
+      // 1. an unscoped catch-all, as a priority plugin would register
+      await dm.registerPlugin(
+        'core/auth/token',
+        new AuthToken(withConfig({ auth_token: [`${machineToken}:rest`] })),
+        'authRest'
+      );
+      // 2. the admin API routes
+      await dm.registerPlugin(
+        'core/demo/helloworld',
+        new HelloWorld(withConfig({ api_prefix: '/api/admin' })),
+        'helloAdmin'
+      );
+      // 3. the plugin guarding them, registered last
+      await dm.registerPlugin(
+        'core/auth/token',
+        new AuthToken(
+          withConfig({
+            auth_token: [`${adminToken}:admins`],
+            auth_path_prefix: ['/api/admin'],
+          })
+        ),
+        'authAdmins'
+      );
+      return dm.app;
+    }
+
+    it('should guard a branch whose plugin registered after its routes', async () => {
+      const app = await routesBeforeAuth();
+      expect((await request(app).get('/api/admin/hello')).status).to.equal(401);
+    });
+
+    it('should still accept the right credential there', async () => {
+      const app = await routesBeforeAuth();
+      expect(
+        (
+          await request(app)
+            .get('/api/admin/hello')
+            .set('Authorization', `Bearer ${adminToken}`)
+        ).status
+      ).to.equal(200);
+    });
+
+    it('should not accept the catch-all credential there', async () => {
+      const app = await routesBeforeAuth();
+      expect(
+        (
+          await request(app)
+            .get('/api/admin/hello')
+            .set('Authorization', `Bearer ${machineToken}`)
+        ).status
+      ).to.equal(401);
+    });
+  });
+
+  describe('nested prefixes', () => {
+    let app: Express;
+
+    before(async () => {
+      ({ app } = await build([
+        { name: 'authApi', token: machineToken, prefix: ['/api'] },
+        { name: 'authAdmins', token: adminToken, prefix: ['/api/admin'] },
+      ]));
+    });
+
+    it('should let the most specific claim win', async () => {
+      // /api/admin belongs to authAdmins alone, even though /api covers it
+      expect(
+        (
+          await request(app)
+            .get('/api/admin/hello')
+            .set('Authorization', `Bearer ${adminToken}`)
+        ).status
+      ).to.equal(200);
+    });
+
+    it('should not require both credentials on the nested branch', async () => {
+      // Two overlapping guards used to compose as AND, which no single
+      // credential could satisfy
+      expect(
+        (
+          await request(app)
+            .get('/api/admin/hello')
+            .set('Authorization', `Bearer ${machineToken}`)
+        ).status
+      ).to.equal(401);
+    });
+
+    it('should keep the outer claim on the rest of its branch', async () => {
+      expect(
+        (
+          await request(app)
+            .get('/api/hello')
+            .set('Authorization', `Bearer ${machineToken}`)
+        ).status
+      ).to.equal(200);
+      expect(
+        (
+          await request(app)
+            .get('/api/hello')
+            .set('Authorization', `Bearer ${adminToken}`)
+        ).status
+      ).to.equal(401);
+    });
+  });
 
   describe('a single scoped plugin', () => {
     let app: Express;

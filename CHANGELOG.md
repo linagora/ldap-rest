@@ -14,15 +14,18 @@
   `/api/admin` behind OIDC. A credential is only valid on the branch it was
   scoped to: a leaked machine token buys nothing on the administration API.
   Prefixes match on segment boundaries, so `/api/m` never catches
-  `/api/machines`. A plugin left unscoped becomes the catch-all: it guards
+  `/api/machines`. A plugin left unscoped is the catch-all: it guards
   everything no scoped plugin claims, so "OIDC on /api/admin, token everywhere
   else" needs no list of everywhere else — the kind of list nobody maintains
-  without forgetting a branch. That subtraction is also what keeps the two from
-  colliding: both middlewares are terminal, so without it they would both match
-  the scoped branch and compose as AND, refusing every credential. The
-  counterpart is that a route outside every prefix, with no catch-all, is served
-  without authentication, which no error would reveal, so those routes are now
-  listed in a warning at startup
+  without forgetting a branch. Authentication is no longer a middleware each
+  plugin mounts for itself: the server mounts one dispatcher, after the guards
+  and the access log, before the first plugin able to register a route, and
+  authentication plugins register with it. Declaration order therefore no
+  longer decides what is protected, and the most specific claim wins, so two
+  plugins covering one request never compose as an AND no credential can
+  satisfy. The counterpart is that a route outside every prefix, with no
+  catch-all, is served without authentication, which no error would reveal, so
+  those routes are listed in a warning at startup
 
 - `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
   the directory — the phpLDAPadmin-shaped hole in an otherwise business-object

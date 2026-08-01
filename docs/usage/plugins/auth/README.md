@@ -72,9 +72,18 @@ ldap-rest \
   --auth-token "…:robot"
 ```
 
-`/api/admin` requires the SSO session, everything else requires the token. Loading order does not matter: the subtraction is computed per request, once every plugin has registered.
+`/api/admin` requires the SSO session, everything else requires the token.
 
-This is also what keeps the two from colliding. Both middlewares are terminal, so without the subtraction they would both match `/api/admin` and compose as **AND** — the session refused by the token plugin, the token refused by the session plugin, and the branch unusable by anyone.
+### How the choice is made
+
+Authentication is not a middleware each plugin mounts for itself. The server mounts **one dispatcher**, positioned after the guards (`protect`: rate limiting, proxy trust, CrowdSec) and access logging, and before the first plugin able to register a route. Authentication plugins register with it instead of adding a layer.
+
+Two properties follow, and both are load-bearing:
+
+- **Order of declaration does not matter.** A plugin that registers after the API it guards still guards it, because the dispatcher — not the plugin — owns the layer. With per-plugin middlewares that was untrue and silent: a guard mounted after its routes never ran for them.
+- **The most specific claim wins.** `/api/admin` is handled by the plugin scoped to it, `/api` by the plugin scoped to `/api`, and anything unclaimed by an unscoped plugin. Only the winner runs, so two plugins covering the same request never compose as an AND that no credential can satisfy.
+
+Several plugins sharing the same winning prefix all run, in registration order: requiring two credentials on one branch is a legitimate ask, and an accident there fails closed rather than open.
 
 ### The gap to watch
 

@@ -146,66 +146,64 @@ export default abstract class AuthBase extends DmPlugin {
     return (this._pathPrefixes = prefixes);
   }
 
-  api(app: Express): void {
-    const prefixes = this.pathPrefixes;
-
-    const middleware = async (
-      req: Request,
-      res: Response,
-      next: () => void
-    ): Promise<void> => {
-      try {
-        [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [
-          req,
-          res,
-        ]);
-      } catch (err) {
-        return serverError(res, err as Error);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      this.authMethod(req, res, async (): Promise<void> => {
-        try {
-          if (this.hooks?.onAuth) {
-            [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
-              req,
-              res,
-            ]);
-          }
-          next();
-        } catch (err) {
-          serverError(res, err as Error);
-        }
-      });
-    };
-
-    if (prefixes.length === 0) {
-      // An unscoped plugin guards everything *no scoped plugin claims*, so
-      // "OIDC here, token everywhere else" needs no list of everywhere else
-      // — which nobody maintains without forgetting a branch. The check runs
-      // per request rather than at mount time: plugins load in any order, and
-      // the claims are only complete once they all have.
-      //
-      // Without this, the two middlewares would both match the scoped branch
-      // and compose as AND: every credential refused, the branch unusable.
-      const catchAll = (
-        req: Request,
-        res: Response,
-        next: () => void
-      ): void => {
-        const claimed = claimedPrefixes(this.server.loadedPlugins, this.name);
-        if (claimed.some(prefix => prefixCoversPath(prefix, req.path)))
-          return next();
-        void middleware(req, res, next);
-      };
-      app.use(catchAll);
-      return;
+  /**
+   * Run this plugin's authentication on a request, hooks included.
+   *
+   * The dispatcher calls this; the plugin no longer owns a layer of its own.
+   *
+   * @param req incoming request
+   * @param res response, ended here when authentication fails
+   * @param next called only when the request is authenticated
+   */
+  async authenticate(
+    req: Request,
+    res: Response,
+    next: () => void
+  ): Promise<void> {
+    try {
+      [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [
+        req,
+        res,
+      ]);
+    } catch (err) {
+      return serverError(res, err as Error);
     }
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    this.authMethod(req, res, async (): Promise<void> => {
+      try {
+        if (this.hooks?.onAuth) {
+          [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
+            req,
+            res,
+          ]);
+        }
+        next();
+      } catch (err) {
+        serverError(res, err as Error);
+      }
+    });
+  }
 
-    // Express matches a mount path on segment boundaries, so `/api/m` guards
-    // `/api/m` and `/api/m/entry` without ever catching `/api/machines`
-    app.use(prefixes, middleware);
+  /**
+   * Register with the server's authentication dispatcher instead of mounting
+   * a middleware.
+   *
+   * Mounting per plugin made protection depend on registration order: a
+   * plugin whose `app.use` landed after the routes it was meant to guard
+   * never ran for them, and the catch-all — stepping aside for a branch that
+   * guard was supposed to cover — turned that into anonymous access. The
+   * dispatcher is mounted by `DM` before any plugin loads, so it always
+   * precedes every route, whatever order the plugins register in.
+   *
+   * @param _app unused: the dispatcher owns the only authentication layer
+   */
+  api(_app: Express): void {
+    const prefixes = this.pathPrefixes;
+    this.server.registerAuthenticator(this);
     this.logger.info(
-      `${this.name}: authentication restricted to ${prefixes.join(', ')}`
+      prefixes.length === 0
+        ? `${this.name}: authentication guards every path not claimed by another plugin`
+        : `${this.name}: authentication restricted to ${prefixes.join(', ')}`
     );
   }
 }

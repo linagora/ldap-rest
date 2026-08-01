@@ -122,7 +122,9 @@ async function syncJames() {
 
     if (!getRes.ok) {
       if (getRes.status === 404) {
-        dm.logger.warn(`User ${mail} not found in James, skipping quota (DN: ${dn})`);
+        dm.logger.warn(
+          `User ${mail} not found in James, skipping quota (DN: ${dn})`
+        );
       } else {
         dm.logger.error(
           `Error getting quota for ${mail}: ${getRes.status} ${getRes.statusText}`
@@ -164,7 +166,9 @@ async function syncJames() {
       }
       stats.quotaSynced++;
     } else {
-      dm.logger.error(`  Failed to update quota: ${putRes.status} ${putRes.statusText}`);
+      dm.logger.error(
+        `  Failed to update quota: ${putRes.status} ${putRes.statusText}`
+      );
       stats.errors++;
     }
   }

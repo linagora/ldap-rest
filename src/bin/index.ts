@@ -29,7 +29,7 @@ import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
-import { claimedPrefixes } from '../lib/auth/base';
+import AuthBase, { claimedPrefixes, prefixCoversPath } from '../lib/auth/base';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -80,6 +80,9 @@ export class DM {
   ldap: ldapActions;
   operationSequence: number;
   logger: winston.Logger;
+  /** Authentication plugins, in registration order */
+  authenticators: AuthBase[] = [];
+  private _authDispatcherMounted = false;
   private _errorMiddlewareSetup: boolean = false;
   private _errorMiddleware?: express.ErrorRequestHandler;
 
@@ -180,6 +183,96 @@ export class DM {
       this,
       { config }
     );
+  }
+
+  /**
+   * Mount the authentication dispatcher, once, before the first plugin that
+   * can register a route.
+   *
+   * Position is the whole point. Guards (`protect`: rate limiting, proxy
+   * trust, CrowdSec) and access logging must see a request *before*
+   * authentication — a rate limiter that runs after a 401 never gets to
+   * answer 429, and `trustedProxy` strips forged `X-Forwarded-For` headers
+   * that authentication relies on. Everything else may register routes, and
+   * a route must never precede authentication: mounting one layer here, at
+   * the boundary between the two, is what makes protection independent of
+   * the order plugins happen to load in.
+   *
+   * @param plugin the plugin about to register
+   */
+  private mountAuthDispatcher(plugin: DmPlugin): void {
+    const roles = plugin.roles || [];
+    if (roles.includes('protect') || roles.includes('logging')) return;
+    this.mountAuthDispatcherNow();
+  }
+
+  /** Mount the dispatcher layer if it is not mounted yet */
+  private mountAuthDispatcherNow(): void {
+    if (this._authDispatcherMounted) return;
+    this._authDispatcherMounted = true;
+    this.app.use((req, res, next) => {
+      this.dispatchAuth(req, res, next);
+    });
+  }
+
+  /**
+   * Add an authentication plugin to the dispatcher.
+   *
+   * Mounts the dispatcher too: a plugin may call `api()` directly instead of
+   * going through `registerPlugin`, and authentication that registers but is
+   * never dispatched would leave the server open.
+   *
+   * @param plugin plugin whose `authenticate` guards the paths it claims
+   */
+  registerAuthenticator(plugin: AuthBase): void {
+    this.mountAuthDispatcherNow();
+    if (!this.authenticators.includes(plugin)) this.authenticators.push(plugin);
+  }
+
+  /**
+   * Pick the authentication a request must satisfy, and run it.
+   *
+   * The most specific claim wins: a plugin scoped to `/api/admin` guards that
+   * branch alone, a plugin scoped to `/api` guards the rest of `/api`, and an
+   * unscoped plugin guards everything nobody claimed. Only the winners run,
+   * so two plugins covering the same request never compose as an AND that no
+   * credential can satisfy.
+   *
+   * Several plugins sharing the same winning prefix all run, in registration
+   * order: asking for two credentials on one branch is a legitimate ask, and
+   * an accident there fails closed.
+   *
+   * A path no plugin claims, with no unscoped plugin loaded, passes through
+   * unauthenticated — the gap `warnUnauthenticatedRoutes` names at startup.
+   *
+   * @param req incoming request
+   * @param res response, ended by the plugin when authentication fails
+   * @param next called when the request is authenticated, or when no
+   *             authentication applies to its path
+   */
+  dispatchAuth(req: Request, res: Response, next: () => void): void {
+    let winning = -1;
+    let selected: AuthBase[] = [];
+    for (const plugin of this.authenticators) {
+      for (const prefix of plugin.pathPrefixes) {
+        if (!prefixCoversPath(prefix, req.path)) continue;
+        if (prefix.length > winning) {
+          winning = prefix.length;
+          selected = [plugin];
+        } else if (prefix.length === winning && !selected.includes(plugin))
+          selected.push(plugin);
+      }
+    }
+    if (winning < 0)
+      selected = this.authenticators.filter(p => p.pathPrefixes.length === 0);
+    if (selected.length === 0) return next();
+
+    // Every selected plugin must let the request through
+    const run = (index: number): void => {
+      if (index >= selected.length) return next();
+      void selected[index].authenticate(req, res, () => run(index + 1));
+    };
+    run(0);
   }
 
   /**
@@ -465,6 +558,7 @@ export class DM {
       }
     }
     if (obj.api) {
+      this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
       await obj.api(this.app);
       // If error middleware was already setup, re-setup it to ensure it stays at the end

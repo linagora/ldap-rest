@@ -31,7 +31,9 @@ describe('James Plugin', () => {
       // Mail rename
       .post('/users/testmail@test.org/rename/t@t.org?action=rename&force')
       .reply(200, { success: true })
-      .post('/users/primary@test.org/rename/newprimary@test.org?action=rename&force')
+      .post(
+        '/users/primary@test.org/rename/newprimary@test.org?action=rename&force'
+      )
       .reply(200, { success: true })
       // Quota
       .put('/quota/users/testmail@test.org/size', '50000000')
@@ -391,7 +393,9 @@ describe('James Plugin', () => {
       const renameScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename&force')
+        .post(
+          '/users/noalias@test.org/rename/newalias@test.org?action=rename&force'
+        )
         .reply(200, { success: true })
         .get('/users/noalias@test.org/identities')
         .reply(200, [
@@ -458,7 +462,9 @@ describe('James Plugin', () => {
       const renameScope = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
       )
-        .post('/users/noalias@test.org/rename/newalias@test.org?action=rename&force')
+        .post(
+          '/users/noalias@test.org/rename/newalias@test.org?action=rename&force'
+        )
         .reply(200, { success: true })
         .get('/users/noalias@test.org/identities')
         .reply(200, [
