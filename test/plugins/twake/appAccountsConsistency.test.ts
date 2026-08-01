@@ -152,6 +152,72 @@ describe('App Accounts Consistency Plugin', function () {
       expect(entry.cn).to.equal('Test User');
     });
 
+    // The applicative branch is only ever read to bind with uid/userPassword,
+    // so an attribute the user entry happens to carry has no reason to be
+    // duplicated there. Copying used to be a denylist, which meant every new
+    // attribute on the user schema was propagated until someone remembered to
+    // exclude it (#103).
+    it('should not copy user attributes outside the configured allowlist', async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+        // Not in --applicative-account-attribute
+        telephoneNumber: '+33123456789',
+        title: 'Chief Secret Keeper',
+      });
+
+      await waitForEntry(dm, testApplicativeDN);
+
+      const result = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        testApplicativeDN
+      );
+      const entry = (result as any).searchEntries[0];
+
+      // Allowlisted attributes are still there
+      expect(entry.cn).to.equal('Test User');
+      expect(entry.sn).to.equal('User');
+      expect(entry.mail).to.equal(`testuser-${timestamp}@example.com`);
+      // The rest stayed on the user entry
+      expect(entry).to.not.have.property('telephoneNumber');
+      expect(entry).to.not.have.property('title');
+    });
+
+    // Same guarantee on the mail-change path, which re-reads the user entry
+    // and recreates the applicative one: this is how `twakeRecoveryEmail`
+    // ended up in 18 applicative entries (#103).
+    it('should not copy attributes outside the allowlist on a mail change', async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+        telephoneNumber: '+33123456789',
+      });
+      await waitForEntry(dm, testApplicativeDN);
+
+      await dm.ldap.modify(testUserDN, {
+        replace: { mail: `newemail-${timestamp}@example.com` },
+      });
+
+      const newApplicativeDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
+      await waitForEntry(dm, newApplicativeDN);
+
+      const result = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        newApplicativeDN
+      );
+      const entry = (result as any).searchEntries[0];
+
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
+      expect(entry.cn).to.equal('Test User');
+      expect(entry).to.not.have.property('telephoneNumber');
+    });
+
     it('should be idempotent when creating applicative account multiple times', async () => {
       // Create user with mail
       const userAttrs = {
@@ -525,7 +591,7 @@ describe('App Accounts Consistency Plugin', function () {
       }
     });
 
-    it('should update all app accounts when user mail changes', async function () {
+    it('should delete app accounts when user mail changes', async function () {
       this.timeout(15000);
 
       // Create user with mail
@@ -622,32 +688,19 @@ describe('App Accounts Consistency Plugin', function () {
       expect(entry.uid).to.equal(`newemail-${timestamp}@example.com`);
       expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
 
-      // Verify app accounts kept their uid but changed mail
-      result = await dm.ldap.search(
-        {
-          scope: 'base',
-          paged: false,
-        },
-        appAccount1DN
-      );
-      expect((result as any).searchEntries).to.have.lengthOf(1);
-      entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal(`testuser-${timestamp}_c12345678`); // UID unchanged
-      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
-      expect(entry.description).to.equal('My Phone'); // Description preserved
-
-      result = await dm.ldap.search(
-        {
-          scope: 'base',
-          paged: false,
-        },
-        appAccount2DN
-      );
-      expect((result as any).searchEntries).to.have.lengthOf(1);
-      entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal(`testuser-${timestamp}_c87654321`); // UID unchanged
-      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
-      expect(entry.description).to.equal('My Laptop'); // Description preserved
+      // App accounts are dropped, not carried over: every MUA has to be
+      // reconfigured against the new address anyway. They used to be recreated
+      // without their password — unusable, yet listed and counted against
+      // max_app_accounts (#103).
+      for (const dn of [appAccount1DN, appAccount2DN]) {
+        await waitForNoEntry(dm, dn);
+        try {
+          await dm.ldap.search({ scope: 'base', paged: false }, dn);
+          expect.fail(`App account ${dn} should have been deleted`);
+        } catch (err: any) {
+          expect(err.message || err.code).to.match(/No such object|0x20/i);
+        }
+      }
 
       // Cleanup - ignore errors if already deleted
       try {
@@ -734,6 +787,56 @@ describe('App Accounts Consistency Plugin', function () {
       expect(() => new AppAccountsConsistency(dmTest)).to.throw(
         /applicative_account_base configuration is required/
       );
+    });
+
+    // An allowlist that omits objectClass or the mail attribute would produce
+    // entries the directory rejects, or entries this plugin can never find
+    // again through its mail-keyed searches. They are forced in.
+    it('should still create a valid entry when the allowlist omits objectClass and mail', async function () {
+      this.timeout(10000);
+
+      const dm2 = new DM();
+      dm2.config.ldap_base = process.env.DM_LDAP_BASE;
+      await dm2.ready;
+      dm2.config.applicative_account_base = applicativeBase;
+      dm2.config.mail_attribute = 'mail';
+      // Neither objectClass nor mail is named here
+      dm2.config.applicative_account_attribute = ['cn', 'sn'];
+
+      await dm2.registerPlugin('onLdapChange', new OnChange(dm2));
+      await dm2.registerPlugin(
+        'appAccountsConsistency',
+        new AppAccountsConsistency(dm2)
+      );
+
+      const userDn = `uid=strict-${timestamp},${userBase}`;
+      const appDn = `uid=strict-${timestamp}@example.com,${applicativeBase}`;
+      try {
+        await dm2.ldap.add(userDn, {
+          objectClass: 'inetOrgPerson',
+          uid: `strict-${timestamp}`,
+          cn: 'Strict User',
+          sn: 'User',
+          mail: `strict-${timestamp}@example.com`,
+        });
+
+        await waitForEntry(dm2, appDn);
+        const result = await dm2.ldap.search(
+          { scope: 'base', paged: false },
+          appDn
+        );
+        const entry = (result as any).searchEntries[0];
+        expect(entry.objectClass).to.contain('inetOrgPerson');
+        expect(entry.mail).to.equal(`strict-${timestamp}@example.com`);
+      } finally {
+        for (const dn of [appDn, userDn]) {
+          try {
+            await dm2.ldap.delete(dn);
+          } catch (err) {
+            // Ignore
+          }
+        }
+      }
     });
   });
 });

@@ -322,13 +322,28 @@ Empty means the plugin guards every path. Scoping several instances to different
 
 #### `core/twake/applicativeAccounts`
 
-| CLI                            | Plural                          | Env                              | Default       | Description                       |
-| ------------------------------ | ------------------------------- | -------------------------------- | ------------- | --------------------------------- |
-| `--applicative-account-base`   |                                 | `DM_APPLICATIVE_ACCOUNT_BASE`    |               | Applicative accounts base DN      |
-| `--max-app-accounts`           |                                 | `DM_MAX_APP_ACCOUNTS`            | `5`           | Max accounts per user             |
-| `--ldap-operational-attribute` | `--ldap-operational-attributes` | `DM_LDAP_OPERATIONAL_ATTRIBUTES` | _(see below)_ | Operational attributes to exclude |
+| CLI                               | Plural                             | Env                                 | Default       | Description                           |
+| --------------------------------- | ---------------------------------- | ----------------------------------- | ------------- | ------------------------------------- |
+| `--applicative-account-base`      |                                    | `DM_APPLICATIVE_ACCOUNT_BASE`       |               | Applicative accounts base DN          |
+| `--max-app-accounts`              |                                    | `DM_MAX_APP_ACCOUNTS`               | `5`           | Max accounts per user                 |
+| `--applicative-account-attribute` | `--applicative-account-attributes` | `DM_APPLICATIVE_ACCOUNT_ATTRIBUTES` | _(see below)_ | Attributes copied from the user entry |
+| `--ldap-operational-attribute`    | `--ldap-operational-attributes`    | `DM_LDAP_OPERATIONAL_ATTRIBUTES`    | _(see below)_ | Operational attributes to exclude     |
+
+Default copied attributes: `objectClass`, `cn`, `sn`, `givenName`, `displayName`, `description` — plus the configured mail attribute, always.
+
+This is an **allowlist**: an attribute the user entry carries but that is not
+named here is not copied into the applicative branch. That branch is only ever
+read to bind with `uid` and `userPassword`, so anything else has no reason to
+be duplicated there — and a new attribute added to the user schema later stays
+out unless someone opts in.
 
 Default operational attributes: `dn`, `controls`, `structuralObjectClass`, `entryUUID`, `entryDN`, `subschemaSubentry`, `modifyTimestamp`, `modifiersName`, `createTimestamp`, `creatorsName`, `userPassword`
+
+Operational attributes are only used when an applicative entry is **recreated
+from its own current state** (on a mail change): they are what the directory
+generates and would refuse on an `add`. `userPassword` is in that list on
+purpose — a mail change forces every client to be reconfigured anyway, so app
+accounts are deliberately reissued without a password.
 
 #### `core/twake/appAccountsConsistency`
 

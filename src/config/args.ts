@@ -232,6 +232,15 @@ export interface Config {
   // where `:user` is the LDAP uid — only safe when uid is unique directory-wide.
   // Generated app-account uids are prefixed from this (unique) value, sanitized.
   app_accounts_user_attribute?: string;
+  // Attributes copied from the user entry into the applicative entries. An
+  // allowlist: anything not named here stays out, so a new attribute on the
+  // user schema is never propagated by accident. The mail attribute is always
+  // added to this set (it is what the applicative entry is keyed on).
+  applicative_account_attribute?: string[];
+  // Attributes dropped from an existing applicative entry when it is recreated
+  // (mail change): the ones the directory generates and refuses on an `add`,
+  // plus `userPassword` — an app account is reconfigured on every client after
+  // a mail change anyway, so its password is deliberately not carried over.
   ldap_operational_attribute?: string[];
 
   // Trash plugin
@@ -609,6 +618,13 @@ const configArgs: ConfigTemplate = [
   // Applicative Accounts plugin
   ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
   ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
+  [
+    '--applicative-account-attribute',
+    'DM_APPLICATIVE_ACCOUNT_ATTRIBUTES',
+    ['objectClass', 'cn', 'sn', 'givenName', 'displayName', 'description'],
+    'array',
+    '--applicative-account-attributes',
+  ],
   [
     '--ldap-operational-attribute',
     'DM_LDAP_OPERATIONAL_ATTRIBUTES',
