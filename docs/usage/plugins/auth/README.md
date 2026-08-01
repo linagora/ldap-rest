@@ -59,6 +59,8 @@ ldap-rest \
 
 A token presented on `/api/admin` is refused, and a session presented on `/api/m` is refused too: each authentication plugin only sees the branch it was mounted on. Prefixes match on segment boundaries, so `/api/m` guards `/api/m` and `/api/m/entry` but never `/api/machines`.
 
+A prefix must be a string starting with `/`. Anything else — a number left in the JSON, an empty entry, a prefix without its leading slash — refuses to start rather than being skipped: a dropped entry shrinks what the plugin guards, which is the failure that leaves a branch open while the configuration still reads as if it were covered. `/` is not a prefix but the whole server, so a list containing it makes the plugin a catch-all: `["/", "/api/admin"]` guards everything, not only `/api/admin`.
+
 ### One branch apart, a token on everything else
 
 Leaving a plugin unscoped makes it the **catch-all**: it guards everything no scoped plugin claims. There is no list of "everything else" to write, and none to keep up to date when a route is added:

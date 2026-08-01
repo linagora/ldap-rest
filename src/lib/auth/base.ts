@@ -72,6 +72,9 @@ export function claimedPrefixes(
 export default abstract class AuthBase extends DmPlugin {
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
 
+  /** Validated prefixes, computed once: the catch-all reads them per request */
+  private _pathPrefixes?: string[];
+
   /**
    * Path prefixes this authentication applies to, empty when it guards the
    * whole server.
@@ -88,18 +91,59 @@ export default abstract class AuthBase extends DmPlugin {
    * A credential is then only valid on the branch it was scoped to, which is
    * the point: a leaked machine token buys nothing on the admin API.
    *
-   * @returns the configured prefixes, without trailing slashes
+   * A malformed entry is refused rather than skipped. Dropping one silently
+   * would shrink what the plugin guards — the failure mode that leaves a
+   * branch open while the configuration still reads as if it were covered.
+   *
+   * `/` is not a prefix but the whole server, so a list containing it makes
+   * the plugin a catch-all: `["/", "/api/admin"]` guards everything, not
+   * only `/api/admin`.
+   *
+   * @returns the configured prefixes without their trailing slashes, empty
+   *          when the plugin guards the whole server
+   * @throws Error when an entry is not a usable path prefix
    */
   get pathPrefixes(): string[] {
+    if (this._pathPrefixes) return this._pathPrefixes;
+
     const configured = this.config.auth_path_prefix;
     const list = Array.isArray(configured)
       ? configured
       : configured
         ? [configured]
         : [];
-    return list
-      .map(p => stripTrailingSlashes(p.trim()))
-      .filter(p => p.length > 0);
+
+    const prefixes: string[] = [];
+    for (const entry of list) {
+      // Plugin overrides are raw JSON, so an entry can be anything at all
+      if (typeof entry !== 'string')
+        throw new Error(
+          `${this.name}: auth_path_prefix must contain strings, got ` +
+            `${JSON.stringify(entry)}`
+        );
+
+      const trimmed = entry.trim();
+      const prefix = stripTrailingSlashes(trimmed);
+      if (prefix.length === 0) {
+        if (trimmed.length === 0)
+          throw new Error(
+            `${this.name}: auth_path_prefix contains an empty entry`
+          );
+        // Only slashes: the plugin guards everything, whatever else is listed
+        this.logger.info(
+          `${this.name}: auth_path_prefix contains "${trimmed}", which covers ` +
+            'the whole server: this authentication guards every path'
+        );
+        return (this._pathPrefixes = []);
+      }
+      if (!prefix.startsWith('/'))
+        throw new Error(
+          `${this.name}: auth_path_prefix entry "${entry}" must start with ` +
+            '"/", otherwise it matches no request and guards nothing'
+        );
+      prefixes.push(prefix);
+    }
+    return (this._pathPrefixes = prefixes);
   }
 
   api(app: Express): void {

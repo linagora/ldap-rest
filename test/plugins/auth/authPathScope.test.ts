@@ -107,6 +107,74 @@ describe('Authentication path scope', () => {
     });
   });
 
+  describe('malformed prefixes', () => {
+    let dm: DM;
+
+    before(async () => {
+      dm = new DM();
+      await dm.ready;
+    });
+
+    /**
+     * Read the prefixes of a token plugin configured with an arbitrary
+     * `auth_path_prefix`, as a plugin override would: the value comes from
+     * raw JSON and is validated nowhere upstream.
+     *
+     * @param prefix value to put in the configuration
+     * @returns a thunk reading the plugin's prefixes
+     */
+    const prefixesOf = (prefix: unknown) => (): string[] =>
+      new AuthToken(
+        dm.withConfig({
+          ...dm.config,
+          auth_token: ['t:name'],
+          auth_path_prefix: prefix as string | string[],
+        })
+      ).pathPrefixes;
+
+    it('should refuse an entry that is not a string', () => {
+      // Skipping it silently would shrink what the plugin guards
+      expect(prefixesOf(['/api/m', 42])).to.throw('must contain strings');
+      expect(prefixesOf([null])).to.throw('must contain strings');
+    });
+
+    it('should refuse an empty entry', () => {
+      expect(prefixesOf(['/api/m', '   '])).to.throw('empty entry');
+    });
+
+    it('should refuse a prefix that cannot match a request', () => {
+      // Express matches against a pathname, which always starts with a slash
+      expect(prefixesOf(['api/m'])).to.throw('must start with "/"');
+    });
+
+    it('should treat "/" as the whole server, not as a prefix', () => {
+      expect(prefixesOf('/')()).to.deep.equal([]);
+      expect(prefixesOf('///')()).to.deep.equal([]);
+    });
+
+    it('should keep a list containing "/" a catch-all', () => {
+      // ["/", "/api/admin"] means everything: reducing it to /api/admin would
+      // silently leave every other branch unguarded
+      expect(prefixesOf(['/', '/api/admin'])()).to.deep.equal([]);
+      expect(prefixesOf(['/api/admin', '/'])()).to.deep.equal([]);
+    });
+
+    it('should still guard everything when configured that way', async () => {
+      const { app } = await build([
+        { name: 'authSlash', token: machineToken, prefix: ['/', '/api/admin'] },
+      ]);
+      expect((await request(app).get('/api/hello')).status).to.equal(401);
+      expect((await request(app).get('/api/admin/hello')).status).to.equal(401);
+      expect(
+        (
+          await request(app)
+            .get('/api/hello')
+            .set('Authorization', `Bearer ${machineToken}`)
+        ).status
+      ).to.equal(200);
+    });
+  });
+
   describe('prefix boundaries', () => {
     let app: Express;
 
