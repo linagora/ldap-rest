@@ -129,6 +129,7 @@ ENV NODE_ENV=production \
  DM_TRASH_ADD_METADATA="true" \
  DM_TRASH_AUTO_CREATE="true" \
  DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini" \
+ DM_AUTH_PATH_PREFIX= \
  DM_AUTH_TOKENS= \
  DM_AUTH_TOTP= \
  DM_AUTH_TOTP_WINDOW="1" \
