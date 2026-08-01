@@ -82,7 +82,17 @@ export class DM {
   logger: winston.Logger;
   /** Authentication plugins, in registration order */
   authenticators: AuthBase[] = [];
-  private _authDispatcherMounted = false;
+  /**
+   * Held in an object, not a boolean field: `withConfig` copies own
+   * properties, so a plain flag would be duplicated per configured plugin and
+   * each clone would mount a dispatcher of its own — authentication running
+   * as many times as there are plugins, which a one-shot method like TOTP
+   * fails on the second pass. An object is copied by reference and stays
+   * shared.
+   */
+  private _authState: { dispatcherMounted: boolean } = {
+    dispatcherMounted: false,
+  };
   private _errorMiddlewareSetup: boolean = false;
   private _errorMiddleware?: express.ErrorRequestHandler;
 
@@ -208,8 +218,8 @@ export class DM {
 
   /** Mount the dispatcher layer if it is not mounted yet */
   private mountAuthDispatcherNow(): void {
-    if (this._authDispatcherMounted) return;
-    this._authDispatcherMounted = true;
+    if (this._authState.dispatcherMounted) return;
+    this._authState.dispatcherMounted = true;
     this.app.use((req, res, next) => {
       this.dispatchAuth(req, res, next);
     });

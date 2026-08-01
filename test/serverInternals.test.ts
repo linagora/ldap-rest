@@ -1,8 +1,12 @@
 import { expect } from 'chai';
+import request from 'supertest';
 
 import { DM } from '../src/bin';
 import HelloWorld from '../src/plugins/demo/helloworld';
 import RateLimit from '../src/plugins/auth/rateLimit';
+import AuthBase from '../src/lib/auth/base';
+import AuthToken from '../src/plugins/auth/token';
+import type { Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
@@ -73,6 +77,84 @@ describe('Server internals', () => {
       expect(typeof last.handle === 'function' && last.handle.length).to.equal(
         4
       );
+    });
+  });
+
+  describe('authentication dispatcher', () => {
+    /** An authenticator that lets everything through and counts its calls */
+    class CountingAuth extends AuthBase {
+      name = 'countingAuth';
+      roles: Role[] = ['auth'] as const;
+      calls = 0;
+      authMethod(_req: unknown, _res: unknown, next: () => void): void {
+        this.calls++;
+        next();
+      }
+    }
+
+    it('should authenticate a request once, whatever the plugin count', async () => {
+      const dm = new DM();
+      await dm.ready;
+
+      // Plugins configured with overrides get a server clone: a per-clone
+      // "already mounted" flag would mount one dispatcher each, and the
+      // request would be authenticated as many times — which a one-shot
+      // method such as TOTP fails on the second pass
+      const counters: CountingAuth[] = [];
+      for (const name of ['authA', 'authB', 'authC']) {
+        const plugin = new CountingAuth(dm.withConfig({ ...dm.config }));
+        counters.push(plugin);
+        await dm.registerPlugin('core/auth/counting', plugin, name);
+      }
+      await dm.registerPlugin(
+        'core/demo/helloworld',
+        new HelloWorld(dm),
+        'hello'
+      );
+
+      await request(dm.app).get('/api/hello');
+      // Three unscoped plugins compose as AND: each runs exactly once
+      expect(counters.map(c => c.calls)).to.deep.equal([1, 1, 1]);
+    });
+
+    it('should let every unscoped plugin refuse the request', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const passing = new CountingAuth(dm.withConfig({ ...dm.config }));
+      await dm.registerPlugin('core/auth/counting', passing, 'authPass');
+      await dm.registerPlugin(
+        'core/auth/token',
+        new AuthToken(
+          dm.withConfig({ ...dm.config, auth_token: ['secret:name'] })
+        ),
+        'authToken'
+      );
+      await dm.registerPlugin(
+        'core/demo/helloworld',
+        new HelloWorld(dm),
+        'hello'
+      );
+
+      // The token plugin still guards the path the other one lets through
+      expect((await request(dm.app).get('/api/hello')).status).to.equal(401);
+      expect(
+        (
+          await request(dm.app)
+            .get('/api/hello')
+            .set('Authorization', 'Bearer secret')
+        ).status
+      ).to.equal(200);
+    });
+
+    it('should leave a server with no authentication open', async () => {
+      const dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin(
+        'core/demo/helloworld',
+        new HelloWorld(dm),
+        'hello'
+      );
+      expect((await request(dm.app).get('/api/hello')).status).to.equal(200);
     });
   });
 
