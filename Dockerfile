@@ -123,6 +123,7 @@ ENV NODE_ENV=production \
  DM_RABBITMQ_URL= \
  DM_APPLICATIVE_ACCOUNT_BASE= \
  DM_MAX_APP_ACCOUNTS="5" \
+ DM_APPLICATIVE_ACCOUNT_ATTRIBUTES=objectClass,cn,sn,givenName,displayName,description \
  DM_LDAP_OPERATIONAL_ATTRIBUTES=dn,controls,structuralObjectClass,entryUUID,entryDN,subschemaSubentry,modifyTimestamp,modifiersName,createTimestamp,creatorsName,userPassword \
  DM_TRASH_BASE= \
  DM_TRASH_WATCHED_BASES= \
