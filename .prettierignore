@@ -1,6 +1,7 @@
 # Build files
 dist/
 build/
+helm/
 package.json
 
 # Dependencies

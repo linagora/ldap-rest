@@ -97,6 +97,12 @@ export interface Config {
   static_path?: string;
   static_name?: string;
 
+  // auth (all authentication plugins)
+  // A single prefix is accepted as a bare string: plugin overrides are raw
+  // JSON (`{"auth_path_prefix":"/api/m"}`) and never go through the array
+  // parsing that `--auth-path-prefix` and `DM_AUTH_PATH_PREFIX` apply
+  auth_path_prefix?: string | string[];
+
   // auth/llng
   llng_ini?: string;
 
@@ -633,6 +639,15 @@ const configArgs: ConfigTemplate = [
 
   // Lemonldap options
   ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
+
+  // Common to every authentication plugin: restrict it to path prefixes
+  [
+    '--auth-path-prefix',
+    'DM_AUTH_PATH_PREFIX',
+    [],
+    'array',
+    '--auth-path-prefixes',
+  ],
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],

@@ -37,6 +37,20 @@ export default class RateLimit extends DmPlugin {
   }
 
   api(app: Express): void {
+    // The limiter keys on the client IP taken from X-Forwarded-For, which a
+    // client can set to anything. That is only safe because trustedProxy —
+    // loaded first — strips the header on requests that do not come from a
+    // declared proxy. Without it, rotating the header defeats the limiter
+    // entirely and the brute-force protection is decorative, with nothing to
+    // show for it in the logs.
+    if (!this.server.loadedPlugins.trustedProxy)
+      this.logger.warn(
+        'Auth rate limiting keys on X-Forwarded-For but core/auth/trustedProxy ' +
+          'is not loaded: a client can forge that header and evade the limit. ' +
+          'Load core/auth/trustedProxy, or put the API behind a proxy that ' +
+          'overwrites the header.'
+      );
+
     // Middleware to check rate limits and track failed authentications
     app.use((req: Request, res: Response, next: NextFunction) => {
       const ip = this.getClientIp(req);

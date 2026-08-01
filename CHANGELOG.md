@@ -4,6 +4,29 @@
 
 ### Features
 
+- `lib/auth`: `--auth-path-prefix` restricts an authentication plugin to one or
+  more path prefixes. Populations rarely authenticate the same way — machines
+  carry a token, administrators arrive with an SSO session — and until now the
+  only way to serve both was two servers on two ports, because `AuthBase`
+  mounted its middleware on every path and the first plugin loaded decided for
+  everyone. Each plugin can now be scoped, and since any plugin can be loaded
+  twice under its own name, one server hosts `/api/m` behind a token and
+  `/api/admin` behind OIDC. A credential is only valid on the branch it was
+  scoped to: a leaked machine token buys nothing on the administration API.
+  Prefixes match on segment boundaries, so `/api/m` never catches
+  `/api/machines`. A plugin left unscoped is the catch-all: it guards
+  everything no scoped plugin claims, so "OIDC on /api/admin, token everywhere
+  else" needs no list of everywhere else — the kind of list nobody maintains
+  without forgetting a branch. Authentication is no longer a middleware each
+  plugin mounts for itself: the server mounts one dispatcher, after the guards
+  and the access log, before the first plugin able to register a route, and
+  authentication plugins register with it. Declaration order therefore no
+  longer decides what is protected, and the most specific claim wins, so two
+  plugins covering one request never compose as an AND no credential can
+  satisfy. The counterpart is that a route outside every prefix, with no
+  catch-all, is served without authentication, which no error would reveal, so
+  those routes are listed in a warning at startup
+
 - `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
   the directory — the phpLDAPadmin-shaped hole in an otherwise business-object
   API. The high-level plugins answer "who are the users of this group"; nothing
@@ -26,6 +49,31 @@
   filter search, with a demo page at `/static/ldap-browser.html`
 
 ### Bug fixes
+
+- `bin`: a plugin loaded with overrides (`module:name:{json}`) received a
+  crippled server. The view was built with `{...this}`, a spread that copies
+  own properties and leaves the prototype behind, so the plugin got the data —
+  config, hooks, app, ldap, registry — and none of the methods: any
+  `this.server.something()` threw, and only in that configuration. No existing
+  plugin had hit it because none called a server method
+
+- `bin`: `setupErrorMiddleware` looked the router stack up as `app._router`,
+  which Express 5 renamed to `app.router`. The lookup silently found nothing,
+  so the previous error handler was never removed and one more was appended on
+  every `registerPlugin`. Only the first ever ran, so nothing broke — the stack
+  just kept growing
+
+- `bin`: registering a plugin under a name already taken was reported at `info`
+  level and the instance was dropped, so its routes simply did not exist and
+  every request to them answered 404 with nothing in the log to explain why. It
+  is now a warning naming the plugin, saying the instance was dropped, and
+  showing how to load the same plugin twice
+
+- `plugins/auth/rateLimit`: warn when `core/auth/trustedProxy` is not loaded.
+  The limiter keys on `X-Forwarded-For`, which a client can set to anything;
+  that is only safe because `trustedProxy` strips the header on requests that
+  do not come from a declared proxy. Without it, rotating the header defeats
+  the limiter entirely and the brute-force protection is decorative
 
 - `plugins/twake/appAccountsApi`: never report a password operation that did not
   happen. Both endpoints kept the principal account — the entry services
