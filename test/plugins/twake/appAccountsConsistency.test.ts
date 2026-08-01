@@ -591,7 +591,7 @@ describe('App Accounts Consistency Plugin', function () {
       }
     });
 
-    it('should update all app accounts when user mail changes', async function () {
+    it('should delete app accounts when user mail changes', async function () {
       this.timeout(15000);
 
       // Create user with mail
@@ -688,32 +688,19 @@ describe('App Accounts Consistency Plugin', function () {
       expect(entry.uid).to.equal(`newemail-${timestamp}@example.com`);
       expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
 
-      // Verify app accounts kept their uid but changed mail
-      result = await dm.ldap.search(
-        {
-          scope: 'base',
-          paged: false,
-        },
-        appAccount1DN
-      );
-      expect((result as any).searchEntries).to.have.lengthOf(1);
-      entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal(`testuser-${timestamp}_c12345678`); // UID unchanged
-      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
-      expect(entry.description).to.equal('My Phone'); // Description preserved
-
-      result = await dm.ldap.search(
-        {
-          scope: 'base',
-          paged: false,
-        },
-        appAccount2DN
-      );
-      expect((result as any).searchEntries).to.have.lengthOf(1);
-      entry = (result as any).searchEntries[0];
-      expect(entry.uid).to.equal(`testuser-${timestamp}_c87654321`); // UID unchanged
-      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`); // Mail updated
-      expect(entry.description).to.equal('My Laptop'); // Description preserved
+      // App accounts are dropped, not carried over: every MUA has to be
+      // reconfigured against the new address anyway. They used to be recreated
+      // without their password — unusable, yet listed and counted against
+      // max_app_accounts (#103).
+      for (const dn of [appAccount1DN, appAccount2DN]) {
+        await waitForNoEntry(dm, dn);
+        try {
+          await dm.ldap.search({ scope: 'base', paged: false }, dn);
+          expect.fail(`App account ${dn} should have been deleted`);
+        } catch (err: any) {
+          expect(err.message || err.code).to.match(/No such object|0x20/i);
+        }
+      }
 
       // Cleanup - ignore errors if already deleted
       try {

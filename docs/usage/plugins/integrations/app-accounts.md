@@ -43,7 +43,8 @@ Instead of using a single primary password to access all services that authentic
 2. **App accounts consistency plugin** `core/twake/appAccountsConsistency` - **Required**
    - Automatically creates principal accounts (uid=mail@domain.com)
    - Ensures automatic cleanup when users are deleted
-   - Synchronizes mail changes across all app accounts
+   - Moves the principal account on a mail change, and drops the app accounts:
+     every MUA has to be reconfigured against the new address anyway
 3. **Applicative accounts base** configured in LDAP (e.g., `ou=applicative,dc=example,dc=com`)
 4. **Read access on `userPassword`** in that branch, for the bind DN
    (`--ldap-dn`) - **Required for deletion**

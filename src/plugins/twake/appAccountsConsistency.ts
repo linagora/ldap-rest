@@ -100,6 +100,36 @@ export default class AppAccountsConsistency extends DmPlugin {
   }
 
   /**
+   * Delete an entry of the applicative branch, tolerating its absence.
+   *
+   * A missing entry is the state we wanted, so `NoSuchObject` is not an error:
+   * it keeps the mail-change path idempotent when a hook fires twice.
+   *
+   * @param dn - DN of the applicative entry to remove
+   * @throws whatever the directory raised, except NoSuchObject
+   */
+  private async deleteApplicativeEntry(dn: string): Promise<void> {
+    try {
+      await this.server.ldap.delete(dn);
+      this.logger.info(`${this.name}: Deleted applicative account ${dn}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (deleteError: any) {
+      if (
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        deleteError.code === 0x20 ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        deleteError.message?.includes('NoSuchObject')
+      ) {
+        this.logger.debug(
+          `${this.name}: Applicative account ${dn} already deleted`
+        );
+        return;
+      }
+      throw deleteError;
+    }
+  }
+
+  /**
    * Select the attributes to copy from a user entry into an applicative entry.
    *
    * An allowlist (`--applicative-account-attribute`, plus the mail attribute):
@@ -371,14 +401,22 @@ export default class AppAccountsConsistency extends DmPlugin {
         // Distinguish between principal account (uid=mail) and applicative accounts (uid=username_cXXXXXXXX)
         const isPrincipalAccount = oldUid === oldMail;
 
-        // Compute new DN based on account type
-        let newApplicativeDn: string;
-        if (isPrincipalAccount) {
-          newApplicativeDn = `uid=${escapeDnValue(newMail)},${this.applicativeAccountBase}`;
-        } else {
-          // Keep the same uid for applicative accounts
-          newApplicativeDn = `uid=${escapeDnValue(oldUid)},${this.applicativeAccountBase}`;
+        // App accounts do not survive a mail change: every MUA has to be
+        // reconfigured against the new address anyway, and a per-device
+        // credential left bound to the old identity is a liability. Drop them
+        // and let the user reissue what they still need.
+        //
+        // They used to be recreated at the same DN carrying the new mail but
+        // without their password — entries that could not authenticate, were
+        // still listed by the API as if they could, and still counted against
+        // `max_app_accounts`, eventually locking the user out of creating new
+        // ones (#103).
+        if (!isPrincipalAccount) {
+          await this.deleteApplicativeEntry(oldApplicativeDn);
+          continue;
         }
+
+        const newApplicativeDn = `uid=${escapeDnValue(newMail)},${this.applicativeAccountBase}`;
 
         try {
           // Save old applicative account entry attributes before deletion
@@ -399,33 +437,11 @@ export default class AppAccountsConsistency extends DmPlugin {
           }
 
           // Delete old applicative account
-          try {
-            await this.server.ldap.delete(oldApplicativeDn);
-            this.logger.info(
-              `${this.name}: Deleted old applicative account ${oldApplicativeDn}`
-            );
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } catch (deleteError: any) {
-            // Ignore NoSuchObjectError (already deleted)
-            if (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-              deleteError.code === 0x20 ||
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-              deleteError.message?.includes('NoSuchObject')
-            ) {
-              this.logger.debug(
-                `${this.name}: Applicative account ${oldApplicativeDn} already deleted`
-              );
-            } else {
-              throw deleteError;
-            }
-          }
+          await this.deleteApplicativeEntry(oldApplicativeDn);
 
-          // Create new applicative account with updated mail. Start from the
-          // old entry's own attributes to keep what the user entry cannot
-          // supply — the per-device `description`, mostly. Not the password:
-          // a mail change forces every client to be reconfigured anyway, so
-          // the app accounts are deliberately reissued without one.
+          // Recreate the principal at its new DN. Start from the old entry's
+          // own attributes to keep what the user entry cannot supply, then
+          // overwrite with the fresh user values below.
           const newAttrs: AttributesList = { ...oldApplicativeAttrs };
 
           // Read the current user entry to get fresh user attributes
@@ -448,14 +464,8 @@ export default class AppAccountsConsistency extends DmPlugin {
           // Overwrite with fresh user attributes (cn, sn, givenName, mail, etc.)
           Object.assign(newAttrs, this.pickCopiedAttributes(userEntry));
 
-          // For principal account: change uid to newMail
-          // For applicative accounts: keep the same uid (username_cXXXXXXXX)
-          if (isPrincipalAccount) {
-            newAttrs.uid = newMail;
-          } else {
-            // Keep the same uid for applicative accounts
-            newAttrs.uid = oldUid;
-          }
+          // The principal account is keyed on the mail address
+          newAttrs.uid = newMail;
 
           await this.server.ldap.add(newApplicativeDn, newAttrs);
           this.logger.info(

@@ -9,6 +9,11 @@
   `--ldap-operational-attribute`. An attribute not named there is no longer
   copied into the applicative branch — name it to keep it (#103)
 
+- `plugins/twake/appAccountsConsistency`: a mail change now deletes the app
+  accounts instead of recreating them without their password. They could not
+  authenticate, yet were still listed and still counted against
+  `--max-app-accounts` (#103)
+
 ### Security
 
 - `lib/utils`: a DN read from a JSON body was parsed by looping on its
