@@ -399,6 +399,12 @@ export default class LdapGroups extends DmPlugin {
           member: string | string[];
         };
         if (!body) return;
+        const members = Array.isArray(body.member)
+          ? body.member
+          : [body.member];
+        if (members.some(m => typeof m !== 'string')) {
+          throw new BadRequestError('member must be a string or string array');
+        }
         await tryMethod(res, this.addMember.bind(this), cn, body.member);
       })
     );
@@ -473,6 +479,9 @@ export default class LdapGroups extends DmPlugin {
             targetOrgDn: string;
           };
           if (!body) return;
+          if (typeof body.targetOrgDn !== 'string') {
+            throw new BadRequestError('targetOrgDn must be a string');
+          }
           await tryMethod(
             res,
             this.moveGroup.bind(this),
@@ -518,6 +527,9 @@ export default class LdapGroups extends DmPlugin {
           newCn: string;
         };
         if (!body) return;
+        if (typeof body.newCn !== 'string') {
+          throw new BadRequestError('newCn must be a string');
+        }
         await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn);
       })
     );

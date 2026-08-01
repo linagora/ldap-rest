@@ -4,6 +4,14 @@
 
 ### Security
 
+- `lib/utils`: a DN read from a JSON body was parsed by looping on its
+  `.length`, so `{"length": 1e100}` hung the worker (CWE-834). `parseDn()` and
+  `unescapeDnValue()` now answer 400 on a non-string
+
+- `plugins/ldap/groups`: `member`, `targetOrgDn` and `newCn` were forwarded
+  without a type check, unlike the equivalent organization and flat-branch
+  endpoints; a non-string now gets a 400
+
 - `lsc-plugin`: jackson-databind 2.17.2 → 2.22.1, clearing five advisories
   (CVE-2026-54512, CVE-2026-54513, CVE-2026-54514, CVE-2026-54515,
   CVE-2026-59888)
