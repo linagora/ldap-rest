@@ -71,7 +71,6 @@ export class UnitTree {
       return;
     }
 
-    // eslint-disable-next-line no-undef
     const ouName = prompt(
       'Enter the name for the new organizational unit (ou):'
     );

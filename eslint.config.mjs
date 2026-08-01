@@ -5,6 +5,7 @@ import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import nodePlugin from 'eslint-plugin-node';
+import globals from 'globals';
 
 export default [
   // Node.js config
@@ -21,13 +22,10 @@ export default [
         sourceType: 'module',
         project: './tsconfig.json',
       },
-      globals: {
-        console: 'readonly',
-        process: 'readonly',
-        Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-      },
+      // The published lists rather than a hand-kept one: every name missing
+      // from it surfaces as a `no-undef` error on correct code, which is how
+      // `crypto`, `setInterval` and `clearInterval` ended up reported
+      globals: globals.node,
     },
     plugins: {
       '@typescript-eslint': tseslint,
@@ -91,18 +89,7 @@ export default [
         sourceType: 'module',
         project: './tsconfig.json',
       },
-      globals: {
-        console: 'readonly',
-        document: 'readonly',
-        window: 'readonly',
-        fetch: 'readonly',
-        HTMLElement: 'readonly',
-        CustomEvent: 'readonly',
-        alert: 'readonly',
-        confirm: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-      },
+      globals: globals.browser,
     },
     plugins: {
       '@typescript-eslint': tseslint,

@@ -259,7 +259,6 @@ export default class James extends TwakePlugin {
 
       // Wait for James to create the user (configurable delay)
       if (this.initDelay > 0) {
-        // eslint-disable-next-line no-undef -- setTimeout is a Node.js global
         await new Promise(resolve => setTimeout(resolve, this.initDelay));
       }
 

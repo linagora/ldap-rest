@@ -1075,9 +1075,9 @@ export default class LdapOrganizations extends DmPlugin {
         targetOrgDn
       )) as SearchResult;
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new NotFoundError(
-        `Target organization ${targetOrgDn} not found: ${err}`
+        `Target organization ${targetOrgDn} not found: ` +
+          `${err instanceof Error ? err.message : String(err)}`
       );
     }
     if (!targetOrg.searchEntries || targetOrg.searchEntries.length === 0) {
