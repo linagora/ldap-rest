@@ -152,6 +152,72 @@ describe('App Accounts Consistency Plugin', function () {
       expect(entry.cn).to.equal('Test User');
     });
 
+    // The applicative branch is only ever read to bind with uid/userPassword,
+    // so an attribute the user entry happens to carry has no reason to be
+    // duplicated there. Copying used to be a denylist, which meant every new
+    // attribute on the user schema was propagated until someone remembered to
+    // exclude it (#103).
+    it('should not copy user attributes outside the configured allowlist', async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+        // Not in --applicative-account-attribute
+        telephoneNumber: '+33123456789',
+        title: 'Chief Secret Keeper',
+      });
+
+      await waitForEntry(dm, testApplicativeDN);
+
+      const result = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        testApplicativeDN
+      );
+      const entry = (result as any).searchEntries[0];
+
+      // Allowlisted attributes are still there
+      expect(entry.cn).to.equal('Test User');
+      expect(entry.sn).to.equal('User');
+      expect(entry.mail).to.equal(`testuser-${timestamp}@example.com`);
+      // The rest stayed on the user entry
+      expect(entry).to.not.have.property('telephoneNumber');
+      expect(entry).to.not.have.property('title');
+    });
+
+    // Same guarantee on the mail-change path, which re-reads the user entry
+    // and recreates the applicative one: this is how `twakeRecoveryEmail`
+    // ended up in 18 applicative entries (#103).
+    it('should not copy attributes outside the allowlist on a mail change', async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+        telephoneNumber: '+33123456789',
+      });
+      await waitForEntry(dm, testApplicativeDN);
+
+      await dm.ldap.modify(testUserDN, {
+        replace: { mail: `newemail-${timestamp}@example.com` },
+      });
+
+      const newApplicativeDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
+      await waitForEntry(dm, newApplicativeDN);
+
+      const result = await dm.ldap.search(
+        { scope: 'base', paged: false },
+        newApplicativeDN
+      );
+      const entry = (result as any).searchEntries[0];
+
+      expect(entry.mail).to.equal(`newemail-${timestamp}@example.com`);
+      expect(entry.cn).to.equal('Test User');
+      expect(entry).to.not.have.property('telephoneNumber');
+    });
+
     it('should be idempotent when creating applicative account multiple times', async () => {
       // Create user with mail
       const userAttrs = {

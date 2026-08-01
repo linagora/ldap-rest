@@ -46,6 +46,7 @@ export default class AppAccountsConsistency extends DmPlugin {
   private mailAttr: string;
   private applicativeAccountBase: string;
   private operationalAttributes: string[];
+  private copiedAttributes: Set<string>;
 
   constructor(server: DM) {
     super(server);
@@ -56,6 +57,12 @@ export default class AppAccountsConsistency extends DmPlugin {
       .applicative_account_base as string;
     this.operationalAttributes =
       (this.config.ldap_operational_attribute as string[]) || [];
+    // The mail attribute is what the applicative entry is keyed on, so it is
+    // always copied whatever the configured list says.
+    this.copiedAttributes = new Set([
+      ...((this.config.applicative_account_attribute as string[]) || []),
+      this.mailAttr,
+    ]);
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -69,7 +76,18 @@ export default class AppAccountsConsistency extends DmPlugin {
   }
 
   /**
-   * Check if an attribute should be excluded when copying LDAP entry attributes
+   * Check if an attribute should be excluded when recreating an existing
+   * applicative entry from its own current state.
+   *
+   * This is a denylist because the input is an entry we wrote ourselves: what
+   * has to go is what the directory generates and would refuse on an `add`,
+   * plus `userPassword` (an app account is reconfigured on every client after
+   * a mail change anyway, so its password is deliberately not carried over).
+   *
+   * Attributes coming from the *user* entry are chosen by
+   * {@link pickCopiedAttributes} instead — an allowlist, so that a new
+   * attribute on the user schema is never propagated by accident.
+   *
    * @param key - The attribute name to check
    * @returns true if the attribute should be excluded
    */
@@ -79,6 +97,31 @@ export default class AppAccountsConsistency extends DmPlugin {
     // cannot lead to "LDAP add error: UndefinedTypeError: dn" failures.
     if (key === 'dn') return true;
     return this.operationalAttributes.includes(key);
+  }
+
+  /**
+   * Select the attributes to copy from a user entry into an applicative entry.
+   *
+   * An allowlist (`--applicative-account-attribute`, plus the mail attribute):
+   * the applicative branch is only ever read to bind with `uid` and
+   * `userPassword`, so anything else the user entry happens to carry —
+   * recovery addresses, e2ee key material, whatever the schema grows next —
+   * has no reason to be duplicated there.
+   *
+   * @param entry - The source user entry
+   * @returns The subset worth copying, empty values dropped
+   */
+  private pickCopiedAttributes(entry: AttributesList): AttributesList {
+    const picked: AttributesList = {};
+    for (const [key, value] of Object.entries(entry)) {
+      if (!this.copiedAttributes.has(key)) continue;
+      // Skip empty values
+      if (value === undefined || value === null) continue;
+      // Skip empty arrays
+      if (Array.isArray(value) && value.length === 0) continue;
+      picked[key] = value;
+    }
+    return picked;
   }
 
   /**
@@ -190,24 +233,9 @@ export default class AppAccountsConsistency extends DmPlugin {
         return;
       }
 
-      // Create applicative account entry with same attributes but uid changed to mail
-      // Filter out operational attributes and userPassword (let API set passwords separately)
-      const applicativeAttrs: AttributesList = {};
-      for (const [key, value] of Object.entries(userEntry)) {
-        // Skip operational attributes
-        if (this.shouldExcludeAttribute(key)) {
-          continue;
-        }
-        // Skip empty values
-        if (value === undefined || value === null) {
-          continue;
-        }
-        // Skip empty arrays
-        if (Array.isArray(value) && value.length === 0) {
-          continue;
-        }
-        applicativeAttrs[key] = value;
-      }
+      // Create the applicative entry from the named subset of the user entry.
+      // No password is set here: the app-account API issues one per device.
+      const applicativeAttrs = this.pickCopiedAttributes(userEntry);
 
       // Update uid to mail
       applicativeAttrs.uid = mail;
@@ -393,8 +421,11 @@ export default class AppAccountsConsistency extends DmPlugin {
             }
           }
 
-          // Create new applicative account with updated mail
-          // Start with old applicative account attributes to preserve things like description, userPassword
+          // Create new applicative account with updated mail. Start from the
+          // old entry's own attributes to keep what the user entry cannot
+          // supply — the per-device `description`, mostly. Not the password:
+          // a mail change forces every client to be reconfigured anyway, so
+          // the app accounts are deliberately reissued without one.
           const newAttrs: AttributesList = { ...oldApplicativeAttrs };
 
           // Read the current user entry to get fresh user attributes
@@ -415,21 +446,7 @@ export default class AppAccountsConsistency extends DmPlugin {
           }
 
           // Overwrite with fresh user attributes (cn, sn, givenName, mail, etc.)
-          for (const [key, value] of Object.entries(userEntry)) {
-            // Skip operational attributes
-            if (this.shouldExcludeAttribute(key)) {
-              continue;
-            }
-            // Skip empty values
-            if (value === undefined || value === null) {
-              continue;
-            }
-            // Skip empty arrays
-            if (Array.isArray(value) && value.length === 0) {
-              continue;
-            }
-            newAttrs[key] = value;
-          }
+          Object.assign(newAttrs, this.pickCopiedAttributes(userEntry));
 
           // For principal account: change uid to newMail
           // For applicative accounts: keep the same uid (username_cXXXXXXXX)

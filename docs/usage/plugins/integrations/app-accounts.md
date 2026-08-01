@@ -295,7 +295,7 @@ sync-app-accounts --help
    - Secure random password
 4. Plugin creates applicative account in LDAP:
    - `uid=alice_c12345678,ou=applicative,dc=example,dc=com`
-   - Copies attributes from user (cn, sn, mail, etc.)
+   - Copies the allowlisted attributes from the user (`--applicative-account-attribute`)
    - Sets generated password
 5. Plugin adds password to principal account:
    - `uid=alice@example.com,ou=applicative,dc=example,dc=com`

@@ -484,14 +484,17 @@ export default class AppAccountsApi extends DmPlugin {
         userPassword: newPassword,
       };
 
-      // Copy relevant attributes from user
+      // Copy relevant attributes from user. Same allowlist as
+      // appAccountsConsistency (`--applicative-account-attribute`) so the two
+      // plugins build applicative entries the same way, minus the two this
+      // method sets itself: `objectClass` is forced to inetOrgPerson above,
+      // and `description` carries the caller-supplied label.
       const attrsToCopy = [
-        'cn',
-        'sn',
-        'givenName',
-        this.mailAttr,
-        'displayName',
-      ];
+        ...new Set([
+          ...((this.config.applicative_account_attribute as string[]) || []),
+          this.mailAttr,
+        ]),
+      ].filter(attr => attr !== 'objectClass' && attr !== 'description');
       for (const attr of attrsToCopy) {
         if (userEntry[attr]) {
           const value = userEntry[attr];
