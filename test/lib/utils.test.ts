@@ -11,6 +11,7 @@ import {
   normalizeDn,
   isDnInBranch,
 } from '../../src/lib/utils';
+import { BadRequestError } from '../../src/lib/errors';
 
 describe('LDAP Utils', () => {
   describe('escapeDnValue', () => {
@@ -67,6 +68,12 @@ describe('LDAP Utils', () => {
 
     it('should unescape multiple special characters', () => {
       expect(unescapeDnValue('a\\,b\\+c\\=d')).to.equal('a,b+c=d');
+    });
+
+    it('should reject a non-string with a forged length', () => {
+      expect(() =>
+        unescapeDnValue({ length: 1e100 } as unknown as string)
+      ).to.throw(BadRequestError, 'must be a string');
     });
 
     it('should unescape leading space', () => {
@@ -223,6 +230,30 @@ describe('LDAP Utils', () => {
         'dc=example',
         'dc=com',
       ]);
+    });
+
+    // CWE-834: a JSON body can forge `.length`, e.g. {"dn": {"length": 1e100}},
+    // which would drive the parsing loop for 10^100 iterations.
+    it('should reject a non-string with a forged length instead of looping', () => {
+      const forged = { length: 1e100 } as unknown as string;
+      expect(() => parseDn(forged)).to.throw(
+        BadRequestError,
+        'must be a string'
+      );
+      expect(() => getParentDn(forged)).to.throw(BadRequestError);
+      expect(() => normalizeDn(forged)).to.throw(BadRequestError);
+      expect(() => isDnInBranch(forged, 'dc=example,dc=com')).to.throw(
+        BadRequestError
+      );
+    });
+
+    it('should answer with a 400 status code', () => {
+      try {
+        parseDn(undefined as unknown as string);
+        expect.fail('parseDn should have thrown');
+      } catch (err) {
+        expect((err as BadRequestError).statusCode).to.equal(400);
+      }
     });
   });
 

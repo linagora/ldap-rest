@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import type { Config } from '../bin';
 
+import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
 
 const logger = getLogger();
@@ -188,8 +189,16 @@ export function escapeDnValue(value: string): string {
  * unescapeDnValue('user\\+admin')
  * // => 'user+admin'
  * ```
+ *
+ * @throws BadRequestError if `value` is not a string
  */
 export function unescapeDnValue(value: string): string {
+  // Same unbounded-loop hazard as {@link parseDn}: the loop below is driven by
+  // `value.length`, which a JSON body can forge.
+  if (typeof value !== 'string') {
+    throw new BadRequestError('DN value must be a string');
+  }
+
   let result = '';
   let i = 0;
 
@@ -277,8 +286,21 @@ export function validateDnValue(value: string, fieldName: string): void {
  * parseDn('cn=Smith\\, John,ou=users,dc=example,dc=com')
  * // => ['cn=Smith\\, John', 'ou=users', 'dc=example', 'dc=com']
  * ```
+ *
+ * @throws BadRequestError if `dn` is not a string
  */
 export function parseDn(dn: string): string[] {
+  // DNs reach us straight from JSON request bodies, where the declared
+  // `string` type is a compile-time promise only. An object such as
+  // `{"length": 1e100}` would drive the loop below for 10^100 iterations
+  // (CWE-834), so refuse anything that is not a real string: its length is
+  // then bounded by the body-size limit. Callers already relied on this
+  // throwing (it used to be an opaque TypeError); a BadRequestError just
+  // turns the 500 into the 400 it always should have been.
+  if (typeof dn !== 'string') {
+    throw new BadRequestError('DN must be a string');
+  }
+
   const parts: string[] = [];
   let current = '';
   let escaped = false;
