@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `lsc-plugin`: jackson-databind 2.17.2 → 2.22.1, clearing five advisories
+  (CVE-2026-54512, CVE-2026-54513, CVE-2026-54514, CVE-2026-54515,
+  CVE-2026-59888)
+
 ## v0.5.0 (2026-08-01)
 
 ### Features
