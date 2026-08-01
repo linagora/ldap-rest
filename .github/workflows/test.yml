@@ -39,8 +39,12 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-      - name: Run tests
-        run: npm run test
+      # Runs the suite once and gates on coverage at the same time, rather
+      # than running it twice. The threshold covers server code only: the
+      # browser libraries have no DOM in the suite, so a global number would
+      # mix two very different situations into one meaningless figure.
+      - name: Run tests and check coverage
+        run: npm run coverage:check
 
   lsc-plugin-test:
     runs-on: ubuntu-latest

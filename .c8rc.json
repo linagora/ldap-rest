@@ -1,0 +1,17 @@
+{
+  "all": true,
+  "src": ["src"],
+  "extension": [".ts"],
+  "reporter": ["text-summary", "html", "lcov"],
+  "report-dir": "coverage",
+  "exclude": [
+    "**/*.d.ts",
+    "src/hooks.ts",
+    "src/config/schema.ts",
+    "src/**/types.ts",
+    "src/browser/shared/types/index.ts",
+    "test/**",
+    "dist/**"
+  ],
+  "skip-full": false
+}

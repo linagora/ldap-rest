@@ -430,6 +430,33 @@ source ~/.test-env && npm run test:dev
 source ~/.test-env && npm run test:one test/plugins/ldap/groups.test.ts
 ```
 
+### Coverage
+
+```bash
+# Full report, browser libraries included: coverage/index.html
+npm run coverage
+
+# What CI enforces: server code only, fails below the thresholds
+npm run coverage:check
+```
+
+`coverage:check` runs the suite once and gates on the result, so CI does not
+run the tests twice. It covers `src` **minus `src/browser`**, and minus the
+files that hold nothing but type declarations (`hooks.ts`, `config/schema.ts`,
+`**/types.ts`), which otherwise report 0% and drag the figure down without
+meaning anything.
+
+Current thresholds — statements and lines 84%, branches 75%, functions 86% —
+sit two to three points under the measured values. They exist to catch drift,
+not to force a number: raise them when the real figure moves up, and if a
+change makes them fail, the honest fix is usually a missing test rather than a
+lower threshold.
+
+**The browser libraries are deliberately outside the gate.** The suite has no
+DOM, so those files sit around 24% while server code is at 86%; a single global
+figure would average two unrelated situations into something nobody can act on.
+`npm run coverage` still reports them, so the gap stays visible.
+
 ### Writing Tests
 
 Create test files in `test/` directory:
