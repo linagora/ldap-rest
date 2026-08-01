@@ -1,95 +1,55 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (2026-08-01)
 
 ### Features
 
-- `lib/auth`: `--auth-path-prefix` restricts an authentication plugin to one or
-  more path prefixes. Populations rarely authenticate the same way — machines
-  carry a token, administrators arrive with an SSO session — and until now the
-  only way to serve both was two servers on two ports, because `AuthBase`
-  mounted its middleware on every path and the first plugin loaded decided for
-  everyone. Each plugin can now be scoped, and since any plugin can be loaded
-  twice under its own name, one server hosts `/api/m` behind a token and
-  `/api/admin` behind OIDC. A credential is only valid on the branch it was
-  scoped to: a leaked machine token buys nothing on the administration API.
-  Prefixes match on segment boundaries, so `/api/m` never catches
-  `/api/machines`. A plugin left unscoped is the catch-all: it guards
-  everything no scoped plugin claims, so "OIDC on /api/admin, token everywhere
-  else" needs no list of everywhere else — the kind of list nobody maintains
-  without forgetting a branch. Authentication is no longer a middleware each
-  plugin mounts for itself: the server mounts one dispatcher, after the guards
-  and the access log, before the first plugin able to register a route, and
-  authentication plugins register with it. Declaration order therefore no
-  longer decides what is protected, and the most specific claim wins, so two
-  plugins covering one request never compose as an AND no credential can
-  satisfy. The counterpart is that a route outside every prefix, with no
-  catch-all, is served without authentication, which no error would reveal, so
-  those routes are listed in a warning at startup
+- `plugins/ldap/raw` + `browser/ldap-browser`: read-only low-level browsing of
+  the directory — root DSE, parsed schema (RFC 4512, `SUP` chains resolved),
+  any entry by DN with its operational attributes, the children of a node, and
+  arbitrary searches. Access is bounded by `--ldap-raw-base`, narrowed by the
+  authorization plugins, and credential attributes (`userPassword` and its
+  Samba, Kerberos and AD counterparts) are stripped unless
+  `--ldap-raw-show-secrets` says otherwise. The browser library ships a tree, a
+  schema-annotated attribute table and a filter search, demo page at
+  `/static/examples/web/ldap-browser.html`
 
-- `plugins/ldap/raw` + `browser/ldap-browser`: low-level, read-only browsing of
-  the directory — the phpLDAPadmin-shaped hole in an otherwise business-object
-  API. The high-level plugins answer "who are the users of this group"; nothing
-  answered "what is actually stored under this DN", which is what an
-  administrator needs when the data does not match the model. The plugin serves
-  the root DSE, the parsed schema, any entry by DN (operational attributes
-  included, binary values base64-encoded and flagged), the direct children of a
-  node, and arbitrary searches. Everything goes through `server.ldap`, so the
-  authorization, trash and logging hooks apply unchanged; access is bounded by
-  `--ldap-raw-base` (403 outside), narrowed by the authz plugins, and credential
-  attributes (`userPassword` and its Samba, Kerberos and AD counterparts) are
-  stripped from every response unless `--ldap-raw-show-secrets` says otherwise —
-  a hash served over HTTP is an offline cracking target, and browsing does not
-  need it. `--ldap-raw-hidden-attribute` adds site-specific ones. Root DSE
-  and schema are read with the service account — they are directory metadata,
-  and a UI that cannot name and type attributes is useless. The new
-  `lib/ldapSchema` parses RFC 4512 definitions and resolves `SUP` chains, so
-  both sides can tell which attributes an entry must and may carry. The browser
-  library `ldap-browser` ships a tree, a schema-annotated attribute table and a
-  filter search, with a demo page at `/static/ldap-browser.html`
+- `lib/auth`: `--auth-path-prefix` scopes an authentication plugin to path
+  prefixes, so one server can serve populations that authenticate differently —
+  `/api/m` behind a token, `/api/admin` behind OIDC. A credential is only valid
+  on the branch it was scoped to, and a plugin left unscoped guards everything
+  no other plugin claims. Authentication is dispatched from a single layer the
+  server mounts, so declaration order no longer decides what is protected and
+  the most specific claim wins. A route outside every prefix with no unscoped
+  plugin is served without authentication: those routes are named in a warning
+  at startup. Plugins extending `AuthBase` no longer mount a middleware of
+  their own: `api()` registers them with the dispatcher, so a third-party
+  plugin that called `super.api(app)` keeps working, but one that relied on
+  where its layer sat in the stack no longer can
 
 ### Bug fixes
 
 - `bin`: a plugin loaded with overrides (`module:name:{json}`) received a
-  crippled server. The view was built with `{...this}`, a spread that copies
-  own properties and leaves the prototype behind, so the plugin got the data —
-  config, hooks, app, ldap, registry — and none of the methods: any
-  `this.server.something()` threw, and only in that configuration. No existing
-  plugin had hit it because none called a server method
+  server view built by spreading, so it carried the data but none of the
+  methods and any `this.server.something()` threw
 
-- `bin`: `setupErrorMiddleware` looked the router stack up as `app._router`,
-  which Express 5 renamed to `app.router`. The lookup silently found nothing,
-  so the previous error handler was never removed and one more was appended on
-  every `registerPlugin`. Only the first ever ran, so nothing broke — the stack
-  just kept growing
+- `bin`: the error middleware was never replaced, only stacked — the lookup
+  used Express 4's `app._router`, which Express 5 renamed
 
-- `bin`: registering a plugin under a name already taken was reported at `info`
-  level and the instance was dropped, so its routes simply did not exist and
-  every request to them answered 404 with nothing in the log to explain why. It
-  is now a warning naming the plugin, saying the instance was dropped, and
-  showing how to load the same plugin twice
+- `bin`: a plugin registered under a name already taken was dropped at `info`
+  level, so its routes answered 404 with nothing in the log to explain it; now
+  a warning naming the plugin and how to load one twice
 
-- `plugins/auth/rateLimit`: warn when `core/auth/trustedProxy` is not loaded.
-  The limiter keys on `X-Forwarded-For`, which a client can set to anything;
-  that is only safe because `trustedProxy` strips the header on requests that
-  do not come from a declared proxy. Without it, rotating the header defeats
-  the limiter entirely and the brute-force protection is decorative
+- `plugins/auth/rateLimit`: warn when `core/auth/trustedProxy` is absent. The
+  limiter keys on `X-Forwarded-For`, which is forgeable without it, and the
+  brute-force protection is then decorative
 
-- `plugins/twake/appAccountsApi`: never report a password operation that did not
-  happen. Both endpoints kept the principal account — the entry services
-  actually bind against — in sync with a `logger.warn` and a
-  `// Not critical, continue`, so two failures were invisible: a `POST` whose
-  principal update failed returned `200` with a password that authenticates
-  nowhere, and a `DELETE` unable to read the account's `userPassword` deleted
-  the app account while leaving its credential valid on the principal — a
-  revocation that silently does not revoke, the kind of defect only an audit
-  finds. `POST` now rolls the app account back and returns `500`; `DELETE`
-  returns `500` and **keeps** the account so the call stays replayable once the
-  cause is fixed — a password already absent from the principal is treated as
-  revoked, so a retry after a partial failure still completes. `userPassword` is
-  also requested explicitly instead of relying on it being returned as part of
-  "all user attributes", and the documentation now states the ACL the bind DN
-  needs on the applicative branch (#105)
+- `plugins/twake/appAccountsApi`: never report a password operation that did
+  not happen. `POST` used to return `200` with a password that authenticated
+  nowhere when the principal update failed, and `DELETE` removed an app account
+  while leaving its credential valid. Both now return `500`; `DELETE` keeps the
+  account so the call stays replayable, and a password already absent counts as
+  revoked (#105)
 
 ### Internal
 
