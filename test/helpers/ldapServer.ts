@@ -58,6 +58,82 @@ export class LdapTestServer {
   }
 
   /**
+   * Run a command that talks to the container's `ldapi:///` socket, retrying
+   * while the socket is unreachable.
+   *
+   * `waitForLdapi` proves the socket answered *once*; it cannot promise it
+   * still answers a moment later. The osixia image bootstraps by starting
+   * slapd, configuring it and restarting it, so a check that passed is
+   * routinely followed by a window where the socket is gone and the command
+   * fails with `Can't contact LDAP server (-1)` — the check-then-use race
+   * that made the suite fail on a loaded machine, or simply when another
+   * container was still running.
+   *
+   * Only connection failures are retried. Anything the directory actually
+   * answered — a duplicate schema, a syntax error — is reported at once.
+   *
+   * @param command command to run
+   * @param what named in the error, to say which step gave up
+   * @param maxAttempts how many times to try before failing
+   * @returns the command output
+   * @throws Error when the command keeps failing
+   */
+  private async execLdapi(
+    command: string,
+    what: string,
+    maxAttempts = 10
+  ): Promise<string> {
+    let lastError = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return execSync(command, { encoding: 'utf-8' });
+      } catch (err) {
+        const e = err as { stderr?: Buffer; message?: string };
+        lastError = e.stderr?.toString() || e.message || '';
+        const unreachable =
+          lastError.includes("Can't contact LDAP server") ||
+          lastError.includes('ldap_sasl_interactive_bind_s');
+        if (!unreachable) throw err;
+        if (attempt < maxAttempts)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    throw new Error(
+      `${what}: ldapi:/// stayed unreachable after ${maxAttempts} attempts: ${lastError}`
+    );
+  }
+
+  /**
+   * Remove containers left behind by interrupted runs.
+   *
+   * Every run names its container after the moment it started, so nothing
+   * ever removed the previous one: they piled up, competed for the machine,
+   * and made the next run fail during schema loading — with an error naming
+   * LDAP rather than the leftovers. Only containers older than an hour are
+   * removed, so a suite running in parallel is never touched.
+   */
+  private static cleanupOrphans(): void {
+    try {
+      const names = execSync(
+        'docker ps -aq --filter "name=ldap-test-" --format "{{.Names}}"',
+        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }
+      )
+        .split('\n')
+        .filter(Boolean);
+      const hourAgo = Date.now() - 3600_000;
+      const stale = names.filter(name => {
+        const started = parseInt(name.replace('ldap-test-', ''), 10);
+        return !isNaN(started) && started < hourAgo;
+      });
+      if (stale.length === 0) return;
+      console.log(`Removing ${stale.length} orphaned LDAP container(s)...`);
+      execSync(`docker rm -f ${stale.join(' ')}`, { stdio: 'ignore' });
+    } catch {
+      // Docker missing or unreadable: start() reports it with a clearer message
+    }
+  }
+
+  /**
    * Start the LDAP server
    */
   async start(): Promise<void> {
@@ -71,6 +147,8 @@ export class LdapTestServer {
         'Docker is not available. Please install Docker to run LDAP tests.'
       );
     }
+
+    LdapTestServer.cleanupOrphans();
 
     // Stop any existing container with the same name
     try {
@@ -124,9 +202,9 @@ export class LdapTestServer {
         execSync(
           `docker cp ${mailSchemaPath} ${this.containerName}:/tmp/mail-schema.ldif`
         );
-        const result = execSync(
+        const result = await this.execLdapi(
           `docker exec ${this.containerName} ldapadd -Y EXTERNAL -H ldapi:/// -f /tmp/mail-schema.ldif`,
-          { encoding: 'utf-8' }
+          'mail schema'
         );
         console.log(`✓ Mail schema loaded`);
         if (result && result.trim()) {
@@ -148,9 +226,9 @@ export class LdapTestServer {
     // Load dyngroup schema (required for groupOfURLs objectClass used by twakeDynamicGroup)
     try {
       console.log(`Loading dyngroup schema...`);
-      const result = execSync(
+      const result = await this.execLdapi(
         `docker exec ${this.containerName} ldapadd -Y EXTERNAL -H ldapi:/// -f /etc/ldap/schema/dyngroup.ldif`,
-        { encoding: 'utf-8' }
+        'dyngroup schema'
       );
       console.log(`✓ Dyngroup schema loaded`);
       if (result && result.trim()) {
@@ -172,9 +250,9 @@ export class LdapTestServer {
     // Try to use the official schema from the container first
     try {
       console.log(`Attempting to load official Twake schema...`);
-      const result = execSync(
+      const result = await this.execLdapi(
         `docker exec ${this.containerName} sh -c "if [ -f /usr/local/openldap/etc/openldap/schema/twake.ldif ]; then ldapadd -Y EXTERNAL -H ldapi:/// -f /usr/local/openldap/etc/openldap/schema/twake.ldif; else exit 1; fi"`,
-        { encoding: 'utf-8' }
+        'official Twake schema'
       );
       console.log(`✓ Official Twake schema loaded from container`);
       if (result && result.trim()) {
@@ -194,9 +272,9 @@ export class LdapTestServer {
           );
 
           // Load schema using ldapadd
-          const result = execSync(
+          const result = await this.execLdapi(
             `docker exec ${this.containerName} ldapadd -Y EXTERNAL -H ldapi:/// -f /tmp/twake-schema.ldif`,
-            { encoding: 'utf-8' }
+            'custom Twake schema'
           );
           console.log(`✓ Custom Twake schema loaded`);
           if (result && result.trim()) {
