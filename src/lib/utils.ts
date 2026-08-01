@@ -247,6 +247,8 @@ export function validateDnValue(value: string, fieldName: string): void {
 
   // Reject control characters (0x00-0x1F and 0x7F)
   // These are invisible and can cause issues in logs, LDIF exports, etc.
+  // The control characters are the point of this check, hence the exemption
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1F\x7F]/.test(value)) {
     throw new Error(`${fieldName} contains invalid control characters`);
   }

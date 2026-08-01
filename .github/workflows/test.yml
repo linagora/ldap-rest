@@ -31,6 +31,14 @@ jobs:
       - name: Run rollup build to check typescript compilation
         run: npm run build
 
+      # Nothing ran ESLint here, which is how fourteen errors accumulated
+      # unnoticed. Warnings stay warnings: only errors fail the build.
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Run tests
         run: npm run test
 

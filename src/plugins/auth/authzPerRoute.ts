@@ -31,7 +31,7 @@ const ALLOWED_GLOB_CHARS = /^[\w/.\-+*]*$/;
 export function globToRegex(glob: string): RegExp {
   if (!ALLOWED_GLOB_CHARS.test(glob)) {
     throw new Error(
-      `Invalid glob pattern: "${glob}" — only [a-zA-Z0-9_/.\-+*] are allowed`
+      `Invalid glob pattern: "${glob}" — only [a-zA-Z0-9_/.+*-] are allowed`
     );
   }
   // Escape every regex-significant character first (producing a safe string).
@@ -64,7 +64,7 @@ export default class AuthzPerRoute extends DmPlugin {
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
 
-    const entries = (this.config.authz_per_route as string[] | undefined) ?? [];
+    const entries = this.config.authz_per_route ?? [];
     for (const entry of entries) {
       this.parseEntry(entry);
     }
