@@ -22,13 +22,16 @@ const root = path.join(__dirname, '..');
 const out = path.join(root, '_site');
 
 const REPO_URL = 'https://github.com/linagora/ldap-rest';
+const REPO_BRANCH = 'master';
+const REPO_RAW_URL =
+  'https://raw.githubusercontent.com/linagora/ldap-rest/' + REPO_BRANCH;
 const SITE_TITLE = 'LDAP-Rest';
 
 function rmrf(p: string): void {
   if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
 }
 
-function extractReadmeIntro(readme: string): string {
+export function extractReadmeIntro(readme: string): string {
   // Keep everything from the first `# ` heading up to (excluding) the
   // `## Documentation` section, which would otherwise pull in a long list
   // of links pointing into the repo (which is fine on GitHub but noisy on
@@ -44,6 +47,31 @@ function extractReadmeIntro(readme: string): string {
     }
   }
   return lines.slice(startIdx, endIdx).join('\n').trim();
+}
+
+/**
+ * Rewrite repository-relative markdown links to absolute GitHub URLs.
+ *
+ * The landing page is served from the site root, so a README link such as
+ * `./helm/ldap-rest/README.md` would resolve to
+ * `https://linagora.github.io/ldap-rest/helm/ldap-rest/README.md`, which the
+ * site never publishes (404). Those targets only exist in the repository, so
+ * point at it: directories and files through `blob`/`tree`, images through
+ * `raw.githubusercontent.com` so they actually render.
+ */
+export function absolutizeRepoLinks(markdown: string): string {
+  return markdown.replace(
+    /(!?)\[([^\]]*)\]\(([^)\s]+)(\s+"[^"]*")?\)/g,
+    (match, bang: string, text: string, target: string, title?: string) => {
+      // Leave absolute URLs, anchors and mail links alone.
+      if (/^([a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(target)) return match;
+      const cleaned = target.replace(/^\.\//, '');
+      const base = bang
+        ? REPO_RAW_URL
+        : `${REPO_URL}/${cleaned.endsWith('/') ? 'tree' : 'blob'}/${REPO_BRANCH}`;
+      return `${bang}[${text}](${base}/${cleaned}${title ?? ''})`;
+    }
+  );
 }
 
 function htmlEscape(s: string): string {
@@ -316,7 +344,7 @@ function main(): void {
   }
 
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf-8');
-  const intro = extractReadmeIntro(readme);
+  const intro = absolutizeRepoLinks(extractReadmeIntro(readme));
 
   rmrf(out);
   fs.mkdirSync(path.join(out, 'api'), { recursive: true });
@@ -339,4 +367,5 @@ function main(): void {
   console.log(`   - openapi.json`);
 }
 
-main();
+// Only build when run as a script; the tests import the helpers above.
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) main();
