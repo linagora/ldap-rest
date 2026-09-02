@@ -40,7 +40,10 @@ describe('SCIM PATCH applicator', () => {
       },
       withEntry({ mail: 'a@x.test' })
     );
-    expect(req.replace).to.deep.equal({ mail: ['a@x.test', 'b@x.test'] });
+    // The existing value is kept by leaving it alone: only the new one is
+    // sent, so a concurrent add of a third address is not overwritten.
+    expect(req.add).to.deep.equal({ mail: 'b@x.test' });
+    expect(req.replace).to.be.undefined;
   });
 
   it('replace sub-attribute → { replace: {...} }', async () => {
@@ -160,14 +163,139 @@ describe('SCIM PATCH applicator', () => {
       }
     );
     expect(seen).to.deep.equal(['alice', 'bob']);
-    // The answer is the member list the group must end up with, existing
-    // members included.
-    expect(req.replace).to.deep.equal({
+    // Growth of an attribute that already held something is an LDAP `add` of
+    // the new values alone, not the whole computed list: a `replace` would
+    // carry the snapshot, and two requests adding different members would
+    // each write their own view of the group.
+    expect(req.add).to.deep.equal({
       member: [
-        'cn=fakeuser',
         'uid=alice,ou=users,dc=example,dc=com',
         'uid=bob,ou=users,dc=example,dc=com',
       ],
+    });
+    expect(req.replace).to.be.undefined;
+  });
+
+  it('adds concurrently without either request losing the other', async () => {
+    // Both requests see the same entry and add a different value. Emitting
+    // the computed set as a `replace` made each write `[snapshot + mine]`,
+    // so whichever landed second erased the other's addition — silently,
+    // with a 200. An `add` lets the directory merge them.
+    const one = await patchToModifyRequest(
+      {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'add', path: 'emails', value: 'b@example.com' }],
+      },
+      withEntry({ mail: ['a@example.com'] })
+    );
+    const two = await patchToModifyRequest(
+      {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'add', path: 'emails', value: 'c@example.com' }],
+      },
+      withEntry({ mail: ['a@example.com'] })
+    );
+    expect(one.add).to.deep.equal({ mail: 'b@example.com' });
+    expect(two.add).to.deep.equal({ mail: 'c@example.com' });
+    expect(one.replace).to.be.undefined;
+    expect(two.replace).to.be.undefined;
+  });
+
+  describe('a member removal that resolves to nothing', () => {
+    const groupCtx = (resolve: (v: string) => Promise<string | undefined>) => ({
+      mapping: DEFAULT_USER_MAPPING,
+      memberAttribute: 'member',
+      current: {
+        member: [
+          'uid=alice,ou=users,dc=example,dc=com',
+          'uid=bob,ou=users,dc=example,dc=com',
+        ],
+      },
+      resolveMemberRef: resolve,
+    });
+    // The member an identity provider names no longer exists in the
+    // directory, so the lookup misses.
+    const missing = async (): Promise<string | undefined> => undefined;
+
+    const cases: [string, Record<string, unknown>][] = [
+      [
+        'a value list nothing resolves',
+        { op: 'remove', path: 'members', value: [{ value: 'ghost' }] },
+      ],
+      [
+        'a value filter nothing resolves',
+        { op: 'remove', path: 'members[value eq "ghost"]' },
+      ],
+      [
+        'a filter on something other than value',
+        { op: 'remove', path: 'members[display eq "Ghost"]' },
+      ],
+      ['an empty value list', { op: 'remove', path: 'members', value: [] }],
+    ];
+
+    for (const [name, op] of cases) {
+      it(`leaves the group alone: ${name}`, async () => {
+        // Each of these used to be read as the bare `remove members`, which
+        // takes every member: the group was emptied — down to the schema
+        // placeholder — and the answer was 200. Withdrawing a member the
+        // directory no longer holds is the routine way to meet it.
+        const req = await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [op],
+          } as never,
+          groupCtx(missing)
+        );
+        expect(req.delete, name).to.be.undefined;
+        expect(req.replace, name).to.be.undefined;
+        expect(req.add, name).to.be.undefined;
+      });
+    }
+
+    it('still empties the group on a bare remove, which does mean all', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: 'members' }],
+        },
+        groupCtx(missing)
+      );
+      expect(req.delete).to.deep.equal({ member: '' });
+    });
+
+    it('leaves the members alone when a replace resolves to nothing', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'members', value: [{ value: 'ghost' }] },
+          ],
+        },
+        groupCtx(missing)
+      );
+      expect(req.replace).to.be.undefined;
+      expect(req.delete).to.be.undefined;
+    });
+
+    it('removes only what did resolve', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [{ value: 'alice' }, { value: 'ghost' }],
+            },
+          ],
+        },
+        groupCtx(async v =>
+          v === 'ghost' ? undefined : `uid=${v},ou=users,dc=example,dc=com`
+        )
+      );
+      expect(req.replace).to.deep.equal({
+        member: 'uid=bob,ou=users,dc=example,dc=com',
+      });
     });
   });
 

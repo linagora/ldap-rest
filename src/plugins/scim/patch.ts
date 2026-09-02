@@ -117,14 +117,27 @@ class WorkingEntry {
     for (const attr of this.touched) {
       const before = asValues(this.current[attr]);
       const after = this.get(attr);
-      const same =
-        before.length === after.length && before.every(v => after.includes(v));
-      if (same) continue;
+      const added = after.filter(v => !before.includes(v));
+      const removed = before.filter(v => !after.includes(v));
+      if (added.length === 0 && removed.length === 0) continue;
       if (after.length === 0) {
         // Nothing to delete if it was not there to begin with.
         if (before.length === 0) continue;
         if (!req.delete) req.delete = {};
         (req.delete as AttributesList)[attr] = '';
+        continue;
+      }
+      // Growth of an attribute that already held something stays an LDAP
+      // `add` of the new values alone. Sending the whole computed set as a
+      // `replace` would carry the snapshot with it: two requests each adding
+      // a different value to the same attribute would both write
+      // `[snapshot + mine]`, and whichever landed second would silently drop
+      // the other's. `add` lets the directory merge them, and turns the one
+      // collision that remains — the same value twice — into an error rather
+      // than a loss.
+      if (removed.length === 0 && before.length > 0) {
+        if (!req.add) req.add = {};
+        req.add[attr] = added.length === 1 ? added[0] : added;
         continue;
       }
       if (!req.replace) req.replace = {};
@@ -311,11 +324,27 @@ async function applyOperation(
       return;
     }
     if (operation === 'replace') {
-      entry.set(memberAttr, await asMemberValues(op.value));
+      const dns = await asMemberValues(op.value);
+      // Same asymmetry as `remove`: a list whose entries all fail to resolve
+      // says nothing about what the membership should become, and emptying
+      // the group on it would be destroying data on the strength of a
+      // lookup miss. This leaves the members alone, as it did before.
+      if (dns.length === 0) return;
+      entry.set(memberAttr, dns);
       return;
     }
     // remove: either `members[value eq "x"]`, or `members` plus a value list,
     // or bare `members`, which takes them all.
+    //
+    // Only the bare form means "all". Naming members that resolve to nothing
+    // — an identity provider withdrawing a member the directory no longer
+    // holds, a filter on something other than `value`, an empty list — is a
+    // removal with nothing to remove, not a request to empty the group.
+    // Reading the two the same way emptied it and answered 200.
+    if (!filter && op.value == null) {
+      entry.drop(memberAttr);
+      return;
+    }
     const fromFilter = filter
       ? (/value\s+eq\s+"([^"]+)"/i.exec(filter)?.[1] ?? '')
       : '';
@@ -323,7 +352,7 @@ async function applyOperation(
       ...(fromFilter ? await asMemberValues(fromFilter) : []),
       ...(op.value != null ? await asMemberValues(op.value) : []),
     ];
-    entry.drop(memberAttr, named.length > 0 ? named : undefined);
+    entry.drop(memberAttr, named);
     return;
   }
 
