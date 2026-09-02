@@ -141,6 +141,15 @@ describe('SCIM Users (integration)', function () {
         .get('/scim/v2/Users/scim-alice')
         .expect(200);
       expect(res.body.userName).to.equal('scim-alice');
+      // RFC 7643 section 2.3.5: meta.created/lastModified are xsd:dateTime,
+      // not the directory's GeneralizedTime.
+      expect(res.body.meta.created).to.match(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/
+      );
+      expect(Date.parse(res.body.meta.created)).to.be.a('number').and.not.NaN;
+      expect(res.body.meta.lastModified).to.match(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/
+      );
     });
 
     it('returns 404 in SCIM envelope for unknown User', async () => {

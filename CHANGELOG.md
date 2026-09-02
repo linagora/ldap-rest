@@ -9,6 +9,13 @@
   token denied write on a branch could still modify a user there through
   PATCH. POST, PUT and DELETE, and the Groups PATCH, were unaffected
 
+### Bug Fixes
+
+- `plugins/scim`: `meta.created` and `meta.lastModified` carried the
+  directory's GeneralizedTime (`20250101120000Z`) straight through. RFC 7643
+  section 2.3.5 wants an `xsd:dateTime`, so a strict client rejected every
+  resource. They are now converted (`2025-01-01T12:00:00Z`)
+
 ## v0.6.0 (2026-08-01)
 
 ### Breaking Changes

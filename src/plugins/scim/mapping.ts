@@ -87,6 +87,44 @@ function asString(v: AttributeValue | undefined): string | undefined {
   return String(v);
 }
 
+/**
+ * LDAP GeneralizedTime (RFC 4517 §3.3.13) → SCIM DateTime (RFC 7643 §2.3.5,
+ * an `xsd:dateTime`).
+ *
+ * The directory answers `createTimestamp`/`modifyTimestamp` as
+ * `YYYYMMDDHHMMSSZ` (optionally with a fraction, a `+HHMM` offset, or the
+ * seconds and minutes omitted). SCIM clients parse `meta.created` as an
+ * `xsd:dateTime` and reject anything else, so the raw directory value must not
+ * be forwarded as-is.
+ *
+ * A value that does not look like a GeneralizedTime is returned untouched: a
+ * directory may already store an ISO 8601 string, and dropping it would lose
+ * more than passing it through.
+ */
+export function ldapTimeToIso(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const m =
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(?:(\d{2})(?:(\d{2}))?)?(?:[.,](\d+))?(Z|[+-]\d{2}(?:\d{2})?)?$/.exec(
+      value
+    );
+  if (!m) return value;
+  const [, year, month, day, hour, minute, second, fraction, zone] = m;
+  // A fraction applies to the smallest unit present, so it can only be turned
+  // into milliseconds when that unit is the second.
+  const ms =
+    fraction && second ? `.${fraction.slice(0, 3).padEnd(3, '0')}` : '';
+  let offset = 'Z';
+  if (zone && zone !== 'Z') {
+    const sign = zone[0];
+    const oh = zone.slice(1, 3);
+    const om = zone.slice(3, 5) || '00';
+    offset = `${sign}${oh}:${om}`;
+  }
+  const iso = `${year}-${month}-${day}T${hour}:${minute || '00'}:${second || '00'}${ms}${offset}`;
+  // Guard against a syntactically plausible but impossible date (month 13).
+  return Number.isNaN(Date.parse(iso)) ? value : iso;
+}
+
 function asArray(v: AttributeValue | undefined): string[] {
   if (v == null) return [];
   if (Array.isArray(v)) {
@@ -201,8 +239,8 @@ export function ldapToScimUser(
   if (id) {
     out.meta = {
       resourceType: 'User',
-      created: asString(entry['createTimestamp']),
-      lastModified: asString(entry['modifyTimestamp']),
+      created: ldapTimeToIso(asString(entry['createTimestamp'])),
+      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
       location: buildLocation(id, ctx),
     };
   }
@@ -307,8 +345,8 @@ export function ldapToScimGroup(
   if (id) {
     out.meta = {
       resourceType: 'Group',
-      created: asString(entry['createTimestamp']),
-      lastModified: asString(entry['modifyTimestamp']),
+      created: ldapTimeToIso(asString(entry['createTimestamp'])),
+      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
       location: buildLocation(id, ctx),
     };
   }
