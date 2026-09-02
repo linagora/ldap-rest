@@ -276,6 +276,7 @@ export interface Config {
   scim_user_lock_value?: string;
   scim_group_object_class?: string[];
   scim_group_rdn_attribute?: string;
+  scim_group_external_id_attribute?: string;
   scim_id_attribute?: string;
   scim_user_mapping?: string;
   scim_group_mapping?: string;
@@ -817,6 +818,11 @@ const configArgs: ConfigTemplate = [
     '--scim-group-object-classes',
   ],
   ['--scim-group-rdn-attribute', 'DM_SCIM_GROUP_RDN_ATTRIBUTE', 'cn'],
+  [
+    '--scim-group-external-id-attribute',
+    'DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE',
+    '',
+  ],
   ['--scim-id-attribute', 'DM_SCIM_ID_ATTRIBUTE', 'rdn'],
   ['--scim-user-mapping', 'DM_SCIM_USER_MAPPING', ''],
   ['--scim-group-mapping', 'DM_SCIM_GROUP_MAPPING', ''],

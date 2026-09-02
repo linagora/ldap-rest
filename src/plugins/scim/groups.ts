@@ -36,6 +36,7 @@ import {
   DEFAULT_GROUP_MAPPING,
   loadMappingFile,
   mergeMapping,
+  withExternalId,
   ldapToScimGroup,
   scimGroupToLdap,
   requiredLdapAttributes,
@@ -106,9 +107,12 @@ export class ScimGroups {
     this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
 
     const override = (this.config.scim_group_mapping as string) || '';
-    this.mapping = mergeMapping(
-      DEFAULT_GROUP_MAPPING,
-      override ? loadMappingFile(override) : undefined
+    this.mapping = withExternalId(
+      mergeMapping(
+        DEFAULT_GROUP_MAPPING,
+        override ? loadMappingFile(override) : undefined
+      ),
+      (this.config.scim_group_external_id_attribute as string) || ''
     );
   }
 

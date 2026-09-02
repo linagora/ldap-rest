@@ -11,6 +11,7 @@ describe('SCIM Groups (integration)', function () {
   let groupBase: string;
   let savedUserBase: string | undefined;
   let savedGroupBase: string | undefined;
+  let savedExternalId: string | undefined;
 
   before(async function () {
     if (
@@ -30,6 +31,10 @@ describe('SCIM Groups (integration)', function () {
     savedGroupBase = process.env.DM_SCIM_GROUP_BASE;
     process.env.DM_SCIM_USER_BASE = userBase;
     process.env.DM_SCIM_GROUP_BASE = groupBase;
+    // groupOfNames has no attribute meant for a provisioning client's id, so
+    // the deployment names one. `description` is the portable choice.
+    savedExternalId = process.env.DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE;
+    process.env.DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE = 'description';
     server = new DM();
     plugin = new Scim(server);
     await plugin.api(server.app);
@@ -59,6 +64,9 @@ describe('SCIM Groups (integration)', function () {
     else process.env.DM_SCIM_USER_BASE = savedUserBase;
     if (savedGroupBase === undefined) delete process.env.DM_SCIM_GROUP_BASE;
     else process.env.DM_SCIM_GROUP_BASE = savedGroupBase;
+    if (savedExternalId === undefined)
+      delete process.env.DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE;
+    else process.env.DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE = savedExternalId;
   });
 
   afterEach(async () => {
@@ -89,6 +97,36 @@ describe('SCIM Groups (integration)', function () {
     // prefix-relative unless --scim-base-url pins an absolute one.
     expect(res.headers.location).to.equal('/scim/v2/Groups/scim-testgroup');
     expect(res.headers.location).to.not.match(/^https?:/);
+  });
+
+  it('stores and returns the client externalId', async () => {
+    const created = await supertest(server.app)
+      .post('/scim/v2/Groups')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'scim-testgroup',
+        externalId: '00g1emaKYZTWRINFRGETl',
+        members: [{ value: 'scim-groupuser' }],
+      })
+      .expect(201);
+    // The value the client sent, not a server-assigned entryUUID.
+    expect(created.body.externalId).to.equal('00g1emaKYZTWRINFRGETl');
+
+    const got = await supertest(server.app)
+      .get('/scim/v2/Groups/scim-testgroup')
+      .expect(200);
+    expect(got.body.externalId).to.equal('00g1emaKYZTWRINFRGETl');
+
+    // And the identity provider can find its group back by that id.
+    const found = await supertest(server.app)
+      .get(
+        '/scim/v2/Groups?filter=' +
+          encodeURIComponent('externalId eq "00g1emaKYZTWRINFRGETl"')
+      )
+      .expect(200);
+    expect(found.body.totalResults).to.equal(1);
+    expect(found.body.Resources[0].id).to.equal('scim-testgroup');
   });
 
   it('gets a Group by id with SCIM member refs', async () => {

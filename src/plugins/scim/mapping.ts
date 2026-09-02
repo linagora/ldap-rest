@@ -63,19 +63,41 @@ export const DEFAULT_USER_MAPPING: ResourceMapping = {
   ],
 };
 
+/**
+ * Group mapping.
+ *
+ * `externalId` is deliberately absent: RFC 7643 section 3.1 defines it as the
+ * *provisioning client's* identifier, so it cannot be served from a
+ * server-assigned value. groupOfNames has no attribute meant to hold one
+ * either, so the deployment names one with
+ * `--scim-group-external-id-attribute` and the entry is added at runtime by
+ * `withExternalId()`.
+ */
 export const DEFAULT_GROUP_MAPPING: ResourceMapping = {
   resourceType: 'Group',
   schemas: [SCHEMA_GROUP],
-  entries: [
-    { scim: 'displayName', ldap: 'cn' },
-    {
-      scim: 'externalId',
-      ldap: 'entryUUID',
-      operational: true,
-      readOnly: true,
-    },
-  ],
+  entries: [{ scim: 'displayName', ldap: 'cn' }],
 };
+
+/**
+ * Add the `externalId` entry when the deployment named an attribute to store
+ * it in. An entry already present — from a mapping override — wins.
+ */
+export function withExternalId(
+  mapping: ResourceMapping,
+  ldapAttribute: string
+): ResourceMapping {
+  // Tolerate the whitespace a configuration file or environment variable
+  // picks up; an attribute name made only of it means "unset", not a name
+  // that would fail every later search and write.
+  const attribute = (ldapAttribute || '').trim();
+  if (!attribute) return mapping;
+  if (mapping.entries.some(e => e.scim === 'externalId')) return mapping;
+  return {
+    ...mapping,
+    entries: [...mapping.entries, { scim: 'externalId', ldap: attribute }],
+  };
+}
 
 function asString(v: AttributeValue | undefined): string | undefined {
   if (v == null) return undefined;

@@ -7,8 +7,10 @@ import {
   scimUserToLdap,
   ldapToScimGroup,
   ldapTimeToIso,
+  scimGroupToLdap,
   scimPathToLdapAttribute,
   requiredLdapAttributes,
+  withExternalId,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
 
@@ -297,6 +299,84 @@ describe('SCIM mapping', () => {
         }
       );
       expect(g.members?.[0]).to.deep.equal({ value: 'alice', type: 'User' });
+    });
+  });
+
+  describe('Group externalId', () => {
+    it('is not mapped by default', () => {
+      expect(DEFAULT_GROUP_MAPPING.entries.some(e => e.scim === 'externalId'))
+        .to.be.false;
+      // And so it never leaks entryUUID, which is a server value, not the
+      // provisioning client's identifier (RFC 7643 section 3.1).
+      const group = ldapToScimGroup(
+        { cn: 'admins', entryUUID: 'b1e5-…' },
+        DEFAULT_GROUP_MAPPING,
+        groupCtx
+      );
+      expect(group.externalId).to.be.undefined;
+    });
+
+    it('round-trips through the configured attribute', () => {
+      const mapping = withExternalId(DEFAULT_GROUP_MAPPING, 'description');
+      const { attributes } = scimGroupToLdap(
+        {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'admins',
+          externalId: '00g1emaKYZTWRINFRGETl',
+        },
+        mapping,
+        ['top', 'groupOfNames']
+      );
+      expect(attributes.description).to.equal('00g1emaKYZTWRINFRGETl');
+
+      const group = ldapToScimGroup(
+        { cn: 'admins', description: '00g1emaKYZTWRINFRGETl' },
+        mapping,
+        groupCtx
+      );
+      expect(group.externalId).to.equal('00g1emaKYZTWRINFRGETl');
+    });
+
+    it('becomes filterable once configured', () => {
+      const mapping = withExternalId(DEFAULT_GROUP_MAPPING, 'description');
+      expect(scimPathToLdapAttribute('externalId', mapping)).to.equal(
+        'description'
+      );
+      expect(scimPathToLdapAttribute('externalId', DEFAULT_GROUP_MAPPING)).to.be
+        .undefined;
+    });
+
+    it('leaves a mapping override in charge', () => {
+      const overridden = {
+        ...DEFAULT_GROUP_MAPPING,
+        entries: [
+          ...DEFAULT_GROUP_MAPPING.entries,
+          { scim: 'externalId', ldap: 'businessCategory' },
+        ],
+      };
+      expect(
+        withExternalId(overridden, 'description').entries.find(
+          e => e.scim === 'externalId'
+        )?.ldap
+      ).to.equal('businessCategory');
+    });
+
+    it('is a no-op when no attribute is named', () => {
+      expect(withExternalId(DEFAULT_GROUP_MAPPING, '')).to.equal(
+        DEFAULT_GROUP_MAPPING
+      );
+      // Whitespace from a config file or environment variable is not a name.
+      expect(withExternalId(DEFAULT_GROUP_MAPPING, '   ')).to.equal(
+        DEFAULT_GROUP_MAPPING
+      );
+    });
+
+    it('trims the configured attribute name', () => {
+      const entry = withExternalId(
+        DEFAULT_GROUP_MAPPING,
+        '  description \n'
+      ).entries.find(e => e.scim === 'externalId');
+      expect(entry?.ldap).to.equal('description');
     });
   });
 
