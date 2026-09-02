@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `plugins/scim`: reads are now authorized — a breaking change shipped in a
+  patch release because it closes a read-authorization bypass. Every
+  `ldapActions.search()` the plugin issued omitted the request, so
+  `ldapsearchrequest` — the hook the authorization plugins use — skipped its
+  check, and any authenticated identity could read any branch the plugin was
+  pointed at whatever `core/auth/authzPerBranch` or `core/auth/authzLinid1`
+  said. `core/auth/authzDynamic` was not affected: it reads its token from
+  an `AsyncLocalStorage` rather than from the request. `GET /Users`,
+  `GET /Users/{id}` and their Group counterparts now answer `403` where read
+  is denied.
+
+  The bypass is not new — it predates 0.6.0 — but the pagination fix in this
+  same release removes what used to limit it. A list previously refused with
+  `tooMany` past `--scim-max-results`, so an unauthorized read of a subtree
+  larger than 200 entries returned nothing; it now pages through the whole
+  subtree. Fixing the two together is the point.
+
+  Note for upgrades: an identity that writes needs `read` on the same branch.
+  A SCIM write answers with the resource it just changed, so it reads the
+  entry back, and a grant of `write` without `read` no longer serves a write
+
 ### Security
 
 - `plugins/scim`: `PATCH /scim/v2/Users/{id}` called `ldapActions.modify()`

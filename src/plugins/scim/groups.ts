@@ -188,7 +188,8 @@ export class ScimGroups {
           scope: 'base',
           attributes: [...requiredLdapAttributes(this.mapping), 'member'],
         },
-        dn
+        dn,
+        req
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
@@ -261,6 +262,7 @@ export class ScimGroups {
       startIndex,
       count,
       maxScanned: this.maxScanned,
+      req,
     });
 
     const resolver = this.buildMemberResolver(req);
@@ -409,7 +411,8 @@ export class ScimGroups {
     ) {
       const current = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: ['member'] },
-        dn
+        dn,
+        req
       )) as SearchResult;
       const currentMembers = current.searchEntries[0]?.member;
       const currentArr = Array.isArray(currentMembers)
@@ -457,13 +460,18 @@ export class ScimGroups {
     try {
       const res = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: ['dn'] },
-        dn
+        dn,
+        req
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
-    } catch {
-      // not found directly
+    } catch (err) {
+      // Only "no such object" is a miss. Anything else — an authorization
+      // refusal, a broken connection — must not be read as an absent member,
+      // which would silently drop the reference from the group.
+      if (extractLdapCode(err) !== 32) throw err;
+      // Not there under that DN; try a filter.
     }
     try {
       const res = (await this.ldap.search(
@@ -473,13 +481,15 @@ export class ScimGroups {
           paged: false,
           attributes: ['dn'],
         },
-        base
+        base,
+        req
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      if (extractLdapCode(err) !== 32) throw err;
+      // The base itself is absent: no match, same as an empty result.
     }
     return undefined;
   }

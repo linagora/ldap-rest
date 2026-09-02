@@ -89,6 +89,8 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       users: {
         writer: { [peopleBase]: { read: true, write: true, delete: true } },
         reader: { [peopleBase]: { read: true, write: false, delete: false } },
+        // `outsider` is absent on purpose: it falls to the default, which
+        // denies read as well.
       },
       groups: {},
     });
@@ -166,6 +168,62 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
         userName,
         name: { familyName: 'Doe' },
       });
+
+  describe('read enforcement', () => {
+    // SCIM reads used to call ldap.search() without the request, exactly as
+    // PATCH did for writes, so `ldapsearchrequest` authorization was skipped
+    // and any authenticated identity could read any branch through SCIM.
+
+    it('an identity without read is DENIED the list (403)', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users')
+        .set('x-scim-user', 'outsider')
+        .expect(403);
+      expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+      expect(res.body.schemas[0]).to.equal(
+        'urn:ietf:params:scim:api:messages:2.0:Error'
+      );
+    });
+
+    it('an identity without read is DENIED a single resource (403)', async () => {
+      await createUser('writer', 'alice').expect(201);
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users/alice')
+        .set('x-scim-user', 'outsider')
+        .expect(403);
+      expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+    });
+
+    it('read stays granted where it was configured', async () => {
+      await createUser('writer', 'alice').expect(201);
+      const list = await supertest(server.app)
+        .get('/scim/v2/Users')
+        .set('x-scim-user', 'reader')
+        .expect(200);
+      const ids = list.body.Resources.map((r: { id: string }) => r.id);
+      expect(ids).to.include('alice');
+      const one = await supertest(server.app)
+        .get('/scim/v2/Users/alice')
+        .set('x-scim-user', 'reader')
+        .expect(200);
+      expect(one.body.userName).to.equal('alice');
+    });
+
+    it('a write still works for an identity that also has read', async () => {
+      // Every SCIM write reads the resource back into its response, so a
+      // write without read cannot be served; writer has both.
+      await createUser('writer', 'alice').expect(201);
+      await supertest(server.app)
+        .patch('/scim/v2/Users/alice')
+        .set('x-scim-user', 'writer')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'Alice' }],
+        })
+        .expect(200);
+    });
+  });
 
   it('rejects unauthenticated SCIM access (401)', async () => {
     await supertest(server.app).get('/scim/v2/Users').expect(401);

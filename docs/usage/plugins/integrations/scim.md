@@ -63,6 +63,22 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-etag`                  | `DM_SCIM_ETAG`                  | `false`                                            | Advertise ETag support in discovery (not yet implemented)              |
 | `--scim-base-url`              | `DM_SCIM_BASE_URL`              | auto from request                                  | Override external base URL for `meta.location` values                  |
 
+### Authorization
+
+Every SCIM operation now reaches `ldapActions` with the request attached, so
+the authorization plugins (`core/auth/authzPerBranch`,
+`core/auth/authzDynamic`, …) apply to reads as well as writes. An identity
+denied `read` on a branch gets `403` from `GET /Users`, `GET /Users/{id}` and
+their Group counterparts, instead of the data.
+
+An identity that writes needs `read` too: every SCIM write answers with the
+resource it just changed, so it reads the entry back. A write-only grant
+cannot be served, and answers 403 on the read-back.
+
+Base resolution (see _multi-tenant_ below) is unchanged and independent: it
+confines an identity to its own subtree whether or not an authorization plugin
+is loaded.
+
 ### Authentication
 
 SCIM piggybacks on whichever auth plugin you load. The discovery endpoint
