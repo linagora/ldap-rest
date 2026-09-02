@@ -207,6 +207,41 @@ describe('SCIM Groups (integration)', function () {
     expect(hasUser).to.not.be.true;
   });
 
+  it('keeps the members when a removal names someone the directory lost', async () => {
+    // The routine way an identity provider meets this: it withdraws a member
+    // that has since been deleted from the directory, so the reference does
+    // not resolve. That used to be read as the bare `remove members`, which
+    // takes every member — the group came back holding nothing but the
+    // schema placeholder, and the answer was 200.
+    await supertest(server.app)
+      .post('/scim/v2/Groups')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'scim-testgroup',
+        members: [{ value: 'scim-groupuser' }],
+      })
+      .expect(201);
+    await supertest(server.app)
+      .patch('/scim/v2/Groups/scim-testgroup')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'remove', path: 'members', value: [{ value: 'no-such-user' }] },
+        ],
+      })
+      .expect(200);
+    const res = await supertest(server.app)
+      .get('/scim/v2/Groups/scim-testgroup')
+      .expect(200);
+    const members = (res.body.members as { value: string }[] | undefined) || [];
+    expect(
+      members.some(m => m.value === 'scim-groupuser'),
+      `members after the no-op removal: ${JSON.stringify(members)}`
+    ).to.be.true;
+  });
+
   it('filters groups by displayName eq', async () => {
     await supertest(server.app)
       .post('/scim/v2/Groups')

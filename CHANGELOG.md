@@ -39,6 +39,32 @@
 
 ### Bug Fixes
 
+- `plugins/scim`: a PATCH carrying several operations could end in a state the
+  operations never asked for. They were collapsed into one LDAP modify keyed
+  by attribute, which loses the order RFC 7644 section 3.5.2 applies them in:
+  two operations on `active` ended on whichever the emitter kept rather than
+  the last one sent, and setting an attribute then removing it in the same
+  request left the value behind. Operations now play in order against the
+  entry as it stands, and only the resulting difference is sent.
+
+  Growth of an attribute that already held values stays an LDAP `add` of the
+  new values alone rather than a computed `replace` of the whole set: a
+  `replace` would carry the snapshot with it, so two requests each adding a
+  different value to the same attribute would both write their own view and
+  whichever landed second would silently drop the other's
+
+- `plugins/scim`: a PATCH removing an attribute the entry does not hold failed
+  the whole atomic modify with noSuchAttribute, taking the operations sent
+  alongside it down with it. Nothing is emitted for it now
+
+- `plugins/scim`: `remove` on a Group's `members` naming members that all
+  fail to resolve — an identity provider withdrawing someone the directory no
+  longer holds, a filter on anything but `value`, an empty list — was read as
+  the bare `remove members`, which takes every member. The group was emptied
+  down to the schema placeholder and the answer was `200`. Only the bare form
+  means all now; naming members that resolve to nothing removes nothing. The
+  same asymmetry applied to `replace`
+
 - `plugins/scim`: a `PUT` carrying `active: false` could answer `200` with
   `active: true` and leave the account binding. The handler swallowed
   noSuchAttribute from its modify — meant to absorb a delete of an attribute

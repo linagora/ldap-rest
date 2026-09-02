@@ -394,56 +394,67 @@ export class ScimGroups {
     id: string,
     patch: PatchRequest
   ): Promise<ScimGroup> {
-    await this.get(req, id); // ensure exists
+    const dn = this.dnForId(id, req);
+    const current = await this.currentEntry(req, id); // ensure exists
     const changes = await patchToModifyRequest(patch, {
       mapping: this.mapping,
       memberAttribute: 'member',
       resolveMemberRef: async value => this.users.resolveRef(req, value),
+      current,
     });
-    if (
-      !changes.add &&
-      !changes.replace &&
-      (!changes.delete ||
-        (Array.isArray(changes.delete) && changes.delete.length === 0))
-    ) {
-      return this.get(req, id);
-    }
 
-    // groupOfNames requires at least one member: if a member-remove would empty
-    // the attribute, add back the configured placeholder to satisfy the schema.
-    const placeholder =
-      (this.config.group_dummy_user as string) || 'cn=fakeuser';
-    const dn = this.dnForId(id, req);
+    // groupOfNames requires at least one member, so a patch that empties the
+    // attribute gets the configured placeholder instead of a schema
+    // violation. The emitted delete says the members are gone; replace it.
     if (
       changes.delete &&
       !Array.isArray(changes.delete) &&
-      changes.delete.member
+      'member' in changes.delete
     ) {
-      const current = (await this.ldap.search(
-        { paged: false, scope: 'base', attributes: ['member'] },
-        dn,
-        req
-      )) as SearchResult;
-      const currentMembers = current.searchEntries[0]?.member;
-      const currentArr = Array.isArray(currentMembers)
-        ? (currentMembers as string[])
-        : currentMembers
-          ? [String(currentMembers)]
-          : [];
-      const toDelete = Array.isArray(changes.delete.member)
-        ? (changes.delete.member as string[])
-        : [String(changes.delete.member)];
-      const remaining = currentArr.filter(m => !toDelete.includes(m));
-      if (remaining.length === 0) {
-        if (!changes.add) changes.add = {};
-        changes.add.member = [placeholder];
-      }
+      const placeholder =
+        (this.config.group_dummy_user as string) || 'cn=fakeuser';
+      delete changes.delete.member;
+      if (Object.keys(changes.delete).length === 0) delete changes.delete;
+      if (!changes.replace) changes.replace = {};
+      changes.replace.member = [placeholder];
     }
 
+    // An empty change set still goes through ldapActions: `ldapmodifyrequest`
+    // is where write permission is checked, and an empty modify touches the
+    // directory not at all.
     await this.ldap.modify(dn, changes, req);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;
+  }
+
+  /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */
+  private async currentEntry(
+    req: DmRequest,
+    id: string
+  ): Promise<AttributesList> {
+    const dn = this.dnForId(id, req);
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: [...requiredLdapAttributes(this.mapping), 'member'],
+        },
+        dn,
+        req
+      )) as SearchResult;
+    } catch (err) {
+      if (extractLdapCode(err) === 32) {
+        throw scimNotFound(`Group ${id} not found`);
+      }
+      throw err;
+    }
+    if (!result.searchEntries?.length) {
+      throw scimNotFound(`Group ${id} not found`);
+    }
+    return result.searchEntries[0] as AttributesList;
   }
 
   async delete(req: DmRequest, id: string): Promise<void> {
