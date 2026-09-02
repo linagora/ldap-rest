@@ -86,4 +86,5 @@ The system will:
 
 - **[Configuration](configuration.md)** - CLI options and environment variables
 - **[Plugins](plugins/README.md)** - Choose and configure plugins
+- **[Upgrading](upgrading.md)** - What to check before deploying a new version
 - **[Troubleshooting](troubleshooting.md)** - Problem resolution
