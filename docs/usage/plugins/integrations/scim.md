@@ -41,30 +41,30 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 
 ### CLI / environment
 
-| Argument                             | Environment                           | Default                                            | Description                                                            |
-| ------------------------------------ | ------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `--scim-prefix`                      | `DM_SCIM_PREFIX`                      | `/scim/v2`                                         | Base URL path for all SCIM endpoints                                   |
-| `--scim-user-base`                   | `DM_SCIM_USER_BASE`                   | `{ldap_base}`                                      | LDAP branch containing users                                           |
-| `--scim-group-base`                  | `DM_SCIM_GROUP_BASE`                  | `{ldap_base}`                                      | LDAP branch containing groups                                          |
-| `--scim-user-base-template`          | `DM_SCIM_USER_BASE_TEMPLATE`          | —                                                  | DN template with `{user}` placeholder (see _multi-tenant_)             |
-| `--scim-group-base-template`         | `DM_SCIM_GROUP_BASE_TEMPLATE`         | —                                                  | Same for groups                                                        |
-| `--scim-base-map`                    | `DM_SCIM_BASE_MAP`                    | —                                                  | Path to JSON file mapping authenticated user → `{userBase, groupBase}` |
-| `--scim-user-object-class`           | `DM_SCIM_USER_OBJECT_CLASSES`         | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users                                       |
-| `--scim-user-rdn-attribute`          | `DM_SCIM_USER_RDN_ATTRIBUTE`          | `uid`                                              | RDN attribute for Users                                                |
-| `--scim-user-lock-attribute`         | `DM_SCIM_USER_LOCK_ATTRIBUTE`         | `pwdAccountLockedTime`                             | LDAP attribute whose presence marks a User as `active: false`          |
-| `--scim-user-lock-value`             | `DM_SCIM_USER_LOCK_VALUE`             | `000001010000Z`                                    | Value written to that attribute when deactivating                      |
-| `--scim-group-object-class`          | `DM_SCIM_GROUP_OBJECT_CLASSES`        | `top, groupOfNames`                                | Object classes for created Groups                                      |
-| `--scim-group-rdn-attribute`         | `DM_SCIM_GROUP_RDN_ATTRIBUTE`         | `cn`                                               | RDN attribute for Groups                                               |
-| `--scim-group-external-id-attribute` | `DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE` | —                                                  | LDAP attribute storing a Group's `externalId` (unset: not supported)   |
-| `--scim-id-attribute`                | `DM_SCIM_ID_ATTRIBUTE`                | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                           |
-| `--scim-user-mapping`                | `DM_SCIM_USER_MAPPING`                | —                                                  | Path to JSON mapping override                                          |
-| `--scim-group-mapping`               | `DM_SCIM_GROUP_MAPPING`               | —                                                  | Same for Groups                                                        |
-| `--scim-max-results`                 | `DM_SCIM_MAX_RESULTS`                 | `200`                                              | Maximum page size (caps `count`)                                       |
-| `--scim-max-scanned`                 | `DM_SCIM_MAX_SCANNED`                 | `10000`                                            | Entries a list may walk before answering `400 tooMany`                 |
-| `--scim-bulk-max-operations`         | `DM_SCIM_BULK_MAX_OPERATIONS`         | `100`                                              | Max `/Bulk` operations per request                                     |
-| `--scim-bulk-max-payload-size`       | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE`       | `1048576`                                          | Max `/Bulk` payload size in bytes                                      |
-| `--scim-etag`                        | `DM_SCIM_ETAG`                        | `false`                                            | Advertise ETag support in discovery (not yet implemented)              |
-| `--scim-base-url`                    | `DM_SCIM_BASE_URL`                    | auto from request                                  | Override external base URL for `meta.location` values                  |
+| Argument                             | Environment                           | Default                                            | Description                                                                                      |
+| ------------------------------------ | ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `--scim-prefix`                      | `DM_SCIM_PREFIX`                      | `/scim/v2`                                         | Base URL path for all SCIM endpoints                                                             |
+| `--scim-user-base`                   | `DM_SCIM_USER_BASE`                   | `{ldap_base}`                                      | LDAP branch containing users                                                                     |
+| `--scim-group-base`                  | `DM_SCIM_GROUP_BASE`                  | `{ldap_base}`                                      | LDAP branch containing groups                                                                    |
+| `--scim-user-base-template`          | `DM_SCIM_USER_BASE_TEMPLATE`          | —                                                  | DN template with `{user}` placeholder (see _multi-tenant_)                                       |
+| `--scim-group-base-template`         | `DM_SCIM_GROUP_BASE_TEMPLATE`         | —                                                  | Same for groups                                                                                  |
+| `--scim-base-map`                    | `DM_SCIM_BASE_MAP`                    | —                                                  | Path to JSON file mapping authenticated user → `{userBase, groupBase}`                           |
+| `--scim-user-object-class`           | `DM_SCIM_USER_OBJECT_CLASSES`         | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users                                                                 |
+| `--scim-user-rdn-attribute`          | `DM_SCIM_USER_RDN_ATTRIBUTE`          | `uid`                                              | RDN attribute for Users                                                                          |
+| `--scim-user-lock-attribute`         | `DM_SCIM_USER_LOCK_ATTRIBUTE`         | `pwdAccountLockedTime`                             | LDAP attribute whose presence marks a User as `active: false`                                    |
+| `--scim-user-lock-value`             | `DM_SCIM_USER_LOCK_VALUE`             | —                                                  | Value written to that attribute when deactivating (required unless the attribute is the default) |
+| `--scim-group-object-class`          | `DM_SCIM_GROUP_OBJECT_CLASSES`        | `top, groupOfNames`                                | Object classes for created Groups                                                                |
+| `--scim-group-rdn-attribute`         | `DM_SCIM_GROUP_RDN_ATTRIBUTE`         | `cn`                                               | RDN attribute for Groups                                                                         |
+| `--scim-group-external-id-attribute` | `DM_SCIM_GROUP_EXTERNAL_ID_ATTRIBUTE` | —                                                  | LDAP attribute storing a Group's `externalId` (unset: not supported)                             |
+| `--scim-id-attribute`                | `DM_SCIM_ID_ATTRIBUTE`                | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                                                     |
+| `--scim-user-mapping`                | `DM_SCIM_USER_MAPPING`                | —                                                  | Path to JSON mapping override                                                                    |
+| `--scim-group-mapping`               | `DM_SCIM_GROUP_MAPPING`               | —                                                  | Same for Groups                                                                                  |
+| `--scim-max-results`                 | `DM_SCIM_MAX_RESULTS`                 | `200`                                              | Maximum page size (caps `count`)                                                                 |
+| `--scim-max-scanned`                 | `DM_SCIM_MAX_SCANNED`                 | `10000`                                            | Entries a list may walk before answering `400 tooMany`                                           |
+| `--scim-bulk-max-operations`         | `DM_SCIM_BULK_MAX_OPERATIONS`         | `100`                                              | Max `/Bulk` operations per request                                                               |
+| `--scim-bulk-max-payload-size`       | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE`       | `1048576`                                          | Max `/Bulk` payload size in bytes                                                                |
+| `--scim-etag`                        | `DM_SCIM_ETAG`                        | `false`                                            | Advertise ETag support in discovery (not yet implemented)                                        |
+| `--scim-base-url`                    | `DM_SCIM_BASE_URL`                    | auto from request                                  | Override external base URL for `meta.location` values                                            |
 
 ### Authorization
 
@@ -156,21 +156,47 @@ The default targets the ppolicy overlay:
 --scim-user-lock-value     000001010000Z          # "locked forever"
 ```
 
-`pwdAccountLockedTime` only exists when slapd loads the ppolicy overlay. Point
-the two flags elsewhere on a directory without it — 389-ds, for instance:
+`pwdAccountLockedTime` only exists when slapd loads the ppolicy overlay. On a
+directory without it — plain OpenLDAP, 389-ds, AD — the directory refuses the
+write against its schema, and the plugin answers `400 invalidValue` naming
+the attribute and the flags to change, on `/Bulk` as on the single-resource
+routes. Point the two flags elsewhere:
 
 ```bash
 --scim-user-lock-attribute nsAccountLock
 --scim-user-lock-value     TRUE
 ```
 
+**Name the value whenever you name the attribute.** `000001010000Z` is the
+ppolicy convention and means nothing to any other attribute: 389-ds reads
+`nsAccountLock` as locked only when it says `true`. Setting the attribute
+alone would write a value the directory ignores — every deactivation answers
+200 and reads back `active: false` while the account keeps binding. The
+plugin refuses to start instead.
+
+Two more pairings get a warning at startup rather than a refusal, because
+neither can be told apart from a deliberate local schema:
+
+- the ppolicy value `000001010000Z` pinned on some other attribute, which is
+  what a deployment template that always sets both flags produces by default
+- a value `pwdAccountLockedTime` cannot hold, `TRUE` for instance: it holds a
+  GeneralizedTime
+
+**None of this can tell whether your directory honours the value you chose.**
+The checks are on the shape of the configuration. `active` is read back from
+the mere presence of the attribute, so a value the directory stores and
+ignores still reads as `false`. Verify once, by hand, that a deactivation
+actually prevents a bind.
+
 `active` is not a mapping entry and must not be added to a mapping file: it is
 handled by these two flags on every path — create, PUT, PATCH and the
 `active eq true|false` filter alike.
 
-Note that PUT is a full replacement (RFC 7644 §3.5.1): a body that omits
-`active` reactivates the account, just as it clears any other omitted
-attribute. Use PATCH to change only the status.
+PUT is a full replacement (RFC 7644 §3.5.1) for every attribute except this
+one: a body that omits `active` leaves the lock as it stands. Clearing it
+would release locks SCIM never set — a ppolicy auto-lockout, or one an
+administrator placed — so a routine profile sync would defeat the
+brute-force control. Send `"active": true` to reactivate deliberately.
 
 ## Writing a custom mapping schema
 

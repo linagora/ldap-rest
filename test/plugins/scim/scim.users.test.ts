@@ -636,6 +636,66 @@ describe('SCIM Users (integration)', function () {
     });
   });
 
+  describe('a lock attribute the directory does not know', () => {
+    let badServer: DM;
+    let badPlugin: Scim;
+    const savedBad: Record<string, string | undefined> = {};
+
+    before(async () => {
+      // Naming an attribute no schema defines, rather than relying on the
+      // shipped default being absent: pwdAccountLockedTime exists wherever
+      // slapd loads the ppolicy overlay, so leaning on this directory not
+      // having it made the only test in this file whose result depended on
+      // what the directory was missing — green here, red against a ppolicy
+      // directory in the documented external-LDAP mode.
+      for (const k of [
+        'DM_SCIM_USER_LOCK_ATTRIBUTE',
+        'DM_SCIM_USER_LOCK_VALUE',
+      ])
+        savedBad[k] = process.env[k];
+      process.env.DM_SCIM_USER_LOCK_ATTRIBUTE = 'noSuchLockAttributeAnywhere';
+      process.env.DM_SCIM_USER_LOCK_VALUE = 'TRUE';
+      badServer = new DM();
+      badPlugin = new Scim(badServer);
+      await badPlugin.api(badServer.app);
+      await badServer.ready;
+    });
+
+    after(async () => {
+      try {
+        await badPlugin.ldap.delete(`uid=scim-bob,${userBase}`);
+      } catch {
+        /* ignore */
+      }
+      for (const [k, v] of Object.entries(savedBad)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+
+    it('answers a SCIM error naming the cause, not a bare 500', async () => {
+      const res = await supertest(badServer.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-bob',
+          name: { familyName: 'Doe' },
+          active: false,
+        })
+        .expect(400);
+      expect(res.body.scimType).to.equal('invalidValue');
+      expect(res.body.detail).to.match(/--scim-user-lock-attribute/);
+      // The attribute that caused it, named — the point of routing this
+      // through the users plugin rather than the generic translation, which
+      // cannot know which attribute backs `active`.
+      expect(res.body.detail).to.match(/noSuchLockAttributeAnywhere/);
+      expect(res.body.schemas[0]).to.equal(
+        'urn:ietf:params:scim:api:messages:2.0:Error'
+      );
+    });
+  });
+
   describe('Users list & filter', () => {
     beforeEach(async () => {
       await supertest(server.app)

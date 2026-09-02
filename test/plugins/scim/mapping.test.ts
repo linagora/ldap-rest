@@ -10,6 +10,8 @@ import {
   scimGroupToLdap,
   scimPathToLdapAttribute,
   requiredLdapAttributes,
+  resolveLockConfig,
+  setLockConfigWarn,
   withExternalId,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
@@ -20,6 +22,8 @@ const userCtx: MappingContext = {
   resourceType: 'User',
   baseUrl: 'https://example.test',
   scimPrefix: '/scim/v2',
+  lockAttribute: 'pwdAccountLockedTime',
+  lockValue: '000001010000Z',
 };
 
 const groupCtx: MappingContext = {
@@ -299,6 +303,115 @@ describe('SCIM mapping', () => {
         }
       );
       expect(g.members?.[0]).to.deep.equal({ value: 'alice', type: 'User' });
+    });
+  });
+
+  describe('resolveLockConfig', () => {
+    it('pairs the ppolicy default with its own value', () => {
+      expect(resolveLockConfig('', '')).to.deep.equal({
+        attribute: 'pwdAccountLockedTime',
+        value: '000001010000Z',
+      });
+      expect(resolveLockConfig('pwdAccountLockedTime', '')).to.deep.equal({
+        attribute: 'pwdAccountLockedTime',
+        value: '000001010000Z',
+      });
+    });
+
+    it('takes both when both are given', () => {
+      expect(resolveLockConfig(' nsAccountLock ', ' TRUE ')).to.deep.equal({
+        attribute: 'nsAccountLock',
+        value: 'TRUE',
+      });
+    });
+
+    it('accepts the ppolicy attribute in any case', () => {
+      // LDAP attribute descriptions are case-insensitive, so a config that
+      // started and really locked must keep starting.
+      for (const spelling of [
+        'pwdaccountlockedtime',
+        'PwdAccountLockedTime',
+        'PWDACCOUNTLOCKEDTIME',
+      ]) {
+        expect(resolveLockConfig(spelling, ''), spelling).to.deep.equal({
+          attribute: spelling,
+          value: '000001010000Z',
+        });
+      }
+    });
+
+    it('refuses another attribute without its value', () => {
+      // `000001010000Z` means nothing to nsAccountLock, which 389-ds honours
+      // only for 'TRUE' — every deactivation would answer 200 while the
+      // account kept binding.
+      expect(() => resolveLockConfig('nsAccountLock', '')).to.throw(
+        /--scim-user-lock-value must say what marks an account locked/
+      );
+    });
+
+    it('refuses a name that is not an attribute name', () => {
+      // It is interpolated into the LDAP filter for `active eq …`.
+      for (const bad of ['pwd*', 'a(b', 'has space', '1leading', '1.2.x']) {
+        expect(() => resolveLockConfig(bad, 'x'), bad).to.throw(
+          /must be an LDAP attribute name/
+        );
+      }
+    });
+
+    it('accepts a numeric OID, which RFC 4512 allows', () => {
+      // `attributetype = descr | numericoid`. Refusing one meant a startup
+      // failure whose message asserted it was not an attribute name, when it
+      // is: a directory may have no `descr` alias for a local attribute.
+      expect(
+        resolveLockConfig('1.3.6.1.4.1.42.2.27.8.1.17', 'TRUE')
+      ).to.deep.equal({
+        attribute: '1.3.6.1.4.1.42.2.27.8.1.17',
+        value: 'TRUE',
+      });
+    });
+
+    describe('the pairings it cannot refuse but will not pass over', () => {
+      let said: string[];
+      let restore: (message: string) => void;
+
+      beforeEach(() => {
+        said = [];
+        restore = setLockConfigWarn(m => said.push(m));
+      });
+      afterEach(() => {
+        setLockConfigWarn(restore);
+      });
+
+      it('warns when the ppolicy value is pinned on another attribute', () => {
+        // The shape a deployment template that always sets both flags
+        // produces: the operator changes the attribute and leaves the value
+        // at its default. A value is present, so the check above passes —
+        // and the result is the very thing it was written to prevent.
+        const got = resolveLockConfig('nsAccountLock', '000001010000Z');
+        expect(got).to.deep.equal({
+          attribute: 'nsAccountLock',
+          value: '000001010000Z',
+        });
+        expect(said).to.have.lengthOf(1);
+        expect(said[0]).to.match(/keeps binding/);
+      });
+
+      it('warns when the default attribute is given a value it cannot hold', () => {
+        // pwdAccountLockedTime is a GeneralizedTime; TRUE is refused by the
+        // schema, or stored and ignored where it was redefined locally.
+        const got = resolveLockConfig('pwdAccountLockedTime', 'TRUE');
+        expect(got.value).to.equal('TRUE');
+        expect(said).to.have.lengthOf(1);
+        expect(said[0]).to.match(/not a GeneralizedTime/);
+      });
+
+      it('says nothing about either default pairing', () => {
+        resolveLockConfig('', '');
+        resolveLockConfig('nsAccountLock', 'TRUE');
+        resolveLockConfig('pwdAccountLockedTime', '000001010000Z');
+        resolveLockConfig('pwdAccountLockedTime', '20240101000000Z');
+        expect(said).to.deep.equal([]);
+      });
     });
   });
 

@@ -127,6 +127,12 @@ export class ScimGroups {
           ? `${req.protocol}://${String(req.get('host') || '')}`
           : ''),
       scimPrefix: this.scimPrefix,
+      // RFC 7643 section 4.2 gives Groups no `active`, so there is no lock
+      // attribute to name. Empty rather than the User default: an entry
+      // never holds an attribute called '', so `isLocked` reads false and
+      // nothing can be written under it by accident.
+      lockAttribute: '',
+      lockValue: '',
     };
   }
 

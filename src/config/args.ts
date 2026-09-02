@@ -809,7 +809,7 @@ const configArgs: ConfigTemplate = [
     'DM_SCIM_USER_LOCK_ATTRIBUTE',
     'pwdAccountLockedTime',
   ],
-  ['--scim-user-lock-value', 'DM_SCIM_USER_LOCK_VALUE', '000001010000Z'],
+  ['--scim-user-lock-value', 'DM_SCIM_USER_LOCK_VALUE', ''],
   [
     '--scim-group-object-class',
     'DM_SCIM_GROUP_OBJECT_CLASSES',
