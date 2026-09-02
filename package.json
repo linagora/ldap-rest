@@ -1,6 +1,6 @@
 {
   "name": "ldap-rest",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Light directory manager",
   "keywords": [
     "Identity-Manager"
@@ -167,6 +167,10 @@
     "./plugin-scim-groups": {
       "types": "./dist/src/plugins/scim/groups.d.ts",
       "import": "./dist/plugins/scim/groups.js"
+    },
+    "./plugin-scim-list": {
+      "types": "./dist/src/plugins/scim/list.d.ts",
+      "import": "./dist/plugins/scim/list.js"
     },
     "./plugin-scim-mapping": {
       "types": "./dist/src/plugins/scim/mapping.d.ts",

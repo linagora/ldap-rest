@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.6.1 (2026-09-02)
 
 ### Breaking Changes
 
@@ -31,6 +31,7 @@
   without the request, so every authorization plugin skipped its check — a
   token denied write on a branch could still modify a user there through
   PATCH. POST, PUT and DELETE, and the Groups PATCH, were unaffected
+- dependencies update
 
 ### Bug Fixes
 
