@@ -277,6 +277,26 @@ describe('SCIM PATCH applicator', () => {
       expect(req.delete).to.deep.equal({ pwdAccountLockedTime: '' });
     });
 
+    it('refuses a value it cannot read as a boolean', async () => {
+      // Reading an unparseable value as `true` would turn a deprovisioning
+      // request into a re-activation, and answer 200 while doing it.
+      for (const value of ['0', 'no', 'disabled', '', 42, null]) {
+        try {
+          await patchToModifyRequest(
+            {
+              schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+              Operations: [{ op: 'replace', path: 'active', value }],
+            },
+            activeCtx
+          );
+          expect.fail(`should have thrown for ${JSON.stringify(value)}`);
+        } catch (err) {
+          expect(err).to.be.instanceOf(ScimError);
+          expect((err as ScimError).scimType).to.equal('invalidValue');
+        }
+      }
+    });
+
     it('reads the string form identity providers sometimes send', async () => {
       const req = await patchToModifyRequest(
         {

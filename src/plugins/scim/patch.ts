@@ -53,14 +53,22 @@ export interface PatchContext {
   supportsActive?: boolean;
 }
 
-/** Read a SCIM `active` value out of a PATCH operation. */
+/**
+ * Read a SCIM `active` value out of a PATCH operation.
+ *
+ * Only a boolean, or the two canonical strings some providers send instead.
+ * Anything else is refused rather than guessed: `active` is the attribute
+ * that gates account access, and reading an unparseable value as `true`
+ * would turn a deprovisioning request into a re-activation and answer 200.
+ */
 function activeValue(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') return value.toLowerCase() !== 'false';
-  if (value == null) return true;
-  // `{ "active": false }` reaches us unwrapped, so anything else is a value
-  // we cannot read as a boolean.
-  throw scimInvalidValue(`Cannot read '${JSON.stringify(value)}' as active`);
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+  }
+  throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
 }
 
 function normalizeOp(op: string): 'add' | 'remove' | 'replace' {

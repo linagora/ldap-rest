@@ -38,8 +38,14 @@
   `PATCH {"op":"replace","path":"active","value":false}` now deactivate an
   account, which is how Okta and Entra ID disable a user — the attribute was
   read-only, so a deactivation was silently dropped on create and answered
-  `400 invalidPath` on PATCH. Backed by `--scim-user-lock-attribute`
-  (default `pwdAccountLockedTime`) and `--scim-user-lock-value`
+  `400 invalidPath` on PATCH.
+
+  `active` is modelled on the presence of one LDAP attribute, named by
+  `--scim-user-lock-attribute` (default `pwdAccountLockedTime`) and written
+  with `--scim-user-lock-value` (default `000001010000Z`, the ppolicy
+  "locked forever" convention). The default needs the ppolicy overlay; point
+  both flags elsewhere on a directory without it, `nsAccountLock` / `TRUE`
+  for instance
 
 ### Bug Fixes
 

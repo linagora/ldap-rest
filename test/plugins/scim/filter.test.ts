@@ -5,6 +5,8 @@ import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
 import { ScimError } from '../../../src/plugins/scim/errors';
 
 describe('SCIM filter parser', () => {
+  // `active` is a Users-only pseudo-attribute.
+  const USERS = { supportsActive: true };
   const m = DEFAULT_USER_MAPPING;
 
   describe('comparison operators', () => {
@@ -92,35 +94,52 @@ describe('SCIM filter parser', () => {
 
   describe('active pseudo-attribute', () => {
     it('active eq true → disabled-account filter', () => {
-      const r = scimFilterToLdap('active eq true', m);
+      const r = scimFilterToLdap('active eq true', m, USERS);
       expect(r.ldapFilter).to.equal('(!(pwdAccountLockedTime=*))');
     });
     it('active eq false', () => {
-      const r = scimFilterToLdap('active eq false', m);
+      const r = scimFilterToLdap('active eq false', m, USERS);
       expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
     });
     it('active ne true', () => {
-      const r = scimFilterToLdap('active ne true', m);
+      const r = scimFilterToLdap('active ne true', m, USERS);
       expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
     });
     it('active pr matches every entry instead of emitting (active=*)', () => {
       // `active` is not an LDAP attribute; the directory would answer
       // undefinedAttributeType.
-      const r = scimFilterToLdap('active pr', m);
+      const r = scimFilterToLdap('active pr', m, USERS);
       expect(r.ldapFilter).to.equal('(objectClass=*)');
       expect(r.ldapFilter).to.not.match(/active/);
     });
     it('honours a configured lock attribute', () => {
-      const r = scimFilterToLdap('active eq false', m, 'nsAccountLock');
+      const r = scimFilterToLdap('active eq false', m, {
+        ...USERS,
+        lockAttribute: 'nsAccountLock',
+      });
       expect(r.ldapFilter).to.equal('(nsAccountLock=*)');
     });
     it('combines with another clause', () => {
-      const r = scimFilterToLdap('userName eq "bob" and active eq false', m);
+      const r = scimFilterToLdap(
+        'userName eq "bob" and active eq false',
+        m,
+        USERS
+      );
       expect(r.ldapFilter).to.equal('(&(uid=bob)(pwdAccountLockedTime=*))');
     });
     it('rejects an unsupported operator on active', () => {
-      expect(() => scimFilterToLdap('active co "x"', m)).to.throw(
+      expect(() => scimFilterToLdap('active co "x"', m, USERS)).to.throw(
         /not supported for 'active'/
+      );
+    });
+    it('is an unknown attribute for a resource type without it', () => {
+      // Groups carry no `active`. Without the flag it must be rejected, not
+      // translated into a pseudo-attribute that means nothing to them.
+      expect(() => scimFilterToLdap('active eq true', m)).to.throw(
+        /Unknown attribute path/
+      );
+      expect(() => scimFilterToLdap('active pr', m)).to.throw(
+        /Unknown attribute path/
       );
     });
   });

@@ -160,12 +160,23 @@ function tokenize(input: string): Token[] {
 /** Marker returned by resolvePath() for the `active` pseudo-attribute. */
 const ACTIVE_PSEUDO = '\u0000active';
 
+export interface FilterOptions {
+  /** LDAP attribute whose presence marks a User as locked. */
+  lockAttribute?: string;
+  /**
+   * Whether this resource type carries SCIM `active`. Users do; Groups do
+   * not, and must get `invalidFilter` rather than a filter built out of a
+   * pseudo-attribute that means nothing to them.
+   */
+  supportsActive?: boolean;
+}
+
 class Parser {
   private pos = 0;
   constructor(
     private tokens: Token[],
     private mapping: ResourceMapping,
-    private lockAttribute: string = DEFAULT_LOCK_ATTRIBUTE
+    private opts: FilterOptions = {}
   ) {}
 
   private peek(offset = 0): Token {
@@ -319,8 +330,10 @@ class Parser {
         "filter on 'id' only supports 'eq' with a string value"
       );
     }
-    // 'active' → presence of the lock attribute (emitted in emitComparison)
-    if (path === 'active') return ACTIVE_PSEUDO;
+    // 'active' → presence of the lock attribute (emitted in emitComparison).
+    // Only for a resource type that has it; otherwise fall through and let
+    // the mapping lookup below reject it as unknown.
+    if (path === 'active' && this.opts.supportsActive) return ACTIVE_PSEUDO;
 
     const ldapAttr = scimPathToLdapAttribute(path, this.mapping);
     if (!ldapAttr) {
@@ -341,8 +354,9 @@ class Parser {
       const truthy =
         value === true ||
         (typeof value === 'string' && value.toLowerCase() === 'true');
-      const locked = `(${this.lockAttribute}=*)`;
-      const unlocked = `(!(${this.lockAttribute}=*))`;
+      const lockAttr = this.opts.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
+      const locked = `(${lockAttr}=*)`;
+      const unlocked = `(!(${lockAttr}=*))`;
       // active=true  <=> lock attribute absent
       // active=false <=> lock attribute present
       if (op === 'eq') return truthy ? unlocked : locked;
@@ -399,7 +413,7 @@ export interface TranslatedFilter {
 export function scimFilterToLdap(
   filter: string,
   mapping: ResourceMapping,
-  lockAttribute: string = DEFAULT_LOCK_ATTRIBUTE
+  opts: FilterOptions = {}
 ): TranslatedFilter {
   const trimmed = filter.trim();
   if (!trimmed) {
@@ -417,7 +431,7 @@ export function scimFilterToLdap(
   }
 
   const tokens = tokenize(trimmed);
-  const parser = new Parser(tokens, mapping, lockAttribute);
+  const parser = new Parser(tokens, mapping, opts);
   const ldapFilter = parser.parse();
   return { ldapFilter, touchesId: /\bid\b/.test(trimmed) };
 }

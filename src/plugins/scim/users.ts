@@ -72,12 +72,19 @@ export interface ScimUsersOptions {
   hooks: { [K: string]: Function[] | undefined };
 }
 
-/** Does this entry actually hold a value for `attr`? */
+/**
+ * Does this entry actually hold `attr`?
+ *
+ * ldapts answers an attribute that was requested but is absent as an empty
+ * array, which is the case to catch. A present attribute counts however it
+ * renders — an empty string or a zero-length Buffer is still there as far as
+ * the directory is concerned, and deleting it would succeed.
+ */
 function entryHas(entry: AttributesList, attr: string): boolean {
   const v = entry[attr];
   if (v == null) return false;
   if (Array.isArray(v)) return v.length > 0;
-  return String(v).length > 0;
+  return true;
 }
 
 /**
@@ -222,11 +229,10 @@ export class ScimUsers {
     let ldapFilter = `(${this.objectClass.includes('inetOrgPerson') ? 'objectClass=inetOrgPerson' : `objectClass=${this.objectClass[0]}`})`;
     let idEquals: string | undefined;
     if (query.filter) {
-      const translated = scimFilterToLdap(
-        query.filter,
-        this.mapping,
-        this.lockAttribute
-      );
+      const translated = scimFilterToLdap(query.filter, this.mapping, {
+        lockAttribute: this.lockAttribute,
+        supportsActive: true,
+      });
       if (translated.idEquals) {
         idEquals = translated.idEquals;
       } else {
@@ -445,7 +451,8 @@ export class ScimUsers {
     try {
       result = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: this.ldapAttributes() },
-        dn
+        dn,
+        req
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
