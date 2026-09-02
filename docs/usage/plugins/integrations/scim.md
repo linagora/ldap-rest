@@ -173,6 +173,12 @@ otherwise write a value the directory ignores: every deactivation answers 200
 and reads back `active: false` while the account keeps binding. The plugin
 refuses to start instead.
 
+That check is on the shape of the configuration, not its meaning: nothing
+here can tell whether your directory honours the value you chose. `active` is
+read back from the mere presence of the attribute, so a value the directory
+ignores still reads as `false`. Verify a deactivation actually prevents a
+bind, once, when you set these flags.
+
 `active` is not a mapping entry and must not be added to a mapping file: it is
 handled by these two flags on every path — create, PUT, PATCH and the
 `active eq true|false` filter alike.

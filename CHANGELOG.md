@@ -128,12 +128,24 @@ type undefined`
   every deactivation was written, read back as `active: false`, and the
   account kept binding. And an attribute name carrying an LDAP filter
   metacharacter was interpolated into the emitted filter for `active eq …`.
-  Both are refused at startup now, with a message saying what to set
+  Both are refused at startup now, with a message saying what to set.
+
+  This narrows the class rather than closing it: the check is on the shape of
+  the configuration, and nothing here can prove the directory honours the
+  value you chose. `active` is still read back from the mere presence of the
+  attribute, so a value the directory ignores still reads as locked
 
 - `plugins/scim`: a directory whose schema does not define the lock attribute
   — the shipped default needs the ppolicy overlay, which plain OpenLDAP,
   389-ds and AD do not load — answered a bare `500` to any deactivation. It
-  is now `400 invalidValue`, naming the flag to change
+  is now `400 invalidValue`, naming the flag to change, on `/Bulk` as well as
+  the single-resource routes
+
+- `plugins/scim`: `/Bulk` built its own error body and recognised only
+  `ScimError`, so a directory refusal came back as `500` quoting the raw
+  message — including the `[authz-forbidden]` marker and the branch DN behind
+  it, which every other route strips. It now applies the same translation as
+  the rest: `403` for a refusal, `404`, `409` and `400` where they belong
 
 - `plugins/scim`: three ways an account could stay usable when SCIM said
   otherwise, all on the write paths of `active`:

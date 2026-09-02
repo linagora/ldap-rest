@@ -258,7 +258,9 @@ export function resolveLockConfig(
   }
   const val = (value || '').trim();
   if (val) return { attribute: attr, value: val };
-  if (attr === DEFAULT_LOCK_ATTRIBUTE) {
+  // LDAP attribute descriptions are case-insensitive (RFC 4512 section 2.5),
+  // so `pwdaccountlockedtime` is the same attribute and must keep working.
+  if (attr.toLowerCase() === DEFAULT_LOCK_ATTRIBUTE.toLowerCase()) {
     // The ppolicy overlay's own "locked forever" convention.
     return { attribute: attr, value: DEFAULT_LOCK_VALUE };
   }

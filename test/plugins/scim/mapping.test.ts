@@ -322,6 +322,21 @@ describe('SCIM mapping', () => {
       });
     });
 
+    it('accepts the ppolicy attribute in any case', () => {
+      // LDAP attribute descriptions are case-insensitive, so a config that
+      // started and really locked must keep starting.
+      for (const spelling of [
+        'pwdaccountlockedtime',
+        'PwdAccountLockedTime',
+        'PWDACCOUNTLOCKEDTIME',
+      ]) {
+        expect(resolveLockConfig(spelling, ''), spelling).to.deep.equal({
+          attribute: spelling,
+          value: '000001010000Z',
+        });
+      }
+    });
+
     it('refuses another attribute without its value', () => {
       // `000001010000Z` means nothing to nsAccountLock, which 389-ds honours
       // only for 'TRUE' — every deactivation would answer 200 while the

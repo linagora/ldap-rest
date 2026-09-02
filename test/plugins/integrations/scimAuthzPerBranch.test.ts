@@ -386,6 +386,37 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
   });
 
+  it('a refused Bulk operation answers 403 and leaks no marker', async () => {
+    // /Bulk reports a status per operation instead of writing a response, so
+    // it built its own error body and read only ScimError — a directory
+    // refusal came back as 500 quoting `[authz-forbidden]` and the branch DN
+    // behind it, which every other route strips.
+    const res = await supertest(server.app)
+      .post('/scim/v2/Bulk')
+      .set('x-scim-user', 'reader')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+        Operations: [
+          {
+            method: 'POST',
+            bulkId: 'u1',
+            path: '/Users',
+            data: {
+              schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+              userName: 'bob',
+              name: { familyName: 'Doe' },
+            },
+          },
+        ],
+      })
+      .expect(200);
+    const op = res.body.Operations[0];
+    expect(op.status).to.equal('403');
+    expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+    expect(JSON.stringify(res.body)).to.not.include(peopleBase);
+  });
+
   it('reader (delete denied) CANNOT delete a user, writer CAN', async () => {
     await createUser('writer', 'alice').expect(201);
 
