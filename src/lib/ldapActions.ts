@@ -605,9 +605,22 @@ class ldapActions {
         this.releaseConnection(pooled);
       }
     } else {
-      // Routine: a SCIM PATCH whose changes all turn out to be no-ops still
-      // comes through here so the authorization hooks run.
-      this.logger.debug('No changes to apply');
+      // A caller that asked for nothing is routine — a SCIM PATCH whose
+      // operations all turn out to be no-ops still comes through here so the
+      // authorization hooks run. A caller that asked for something and got
+      // nothing emitted is not: say so.
+      const asked = Boolean(
+        (changes.add && Object.keys(changes.add).length) ||
+        (changes.replace && Object.keys(changes.replace).length) ||
+        (Array.isArray(changes.delete)
+          ? changes.delete.length
+          : changes.delete && Object.keys(changes.delete).length)
+      );
+      if (asked) {
+        this.logger.warn(`Modify on ${dn} produced no change to apply`);
+      } else {
+        this.logger.debug(`Modify on ${dn} had nothing to apply`);
+      }
       void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(
         err => {
           this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);

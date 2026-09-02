@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Security
+
+- `plugins/ldap/onChange`, `plugins/ldap/organizations`: both rebuilt the hook
+  tuple without the request. `launchHooksChained` feeds each hook's return
+  value to the next, so an authorization plugin registered after either of
+  them saw no request — and `shouldSkipAuthorization()` returns true the
+  moment it is missing. Every write went through unchecked, whatever
+  `core/auth/authzPerBranch` or `core/auth/authzLinid1` said, depending only
+  on the order the plugins happened to load. This is not specific to SCIM: it
+  covered `modify` for both plugins and `rename` for the second
+
 ### Breaking Changes
 
 - `plugins/scim`: a Group's `externalId` no longer answers its `entryUUID`.
@@ -38,6 +49,15 @@
   exclusive
 
 ### Bug Fixes
+
+- `plugins/ldap/onChange`: the entry snapshot taken before each modify was
+  only ever cleared when the operation was unknown, so the map grew by one
+  entry per modify for the lifetime of the process
+
+- `lib/ldapActions`: a modify that produced nothing to apply logged at error
+  level, which a caller intending a no-op does routinely. It now separates
+  the two: nothing asked for is `debug`, something asked for that produced no
+  change is `warn`
 
 - `plugins/scim`: `active` was always answered as `true`. The attribute
   backing it is operational and was never named in the LDAP search, so a

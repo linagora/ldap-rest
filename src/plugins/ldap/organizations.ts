@@ -586,7 +586,8 @@ export default class LdapOrganizations extends DmPlugin {
         : ([dn, entry] as [string, AttributesList, Request?]);
     },
 
-    ldapmodifyrequest: async ([dn, changes, op]) => {
+    // `req` travels with the tuple — see the note in plugins/ldap/onChange.
+    ldapmodifyrequest: async ([dn, changes, op, req]) => {
       let fakeEntryL: AttributesList = {};
       let fakeEntryP: AttributesList = {};
       let isOrgEntry: boolean | undefined;
@@ -664,7 +665,7 @@ export default class LdapOrganizations extends DmPlugin {
           await this.checkDeptPath(fakeEntryP);
         }
       }
-      return [dn, changes, op];
+      return [dn, changes, op, req];
     },
 
     ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
@@ -676,8 +677,8 @@ export default class LdapOrganizations extends DmPlugin {
       return [dn, req] as [string | string[], Request?];
     },
 
-    ldaprenamerequest: ([dn, newdn]) => {
-      return [dn, newdn];
+    ldaprenamerequest: ([dn, newdn, req]) => {
+      return [dn, newdn, req];
     },
   };
 
