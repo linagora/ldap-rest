@@ -227,6 +227,24 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       expect(entry.displayName || []).to.have.lengthOf(0);
     });
 
+    it('a PATCH that changes nothing is still a write', async () => {
+      await createUser('writer', 'alice').expect(201);
+      // `reader` may read but not write. Removing an attribute the entry
+      // does not hold prunes to an empty change set; answering 200 without
+      // reaching ldapActions told the caller its write had succeeded, when
+      // it was never authorized in the first place.
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/alice')
+        .set('x-scim-user', 'reader')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: 'title' }],
+        })
+        .expect(403);
+      expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+    });
+
     it('read stays granted where it was configured', async () => {
       await createUser('writer', 'alice').expect(201);
       const list = await supertest(server.app)

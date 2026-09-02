@@ -398,9 +398,12 @@ describe('SCIM Users (integration)', function () {
       expect(res.body.active).to.be.false;
     });
 
-    it('PUT without active reactivates, PUT with active=false does not', async () => {
+    it('PUT leaves the lock alone unless the body speaks about it', async () => {
       await create({ active: false }).expect(201);
-      const put = await supertest(server.app)
+      // A profile-sync PUT that never mentions `active` must not release a
+      // lock it knows nothing about — the directory may own it (a ppolicy
+      // auto-lockout, an administrator's hand).
+      const silent = await supertest(server.app)
         .put('/scim/v2/Users/scim-alice')
         .set('Content-Type', 'application/scim+json')
         .send({
@@ -409,9 +412,22 @@ describe('SCIM Users (integration)', function () {
           name: { familyName: 'Doe' },
         })
         .expect(200);
-      expect(put.body.active).to.be.true;
+      expect(silent.body.active).to.be.false;
 
-      const put2 = await supertest(server.app)
+      // Saying so explicitly does reactivate.
+      const on = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+          active: true,
+        })
+        .expect(200);
+      expect(on.body.active).to.be.true;
+
+      const off = await supertest(server.app)
         .put('/scim/v2/Users/scim-alice')
         .set('Content-Type', 'application/scim+json')
         .send({
@@ -421,7 +437,65 @@ describe('SCIM Users (integration)', function () {
           active: false,
         })
         .expect(200);
-      expect(put2.body.active).to.be.false;
+      expect(off.body.active).to.be.false;
+    });
+
+    it('reads the string form on POST and PUT, not only on PATCH', async () => {
+      // `active: "false"` used to miss the strict `=== false` test, so POST
+      // created an enabled account and PUT deleted the lock attribute —
+      // a deactivation executed as a reactivation, answering 200.
+      const created = await create({ active: 'false' }).expect(201);
+      expect(created.body.active).to.be.false;
+
+      const put = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+          active: 'false',
+        })
+        .expect(200);
+      expect(put.body.active).to.be.false;
+    });
+
+    it('refuses a value it cannot read, on POST, PUT and PATCH alike', async () => {
+      for (const value of ['0', 'no', 42, null]) {
+        const res = await create({ active: value }).expect(400);
+        expect(res.body.scimType).to.equal('invalidValue');
+      }
+
+      await create({}).expect(201);
+      for (const value of ['0', 'no', 42, null]) {
+        const put = await supertest(server.app)
+          .put('/scim/v2/Users/scim-alice')
+          .set('Content-Type', 'application/scim+json')
+          .send({
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            userName: 'scim-alice',
+            name: { familyName: 'Doe' },
+            active: value,
+          })
+          .expect(400);
+        expect(put.body.scimType).to.equal('invalidValue');
+
+        const patch = await supertest(server.app)
+          .patch('/scim/v2/Users/scim-alice')
+          .set('Content-Type', 'application/scim+json')
+          .send({
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'replace', path: 'active', value }],
+          })
+          .expect(400);
+        expect(patch.body.scimType).to.equal('invalidValue');
+      }
+
+      // And the account is untouched by any of it.
+      const got = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice')
+        .expect(200);
+      expect(got.body.active).to.be.true;
     });
 
     it('filters on active', async () => {

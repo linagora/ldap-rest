@@ -84,6 +84,30 @@
 
 ### Bug Fixes
 
+- `plugins/scim`: three ways an account could stay usable when SCIM said
+  otherwise, all on the write paths of `active`:
+
+  `POST` and `PUT` only recognised the boolean `false`, so `"active": "false"`
+  — the string several provisioning libraries emit — created an enabled
+  account, and on `PUT` deleted the lock attribute outright: a deactivation
+  executed as a reactivation, answering `200`. The same body via `PATCH` did
+  lock, so the outcome depended on the verb. One rule now reads `active`
+  everywhere, and refuses what it cannot read rather than guessing.
+
+  A `PUT` that never mentioned `active` released the lock all the same. That
+  cleared locks SCIM never set — a ppolicy auto-lockout after failed binds,
+  or one an administrator placed — so a routine profile sync silently
+  defeated the brute-force control. Omission now means unchanged. This
+  deviates from the full-replace semantics of RFC 7644 section 3.5.1, on
+  purpose: `active` projects a lock the directory may own, not an attribute
+  SCIM stores.
+
+  A `PATCH` whose operations all turned out to be no-ops answered `200`
+  without reaching `ldapActions`, where write permission is checked — so a
+  token with read but no write was told its write had succeeded. The empty
+  change set now goes through the same call, which authorizes and then
+  touches nothing
+
 - `plugins/scim`: `meta.created` and `meta.lastModified` carried the
   directory's GeneralizedTime (`20250101120000Z`) straight through. RFC 7643
   section 2.3.5 wants an `xsd:dateTime`, so a strict client rejected every

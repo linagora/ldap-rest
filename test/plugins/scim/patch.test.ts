@@ -297,6 +297,26 @@ describe('SCIM PATCH applicator', () => {
       }
     });
 
+    it('refuses an add or replace with no value at all', async () => {
+      // `{"op":"replace","path":"active"}` is a malformed request, not a
+      // request to unlock. `remove` is the explicit way to say that.
+      for (const op of ['add', 'replace'] as const) {
+        try {
+          await patchToModifyRequest(
+            {
+              schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+              Operations: [{ op, path: 'active' }],
+            },
+            activeCtx
+          );
+          expect.fail(`should have thrown for ${op}`);
+        } catch (err) {
+          expect(err).to.be.instanceOf(ScimError);
+          expect((err as ScimError).scimType).to.equal('invalidValue');
+        }
+      }
+    });
+
     it('reads the string form identity providers sometimes send', async () => {
       const req = await patchToModifyRequest(
         {
