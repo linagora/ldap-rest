@@ -201,6 +201,46 @@ describe('SCIM PATCH applicator', () => {
     expect(two.replace).to.be.undefined;
   });
 
+  describe('an attribute the directory renders as empty', () => {
+    // ldapts signals a requested-but-absent attribute with an empty array,
+    // and the directory refuses to store an empty value for the usual
+    // syntaxes (OpenLDAP: `invalid per syntax`, 0x15). Whichever shape it
+    // arrives in, it means "not there" — and the two shapes must agree,
+    // which they did not.
+    for (const [name, current] of [
+      ['a scalar empty string', { displayName: '' }],
+      ['an empty array', { displayName: [] }],
+      ['an array holding an empty string', { displayName: [''] }],
+    ] as [string, Record<string, string | string[]>][]) {
+      it(`removes nothing when it is ${name}`, async () => {
+        const req = await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'remove', path: 'displayName' }],
+          },
+          withEntry(current)
+        );
+        // Emitting a delete here answers noSuchAttribute and fails the whole
+        // atomic modify, taking the operations sent alongside it down.
+        expect(req.delete, name).to.be.undefined;
+      });
+
+      it(`replaces it as a fresh value when it is ${name}`, async () => {
+        const req = await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'add', path: 'displayName', value: 'Alice' }],
+          },
+          withEntry(current)
+        );
+        // Nothing was there, so this is a replace rather than an add onto an
+        // existing set — and identical whichever way the emptiness rendered.
+        expect(req.replace, name).to.deep.equal({ displayName: 'Alice' });
+        expect(req.add, name).to.be.undefined;
+      });
+    }
+  });
+
   describe('a member removal that resolves to nothing', () => {
     const groupCtx = (resolve: (v: string) => Promise<string | undefined>) => ({
       mapping: DEFAULT_USER_MAPPING,

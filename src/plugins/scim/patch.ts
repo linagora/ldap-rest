@@ -61,14 +61,31 @@ export interface PatchContext {
   current: AttributesList;
 }
 
-/** Attribute values as a plain list, whatever ldapts handed back. */
+/**
+ * Attribute values as a plain list, whatever ldapts handed back.
+ *
+ * The empty string is not a value. ldapts signals an attribute that was
+ * requested and is absent with an empty array, and a directory refuses to
+ * store an empty value for the usual syntaxes — OpenLDAP answers
+ * `invalid per syntax` (0x15) — so anything empty reaching here means
+ * "not there", whether it arrives as `''`, `[]` or `['']`.
+ *
+ * Both shapes have to agree on that. They did not: a scalar `''` read as
+ * absent while an array `['']` kept the empty string, so the same attribute
+ * diffed differently depending on how it was rendered.
+ *
+ * Erring toward "absent" is the deliberate direction. A removal of something
+ * that was not there emits nothing; the opposite reading would emit a delete
+ * that answers noSuchAttribute and fails the whole atomic modify, taking the
+ * operations sent alongside it down — which is the very failure this module
+ * exists to avoid.
+ */
 function asValues(v: AttributeValue | undefined): string[] {
   if (v == null) return [];
-  if (Array.isArray(v))
-    return v.map(x => (Buffer.isBuffer(x) ? x.toString() : String(x)));
-  if (Buffer.isBuffer(v)) return [v.toString()];
-  const s = String(v);
-  return s.length > 0 ? [s] : [];
+  const list = Array.isArray(v) ? v : [v];
+  return list
+    .map(x => (Buffer.isBuffer(x) ? x.toString() : String(x)))
+    .filter(s => s.length > 0);
 }
 
 /**
