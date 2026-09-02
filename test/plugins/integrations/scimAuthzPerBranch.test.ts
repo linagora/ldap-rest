@@ -219,6 +219,34 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
   });
 
+  it('reader (write denied) is DENIED update (PATCH) with 403', async () => {
+    await createUser('writer', 'alice').expect(201);
+
+    // PATCH is a write like PUT: the modify hook must see the request and
+    // deny it. It used to reach ldapActions without `req`, which made every
+    // authorization plugin skip its check.
+    const res = await supertest(server.app)
+      .patch('/scim/v2/Users/alice')
+      .set('x-scim-user', 'reader')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: 'Hax' }],
+      })
+      .expect(403);
+    expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+
+    // And the entry must be untouched.
+    const after = await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['displayName'] },
+      `uid=alice,${peopleBase}`
+    );
+    const entry = (after as { searchEntries: Record<string, unknown>[] })
+      .searchEntries[0];
+    // ldapts answers an absent requested attribute as an empty array.
+    expect(entry.displayName || []).to.have.lengthOf(0);
+  });
+
   it('reader (delete denied) CANNOT delete a user, writer CAN', async () => {
     await createUser('writer', 'alice').expect(201);
 

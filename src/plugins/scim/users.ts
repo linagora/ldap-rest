@@ -367,7 +367,9 @@ export class ScimUsers {
       return this.get(req, id);
     }
     const dn = this.dnForId(id, req);
-    await this.ldap.modify(dn, changes);
+    // `req` must reach ldapActions: the authorization plugins hook
+    // `ldapmodifyrequest` and skip every check when it is missing.
+    await this.ldap.modify(dn, changes, req);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;
