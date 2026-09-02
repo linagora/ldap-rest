@@ -226,6 +226,50 @@ export interface MappingContext {
 export const DEFAULT_LOCK_ATTRIBUTE = 'pwdAccountLockedTime';
 export const DEFAULT_LOCK_VALUE = '000001010000Z';
 
+/** An LDAP attribute name, per RFC 4512 section 2.5 (no options accepted). */
+const LDAP_ATTRIBUTE_NAME = /^[A-Za-z][A-Za-z0-9-]*$/;
+
+/**
+ * Settle the lock configuration, or refuse to start.
+ *
+ * Two ways to get a deployment that answers 200 to every deactivation while
+ * the directory locks nothing:
+ *
+ * - naming an attribute without its value. `000001010000Z` is the ppolicy
+ *   convention and means nothing to `nsAccountLock`, which 389-ds honours
+ *   only for the string `TRUE` — so every deactivation would be written,
+ *   read back as `active: false`, and the account would keep binding.
+ * - a name that is not an attribute name. It is interpolated into the
+ *   emitted LDAP filter for `active eq …`, where a metacharacter makes
+ *   every list either malformed or quietly wrong.
+ *
+ * Both are operator mistakes rather than attacks, and both are silent. This
+ * turns them into a startup failure.
+ */
+export function resolveLockConfig(
+  attribute: string,
+  value: string
+): { attribute: string; value: string } {
+  const attr = (attribute || '').trim() || DEFAULT_LOCK_ATTRIBUTE;
+  if (!LDAP_ATTRIBUTE_NAME.test(attr)) {
+    throw new Error(
+      `--scim-user-lock-attribute must be an LDAP attribute name, got '${attr}'`
+    );
+  }
+  const val = (value || '').trim();
+  if (val) return { attribute: attr, value: val };
+  if (attr === DEFAULT_LOCK_ATTRIBUTE) {
+    // The ppolicy overlay's own "locked forever" convention.
+    return { attribute: attr, value: DEFAULT_LOCK_VALUE };
+  }
+  throw new Error(
+    `--scim-user-lock-attribute is '${attr}', so --scim-user-lock-value must ` +
+      `say what marks an account locked (for ${attr} on 389-ds, 'TRUE'). ` +
+      `The default '${DEFAULT_LOCK_VALUE}' only means anything to ` +
+      `${DEFAULT_LOCK_ATTRIBUTE}.`
+  );
+}
+
 /**
  * Read a SCIM `active` value, wherever it came from.
  *

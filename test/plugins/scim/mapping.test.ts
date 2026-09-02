@@ -10,6 +10,7 @@ import {
   scimGroupToLdap,
   scimPathToLdapAttribute,
   requiredLdapAttributes,
+  resolveLockConfig,
   withExternalId,
   type MappingContext,
 } from '../../../src/plugins/scim/mapping';
@@ -299,6 +300,44 @@ describe('SCIM mapping', () => {
         }
       );
       expect(g.members?.[0]).to.deep.equal({ value: 'alice', type: 'User' });
+    });
+  });
+
+  describe('resolveLockConfig', () => {
+    it('pairs the ppolicy default with its own value', () => {
+      expect(resolveLockConfig('', '')).to.deep.equal({
+        attribute: 'pwdAccountLockedTime',
+        value: '000001010000Z',
+      });
+      expect(resolveLockConfig('pwdAccountLockedTime', '')).to.deep.equal({
+        attribute: 'pwdAccountLockedTime',
+        value: '000001010000Z',
+      });
+    });
+
+    it('takes both when both are given', () => {
+      expect(resolveLockConfig(' nsAccountLock ', ' TRUE ')).to.deep.equal({
+        attribute: 'nsAccountLock',
+        value: 'TRUE',
+      });
+    });
+
+    it('refuses another attribute without its value', () => {
+      // `000001010000Z` means nothing to nsAccountLock, which 389-ds honours
+      // only for 'TRUE' — every deactivation would answer 200 while the
+      // account kept binding.
+      expect(() => resolveLockConfig('nsAccountLock', '')).to.throw(
+        /--scim-user-lock-value must say what marks an account locked/
+      );
+    });
+
+    it('refuses a name that is not an attribute name', () => {
+      // It is interpolated into the LDAP filter for `active eq …`.
+      for (const bad of ['pwd*', 'a(b', 'has space', '1leading']) {
+        expect(() => resolveLockConfig(bad, 'x'), bad).to.throw(
+          /must be an LDAP attribute name/
+        );
+      }
     });
   });
 

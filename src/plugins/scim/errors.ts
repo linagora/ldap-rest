@@ -78,6 +78,16 @@ export function extractLdapCode(err: unknown): number | undefined {
   if (/noSuchAttribute|No such attribute|code:?\s*(16|0x10)/i.test(msg))
     return 16;
   if (/sizeLimitExceeded|Size Limit Exceeded/i.test(msg)) return 4;
+  if (
+    /undefinedAttributeType|Undefined attribute type|code:?\s*(17|0x11)/i.test(
+      msg
+    )
+  )
+    return 17;
+  if (
+    /objectClassViolation|Object Class Violation|code:?\s*(65|0x41)/i.test(msg)
+  )
+    return 65;
   return undefined;
 }
 
@@ -116,6 +126,23 @@ export function writeScimErrorFromException(
   }
   if (ldapCode === 68) {
     writeScimError(res, 409, sanitize(message), 'uniqueness');
+    return;
+  }
+  // The directory rejected the write against its schema. Almost always a
+  // configuration mistake rather than a bad request — most often the lock
+  // attribute backing `active`, whose default needs the ppolicy overlay —
+  // so name the cause instead of answering a bare 500.
+  if (ldapCode === 17 || ldapCode === 65) {
+    writeScimError(
+      res,
+      400,
+      `The directory rejected this write against its schema: ${sanitize(
+        message
+      )}. If it names the attribute backing 'active', that attribute is not in ` +
+        `the directory's schema — the default needs the ppolicy overlay; see ` +
+        `--scim-user-lock-attribute.`,
+      'invalidValue'
+    );
     return;
   }
   writeScimError(res, fallbackStatus, sanitize(message) || 'Internal error');

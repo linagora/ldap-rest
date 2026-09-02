@@ -121,6 +121,20 @@ type undefined`
 
 ### Bug Fixes
 
+- `plugins/scim`: two lock configurations that answered 200 while the
+  directory locked nothing. Naming `--scim-user-lock-attribute` without
+  `--scim-user-lock-value` kept the ppolicy default `000001010000Z`, which
+  means nothing to `nsAccountLock` — 389-ds honours it only for `TRUE` — so
+  every deactivation was written, read back as `active: false`, and the
+  account kept binding. And an attribute name carrying an LDAP filter
+  metacharacter was interpolated into the emitted filter for `active eq …`.
+  Both are refused at startup now, with a message saying what to set
+
+- `plugins/scim`: a directory whose schema does not define the lock attribute
+  — the shipped default needs the ppolicy overlay, which plain OpenLDAP,
+  389-ds and AD do not load — answered a bare `500` to any deactivation. It
+  is now `400 invalidValue`, naming the flag to change
+
 - `plugins/scim`: three ways an account could stay usable when SCIM said
   otherwise, all on the write paths of `active`:
 

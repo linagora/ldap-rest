@@ -32,14 +32,13 @@ import {
   SCHEMA_LIST_RESPONSE,
 } from './types';
 import {
-  DEFAULT_LOCK_ATTRIBUTE,
-  DEFAULT_LOCK_VALUE,
   DEFAULT_USER_MAPPING,
   loadMappingFile,
   mergeMapping,
   ldapToScimUser,
   scimUserToLdap,
   requiredLdapAttributes,
+  resolveLockConfig,
   type MappingContext,
 } from './mapping';
 import { scimFilterToLdap } from './filter';
@@ -143,11 +142,12 @@ export class ScimUsers {
     this.maxResults = (this.config.scim_max_results as number) || 200;
     this.maxScanned = (this.config.scim_max_scanned as number) || 10000;
     this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
-    this.lockAttribute =
-      (this.config.scim_user_lock_attribute as string) ||
-      DEFAULT_LOCK_ATTRIBUTE;
-    this.lockValue =
-      (this.config.scim_user_lock_value as string) || DEFAULT_LOCK_VALUE;
+    const lock = resolveLockConfig(
+      (this.config.scim_user_lock_attribute as string) || '',
+      (this.config.scim_user_lock_value as string) || ''
+    );
+    this.lockAttribute = lock.attribute;
+    this.lockValue = lock.value;
 
     const override = (this.config.scim_user_mapping as string) || '';
     this.mapping = mergeMapping(
