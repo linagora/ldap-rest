@@ -39,6 +39,83 @@
 
 ### Bug Fixes
 
+- `plugins/scim`: a `PUT` carrying `active: false` could answer `200` with
+  `active: true` and leave the account binding. The handler swallowed
+  noSuchAttribute from its modify — meant to absorb a delete of an attribute
+  the entry no longer held — but an LDAP modify is atomic, so nothing had
+  been applied, the lock least of all. It is reported now: `409` when the
+  entry changed underneath, and the schema error below when the lock
+  attribute is the cause
+
+- `plugins/scim`: lock configurations that answered 200 while the directory
+  locked nothing. Naming `--scim-user-lock-attribute` without
+  `--scim-user-lock-value` kept the ppolicy default `000001010000Z`, which
+  means nothing to `nsAccountLock` — 389-ds reads it as locked only when it
+  says `true` — so every deactivation was written, read back as
+  `active: false`, and the account kept binding. And an attribute name
+  carrying an LDAP filter metacharacter was interpolated into the emitted
+  filter for `active eq …`. Both are refused at startup now, with a message
+  saying what to set.
+
+  Two pairings the same mistake produces are warned about rather than
+  refused, being indistinguishable from a deliberate local schema: the
+  ppolicy value pinned on another attribute, which is what a deployment
+  template setting both flags produces by default, and a value
+  `pwdAccountLockedTime` cannot hold.
+
+  This narrows the class rather than closing it: the checks are on the shape
+  of the configuration, and nothing here can prove the directory honours the
+  value you chose. `active` is still read back from the mere presence of the
+  attribute, so a value the directory ignores still reads as locked
+
+- `plugins/scim`: a directory whose schema does not define the lock attribute
+  — the shipped default needs the ppolicy overlay, which plain OpenLDAP,
+  389-ds and AD do not load — answered a bare `500` to any deactivation. It
+  is now `400 invalidValue` naming that attribute and the flags that set it,
+  on `/Bulk` as well as the single-resource routes. The generic translation
+  no longer offers that advice on every schema refusal: an
+  `objectClassViolation` on `/Groups` used to come back recommending a
+  ppolicy overlay
+
+- `lib/ldapActions`: `add`, `modify`, `rename`, `move` and `delete` re-threw
+  their own `Error` around the driver's, which dropped its numeric result
+  code and left callers matching on the driver's wording to tell
+  noSuchObject from a schema refusal. The code travels with the error now
+
+- `plugins/scim`: `--scim-user-lock-attribute` refused a numeric OID, which
+  RFC 4512 accepts wherever an attribute description is written, with a
+  message asserting it was not an attribute name
+
+- `plugins/scim`: `/Bulk` built its own error body and recognised only
+  `ScimError`, so a directory refusal came back as `500` quoting the raw
+  message — including the `[authz-forbidden]` marker and the branch DN behind
+  it, which every other route strips. It now applies the same translation as
+  the rest: `403` for a refusal, `404`, `409` and `400` where they belong
+
+- `plugins/scim`: three ways an account could stay usable when SCIM said
+  otherwise, all on the write paths of `active`:
+
+  `POST` and `PUT` only recognised the boolean `false`, so `"active": "false"`
+  — the string several provisioning libraries emit — created an enabled
+  account, and on `PUT` deleted the lock attribute outright: a deactivation
+  executed as a reactivation, answering `200`. The same body via `PATCH` did
+  lock, so the outcome depended on the verb. One rule now reads `active`
+  everywhere, and refuses what it cannot read rather than guessing.
+
+  A `PUT` that never mentioned `active` released the lock all the same. That
+  cleared locks SCIM never set — a ppolicy auto-lockout after failed binds,
+  or one an administrator placed — so a routine profile sync silently
+  defeated the brute-force control. Omission now means unchanged. This
+  deviates from the full-replace semantics of RFC 7644 section 3.5.1, on
+  purpose: `active` projects a lock the directory may own, not an attribute
+  SCIM stores.
+
+  A `PATCH` whose operations all turned out to be no-ops answered `200`
+  without reaching `ldapActions`, where write permission is checked — so a
+  token with read but no write was told its write had succeeded. The empty
+  change set now goes through the same call, which authorizes and then
+  touches nothing
+
 - `plugins/scim`: a PATCH removing an attribute the entry does not hold failed
   the whole modify with noSuchAttribute; such a removal is now dropped
 
@@ -120,56 +197,6 @@ type undefined`
 - dependencies update
 
 ### Bug Fixes
-
-- `plugins/scim`: two lock configurations that answered 200 while the
-  directory locked nothing. Naming `--scim-user-lock-attribute` without
-  `--scim-user-lock-value` kept the ppolicy default `000001010000Z`, which
-  means nothing to `nsAccountLock` — 389-ds honours it only for `TRUE` — so
-  every deactivation was written, read back as `active: false`, and the
-  account kept binding. And an attribute name carrying an LDAP filter
-  metacharacter was interpolated into the emitted filter for `active eq …`.
-  Both are refused at startup now, with a message saying what to set.
-
-  This narrows the class rather than closing it: the check is on the shape of
-  the configuration, and nothing here can prove the directory honours the
-  value you chose. `active` is still read back from the mere presence of the
-  attribute, so a value the directory ignores still reads as locked
-
-- `plugins/scim`: a directory whose schema does not define the lock attribute
-  — the shipped default needs the ppolicy overlay, which plain OpenLDAP,
-  389-ds and AD do not load — answered a bare `500` to any deactivation. It
-  is now `400 invalidValue`, naming the flag to change, on `/Bulk` as well as
-  the single-resource routes
-
-- `plugins/scim`: `/Bulk` built its own error body and recognised only
-  `ScimError`, so a directory refusal came back as `500` quoting the raw
-  message — including the `[authz-forbidden]` marker and the branch DN behind
-  it, which every other route strips. It now applies the same translation as
-  the rest: `403` for a refusal, `404`, `409` and `400` where they belong
-
-- `plugins/scim`: three ways an account could stay usable when SCIM said
-  otherwise, all on the write paths of `active`:
-
-  `POST` and `PUT` only recognised the boolean `false`, so `"active": "false"`
-  — the string several provisioning libraries emit — created an enabled
-  account, and on `PUT` deleted the lock attribute outright: a deactivation
-  executed as a reactivation, answering `200`. The same body via `PATCH` did
-  lock, so the outcome depended on the verb. One rule now reads `active`
-  everywhere, and refuses what it cannot read rather than guessing.
-
-  A `PUT` that never mentioned `active` released the lock all the same. That
-  cleared locks SCIM never set — a ppolicy auto-lockout after failed binds,
-  or one an administrator placed — so a routine profile sync silently
-  defeated the brute-force control. Omission now means unchanged. This
-  deviates from the full-replace semantics of RFC 7644 section 3.5.1, on
-  purpose: `active` projects a lock the directory may own, not an attribute
-  SCIM stores.
-
-  A `PATCH` whose operations all turned out to be no-ops answered `200`
-  without reaching `ldapActions`, where write permission is checked — so a
-  token with read but no write was told its write had succeeded. The empty
-  change set now goes through the same call, which authorizes and then
-  touches nothing
 
 - `plugins/scim`: `meta.created` and `meta.lastModified` carried the
   directory's GeneralizedTime (`20250101120000Z`) straight through. RFC 7643

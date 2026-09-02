@@ -86,6 +86,16 @@ function entryHas(entry: AttributesList, attr: string): boolean {
   return true;
 }
 
+/** Does this change set write or clear the attribute backing `active`? */
+function touchesLock(changes: ModifyRequest, lockAttribute: string): boolean {
+  if (changes.replace && lockAttribute in changes.replace) return true;
+  if (changes.add && lockAttribute in changes.add) return true;
+  const del = changes.delete;
+  if (Array.isArray(del)) return del.includes(lockAttribute);
+  if (del && typeof del === 'object') return lockAttribute in del;
+  return false;
+}
+
 /**
  * Drop from `changes.delete` every attribute the entry does not hold.
  *
@@ -325,6 +335,12 @@ export class ScimUsers {
       if (extractLdapCode(err) === 68) {
         throw scimUniqueness(`User ${rdn} already exists`);
       }
+      // The lock attribute is written here whenever the body said
+      // `active: false`, and a directory without the schema for it refuses
+      // the whole add.
+      if (attributes[this.lockAttribute] !== undefined) {
+        throw this.lockSchemaError(err);
+      }
       throw err;
     }
 
@@ -412,10 +428,23 @@ export class ScimUsers {
     if ((changes.delete as string[]).length === 0) delete changes.delete;
 
     if (changes.replace || changes.delete) {
+      // An LDAP modify is atomic: noSuchAttribute (0x10) means *nothing* was
+      // applied. Swallowing it was meant to absorb a delete of an attribute
+      // the snapshot said was there and the entry no longer holds — but with
+      // `active` in the same change set it answered 200 to a deactivation
+      // the directory had rolled back, and the account kept binding. The
+      // deletes are already derived from the snapshot, so a 16 here is a
+      // concurrent modification, not a routine no-op: report it.
       try {
         await this.ldap.modify(dn, changes, req);
       } catch (err) {
+        if (active !== undefined) throw this.lockSchemaError(err);
         if (extractLdapCode(err) !== 16) throw err;
+        throw new ScimError(
+          409,
+          `${dn} changed while this PUT was being applied; nothing was ` +
+            `written. Retry the request.`
+        );
       }
     }
 
@@ -449,10 +478,40 @@ export class ScimUsers {
     //
     // `req` must reach ldapActions: the authorization plugins hook
     // `ldapmodifyrequest` and skip every check when it is missing.
-    await this.ldap.modify(dn, changes, req);
+    try {
+      await this.ldap.modify(dn, changes, req);
+    } catch (err) {
+      if (touchesLock(changes, this.lockAttribute)) {
+        throw this.lockSchemaError(err);
+      }
+      throw err;
+    }
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;
+  }
+
+  /**
+   * Re-raise a directory refusal that names the schema, pointing at the flag
+   * that caused it.
+   *
+   * The generic translation in `errors` cannot do this: it sees the error,
+   * not the configuration. Only this class knows which attribute was
+   * configured to back `active`, and the shipped default —
+   * `pwdAccountLockedTime` — exists only where slapd loads the ppolicy
+   * overlay, which is the common way to meet this.
+   */
+  private lockSchemaError(err: unknown): unknown {
+    const code = extractLdapCode(err);
+    if (code !== 17 && code !== 65) return err;
+    const message = err instanceof Error ? err.message : String(err);
+    return scimInvalidValue(
+      `The directory rejected '${this.lockAttribute}', the attribute backing ` +
+        `'active': ${message}. Point --scim-user-lock-attribute and ` +
+        `--scim-user-lock-value at an attribute this directory defines ` +
+        `(nsAccountLock / TRUE on 389-ds); the default needs the ppolicy ` +
+        `overlay.`
+    );
   }
 
   /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */

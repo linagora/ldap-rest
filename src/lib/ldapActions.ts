@@ -50,6 +50,24 @@ export interface ModifyRequest {
 
 // Code
 
+/**
+ * Wrap a driver error without losing its LDAP result code.
+ *
+ * These methods re-throw their own `Error` so the message says which
+ * operation failed. That used to leave the numeric code — the only
+ * dependable way for a caller to tell noSuchObject from
+ * entryAlreadyExists, or a schema refusal from a server fault — recoverable
+ * only by matching the driver's wording, which no driver promises to keep.
+ * `Error.cause` would be the idiomatic home for it, but it is not in this
+ * project's `lib` target; the code itself is what callers read.
+ */
+function ldapError(context: string, error: unknown): Error {
+  const wrapped = new Error(`${context}: ${String(error)}`);
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (typeof code === 'number') (wrapped as { code?: number }).code = code;
+  return wrapped;
+}
+
 class ldapActions {
   config: Config;
   options: ClientOptions;
@@ -501,8 +519,7 @@ class ldapActions {
       );
       return true;
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`LDAP add error: ${error}`);
+      throw ldapError(`LDAP add error`, error);
     } finally {
       this.releaseConnection(pooled);
     }
@@ -599,8 +616,7 @@ class ldapActions {
         this.logger.warn(
           `Changes that failed: ${dn}, ${JSON.stringify(ldapChanges)}`
         );
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        throw new Error(`LDAP modify error: ${error}`);
+        throw ldapError(`LDAP modify error`, error);
       } finally {
         this.releaseConnection(pooled);
       }
@@ -634,8 +650,7 @@ class ldapActions {
       );
       return true;
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`LDAP rename error: ${error}`);
+      throw ldapError(`LDAP rename error`, error);
     } finally {
       this.releaseConnection(pooled);
     }
@@ -663,8 +678,7 @@ class ldapActions {
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`LDAP move error: ${error}`);
+      throw ldapError(`LDAP move error`, error);
     } finally {
       this.releaseConnection(pooled);
     }
@@ -693,8 +707,7 @@ class ldapActions {
           // Invalidate cache for this DN
           this.invalidateCache(entry);
         } catch (error) {
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          throw new Error(`LDAP delete error: ${error}`);
+          throw ldapError(`LDAP delete error`, error);
         }
         void launchHooks(this.parent.hooks.ldapdeletedone, entry).catch(err => {
           this.logger.error(`Hook ldapdeletedone failed: ${String(err)}`);

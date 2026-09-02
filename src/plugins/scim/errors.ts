@@ -60,9 +60,13 @@ export function writeScimError(
 }
 
 /**
- * Extract an LDAP numeric error code from either a thrown ldapts error
- * (has `.code`) or an Error wrapped by ldapActions (message contains the
- * original text). Returns undefined if no code is detectable.
+ * Extract an LDAP numeric error code from a thrown ldapts error.
+ *
+ * `.code` first: ldapts sets it, and `ldapActions` now carries it across its
+ * own wrapping rather than reducing the failure to a sentence. The message
+ * patterns below stay as a fallback for the paths that still throw a bare
+ * `Error` — they are why a driver that reworded its messages could quietly
+ * turn a 400 into a 500, so they are the last resort, not the first.
  */
 export function extractLdapCode(err: unknown): number | undefined {
   if (err == null) return undefined;
@@ -136,18 +140,18 @@ export function scimErrorFromException(
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) return body(404, 'Resource not found');
   if (ldapCode === 68) return body(409, sanitize(message), 'uniqueness');
-  // The directory rejected the write against its schema. Almost always a
-  // configuration mistake rather than a bad request — most often the lock
-  // attribute backing `active`, whose default needs the ppolicy overlay —
-  // so name the cause instead of answering a bare 500.
+  // undefinedAttributeType (17) and objectClassViolation (65): the request
+  // named something the directory's schema does not allow here. That is the
+  // client's or the operator's doing, not a server fault, so it is a 400
+  // rather than a bare 500 — but which of the two, and which flag to reach
+  // for, depends on the route. The caller that knows adds that; this stays
+  // generic, having only the error to go on.
   if (ldapCode === 17 || ldapCode === 65) {
     return body(
       400,
       `The directory rejected this write against its schema: ${sanitize(
         message
-      )}. If it names the attribute backing 'active', that attribute is not in ` +
-        `the directory's schema — the default needs the ppolicy overlay; see ` +
-        `--scim-user-lock-attribute.`,
+      )}`,
       'invalidValue'
     );
   }

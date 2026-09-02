@@ -206,10 +206,13 @@ export interface MappingContext {
   scimPrefix: string;
   /**
    * LDAP attribute whose *presence* marks the account as locked, and the
-   * value written to lock it. See `DEFAULT_LOCK_ATTRIBUTE`.
+   * value written to lock it. Both come from `resolveLockConfig()`, which is
+   * the only place the defaults live: re-defaulting here would let a context
+   * built outside the plugin reach the directory with a pair the startup
+   * guard never saw. Groups have no `active`, so they pass empty strings.
    */
-  lockAttribute?: string;
-  lockValue?: string;
+  lockAttribute: string;
+  lockValue: string;
 }
 
 /**
@@ -226,25 +229,64 @@ export interface MappingContext {
 export const DEFAULT_LOCK_ATTRIBUTE = 'pwdAccountLockedTime';
 export const DEFAULT_LOCK_VALUE = '000001010000Z';
 
-/** An LDAP attribute name, per RFC 4512 section 2.5 (no options accepted). */
-const LDAP_ATTRIBUTE_NAME = /^[A-Za-z][A-Za-z0-9-]*$/;
+/**
+ * RFC 4517 section 3.3.13, loosely: enough to tell `000001010000Z` from
+ * `TRUE`, not enough to validate a timestamp — that is the directory's job.
+ */
+const GENERALIZED_TIME = /^\d{10,14}(\.\d+)?(Z|[+-]\d{2,4})$/;
+
+/**
+ * Where the configuration warnings go. A seam rather than a direct
+ * `console.warn` so the unit tests can read what was said instead of
+ * asserting on stderr.
+ */
+export let warn: (message: string) => void = message => {
+  console.warn(`WARNING: ${message}`);
+};
+
+/** Testing seam: replace the warning sink, and get the previous one back. */
+export function setLockConfigWarn(
+  sink: (message: string) => void
+): (message: string) => void {
+  const previous = warn;
+  warn = sink;
+  return previous;
+}
+
+/**
+ * An LDAP attribute description, per RFC 4512 section 2.5: `descr` — a
+ * letter then letters, digits and hyphens — or a `numericoid`. Options
+ * (`;binary`) are not accepted: the plugin compares the name it configured
+ * against the name the directory answers, and an option would never match.
+ */
+const LDAP_ATTRIBUTE_NAME = /^([A-Za-z][A-Za-z0-9-]*|\d+(\.\d+)+)$/;
 
 /**
  * Settle the lock configuration, or refuse to start.
  *
- * Two ways to get a deployment that answers 200 to every deactivation while
- * the directory locks nothing:
+ * Ways to get a deployment that answers 200 to every deactivation while the
+ * directory locks nothing:
  *
  * - naming an attribute without its value. `000001010000Z` is the ppolicy
- *   convention and means nothing to `nsAccountLock`, which 389-ds honours
- *   only for the string `TRUE` — so every deactivation would be written,
- *   read back as `active: false`, and the account would keep binding.
- * - a name that is not an attribute name. It is interpolated into the
+ *   convention and means nothing to `nsAccountLock`, which 389-ds reads as
+ *   locked only when it says `true` — so every deactivation would be
+ *   written, read back as `active: false`, and the account would keep
+ *   binding.
+ * - naming an attribute and pinning that same ppolicy value on it, which a
+ *   deployment template that always sets both flags does by default. The
+ *   guard above sees a value and passes; the outcome is identical.
+ * - the mirror: a value the default attribute cannot hold.
+ *   `pwdAccountLockedTime` is a GeneralizedTime, so `TRUE` is refused by the
+ *   directory's schema — or, where the attribute was redefined locally,
+ *   stored and ignored.
+ * - a name that is not an attribute description. It is interpolated into the
  *   emitted LDAP filter for `active eq …`, where a metacharacter makes
  *   every list either malformed or quietly wrong.
  *
- * Both are operator mistakes rather than attacks, and both are silent. This
- * turns them into a startup failure.
+ * All are operator mistakes rather than attacks, and all are silent. The
+ * first and the last are refused outright. The two in the middle cannot be
+ * told apart from a deliberate local schema, so they are warned about: what
+ * the directory does with a value is beyond anything this can check.
  */
 export function resolveLockConfig(
   attribute: string,
@@ -256,20 +298,41 @@ export function resolveLockConfig(
       `--scim-user-lock-attribute must be an LDAP attribute name, got '${attr}'`
     );
   }
-  const val = (value || '').trim();
-  if (val) return { attribute: attr, value: val };
   // LDAP attribute descriptions are case-insensitive (RFC 4512 section 2.5),
   // so `pwdaccountlockedtime` is the same attribute and must keep working.
-  if (attr.toLowerCase() === DEFAULT_LOCK_ATTRIBUTE.toLowerCase()) {
+  const isDefaultAttr =
+    attr.toLowerCase() === DEFAULT_LOCK_ATTRIBUTE.toLowerCase();
+  const val = (value || '').trim();
+  if (!val) {
     // The ppolicy overlay's own "locked forever" convention.
-    return { attribute: attr, value: DEFAULT_LOCK_VALUE };
+    if (isDefaultAttr) return { attribute: attr, value: DEFAULT_LOCK_VALUE };
+    throw new Error(
+      `--scim-user-lock-attribute is '${attr}', so --scim-user-lock-value ` +
+        `must say what marks an account locked (for nsAccountLock on 389-ds, ` +
+        `'TRUE'). The default '${DEFAULT_LOCK_VALUE}' only means anything to ` +
+        `${DEFAULT_LOCK_ATTRIBUTE}.`
+    );
   }
-  throw new Error(
-    `--scim-user-lock-attribute is '${attr}', so --scim-user-lock-value must ` +
-      `say what marks an account locked (for ${attr} on 389-ds, 'TRUE'). ` +
-      `The default '${DEFAULT_LOCK_VALUE}' only means anything to ` +
-      `${DEFAULT_LOCK_ATTRIBUTE}.`
-  );
+  if (!isDefaultAttr && val === DEFAULT_LOCK_VALUE) {
+    warn(
+      `--scim-user-lock-value is the ppolicy convention '${DEFAULT_LOCK_VALUE}' ` +
+        `but --scim-user-lock-attribute is '${attr}', not ` +
+        `${DEFAULT_LOCK_ATTRIBUTE}. Unless '${attr}' is a GeneralizedTime your ` +
+        `directory reads as a lock, every deactivation will answer 200 and ` +
+        `read back as active:false while the account keeps binding. Verify a ` +
+        `deactivation actually prevents a bind.`
+    );
+  }
+  if (isDefaultAttr && !GENERALIZED_TIME.test(val)) {
+    warn(
+      `--scim-user-lock-value '${val}' is not a GeneralizedTime, and ` +
+        `${DEFAULT_LOCK_ATTRIBUTE} holds one. The directory will refuse the ` +
+        `write, or — where the attribute was redefined locally — store a value ` +
+        `it does not read as a lock. The ppolicy convention is ` +
+        `'${DEFAULT_LOCK_VALUE}'.`
+    );
+  }
+  return { attribute: attr, value: val };
 }
 
 /**
@@ -295,7 +358,7 @@ export function readActive(value: unknown): boolean | undefined {
 
 /** Is this entry locked, per the configured lock attribute? */
 export function isLocked(entry: AttributesList, ctx: MappingContext): boolean {
-  const raw = entry[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE];
+  const raw = entry[ctx.lockAttribute];
   if (raw == null) return false;
   // A directory may answer an empty array for an attribute it does not hold.
   if (Array.isArray(raw)) return raw.length > 0;
@@ -437,8 +500,7 @@ export function scimUserToLdap(
   // anything about it at all.
   const active = readActive(user.active);
   if (active === false) {
-    attributes[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE] =
-      ctx.lockValue || DEFAULT_LOCK_VALUE;
+    attributes[ctx.lockAttribute] = ctx.lockValue || DEFAULT_LOCK_VALUE;
   }
 
   // Ensure required inetOrgPerson attributes have sensible defaults

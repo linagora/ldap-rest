@@ -157,9 +157,10 @@ The default targets the ppolicy overlay:
 ```
 
 `pwdAccountLockedTime` only exists when slapd loads the ppolicy overlay. On a
-directory without it — plain OpenLDAP, 389-ds, AD — a deactivation is refused
-by the schema, and the plugin answers `400 invalidValue` naming the flag
-rather than a bare 500. Point the two flags elsewhere:
+directory without it — plain OpenLDAP, 389-ds, AD — the directory refuses the
+write against its schema, and the plugin answers `400 invalidValue` naming
+the attribute and the flags to change, on `/Bulk` as on the single-resource
+routes. Point the two flags elsewhere:
 
 ```bash
 --scim-user-lock-attribute nsAccountLock
@@ -167,25 +168,35 @@ rather than a bare 500. Point the two flags elsewhere:
 ```
 
 **Name the value whenever you name the attribute.** `000001010000Z` is the
-ppolicy convention and means nothing to any other attribute — 389-ds honours
-`nsAccountLock` only for the string `TRUE`. Setting the attribute alone would
-otherwise write a value the directory ignores: every deactivation answers 200
-and reads back `active: false` while the account keeps binding. The plugin
-refuses to start instead.
+ppolicy convention and means nothing to any other attribute: 389-ds reads
+`nsAccountLock` as locked only when it says `true`. Setting the attribute
+alone would write a value the directory ignores — every deactivation answers
+200 and reads back `active: false` while the account keeps binding. The
+plugin refuses to start instead.
 
-That check is on the shape of the configuration, not its meaning: nothing
-here can tell whether your directory honours the value you chose. `active` is
-read back from the mere presence of the attribute, so a value the directory
-ignores still reads as `false`. Verify a deactivation actually prevents a
-bind, once, when you set these flags.
+Two more pairings get a warning at startup rather than a refusal, because
+neither can be told apart from a deliberate local schema:
+
+- the ppolicy value `000001010000Z` pinned on some other attribute, which is
+  what a deployment template that always sets both flags produces by default
+- a value `pwdAccountLockedTime` cannot hold, `TRUE` for instance: it holds a
+  GeneralizedTime
+
+**None of this can tell whether your directory honours the value you chose.**
+The checks are on the shape of the configuration. `active` is read back from
+the mere presence of the attribute, so a value the directory stores and
+ignores still reads as `false`. Verify once, by hand, that a deactivation
+actually prevents a bind.
 
 `active` is not a mapping entry and must not be added to a mapping file: it is
 handled by these two flags on every path — create, PUT, PATCH and the
 `active eq true|false` filter alike.
 
-Note that PUT is a full replacement (RFC 7644 §3.5.1): a body that omits
-`active` reactivates the account, just as it clears any other omitted
-attribute. Use PATCH to change only the status.
+PUT is a full replacement (RFC 7644 §3.5.1) for every attribute except this
+one: a body that omits `active` leaves the lock as it stands. Clearing it
+would release locks SCIM never set — a ppolicy auto-lockout, or one an
+administrator placed — so a routine profile sync would defeat the
+brute-force control. Send `"active": true` to reactivate deliberately.
 
 ## Writing a custom mapping schema
 

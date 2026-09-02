@@ -642,16 +642,19 @@ describe('SCIM Users (integration)', function () {
     const savedBad: Record<string, string | undefined> = {};
 
     before(async () => {
-      // The shipped default, pwdAccountLockedTime, only exists when slapd
-      // loads the ppolicy overlay — this test directory does not, which is
-      // the common default deployment shape.
+      // Naming an attribute no schema defines, rather than relying on the
+      // shipped default being absent: pwdAccountLockedTime exists wherever
+      // slapd loads the ppolicy overlay, so leaning on this directory not
+      // having it made the only test in this file whose result depended on
+      // what the directory was missing — green here, red against a ppolicy
+      // directory in the documented external-LDAP mode.
       for (const k of [
         'DM_SCIM_USER_LOCK_ATTRIBUTE',
         'DM_SCIM_USER_LOCK_VALUE',
       ])
         savedBad[k] = process.env[k];
-      delete process.env.DM_SCIM_USER_LOCK_ATTRIBUTE;
-      delete process.env.DM_SCIM_USER_LOCK_VALUE;
+      process.env.DM_SCIM_USER_LOCK_ATTRIBUTE = 'noSuchLockAttributeAnywhere';
+      process.env.DM_SCIM_USER_LOCK_VALUE = 'TRUE';
       badServer = new DM();
       badPlugin = new Scim(badServer);
       await badPlugin.api(badServer.app);
@@ -683,6 +686,10 @@ describe('SCIM Users (integration)', function () {
         .expect(400);
       expect(res.body.scimType).to.equal('invalidValue');
       expect(res.body.detail).to.match(/--scim-user-lock-attribute/);
+      // The attribute that caused it, named — the point of routing this
+      // through the users plugin rather than the generic translation, which
+      // cannot know which attribute backs `active`.
+      expect(res.body.detail).to.match(/noSuchLockAttributeAnywhere/);
       expect(res.body.schemas[0]).to.equal(
         'urn:ietf:params:scim:api:messages:2.0:Error'
       );
