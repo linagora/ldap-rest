@@ -43,6 +43,8 @@ const en: Catalogue = {
   'dashboard.create': 'New {entity}',
   'dashboard.noCreate': 'Creation not allowed here',
 
+  'list.open': 'Open',
+  'list.listEverything': 'List everything (may be slow)',
   'list.search': 'Search',
   'list.searchIn': 'in',
   'list.searchGuard': 'Type at least {count} characters to search',
@@ -60,6 +62,7 @@ const en: Catalogue = {
 
   'detail.attributes': 'Details',
   'detail.relations': 'Related entries',
+  'detail.members': 'Attached entries',
   'detail.emptyRelations': 'No related entry',
   'detail.actions': 'Actions',
   'detail.notFound': 'This entry no longer exists',
@@ -80,6 +83,10 @@ const en: Catalogue = {
   'status.title': 'Account state',
   'status.change': 'Change state',
   'status.changed': 'State changed to {state}',
+  'state.enabled': 'Enabled',
+  'state.disabled': 'Disabled',
+  'state.noAccess': 'No access',
+  'state.toDelete': 'To be deleted',
 
   'password.title': 'Reset password',
   'password.generate': 'Generate a password',
@@ -126,9 +133,11 @@ const fr: Catalogue = {
 
   'dashboard.welcome': 'Connecté en tant que {user}',
   'dashboard.entities': 'Ce que vous pouvez gérer',
-  'dashboard.create': 'Nouveau : {entity}',
+  'dashboard.create': 'Créer : {entity}',
   'dashboard.noCreate': 'Création non autorisée ici',
 
+  'list.open': 'Ouvrir',
+  'list.listEverything': 'Tout lister (peut être long)',
   'list.search': 'Rechercher',
   'list.searchIn': 'dans',
   'list.searchGuard': 'Saisissez au moins {count} caractères pour rechercher',
@@ -146,6 +155,7 @@ const fr: Catalogue = {
 
   'detail.attributes': 'Fiche',
   'detail.relations': 'Entrées liées',
+  'detail.members': 'Entrées rattachées',
   'detail.emptyRelations': 'Aucune entrée liée',
   'detail.actions': 'Actions',
   'detail.notFound': 'Cette entrée n’existe plus',
@@ -166,6 +176,10 @@ const fr: Catalogue = {
   'status.title': 'État du compte',
   'status.change': 'Changer l’état',
   'status.changed': 'État passé à {state}',
+  'state.enabled': 'Actif',
+  'state.disabled': 'Désactivé',
+  'state.noAccess': 'Sans accès',
+  'state.toDelete': 'À supprimer',
 
   'password.title': 'Réinitialiser le mot de passe',
   'password.generate': 'Générer un mot de passe',

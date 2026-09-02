@@ -52,6 +52,16 @@
   which attribute carries it, is schema configuration. A generated password is
   returned exactly once, since the credential attributes are `neverReturn`
 
+- `abstract/ldapFlat`, `browser/directory-console`: a schema names its own
+  entities and attributes in as many languages as it likes — `label`,
+  `entity.label` and `entity.singularLabel` accept `{ "en": …, "fr": … }`
+  alongside a plain string — and the console shows the reader's. Two
+  catalogues meet without either learning the other's words: the console's
+  own holds the interface (`Search`, `Per page`), the schema's holds the
+  deployment's vocabulary. That is what lets an interface be fully translated
+  without the product learning what a customer calls a department, and it is
+  what the screens it replaces got wrong one field at a time
+
 - `browser/directory-console`: an administration interface — entity lists with
   search, paging and bulk actions, an organization tree that stays on screen,
   a detail card showing every attribute, schema-driven forms with the pattern

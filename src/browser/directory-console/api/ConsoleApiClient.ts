@@ -12,6 +12,7 @@ import type {
   EntityDescriptor,
   EntitySchema,
   Entry,
+  LocalizedText,
   OrganizationNode,
   Scope,
   SchemaAttribute,
@@ -21,6 +22,8 @@ interface FlatResource {
   name: string;
   singularName: string;
   pluralName: string;
+  label?: LocalizedText;
+  singularLabel?: LocalizedText;
   mainAttribute: string;
   base: string;
   schema: EntitySchema;
@@ -40,6 +43,7 @@ interface ConfigResponse {
     ldapOrganizations?: {
       enabled?: boolean;
       topOrganization?: string;
+      organizationClass?: string[];
       pathSeparator?: string;
       schema?: EntitySchema;
     };
@@ -85,6 +89,8 @@ export class ConsoleApiClient {
   private topOrganization?: string;
   /** Attribute carrying the readable path of an organization, from its role */
   private organizationPathAttribute?: string;
+  /** Object classes that make an entry an organization rather than a member */
+  private organizationClasses: string[] = [];
   /**
    * Whether the API lives on another origin than the page. `same-origin`
    * attaches no cookie to a cross-origin request, so a deployment that points
@@ -164,6 +170,9 @@ export class ConsoleApiClient {
           key: resource.pluralName,
           pluralName: resource.pluralName,
           singularName: resource.singularName,
+          label: resource.label ?? resource.schema.entity?.label,
+          singularLabel:
+            resource.singularLabel ?? resource.schema.entity?.singularLabel,
           mainAttribute: resource.mainAttribute,
           base: resource.base,
           schema: resource.schema,
@@ -180,6 +189,8 @@ export class ConsoleApiClient {
           key: 'groups',
           pluralName: 'groups',
           singularName: 'group',
+          label: groups.schema.entity?.label,
+          singularLabel: groups.schema.entity?.singularLabel,
           mainAttribute: groups.mainAttribute || 'cn',
           base: groups.base || '',
           schema: groups.schema,
@@ -197,12 +208,17 @@ export class ConsoleApiClient {
         organizations.schema,
         'organizationPath'
       );
+      this.organizationClasses = (organizations.organizationClass || [])
+        .filter(name => name.toLowerCase() !== 'top')
+        .map(name => name.toLowerCase());
       if (organizations.schema?.attributes) {
         entities.push(
           this.describe({
             key: 'organizations',
             pluralName: 'organizations',
             singularName: 'organization',
+            label: organizations.schema.entity?.label,
+            singularLabel: organizations.schema.entity?.singularLabel,
             mainAttribute: 'ou',
             base: organizations.topOrganization || '',
             schema: organizations.schema,
@@ -368,21 +384,81 @@ export class ConsoleApiClient {
   }
 
   /**
-   * Direct children of an organization.
+   * What the directory hangs under an organization: its child organizations
+   * *and* the entries attached to it.
    *
-   * `subnodes` answers with the child organizations *and* the entries linked
-   * to this one — the accounts and groups it holds — capped at
-   * `ldap_organization_max_subnodes` and followed by a `moreIndicator` row
-   * when the cap bites. A tree of organizations wants none of that, so the
-   * filter the endpoint provides for exactly this is passed: it drops the
-   * linked entries, and with them the indicator that counted them.
+   * Asked whole, the answer caps the attached entries at
+   * `ldap_organization_max_subnodes` and appends a `moreIndicator` row
+   * counting the rest. Asked for one class, it drops the attached entries
+   * altogether — and with them the cap and the indicator.
+   *
+   * @param dn organization to read
+   * @param objectClass class to restrict the answer to
+   * @returns the raw entries
+   */
+  private async subnodes(dn: string, objectClass?: string): Promise<Entry[]> {
+    const filter = objectClass
+      ? `?objectClass=${encodeURIComponent(objectClass)}`
+      : '';
+    return (
+      (await this.call<Entry[]>(
+        `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}` +
+          `/subnodes${filter}`
+      )) || []
+    );
+  }
+
+  /**
+   * Tell an organization apart from an entry merely attached to one. The
+   * subnodes endpoint returns both, and a tree that shows accounts as branches
+   * of the org chart is worse than no tree at all.
+   *
+   * @param entry entry to classify
+   * @returns true when the entry is itself an organization
+   */
+  private isOrganization(entry: Entry): boolean {
+    const classes = (
+      Array.isArray(entry.objectClass)
+        ? entry.objectClass
+        : [entry.objectClass ?? '']
+    ).map(name => String(name).toLowerCase());
+    if (this.organizationClasses.length)
+      return this.organizationClasses.some(name => classes.includes(name));
+    // No class list configured: fall back to the shape of the DN.
+    return /^ou=/i.test(String(entry.dn || ''));
+  }
+
+  /**
+   * Direct child organizations of an organization.
+   *
+   * The endpoint searches its own children on `organizationalUnit` whatever
+   * it is asked, so that is the class to ask for; the class list a deployment
+   * declares is what tells an *attached* entry apart, below.
    */
   async organizationChildren(dn: string): Promise<OrganizationNode[]> {
-    const entries = await this.call<Entry[]>(
-      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}` +
-        `/subnodes?objectClass=${encodeURIComponent(ORGANIZATION_CLASS)}`
+    return (await this.subnodes(dn, ORGANIZATION_CLASS)).map(entry =>
+      this.toNode(entry)
     );
-    return (entries || []).map(entry => this.toNode(entry));
+  }
+
+  /**
+   * Entries attached to an organization without being one — the accounts and
+   * groups that answer "who is in this department?".
+   *
+   * @param dn organization to read
+   * @returns DN and readable name of each attached entry
+   */
+  async organizationMembers(
+    dn: string
+  ): Promise<{ dn: string; label: string }[]> {
+    return (await this.subnodes(dn))
+      .filter(entry => !this.isOrganization(entry))
+      .map(entry => ({
+        dn: String(entry.dn || ''),
+        label: String(entry.dn || '')
+          .split(',')[0]
+          .replace(/^[^=]+=/, ''),
+      }));
   }
 
   /** Read one organization. */

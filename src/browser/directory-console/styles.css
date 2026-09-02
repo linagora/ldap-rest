@@ -232,6 +232,12 @@
   align-items: center;
 }
 
+/* A class that sets `display` outranks the user-agent rule behind [hidden],
+   so the bulk bar has to opt out of it explicitly. */
+.dc-bulk[hidden] {
+  display: none;
+}
+
 .dc-table-scroll {
   overflow-x: auto;
   background: var(--dc-surface);

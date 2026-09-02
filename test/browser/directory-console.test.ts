@@ -10,6 +10,10 @@ import { expect } from 'chai';
 import nock from 'nock';
 
 import { ConsoleApiClient } from '../../src/browser/directory-console/api/ConsoleApiClient';
+import {
+  attributeLabel,
+  resolveText,
+} from '../../src/browser/directory-console/format';
 import { EntityDetail } from '../../src/browser/directory-console/components/EntityDetail';
 import { EntityForm } from '../../src/browser/directory-console/components/EntityForm';
 import {
@@ -46,7 +50,12 @@ const usersSchema: EntitySchema = {
       generated: true,
       generatedFrom: { attribute: 'mail', extract: '^([^@]+)@' },
     },
-    cn: { type: 'string', role: 'displayName', required: true },
+    cn: {
+      type: 'string',
+      role: 'displayName',
+      required: true,
+      label: { en: 'Name', fr: 'Nom' },
+    },
     mail: {
       type: 'string',
       role: 'primaryEmail',
@@ -134,6 +143,43 @@ describe('Directory console', () => {
     });
   });
 
+  describe('localized text', () => {
+    it('should take a plain string as the text itself', () => {
+      expect(resolveText('Department', 'fr')).to.equal('Department');
+    });
+
+    it('should pick the language, then its base tag, then English', () => {
+      const label = { en: 'Department', fr: 'Organisation' };
+      expect(resolveText(label, 'fr')).to.equal('Organisation');
+      expect(resolveText(label, 'fr-CA')).to.equal('Organisation');
+      expect(resolveText(label, 'de')).to.equal('Department');
+    });
+
+    it('should show something rather than nothing for a partial schema', () => {
+      // A schema translated into one language the reader does not speak is
+      // still more useful than a blank label.
+      expect(resolveText({ nl: 'Afdeling' }, 'fr')).to.equal('Afdeling');
+    });
+
+    it('should treat an absent or empty text as absent', () => {
+      expect(resolveText(undefined, 'en')).to.be.undefined;
+      expect(resolveText('', 'en')).to.be.undefined;
+      expect(resolveText({}, 'en')).to.be.undefined;
+    });
+
+    it('should name an attribute in the reader’s language', () => {
+      const attr = usersSchema.attributes.cn;
+      expect(attributeLabel('cn', attr, 'fr')).to.equal('Nom');
+      expect(attributeLabel('cn', attr, 'en')).to.equal('Name');
+    });
+
+    it('should make an unlabelled attribute readable rather than raw', () => {
+      expect(
+        attributeLabel('twakeDepartmentPath', { type: 'string' }, 'fr')
+      ).to.equal('Twake Department Path');
+    });
+  });
+
   describe('ConsoleApiClient', () => {
     it('should turn the server configuration into entities', async () => {
       nock(baseUrl)
@@ -194,6 +240,32 @@ describe('Directory console', () => {
       expect(client.organizationRoot).to.equal(
         'ou=organization,dc=example,dc=com'
       );
+    });
+
+    it('should take an entity’s own names from its schema metadata', async () => {
+      nock(baseUrl)
+        .get('/api/v1/config')
+        .reply(200, {
+          apiPrefix: '/api',
+          ldapBase: 'dc=example,dc=com',
+          features: {
+            ldapGroups: {
+              enabled: true,
+              base: 'ou=groups,dc=example,dc=com',
+              mainAttribute: 'cn',
+              schema: {
+                entity: {
+                  label: { en: 'Groups', fr: 'Groupes' },
+                  singularLabel: { en: 'group', fr: 'groupe' },
+                },
+                attributes: { cn: { type: 'string' } },
+              },
+            },
+          },
+        });
+      const [groups] = await new ConsoleApiClient(baseUrl).discover();
+      expect(resolveText(groups.label, 'fr')).to.equal('Groupes');
+      expect(resolveText(groups.singularLabel, 'fr')).to.equal('groupe');
     });
 
     it('should ignore an entity whose schema the server did not serve', async () => {
@@ -514,13 +586,60 @@ describe('Directory console', () => {
       return container.innerHTML;
     };
 
+    it('should name attributes in the reader’s language', () => {
+      const container = stubContainer();
+      new EntityDetail({
+        entity: users,
+        entry: { uid: 'jsmith' },
+        translator: new Translator('fr'),
+        canWrite: true,
+        canDelete: true,
+        onEdit: () => undefined,
+        onDelete: () => undefined,
+        onStatus: () => undefined,
+        onResetPassword: () => undefined,
+      }).render(container);
+      expect(container.innerHTML).to.include('Nom');
+    });
+
+    it('should translate the states it knows and keep the ones it does not', () => {
+      const entity: EntityDescriptor = {
+        ...users,
+        schema: {
+          attributes: {
+            ...usersSchema.attributes,
+            twakeAccountStatus: {
+              type: 'pointer',
+              role: 'accountStatus',
+              states: { disabled: 'cn=disabled', seconded: 'cn=seconded' },
+            },
+          },
+        },
+      };
+      const container = stubContainer();
+      new EntityDetail({
+        entity,
+        entry: { uid: 'jsmith' },
+        translator: new Translator('fr'),
+        canWrite: true,
+        canDelete: true,
+        onEdit: () => undefined,
+        onDelete: () => undefined,
+        onStatus: () => undefined,
+        onResetPassword: () => undefined,
+      }).render(container);
+      expect(container.innerHTML).to.include('>Désactivé<');
+      // A state the deployment invented keeps the name the deployment gave it.
+      expect(container.innerHTML).to.include('>seconded<');
+    });
+
     it('should show every attribute, empty ones included', () => {
       const html = render({ uid: 'jsmith', cn: 'John Smith' });
       // The defect this replaces: a card showing two fields, the rest only
       // reachable by opening the edit dialog.
-      expect(html).to.include('cn');
-      expect(html).to.include('telephoneNumber');
-      expect(html).to.include('twakeDepartmentLink');
+      expect(html).to.include('Name');
+      expect(html).to.include('Telephone Number');
+      expect(html).to.include('Twake Department Link');
     });
 
     it('should never show a write-only attribute', () => {
@@ -529,9 +648,9 @@ describe('Directory console', () => {
 
     it('should offer the states the schema declares, and no others', () => {
       const html = render({ uid: 'jsmith' });
-      expect(html).to.include('>enabled<');
-      expect(html).to.include('>disabled<');
-      expect(html).to.not.include('>retired<');
+      expect(html).to.include('value="enabled"');
+      expect(html).to.include('value="disabled"');
+      expect(html).to.not.include('value="retired"');
     });
 
     it('should hide every action from a reader', () => {

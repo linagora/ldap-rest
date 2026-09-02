@@ -13,7 +13,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
 import { transformSchemas } from '../../lib/utils';
-import type { Schema } from '../../config/schema';
+import type { LocalizedText, Schema } from '../../config/schema';
 import type { AttributesList } from '../../lib/ldapActions';
 
 interface EnrichedSchema extends Schema {
@@ -25,6 +25,10 @@ interface EnrichedSchema extends Schema {
     pluralName: string;
     base: string;
     defaultAttributes?: Record<string, unknown>;
+    /** Name a client shows for the collection, in one or several languages */
+    label?: LocalizedText;
+    /** Same, for a single entry */
+    singularLabel?: LocalizedText;
   };
 }
 
@@ -34,6 +38,10 @@ interface EnrichedSchema extends Schema {
 class LdapFlatInstance extends LdapFlat {
   name: string = 'ldapFlatInstance';
   roles: Role[] = ['api'] as const;
+
+  /** Names a client shows for the collection and for one entry */
+  label?: LocalizedText;
+  singularLabel?: LocalizedText;
 
   // Ensure department sync is loaded to maintain consistency
   // when organizations are renamed/moved
@@ -131,6 +139,8 @@ export default class LdapFlatGeneric extends DmPlugin {
           hookPrefix: `ldap${schema.entity.name}`,
         });
 
+        instance.label = schema.entity.label;
+        instance.singularLabel = schema.entity.singularLabel;
         instance.name = `ldapFlat:${schema.entity.name}`;
         this.instances.push(instance);
         this.schemaPaths.push(schemaPath);
@@ -179,6 +189,8 @@ export default class LdapFlatGeneric extends DmPlugin {
         name: instance.name.replace('ldapFlat:', ''),
         singularName: instance.singularName,
         pluralName: instance.pluralName,
+        label: instance.label,
+        singularLabel: instance.singularLabel,
         mainAttribute: instance.mainAttribute,
         objectClass: instance.objectClass,
         base: instance.base,

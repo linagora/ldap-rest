@@ -16,6 +16,7 @@
 import { escapeHtml } from '../../shared/utils/dom';
 import type { Translator } from '../i18n';
 import { hasRole } from '../api/ConsoleApiClient';
+import { attributeLabel, displayValue } from '../format';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
 /** Characters required before a search is issued. */
@@ -83,6 +84,8 @@ export class EntityList {
   private loading = false;
   private loaded = false;
   private error: string | null = null;
+  /** Set when the reader asked for the whole branch despite the guard */
+  private listEverything = false;
   /**
    * Which load is the current one. A search is debounced, not serialised, so
    * two requests are in flight whenever the operator keeps typing — and the
@@ -152,13 +155,18 @@ export class EntityList {
   async render(container: HTMLElement): Promise<void> {
     this.root = container;
     this.draw();
-    if (this.options.listable && !this.loaded) await this.reload();
+    if (this.listable() && !this.loaded) await this.reload();
+  }
+
+  /** Whether the branch may be shown without a search. */
+  private listable(): boolean {
+    return this.options.listable || this.listEverything;
   }
 
   /** Fetch the entries matching the current search. */
   private async reload(): Promise<void> {
     const generation = ++this.generation;
-    if (!this.options.listable && this.search.length < SEARCH_MINIMUM) {
+    if (!this.listable() && this.search.length < SEARCH_MINIMUM) {
       this.entries = [];
       this.loaded = false;
       this.draw();
@@ -213,7 +221,13 @@ export class EntityList {
                     ([name, attr]) =>
                       `<option value="${escapeHtml(name)}"${
                         name === this.searchAttribute ? ' selected' : ''
-                      }>${escapeHtml(attr.label || name)}</option>`
+                      }>${escapeHtml(
+                        attributeLabel(
+                          name,
+                          attr,
+                          this.options.translator.language
+                        )
+                      )}</option>`
                   )
                   .join('')}
               </select>
@@ -248,10 +262,12 @@ export class EntityList {
       return `<p class="dc-empty">${escapeHtml(translator.t('app.loading'))}</p>`;
     if (this.error)
       return `<p class="dc-empty dc-error-block">${escapeHtml(this.error)}</p>`;
-    if (!this.options.listable && this.search.length < SEARCH_MINIMUM)
+    if (!this.listable() && this.search.length < SEARCH_MINIMUM)
       return `<p class="dc-empty">${escapeHtml(
         translator.t('list.searchGuard', { count: SEARCH_MINIMUM })
-      )}</p>`;
+      )}<br /><button type="button" class="dc-button" data-list-all>${escapeHtml(
+        translator.t('list.listEverything')
+      )}</button></p>`;
     if (this.entries.length === 0)
       return `<p class="dc-empty">${escapeHtml(
         translator.t(this.search ? 'list.noMatch' : 'list.empty')
@@ -270,7 +286,13 @@ export class EntityList {
               ${this.columns
                 .map(
                   name =>
-                    `<th>${escapeHtml(attributes[name]?.label || name)}</th>`
+                    `<th>${escapeHtml(
+                      attributeLabel(
+                        name,
+                        attributes[name],
+                        translator.language
+                      )
+                    )}</th>`
                 )
                 .join('')}
             </tr>
@@ -293,10 +315,16 @@ export class EntityList {
         </td>
         ${this.columns
           .map(name => {
-            const value = text(entry[name]);
+            const attr = entity.schema.attributes[name];
+            const raw = text(entry[name]);
+            const shown = text(
+              (Array.isArray(entry[name]) ? entry[name] : [entry[name]])
+                .filter((v): v is string => v !== undefined)
+                .map(v => displayValue(attr, String(v)))
+            );
             const isPath = name === entity.organizationPath;
-            return `<td${isPath ? ' class="dc-path"' : ''} title="${escapeHtml(value)}">${
-              isPath ? EntityList.shortenPath(value) : escapeHtml(value)
+            return `<td${isPath ? ' class="dc-path"' : ''} title="${escapeHtml(raw)}">${
+              isPath ? EntityList.shortenPath(shown) : escapeHtml(shown)
             }</td>`;
           })
           .join('')}
@@ -425,6 +453,11 @@ export class EntityList {
         this.options.onOpen(row.dataset.id as string);
       });
     }
+
+    root.querySelector('[data-list-all]')?.addEventListener('click', () => {
+      this.listEverything = true;
+      void this.reload();
+    });
 
     root.querySelector('[data-export]')?.addEventListener('click', () => {
       this.exportSelection();

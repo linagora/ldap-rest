@@ -110,6 +110,40 @@ describe('Twake schemas', () => {
     });
   });
 
+  describe('labels', () => {
+    it('should name every attribute a client shows', () => {
+      const missing: string[] = [];
+      for (const schema of [users, groups, organizations])
+        for (const [name, attr] of Object.entries(schema.attributes)) {
+          if (name === 'objectClass') continue;
+          if (!attr.label) missing.push(name);
+        }
+      expect(missing).to.deep.equal([]);
+    });
+
+    it('should translate those names rather than assume one language', () => {
+      // A label the interface cannot translate is the mixed-language screen
+      // this replaces, one field at a time.
+      const untranslated: string[] = [];
+      for (const schema of [users, groups, organizations])
+        for (const [name, attr] of Object.entries(schema.attributes)) {
+          if (!attr.label) continue;
+          if (typeof attr.label === 'string' || !attr.label.fr)
+            untranslated.push(name);
+        }
+      expect(untranslated).to.deep.equal([]);
+    });
+
+    it('should name the collections themselves', () => {
+      const entity = (users as unknown as { entity?: { label?: unknown } })
+        .entity;
+      expect(entity?.label).to.deep.equal({
+        en: 'Users',
+        fr: 'Utilisateurs',
+      });
+    });
+  });
+
   describe('hints', () => {
     it('should explain every pattern a client can show under a field', () => {
       const missing: string[] = [];

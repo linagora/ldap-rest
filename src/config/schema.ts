@@ -45,6 +45,22 @@ export type SchemaAttributeType =
  */
 export type SchemaRole = string;
 
+/**
+ * A piece of text a client shows, in one or several languages.
+ *
+ * A plain string is the text itself. A map is keyed by language tag, and a
+ * client picks the closest one it can:
+ *
+ * ```json
+ * "label": { "en": "Department", "fr": "Département" }
+ * ```
+ *
+ * These words belong to the deployment, not to the product — they name *its*
+ * entities and attributes — so their translations belong in its schemas
+ * rather than in a catalogue shipped with the code.
+ */
+export type LocalizedText = string | Record<string, string>;
+
 /** Roles the core itself looks for. See {@link SchemaRole}. */
 export const CORE_ROLES = [
   'identifier',
@@ -209,8 +225,8 @@ export interface SchemaAttribute {
   allowSubdomains?: boolean;
   /** Grouping hint for a form, e.g. `Mailbox Settings` */
   group?: string;
-  /** Label shown by a client, or a key it resolves in its own catalogue */
-  label?: string;
+  /** Name a client shows for this attribute, in one or several languages */
+  label?: LocalizedText;
 }
 
 export interface Schema {

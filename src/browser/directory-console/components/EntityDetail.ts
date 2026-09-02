@@ -10,6 +10,7 @@
  */
 
 import { escapeHtml } from '../../shared/utils/dom';
+import { attributeLabel, displayValue } from '../format';
 import type { Translator } from '../i18n';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
@@ -24,7 +25,12 @@ export interface DetailOptions {
   onStatus(state: string): void;
   onResetPassword(): void;
   /** Entries pointing at this one, or pointed at by it */
-  relations?: { title: string; items: { id: string; label: string }[] };
+  relations?: {
+    title: string;
+    /** Attribute the list came from, so the card does not repeat it */
+    attribute?: string;
+    items: { id: string; label: string }[];
+  };
   onOpenRelation?(id: string): void;
 }
 
@@ -99,6 +105,8 @@ export class EntityDetail {
       if (name === 'objectClass') continue;
       // A write-only attribute has nothing to show: the API never returns it.
       if (attr.neverReturn) continue;
+      // The related-entries section below shows this one in full.
+      if (name === this.options.relations?.attribute) continue;
       const list = values(entry[name]);
       rows.push(`
         <div class="dc-attribute">
@@ -114,7 +122,7 @@ export class EntityDetail {
   }
 
   private label(name: string, attr: SchemaAttribute): string {
-    return attr.label || name;
+    return attributeLabel(name, attr, this.options.translator.language);
   }
 
   /**
@@ -127,7 +135,8 @@ export class EntityDetail {
       return `<a href="#/organizations" class="dc-path-link" title="${escapeHtml(
         value
       )}" data-path>${escapeHtml(value)}</a>`;
-    return `<span class="dc-value" title="${escapeHtml(value)}">${escapeHtml(value)}</span>`;
+    const shown = displayValue(entity.schema.attributes[name], value);
+    return `<span class="dc-value" title="${escapeHtml(value)}">${escapeHtml(shown)}</span>`;
   }
 
   /** The states this account can be moved to, straight from the schema. */
@@ -142,10 +151,14 @@ export class EntityDetail {
         <select class="dc-input" data-status>
           <option value="">${escapeHtml(translator.t('status.change'))}</option>
           ${Object.keys(states)
-            .map(
-              state =>
-                `<option value="${escapeHtml(state)}">${escapeHtml(state)}</option>`
-            )
+            .map(state => {
+              // A state the catalogue knows is translated; one the deployment
+              // invented keeps the name the deployment gave it.
+              const shown = translator.t(`state.${state}`);
+              return `<option value="${escapeHtml(state)}">${escapeHtml(
+                shown === `state.${state}` ? state : shown
+              )}</option>`;
+            })
             .join('')}
         </select>
       </label>`;

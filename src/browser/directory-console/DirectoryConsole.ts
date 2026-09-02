@@ -17,6 +17,7 @@ import { EntityDetail } from './components/EntityDetail';
 import { EntityForm } from './components/EntityForm';
 import { EntityList, SEARCH_MINIMUM } from './components/EntityList';
 import { OrganizationTree } from './components/OrganizationTree';
+import { attributeLabel, rdnValue, resolveText } from './format';
 import { availableLanguages, Translator } from './i18n';
 import type {
   ConsoleOptions,
@@ -165,7 +166,7 @@ export class DirectoryConsole {
                 entity =>
                   `<button type="button" class="dc-nav-item" data-nav="${escapeHtml(
                     entity.key
-                  )}">${escapeHtml(entity.pluralName)}</button>`
+                  )}">${escapeHtml(this.plural(entity))}</button>`
               )
               .join('')}
           </nav>
@@ -304,6 +305,37 @@ export class DirectoryConsole {
     return this.entities.find(entity => entity.key === key);
   }
 
+  /**
+   * What to call a collection: the schema's label in the current language,
+   * falling back to the name the schema gives it.
+   *
+   * @param entity entity to name
+   * @returns the plural name to show
+   */
+  private plural(entity: EntityDescriptor): string {
+    return (
+      resolveText(entity.label, this.translator.language) ||
+      // The organization tree is the one collection the product itself names,
+      // because it is the product that draws it.
+      (entity.kind === 'organization'
+        ? this.translator.t('tree.title')
+        : entity.pluralName)
+    );
+  }
+
+  /**
+   * What to call one entry of a collection.
+   *
+   * @param entity entity to name
+   * @returns the singular name to show
+   */
+  private singular(entity: EntityDescriptor): string {
+    return (
+      resolveText(entity.singularLabel, this.translator.language) ||
+      entity.singularName
+    );
+  }
+
   /** Whether the caller may create an entry of this entity. */
   private canCreate(entity: EntityDescriptor): boolean {
     if (this.scopeError) return false;
@@ -354,17 +386,19 @@ export class DirectoryConsole {
             .map(entity => {
               const allowed = this.canCreate(entity);
               return `<li class="dc-card">
-                <h3>${escapeHtml(entity.pluralName)}</h3>
+                <h3>${escapeHtml(this.plural(entity))}</h3>
                 <div class="dc-card-actions">
                   <button type="button" class="dc-button" data-open="${escapeHtml(
                     entity.key
-                  )}">${escapeHtml(entity.pluralName)}</button>
+                  )}">${escapeHtml(t('list.open'))}</button>
                   ${
                     allowed
                       ? `<button type="button" class="dc-button dc-button-primary" data-new="${escapeHtml(
                           entity.key
                         )}">${escapeHtml(
-                          t('dashboard.create', { entity: entity.singularName })
+                          t('dashboard.create', {
+                            entity: this.singular(entity),
+                          })
                         )}</button>`
                       : `<span class="dc-muted">${escapeHtml(t('dashboard.noCreate'))}</span>`
                   }
@@ -400,11 +434,11 @@ export class DirectoryConsole {
     main.innerHTML = `
       <section class="dc-view">
         <header class="dc-view-header">
-          <h1>${escapeHtml(entity.pluralName)}</h1>
+          <h1>${escapeHtml(this.plural(entity))}</h1>
           ${
             this.canCreate(entity)
               ? `<button type="button" class="dc-button dc-button-primary" data-new>${escapeHtml(
-                  t('dashboard.create', { entity: entity.singularName })
+                  t('dashboard.create', { entity: this.singular(entity) })
                 )}</button>`
               : ''
           }
@@ -508,7 +542,13 @@ export class DirectoryConsole {
   private relations(
     entity: EntityDescriptor,
     entry: Entry
-  ): { title: string; items: { id: string; label: string }[] } | undefined {
+  ):
+    | {
+        title: string;
+        attribute: string;
+        items: { id: string; label: string }[];
+      }
+    | undefined {
     for (const role of ['members', 'groupMemberships']) {
       for (const [name, attr] of Object.entries(entity.schema.attributes)) {
         const roles = Array.isArray(attr.role) ? attr.role : [attr.role];
@@ -516,12 +556,11 @@ export class DirectoryConsole {
         const raw = entry[name];
         const list = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
         return {
-          title: attr.label || name,
+          title: attributeLabel(name, attr, this.translator.language),
+          attribute: name,
           items: list.map(dn => ({
             id: String(dn),
-            label: String(dn)
-              .split(',')[0]
-              .replace(/^[^=]+=/, ''),
+            label: rdnValue(String(dn)),
           })),
         };
       }
@@ -597,12 +636,24 @@ export class DirectoryConsole {
       return;
     }
 
+    // "Who is in this department?" is the question an organization card is
+    // opened to answer, and the tree deliberately does not show accounts.
+    const members = await this.api.organizationMembers(node.dn).catch(() => []);
+
     new EntityDetail({
       entity,
       entry,
       translator: this.translator,
       canWrite: this.canWrite(),
       canDelete: this.canDelete(),
+      relations: {
+        title: this.translator.t('detail.members'),
+        items: members.map(member => ({
+          id: member.dn,
+          label: member.label,
+        })),
+      },
+      onOpenRelation: (target: string): void => this.openRelation(target),
       onEdit: (): void => {
         void this.openOrganizationForm(entity, entry);
       },
@@ -695,7 +746,7 @@ export class DirectoryConsole {
     this.openPanel(
       entry
         ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
-        : t('dashboard.create', { entity: entity.singularName }),
+        : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
       },
@@ -751,7 +802,7 @@ export class DirectoryConsole {
     this.openPanel(
       entry
         ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
-        : t('dashboard.create', { entity: entity.singularName }),
+        : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
       },

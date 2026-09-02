@@ -5,7 +5,15 @@
     "objectClass": ["top", "twakePosition"],
     "singularName": "position",
     "pluralName": "positions",
-    "base": "ou=positions,{ldap_base}"
+    "base": "ou=positions,{ldap_base}",
+    "label": {
+      "en": "Positions",
+      "fr": "Postes"
+    },
+    "singularLabel": {
+      "en": "position",
+      "fr": "poste"
+    }
   },
   "strict": true,
   "attributes": {
@@ -24,11 +32,19 @@
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 &/,.'’-]*$",
       "hint": "Letters, digits, spaces and & / , . ' -, starting with a letter or a digit",
       "required": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     }
   }
 }
