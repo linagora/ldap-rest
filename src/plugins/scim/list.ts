@@ -16,14 +16,17 @@
  * `tooMany` RFC 7644 §3.12 provides for a filter yielding "many more results
  * than the server is willing to calculate or process".
  */
-import type ldapActions from '../../lib/ldapActions';
-import type { AttributesList, SearchResult } from '../../lib/ldapActions';
-import type { DmRequest } from '../../lib/auth/base';
+import type {
+  AttributesList,
+  RequestBoundLdap,
+  SearchResult,
+} from '../../lib/ldapActions';
 
 import { ScimError, scimTooMany, extractLdapCode } from './errors';
 
 export interface PagedSearch {
-  ldap: ldapActions;
+  /** The directory bound to the request, so authorization always applies. */
+  directory: RequestBoundLdap;
   base: string;
   filter: string;
   attributes: string[];
@@ -33,7 +36,6 @@ export interface PagedSearch {
   count: number;
   /** Upper bound on entries walked before answering `tooMany`. */
   maxScanned: number;
-  req?: DmRequest;
 }
 
 export interface PagedResult {
@@ -57,7 +59,7 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
     // `searchPaginated` is lazy: it hands back a generator and only talks to
     // the directory on the first iteration, so an LDAP failure surfaces from
     // the loop below, never from this call. One try covers both.
-    const generator = (await opts.ldap.search(
+    const generator = (await opts.directory.search(
       {
         filter: opts.filter,
         scope: 'sub',
@@ -67,8 +69,7 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
         // size limit would truncate the count instead of reporting it.
         sizeLimit: 0,
       },
-      opts.base,
-      opts.req
+      opts.base
     )) as AsyncGenerator<SearchResult>;
 
     for await (const page of generator) {
