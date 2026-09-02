@@ -181,6 +181,35 @@ export interface MappingContext {
   resourceType: 'User' | 'Group';
   baseUrl?: string;
   scimPrefix: string;
+  /**
+   * LDAP attribute whose *presence* marks the account as locked, and the
+   * value written to lock it. See `DEFAULT_LOCK_ATTRIBUTE`.
+   */
+  lockAttribute?: string;
+  lockValue?: string;
+}
+
+/**
+ * SCIM `active` (RFC 7643 section 4.1.1) has no direct LDAP equivalent. We
+ * model it on the presence of one attribute: present means locked, absent
+ * means active.
+ *
+ * The default is the ppolicy overlay's `pwdAccountLockedTime`, whose
+ * conventional "locked forever" value is a GeneralizedTime in the distant
+ * past. A directory without that overlay points
+ * `--scim-user-lock-attribute` / `--scim-user-lock-value` somewhere else
+ * (`nsAccountLock` / `TRUE`, for instance).
+ */
+export const DEFAULT_LOCK_ATTRIBUTE = 'pwdAccountLockedTime';
+export const DEFAULT_LOCK_VALUE = '000001010000Z';
+
+/** Is this entry locked, per the configured lock attribute? */
+export function isLocked(entry: AttributesList, ctx: MappingContext): boolean {
+  const raw = entry[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE];
+  if (raw == null) return false;
+  // A directory may answer an empty array for an attribute it does not hold.
+  if (Array.isArray(raw)) return raw.length > 0;
+  return String(raw).length > 0;
 }
 
 /** Resolve the SCIM id for an LDAP entry, per configuration. */
@@ -250,8 +279,8 @@ export function ldapToScimUser(
     }
   }
 
-  // active: true if pwdAccountLockedTime is not set (reasonable default)
-  out.active = entry['pwdAccountLockedTime'] == null;
+  // active: RFC 7643 section 4.1.1 — locked accounts answer false
+  out.active = !isLocked(entry, ctx);
 
   // meta
   if (id) {
@@ -310,6 +339,13 @@ export function scimUserToLdap(
         attributes[m.ldap] = String(value);
       }
     }
+  }
+
+  // `active` is not a mapping entry: false writes the lock attribute, true
+  // leaves it out so the caller deletes it (absent means active).
+  if (user.active === false) {
+    attributes[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE] =
+      ctx.lockValue || DEFAULT_LOCK_VALUE;
   }
 
   // Ensure required inetOrgPerson attributes have sensible defaults
@@ -402,8 +438,15 @@ export function scimGroupToLdap(
  * List of LDAP attributes to request from the directory so all
  * mapped SCIM attributes can be populated.
  */
-export function requiredLdapAttributes(mapping: ResourceMapping): string[] {
-  const attrs = new Set<string>(['objectClass', ...OPERATIONAL_ATTRIBUTES]);
+export function requiredLdapAttributes(
+  mapping: ResourceMapping,
+  extra: string[] = []
+): string[] {
+  const attrs = new Set<string>([
+    'objectClass',
+    ...OPERATIONAL_ATTRIBUTES,
+    ...extra,
+  ]);
   for (const m of mapping.entries) {
     if (m.ldap) attrs.add(m.ldap);
     if (m.ldapPrimary) attrs.add(m.ldapPrimary);

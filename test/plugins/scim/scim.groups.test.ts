@@ -196,6 +196,17 @@ describe('SCIM Groups (integration)', function () {
     expect(res.body.Resources[0].displayName).to.equal('scim-testgroup');
   });
 
+  it('rejects a filter on active, which Groups do not carry', async () => {
+    const res = await supertest(server.app)
+      .get('/scim/v2/Groups?filter=' + encodeURIComponent('active pr'))
+      .expect(400);
+    expect(res.body.scimType).to.equal('invalidFilter');
+    const eq = await supertest(server.app)
+      .get('/scim/v2/Groups?filter=' + encodeURIComponent('active eq true'))
+      .expect(400);
+    expect(eq.body.scimType).to.equal('invalidFilter');
+  });
+
   it('DELETE removes the Group', async () => {
     await supertest(server.app)
       .post('/scim/v2/Groups')

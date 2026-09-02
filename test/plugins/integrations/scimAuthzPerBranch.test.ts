@@ -89,6 +89,11 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       users: {
         writer: { [peopleBase]: { read: true, write: true, delete: true } },
         reader: { [peopleBase]: { read: true, write: false, delete: false } },
+        // write without read: the shape that exposes an unauthorized
+        // pre-read, because the write itself is allowed to proceed.
+        writeonly: {
+          [peopleBase]: { read: false, write: true, delete: false },
+        },
         // `outsider` is absent on purpose: it falls to the default, which
         // denies read as well.
       },
@@ -192,6 +197,34 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
         .set('x-scim-user', 'outsider')
         .expect(403);
       expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+    });
+
+    it('the PATCH pre-read is authorized, so no write slips through', async () => {
+      await createUser('writer', 'alice').expect(201);
+      // `writeonly` may write but not read. PATCH reads the entry before
+      // building its ModifyRequest; when that read skipped authorization,
+      // the modify went ahead — and only the trailing read-back answered
+      // 403, so the caller was told the operation failed after it had
+      // already landed.
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/alice')
+        .set('x-scim-user', 'writeonly')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'Hax' }],
+        })
+        .expect(403);
+      expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+
+      // The refusal must mean nothing happened.
+      const after = await server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['displayName'] },
+        `uid=alice,${peopleBase}`
+      );
+      const entry = (after as { searchEntries: Record<string, unknown>[] })
+        .searchEntries[0];
+      expect(entry.displayName || []).to.have.lengthOf(0);
     });
 
     it('read stays granted where it was configured', async () => {

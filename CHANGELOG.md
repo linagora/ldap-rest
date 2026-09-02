@@ -33,6 +33,21 @@
   PATCH. POST, PUT and DELETE, and the Groups PATCH, were unaffected
 - dependencies update
 
+### Features
+
+- `plugins/scim`: SCIM `active` is writable. `POST`, `PUT` and
+  `PATCH {"op":"replace","path":"active","value":false}` now deactivate an
+  account, which is how Okta and Entra ID disable a user — the attribute was
+  read-only, so a deactivation was silently dropped on create and answered
+  `400 invalidPath` on PATCH.
+
+  `active` is modelled on the presence of one LDAP attribute, named by
+  `--scim-user-lock-attribute` (default `pwdAccountLockedTime`) and written
+  with `--scim-user-lock-value` (default `000001010000Z`, the ppolicy
+  "locked forever" convention). The default needs the ppolicy overlay; point
+  both flags elsewhere on a directory without it, `nsAccountLock` / `TRUE`
+  for instance
+
 ### Bug Fixes
 
 - `plugins/scim`: `meta.created` and `meta.lastModified` carried the
@@ -64,6 +79,16 @@
   `--scim-max-scanned` (10000) bounds how far a list walks to count its
   result set, past which `tooMany` is answered as RFC 7644 section 3.12
   provides for
+
+- `plugins/scim`: `active` was always answered as `true`. The attribute
+  backing it is operational and was never named in the LDAP search, so a
+  locked account still looked enabled
+
+- `plugins/scim`: a filter on `active pr` emitted `(active=*)`, an attribute
+  no directory defines
+
+- `plugins/scim`: a PATCH removing an attribute the entry does not hold failed
+  the whole modify with noSuchAttribute; such a removal is now dropped
 
 ## v0.6.0 (2026-08-01)
 

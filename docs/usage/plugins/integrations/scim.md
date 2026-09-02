@@ -51,6 +51,8 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-base-map`              | `DM_SCIM_BASE_MAP`              | —                                                  | Path to JSON file mapping authenticated user → `{userBase, groupBase}` |
 | `--scim-user-object-class`     | `DM_SCIM_USER_OBJECT_CLASSES`   | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users                                       |
 | `--scim-user-rdn-attribute`    | `DM_SCIM_USER_RDN_ATTRIBUTE`    | `uid`                                              | RDN attribute for Users                                                |
+| `--scim-user-lock-attribute`   | `DM_SCIM_USER_LOCK_ATTRIBUTE`   | `pwdAccountLockedTime`                             | LDAP attribute whose presence marks a User as `active: false`          |
+| `--scim-user-lock-value`       | `DM_SCIM_USER_LOCK_VALUE`       | `000001010000Z`                                    | Value written to that attribute when deactivating                      |
 | `--scim-group-object-class`    | `DM_SCIM_GROUP_OBJECT_CLASSES`  | `top, groupOfNames`                                | Object classes for created Groups                                      |
 | `--scim-group-rdn-attribute`   | `DM_SCIM_GROUP_RDN_ATTRIBUTE`   | `cn`                                               | RDN attribute for Groups                                               |
 | `--scim-id-attribute`          | `DM_SCIM_ID_ATTRIBUTE`          | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                           |
@@ -110,26 +112,64 @@ All responses have `Content-Type: application/scim+json`.
 
 ### Default mapping (LDAP ⇄ SCIM User)
 
-| SCIM                                 | LDAP                                            |
-| ------------------------------------ | ----------------------------------------------- |
-| `id`                                 | `uid` (or `entryUUID`)                          |
-| `userName`                           | `uid`                                           |
-| `externalId`                         | `employeeNumber`                                |
-| `name.familyName`                    | `sn`                                            |
-| `name.givenName`                     | `givenName`                                     |
-| `name.formatted`                     | `cn`                                            |
-| `displayName`                        | `displayName`                                   |
-| `title`                              | `title`                                         |
-| `preferredLanguage`                  | `preferredLanguage`                             |
-| `emails[primary=true].value`         | `mail`                                          |
-| `emails[primary=false].value`        | `mailAlternateAddress`                          |
-| `phoneNumbers[primary=true].value`   | `telephoneNumber`                               |
-| `phoneNumbers[primary=false].value`  | `mobile`                                        |
-| `active`                             | pseudo (false if `pwdAccountLockedTime` is set) |
-| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp`           |
+| SCIM                                 | LDAP                                        |
+| ------------------------------------ | ------------------------------------------- |
+| `id`                                 | `uid` (or `entryUUID`)                      |
+| `userName`                           | `uid`                                       |
+| `externalId`                         | `employeeNumber`                            |
+| `name.familyName`                    | `sn`                                        |
+| `name.givenName`                     | `givenName`                                 |
+| `name.formatted`                     | `cn`                                        |
+| `displayName`                        | `displayName`                               |
+| `title`                              | `title`                                     |
+| `preferredLanguage`                  | `preferredLanguage`                         |
+| `emails[primary=true].value`         | `mail`                                      |
+| `emails[primary=false].value`        | `mailAlternateAddress`                      |
+| `phoneNumbers[primary=true].value`   | `telephoneNumber`                           |
+| `phoneNumbers[primary=false].value`  | `mobile`                                    |
+| `active`                             | pseudo (false if the lock attribute is set) |
+| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp`       |
 
 Override with `--scim-user-mapping /path/to/user-mapping.json` (same schema as
 `static/schemas/scim/default-mapping.json`).
+
+## Deactivating an account (`active`)
+
+SCIM models account status with the boolean `active` (RFC 7643 §4.1.1), and it
+is how Okta, Entra ID and JumpCloud disable a user — they PATCH `active` to
+`false` rather than DELETE the resource.
+
+LDAP has no single equivalent, so the plugin models it on the **presence of one
+attribute**: present means locked, absent means active.
+
+| SCIM              | LDAP                                            |
+| ----------------- | ----------------------------------------------- |
+| `"active": false` | write `--scim-user-lock-value` to the attribute |
+| `"active": true`  | remove the attribute                            |
+| attribute absent  | `"active": true`                                |
+
+The default targets the ppolicy overlay:
+
+```bash
+--scim-user-lock-attribute pwdAccountLockedTime
+--scim-user-lock-value     000001010000Z          # "locked forever"
+```
+
+`pwdAccountLockedTime` only exists when slapd loads the ppolicy overlay. Point
+the two flags elsewhere on a directory without it — 389-ds, for instance:
+
+```bash
+--scim-user-lock-attribute nsAccountLock
+--scim-user-lock-value     TRUE
+```
+
+`active` is not a mapping entry and must not be added to a mapping file: it is
+handled by these two flags on every path — create, PUT, PATCH and the
+`active eq true|false` filter alike.
+
+Note that PUT is a full replacement (RFC 7644 §3.5.1): a body that omits
+`active` reactivates the account, just as it clears any other omitted
+attribute. Use PATCH to change only the status.
 
 ## Writing a custom mapping schema
 
@@ -259,6 +299,7 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 | `emails.value co "@example.com"` | `(mail=*@example.com*)`       |
 | `displayName pr`                 | `(displayName=*)`             |
 | `active eq true`                 | `(!(pwdAccountLockedTime=*))` |
+| `active pr`                      | `(objectClass=*)`             |
 | `a eq "x" and b eq "y"`          | `(&(a=x)(b=y))`               |
 | `not (a eq "x")`                 | `(!(a=x))`                    |
 

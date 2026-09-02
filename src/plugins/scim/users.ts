@@ -32,6 +32,8 @@ import {
   SCHEMA_LIST_RESPONSE,
 } from './types';
 import {
+  DEFAULT_LOCK_ATTRIBUTE,
+  DEFAULT_LOCK_VALUE,
   DEFAULT_USER_MAPPING,
   loadMappingFile,
   mergeMapping,
@@ -70,6 +72,46 @@ export interface ScimUsersOptions {
   hooks: { [K: string]: Function[] | undefined };
 }
 
+/**
+ * Does this entry actually hold `attr`?
+ *
+ * ldapts answers an attribute that was requested but is absent as an empty
+ * array, which is the case to catch. A present attribute counts however it
+ * renders — an empty string or a zero-length Buffer is still there as far as
+ * the directory is concerned, and deleting it would succeed.
+ */
+function entryHas(entry: AttributesList, attr: string): boolean {
+  const v = entry[attr];
+  if (v == null) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+
+/**
+ * Drop from `changes.delete` every attribute the entry does not hold.
+ *
+ * LDAP answers noSuchAttribute (0x10) when asked to delete an absent
+ * attribute, and that failure takes the whole atomic modify with it — so one
+ * no-op removal in a PATCH would undo the operations sent alongside it.
+ */
+function pruneAbsentDeletes(
+  changes: ModifyRequest,
+  entry: AttributesList
+): void {
+  if (!changes.delete) return;
+  if (Array.isArray(changes.delete)) {
+    changes.delete = changes.delete.filter(attr => entryHas(entry, attr));
+    if (changes.delete.length === 0) delete changes.delete;
+    return;
+  }
+  const kept: AttributesList = {};
+  for (const [attr, value] of Object.entries(changes.delete)) {
+    if (entryHas(entry, attr)) kept[attr] = value;
+  }
+  if (Object.keys(kept).length === 0) delete changes.delete;
+  else changes.delete = kept;
+}
+
 export class ScimUsers {
   private readonly ldap: ldapActions;
   private readonly config: Config;
@@ -84,6 +126,8 @@ export class ScimUsers {
   private readonly maxResults: number;
   private readonly maxScanned: number;
   private readonly scimPrefix: string;
+  private readonly lockAttribute: string;
+  private readonly lockValue: string;
 
   constructor(opts: ScimUsersOptions) {
     this.ldap = opts.ldap;
@@ -99,6 +143,11 @@ export class ScimUsers {
     this.maxResults = (this.config.scim_max_results as number) || 200;
     this.maxScanned = (this.config.scim_max_scanned as number) || 10000;
     this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
+    this.lockAttribute =
+      (this.config.scim_user_lock_attribute as string) ||
+      DEFAULT_LOCK_ATTRIBUTE;
+    this.lockValue =
+      (this.config.scim_user_lock_value as string) || DEFAULT_LOCK_VALUE;
 
     const override = (this.config.scim_user_mapping as string) || '';
     this.mapping = mergeMapping(
@@ -118,7 +167,18 @@ export class ScimUsers {
           ? `${req.protocol}://${String(req.get('host') || '')}`
           : ''),
       scimPrefix: this.scimPrefix,
+      lockAttribute: this.lockAttribute,
+      lockValue: this.lockValue,
     };
+  }
+
+  /**
+   * LDAP attributes to fetch. The lock attribute backing SCIM `active` is
+   * operational on most directories, so it is never returned unless asked
+   * for by name.
+   */
+  private ldapAttributes(): string[] {
+    return requiredLdapAttributes(this.mapping, [this.lockAttribute]);
   }
 
   private dnForId(id: string, req?: DmRequest): string {
@@ -134,7 +194,7 @@ export class ScimUsers {
         {
           paged: false,
           scope: 'base',
-          attributes: requiredLdapAttributes(this.mapping),
+          attributes: this.ldapAttributes(),
         },
         dn,
         req
@@ -169,7 +229,10 @@ export class ScimUsers {
     let ldapFilter = `(${this.objectClass.includes('inetOrgPerson') ? 'objectClass=inetOrgPerson' : `objectClass=${this.objectClass[0]}`})`;
     let idEquals: string | undefined;
     if (query.filter) {
-      const translated = scimFilterToLdap(query.filter, this.mapping);
+      const translated = scimFilterToLdap(query.filter, this.mapping, {
+        lockAttribute: this.lockAttribute,
+        supportsActive: true,
+      });
       if (translated.idEquals) {
         idEquals = translated.idEquals;
       } else {
@@ -206,7 +269,7 @@ export class ScimUsers {
       ldap: this.ldap,
       base,
       filter: ldapFilter,
-      attributes: requiredLdapAttributes(this.mapping),
+      attributes: this.ldapAttributes(),
       startIndex,
       count,
       maxScanned: this.maxScanned,
@@ -282,7 +345,7 @@ export class ScimUsers {
       {
         paged: false,
         scope: 'base',
-        attributes: requiredLdapAttributes(this.mapping),
+        attributes: this.ldapAttributes(),
       },
       dn,
       req
@@ -319,7 +382,7 @@ export class ScimUsers {
       if (Array.isArray(v)) return v.length > 0 && v.some(x => x != null);
       return true;
     };
-    for (const attr of requiredLdapAttributes(this.mapping)) {
+    for (const attr of this.ldapAttributes()) {
       if (skipAttrs.has(attr)) continue;
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
@@ -348,25 +411,59 @@ export class ScimUsers {
     id: string,
     patch: PatchRequest
   ): Promise<ScimUser> {
-    await this.get(req, id); // ensure exists
+    const dn = this.dnForId(id, req);
+    const current = await this.currentEntry(req, id); // ensure exists
     const changes = await patchToModifyRequest(patch, {
       mapping: this.mapping,
+      lockAttribute: this.lockAttribute,
+      lockValue: this.lockValue,
+      supportsActive: true,
     });
+    // Deleting an attribute the entry does not hold answers noSuchAttribute
+    // (0x10) and fails the whole modify. `active: true` on an already-active
+    // account is exactly that case, and identity providers send it routinely.
+    pruneAbsentDeletes(changes, current);
     if (
       !changes.add &&
       !changes.replace &&
       (!changes.delete ||
-        (Array.isArray(changes.delete) && changes.delete.length === 0))
+        (Array.isArray(changes.delete)
+          ? changes.delete.length === 0
+          : Object.keys(changes.delete).length === 0))
     ) {
       return this.get(req, id);
     }
-    const dn = this.dnForId(id, req);
     // `req` must reach ldapActions: the authorization plugins hook
     // `ldapmodifyrequest` and skip every check when it is missing.
     await this.ldap.modify(dn, changes, req);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;
+  }
+
+  /** Fetch the raw LDAP entry backing a SCIM id, or raise 404. */
+  private async currentEntry(
+    req: DmRequest,
+    id: string
+  ): Promise<AttributesList> {
+    const dn = this.dnForId(id, req);
+    let result: SearchResult;
+    try {
+      result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: this.ldapAttributes() },
+        dn,
+        req
+      )) as SearchResult;
+    } catch (err) {
+      if (extractLdapCode(err) === 32) {
+        throw scimNotFound(`User ${id} not found`);
+      }
+      throw err;
+    }
+    if (!result.searchEntries?.length) {
+      throw scimNotFound(`User ${id} not found`);
+    }
+    return result.searchEntries[0] as AttributesList;
   }
 
   async delete(req: DmRequest, id: string): Promise<void> {

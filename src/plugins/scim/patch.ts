@@ -31,7 +31,11 @@ import {
   type PatchOperation,
   type PatchRequest,
 } from './types';
-import { scimPathToLdapAttribute } from './mapping';
+import {
+  DEFAULT_LOCK_ATTRIBUTE,
+  DEFAULT_LOCK_VALUE,
+  scimPathToLdapAttribute,
+} from './mapping';
 
 export interface PatchContext {
   mapping: ResourceMapping;
@@ -39,6 +43,32 @@ export interface PatchContext {
   resolveMemberRef?: (value: string) => Promise<string | undefined>;
   /** The LDAP attribute holding members, default 'member'. */
   memberAttribute?: string;
+  /**
+   * For Users: the attribute whose presence marks the account as locked, and
+   * the value to write when SCIM `active` is set to false.
+   */
+  lockAttribute?: string;
+  lockValue?: string;
+  /** True when this resource type carries SCIM `active` (Users only). */
+  supportsActive?: boolean;
+}
+
+/**
+ * Read a SCIM `active` value out of a PATCH operation.
+ *
+ * Only a boolean, or the two canonical strings some providers send instead.
+ * Anything else is refused rather than guessed: `active` is the attribute
+ * that gates account access, and reading an unparseable value as `true`
+ * would turn a deprovisioning request into a re-activation and answer 200.
+ */
+function activeValue(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+  }
+  throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
 }
 
 function normalizeOp(op: string): 'add' | 'remove' | 'replace' {
@@ -289,6 +319,28 @@ async function applyOperation(
       }
       return;
     }
+  }
+
+  // Special: `active` on Users. RFC 7643 section 4.1.1 makes it readWrite,
+  // and it is the operation every identity provider uses to deactivate an
+  // account, but it has no mapping entry: it is the *absence* of the lock
+  // attribute. Locking writes the attribute, unlocking removes it.
+  if (top === 'active' && ctx.supportsActive) {
+    if (sub || filter) {
+      throw scimInvalidPath(`'active' has no sub-attribute (got '${op.path}')`);
+    }
+    const lockAttr = ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
+    // `remove active` restores the default, which is an active account.
+    const wanted = operation === 'remove' ? true : activeValue(op.value);
+    if (wanted) {
+      if (!req.delete) req.delete = {};
+      if (Array.isArray(req.delete)) req.delete.push(lockAttr);
+      else req.delete[lockAttr] = '';
+    } else {
+      if (!req.replace) req.replace = {};
+      req.replace[lockAttr] = ctx.lockValue || DEFAULT_LOCK_VALUE;
+    }
+    return;
   }
 
   // Regular SCIM attributes — reject bracket-filtered paths on anything other
