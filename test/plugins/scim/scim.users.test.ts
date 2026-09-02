@@ -150,6 +150,8 @@ describe('SCIM Users (integration)', function () {
       expect(res.body.meta.lastModified).to.match(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/
       );
+      expect(Date.parse(res.body.meta.lastModified)).to.be.a('number').and.not
+        .NaN;
     });
 
     it('returns 404 in SCIM envelope for unknown User', async () => {

@@ -109,18 +109,36 @@ export function ldapTimeToIso(value: string | undefined): string | undefined {
     );
   if (!m) return value;
   const [, year, month, day, hour, minute, second, fraction, zone] = m;
-  // A fraction applies to the smallest unit present, so it can only be turned
-  // into milliseconds when that unit is the second.
-  const ms =
-    fraction && second ? `.${fraction.slice(0, 3).padEnd(3, '0')}` : '';
+
+  // The fraction applies to the smallest unit actually present, so `1230.5`
+  // is half a minute, not half a second. Fold it into the time of day rather
+  // than dropping it, which would answer a timestamp that is simply wrong.
+  let extraMs = 0;
+  if (fraction) {
+    const unitMs = second ? 1000 : minute ? 60000 : 3600000;
+    extraMs = Math.round(Number(`0.${fraction}`) * unitMs);
+  }
+  // The fraction is always smaller than one of its own unit, so this can
+  // never carry past the hour that was given: no date arithmetic needed.
+  let rest =
+    ((Number(hour) * 60 + Number(minute || 0)) * 60 + Number(second || 0)) *
+      1000 +
+    extraMs;
+  const hh = Math.floor(rest / 3600000);
+  rest -= hh * 3600000;
+  const mm = Math.floor(rest / 60000);
+  rest -= mm * 60000;
+  const ss = Math.floor(rest / 1000);
+  const ms = rest - ss * 1000;
+
   let offset = 'Z';
   if (zone && zone !== 'Z') {
-    const sign = zone[0];
-    const oh = zone.slice(1, 3);
-    const om = zone.slice(3, 5) || '00';
-    offset = `${sign}${oh}:${om}`;
+    offset = `${zone[0]}${zone.slice(1, 3)}:${zone.slice(3, 5) || '00'}`;
   }
-  const iso = `${year}-${month}-${day}T${hour}:${minute || '00'}:${second || '00'}${ms}${offset}`;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const iso =
+    `${year}-${month}-${day}T${pad(hh)}:${pad(mm)}:${pad(ss)}` +
+    `${ms ? `.${String(ms).padStart(3, '0')}` : ''}${offset}`;
   // Guard against a syntactically plausible but impossible date (month 13).
   return Number.isNaN(Date.parse(iso)) ? value : iso;
 }

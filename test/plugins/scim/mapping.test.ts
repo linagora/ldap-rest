@@ -87,6 +87,35 @@ describe('SCIM mapping', () => {
         '2025-01-01T12:30:45.500Z'
       );
     });
+    it('reads a fraction of a minute as seconds', () => {
+      // RFC 4517: the fraction applies to the smallest unit present.
+      expect(ldapTimeToIso('202501011230.5Z')).to.equal('2025-01-01T12:30:30Z');
+      expect(ldapTimeToIso('202501011230.25Z')).to.equal(
+        '2025-01-01T12:30:15Z'
+      );
+      expect(ldapTimeToIso('202501011230.505Z')).to.equal(
+        '2025-01-01T12:30:30.300Z'
+      );
+    });
+    it('reads a fraction of an hour as minutes and seconds', () => {
+      expect(ldapTimeToIso('2025010112.5Z')).to.equal('2025-01-01T12:30:00Z');
+      expect(ldapTimeToIso('2025010112.75Z')).to.equal('2025-01-01T12:45:00Z');
+      expect(ldapTimeToIso('2025010112.51Z')).to.equal('2025-01-01T12:30:36Z');
+    });
+    it('never carries a fraction past the hour it was given', () => {
+      // 0.99999 of an hour is still inside that hour.
+      expect(ldapTimeToIso('2025010123.99999Z')).to.equal(
+        '2025-01-01T23:59:59.964Z'
+      );
+      expect(ldapTimeToIso('202501012359.9999Z')).to.equal(
+        '2025-01-01T23:59:59.994Z'
+      );
+    });
+    it('accepts a comma as the decimal separator', () => {
+      expect(ldapTimeToIso('20250101123045,5Z')).to.equal(
+        '2025-01-01T12:30:45.500Z'
+      );
+    });
     it('converts a numeric offset', () => {
       expect(ldapTimeToIso('20250101123045+0200')).to.equal(
         '2025-01-01T12:30:45+02:00'
