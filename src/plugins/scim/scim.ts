@@ -1709,6 +1709,7 @@ export default class Scim extends DmPlugin {
         etag: Boolean(this.config.scim_etag),
         changePassword: false,
         maxResults: (this.config.scim_max_results as number) || 200,
+        maxScanned: (this.config.scim_max_scanned as number) || 10000,
         bulkMaxOperations:
           (this.config.scim_bulk_max_operations as number) || 100,
         bulkMaxPayloadSize:

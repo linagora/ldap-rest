@@ -278,6 +278,7 @@ export interface Config {
   scim_user_mapping?: string;
   scim_group_mapping?: string;
   scim_max_results?: number;
+  scim_max_scanned?: number;
   scim_bulk_max_operations?: number;
   scim_bulk_max_payload_size?: number;
   scim_etag?: boolean;
@@ -812,6 +813,7 @@ const configArgs: ConfigTemplate = [
   ['--scim-user-mapping', 'DM_SCIM_USER_MAPPING', ''],
   ['--scim-group-mapping', 'DM_SCIM_GROUP_MAPPING', ''],
   ['--scim-max-results', 'DM_SCIM_MAX_RESULTS', 200, 'number'],
+  ['--scim-max-scanned', 'DM_SCIM_MAX_SCANNED', 10000, 'number'],
   ['--scim-bulk-max-operations', 'DM_SCIM_BULK_MAX_OPERATIONS', 100, 'number'],
   [
     '--scim-bulk-max-payload-size',

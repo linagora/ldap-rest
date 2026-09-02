@@ -56,7 +56,8 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-id-attribute`          | `DM_SCIM_ID_ATTRIBUTE`          | `rdn`                                              | `rdn` (default) or `entryUUID` for SCIM `id`                           |
 | `--scim-user-mapping`          | `DM_SCIM_USER_MAPPING`          | —                                                  | Path to JSON mapping override                                          |
 | `--scim-group-mapping`         | `DM_SCIM_GROUP_MAPPING`         | —                                                  | Same for Groups                                                        |
-| `--scim-max-results`           | `DM_SCIM_MAX_RESULTS`           | `200`                                              | Hard cap on list results                                               |
+| `--scim-max-results`           | `DM_SCIM_MAX_RESULTS`           | `200`                                              | Maximum page size (caps `count`)                                       |
+| `--scim-max-scanned`           | `DM_SCIM_MAX_SCANNED`           | `10000`                                            | Entries a list may walk before answering `400 tooMany`                 |
 | `--scim-bulk-max-operations`   | `DM_SCIM_BULK_MAX_OPERATIONS`   | `100`                                              | Max `/Bulk` operations per request                                     |
 | `--scim-bulk-max-payload-size` | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE` | `1048576`                                          | Max `/Bulk` payload size in bytes                                      |
 | `--scim-etag`                  | `DM_SCIM_ETAG`                  | `false`                                            | Advertise ETag support in discovery (not yet implemented)              |
@@ -246,6 +247,39 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 | `not (a eq "x")`                 | `(!(a=x))`                    |
 
 Unknown SCIM attributes raise `400 invalidFilter`.
+
+## Pagination
+
+`GET /Users` and `GET /Groups` answer a window over the matching resources
+(RFC 7644 §3.4.2.4):
+
+```
+GET /scim/v2/Users?startIndex=201&count=100
+```
+
+```json
+{
+  "totalResults": 4213,
+  "startIndex": 201,
+  "itemsPerPage": 100,
+  "Resources": [...]
+}
+```
+
+- `count` is capped at `--scim-max-results` (200). A `count` of 0 is legal and
+  answers `totalResults` with no resource.
+- `startIndex` is 1-based, and is not bounded by the page size: any offset into
+  the collection is reachable.
+- `totalResults` is the real size of the result set, not the size of the page.
+
+Only the requested page is held in memory, but counting the rest still means
+walking to the end of the result set. `--scim-max-scanned` bounds that walk at
+10000 entries; a query matching more answers `400 tooMany`, which RFC 7644
+§3.12 defines for "a filter [that] yields many more results than the server is
+willing to calculate or process". Raise the flag, or narrow the query.
+
+If the directory's own size limit is lower than the collection, it refuses the
+search first and the answer is the same `tooMany` — raise `sizelimit` in slapd.
 
 ## Multi-tenant: per-user LDAP bases
 
@@ -562,6 +596,6 @@ the `configurable` role automatically, and `core/configApi` picks it up.
 - No `/Me` endpoint (RFC 7644 §3.11).
 - ETag / `If-Match` advertised but not enforced.
 - No `/.search` POST endpoint (use GET with `?filter=…`).
-- `totalResults` is computed from a single LDAP search capped at
-  `--scim-max-results`; switch to paged search for directories with many thousands
-  of entries.
+- A list walks its result set to count it, bounded by `--scim-max-scanned`
+  (10000 by default). Past that bound it answers `400 tooMany`, as RFC 7644
+  §3.12 allows; raise the bound or narrow the query with a filter.
