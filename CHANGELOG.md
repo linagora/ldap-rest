@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `plugins/ldap/onChange`, `plugins/ldap/organizations`: both rebuilt the hook
+  tuple without the request. `launchHooksChained` feeds each hook's return
+  value to the next, so an authorization plugin registered after either of
+  them saw no request — and `shouldSkipAuthorization()` returns true the
+  moment it is missing. Every `modify`, and every `rename` for the second
+  plugin, went through unchecked, whatever `core/auth/authzPerBranch` or
+  `core/auth/authzLinid1` said.
+
+  Neither plugin sits in `priority.json`, and the remaining plugins load
+  concurrently, so which side of the line a deployment fell on was decided by
+  a load race and could differ from one restart to the next.
+  `core/auth/authzDynamic` was not affected: it reads its token from an
+  `AsyncLocalStorage` rather than from the request. Present since at least
+  v0.4.7
+
+### Bug Fixes
+
+- `plugins/ldap/onChange`: the entry snapshot taken before each modify was
+  only ever cleared when the operation was unknown, so the map grew by one
+  entry per modify for the lifetime of the process
+
 ## v0.6.1 (2026-09-02)
 
 ### Breaking Changes

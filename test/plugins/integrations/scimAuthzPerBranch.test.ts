@@ -18,6 +18,7 @@ import supertest from 'supertest';
 import type { Response } from 'express';
 
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
+import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
 import { DM } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
@@ -106,6 +107,12 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     const auth = new HeaderAuthPlugin(server);
     auth.api(server.app);
 
+    // Registered BEFORE the authorization plugin on purpose. `launchHooksChained`
+    // feeds each hook's return value to the next, so a hook that rebuilds the
+    // tuple without the request blinds everything downstream of it.
+    const onChange = new OnLdapChange(server);
+    wireHooks(server, onChange);
+
     const authz = new AuthzPerBranch(server);
     wireHooks(server, authz);
 
@@ -114,6 +121,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     wireHooks(server, scim);
 
     server.loadedPlugins['headerAuth'] = auth;
+    server.loadedPlugins['onLdapChange'] = onChange;
     server.loadedPlugins['authzPerBranch'] = authz;
     server.loadedPlugins['scim'] = scim;
     await server.ready;

@@ -337,8 +337,17 @@ describe('LDAP Organizations Plugin', function () {
         const dn = testOrgDn;
         const changes = { replace: { description: 'test' } };
 
-        const result = await plugin.hooks.ldapmodifyrequest?.([dn, changes, 0]);
-        expect(result).to.deep.equal([dn, changes, 0]);
+        const req = { user: 'alice' } as never;
+        const result = await plugin.hooks.ldapmodifyrequest?.([
+          dn,
+          changes,
+          0,
+          req,
+        ]);
+        // The request must come back out: `launchHooksChained` feeds this
+        // return value to the next hook, and an authorization plugin that
+        // does not see it skips its check.
+        expect(result).to.deep.equal([dn, changes, 0, req]);
       });
     });
 
@@ -377,8 +386,9 @@ describe('LDAP Organizations Plugin', function () {
       it('should pass through rename requests', () => {
         const dn = testOrgDn;
         const newdn = testSubOrgDn;
-        const result = plugin.hooks.ldaprenamerequest?.([dn, newdn]);
-        expect(result).to.deep.equal([dn, newdn]);
+        const req = { user: 'alice' } as never;
+        const result = plugin.hooks.ldaprenamerequest?.([dn, newdn, req]);
+        expect(result).to.deep.equal([dn, newdn, req]);
       });
     });
   });
