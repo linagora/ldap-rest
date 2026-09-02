@@ -49,6 +49,7 @@ import {
   scimUniqueness,
   ScimError,
   extractLdapCode,
+  isAuthzForbidden,
 } from './errors';
 
 export interface ListQuery {
@@ -136,7 +137,8 @@ export class ScimUsers {
           scope: 'base',
           attributes: requiredLdapAttributes(this.mapping),
         },
-        dn
+        dn,
+        req
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
@@ -209,6 +211,7 @@ export class ScimUsers {
       startIndex,
       count,
       maxScanned: this.maxScanned,
+      req,
     });
 
     // sortBy / sortOrder are parsed for backwards compatibility but not
@@ -282,7 +285,8 @@ export class ScimUsers {
         scope: 'base',
         attributes: requiredLdapAttributes(this.mapping),
       },
-      dn
+      dn,
+      req
     )) as SearchResult;
     if (!currentResult.searchEntries?.length) {
       throw scimNotFound(`User ${id} not found`);
@@ -395,12 +399,16 @@ export class ScimUsers {
     try {
       const res = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: ['dn'] },
-        dn
+        dn,
+        req
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
-    } catch {
+    } catch (err) {
+      // A refusal is an answer, not a miss: re-raise it so the caller gets a
+      // 403 instead of the reference silently vanishing from the group.
+      if (isAuthzForbidden(err)) throw err;
       // not found by DN; try a filter
     }
     try {
@@ -411,12 +419,14 @@ export class ScimUsers {
           paged: false,
           attributes: ['dn'],
         },
-        base
+        base,
+        req
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
-    } catch {
+    } catch (err) {
+      if (isAuthzForbidden(err)) throw err;
       // ignore
     }
     return undefined;

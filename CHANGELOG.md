@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `plugins/scim`: reads are now authorized. Every `ldapActions.search()` the
+  plugin issues omitted the request, so `ldapsearchrequest` — the hook the
+  authorization plugins use — skipped its check: any authenticated identity
+  could read any branch the plugin was pointed at, whatever
+  `core/auth/authzPerBranch` or `core/auth/authzDynamic` said. `GET /Users`,
+  `GET /Users/{id}` and their Group counterparts now answer `403` where read
+  is denied.
+
+  An identity that writes needs `read` on the same branch: a SCIM write
+  answers with the resource it just changed, so it reads the entry back. A
+  grant of `write` without `read` no longer serves a write
+
 ### Security
 
 - `plugins/scim`: `PATCH /scim/v2/Users/{id}` called `ldapActions.modify()`
