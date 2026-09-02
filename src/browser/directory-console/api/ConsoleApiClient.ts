@@ -1,0 +1,494 @@
+/**
+ * REST client of the directory console.
+ *
+ * It discovers what the server offers instead of assuming it: the entity list,
+ * their schemas and their endpoints all come from `GET /v1/config`, and the
+ * caller's own rights from `GET /v1/authz/scope`.
+ *
+ * @module browser/directory-console/api/ConsoleApiClient
+ */
+
+import type {
+  EntityDescriptor,
+  EntitySchema,
+  Entry,
+  OrganizationNode,
+  Scope,
+  SchemaAttribute,
+} from '../types';
+
+interface FlatResource {
+  name: string;
+  singularName: string;
+  pluralName: string;
+  mainAttribute: string;
+  base: string;
+  schema: EntitySchema;
+}
+
+interface ConfigResponse {
+  apiPrefix: string;
+  ldapBase: string;
+  features: {
+    ldapFlatGeneric?: { flatResources?: FlatResource[] };
+    ldapGroups?: {
+      enabled?: boolean;
+      base?: string;
+      mainAttribute?: string;
+      schema?: EntitySchema;
+    };
+    ldapOrganizations?: {
+      enabled?: boolean;
+      topOrganization?: string;
+      pathSeparator?: string;
+      schema?: EntitySchema;
+    };
+  };
+}
+
+/** Tell whether an attribute carries a role, single or among several. */
+export function hasRole(
+  attr: SchemaAttribute | undefined,
+  role: string
+): boolean {
+  if (!attr?.role) return false;
+  return Array.isArray(attr.role)
+    ? attr.role.includes(role)
+    : attr.role === role;
+}
+
+/** Name of the attribute carrying a role, if any. */
+export function roleAttribute(
+  schema: EntitySchema | undefined,
+  role: string
+): string | undefined {
+  if (!schema) return undefined;
+  for (const [name, attr] of Object.entries(schema.attributes || {}))
+    if (hasRole(attr, role)) return name;
+  return undefined;
+}
+
+/** Organizations walked before a pointer listing stops asking for more. */
+const ORGANIZATION_OPTION_LIMIT = 200;
+
+export class ConsoleApiClient {
+  private readonly origin: string;
+  private apiPrefix = '/api';
+  private ldapBase = '';
+  private pathSeparator = ' / ';
+  private topOrganization?: string;
+  /** Attribute carrying the readable path of an organization, from its role */
+  private organizationPathAttribute?: string;
+
+  constructor(apiBaseUrl?: string) {
+    this.origin =
+      apiBaseUrl ??
+      (typeof window !== 'undefined' ? window.location.origin : '');
+  }
+
+  /** Separator the directory puts between the segments of an organization path. */
+  get organizationPathSeparator(): string {
+    return this.pathSeparator;
+  }
+
+  /** Root of the organization tree, when the server serves one. */
+  get organizationRoot(): string | undefined {
+    return this.topOrganization;
+  }
+
+  /**
+   * Issue a request and turn a failure into an `Error` carrying the server's
+   * own message — the API explains what it refused and why, and repeating that
+   * verbatim is more useful than any wording invented here.
+   */
+  private async call<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`${this.origin}${path}`, {
+      credentials: 'same-origin',
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init?.headers || {}),
+      },
+    });
+    const text = await response.text();
+    const payload = text ? (JSON.parse(text) as unknown) : null;
+    if (!response.ok) {
+      const message =
+        (payload as { error?: string } | null)?.error ||
+        `${response.status} ${response.statusText}`;
+      const error = new Error(message) as Error & { status: number };
+      error.status = response.status;
+      throw error;
+    }
+    return payload as T;
+  }
+
+  /**
+   * Read the server's configuration and turn it into the entity list the
+   * console navigates.
+   *
+   * @returns one descriptor per entity the server exposes
+   */
+  async discover(): Promise<EntityDescriptor[]> {
+    const config = await this.call<ConfigResponse>('/api/v1/config');
+    this.apiPrefix = config.apiPrefix || '/api';
+    this.ldapBase = config.ldapBase || '';
+    const entities: EntityDescriptor[] = [];
+
+    for (const resource of config.features.ldapFlatGeneric?.flatResources ||
+      []) {
+      if (!resource.schema?.attributes) continue;
+      entities.push(
+        this.describe({
+          key: resource.pluralName,
+          pluralName: resource.pluralName,
+          singularName: resource.singularName,
+          mainAttribute: resource.mainAttribute,
+          base: resource.base,
+          schema: resource.schema,
+          endpoint: `${this.apiPrefix}/v1/ldap/${resource.pluralName}`,
+          kind: 'flat',
+        })
+      );
+    }
+
+    const groups = config.features.ldapGroups;
+    if (groups?.enabled && groups.schema?.attributes) {
+      entities.push(
+        this.describe({
+          key: 'groups',
+          pluralName: 'groups',
+          singularName: 'group',
+          mainAttribute: groups.mainAttribute || 'cn',
+          base: groups.base || '',
+          schema: groups.schema,
+          endpoint: `${this.apiPrefix}/v1/ldap/groups`,
+          kind: 'group',
+        })
+      );
+    }
+
+    const organizations = config.features.ldapOrganizations;
+    if (organizations?.enabled) {
+      this.pathSeparator = organizations.pathSeparator || ' / ';
+      this.topOrganization = organizations.topOrganization;
+      this.organizationPathAttribute = roleAttribute(
+        organizations.schema,
+        'organizationPath'
+      );
+      if (organizations.schema?.attributes) {
+        entities.push(
+          this.describe({
+            key: 'organizations',
+            pluralName: 'organizations',
+            singularName: 'organization',
+            mainAttribute: 'ou',
+            base: organizations.topOrganization || '',
+            schema: organizations.schema,
+            endpoint: `${this.apiPrefix}/v1/ldap/organizations`,
+            kind: 'organization',
+          })
+        );
+      }
+    }
+
+    return entities;
+  }
+
+  /** Fill in the role-derived fields of a descriptor. */
+  private describe(
+    base: Omit<
+      EntityDescriptor,
+      'organizationLink' | 'organizationPath' | 'accountStatus' | 'password'
+    >
+  ): EntityDescriptor {
+    return {
+      ...base,
+      organizationLink: roleAttribute(base.schema, 'organizationLink'),
+      organizationPath: roleAttribute(base.schema, 'organizationPath'),
+      accountStatus: roleAttribute(base.schema, 'accountStatus'),
+      password: roleAttribute(base.schema, 'password'),
+    };
+  }
+
+  /** The caller's administration scope, or null when the server serves none. */
+  async scope(): Promise<Scope | null> {
+    try {
+      return await this.call<Scope>(`${this.apiPrefix}/v1/authz/scope`);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * List the entries of an entity, optionally narrowed by a substring on one
+   * attribute.
+   *
+   * @param entity entity to list
+   * @param search substring to look for
+   * @param attribute attribute the substring applies to
+   * @returns the entries, keyed by their identifier
+   */
+  async list(
+    entity: EntityDescriptor,
+    search?: string,
+    attribute?: string
+  ): Promise<Record<string, Entry>> {
+    const params = new URLSearchParams();
+    if (search && attribute) {
+      params.set('match', search);
+      params.set('attribute', attribute);
+    }
+    const query = params.toString();
+    return this.call<Record<string, Entry>>(
+      `${entity.endpoint}${query ? `?${query}` : ''}`
+    );
+  }
+
+  /** Read one entry. */
+  async get(entity: EntityDescriptor, id: string): Promise<Entry> {
+    return this.call<Entry>(`${entity.endpoint}/${encodeURIComponent(id)}`);
+  }
+
+  /** Create an entry, and return it as stored. */
+  async create(entity: EntityDescriptor, values: Entry): Promise<Entry> {
+    return this.call<Entry>(entity.endpoint, {
+      method: 'POST',
+      body: JSON.stringify(values),
+    });
+  }
+
+  /** Replace the given attributes of an entry. */
+  async update(
+    entity: EntityDescriptor,
+    id: string,
+    replace: Record<string, string | string[]>,
+    remove: string[] = []
+  ): Promise<void> {
+    const body: Record<string, unknown> = {};
+    if (Object.keys(replace).length) body.replace = replace;
+    if (remove.length) body.delete = remove;
+    if (!Object.keys(body).length) return;
+    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Delete an entry. */
+  async remove(entity: EntityDescriptor, id: string): Promise<void> {
+    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** Move an entry to another organization. */
+  async move(
+    entity: EntityDescriptor,
+    id: string,
+    targetOrgDn: string
+  ): Promise<void> {
+    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ targetOrgDn }),
+    });
+  }
+
+  /** Move an account to one of the states its schema declares. */
+  async setStatus(
+    entity: EntityDescriptor,
+    id: string,
+    state: string
+  ): Promise<void> {
+    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ state }),
+    });
+  }
+
+  /**
+   * Reset an account's credential.
+   *
+   * @returns the generated password, when the server chose one
+   */
+  async resetPassword(
+    entity: EntityDescriptor,
+    id: string,
+    password?: string,
+    forceChange = true
+  ): Promise<{ generated: boolean; password?: string }> {
+    return this.call<{ generated: boolean; password?: string }>(
+      `${entity.endpoint}/${encodeURIComponent(id)}/password`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ password, forceChange }),
+      }
+    );
+  }
+
+  /** Top of the organization tree. */
+  async organizationTop(): Promise<OrganizationNode | null> {
+    try {
+      const entry = await this.call<Entry>(
+        `${this.apiPrefix}/v1/ldap/organizations/top`
+      );
+      return entry?.dn ? this.toNode(entry) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Direct children of an organization. */
+  async organizationChildren(dn: string): Promise<OrganizationNode[]> {
+    const entries = await this.call<Entry[]>(
+      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`
+    );
+    return (entries || []).map(entry => this.toNode(entry));
+  }
+
+  /** Read one organization. */
+  async organization(dn: string): Promise<Entry> {
+    return this.call<Entry>(
+      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}`
+    );
+  }
+
+  /** Create an organization, optionally under a parent. */
+  async createOrganization(
+    values: Record<string, unknown>,
+    parentDn?: string
+  ): Promise<void> {
+    await this.call(`${this.apiPrefix}/v1/ldap/organizations`, {
+      method: 'POST',
+      body: JSON.stringify(parentDn ? { ...values, parentDn } : values),
+    });
+  }
+
+  /** Replace the given attributes of an organization. */
+  async updateOrganization(
+    dn: string,
+    replace: Record<string, string | string[]>,
+    remove: string[] = []
+  ): Promise<void> {
+    const body: Record<string, unknown> = {};
+    if (Object.keys(replace).length) body.replace = replace;
+    if (remove.length) body.delete = remove;
+    if (!Object.keys(body).length) return;
+    await this.call(
+      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}`,
+      { method: 'PUT', body: JSON.stringify(body) }
+    );
+  }
+
+  /** Delete an organization. */
+  async deleteOrganization(dn: string): Promise<void> {
+    await this.call(
+      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  /**
+   * Entries of a branch, for a pointer field. The branch is a raw DN, so the
+   * console reads it through the low-level browsing API when it is available
+   * and falls back to the entity that owns the branch otherwise.
+   *
+   * @param branch DN the pointer must land in
+   * @param entities entities the console knows, to find one covering the branch
+   * @returns DN and label of every candidate
+   */
+  async pointerOptions(
+    branch: string,
+    entities: EntityDescriptor[]
+  ): Promise<{ dn: string; label: string }[]> {
+    // An organization pointer names the whole tree, which no flat listing
+    // covers: walk it instead, so the department field of an account is
+    // filled from the organizations themselves.
+    if (
+      this.topOrganization &&
+      (branch.toLowerCase() === this.topOrganization.toLowerCase() ||
+        this.topOrganization.toLowerCase().endsWith(`,${branch.toLowerCase()}`))
+    ) {
+      return this.organizationOptions();
+    }
+
+    const owner = entities.find(
+      entity =>
+        entity.base && branch.toLowerCase() === entity.base.toLowerCase()
+    );
+    if (owner) {
+      const list = await this.list(owner);
+      return Object.entries(list).map(([id, entry]) => ({
+        dn: String(entry.dn || id),
+        label: id,
+      }));
+    }
+    // An unknown branch: ask the raw browser, which every deployment that
+    // enables it serves, and give up quietly when it is not there.
+    try {
+      const answer = await this.call<{
+        children?: { dn: string; rdn: string }[];
+      }>(
+        `${this.apiPrefix}/v1/ldap/raw/children/${encodeURIComponent(branch)}`
+      );
+      return (answer.children || []).map(child => ({
+        dn: child.dn,
+        label: child.rdn.replace(/^[^=]+=/, ''),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Every organization, as pointer candidates labelled by their readable path.
+   *
+   * The walk is breadth-first and bounded: a directory with a very wide tree
+   * should not turn opening a form into hundreds of requests.
+   *
+   * @returns DN and label of each organization found
+   */
+  private async organizationOptions(): Promise<
+    { dn: string; label: string }[]
+  > {
+    const root = await this.organizationTop();
+    if (!root) return [];
+    const options: { dn: string; label: string }[] = [];
+    const queue: OrganizationNode[] = [root];
+    let visited = 0;
+    while (queue.length > 0 && visited < ORGANIZATION_OPTION_LIMIT) {
+      const node = queue.shift() as OrganizationNode;
+      visited++;
+      options.push({ dn: node.dn, label: node.path || node.name });
+      try {
+        queue.push(...(await this.organizationChildren(node.dn)));
+      } catch {
+        // A branch the caller may not read is simply not offered.
+      }
+    }
+    return options;
+  }
+
+  /** Turn an organization entry into a tree node. */
+  private toNode(entry: Entry): OrganizationNode {
+    const dn = String(entry.dn || '');
+    const value = (name: string): string | undefined => {
+      const raw = entry[name];
+      return Array.isArray(raw) ? raw[0] : raw;
+    };
+    return {
+      dn,
+      name:
+        value('ou') || value('o') || dn.split(',')[0].replace(/^[^=]+=/, ''),
+      path: this.organizationPathAttribute
+        ? value(this.organizationPathAttribute)
+        : undefined,
+    };
+  }
+
+  /** Base DN of the directory, for display. */
+  get base(): string {
+    return this.ldapBase;
+  }
+}
