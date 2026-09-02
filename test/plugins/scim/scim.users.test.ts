@@ -10,6 +10,8 @@ describe('SCIM Users (integration)', function () {
   let userBase: string;
   let savedUserBase: string | undefined;
   let savedGroupBase: string | undefined;
+  let savedLockAttr: string | undefined;
+  let savedLockValue: string | undefined;
 
   before(async function () {
     // setup.ts populates DM_LDAP_* env vars via mocha root beforeAll hook
@@ -30,6 +32,13 @@ describe('SCIM Users (integration)', function () {
     savedGroupBase = process.env.DM_SCIM_GROUP_BASE;
     process.env.DM_SCIM_USER_BASE = userBase;
     process.env.DM_SCIM_GROUP_BASE = `ou=groups,${baseDn}`;
+    // The test directory has no ppolicy overlay, so pwdAccountLockedTime is
+    // not in its schema. Back SCIM `active` with an inetOrgPerson attribute
+    // the mapping does not otherwise use.
+    savedLockAttr = process.env.DM_SCIM_USER_LOCK_ATTRIBUTE;
+    savedLockValue = process.env.DM_SCIM_USER_LOCK_VALUE;
+    process.env.DM_SCIM_USER_LOCK_ATTRIBUTE = 'employeeType';
+    process.env.DM_SCIM_USER_LOCK_VALUE = 'disabled';
     server = new DM();
     plugin = new Scim(server);
     await plugin.api(server.app);
@@ -41,6 +50,12 @@ describe('SCIM Users (integration)', function () {
     else process.env.DM_SCIM_USER_BASE = savedUserBase;
     if (savedGroupBase === undefined) delete process.env.DM_SCIM_GROUP_BASE;
     else process.env.DM_SCIM_GROUP_BASE = savedGroupBase;
+    if (savedLockAttr === undefined)
+      delete process.env.DM_SCIM_USER_LOCK_ATTRIBUTE;
+    else process.env.DM_SCIM_USER_LOCK_ATTRIBUTE = savedLockAttr;
+    if (savedLockValue === undefined)
+      delete process.env.DM_SCIM_USER_LOCK_VALUE;
+    else process.env.DM_SCIM_USER_LOCK_VALUE = savedLockValue;
   });
 
   afterEach(async () => {
@@ -305,6 +320,134 @@ describe('SCIM Users (integration)', function () {
         'https://scim.example.test/scim/v2/Users/scim-alice'
       );
       expect(res.headers.location).to.not.match(/attacker/);
+    });
+  });
+
+  describe('active (RFC 7643 section 4.1.1)', () => {
+    const create = (body: Record<string, unknown>) =>
+      supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+          ...body,
+        });
+
+    it('defaults to active on create', async () => {
+      const res = await create({}).expect(201);
+      expect(res.body.active).to.be.true;
+    });
+
+    it('creates a deactivated user', async () => {
+      const res = await create({ active: false }).expect(201);
+      expect(res.body.active).to.be.false;
+      const got = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice')
+        .expect(200);
+      expect(got.body.active).to.be.false;
+    });
+
+    it('PATCH replace active=false deactivates, active=true reactivates', async () => {
+      await create({}).expect(201);
+      const off = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: false }],
+        })
+        .expect(200);
+      expect(off.body.active).to.be.false;
+
+      const on = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: true }],
+        })
+        .expect(200);
+      expect(on.body.active).to.be.true;
+    });
+
+    it('reactivating an already active user is a no-op, not a 500', async () => {
+      await create({}).expect(201);
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: true }],
+        })
+        .expect(200);
+      expect(res.body.active).to.be.true;
+    });
+
+    it('deactivates through a PATCH with no path', async () => {
+      await create({}).expect(201);
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', value: { active: false } }],
+        })
+        .expect(200);
+      expect(res.body.active).to.be.false;
+    });
+
+    it('PUT without active reactivates, PUT with active=false does not', async () => {
+      await create({ active: false }).expect(201);
+      const put = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(200);
+      expect(put.body.active).to.be.true;
+
+      const put2 = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+          active: false,
+        })
+        .expect(200);
+      expect(put2.body.active).to.be.false;
+    });
+
+    it('filters on active', async () => {
+      await create({ active: false }).expect(201);
+      const inactive = await supertest(server.app)
+        .get('/scim/v2/Users?filter=' + encodeURIComponent('active eq false'))
+        .expect(200);
+      const ids = inactive.body.Resources.map((r: { id: string }) => r.id);
+      expect(ids).to.include('scim-alice');
+
+      const activeOnly = await supertest(server.app)
+        .get('/scim/v2/Users?filter=' + encodeURIComponent('active eq true'))
+        .expect(200);
+      const activeIds = activeOnly.body.Resources.map(
+        (r: { id: string }) => r.id
+      );
+      expect(activeIds).to.not.include('scim-alice');
+    });
+
+    it('answers "active pr" instead of sending an undefined attribute', async () => {
+      await create({}).expect(201);
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users?filter=' + encodeURIComponent('active pr'))
+        .expect(200);
+      const ids = res.body.Resources.map((r: { id: string }) => r.id);
+      expect(ids).to.include('scim-alice');
     });
   });
 

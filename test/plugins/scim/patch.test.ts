@@ -233,4 +233,122 @@ describe('SCIM PATCH applicator', () => {
       expect(req.delete).to.deep.equal({ displayName: '' });
     });
   });
+
+  describe('active (RFC 7643 section 4.1.1)', () => {
+    const activeCtx = {
+      mapping: DEFAULT_USER_MAPPING,
+      supportsActive: true,
+      lockAttribute: 'pwdAccountLockedTime',
+      lockValue: '000001010000Z',
+    };
+
+    it('replace active=false writes the lock attribute', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: false }],
+        },
+        activeCtx
+      );
+      expect(req.replace).to.deep.equal({
+        pwdAccountLockedTime: '000001010000Z',
+      });
+    });
+
+    it('replace active=true removes it', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: true }],
+        },
+        activeCtx
+      );
+      expect(req.delete).to.deep.equal({ pwdAccountLockedTime: '' });
+    });
+
+    it('remove active restores the default, an active account', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: 'active' }],
+        },
+        activeCtx
+      );
+      expect(req.delete).to.deep.equal({ pwdAccountLockedTime: '' });
+    });
+
+    it('reads the string form identity providers sometimes send', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: 'False' }],
+        },
+        activeCtx
+      );
+      expect(req.replace).to.deep.equal({
+        pwdAccountLockedTime: '000001010000Z',
+      });
+    });
+
+    it('honours a configured lock attribute and value', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: false }],
+        },
+        {
+          ...activeCtx,
+          lockAttribute: 'nsAccountLock',
+          lockValue: 'TRUE',
+        }
+      );
+      expect(req.replace).to.deep.equal({ nsAccountLock: 'TRUE' });
+    });
+
+    it('applies through a path-less operation', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', value: { active: false } }],
+        },
+        activeCtx
+      );
+      expect(req.replace).to.deep.equal({
+        pwdAccountLockedTime: '000001010000Z',
+      });
+    });
+
+    it('rejects a sub-attribute on active', async () => {
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'replace', path: 'active.value', value: false }],
+          },
+          activeCtx
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).scimType).to.equal('invalidPath');
+      }
+    });
+
+    it('is still an unknown path on a resource without active', async () => {
+      // Groups do not carry `active`.
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'replace', path: 'active', value: false }],
+          },
+          { mapping: DEFAULT_USER_MAPPING }
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).scimType).to.equal('invalidPath');
+      }
+    });
+  });
 });

@@ -21,7 +21,7 @@
  */
 import { escapeLdapFilter } from '../../lib/utils';
 
-import { scimPathToLdapAttribute } from './mapping';
+import { DEFAULT_LOCK_ATTRIBUTE, scimPathToLdapAttribute } from './mapping';
 import type { ResourceMapping } from './types';
 import { scimInvalidFilter } from './errors';
 
@@ -157,11 +157,15 @@ function tokenize(input: string): Token[] {
   return tokens;
 }
 
+/** Marker returned by resolvePath() for the `active` pseudo-attribute. */
+const ACTIVE_PSEUDO = '\u0000active';
+
 class Parser {
   private pos = 0;
   constructor(
     private tokens: Token[],
-    private mapping: ResourceMapping
+    private mapping: ResourceMapping,
+    private lockAttribute: string = DEFAULT_LOCK_ATTRIBUTE
   ) {}
 
   private peek(offset = 0): Token {
@@ -264,6 +268,10 @@ class Parser {
       const opName = op.value.toLowerCase();
       if (opName === 'pr') {
         const ldapAttr = this.resolvePath(path);
+        // `active` is not an LDAP attribute: emitting `(active=*)` would send
+        // an undefined attribute type to the directory. Every user we return
+        // carries an `active` value, so the presence test matches them all.
+        if (ldapAttr === ACTIVE_PSEUDO) return '(objectClass=*)';
         return `(${ldapAttr}=*)`;
       }
       if (!KEYWORDS.has(opName) || ['and', 'or', 'not'].includes(opName)) {
@@ -311,8 +319,8 @@ class Parser {
         "filter on 'id' only supports 'eq' with a string value"
       );
     }
-    // 'active' → presence of pwdAccountLockedTime (emitted in emitComparison)
-    if (path === 'active') return 'active';
+    // 'active' → presence of the lock attribute (emitted in emitComparison)
+    if (path === 'active') return ACTIVE_PSEUDO;
 
     const ldapAttr = scimPathToLdapAttribute(path, this.mapping);
     if (!ldapAttr) {
@@ -329,20 +337,16 @@ class Parser {
     const ldapAttr = this.resolvePath(path);
 
     // Pseudo-attributes
-    if (ldapAttr === 'active') {
+    if (ldapAttr === ACTIVE_PSEUDO) {
       const truthy =
         value === true ||
         (typeof value === 'string' && value.toLowerCase() === 'true');
-      // active=true  <=> no pwdAccountLockedTime
-      // active=false <=> pwdAccountLockedTime present
-      if (op === 'eq')
-        return truthy
-          ? '(!(pwdAccountLockedTime=*))'
-          : '(pwdAccountLockedTime=*)';
-      if (op === 'ne')
-        return truthy
-          ? '(pwdAccountLockedTime=*)'
-          : '(!(pwdAccountLockedTime=*))';
+      const locked = `(${this.lockAttribute}=*)`;
+      const unlocked = `(!(${this.lockAttribute}=*))`;
+      // active=true  <=> lock attribute absent
+      // active=false <=> lock attribute present
+      if (op === 'eq') return truthy ? unlocked : locked;
+      if (op === 'ne') return truthy ? locked : unlocked;
       throw scimInvalidFilter(`Operator '${op}' not supported for 'active'`);
     }
 
@@ -394,7 +398,8 @@ export interface TranslatedFilter {
  */
 export function scimFilterToLdap(
   filter: string,
-  mapping: ResourceMapping
+  mapping: ResourceMapping,
+  lockAttribute: string = DEFAULT_LOCK_ATTRIBUTE
 ): TranslatedFilter {
   const trimmed = filter.trim();
   if (!trimmed) {
@@ -412,7 +417,7 @@ export function scimFilterToLdap(
   }
 
   const tokens = tokenize(trimmed);
-  const parser = new Parser(tokens, mapping);
+  const parser = new Parser(tokens, mapping, lockAttribute);
   const ldapFilter = parser.parse();
   return { ldapFilter, touchesId: /\bid\b/.test(trimmed) };
 }

@@ -73,6 +73,32 @@ describe('SCIM mapping', () => {
       );
       expect(user.active).to.be.false;
     });
+    it('treats an empty lock attribute as active', () => {
+      const user = ldapToScimUser(
+        { uid: 'bob', pwdAccountLockedTime: [] },
+        DEFAULT_USER_MAPPING,
+        userCtx
+      );
+      expect(user.active).to.be.true;
+    });
+    it('reads a configured lock attribute', () => {
+      const ctx = { ...userCtx, lockAttribute: 'nsAccountLock' };
+      expect(
+        ldapToScimUser(
+          { uid: 'bob', nsAccountLock: 'TRUE' },
+          DEFAULT_USER_MAPPING,
+          ctx
+        ).active
+      ).to.be.false;
+      // The default attribute must no longer be consulted.
+      expect(
+        ldapToScimUser(
+          { uid: 'bob', pwdAccountLockedTime: '20260101000000Z' },
+          DEFAULT_USER_MAPPING,
+          ctx
+        ).active
+      ).to.be.true;
+    });
   });
 
   describe('ldapTimeToIso', () => {
@@ -194,6 +220,49 @@ describe('SCIM mapping', () => {
     });
   });
 
+  describe('scimUserToLdap and active', () => {
+    it('writes the lock attribute for active=false', () => {
+      const { attributes } = scimUserToLdap(
+        {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'alice',
+          active: false,
+        },
+        DEFAULT_USER_MAPPING,
+        userCtx,
+        ['top', 'inetOrgPerson']
+      );
+      expect(attributes.pwdAccountLockedTime).to.equal('000001010000Z');
+    });
+    it('leaves it out for active=true, absence meaning active', () => {
+      const { attributes } = scimUserToLdap(
+        {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'alice',
+          active: true,
+        },
+        DEFAULT_USER_MAPPING,
+        userCtx,
+        ['top', 'inetOrgPerson']
+      );
+      expect(attributes.pwdAccountLockedTime).to.be.undefined;
+    });
+    it('honours a configured lock attribute and value', () => {
+      const { attributes } = scimUserToLdap(
+        {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'alice',
+          active: false,
+        },
+        DEFAULT_USER_MAPPING,
+        { ...userCtx, lockAttribute: 'nsAccountLock', lockValue: 'TRUE' },
+        ['top', 'inetOrgPerson']
+      );
+      expect(attributes.nsAccountLock).to.equal('TRUE');
+      expect(attributes.pwdAccountLockedTime).to.be.undefined;
+    });
+  });
+
   describe('ldapToScimGroup', () => {
     it('maps groupOfNames to SCIM Group', () => {
       const g = ldapToScimGroup(
@@ -262,6 +331,9 @@ describe('SCIM mapping', () => {
       expect(attrs).to.include('mailAlternateAddress');
       expect(attrs).to.include('entryUUID');
       expect(attrs).to.include('createTimestamp');
+      expect(
+        requiredLdapAttributes(DEFAULT_USER_MAPPING, ['nsAccountLock'])
+      ).to.include('nsAccountLock');
     });
   });
 });

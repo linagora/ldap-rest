@@ -272,6 +272,8 @@ export interface Config {
   scim_base_map?: string;
   scim_user_object_class?: string[];
   scim_user_rdn_attribute?: string;
+  scim_user_lock_attribute?: string;
+  scim_user_lock_value?: string;
   scim_group_object_class?: string[];
   scim_group_rdn_attribute?: string;
   scim_id_attribute?: string;
@@ -801,6 +803,12 @@ const configArgs: ConfigTemplate = [
     '--scim-user-object-classes',
   ],
   ['--scim-user-rdn-attribute', 'DM_SCIM_USER_RDN_ATTRIBUTE', 'uid'],
+  [
+    '--scim-user-lock-attribute',
+    'DM_SCIM_USER_LOCK_ATTRIBUTE',
+    'pwdAccountLockedTime',
+  ],
+  ['--scim-user-lock-value', 'DM_SCIM_USER_LOCK_VALUE', '000001010000Z'],
   [
     '--scim-group-object-class',
     'DM_SCIM_GROUP_OBJECT_CLASSES',

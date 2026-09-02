@@ -99,6 +99,30 @@ describe('SCIM filter parser', () => {
       const r = scimFilterToLdap('active eq false', m);
       expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
     });
+    it('active ne true', () => {
+      const r = scimFilterToLdap('active ne true', m);
+      expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
+    });
+    it('active pr matches every entry instead of emitting (active=*)', () => {
+      // `active` is not an LDAP attribute; the directory would answer
+      // undefinedAttributeType.
+      const r = scimFilterToLdap('active pr', m);
+      expect(r.ldapFilter).to.equal('(objectClass=*)');
+      expect(r.ldapFilter).to.not.match(/active/);
+    });
+    it('honours a configured lock attribute', () => {
+      const r = scimFilterToLdap('active eq false', m, 'nsAccountLock');
+      expect(r.ldapFilter).to.equal('(nsAccountLock=*)');
+    });
+    it('combines with another clause', () => {
+      const r = scimFilterToLdap('userName eq "bob" and active eq false', m);
+      expect(r.ldapFilter).to.equal('(&(uid=bob)(pwdAccountLockedTime=*))');
+    });
+    it('rejects an unsupported operator on active', () => {
+      expect(() => scimFilterToLdap('active co "x"', m)).to.throw(
+        /not supported for 'active'/
+      );
+    });
   });
 
   describe('security: LDAP injection escaping', () => {
