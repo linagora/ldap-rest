@@ -25,6 +25,16 @@
   A SCIM write answers with the resource it just changed, so it reads the
   entry back, and a grant of `write` without `read` no longer serves a write
 
+- `plugins/scim`: a Group's `externalId` no longer answers its `entryUUID`.
+  RFC 7643 section 3.1 defines `externalId` as the _provisioning client's_
+  identifier, so serving a server-assigned value meant the id Okta or Entra ID
+  sent was discarded, and `filter=externalId eq "<their id>"` searched
+  `entryUUID` and matched nothing. Name an attribute with
+  `--scim-group-external-id-attribute` (`description`, for instance) to store
+  it for real; leave it unset and `externalId` is simply not supported on
+  Groups. Users are unaffected — theirs was already stored in
+  `employeeNumber`
+
 ### Security
 
 - `plugins/scim`: `PATCH /scim/v2/Users/{id}` called `ldapActions.modify()`
