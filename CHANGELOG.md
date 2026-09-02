@@ -32,9 +32,21 @@
   section 2.3.5 wants an `xsd:dateTime`, so a strict client rejected every
   resource. They are now converted (`2025-01-01T12:00:00Z`)
 
-- `plugins/scim`: a create answered 201 without the `Location` response header
-  RFC 7644 section 3.1 requires — only `meta.location` inside the body. It is
-  now sent on POST, and on the PUT and PATCH answers as well
+- `plugins/scim`: a list could not be served at all beyond
+  `--scim-max-results`. `GET /Users` and `GET /Groups` fetched their whole
+  result set and answered `400 tooMany` as soon as it passed that figure — so
+  a directory of more than 200 entries was unlistable, filter or no filter,
+  and no `startIndex` reached past that window. RFC 7644 section 3.4.2.4 asks
+  for a page. The window is now cut server-side while walking a paged search:
+  `startIndex` reaches any offset, `totalResults` is the real size of the
+  result set, and only the requested page is held in memory
+
+  Two notes on configuration. `--scim-max-results` keeps its name but now
+  means the maximum page size — the cap on `count`, which is what
+  `ServiceProviderConfig.filter.maxResults` advertises. And the new
+  `--scim-max-scanned` (10000) bounds how far a list walks to count its
+  result set, past which `tooMany` is answered as RFC 7644 section 3.12
+  provides for
 
 - `plugins/scim`: a PATCH `remove` operation without a `path` was applied to
   every key of its `value` instead of being refused. RFC 7644 section 3.5.2.2
