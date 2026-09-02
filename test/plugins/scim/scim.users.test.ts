@@ -103,6 +103,42 @@ describe('SCIM Users (integration)', function () {
       expect(res.body.userName).to.equal('scim-alice');
       expect(res.body.meta.resourceType).to.equal('User');
       expect(res.body.emails[0].value).to.equal('alice@example.com');
+      // RFC 7644 section 3.1: a create answers with the Location header.
+      // No --scim-base-url here, so it is the prefix-relative form: the
+      // absolute one would carry the client's own Host header.
+      expect(res.headers.location).to.equal('/scim/v2/Users/scim-alice');
+      expect(res.headers.location).to.not.match(/^https?:/);
+    });
+
+    it('sends Location on PUT and PATCH too', async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(201);
+      const put = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Smith' },
+        })
+        .expect(200);
+      expect(put.headers.location).to.match(/\/scim\/v2\/Users\/scim-alice$/);
+      const patch = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'X' }],
+        })
+        .expect(200);
+      expect(patch.headers.location).to.match(/\/scim\/v2\/Users\/scim-alice$/);
     });
 
     it('rejects duplicate User with 409', async () => {
@@ -227,6 +263,48 @@ describe('SCIM Users (integration)', function () {
         .delete('/scim/v2/Users/scim-alice')
         .expect(204);
       await supertest(server.app).get('/scim/v2/Users/scim-alice').expect(404);
+    });
+  });
+
+  describe('Location with a pinned base URL', () => {
+    let pinnedServer: DM;
+    let pinnedPlugin: Scim;
+    let savedBaseUrl: string | undefined;
+
+    before(async () => {
+      savedBaseUrl = process.env.DM_SCIM_BASE_URL;
+      process.env.DM_SCIM_BASE_URL = 'https://scim.example.test';
+      pinnedServer = new DM();
+      pinnedPlugin = new Scim(pinnedServer);
+      await pinnedPlugin.api(pinnedServer.app);
+      await pinnedServer.ready;
+    });
+
+    after(async () => {
+      try {
+        await pinnedPlugin.ldap.delete(`uid=scim-alice,${userBase}`);
+      } catch {
+        /* ignore */
+      }
+      if (savedBaseUrl === undefined) delete process.env.DM_SCIM_BASE_URL;
+      else process.env.DM_SCIM_BASE_URL = savedBaseUrl;
+    });
+
+    it('is absolute, and built from the flag rather than the Host header', async () => {
+      const res = await supertest(pinnedServer.app)
+        .post('/scim/v2/Users')
+        .set('Host', 'attacker.example')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(201);
+      expect(res.headers.location).to.equal(
+        'https://scim.example.test/scim/v2/Users/scim-alice'
+      );
+      expect(res.headers.location).to.not.match(/attacker/);
     });
   });
 
