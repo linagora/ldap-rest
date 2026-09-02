@@ -6,6 +6,7 @@ import {
   ldapToScimUser,
   scimUserToLdap,
   ldapToScimGroup,
+  ldapTimeToIso,
   scimPathToLdapAttribute,
   requiredLdapAttributes,
   type MappingContext,
@@ -61,6 +62,8 @@ describe('SCIM mapping', () => {
       expect(user.meta?.location).to.equal(
         'https://example.test/scim/v2/Users/alice'
       );
+      expect(user.meta?.created).to.equal('2025-01-01T00:00:00Z');
+      expect(user.meta?.lastModified).to.equal('2025-02-02T00:00:00Z');
     });
     it('marks locked accounts as active=false', () => {
       const user = ldapToScimUser(
@@ -69,6 +72,75 @@ describe('SCIM mapping', () => {
         userCtx
       );
       expect(user.active).to.be.false;
+    });
+  });
+
+  describe('ldapTimeToIso', () => {
+    it('converts a GeneralizedTime to an xsd:dateTime', () => {
+      expect(ldapTimeToIso('20250101123045Z')).to.equal('2025-01-01T12:30:45Z');
+    });
+    it('keeps a fraction of a second as milliseconds', () => {
+      expect(ldapTimeToIso('20250101123045.123Z')).to.equal(
+        '2025-01-01T12:30:45.123Z'
+      );
+      expect(ldapTimeToIso('20250101123045.5Z')).to.equal(
+        '2025-01-01T12:30:45.500Z'
+      );
+    });
+    it('reads a fraction of a minute as seconds', () => {
+      // RFC 4517: the fraction applies to the smallest unit present.
+      expect(ldapTimeToIso('202501011230.5Z')).to.equal('2025-01-01T12:30:30Z');
+      expect(ldapTimeToIso('202501011230.25Z')).to.equal(
+        '2025-01-01T12:30:15Z'
+      );
+      expect(ldapTimeToIso('202501011230.505Z')).to.equal(
+        '2025-01-01T12:30:30.300Z'
+      );
+    });
+    it('reads a fraction of an hour as minutes and seconds', () => {
+      expect(ldapTimeToIso('2025010112.5Z')).to.equal('2025-01-01T12:30:00Z');
+      expect(ldapTimeToIso('2025010112.75Z')).to.equal('2025-01-01T12:45:00Z');
+      expect(ldapTimeToIso('2025010112.51Z')).to.equal('2025-01-01T12:30:36Z');
+    });
+    it('never carries a fraction past the hour it was given', () => {
+      // 0.99999 of an hour is still inside that hour.
+      expect(ldapTimeToIso('2025010123.99999Z')).to.equal(
+        '2025-01-01T23:59:59.964Z'
+      );
+      expect(ldapTimeToIso('202501012359.9999Z')).to.equal(
+        '2025-01-01T23:59:59.994Z'
+      );
+    });
+    it('accepts a comma as the decimal separator', () => {
+      expect(ldapTimeToIso('20250101123045,5Z')).to.equal(
+        '2025-01-01T12:30:45.500Z'
+      );
+    });
+    it('converts a numeric offset', () => {
+      expect(ldapTimeToIso('20250101123045+0200')).to.equal(
+        '2025-01-01T12:30:45+02:00'
+      );
+      expect(ldapTimeToIso('20250101123045-05')).to.equal(
+        '2025-01-01T12:30:45-05:00'
+      );
+    });
+    it('defaults the omitted minutes and seconds', () => {
+      expect(ldapTimeToIso('2025010112Z')).to.equal('2025-01-01T12:00:00Z');
+      expect(ldapTimeToIso('202501011230Z')).to.equal('2025-01-01T12:30:00Z');
+    });
+    it('assumes UTC when no zone is given', () => {
+      expect(ldapTimeToIso('20250101123045')).to.equal('2025-01-01T12:30:45Z');
+    });
+    it('passes through a value that is not a GeneralizedTime', () => {
+      expect(ldapTimeToIso('2025-01-01T12:30:45Z')).to.equal(
+        '2025-01-01T12:30:45Z'
+      );
+      expect(ldapTimeToIso('nonsense')).to.equal('nonsense');
+      expect(ldapTimeToIso('20251301123045Z')).to.equal('20251301123045Z');
+    });
+    it('returns undefined for a missing value', () => {
+      expect(ldapTimeToIso(undefined)).to.be.undefined;
+      expect(ldapTimeToIso('')).to.be.undefined;
     });
   });
 

@@ -87,6 +87,62 @@ function asString(v: AttributeValue | undefined): string | undefined {
   return String(v);
 }
 
+/**
+ * LDAP GeneralizedTime (RFC 4517 §3.3.13) → SCIM DateTime (RFC 7643 §2.3.5,
+ * an `xsd:dateTime`).
+ *
+ * The directory answers `createTimestamp`/`modifyTimestamp` as
+ * `YYYYMMDDHHMMSSZ` (optionally with a fraction, a `+HHMM` offset, or the
+ * seconds and minutes omitted). SCIM clients parse `meta.created` as an
+ * `xsd:dateTime` and reject anything else, so the raw directory value must not
+ * be forwarded as-is.
+ *
+ * A value that does not look like a GeneralizedTime is returned untouched: a
+ * directory may already store an ISO 8601 string, and dropping it would lose
+ * more than passing it through.
+ */
+export function ldapTimeToIso(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const m =
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(?:(\d{2})(?:(\d{2}))?)?(?:[.,](\d+))?(Z|[+-]\d{2}(?:\d{2})?)?$/.exec(
+      value
+    );
+  if (!m) return value;
+  const [, year, month, day, hour, minute, second, fraction, zone] = m;
+
+  // The fraction applies to the smallest unit actually present, so `1230.5`
+  // is half a minute, not half a second. Fold it into the time of day rather
+  // than dropping it, which would answer a timestamp that is simply wrong.
+  let extraMs = 0;
+  if (fraction) {
+    const unitMs = second ? 1000 : minute ? 60000 : 3600000;
+    extraMs = Math.round(Number(`0.${fraction}`) * unitMs);
+  }
+  // The fraction is always smaller than one of its own unit, so this can
+  // never carry past the hour that was given: no date arithmetic needed.
+  let rest =
+    ((Number(hour) * 60 + Number(minute || 0)) * 60 + Number(second || 0)) *
+      1000 +
+    extraMs;
+  const hh = Math.floor(rest / 3600000);
+  rest -= hh * 3600000;
+  const mm = Math.floor(rest / 60000);
+  rest -= mm * 60000;
+  const ss = Math.floor(rest / 1000);
+  const ms = rest - ss * 1000;
+
+  let offset = 'Z';
+  if (zone && zone !== 'Z') {
+    offset = `${zone[0]}${zone.slice(1, 3)}:${zone.slice(3, 5) || '00'}`;
+  }
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const iso =
+    `${year}-${month}-${day}T${pad(hh)}:${pad(mm)}:${pad(ss)}` +
+    `${ms ? `.${String(ms).padStart(3, '0')}` : ''}${offset}`;
+  // Guard against a syntactically plausible but impossible date (month 13).
+  return Number.isNaN(Date.parse(iso)) ? value : iso;
+}
+
 function asArray(v: AttributeValue | undefined): string[] {
   if (v == null) return [];
   if (Array.isArray(v)) {
@@ -201,8 +257,8 @@ export function ldapToScimUser(
   if (id) {
     out.meta = {
       resourceType: 'User',
-      created: asString(entry['createTimestamp']),
-      lastModified: asString(entry['modifyTimestamp']),
+      created: ldapTimeToIso(asString(entry['createTimestamp'])),
+      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
       location: buildLocation(id, ctx),
     };
   }
@@ -307,8 +363,8 @@ export function ldapToScimGroup(
   if (id) {
     out.meta = {
       resourceType: 'Group',
-      created: asString(entry['createTimestamp']),
-      lastModified: asString(entry['modifyTimestamp']),
+      created: ldapTimeToIso(asString(entry['createTimestamp'])),
+      lastModified: ldapTimeToIso(asString(entry['modifyTimestamp'])),
       location: buildLocation(id, ctx),
     };
   }
