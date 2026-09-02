@@ -980,16 +980,34 @@ export default class LdapOrganizations extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!this._validateOneChange(field, value)) {
-        throw new BadRequestError(`Invalid value for field ${field}`);
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
     }
 
-    // Check required fields
+    // Check required fields. A `generated` attribute is exempt: it is filled
+    // by a hook after validation, so demanding it here would refuse the very
+    // payload the hook expects — the client sending nothing.
     for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] == undefined)
+      if (test.required && !test.generated && entry[field] == undefined)
         throw new BadRequestError(`Missing required field ${field}`);
     }
     return true;
+  }
+
+  /**
+   * Build the rejection message for a value that failed its schema `test`,
+   * quoting the `hint` when the schema carries one so the answer says what a
+   * valid value looks like.
+   *
+   * @param field attribute name
+   * @returns message for a `BadRequestError`
+   */
+  invalidValueMessage(field: string): string {
+    const attr = this.schema?.attributes[field];
+    const hint = attr?.hint || attr?.items?.hint;
+    return hint
+      ? `Invalid value for field ${field}: ${hint}`
+      : `Invalid value for field ${field}`;
   }
 
   validateChanges(dn: string, changes: ModifyRequest): boolean {
@@ -998,7 +1016,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
         if (!this._validateOneChange(field, value)) {
-          throw new BadRequestError(`Invalid value for field ${field}`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1006,7 +1024,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
         if (!this._validateOneChange(field, value)) {
-          throw new BadRequestError(`Invalid value for field ${field}`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }

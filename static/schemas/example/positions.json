@@ -1,6 +1,6 @@
 {
   "entity": {
-    "name": "twakePosition",
+    "name": "position",
     "mainAttribute": "cn",
     "objectClass": ["top", "twakePosition"],
     "singularName": "position",
@@ -21,10 +21,11 @@
     },
     "cn": {
       "type": "string",
-      "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 &/,.'’-]*$",
-      "hint": "Letters, digits, spaces and & / , . ' -, starting with a letter or a digit",
+      "test": "^[a-zA-ZÀ-ÖØ-öø-ÿ](?!.*([-'’/,&()]{2}|\\s{2}|\\s[-,'’]|\\s[-'’]\\s|\\s\\)|\\(\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ'’ \\-/,&()]+[a-zA-Z]$",
+      "hint": "Letters, spaces and ' - / , & ( ), starting and ending with a letter, no repeated punctuation",
       "required": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": "Position name"
     },
     "description": {
       "type": "string",

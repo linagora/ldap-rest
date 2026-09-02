@@ -1,6 +1,6 @@
 {
   "entity": {
-    "name": "twakeUser",
+    "name": "user",
     "mainAttribute": "uid",
     "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
     "singularName": "user",
@@ -34,8 +34,12 @@
     },
     "employeeNumber": {
       "type": "string",
-      "required": false,
-      "unique": true,
+      "test": "^([A-Z0-9]{6,9}|[A-Z][A-Z0-9]{13}|UNIT)$",
+      "hint": "Expected 6 to 9 characters, or a letter followed by 13 characters, or UNIT",
+      "required": true,
+      "unique": {
+        "sentinel": "UNIT"
+      },
       "role": "employeeId",
       "label": "Employee ID"
     },
@@ -46,11 +50,17 @@
     },
     "sn": {
       "type": "string",
-      "required": true
+      "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
+      "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
+      "required": true,
+      "label": "Last name"
     },
     "givenName": {
       "type": "string",
-      "required": false
+      "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
+      "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
+      "required": false,
+      "label": "First name"
     },
     "displayName": {
       "type": "string",
@@ -77,8 +87,8 @@
     },
     "mail": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "hint": "Expected an email address, e.g. jane.doe@example.org",
+      "test": "^[^@\\s]{1,64}@example\\.org$",
+      "hint": "Expected an address in the example.org domain, at most 64 characters before the @",
       "required": true,
       "unique": {
         "attributes": ["mailAlternateAddress"],
@@ -91,8 +101,8 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-        "hint": "Expected an email address, e.g. jane.doe@example.org"
+        "test": "^[^@\\s]{1,64}@example\\.org$",
+        "hint": "Expected an address in the example.org domain, at most 64 characters before the @"
       },
       "required": false,
       "unique": {
@@ -107,15 +117,9 @@
       "items": {
         "type": "string",
         "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-        "hint": "Expected an email address, e.g. jane.doe@example.org"
+        "hint": "Expected an external email address"
       },
       "required": false,
-      "group": "Mailbox Settings"
-    },
-    "mailQuota": {
-      "type": "number",
-      "required": false,
-      "role": "emailQuota",
       "group": "Mailbox Settings"
     },
     "mailQuotaSize": {
@@ -123,27 +127,41 @@
       "required": false,
       "role": "emailQuotaSize",
       "normalize": "byteSize",
+      "default": 1000000000,
       "hint": "Expected pattern xGB, xMB, xKB or a number of bytes",
       "group": "Mailbox Settings"
     },
     "telephoneNumber": {
       "type": "string",
-      "required": false
+      "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+      "hint": "Expected pattern (+99) 999 9999",
+      "required": false,
+      "label": "Phone"
     },
     "mobile": {
       "type": "string",
+      "test": "^\\(\\+99\\)\\s5\\d{3}\\s\\d{4}$",
+      "hint": "Expected pattern (+99) 5999 9999",
       "required": false
     },
     "postalAddress": {
       "type": "string",
-      "required": false
+      "test": "^[A-Z0-9À-ÖØ-öø-ÿ]((?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.])*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
+      "hint": "Starts with a capital or a digit, no repeated punctuation, ends with a letter, a digit or )",
+      "required": false,
+      "label": "Address"
     },
     "postalCode": {
       "type": "string",
-      "required": false
+      "test": "^[AR1-9][0-9]{4}$",
+      "hint": "Expected pattern 9999, A9999 or R9999",
+      "required": false,
+      "label": "Zip code"
     },
     "l": {
       "type": "string",
+      "test": "^[A-Za-zÀ-ÖØ-Þ](?!.*(['’\\s-]{2}))[A-Za-zÀ-ÖØ-öø-ÿ'’\\s-]*$",
+      "hint": "Letters, spaces, apostrophes and hyphens, none of them repeated",
       "required": false,
       "label": "Locality"
     },
@@ -161,9 +179,10 @@
     },
     "twakeDepartmentLink": {
       "type": "pointer",
-      "branch": ["__LDAP_BASE__"],
+      "branch": ["ou=organization,__LDAP_BASE__"],
       "required": true,
-      "role": "organizationLink"
+      "role": "organizationLink",
+      "label": "Department"
     },
     "twakeDepartmentPath": {
       "type": "string",
@@ -200,16 +219,8 @@
       "type": "date",
       "required": false,
       "role": "accountExpiry",
-      "hint": "Expected a date not earlier than today"
-    },
-    "twakeDelegatedUsers": {
-      "type": "array",
-      "items": {
-        "type": "pointer",
-        "branch": ["ou=users,__LDAP_BASE__"]
-      },
-      "required": false,
-      "group": "Mailbox Settings"
+      "hint": "Expected pattern MM/DD/YYYY, not earlier than today",
+      "label": "Deletion date"
     },
     "memberOf": {
       "type": "array",
@@ -218,7 +229,8 @@
       },
       "required": false,
       "readOnly": true,
-      "role": "groupMemberships"
+      "role": "groupMemberships",
+      "label": "Mailing lists"
     }
   }
 }

@@ -14,11 +14,12 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 
 ## Authorization Plugins
 
-| Method                                          | Plugin                     | Description                 |
-| ----------------------------------------------- | -------------------------- | --------------------------- |
-| [Authorization Per Branch](authz-per-branch.md) | `core/auth/authzPerBranch` | Branch-level access control |
-| [Authorization Per Route](authz-per-route.md)   | `core/auth/authzPerRoute`  | HTTP route-level ACL        |
-| [Authorization LinID 1.x](authz-linid1.md)      | `core/auth/authzLinid1`    | LinID 1.x integration       |
+| Method                                          | Plugin                     | Description                  |
+| ----------------------------------------------- | -------------------------- | ---------------------------- |
+| [Authorization Per Branch](authz-per-branch.md) | `core/auth/authzPerBranch` | Branch-level access control  |
+| [Authorization Per Route](authz-per-route.md)   | `core/auth/authzPerRoute`  | HTTP route-level ACL         |
+| [Authorization LinID 1.x](authz-linid1.md)      | `core/auth/authzLinid1`    | LinID 1.x integration        |
+| [Authorization Scope](authz-scope.md)           | `core/auth/authzScope`     | What the current user may do |
 
 ## Security Plugins
 
