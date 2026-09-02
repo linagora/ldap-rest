@@ -621,9 +621,31 @@ class ldapActions {
         this.releaseConnection(pooled);
       }
     } else {
-      // Routine: a SCIM PATCH whose changes all turn out to be no-ops still
-      // comes through here so the authorization hooks run.
-      this.logger.debug('No changes to apply');
+      // Two different things end up here, and only one of them is routine.
+      //
+      // A caller that asked for nothing: a SCIM PATCH whose operations all
+      // turn out to be no-ops still comes through so the authorization hooks
+      // run, and an empty modify touches the directory not at all.
+      //
+      // A caller that asked for something and got nothing emitted: every
+      // change it named was dropped while building the request — an array
+      // `delete` holding only empty strings, for instance. Nothing reaches
+      // the directory and the call still answers, so a translation bug
+      // upstream is invisible from the outside. That is worth a line someone
+      // will see.
+      const asked =
+        Object.keys(changes.add || {}).length > 0 ||
+        Object.keys(changes.replace || {}).length > 0 ||
+        (Array.isArray(changes.delete)
+          ? changes.delete.length > 0
+          : Object.keys(changes.delete || {}).length > 0);
+      if (asked) {
+        this.logger.warn(
+          `Modify on ${dn} asked for changes but emitted none; nothing was written`
+        );
+      } else {
+        this.logger.debug(`Modify on ${dn} had nothing to apply`);
+      }
       void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(
         err => {
           this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);

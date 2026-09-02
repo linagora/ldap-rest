@@ -53,6 +53,69 @@ describe('ldapActions', function () {
       newDN = `uid=newtestuser,${process.env.DM_LDAP_BASE}`;
     });
 
+    describe('a modify that emits nothing', () => {
+      const capture = (): { warn: string[]; debug: string[] } => {
+        const said = { warn: [] as string[], debug: [] as string[] };
+        const logger = ldapActions.logger as unknown as Record<
+          string,
+          (m: string) => void
+        >;
+        logger.warn = (m: string) => said.warn.push(m);
+        logger.debug = (m: string) => said.debug.push(m);
+        return said;
+      };
+
+      before(async () => {
+        try {
+          await ldapActions.delete(testDN);
+        } catch {
+          /* ignore */
+        }
+      });
+
+      afterEach(async () => {
+        try {
+          await ldapActions.delete(testDN);
+        } catch {
+          /* ignore */
+        }
+      });
+
+      beforeEach(async () => {
+        await ldapActions.add(testDN, {
+          objectClass: [
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+            'top',
+          ],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+        });
+      });
+
+      it('says nothing loud when the caller asked for nothing', async () => {
+        // The routine case: a SCIM PATCH whose operations all turn out to be
+        // no-ops still comes through so the authorization hooks run.
+        const said = capture();
+        expect(await ldapActions.modify(testDN, {})).to.be.false;
+        expect(said.warn).to.deep.equal([]);
+        expect(said.debug.join('\n')).to.match(/nothing to apply/);
+      });
+
+      it('warns when the caller asked for something and none of it was emitted', async () => {
+        // Every change named here is dropped while the request is built, so
+        // nothing reaches the directory — and the call still answers. Under
+        // one debug line shared with the routine case, a translation bug
+        // upstream was invisible from the outside.
+        const said = capture();
+        expect(await ldapActions.modify(testDN, { delete: [''] })).to.be.false;
+        expect(said.warn.join('\n')).to.match(/emitted none/);
+        expect(said.warn.join('\n')).to.include(testDN);
+      });
+    });
+
     describe('add', () => {
       afterEach(async () => {
         // Clean up: delete the test entry if it exists

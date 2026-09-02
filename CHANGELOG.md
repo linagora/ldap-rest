@@ -65,6 +65,13 @@
   means all now; naming members that resolve to nothing removes nothing. The
   same asymmetry applied to `replace`
 
+- `lib/ldapActions`: a `modify` that emitted nothing logged one `debug` line
+  whether the caller had asked for nothing — the routine case, since an
+  authorized no-op PATCH comes through so the hooks run — or had asked for
+  changes that were all dropped while the request was built. The second is a
+  translation bug upstream, it writes nothing, the call still answers, and
+  under a shared debug line it was invisible. It is a `warn` naming the DN now
+
 - `plugins/scim`: a `PUT` carrying `active: false` could answer `200` with
   `active: true` and leave the account binding. The handler swallowed
   noSuchAttribute from its modify — meant to absorb a delete of an attribute
