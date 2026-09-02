@@ -455,6 +455,28 @@ export default class MyPlugin extends DmPlugin {
 
 The `this.server.ldap` object provides access to all LDAP operations:
 
+> **Serving an HTTP request? Bind it first.**
+>
+> The authorization plugins (`core/auth/authzPerBranch`,
+> `core/auth/authzDynamic`, …) hook `ldapsearchrequest`, `ldapaddrequest`,
+> `ldapmodifyrequest`, `ldaprenamerequest` and `ldapdeleterequest`, and they
+> **skip every check when the request is missing**. The methods below take it as a trailing
+> optional argument, so forgetting it does not fail — it silently authorizes
+> the operation. Three such bugs shipped in the SCIM plugin.
+>
+> In a request handler, bind once and use the result:
+>
+> ```typescript
+> const directory = this.server.ldap.forRequest(req);
+> await directory.search({ scope: 'base' }, dn);
+> await directory.modify(dn, changes);
+> ```
+>
+> `forRequest()` returns a `RequestBoundLdap`, whose methods have no request
+> parameter at all — the omission stops being expressible. Use the unbound
+> methods only for work that genuinely belongs to no request, such as startup
+> or scheduled tasks, where passing nothing is the deliberate answer.
+
 #### Search
 
 ```typescript

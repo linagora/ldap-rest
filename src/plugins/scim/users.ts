@@ -160,14 +160,13 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
-      result = (await this.ldap.search(
+      result = (await this.ldap.forRequest(req).search(
         {
           paged: false,
           scope: 'base',
           attributes: this.ldapAttributes(),
         },
-        dn,
-        req
+        dn
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
@@ -236,14 +235,13 @@ export class ScimUsers {
     }
 
     const { entries, totalResults } = await pagedSearch({
-      ldap: this.ldap,
+      directory: this.ldap.forRequest(req),
       base,
       filter: ldapFilter,
       attributes: this.ldapAttributes(),
       startIndex,
       count,
       maxScanned: this.maxScanned,
-      req,
     });
 
     // sortBy / sortOrder are parsed for backwards compatibility but not
@@ -290,7 +288,7 @@ export class ScimUsers {
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
     try {
-      await this.ldap.add(dn, attributes, req);
+      await this.ldap.forRequest(req).add(dn, attributes);
     } catch (err) {
       if (extractLdapCode(err) === 68) {
         throw scimUniqueness(`User ${rdn} already exists`);
@@ -317,14 +315,13 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     // Fetch current LDAP entry so we only delete attributes that actually
     // exist on the entry (avoids noSuchAttribute errors on atomic modify).
-    const currentResult = (await this.ldap.search(
+    const currentResult = (await this.ldap.forRequest(req).search(
       {
         paged: false,
         scope: 'base',
         attributes: this.ldapAttributes(),
       },
-      dn,
-      req
+      dn
     )) as SearchResult;
     if (!currentResult.searchEntries?.length) {
       throw scimNotFound(`User ${id} not found`);
@@ -396,7 +393,7 @@ export class ScimUsers {
       // deletes are already derived from the snapshot, so a 16 here is a
       // concurrent modification, not a routine no-op: report it.
       try {
-        await this.ldap.modify(dn, changes, req);
+        await this.ldap.forRequest(req).modify(dn, changes);
       } catch (err) {
         if (active !== undefined) throw this.lockSchemaError(err);
         if (extractLdapCode(err) !== 16) throw err;
@@ -436,7 +433,7 @@ export class ScimUsers {
     // `req` must reach ldapActions: the authorization plugins hook
     // `ldapmodifyrequest` and skip every check when it is missing.
     try {
-      await this.ldap.modify(dn, changes, req);
+      await this.ldap.forRequest(req).modify(dn, changes);
     } catch (err) {
       if (touchesLock(changes, this.lockAttribute)) {
         throw this.lockSchemaError(err);
@@ -479,11 +476,12 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
-      result = (await this.ldap.search(
-        { paged: false, scope: 'base', attributes: this.ldapAttributes() },
-        dn,
-        req
-      )) as SearchResult;
+      result = (await this.ldap
+        .forRequest(req)
+        .search(
+          { paged: false, scope: 'base', attributes: this.ldapAttributes() },
+          dn
+        )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
         throw scimNotFound(`User ${id} not found`);
@@ -504,7 +502,7 @@ export class ScimUsers {
     ] as [string, DmRequest]);
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
-    await this.ldap.delete(dn, req);
+    await this.ldap.forRequest(req).delete(dn);
     void launchHooks(this.hooks.scimuserdeletedone, finalId);
   }
 
@@ -523,11 +521,12 @@ export class ScimUsers {
     }
     const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
-      const res = (await this.ldap.search(
-        { paged: false, scope: 'base', attributes: ['dn'] },
-        dn,
-        req
-      )) as SearchResult;
+      const res = (await this.ldap
+        .forRequest(req)
+        .search(
+          { paged: false, scope: 'base', attributes: ['dn'] },
+          dn
+        )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
@@ -539,15 +538,14 @@ export class ScimUsers {
       // Not there under that DN; try a filter.
     }
     try {
-      const res = (await this.ldap.search(
+      const res = (await this.ldap.forRequest(req).search(
         {
           filter: `(${this.rdnAttribute}=${escapeLdapFilter(value)})`,
           scope: 'sub',
           paged: false,
           attributes: ['dn'],
         },
-        base,
-        req
+        base
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;

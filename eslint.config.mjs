@@ -122,6 +122,26 @@ export default [
     },
   },
 
+  // The SCIM plugin serves identity providers, and every operation it makes
+  // must reach the authorization hooks. `ldapActions`'s own methods take the
+  // request as a trailing optional argument, so forgetting it silently skips
+  // authorization — three such bugs have shipped here. Bind the request once
+  // with `ldap.forRequest(req)` and the omission stops being expressible.
+  {
+    files: ['src/plugins/scim/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.property.name='ldap'][callee.property.name=/^(search|add|modify|delete|rename)$/]",
+          message:
+            'Use ldap.forRequest(req).<method>() so the authorization hooks see the request.',
+        },
+      ],
+    },
+  },
+
   // Ignored files
   {
     ignores: [

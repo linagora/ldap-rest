@@ -192,14 +192,13 @@ export class ScimGroups {
     const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
-      result = (await this.ldap.search(
+      result = (await this.ldap.forRequest(req).search(
         {
           paged: false,
           scope: 'base',
           attributes: [...requiredLdapAttributes(this.mapping), 'member'],
         },
-        dn,
-        req
+        dn
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
@@ -265,14 +264,13 @@ export class ScimGroups {
     }
 
     const { entries, totalResults } = await pagedSearch({
-      ldap: this.ldap,
+      directory: this.ldap.forRequest(req),
       base,
       filter: ldapFilter,
       attributes: [...requiredLdapAttributes(this.mapping), 'member'],
       startIndex,
       count,
       maxScanned: this.maxScanned,
-      req,
     });
 
     const resolver = this.buildMemberResolver(req);
@@ -329,7 +327,7 @@ export class ScimGroups {
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
     try {
-      await this.ldap.add(dn, attributes, req);
+      await this.ldap.forRequest(req).add(dn, attributes);
     } catch (err) {
       if (extractLdapCode(err) === 68) {
         throw scimUniqueness(`Group ${rdn} already exists`);
@@ -382,7 +380,7 @@ export class ScimGroups {
       changes.replace![k] = v;
     }
     changes.replace!.member = memberDns;
-    await this.ldap.modify(dn, changes, req);
+    await this.ldap.forRequest(req).modify(dn, changes);
 
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
@@ -422,7 +420,7 @@ export class ScimGroups {
     // An empty change set still goes through ldapActions: `ldapmodifyrequest`
     // is where write permission is checked, and an empty modify touches the
     // directory not at all.
-    await this.ldap.modify(dn, changes, req);
+    await this.ldap.forRequest(req).modify(dn, changes);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;
@@ -436,14 +434,13 @@ export class ScimGroups {
     const dn = this.dnForId(id, req);
     let result: SearchResult;
     try {
-      result = (await this.ldap.search(
+      result = (await this.ldap.forRequest(req).search(
         {
           paged: false,
           scope: 'base',
           attributes: [...requiredLdapAttributes(this.mapping), 'member'],
         },
-        dn,
-        req
+        dn
       )) as SearchResult;
     } catch (err) {
       if (extractLdapCode(err) === 32) {
@@ -465,7 +462,7 @@ export class ScimGroups {
     ] as [string, DmRequest]);
     const finalId = hookInput[0];
     const dn = this.dnForId(finalId, req);
-    await this.ldap.delete(dn, req);
+    await this.ldap.forRequest(req).delete(dn);
     void launchHooks(this.hooks.scimgroupdeletedone, finalId);
   }
 
@@ -479,11 +476,12 @@ export class ScimGroups {
     }
     const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
-      const res = (await this.ldap.search(
-        { paged: false, scope: 'base', attributes: ['dn'] },
-        dn,
-        req
-      )) as SearchResult;
+      const res = (await this.ldap
+        .forRequest(req)
+        .search(
+          { paged: false, scope: 'base', attributes: ['dn'] },
+          dn
+        )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;
       }
@@ -495,15 +493,14 @@ export class ScimGroups {
       // Not there under that DN; try a filter.
     }
     try {
-      const res = (await this.ldap.search(
+      const res = (await this.ldap.forRequest(req).search(
         {
           filter: `(${this.rdnAttribute}=${escapeLdapFilter(value)})`,
           scope: 'sub',
           paged: false,
           attributes: ['dn'],
         },
-        base,
-        req
+        base
       )) as SearchResult;
       if (res.searchEntries && res.searchEntries.length > 0) {
         return res.searchEntries[0].dn;

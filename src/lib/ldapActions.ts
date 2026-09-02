@@ -41,6 +41,31 @@ const defaultSearchOptions: SearchOptions = {
 };
 export type { SearchOptions, SearchResult };
 
+/**
+ * The directory as seen by one HTTP request.
+ *
+ * `ldapActions`'s own methods take the request as a trailing optional
+ * argument, and the authorization plugins hook `ldap*request` and skip every
+ * check when it is missing — so omitting it is an authorization bypass that
+ * fails silently rather than loudly. Three shipped in the SCIM plugin alone.
+ *
+ * These methods take no request parameter: it is captured once by
+ * `ldapActions.forRequest()`, and forgetting it stops being expressible.
+ * Request handlers should bind once and use this; the unbound methods remain
+ * for work that genuinely belongs to no request, such as startup and cron
+ * tasks, where passing nothing is the deliberate answer.
+ */
+export interface RequestBoundLdap {
+  search(
+    options: SearchOptions,
+    base?: string
+  ): Promise<SearchResult | AsyncGenerator<SearchResult>>;
+  add(dn: string, entry: AttributesList): Promise<boolean>;
+  modify(dn: string, changes: ModifyRequest): Promise<boolean>;
+  rename(dn: string, newRdn: string): Promise<boolean>;
+  delete(dn: string | string[]): Promise<boolean>;
+}
+
 // modify
 export interface ModifyRequest {
   add?: AttributesList;
@@ -380,6 +405,20 @@ class ldapActions {
   /*
     LDAP search
    */
+  /**
+   * Bind every directory operation to one request, so the authorization
+   * hooks always see it. See {@link RequestBoundLdap}.
+   */
+  forRequest(req: Request): RequestBoundLdap {
+    return {
+      search: (options, base) => this.search(options, base ?? this.base, req),
+      add: (dn, entry) => this.add(dn, entry, req),
+      modify: (dn, changes) => this.modify(dn, changes, req),
+      rename: (dn, newRdn) => this.rename(dn, newRdn, req),
+      delete: dn => this.delete(dn, req),
+    };
+  }
+
   async search(
     options: SearchOptions,
     base: string = this.base,
