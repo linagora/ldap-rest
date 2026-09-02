@@ -8,17 +8,19 @@ LDAP-Rest provides reusable web components for LDAP management.
 
 ## Documentation
 
+- **[directory-console.md](directory-console.md)** - The administration interface
 - **[libraries.md](libraries.md)** - Complete component documentation
 
 ## Available Components
 
-| Component            | Description                    |
-| -------------------- | ------------------------------ |
-| `LdapTreeViewer`     | LDAP tree navigation           |
-| `LdapUserEditor`     | User editing                   |
-| `LdapGroupEditor`    | Group management               |
-| `LdapUnitEditor`     | Organizational unit management |
-| `LdapResourceEditor` | Resource management            |
+| Component            | Description                       |
+| -------------------- | --------------------------------- |
+| `DirectoryConsole`   | Complete administration interface |
+| `LdapTreeViewer`     | LDAP tree navigation              |
+| `LdapUserEditor`     | User editing                      |
+| `LdapGroupEditor`    | Group management                  |
+| `LdapUnitEditor`     | Organizational unit management    |
+| `LdapResourceEditor` | Resource management               |
 
 ## Utilities
 
