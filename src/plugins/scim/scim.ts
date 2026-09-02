@@ -504,6 +504,31 @@ export default class Scim extends DmPlugin {
     res.status(status).type(SCIM_CONTENT_TYPE).json(body);
   }
 
+  /**
+   * Answer a single resource, adding the `Location` response header required
+   * by RFC 7644 section 3.1 for a create and used there for a modification.
+   *
+   * `meta.location` is absolute whenever the external base URL is known
+   * (`--scim-base-url`, else the request's own host). When it is not, fall
+   * back to a prefix-relative URI rather than omitting the header: a relative
+   * `Location` is valid per RFC 7231 section 7.1.2 and still points the client
+   * at the resource.
+   */
+  private scimResource(
+    res: import('express').Response,
+    status: number,
+    resource: ScimUser | ScimGroup,
+    endpoint: 'Users' | 'Groups'
+  ): void {
+    const location =
+      resource.meta?.location ||
+      (resource.id
+        ? `${this.scimPrefix}/${endpoint}/${encodeURIComponent(resource.id)}`
+        : undefined);
+    if (location) res.set('Location', location);
+    this.scimJson(res, status, resource);
+  }
+
   private readScimBody(req: Request): unknown {
     // Accept application/scim+json as well as application/json
     const ct = String(req.headers['content-type'] || '');
@@ -702,6 +727,10 @@ export default class Scim extends DmPlugin {
      * responses:
      *   '201':
      *     description: User created.
+     *     headers:
+     *       Location:
+     *         description: URI of the created resource (RFC 7644 section 3.1).
+     *         schema: { type: string }
      *     content:
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimUser' }
@@ -747,7 +776,7 @@ export default class Scim extends DmPlugin {
           req as DmRequest,
           body as ScimUser
         );
-        this.scimJson(res, 201, user);
+        this.scimResource(res, 201, user, 'Users');
       })
     );
     /**
@@ -814,7 +843,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as ScimUser
         );
-        this.scimJson(res, 200, user);
+        this.scimResource(res, 200, user, 'Users');
       })
     );
     /**
@@ -873,7 +902,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as PatchRequest
         );
-        this.scimJson(res, 200, user);
+        this.scimResource(res, 200, user, 'Users');
       })
     );
     /**
@@ -1048,6 +1077,10 @@ export default class Scim extends DmPlugin {
      * responses:
      *   '201':
      *     description: Group created.
+     *     headers:
+     *       Location:
+     *         description: URI of the created resource (RFC 7644 section 3.1).
+     *         schema: { type: string }
      *     content:
      *       application/scim+json:
      *         schema: { $ref: '#/components/schemas/ScimGroup' }
@@ -1089,7 +1122,7 @@ export default class Scim extends DmPlugin {
           req as DmRequest,
           body as ScimGroup
         );
-        this.scimJson(res, 201, group);
+        this.scimResource(res, 201, group, 'Groups');
       })
     );
     /**
@@ -1148,7 +1181,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as ScimGroup
         );
-        this.scimJson(res, 200, group);
+        this.scimResource(res, 200, group, 'Groups');
       })
     );
     /**
@@ -1209,7 +1242,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as PatchRequest
         );
-        this.scimJson(res, 200, group);
+        this.scimResource(res, 200, group, 'Groups');
       })
     );
     /**

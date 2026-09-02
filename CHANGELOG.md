@@ -16,6 +16,10 @@
   section 2.3.5 wants an `xsd:dateTime`, so a strict client rejected every
   resource. They are now converted (`2025-01-01T12:00:00Z`)
 
+- `plugins/scim`: a create answered 201 without the `Location` response header
+  RFC 7644 section 3.1 requires — only `meta.location` inside the body. It is
+  now sent on POST, and on the PUT and PATCH answers as well
+
 ## v0.6.0 (2026-08-01)
 
 ### Breaking Changes

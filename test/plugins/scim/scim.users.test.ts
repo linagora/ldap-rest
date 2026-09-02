@@ -103,6 +103,41 @@ describe('SCIM Users (integration)', function () {
       expect(res.body.userName).to.equal('scim-alice');
       expect(res.body.meta.resourceType).to.equal('User');
       expect(res.body.emails[0].value).to.equal('alice@example.com');
+      // RFC 7644 section 3.1: a create answers with the Location header.
+      expect(res.headers.location).to.be.a('string');
+      expect(res.headers.location).to.equal(res.body.meta.location);
+      expect(res.headers.location).to.match(/\/scim\/v2\/Users\/scim-alice$/);
+    });
+
+    it('sends Location on PUT and PATCH too', async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(201);
+      const put = await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Smith' },
+        })
+        .expect(200);
+      expect(put.headers.location).to.match(/\/scim\/v2\/Users\/scim-alice$/);
+      const patch = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'X' }],
+        })
+        .expect(200);
+      expect(patch.headers.location).to.match(/\/scim\/v2\/Users\/scim-alice$/);
     });
 
     it('rejects duplicate User with 409', async () => {
