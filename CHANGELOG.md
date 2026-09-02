@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `plugins/scim`: `PATCH /scim/v2/Users/{id}` called `ldapActions.modify()`
+  without the request, so every authorization plugin skipped its check — a
+  token denied write on a branch could still modify a user there through
+  PATCH. POST, PUT and DELETE, and the Groups PATCH, were unaffected
+
 ## v0.6.0 (2026-08-01)
 
 ### Breaking Changes
