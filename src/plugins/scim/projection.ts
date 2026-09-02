@@ -126,6 +126,23 @@ export function assertProjection(query: ProjectionQuery): void {
   }
 }
 
+/**
+ * Did the projection leave nothing behind?
+ *
+ * Narrowing `name` to a sub-attribute the entry does not hold, or excluding
+ * every sub-attribute it does hold, yields an empty value. Answering
+ * `"name": {}` would claim the attribute is there and empty; the resource
+ * omits an attribute it does not have, and so should the projection.
+ */
+function projectedToNothing(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.keys(value).length === 0
+  );
+}
+
 /** Apply `attributes` / `excludedAttributes` to one resource. */
 export function projectResource<T extends Record<string, unknown>>(
   resource: T,
@@ -137,7 +154,12 @@ export function projectResource<T extends Record<string, unknown>>(
     for (const [key, value] of Object.entries(resource)) {
       if (!wanted.has(key.toLowerCase())) continue;
       const subs = wanted.get(key.toLowerCase());
-      out[key] = subs ? narrow(value, subs) : value;
+      if (!subs) {
+        out[key] = value;
+        continue;
+      }
+      const narrowed = narrow(value, subs);
+      if (!projectedToNothing(narrowed)) out[key] = narrowed;
     }
     return out as T;
   }
@@ -158,7 +180,8 @@ export function projectResource<T extends Record<string, unknown>>(
         if (always.has(lower)) out[key] = value;
         continue;
       }
-      out[key] = without(value, subs);
+      const remaining = without(value, subs);
+      if (!projectedToNothing(remaining)) out[key] = remaining;
     }
     return out as T;
   }

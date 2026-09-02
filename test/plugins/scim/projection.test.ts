@@ -52,6 +52,26 @@ describe('SCIM attribute projection (RFC 7644 section 3.9)', () => {
       ]);
     });
 
+    it('omits an attribute the narrowing empties', () => {
+      // `name` holds no middleName here; answering `name: {}` would claim it
+      // is present and empty.
+      const out = projectResource(user, { attributes: ['name.middleName'] });
+      expect(out).to.not.have.property('name');
+      expect(Object.keys(out).sort()).to.deep.equal(['id', 'schemas']);
+    });
+
+    it('omits a multi-valued attribute left with nothing', () => {
+      const out = projectResource(user, { attributes: ['emails.nosuch'] });
+      expect(out).to.not.have.property('emails');
+    });
+
+    it('keeps an attribute that still has something', () => {
+      const out = projectResource(user, {
+        attributes: ['name.middleName', 'name.familyName'],
+      });
+      expect(out.name).to.deep.equal({ familyName: 'Doe' });
+    });
+
     it('a whole attribute wins over its own sub-attributes', () => {
       const out = projectResource(user, {
         attributes: ['name', 'name.givenName'],
@@ -118,6 +138,19 @@ describe('SCIM attribute projection (RFC 7644 section 3.9)', () => {
         { value: 'alice@example.com', primary: true },
         { value: 'a@corp.com' },
       ]);
+    });
+
+    it('omits an attribute whose sub-attributes are all excluded', () => {
+      const out = projectResource(user, {
+        excludedAttributes: [
+          'name.familyName',
+          'name.givenName',
+          'name.formatted',
+        ],
+      });
+      expect(out).to.not.have.property('name');
+      // The rest of the resource is untouched.
+      expect(out.userName).to.equal('alice');
     });
 
     it('cannot drop id or schemas, whose returned is always', () => {
