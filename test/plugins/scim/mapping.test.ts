@@ -365,6 +365,18 @@ describe('SCIM mapping', () => {
       expect(withExternalId(DEFAULT_GROUP_MAPPING, '')).to.equal(
         DEFAULT_GROUP_MAPPING
       );
+      // Whitespace from a config file or environment variable is not a name.
+      expect(withExternalId(DEFAULT_GROUP_MAPPING, '   ')).to.equal(
+        DEFAULT_GROUP_MAPPING
+      );
+    });
+
+    it('trims the configured attribute name', () => {
+      const entry = withExternalId(
+        DEFAULT_GROUP_MAPPING,
+        '  description \n'
+      ).entries.find(e => e.scim === 'externalId');
+      expect(entry?.ldap).to.equal('description');
     });
   });
 

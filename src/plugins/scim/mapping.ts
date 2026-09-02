@@ -87,11 +87,15 @@ export function withExternalId(
   mapping: ResourceMapping,
   ldapAttribute: string
 ): ResourceMapping {
-  if (!ldapAttribute) return mapping;
+  // Tolerate the whitespace a configuration file or environment variable
+  // picks up; an attribute name made only of it means "unset", not a name
+  // that would fail every later search and write.
+  const attribute = (ldapAttribute || '').trim();
+  if (!attribute) return mapping;
   if (mapping.entries.some(e => e.scim === 'externalId')) return mapping;
   return {
     ...mapping,
-    entries: [...mapping.entries, { scim: 'externalId', ldap: ldapAttribute }],
+    entries: [...mapping.entries, { scim: 'externalId', ldap: attribute }],
   };
 }
 
