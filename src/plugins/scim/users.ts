@@ -362,7 +362,7 @@ export class ScimUsers {
     ] as [string, ScimUser, DmRequest]);
     const incoming = hookInput[1];
 
-    const { attributes } = scimUserToLdap(
+    const { attributes, active } = scimUserToLdap(
       incoming,
       this.mapping,
       this.ctx(req),
@@ -375,6 +375,11 @@ export class ScimUsers {
       'createTimestamp',
       'modifyTimestamp',
       this.rdnAttribute,
+      // The lock attribute is not a mapped attribute: `active` decides it,
+      // below, and a body that says nothing about `active` must leave it
+      // alone. Clearing it here would silently release a lock the directory
+      // owns — a ppolicy auto-lockout, or one an administrator set.
+      this.lockAttribute,
     ]);
     const hasAttrValue = (v: unknown): boolean => {
       if (v == null) return false;
@@ -390,6 +395,19 @@ export class ScimUsers {
         (changes.delete as string[]).push(attr);
       }
     }
+    // `active` is a full-replace attribute like any other, but only when the
+    // body actually carries it. RFC 7644 section 3.5.1 would have omission
+    // clear it; here that would defeat a lockout no SCIM client set, so
+    // omission means "unchanged" and the deviation is documented.
+    if (active === false) {
+      changes.replace![this.lockAttribute] = this.lockValue;
+    } else if (
+      active === true &&
+      hasAttrValue(currentEntry[this.lockAttribute])
+    ) {
+      (changes.delete as string[]).push(this.lockAttribute);
+    }
+
     if (Object.keys(changes.replace || {}).length === 0) delete changes.replace;
     if ((changes.delete as string[]).length === 0) delete changes.delete;
 
@@ -423,16 +441,12 @@ export class ScimUsers {
     // (0x10) and fails the whole modify. `active: true` on an already-active
     // account is exactly that case, and identity providers send it routinely.
     pruneAbsentDeletes(changes, current);
-    if (
-      !changes.add &&
-      !changes.replace &&
-      (!changes.delete ||
-        (Array.isArray(changes.delete)
-          ? changes.delete.length === 0
-          : Object.keys(changes.delete).length === 0))
-    ) {
-      return this.get(req, id);
-    }
+    // An empty change set still goes to ldapActions rather than returning
+    // early: `ldapmodifyrequest` — where write permission is checked — runs
+    // before the changes are examined, and an empty one touches the
+    // directory not at all. Answering 200 without it told a caller with no
+    // write permission that its write had succeeded.
+    //
     // `req` must reach ldapActions: the authorization plugins hook
     // `ldapmodifyrequest` and skip every check when it is missing.
     await this.ldap.modify(dn, changes, req);

@@ -13,6 +13,7 @@ import fs from 'fs';
 
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 
+import { scimInvalidValue } from './errors';
 import {
   type ScimUser,
   type ScimGroup,
@@ -225,6 +226,27 @@ export interface MappingContext {
 export const DEFAULT_LOCK_ATTRIBUTE = 'pwdAccountLockedTime';
 export const DEFAULT_LOCK_VALUE = '000001010000Z';
 
+/**
+ * Read a SCIM `active` value, wherever it came from.
+ *
+ * `undefined` means the body did not mention it — which is not the same as
+ * `true`. Only a boolean, or the two canonical strings some providers send
+ * instead, are accepted: guessing at `"0"`, `null` or `1` would let a
+ * deprovisioning request be executed as a re-activation, and answer 200
+ * doing it. The one rule lives here so POST, PUT, PATCH and the filter
+ * translator cannot drift apart.
+ */
+export function readActive(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+  }
+  throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
+}
+
 /** Is this entry locked, per the configured lock attribute? */
 export function isLocked(entry: AttributesList, ctx: MappingContext): boolean {
   const raw = entry[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE];
@@ -326,7 +348,7 @@ export function scimUserToLdap(
   mapping: ResourceMapping,
   ctx: MappingContext,
   objectClass: string[]
-): { rdn: string; attributes: AttributesList } {
+): { rdn: string; attributes: AttributesList; active?: boolean } {
   const attributes: AttributesList = { objectClass };
   const rdnValue = user.userName || user.id || '';
 
@@ -363,9 +385,12 @@ export function scimUserToLdap(
     }
   }
 
-  // `active` is not a mapping entry: false writes the lock attribute, true
-  // leaves it out so the caller deletes it (absent means active).
-  if (user.active === false) {
+  // `active` is not a mapping entry: false writes the lock attribute. True,
+  // and the absence of the field, are answered by the caller — only it knows
+  // whether the entry currently holds a lock and whether the body claimed
+  // anything about it at all.
+  const active = readActive(user.active);
+  if (active === false) {
     attributes[ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE] =
       ctx.lockValue || DEFAULT_LOCK_VALUE;
   }
@@ -378,7 +403,7 @@ export function scimUserToLdap(
   }
 
   // Set RDN attribute value explicitly
-  return { rdn: rdnValue, attributes };
+  return { rdn: rdnValue, attributes, active };
 }
 
 export function ldapToScimGroup(

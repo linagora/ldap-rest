@@ -34,6 +34,7 @@ import {
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
+  readActive,
   scimPathToLdapAttribute,
 } from './mapping';
 
@@ -54,21 +55,12 @@ export interface PatchContext {
 }
 
 /**
- * Read a SCIM `active` value out of a PATCH operation.
- *
- * Only a boolean, or the two canonical strings some providers send instead.
- * Anything else is refused rather than guessed: `active` is the attribute
- * that gates account access, and reading an unparseable value as `true`
- * would turn a deprovisioning request into a re-activation and answer 200.
+ * Read a SCIM `active` value out of a PATCH operation. `remove` and a body
+ * that omits the value both restore the default, an active account; every
+ * other shape follows the one rule in `readActive()`.
  */
 function activeValue(value: unknown): boolean {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const v = value.trim().toLowerCase();
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-  }
-  throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
+  return readActive(value) ?? true;
 }
 
 function normalizeOp(op: string): 'add' | 'remove' | 'replace' {

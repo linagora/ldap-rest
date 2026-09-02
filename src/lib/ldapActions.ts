@@ -605,7 +605,9 @@ class ldapActions {
         this.releaseConnection(pooled);
       }
     } else {
-      this.logger.error('No changes to apply');
+      // Routine: a SCIM PATCH whose changes all turn out to be no-ops still
+      // comes through here so the authorization hooks run.
+      this.logger.debug('No changes to apply');
       void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(
         err => {
           this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
