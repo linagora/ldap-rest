@@ -39,15 +39,52 @@
 
 ### Bug Fixes
 
-- `plugins/scim`: `active` was always answered as `true`. The attribute
-  backing it is operational and was never named in the LDAP search, so a
-  locked account still looked enabled
-
-- `plugins/scim`: a filter on `active pr` emitted `(active=*)`, an attribute
-  no directory defines
-
 - `plugins/scim`: a PATCH removing an attribute the entry does not hold failed
   the whole modify with noSuchAttribute; such a removal is now dropped
+
+## v0.6.2 (2026-09-02)
+
+### Security
+
+- `plugins/ldap/onChange`, `plugins/ldap/organizations`: both rebuilt the hook
+  tuple without the request. `launchHooksChained` feeds each hook's return
+  value to the next, so an authorization plugin registered after either of
+  them saw no request — and `shouldSkipAuthorization()` returns true the
+  moment it is missing. Every `modify`, and every `rename` for the second
+  plugin, went through unchecked, whatever `core/auth/authzPerBranch` or
+  `core/auth/authzLinid1` said. `core/auth/authzDynamic` was not affected: it
+  reads its token from an `AsyncLocalStorage` rather than from the request.
+
+  Neither plugin sits in `priority.json`, and the remaining plugins load
+  concurrently, so which side of the line a deployment fell on was decided by
+  a load race and could differ from one restart to the next. Present since at
+  least v0.4.7.
+
+  Note for upgrades: writes that this bypass was letting through are refused
+  now. An identity whose grants were never quite right may start seeing `403`
+  where it saw `200` — that is the fix, not a regression, but check your
+  `authzPerBranch` or `authzLinid1` grants before rolling this out widely
+
+### Bug Fixes
+
+- `plugins/scim`: `active` was answered as `true` for every user, locked ones
+  included. It is read from the presence of `pwdAccountLockedTime`, which is
+  operational and no search named it, so a disabled account was reported to
+  the provisioning system as enabled
+
+- `plugins/scim`: a `PATCH` whose operations all translated to no LDAP change
+  answered `200` without reaching `ldapActions`, where write permission is
+  checked, so an identity with read and no write was told its write had
+  succeeded. Nothing was written either way — the answer was the problem, and
+  a provisioning system records it as applied
+
+- `plugins/scim`: a filter on `active pr` emitted `(active=*)`. `active` is
+  not an LDAP attribute, so the directory refused the search with `attribute
+type undefined`
+
+- `plugins/ldap/onChange`: the entry snapshot taken before each modify was
+  only ever cleared when the operation was unknown, so the map grew by one
+  entry per modify for the lifetime of the process
 
 ## v0.6.1 (2026-09-02)
 

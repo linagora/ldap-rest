@@ -57,7 +57,10 @@ class OnLdapChange extends DmPlugin {
       this.notify(dn, res);
     },
 
-    ldapmodifyrequest: async ([dn, attributes, op]) => {
+    // The request travels with the tuple: `launchHooksChained` feeds each
+    // hook's return value to the next, so dropping it here would blind every
+    // authorization plugin registered after this one.
+    ldapmodifyrequest: async ([dn, attributes, op, req]) => {
       const tmp = (await this.server.ldap.search(
         { paged: false },
         dn
@@ -69,7 +72,7 @@ class OnLdapChange extends DmPlugin {
           `Could not find unique entry ${dn} before modification, got ${tmp.searchEntries.length} entries`
         );
       }
-      return [dn, attributes, op];
+      return [dn, attributes, op, req];
     },
 
     ldapmodifydone: ([dn, changes, op]) => {
@@ -104,6 +107,10 @@ class OnLdapChange extends DmPlugin {
         }
       }
       this.notify(dn, res);
+      // The snapshot has served its purpose. Without this the map grows by
+      // one entry per modify, for the lifetime of the process — only the
+      // unknown-operation branch above ever cleared it.
+      delete this.stack[op];
     },
 
     /**
