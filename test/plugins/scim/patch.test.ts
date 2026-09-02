@@ -177,4 +177,60 @@ describe('SCIM PATCH applicator', () => {
       expect(r.userName).to.be.undefined;
     });
   });
+
+  describe('remove without a path (RFC 7644 section 3.5.2.2)', () => {
+    it('is rejected with noTarget', async () => {
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'remove', value: { displayName: 'Alice' } }],
+          },
+          ctx
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).scimType).to.equal('noTarget');
+        expect((err as ScimError).statusCode).to.equal(400);
+      }
+    });
+
+    it('is rejected whatever the case of the op', async () => {
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'Remove', value: { displayName: 'Alice' } }],
+          },
+          ctx
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect((err as ScimError).scimType).to.equal('noTarget');
+      }
+    });
+
+    it('leaves add and replace without a path working', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', value: { displayName: 'Alice' } }],
+        },
+        ctx
+      );
+      expect(req.replace).to.deep.equal({ displayName: 'Alice' });
+    });
+
+    it('still removes when a path is given', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: 'displayName' }],
+        },
+        ctx
+      );
+      expect(req.delete).to.deep.equal({ displayName: '' });
+    });
+  });
 });
