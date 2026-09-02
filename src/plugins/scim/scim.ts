@@ -508,11 +508,15 @@ export default class Scim extends DmPlugin {
    * Answer a single resource, adding the `Location` response header required
    * by RFC 7644 section 3.1 for a create and used there for a modification.
    *
-   * `meta.location` is absolute whenever the external base URL is known
-   * (`--scim-base-url`, else the request's own host). When it is not, fall
-   * back to a prefix-relative URI rather than omitting the header: a relative
-   * `Location` is valid per RFC 7231 section 7.1.2 and still points the client
-   * at the resource.
+   * The header is absolute only when the operator pinned the external base
+   * URL with `--scim-base-url`. Without it, `meta.location` is built from the
+   * request's own `Host`, which the client controls: echoing that into a
+   * redirect header would let a caller choose where another consumer of the
+   * response is pointed. So we emit the prefix-relative URI instead — valid
+   * per RFC 7231 section 7.1.2, and it still names the resource.
+   *
+   * `meta.location` inside the body keeps its existing behaviour; pin
+   * `--scim-base-url` to make it absolute and trustworthy too.
    */
   private scimResource(
     res: import('express').Response,
@@ -520,11 +524,14 @@ export default class Scim extends DmPlugin {
     resource: ScimUser | ScimGroup,
     endpoint: 'Users' | 'Groups'
   ): void {
+    const relative = resource.id
+      ? `${this.scimPrefix}/${endpoint}/${encodeURIComponent(resource.id)}`
+      : undefined;
+    const configuredBaseUrl = (this.config.scim_base_url as string) || '';
     const location =
-      resource.meta?.location ||
-      (resource.id
-        ? `${this.scimPrefix}/${endpoint}/${encodeURIComponent(resource.id)}`
-        : undefined);
+      configuredBaseUrl && resource.meta?.location
+        ? resource.meta.location
+        : relative;
     if (location) res.set('Location', location);
     this.scimJson(res, status, resource);
   }
@@ -729,7 +736,9 @@ export default class Scim extends DmPlugin {
      *     description: User created.
      *     headers:
      *       Location:
-     *         description: URI of the created resource (RFC 7644 section 3.1).
+     *         description: |
+     *           URI of the created resource (RFC 7644 section 3.1). Absolute
+     *           when `--scim-base-url` is set, prefix-relative otherwise.
      *         schema: { type: string }
      *     content:
      *       application/scim+json:
@@ -1079,7 +1088,9 @@ export default class Scim extends DmPlugin {
      *     description: Group created.
      *     headers:
      *       Location:
-     *         description: URI of the created resource (RFC 7644 section 3.1).
+     *         description: |
+     *           URI of the created resource (RFC 7644 section 3.1). Absolute
+     *           when `--scim-base-url` is set, prefix-relative otherwise.
      *         schema: { type: string }
      *     content:
      *       application/scim+json:

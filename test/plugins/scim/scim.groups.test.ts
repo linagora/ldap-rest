@@ -85,11 +85,10 @@ describe('SCIM Groups (integration)', function () {
     expect(res.body.id).to.equal('scim-testgroup');
     expect(res.body.displayName).to.equal('scim-testgroup');
     expect(res.body.members).to.have.lengthOf.at.least(1);
-    // RFC 7644 section 3.1: a create answers with the Location header.
-    expect(res.headers.location).to.equal(res.body.meta.location);
-    expect(res.headers.location).to.match(
-      /\/scim\/v2\/Groups\/scim-testgroup$/
-    );
+    // RFC 7644 section 3.1: a create answers with the Location header,
+    // prefix-relative unless --scim-base-url pins an absolute one.
+    expect(res.headers.location).to.equal('/scim/v2/Groups/scim-testgroup');
+    expect(res.headers.location).to.not.match(/^https?:/);
   });
 
   it('gets a Group by id with SCIM member refs', async () => {
