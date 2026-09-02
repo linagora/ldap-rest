@@ -1,5 +1,87 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `static/schemas/twake`: the shipped Twake schemas now describe an enterprise
+  directory rather than a bare CRUD surface, and three attributes changed
+  status on the API. `uid` is **generated** from the local part of `mail`, so
+  a creation must no longer send it — and no longer may;
+  `twakeDepartmentPath` and `twakeAccountStatus` are computed by the server;
+  `twakeDeliveryMode` became an array and is read-only. `twakeDepartmentLink`
+  became a `pointer`, so the organization it names must exist. Deployments
+  that were posting these values get a `400` naming the attribute. Keep the
+  old behaviour by copying the schema and dropping the markers — every one of
+  them is configuration
+
+### Features
+
+- `plugins/ldap/enterpriseRules`: the business rules an enterprise directory
+  needs on top of per-attribute validation — uniqueness across a shared
+  namespace (an address must not already be someone's alias, on accounts _or_
+  on lists), mail addresses confined to the domains an organization owns
+  (walking up the tree, `*` meaning "any"), computed organization paths,
+  byte-size normalisation, referential integrity on deletion and a guard on
+  deleting a group that still has members. Every rule is driven by markers in
+  the entity schemas, so the plugin holds no attribute name, no domain and no
+  nomenclature value
+
+- `plugins/ldap/accountLifecycle`: `POST {entity}/:id/status` and
+  `POST {entity}/:id/password` — disable an account, reset a credential. Both
+  are written against semantic roles: what "disabled" _is_ in a directory, and
+  which attribute carries it, is schema configuration. A generated password is
+  returned exactly once, since the credential attributes are `neverReturn`
+
+- `plugins/auth/authzScope`: `GET /api/v1/authz/scope` answers what the
+  signed-in administrator may do — the branches they manage, named and with
+  their permissions, and per entity whether they may create one. In a
+  local-administration model an interface cannot show the scope, or hide the
+  buttons that would fail, without it
+
+- `abstract/ldapFlat`: entity schemas gained the markers those plugins read.
+  `hint` explains a `test` in words a client shows under the field; `role`
+  names what an attribute _means_, so core code finds it without knowing its
+  name; `generated` and `readOnly` refuse a value in a request body;
+  `neverReturn` keeps a writable attribute out of every answer;
+  `generatedFrom` derives an identifier from another attribute, with collision
+  handling. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
+
+- `static/schemas/twake`: the missing `domains` nomenclature, plus
+  `employeeNumber`, `personalTitle`, `title`, `postalAddress`, `postalCode`,
+  `l`, `description`, `twakeOtherMailbox`, `twakeDeletionDate`, `pwdReset` and
+  a read-only `memberOf` on users; `businessCategory` on groups;
+  `twakeManagerLink` and `twakeDomainLink` on organizations
+
+- `static/schemas/example`: a worked deployment configuration, showing every
+  national format, mail domain, payroll-number rule and quota default living
+  in a schema rather than in the code. `npm run check:no-client-values` fails
+  the build if one leaks back into `src/`, reading its patterns from an
+  untracked `scripts/client-values.txt` — a list of forbidden names has no
+  business being published either
+
+- `--organization-schema` is settable on the command line. It was declared in
+  the configuration type but never registered as an option, so only a plugin
+  override could reach it
+
+### Bug Fixes
+
+- `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
+  rejects the names real directories carry — every one with a space, an
+  apostrophe or an `&`. Loading such a directory failed on its first
+  organization
+
+- `abstract/ldapFlat`: a business rule that refused a creation answered `500`.
+  The add path wrapped every error in a plain `Error`, so a `409 "this address
+is already used"` reached the client as an internal error, and was logged as
+  an incident rather than as the ordinary outcome it is
+
+- `test/helpers`: a failing LDIF load reported "Already exists" whatever the
+  real cause. Every error was retried, and a first attempt that stopped
+  halfway left its earlier entries behind, so the retries could only fail on
+  them. Only a connection failure is retried now, and the directory's own
+  message is reported
+
 ## v0.7.0 (2026-09-02)
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.

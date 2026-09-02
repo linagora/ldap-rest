@@ -13,11 +13,12 @@
     },
     "ou": {
       "type": "string",
-      "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 ()&/,.'’_-]{0,254}$",
-      "hint": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
+      "test": "^[A-ZÀ-ÖØ-Þ]((?!.*([-,’'()&]{2}|\\s{2}|\\s[-,’')]|[-’'(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-’'()&])*[a-zà-öø-ÿ)]$",
+      "hint": "Starts with a capital and ends with a lowercase letter or ), no repeated punctuation",
       "required": true,
       "unique": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": "Department name"
     },
     "description": {
       "type": "string",
@@ -26,13 +27,19 @@
     "telephoneNumber": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+        "hint": "Expected pattern (+99) 999 9999"
       },
-      "required": false
+      "required": false,
+      "label": "Phone"
     },
     "facsimileTelephoneNumber": {
       "type": "string",
-      "required": false
+      "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+      "hint": "Expected pattern (+99) 999 9999",
+      "required": false,
+      "label": "Fax"
     },
     "l": {
       "type": "string",
@@ -41,7 +48,10 @@
     },
     "postalAddress": {
       "type": "string",
-      "required": false
+      "test": "^[A-Z0-9À-ÖØ-öø-ÿ]((?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.])*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
+      "hint": "Starts with a capital or a digit, no repeated punctuation, ends with a letter, a digit or )",
+      "required": false,
+      "label": "Address"
     },
     "twakeDepartmentPath": {
       "type": "string",
@@ -57,7 +67,8 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
-      "role": "managers"
+      "role": "managers",
+      "label": "Managers"
     },
     "twakeDomainLink": {
       "type": "array",
@@ -76,7 +87,8 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
-      "role": "localAdmins"
+      "role": "localAdmins",
+      "label": "Local administrators"
     }
   }
 }

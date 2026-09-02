@@ -615,7 +615,7 @@
     "build:pages": "tsx scripts/build-pages.ts",
     "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
     "build:watch": "rollup -c --watch",
-    "check": "npm run check:ts && npm run lint && npm run format:check",
+    "check": "npm run check:ts && npm run lint && npm run format:check && npm run check:no-client-values",
     "check:ts": "tsc --noEmit",
     "clean": "rimraf dist/* static/browser/* coverage",
     "coverage": "c8 --config .c8rc.json mocha",
@@ -632,7 +632,8 @@
     "start:dev": "./.dev.mk start",
     "test": "npm run check:ts && mocha",
     "test:dev": "./.dev.mk test",
-    "test:one": "mocha --config .mocharc-one.json"
+    "test:one": "mocha --config .mocharc-one.json",
+    "check:no-client-values": "sh scripts/check-no-client-values.sh"
   },
   "overrides": {
     "diff": ">=8.0.3",

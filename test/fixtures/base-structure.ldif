@@ -210,3 +210,82 @@ displayName: Bob User
 description: Test user in organization
 twakeDepartmentLink: ou=Sub Org 1,ou=Test Org 1,ou=organization,dc=example,dc=com
 twakeDepartmentPath: Test Org 1/Sub Org 1
+
+# Account status nomenclature (lifecycle states)
+dn: ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeAccountStatus
+description: Account status nomenclature
+
+dn: cn=active,ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: active
+description: Active account
+
+dn: cn=disabled,ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: disabled
+description: Disabled account
+
+dn: cn=noaccess,ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: noaccess
+description: Account without access
+
+dn: cn=todelete,ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: todelete
+description: Account scheduled for deletion
+
+# Delivery mode nomenclature
+dn: ou=twakeDeliveryMode,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeDeliveryMode
+description: Delivery mode nomenclature
+
+dn: cn=normal,ou=twakeDeliveryMode,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: normal
+description: Normal delivery
+
+dn: cn=localDelivery,ou=twakeDeliveryMode,ou=nomenclature,dc=example,dc=com
+objectClass: device
+cn: localDelivery
+description: Local delivery only
+
+# Mail domain nomenclature
+dn: ou=domains,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: domains
+description: Mail domain nomenclature
+
+dn: dc=example,ou=domains,ou=nomenclature,dc=example,dc=com
+objectClass: top
+objectClass: domain
+objectClass: domainRelatedObject
+dc: example
+associatedDomain: example.com
+description: Main mail domain
+
+dn: dc=lists,ou=domains,ou=nomenclature,dc=example,dc=com
+objectClass: top
+objectClass: domain
+objectClass: domainRelatedObject
+dc: lists
+associatedDomain: lists.example.com
+description: Mailing list domain
+
+# Positions
+dn: ou=positions,dc=example,dc=com
+objectClass: organizationalUnit
+ou: positions
+description: Positions branch
+
+# twakePosition allows nothing but `cn`, so these carry no description.
+dn: cn=Systems Analyst,ou=positions,dc=example,dc=com
+objectClass: twakePosition
+cn: Systems Analyst
+
+dn: cn=Support Officer / Senior Support Officer,ou=positions,dc=example,dc=com
+objectClass: twakePosition
+cn: Support Officer / Senior Support Officer

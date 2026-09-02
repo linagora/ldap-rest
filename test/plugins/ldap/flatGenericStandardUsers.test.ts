@@ -1,31 +1,23 @@
 import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
-
-const { DM_LDAP_BASE } = process.env;
-const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('LdapUsersFlat validation with standard schema (via flatGeneric)', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapUsersFlat standard schema validation tests: DM_LDAP_BASE and LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
+  let USER_BRANCH: string;
 
   let server: DM;
   let genericPlugin: LdapFlatGeneric;
   let plugin: any;
 
+  // The embedded directory is started by a root hook, so the environment only
+  // exists once the suite runs — never at file load.
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
   before(async function () {
+    USER_BRANCH = `ou=users,${process.env.DM_LDAP_BASE}`;
     this.timeout(5000);
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/standard/users.json';
     server = new DM();
