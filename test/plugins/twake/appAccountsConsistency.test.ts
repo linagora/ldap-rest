@@ -533,6 +533,10 @@ describe('App Accounts Consistency Plugin', function () {
 
       // Verify new applicative account exists
       const newApplicativeDN = `uid=newemail-${timestamp}@example.com,${applicativeBase}`;
+      // The hook deletes the old entry and adds the new one as two separate
+      // operations: waiting for the deletion above proves nothing about the
+      // addition, and the search below raced it.
+      await waitForEntry(dm, newApplicativeDN);
       result = await dm.ldap.search(
         {
           scope: 'base',
