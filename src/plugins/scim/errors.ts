@@ -81,18 +81,6 @@ export function extractLdapCode(err: unknown): number | undefined {
   return undefined;
 }
 
-/**
- * Did an authorization plugin refuse this operation?
- *
- * They signal it by embedding `[authz-forbidden]` in the thrown message, so a
- * 403 stays recognisable after an intermediate caller has wrapped the error.
- */
-export function isAuthzForbidden(err: unknown): boolean {
-  const message =
-    err instanceof Error ? err.message : typeof err === 'string' ? err : '';
-  return /\[authz-forbidden\]/.test(message);
-}
-
 export function writeScimErrorFromException(
   res: Response,
   err: unknown,

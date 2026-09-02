@@ -50,7 +50,6 @@ import {
   scimUniqueness,
   ScimError,
   extractLdapCode,
-  isAuthzForbidden,
 } from './errors';
 import type { ScimUsers } from './users';
 
@@ -468,10 +467,11 @@ export class ScimGroups {
         return res.searchEntries[0].dn;
       }
     } catch (err) {
-      // A refusal is an answer, not a miss: re-raise it so the caller gets a
-      // 403 instead of the reference silently vanishing from the group.
-      if (isAuthzForbidden(err)) throw err;
-      // not found directly
+      // Only "no such object" is a miss. Anything else — an authorization
+      // refusal, a broken connection — must not be read as an absent member,
+      // which would silently drop the reference from the group.
+      if (extractLdapCode(err) !== 32) throw err;
+      // Not there under that DN; try a filter.
     }
     try {
       const res = (await this.ldap.search(
@@ -488,8 +488,8 @@ export class ScimGroups {
         return res.searchEntries[0].dn;
       }
     } catch (err) {
-      if (isAuthzForbidden(err)) throw err;
-      // ignore
+      if (extractLdapCode(err) !== 32) throw err;
+      // The base itself is absent: no match, same as an empty result.
     }
     return undefined;
   }
