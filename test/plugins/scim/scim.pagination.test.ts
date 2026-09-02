@@ -15,6 +15,12 @@ describe('SCIM pagination (integration)', function () {
   let server: DM;
   let plugin: Scim;
   let userBase: string;
+  // A run that crashed before its cleanup must not poison the next one, and
+  // two runs against the same directory must not collide.
+  const stamp = Date.now();
+  const ou = `scimpage-${stamp}`;
+  const uid = (i: number): string =>
+    `page-user-${stamp}-${String(i).padStart(2, '0')}`;
   const saved: Record<string, string | undefined> = {};
 
   const setEnv = (key: string, value: string): void => {
@@ -34,7 +40,7 @@ describe('SCIM pagination (integration)', function () {
       return;
     }
     const baseDn = process.env.DM_LDAP_BASE;
-    userBase = `ou=scimpage,${baseDn}`;
+    userBase = `ou=${ou},${baseDn}`;
     setEnv('DM_SCIM_USER_BASE', userBase);
     setEnv('DM_SCIM_GROUP_BASE', `ou=groups,${baseDn}`);
     // A page smaller than the collection is the whole point of the suite.
@@ -48,7 +54,7 @@ describe('SCIM pagination (integration)', function () {
     try {
       await plugin.ldap.add(userBase, {
         objectClass: ['top', 'organizationalUnit'],
-        ou: 'scimpage',
+        ou,
       });
     } catch {
       /* may already exist */
@@ -59,7 +65,7 @@ describe('SCIM pagination (integration)', function () {
         .set('Content-Type', 'application/scim+json')
         .send({
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: `page-user-${String(i).padStart(2, '0')}`,
+          userName: uid(i),
           name: { familyName: 'Page' },
         })
         .expect(201);
@@ -70,9 +76,7 @@ describe('SCIM pagination (integration)', function () {
     if (plugin) {
       for (let i = 0; i < TOTAL; i++) {
         try {
-          await plugin.ldap.delete(
-            `uid=page-user-${String(i).padStart(2, '0')},${userBase}`
-          );
+          await plugin.ldap.delete(`uid=${uid(i)},${userBase}`);
         } catch {
           /* ignore */
         }
@@ -139,11 +143,47 @@ describe('SCIM pagination (integration)', function () {
 
   it('paginates a filtered collection too', async () => {
     const res = await list(
-      '?filter=' + encodeURIComponent('userName sw "page-user-0"') + '&count=3'
+      '?filter=' +
+        encodeURIComponent(`userName sw "page-user-${stamp}-0"`) +
+        '&count=3'
     ).expect(200);
-    // page-user-00 … page-user-09
+    // …-00 through …-09
     expect(res.body.totalResults).to.equal(10);
     expect(res.body.itemsPerPage).to.equal(3);
+  });
+
+  describe('a base that does not exist', () => {
+    let missingServer: DM;
+    let missingPlugin: Scim;
+    let savedMissing: string | undefined;
+
+    before(async () => {
+      savedMissing = process.env.DM_SCIM_USER_BASE;
+      process.env.DM_SCIM_USER_BASE = `ou=nothing-here-${stamp},${
+        process.env.DM_LDAP_BASE as string
+      }`;
+      missingServer = new DM();
+      missingPlugin = new Scim(missingServer);
+      await missingPlugin.api(missingServer.app);
+      await missingServer.ready;
+    });
+
+    after(() => {
+      if (savedMissing === undefined) delete process.env.DM_SCIM_USER_BASE;
+      else process.env.DM_SCIM_USER_BASE = savedMissing;
+    });
+
+    it('reads as an empty collection, not a 404', async () => {
+      // The paged search is lazy, so noSuchObject surfaces while iterating
+      // rather than when the generator is built, and escaped the guard meant
+      // to catch it — the list then answered 404, which a collection endpoint
+      // never should.
+      const res = await supertest(missingServer.app)
+        .get('/scim/v2/Users')
+        .expect(200);
+      expect(res.body.totalResults).to.equal(0);
+      expect(res.body.Resources).to.have.lengthOf(0);
+    });
   });
 
   describe('with a scan bound below the collection size', () => {

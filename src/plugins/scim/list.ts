@@ -20,7 +20,7 @@ import type ldapActions from '../../lib/ldapActions';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 
-import { scimTooMany, extractLdapCode } from './errors';
+import { ScimError, scimTooMany, extractLdapCode } from './errors';
 
 export interface PagedSearch {
   ldap: ldapActions;
@@ -53,9 +53,11 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
   const entries: AttributesList[] = [];
   let scanned = 0;
 
-  let generator: AsyncGenerator<SearchResult>;
   try {
-    generator = (await opts.ldap.search(
+    // `searchPaginated` is lazy: it hands back a generator and only talks to
+    // the directory on the first iteration, so an LDAP failure surfaces from
+    // the loop below, never from this call. One try covers both.
+    const generator = (await opts.ldap.search(
       {
         filter: opts.filter,
         scope: 'sub',
@@ -68,14 +70,7 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
       opts.base,
       opts.req
     )) as AsyncGenerator<SearchResult>;
-  } catch (err) {
-    // A base that does not exist yet is an empty collection, not an error:
-    // the equivalent single-resource lookups answer 404 on their own.
-    if (extractLdapCode(err) === 32) return { entries: [], totalResults: 0 };
-    throw err;
-  }
 
-  try {
     for await (const page of generator) {
       for (const entry of page.searchEntries || []) {
         if (scanned >= first && entries.length < opts.count) {
@@ -90,8 +85,16 @@ export async function pagedSearch(opts: PagedSearch): Promise<PagedResult> {
       }
     }
   } catch (err) {
+    // Our own scan bound, and any other SCIM error a hook raised, are the
+    // answer — not something to translate.
+    if (err instanceof ScimError) throw err;
+    const code = extractLdapCode(err);
+    // noSuchObject (32): a base that does not exist yet is an empty
+    // collection, not an error. The single-resource lookups answer 404 on
+    // their own.
+    if (code === 32) return { entries: [], totalResults: 0 };
     // sizeLimitExceeded (4): the directory itself refused to walk that far.
-    if (extractLdapCode(err) === 4) {
+    if (code === 4) {
       throw scimTooMany(
         'The directory refused the query with sizeLimitExceeded; narrow it with a filter or raise the directory size limit'
       );

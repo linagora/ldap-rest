@@ -9,28 +9,21 @@
   token denied write on a branch could still modify a user there through
   PATCH. POST, PUT and DELETE, and the Groups PATCH, were unaffected
 
-### Features
-
-- `plugins/scim`: `GET /Users` and `GET /Groups` paginate for real. A list used
-  to fetch its whole result set and answer `400 tooMany` as soon as it passed
-  `--scim-max-results` — so a directory of more than 200 entries could not be
-  listed at all, filter or no filter, and no `startIndex` reached past that
-  window. The window is now cut server-side while walking a paged search:
-  `startIndex` reaches any offset, `totalResults` is the real size of the
-  result set, and only the requested page is held in memory. The walk is
-  bounded by the new `--scim-max-scanned` (10000), past which `tooMany` is
-  answered as RFC 7644 section 3.12 provides for
-
-  `--scim-max-results` keeps its name but now means the maximum page size, the
-  cap on `count`, which is what `ServiceProviderConfig.filter.maxResults`
-  advertises
-
 ### Bug Fixes
 
 - `plugins/scim`: `meta.created` and `meta.lastModified` carried the
   directory's GeneralizedTime (`20250101120000Z`) straight through. RFC 7643
   section 2.3.5 wants an `xsd:dateTime`, so a strict client rejected every
   resource. They are now converted (`2025-01-01T12:00:00Z`)
+
+- `plugins/scim`: a create answered 201 without the `Location` response header
+  RFC 7644 section 3.1 requires — only `meta.location` inside the body. It is
+  now sent on POST, and on the PUT and PATCH answers as well
+
+- `plugins/scim`: a PATCH `remove` operation without a `path` was applied to
+  every key of its `value` instead of being refused. RFC 7644 section 3.5.2.2
+  requires `400` with `scimType: noTarget`, since a pathless remove names no
+  target
 
 - `plugins/scim`: a list could not be served at all beyond
   `--scim-max-results`. `GET /Users` and `GET /Groups` fetched their whole
@@ -47,11 +40,6 @@
   `--scim-max-scanned` (10000) bounds how far a list walks to count its
   result set, past which `tooMany` is answered as RFC 7644 section 3.12
   provides for
-
-- `plugins/scim`: a PATCH `remove` operation without a `path` was applied to
-  every key of its `value` instead of being refused. RFC 7644 section 3.5.2.2
-  requires `400` with `scimType: noTarget`, since a pathless remove names no
-  target
 
 ## v0.6.0 (2026-08-01)
 
