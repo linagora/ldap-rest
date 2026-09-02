@@ -10,7 +10,8 @@
  *  - sub-attribute paths: "name.familyName"
  *  - multi-valued paths: "emails"
  *  - Group member ops via filtered path: `members[value eq "alice"]`
- *  - implicit path (op.value is an object)
+ *  - implicit path (op.value is an object) for add and replace; `remove`
+ *    without a path is rejected with `noTarget` per RFC 7644 section 3.5.2.2
  *
  * Complex filtered paths on multi-valued attributes OTHER than `members`
  * (e.g. `emails[type eq "work"]`) are rejected with `invalidPath`: the
@@ -172,6 +173,12 @@ async function applyOperation(
 
   // No path: value must be an object with top-level keys
   if (!op.path) {
+    // RFC 7644 section 3.5.2.2: "If 'path' is unspecified, the operation
+    // fails with HTTP status code 400 and a scimType error code of
+    // 'noTarget'." Only add and replace accept an implicit path.
+    if (operation === 'remove') {
+      throw scimNoTarget("PATCH 'remove' requires a path");
+    }
     if (
       op.value == null ||
       typeof op.value !== 'object' ||

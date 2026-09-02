@@ -20,6 +20,11 @@
   RFC 7644 section 3.1 requires — only `meta.location` inside the body. It is
   now sent on POST, and on the PUT and PATCH answers as well
 
+- `plugins/scim`: a PATCH `remove` operation without a `path` was applied to
+  every key of its `value` instead of being refused. RFC 7644 section 3.5.2.2
+  requires `400` with `scimType: noTarget`, since a pathless remove names no
+  target
+
 ## v0.6.0 (2026-08-01)
 
 ### Breaking Changes
