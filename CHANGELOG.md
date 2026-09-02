@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-09-02)
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
