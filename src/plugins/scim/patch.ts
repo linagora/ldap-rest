@@ -55,12 +55,19 @@ export interface PatchContext {
 }
 
 /**
- * Read a SCIM `active` value out of a PATCH operation. `remove` and a body
- * that omits the value both restore the default, an active account; every
- * other shape follows the one rule in `readActive()`.
+ * Read a SCIM `active` value out of an add or replace operation.
+ *
+ * A missing value is refused rather than read as `true`: `active` gates
+ * account access, and `{"op":"replace","path":"active"}` with nothing to
+ * apply is a malformed request, not a request to unlock. `remove` already
+ * says "restore the default" explicitly, and is handled by the caller.
  */
 function activeValue(value: unknown): boolean {
-  return readActive(value) ?? true;
+  const read = readActive(value);
+  if (read === undefined) {
+    throw scimInvalidValue("PATCH on 'active' requires a value");
+  }
+  return read;
 }
 
 function normalizeOp(op: string): 'add' | 'remove' | 'replace' {

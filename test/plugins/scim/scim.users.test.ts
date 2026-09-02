@@ -460,11 +460,42 @@ describe('SCIM Users (integration)', function () {
       expect(put.body.active).to.be.false;
     });
 
-    it('refuses a value it cannot read, whatever the verb', async () => {
+    it('refuses a value it cannot read, on POST, PUT and PATCH alike', async () => {
       for (const value of ['0', 'no', 42, null]) {
         const res = await create({ active: value }).expect(400);
         expect(res.body.scimType).to.equal('invalidValue');
       }
+
+      await create({}).expect(201);
+      for (const value of ['0', 'no', 42, null]) {
+        const put = await supertest(server.app)
+          .put('/scim/v2/Users/scim-alice')
+          .set('Content-Type', 'application/scim+json')
+          .send({
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            userName: 'scim-alice',
+            name: { familyName: 'Doe' },
+            active: value,
+          })
+          .expect(400);
+        expect(put.body.scimType).to.equal('invalidValue');
+
+        const patch = await supertest(server.app)
+          .patch('/scim/v2/Users/scim-alice')
+          .set('Content-Type', 'application/scim+json')
+          .send({
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op: 'replace', path: 'active', value }],
+          })
+          .expect(400);
+        expect(patch.body.scimType).to.equal('invalidValue');
+      }
+
+      // And the account is untouched by any of it.
+      const got = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice')
+        .expect(200);
+      expect(got.body.active).to.be.true;
     });
 
     it('filters on active', async () => {
