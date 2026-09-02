@@ -77,6 +77,7 @@ export function extractLdapCode(err: unknown): number | undefined {
     return 68;
   if (/noSuchAttribute|No such attribute|code:?\s*(16|0x10)/i.test(msg))
     return 16;
+  if (/sizeLimitExceeded|Size Limit Exceeded/i.test(msg)) return 4;
   return undefined;
 }
 

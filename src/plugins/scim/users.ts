@@ -41,11 +41,11 @@ import {
   type MappingContext,
 } from './mapping';
 import { scimFilterToLdap } from './filter';
+import { pagedSearch } from './list';
 import { patchToModifyRequest } from './patch';
 import {
   scimInvalidValue,
   scimNotFound,
-  scimTooMany,
   scimUniqueness,
   ScimError,
   extractLdapCode,
@@ -82,6 +82,7 @@ export class ScimUsers {
   private readonly objectClass: string[];
   private readonly idAttribute: string;
   private readonly maxResults: number;
+  private readonly maxScanned: number;
   private readonly scimPrefix: string;
 
   constructor(opts: ScimUsersOptions) {
@@ -96,6 +97,7 @@ export class ScimUsers {
     this.objectClass = this.config.scim_user_object_class as string[];
     this.idAttribute = (this.config.scim_id_attribute as string) || 'rdn';
     this.maxResults = (this.config.scim_max_results as number) || 200;
+    this.maxScanned = (this.config.scim_max_scanned as number) || 10000;
     this.scimPrefix = (this.config.scim_prefix as string) || '/scim/v2';
 
     const override = (this.config.scim_user_mapping as string) || '';
@@ -199,26 +201,15 @@ export class ScimUsers {
       }
     }
 
-    const result = (await this.ldap.search(
-      {
-        filter: ldapFilter,
-        scope: 'sub',
-        paged: false,
-        attributes: requiredLdapAttributes(this.mapping),
-        sizeLimit: this.maxResults + 1,
-      },
-      base
-    )) as SearchResult;
-
-    const entries = result.searchEntries || [];
-    const total = entries.length;
-    if (total > this.maxResults) {
-      throw scimTooMany(
-        `Filter matched ${total} resources, exceeds max ${this.maxResults}`
-      );
-    }
-
-    const page = entries.slice(startIndex - 1, startIndex - 1 + count);
+    const { entries, totalResults } = await pagedSearch({
+      ldap: this.ldap,
+      base,
+      filter: ldapFilter,
+      attributes: requiredLdapAttributes(this.mapping),
+      startIndex,
+      count,
+      maxScanned: this.maxScanned,
+    });
 
     // sortBy / sortOrder are parsed for backwards compatibility but not
     // applied — see ServiceProviderConfig.sort.supported = false. Full sort
@@ -227,13 +218,13 @@ export class ScimUsers {
     void query.sortBy;
     void query.sortOrder;
 
-    const resources = page.map(e =>
-      ldapToScimUser(e as AttributesList, this.mapping, this.ctx(req))
+    const resources = entries.map(e =>
+      ldapToScimUser(e, this.mapping, this.ctx(req))
     );
 
     return {
       schemas: [SCHEMA_LIST_RESPONSE],
-      totalResults: total,
+      totalResults,
       startIndex,
       itemsPerPage: resources.length,
       Resources: resources,
