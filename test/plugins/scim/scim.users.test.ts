@@ -532,6 +532,26 @@ describe('SCIM Users (integration)', function () {
       expect(res.headers.location).to.match(/\/Users\/scim-alice$/);
     });
 
+    it('refuses both parameters on a write before it happens', async () => {
+      // The check used to run while building the answer, so the entry was
+      // created and the caller still read a 400 — a provisioner would record
+      // the user as not provisioned while it existed in the directory.
+      await supertest(server.app)
+        .delete('/scim/v2/Users/scim-alice')
+        .expect(204);
+      await supertest(server.app)
+        .post('/scim/v2/Users?attributes=userName&excludedAttributes=emails')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(400);
+      // Nothing must have been written.
+      await supertest(server.app).get('/scim/v2/Users/scim-alice').expect(404);
+    });
+
     it('refuses both parameters at once', async () => {
       const res = await supertest(server.app)
         .get(

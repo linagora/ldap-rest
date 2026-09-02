@@ -592,6 +592,19 @@ export default class Scim extends DmPlugin {
       })
     );
 
+    // RFC 7644 section 3.9 makes `attributes` and `excludedAttributes`
+    // mutually exclusive. Refuse the pair before any handler runs, not while
+    // building the answer: on a write route the check would otherwise sit
+    // after the directory had already been changed, and the caller would read
+    // a 400 for a request that had in fact landed.
+    app.use(
+      prefix,
+      scimAsyncHandler((req, _res, next) => {
+        this.parseProjection(req);
+        next();
+      })
+    );
+
     /** Users */
     /**
      * @openapi
