@@ -62,6 +62,16 @@
   both flags elsewhere on a directory without it, `nsAccountLock` / `TRUE`
   for instance
 
+### Features
+
+- `plugins/scim`: `attributes` and `excludedAttributes` (RFC 7644 section 3.9)
+  are honoured instead of parsed and dropped. They apply to the lists, to the
+  single-resource GETs and to the answers of POST, PUT and PATCH, accept
+  standard attribute notation (`name.familyName`, `emails.value`) and a core
+  schema URN prefix, keep `id` and `schemas` whatever is asked, and answer
+  `400 invalidValue` when both are sent, as the RFC makes them mutually
+  exclusive
+
 ### Bug Fixes
 
 - `plugins/scim`: `meta.created` and `meta.lastModified` carried the

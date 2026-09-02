@@ -451,6 +451,97 @@ describe('SCIM Users (integration)', function () {
     });
   });
 
+  describe('attributes / excludedAttributes (RFC 7644 section 3.9)', () => {
+    beforeEach(async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe', givenName: 'Alice' },
+          displayName: 'Alice D.',
+          emails: [{ value: 'alice@example.com', primary: true }],
+        })
+        .expect(201);
+    });
+
+    it('narrows a single resource', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice?attributes=userName')
+        .expect(200);
+      expect(Object.keys(res.body).sort()).to.deep.equal([
+        'id',
+        'schemas',
+        'userName',
+      ]);
+    });
+
+    it('narrows to a sub-attribute', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice?attributes=name.familyName')
+        .expect(200);
+      expect(res.body.name).to.deep.equal({ familyName: 'Doe' });
+    });
+
+    it('excludes from a single resource', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice?excludedAttributes=emails,name')
+        .expect(200);
+      expect(res.body).to.not.have.property('emails');
+      expect(res.body).to.not.have.property('name');
+      expect(res.body.userName).to.equal('scim-alice');
+      expect(res.body.id).to.equal('scim-alice');
+    });
+
+    it('narrows every resource of a list', async () => {
+      const res = await supertest(server.app)
+        .get('/scim/v2/Users?attributes=userName')
+        .expect(200);
+      expect(res.body.schemas[0]).to.equal(
+        'urn:ietf:params:scim:api:messages:2.0:ListResponse'
+      );
+      for (const r of res.body.Resources) {
+        expect(Object.keys(r).sort()).to.deep.equal([
+          'id',
+          'schemas',
+          'userName',
+        ]);
+      }
+    });
+
+    it('narrows the answer to a create', async () => {
+      await supertest(server.app)
+        .delete('/scim/v2/Users/scim-alice')
+        .expect(204);
+      const res = await supertest(server.app)
+        .post('/scim/v2/Users?attributes=userName')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(201);
+      expect(Object.keys(res.body).sort()).to.deep.equal([
+        'id',
+        'schemas',
+        'userName',
+      ]);
+      // The Location header is built before the projection, so it survives.
+      expect(res.headers.location).to.match(/\/Users\/scim-alice$/);
+    });
+
+    it('refuses both parameters at once', async () => {
+      const res = await supertest(server.app)
+        .get(
+          '/scim/v2/Users/scim-alice?attributes=userName&excludedAttributes=emails'
+        )
+        .expect(400);
+      expect(res.body.scimType).to.equal('invalidValue');
+    });
+  });
+
   describe('Users list & filter', () => {
     beforeEach(async () => {
       await supertest(server.app)

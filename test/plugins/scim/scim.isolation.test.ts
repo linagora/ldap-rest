@@ -191,12 +191,21 @@ describe('SCIM ServiceProviderConfig honesty (integration)', function () {
       .expect(200);
   });
 
-  it('accepts attributes / excludedAttributes query params without error', async () => {
+  it('honours attributes and excludedAttributes, one at a time', async () => {
+    // They used to be parsed and dropped, and sending both was accepted.
+    // RFC 7644 section 3.9 applies them, and makes them mutually exclusive.
     await supertest(server.app)
+      .get('/scim/v2/Users?attributes=userName,displayName')
+      .expect(200);
+    await supertest(server.app)
+      .get('/scim/v2/Users?excludedAttributes=emails')
+      .expect(200);
+    const both = await supertest(server.app)
       .get(
         '/scim/v2/Users?attributes=userName,displayName&excludedAttributes=emails'
       )
-      .expect(200);
+      .expect(400);
+    expect(both.body.scimType).to.equal('invalidValue');
   });
 
   it('invalid filter returns a SCIM error envelope', async () => {

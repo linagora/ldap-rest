@@ -34,6 +34,12 @@ import {
   type ScimGroup,
   type ScimUser,
 } from './types';
+import {
+  type ProjectionQuery,
+  assertProjection,
+  projectList,
+  projectResource,
+} from './projection';
 
 /**
  * Reusable SCIM 2.0 schemas surfaced by this plugin.
@@ -522,7 +528,8 @@ export default class Scim extends DmPlugin {
     res: import('express').Response,
     status: number,
     resource: ScimUser | ScimGroup,
-    endpoint: 'Users' | 'Groups'
+    endpoint: 'Users' | 'Groups',
+    projection: ProjectionQuery = {}
   ): void {
     const relative = resource.id
       ? `${this.scimPrefix}/${endpoint}/${encodeURIComponent(resource.id)}`
@@ -533,7 +540,28 @@ export default class Scim extends DmPlugin {
         ? resource.meta.location
         : relative;
     if (location) res.set('Location', location);
-    this.scimJson(res, status, resource);
+    this.scimJson(res, status, projectResource(resource, projection));
+  }
+
+  /**
+   * `attributes` / `excludedAttributes` (RFC 7644 section 3.9). Accepted on
+   * every route that answers a resource, not only the list ones.
+   */
+  private parseProjection(req: Request): ProjectionQuery {
+    const toCsv = (v: unknown): string[] | undefined => {
+      if (typeof v !== 'string') return undefined;
+      const list = v
+        .split(',')
+        .map(x => x.trim())
+        .filter(Boolean);
+      return list.length > 0 ? list : undefined;
+    };
+    const query: ProjectionQuery = {
+      attributes: toCsv(req.query.attributes),
+      excludedAttributes: toCsv(req.query.excludedAttributes),
+    };
+    assertProjection(query);
+    return query;
   }
 
   private readScimBody(req: Request): unknown {
@@ -593,7 +621,10 @@ export default class Scim extends DmPlugin {
      *   - in: query
      *     name: attributes
      *     schema: { type: string }
-     *     description: Comma-separated SCIM attribute names to include in the response.
+     *     description: |
+     *       Comma-separated SCIM attribute names to return, in place of the
+     *       default set (RFC 7644 section 3.9). Mutually exclusive with
+     *       `excludedAttributes`.
      *     example: 'userName,emails'
      *   - in: query
      *     name: excludedAttributes
@@ -649,8 +680,9 @@ export default class Scim extends DmPlugin {
       `${prefix}/Users`,
       scimAsyncHandler(async (req, res) => {
         const q = this.parseListQuery(req);
+        assertProjection(q);
         const list = await this.users.list(req as DmRequest, q);
-        this.scimJson(res, 200, list);
+        this.scimJson(res, 200, projectList(list, q));
       })
     );
     /**
@@ -659,6 +691,20 @@ export default class Scim extends DmPlugin {
      * description: |
      *   Returns a single SCIM User resource. The `:id` value is the server-
      *   assigned opaque identifier returned when the resource was created.
+     * parameters:
+     *   - in: query
+     *     name: attributes
+     *     schema: { type: string }
+     *     description: |
+     *       Comma-separated attribute names to return, in place of the default
+     *       set (RFC 7644 section 3.9). Mutually exclusive with
+     *       `excludedAttributes`.
+     *     example: 'userName,name.familyName'
+     *   - in: query
+     *     name: excludedAttributes
+     *     schema: { type: string }
+     *     description: Comma-separated attribute names to omit from the default set.
+     *     example: 'emails'
      * responses:
      *   '200':
      *     description: User resource.
@@ -700,11 +746,12 @@ export default class Scim extends DmPlugin {
     app.get(
       `${prefix}/Users/:id`,
       scimAsyncHandler(async (req, res) => {
+        const projection = this.parseProjection(req);
         const user = await this.users.get(
           req as DmRequest,
           decodeURIComponent(req.params.id as string)
         );
-        this.scimJson(res, 200, user);
+        this.scimJson(res, 200, projectResource(user, projection));
       })
     );
     /**
@@ -785,7 +832,7 @@ export default class Scim extends DmPlugin {
           req as DmRequest,
           body as ScimUser
         );
-        this.scimResource(res, 201, user, 'Users');
+        this.scimResource(res, 201, user, 'Users', this.parseProjection(req));
       })
     );
     /**
@@ -852,7 +899,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as ScimUser
         );
-        this.scimResource(res, 200, user, 'Users');
+        this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
       })
     );
     /**
@@ -911,7 +958,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as PatchRequest
         );
-        this.scimResource(res, 200, user, 'Users');
+        this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
       })
     );
     /**
@@ -1017,14 +1064,29 @@ export default class Scim extends DmPlugin {
       `${prefix}/Groups`,
       scimAsyncHandler(async (req, res) => {
         const q = this.parseListQuery(req);
+        assertProjection(q);
         const list = await this.groups.list(req as DmRequest, q);
-        this.scimJson(res, 200, list);
+        this.scimJson(res, 200, projectList(list, q));
       })
     );
     /**
      * @openapi
      * summary: Get group by ID
      * description: Returns a single SCIM Group resource by its server-assigned ID.
+     * parameters:
+     *   - in: query
+     *     name: attributes
+     *     schema: { type: string }
+     *     description: |
+     *       Comma-separated attribute names to return, in place of the default
+     *       set (RFC 7644 section 3.9). Mutually exclusive with
+     *       `excludedAttributes`.
+     *     example: 'displayName'
+     *   - in: query
+     *     name: excludedAttributes
+     *     schema: { type: string }
+     *     description: Comma-separated attribute names to omit from the default set.
+     *     example: 'members'
      * responses:
      *   '200':
      *     description: Group resource.
@@ -1058,11 +1120,12 @@ export default class Scim extends DmPlugin {
     app.get(
       `${prefix}/Groups/:id`,
       scimAsyncHandler(async (req, res) => {
+        const projection = this.parseProjection(req);
         const group = await this.groups.get(
           req as DmRequest,
           decodeURIComponent(req.params.id as string)
         );
-        this.scimJson(res, 200, group);
+        this.scimJson(res, 200, projectResource(group, projection));
       })
     );
     /**
@@ -1133,7 +1196,7 @@ export default class Scim extends DmPlugin {
           req as DmRequest,
           body as ScimGroup
         );
-        this.scimResource(res, 201, group, 'Groups');
+        this.scimResource(res, 201, group, 'Groups', this.parseProjection(req));
       })
     );
     /**
@@ -1192,7 +1255,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as ScimGroup
         );
-        this.scimResource(res, 200, group, 'Groups');
+        this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
       })
     );
     /**
@@ -1253,7 +1316,7 @@ export default class Scim extends DmPlugin {
           decodeURIComponent(req.params.id as string),
           body as PatchRequest
         );
-        this.scimResource(res, 200, group, 'Groups');
+        this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
       })
     );
     /**
