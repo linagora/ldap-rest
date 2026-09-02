@@ -8,3 +8,4 @@ static/browser/
 static/*.html
 openapi.json
 _site/
+scripts/client-values.txt

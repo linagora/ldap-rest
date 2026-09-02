@@ -77,6 +77,10 @@ export interface Config {
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
 
+  // LDAP enterprise rules plugin
+  enterprise_domain_name_attribute?: string;
+  enterprise_domain_link_attribute?: string;
+
   // LDAP raw (low-level browsing) plugin
   ldap_raw_base?: string[];
   ldap_raw_hidden_attribute?: string[];
@@ -396,6 +400,22 @@ const configArgs: ConfigTemplate = [
     'DM_LDAP_ORGANIZATION_MAX_SUBNODES',
     50,
     'number',
+  ],
+  // No default: loading a schema turns on validation the organizations plugin
+  // does not perform otherwise, so it stays an explicit choice.
+  ['--organization-schema', 'DM_ORGANIZATION_SCHEMA', ''],
+
+  // LDAP enterprise rules plugin
+
+  [
+    '--enterprise-domain-name-attribute',
+    'DM_ENTERPRISE_DOMAIN_NAME_ATTRIBUTE',
+    'associatedDomain',
+  ],
+  [
+    '--enterprise-domain-link-attribute',
+    'DM_ENTERPRISE_DOMAIN_LINK_ATTRIBUTE',
+    '',
   ],
 
   // LDAP groups plugin

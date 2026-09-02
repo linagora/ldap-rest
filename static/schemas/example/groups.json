@@ -1,11 +1,11 @@
 {
   "entity": {
-    "name": "twakeGroup",
+    "name": "mailingList",
     "mainAttribute": "cn",
     "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
-    "singularName": "group",
-    "pluralName": "groups",
-    "base": "ou=groups,__ldap_base__"
+    "singularName": "mailingList",
+    "pluralName": "mailingLists",
+    "base": "ou=lists,ou=groups,__ldap_base__"
   },
   "strict": true,
   "attributes": {
@@ -22,9 +22,10 @@
     "cn": {
       "type": "string",
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
-      "hint": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
+      "hint": "Must match an email local part, at most 64 characters, no consecutive dots",
       "required": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": "Mailing list name"
     },
     "description": {
       "type": "string",
@@ -32,9 +33,9 @@
     },
     "mail": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "hint": "Expected an email address, e.g. all-staff@lists.example.org",
-      "required": false,
+      "test": "^[^@\\s]{1,64}@([^@\\s]{1,245}\\.)?example\\.org$",
+      "hint": "Expected an address in example.org or one of its subdomains",
+      "required": true,
       "unique": {
         "attributes": ["mailAlternateAddress"],
         "branches": ["__LDAP_BASE__"]
@@ -48,15 +49,7 @@
       "branch": ["ou=twakeListType,ou=nomenclature,__LDAP_BASE__"],
       "required": false,
       "role": "writePolicy",
-      "label": "List type",
-      "group": "Mailbox Settings"
-    },
-    "twakeMailboxType": {
-      "type": "pointer",
-      "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
-      "group": "Mailbox Settings",
-      "required": false,
-      "role": "mailboxType"
+      "label": "List type"
     },
     "member": {
       "type": "array",
@@ -66,13 +59,15 @@
         "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "members"
+      "deleteGuard": "nonEmpty",
+      "role": "members",
+      "label": "Members"
     },
     "owner": {
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
@@ -80,9 +75,10 @@
     },
     "twakeDepartmentLink": {
       "type": "pointer",
-      "branch": ["__LDAP_BASE__"],
+      "branch": ["ou=organization,__LDAP_BASE__"],
       "required": true,
-      "role": "organizationLink"
+      "role": "organizationLink",
+      "label": "Department"
     },
     "twakeDepartmentPath": {
       "type": "string",
