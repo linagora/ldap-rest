@@ -250,8 +250,16 @@ export function ldapToScimUser(
     }
   }
 
-  // active: true if pwdAccountLockedTime is not set (reasonable default)
-  out.active = entry['pwdAccountLockedTime'] == null;
+  // active: true unless the lock attribute is set. It is operational, so it
+  // is only here when the search asked for it by name — see LOCK_ATTRIBUTE
+  // and its use in the users plugin. Without that this read
+  // `undefined == null` and answered `true` for every account, including the
+  // locked ones.
+  //
+  // Once asked for, an attribute the entry does not hold comes back as an
+  // empty array rather than absent, and `[] == null` is false — so the
+  // emptiness has to be tested, not the presence of a key.
+  out.active = !isLocked(entry);
 
   // meta
   if (id) {
@@ -402,8 +410,32 @@ export function scimGroupToLdap(
  * List of LDAP attributes to request from the directory so all
  * mapped SCIM attributes can be populated.
  */
-export function requiredLdapAttributes(mapping: ResourceMapping): string[] {
-  const attrs = new Set<string>(['objectClass', ...OPERATIONAL_ATTRIBUTES]);
+/**
+ * The ppolicy overlay's lock marker, whose presence means `active: false`.
+ *
+ * Operational, so a search that does not name it never answers it: the read
+ * path has to ask for it explicitly.
+ */
+export const LOCK_ATTRIBUTE = 'pwdAccountLockedTime';
+
+/** Is this entry locked, per the ppolicy lock marker? */
+export function isLocked(entry: AttributesList): boolean {
+  const raw = entry[LOCK_ATTRIBUTE];
+  if (raw == null) return false;
+  // A directory answers an attribute it does not hold as an empty array.
+  if (Array.isArray(raw)) return raw.length > 0;
+  return String(raw).length > 0;
+}
+
+export function requiredLdapAttributes(
+  mapping: ResourceMapping,
+  extra: string[] = []
+): string[] {
+  const attrs = new Set<string>([
+    'objectClass',
+    ...OPERATIONAL_ATTRIBUTES,
+    ...extra,
+  ]);
   for (const m of mapping.entries) {
     if (m.ldap) attrs.add(m.ldap);
     if (m.ldapPrimary) attrs.add(m.ldapPrimary);

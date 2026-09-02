@@ -264,6 +264,10 @@ class Parser {
       const opName = op.value.toLowerCase();
       if (opName === 'pr') {
         const ldapAttr = this.resolvePath(path);
+        // `active` is not an LDAP attribute: emitting `(active=*)` would send
+        // an undefined attribute type to the directory. Every user we return
+        // carries an `active` value, so the presence test matches them all.
+        if (ldapAttr === 'active') return '(objectClass=*)';
         return `(${ldapAttr}=*)`;
       }
       if (!KEYWORDS.has(opName) || ['and', 'or', 'not'].includes(opName)) {

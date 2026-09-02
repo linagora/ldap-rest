@@ -25,6 +25,24 @@
   only ever cleared when the operation was unknown, so the map grew by one
   entry per modify for the lifetime of the process
 
+- `plugins/scim`: `active` was answered as `true` for every user, locked ones
+  included. It is read from the presence of `pwdAccountLockedTime`, which is
+  operational: no search named it, so it was never in the entry and the test
+  read `undefined == null`. A provisioning system reading this back saw a
+  disabled account as enabled
+
+- `plugins/scim`: a filter on `active pr` emitted `(active=*)`. `active` is
+  not an LDAP attribute, so the directory refused the search with
+  `attribute type undefined` and a filter RFC 7644 allows answered a server
+  error
+
+- `plugins/scim`: a `PATCH` whose operations all translated to no LDAP change
+  answered `200` without reaching `ldapActions`, where write permission is
+  checked — so an identity with read and no write was told its write had
+  succeeded. Nothing was written either way, but a provisioning system
+  records the answer as applied. The empty change set now goes through the
+  same call, which authorizes and then touches nothing
+
 ## v0.6.1 (2026-09-02)
 
 ### Breaking Changes

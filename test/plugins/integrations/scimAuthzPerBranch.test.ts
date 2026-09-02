@@ -313,6 +313,28 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     expect(entry.displayName || []).to.have.lengthOf(0);
   });
 
+  it('a PATCH that changes nothing is still a write', async () => {
+    await createUser('writer', 'alice').expect(201);
+
+    // A PATCH whose operations all turn out to be no-ops used to return
+    // early, before `ldapActions.modify` — which is where write permission
+    // is checked. An identity with read and no write was told its write had
+    // succeeded. Nothing was written either way, but the answer was a lie,
+    // and a provisioning system records it as applied.
+    const res = await supertest(server.app)
+      .patch('/scim/v2/Users/alice')
+      .set('x-scim-user', 'reader')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        // An implicit-path replace with nothing in it: the smallest body
+        // that translates to no LDAP change at all.
+        Operations: [{ op: 'replace', value: {} }],
+      })
+      .expect(403);
+    expect(JSON.stringify(res.body)).to.not.match(/\[authz-forbidden\]/);
+  });
+
   it('reader (delete denied) CANNOT delete a user, writer CAN', async () => {
     await createUser('writer', 'alice').expect(201);
 
