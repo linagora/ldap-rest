@@ -356,6 +356,30 @@ willing to calculate or process". Raise the flag, or narrow the query.
 If the directory's own size limit is lower than the collection, it refuses the
 search first and the answer is the same `tooMany` — raise `sizelimit` in slapd.
 
+## Partial representations (`attributes` / `excludedAttributes`)
+
+Any route that answers a resource accepts the two RFC 7644 §3.9 parameters —
+the lists, the single-resource GETs, and the POST/PUT/PATCH answers alike.
+
+```bash
+curl '.../Users/alice?attributes=userName,name.familyName'
+curl '.../Users?excludedAttributes=emails'
+```
+
+- `attributes` replaces the default set: only what you name comes back.
+- `excludedAttributes` keeps the default set minus what you name.
+- Both accept standard attribute notation, so `name.familyName` and
+  `emails.value` narrow a complex or multi-valued attribute rather than
+  dropping it whole, and a core schema URN prefix is accepted and stripped.
+- `id` and `schemas` are `returned: always` (RFC 7643 §7): they survive an
+  exclusion and are added back to an `attributes` list.
+- `meta` is `returned: default`, so an `attributes` list that does not name it
+  does not get it. Ask for `meta` explicitly if you need `meta.location`.
+- The two are mutually exclusive; sending both answers `400 invalidValue`.
+
+The projection applies to the response only — the LDAP search still reads the
+attributes the mapping needs.
+
 ## Multi-tenant: per-user LDAP bases
 
 SCIM does not expose any tenant concept to clients — resource `id`s are opaque
