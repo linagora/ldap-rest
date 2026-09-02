@@ -52,6 +52,86 @@ export interface PatchContext {
   lockValue?: string;
   /** True when this resource type carries SCIM `active` (Users only). */
   supportsActive?: boolean;
+  /**
+   * The entry as it stands. RFC 7644 section 3.5.2 applies operations in
+   * order, so they are played against this and only the resulting difference
+   * is sent — without it, two operations touching one attribute would
+   * collapse into whichever the emitter happened to keep.
+   */
+  current: AttributesList;
+}
+
+/** Attribute values as a plain list, whatever ldapts handed back. */
+function asValues(v: AttributeValue | undefined): string[] {
+  if (v == null) return [];
+  if (Array.isArray(v))
+    return v.map(x => (Buffer.isBuffer(x) ? x.toString() : String(x)));
+  if (Buffer.isBuffer(v)) return [v.toString()];
+  const s = String(v);
+  return s.length > 0 ? [s] : [];
+}
+
+/**
+ * The entry being patched, as the operations see it.
+ *
+ * Operations mutate this in order; `diff()` then says what the directory
+ * must be told. Two consequences fall out. A later operation on an attribute
+ * wins over an earlier one, as RFC 7644 section 3.5.2 requires. And a
+ * deletion is emitted only for something that was really there, so a removal
+ * of an attribute the entry never held — or one an earlier operation of the
+ * same request added and this one takes back — sends nothing rather than
+ * failing the whole modify with noSuchAttribute.
+ */
+class WorkingEntry {
+  private readonly values = new Map<string, string[]>();
+  private readonly touched = new Set<string>();
+
+  constructor(private readonly current: AttributesList) {}
+
+  get(attr: string): string[] {
+    if (!this.values.has(attr))
+      this.values.set(attr, asValues(this.current[attr]));
+    return this.values.get(attr) as string[];
+  }
+
+  set(attr: string, values: string[]): void {
+    this.touched.add(attr);
+    this.values.set(attr, values);
+  }
+
+  append(attr: string, values: string[]): void {
+    const kept = this.get(attr);
+    this.set(attr, [...kept, ...values.filter(v => !kept.includes(v))]);
+  }
+
+  drop(attr: string, values?: string[]): void {
+    if (!values) return this.set(attr, []);
+    this.set(
+      attr,
+      this.get(attr).filter(v => !values.includes(v))
+    );
+  }
+
+  diff(): ModifyRequest {
+    const req: ModifyRequest = {};
+    for (const attr of this.touched) {
+      const before = asValues(this.current[attr]);
+      const after = this.get(attr);
+      const same =
+        before.length === after.length && before.every(v => after.includes(v));
+      if (same) continue;
+      if (after.length === 0) {
+        // Nothing to delete if it was not there to begin with.
+        if (before.length === 0) continue;
+        if (!req.delete) req.delete = {};
+        (req.delete as AttributesList)[attr] = '';
+        continue;
+      }
+      if (!req.replace) req.replace = {};
+      req.replace[attr] = after.length === 1 ? after[0] : after;
+    }
+    return req;
+  }
 }
 
 /**
@@ -167,34 +247,13 @@ function coerceValue(v: unknown): string | string[] | undefined {
   return undefined;
 }
 
-function mergeAttr(
-  target: AttributesList,
-  attr: string,
-  value: string | string[]
-): void {
-  const existing = target[attr];
-  if (existing == null) {
-    target[attr] = value;
-    return;
-  }
-  const asArr = (v: AttributeValue): string[] =>
-    Array.isArray(v)
-      ? v.map(x => (typeof x === 'string' ? x : x.toString()))
-      : [typeof v === 'string' ? v : v.toString()];
-  const combined = [
-    ...asArr(existing),
-    ...(Array.isArray(value) ? value : [value]),
-  ];
-  target[attr] = combined;
-}
-
 /**
- * Apply a PATCH operation by mutating an in-progress ModifyRequest.
- * For member-related ops on Groups, caller must supply resolveMemberRef.
+ * Apply one PATCH operation to the working entry, in the order it was sent.
+ * For member operations on Groups the caller supplies `resolveMemberRef`.
  */
 async function applyOperation(
   op: PatchOperation,
-  req: ModifyRequest,
+  entry: WorkingEntry,
   ctx: PatchContext
 ): Promise<void> {
   const operation = normalizeOp(op.op);
@@ -217,7 +276,7 @@ async function applyOperation(
     }
     const valueObj = op.value as Record<string, unknown>;
     for (const [scimAttr, v] of Object.entries(valueObj)) {
-      await applyOperation({ op: op.op, path: scimAttr, value: v }, req, ctx);
+      await applyOperation({ op: op.op, path: scimAttr, value: v }, entry, ctx);
     }
     return;
   }
@@ -226,13 +285,14 @@ async function applyOperation(
 
   // Special: members on Groups
   if (top === 'members') {
-    if (!ctx.resolveMemberRef) {
+    const resolveMemberRef = ctx.resolveMemberRef;
+    if (!resolveMemberRef) {
       throw scimNoTarget('Member operations require a member resolver');
     }
-    if (operation === 'add') {
-      const values = Array.isArray(op.value) ? op.value : [op.value];
+    const asMemberValues = async (value: unknown): Promise<string[]> => {
+      const list = Array.isArray(value) ? value : [value];
       const dns: string[] = [];
-      for (const v of values) {
+      for (const v of list) {
         const memberValue =
           typeof v === 'string'
             ? v
@@ -240,84 +300,31 @@ async function applyOperation(
               ? String((v as { value: unknown }).value)
               : '';
         if (!memberValue) continue;
-        const dn = await ctx.resolveMemberRef(memberValue);
+        const dn = await resolveMemberRef(memberValue);
         if (dn) dns.push(dn);
       }
-      if (dns.length > 0) {
-        if (!req.add) req.add = {};
-        mergeAttr(req.add, memberAttr, dns);
-      }
-      return;
-    }
-    if (operation === 'remove') {
-      // Two cases:
-      //  - path "members" with no filter but with `value` listing members → remove those
-      //  - path 'members[value eq "abc"]' → filter identifies members
-      const collectFromValue = (): string[] => {
-        if (op.value == null) return [];
-        const arr = Array.isArray(op.value) ? op.value : [op.value];
-        return arr
-          .map(v =>
-            typeof v === 'string'
-              ? v
-              : typeof v === 'object' && v != null && 'value' in v
-                ? String((v as { value: unknown }).value)
-                : ''
-          )
-          .filter(Boolean);
-      };
-      const collectFromFilter = (): string[] => {
-        if (!filter) return [];
-        const fm = /value\s+eq\s+"([^"]+)"/i.exec(filter);
-        return fm ? [fm[1]] : [];
-      };
-      const ids = [...collectFromFilter(), ...collectFromValue()];
-      const dns: string[] = [];
-      for (const id of ids) {
-        const dn = await ctx.resolveMemberRef(id);
-        if (dn) dns.push(dn);
-      }
-      if (dns.length > 0) {
-        if (!req.delete) req.delete = {};
-        if (Array.isArray(req.delete)) {
-          // Not expected: would have been initialized as array elsewhere.
-          req.delete = { [memberAttr]: dns };
-        } else {
-          mergeAttr(req.delete, memberAttr, dns);
-        }
-      } else if (!filter && !op.value) {
-        // Remove all members
-        if (!req.delete) req.delete = {};
-        if (Array.isArray(req.delete)) {
-          req.delete.push(memberAttr);
-        } else {
-          req.delete[memberAttr] = '';
-        }
-      }
+      return dns;
+    };
+
+    if (operation === 'add') {
+      entry.append(memberAttr, await asMemberValues(op.value));
       return;
     }
     if (operation === 'replace') {
-      // replace: remove existing members, add new
-      // ldapts modify with { replace: { member: [...] } } → same semantic
-      const values = Array.isArray(op.value) ? op.value : [op.value];
-      const dns: string[] = [];
-      for (const v of values) {
-        const memberValue =
-          typeof v === 'string'
-            ? v
-            : typeof v === 'object' && v != null && 'value' in v
-              ? String((v as { value: unknown }).value)
-              : '';
-        if (!memberValue) continue;
-        const dn = await ctx.resolveMemberRef(memberValue);
-        if (dn) dns.push(dn);
-      }
-      if (dns.length > 0) {
-        if (!req.replace) req.replace = {};
-        req.replace[memberAttr] = dns;
-      }
+      entry.set(memberAttr, await asMemberValues(op.value));
       return;
     }
+    // remove: either `members[value eq "x"]`, or `members` plus a value list,
+    // or bare `members`, which takes them all.
+    const fromFilter = filter
+      ? (/value\s+eq\s+"([^"]+)"/i.exec(filter)?.[1] ?? '')
+      : '';
+    const named = [
+      ...(fromFilter ? await asMemberValues(fromFilter) : []),
+      ...(op.value != null ? await asMemberValues(op.value) : []),
+    ];
+    entry.drop(memberAttr, named.length > 0 ? named : undefined);
+    return;
   }
 
   // Special: `active` on Users. RFC 7643 section 4.1.1 makes it readWrite,
@@ -331,14 +338,8 @@ async function applyOperation(
     const lockAttr = ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
     // `remove active` restores the default, which is an active account.
     const wanted = operation === 'remove' ? true : activeValue(op.value);
-    if (wanted) {
-      if (!req.delete) req.delete = {};
-      if (Array.isArray(req.delete)) req.delete.push(lockAttr);
-      else req.delete[lockAttr] = '';
-    } else {
-      if (!req.replace) req.replace = {};
-      req.replace[lockAttr] = ctx.lockValue || DEFAULT_LOCK_VALUE;
-    }
+    if (wanted) entry.drop(lockAttr);
+    else entry.set(lockAttr, [ctx.lockValue || DEFAULT_LOCK_VALUE]);
     return;
   }
 
@@ -359,12 +360,7 @@ async function applyOperation(
   }
 
   if (operation === 'remove') {
-    if (!req.delete) req.delete = {};
-    if (Array.isArray(req.delete)) {
-      req.delete.push(ldapAttr);
-    } else {
-      req.delete[ldapAttr] = '';
-    }
+    entry.drop(ldapAttr);
     return;
   }
 
@@ -372,17 +368,9 @@ async function applyOperation(
   if (value == null) {
     throw scimInvalidValue(`PATCH ${op.op} ${op.path} missing value`);
   }
-
-  if (operation === 'add') {
-    if (!req.add) req.add = {};
-    mergeAttr(req.add, ldapAttr, value);
-    return;
-  }
-  if (operation === 'replace') {
-    if (!req.replace) req.replace = {};
-    req.replace[ldapAttr] = value;
-    return;
-  }
+  const values = Array.isArray(value) ? value : [value];
+  if (operation === 'add') entry.append(ldapAttr, values);
+  else entry.set(ldapAttr, values);
 }
 
 export async function patchToModifyRequest(
@@ -392,11 +380,11 @@ export async function patchToModifyRequest(
   if (!patch.Operations || !Array.isArray(patch.Operations)) {
     throw scimInvalidValue('Missing Operations array');
   }
-  const req: ModifyRequest = {};
+  const entry = new WorkingEntry(ctx.current);
   for (const op of patch.Operations) {
-    await applyOperation(op, req, ctx);
+    await applyOperation(op, entry, ctx);
   }
-  return req;
+  return entry.diff();
 }
 
 /**

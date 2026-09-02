@@ -636,6 +636,109 @@ describe('SCIM Users (integration)', function () {
     });
   });
 
+  describe('operations apply in order (RFC 7644 section 3.5.2)', () => {
+    beforeEach(async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+        })
+        .expect(201);
+    });
+
+    it('the last operation on an attribute wins', async () => {
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'First' },
+            { op: 'replace', path: 'displayName', value: 'Second' },
+          ],
+        })
+        .expect(200);
+      expect(res.body.displayName).to.equal('Second');
+    });
+
+    it('the last operation on active wins from an active account', async () => {
+      // Both operations land on the same LDAP attribute. The first wrote it
+      // and the second deleted it, but the entry held no lock to delete, so
+      // the deletion was dropped and the account ended locked — the opposite
+      // of what the last operation asked.
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'active', value: false },
+            { op: 'replace', path: 'active', value: true },
+          ],
+        })
+        .expect(200);
+      expect(res.body.active).to.be.true;
+    });
+
+    it('the last operation on active wins from a locked account', async () => {
+      await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: false }],
+        })
+        .expect(200);
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'active', value: true },
+            { op: 'replace', path: 'active', value: false },
+          ],
+        })
+        .expect(200);
+      expect(res.body.active).to.be.false;
+    });
+
+    it('setting then removing an attribute leaves it absent', async () => {
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'add', path: 'title', value: 'contractor' },
+            { op: 'remove', path: 'title' },
+          ],
+        })
+        .expect(200);
+      expect(res.body).to.not.have.property('title');
+    });
+
+    it('a no-op removal does not take its neighbours down', async () => {
+      // One removal of an attribute the entry does not hold used to fail the
+      // whole atomic modify with noSuchAttribute.
+      const res = await supertest(server.app)
+        .patch('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'remove', path: 'title' },
+            { op: 'replace', path: 'displayName', value: 'Kept' },
+          ],
+        })
+        .expect(200);
+      expect(res.body.displayName).to.equal('Kept');
+    });
+  });
+
   describe('a lock attribute the directory does not know', () => {
     let badServer: DM;
     let badPlugin: Scim;

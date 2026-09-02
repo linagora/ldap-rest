@@ -71,21 +71,6 @@ export interface ScimUsersOptions {
   hooks: { [K: string]: Function[] | undefined };
 }
 
-/**
- * Does this entry actually hold `attr`?
- *
- * ldapts answers an attribute that was requested but is absent as an empty
- * array, which is the case to catch. A present attribute counts however it
- * renders — an empty string or a zero-length Buffer is still there as far as
- * the directory is concerned, and deleting it would succeed.
- */
-function entryHas(entry: AttributesList, attr: string): boolean {
-  const v = entry[attr];
-  if (v == null) return false;
-  if (Array.isArray(v)) return v.length > 0;
-  return true;
-}
-
 /** Does this change set write or clear the attribute backing `active`? */
 function touchesLock(changes: ModifyRequest, lockAttribute: string): boolean {
   if (changes.replace && lockAttribute in changes.replace) return true;
@@ -94,31 +79,6 @@ function touchesLock(changes: ModifyRequest, lockAttribute: string): boolean {
   if (Array.isArray(del)) return del.includes(lockAttribute);
   if (del && typeof del === 'object') return lockAttribute in del;
   return false;
-}
-
-/**
- * Drop from `changes.delete` every attribute the entry does not hold.
- *
- * LDAP answers noSuchAttribute (0x10) when asked to delete an absent
- * attribute, and that failure takes the whole atomic modify with it — so one
- * no-op removal in a PATCH would undo the operations sent alongside it.
- */
-function pruneAbsentDeletes(
-  changes: ModifyRequest,
-  entry: AttributesList
-): void {
-  if (!changes.delete) return;
-  if (Array.isArray(changes.delete)) {
-    changes.delete = changes.delete.filter(attr => entryHas(entry, attr));
-    if (changes.delete.length === 0) delete changes.delete;
-    return;
-  }
-  const kept: AttributesList = {};
-  for (const [attr, value] of Object.entries(changes.delete)) {
-    if (entryHas(entry, attr)) kept[attr] = value;
-  }
-  if (Object.keys(kept).length === 0) delete changes.delete;
-  else changes.delete = kept;
 }
 
 export class ScimUsers {
@@ -465,11 +425,8 @@ export class ScimUsers {
       lockAttribute: this.lockAttribute,
       lockValue: this.lockValue,
       supportsActive: true,
+      current,
     });
-    // Deleting an attribute the entry does not hold answers noSuchAttribute
-    // (0x10) and fails the whole modify. `active: true` on an already-active
-    // account is exactly that case, and identity providers send it routinely.
-    pruneAbsentDeletes(changes, current);
     // An empty change set still goes to ldapActions rather than returning
     // early: `ldapmodifyrequest` — where write permission is checked — runs
     // before the changes are examined, and an empty one touches the

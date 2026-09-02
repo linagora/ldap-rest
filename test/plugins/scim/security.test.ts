@@ -24,7 +24,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: '__proto__', value: 'polluted' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -40,7 +40,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: 'constructor', value: 'x' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -55,7 +55,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: 'name.prototype', value: 'x' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -94,7 +94,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: 'name.__proto__', value: 'leak' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
       } catch {
         /* expected */
@@ -115,7 +115,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: malicious, value: 'x' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
       } catch {
         /* expected invalidPath */
@@ -134,7 +134,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: oversize, value: 'x' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -149,7 +149,7 @@ describe('SCIM security hardening', () => {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
             Operations: [{ op: 'add', path: 'emails[broken', value: 'x' }],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -174,7 +174,7 @@ describe('SCIM security hardening', () => {
             },
           ],
         },
-        { mapping: DEFAULT_USER_MAPPING }
+        { mapping: DEFAULT_USER_MAPPING, current: {} }
       );
       expect(req.replace).to.deep.equal({
         mail: ['a@b.com', 'c@d.com'],
@@ -194,7 +194,7 @@ describe('SCIM security hardening', () => {
               },
             ],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
@@ -218,7 +218,7 @@ describe('SCIM security hardening', () => {
               },
             ],
           },
-          { mapping: DEFAULT_USER_MAPPING }
+          { mapping: DEFAULT_USER_MAPPING, current: {} }
         );
         expect.fail('should have thrown');
       } catch (err) {
