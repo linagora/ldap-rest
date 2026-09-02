@@ -139,6 +139,38 @@ Fixed attributes:
 - Cannot be modified after creation
 - Cannot be deleted
 
+### Naming things, in the reader's language
+
+`label` is what a client shows instead of the attribute name, and `entity.label`
+/ `entity.singularLabel` are what it calls the collection and one of its
+entries. Each may be a plain string, or a map keyed by language tag:
+
+```json
+{
+  "entity": {
+    "name": "twakeUser",
+    "singularName": "user",
+    "pluralName": "users",
+    "label": { "en": "Users", "fr": "Utilisateurs" },
+    "singularLabel": { "en": "user", "fr": "utilisateur" }
+  },
+  "attributes": {
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "role": "organizationLink",
+      "label": { "en": "Department", "fr": "Organisation" }
+    }
+  }
+}
+```
+
+These words name _your_ entities and attributes, so their translations belong
+in your schemas rather than in a catalogue shipped with the product — which is
+also why an interface can be fully translated without the product learning what
+you call a department. A client picks the exact tag, then its language, then
+English, then whatever the map does hold; with no label at all it falls back to
+the attribute name made readable.
+
 ### Explaining a pattern: `hint`
 
 A `test` tells the server what to refuse. A `hint` tells the person what to

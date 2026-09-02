@@ -5,7 +5,15 @@
     "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
     "singularName": "user",
     "pluralName": "users",
-    "base": "ou=users,__ldap_base__"
+    "base": "ou=users,__ldap_base__",
+    "label": {
+      "en": "Users",
+      "fr": "Utilisateurs"
+    },
+    "singularLabel": {
+      "en": "user",
+      "fr": "utilisateur"
+    }
   },
   "strict": true,
   "attributes": {
@@ -31,6 +39,10 @@
         "lowercase": true,
         "strip": "[^a-zA-Z0-9._-]",
         "onCollision": "suffix"
+      },
+      "label": {
+        "en": "Identifier",
+        "fr": "Identifiant"
       }
     },
     "employeeNumber": {
@@ -38,30 +50,52 @@
       "required": false,
       "unique": true,
       "role": "employeeId",
-      "label": "Employee ID"
+      "label": {
+        "en": "Employee ID",
+        "fr": "Matricule"
+      }
     },
     "cn": {
       "type": "string",
       "required": true,
-      "role": "displayName"
+      "role": "displayName",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "sn": {
       "type": "string",
-      "required": true
+      "required": true,
+      "label": {
+        "en": "Last name",
+        "fr": "Nom de famille"
+      }
     },
     "givenName": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "First name",
+        "fr": "Prénom"
+      }
     },
     "displayName": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Display name",
+        "fr": "Nom affiché"
+      }
     },
     "personalTitle": {
       "type": "pointer",
       "branch": ["ou=twakeTitle,ou=nomenclature,__LDAP_BASE__"],
       "required": false,
-      "label": "Title"
+      "label": {
+        "en": "Title",
+        "fr": "Civilité"
+      }
     },
     "title": {
       "type": "pointer",
@@ -69,12 +103,18 @@
       "required": false,
       "referentialIntegrity": "restrict",
       "role": "position",
-      "label": "Position"
+      "label": {
+        "en": "Position",
+        "fr": "Poste"
+      }
     },
     "description": {
       "type": "string",
       "required": false,
-      "label": "Comment"
+      "label": {
+        "en": "Comment",
+        "fr": "Commentaire"
+      }
     },
     "mail": {
       "type": "string",
@@ -86,7 +126,11 @@
         "branches": ["__LDAP_BASE__"]
       },
       "mailDomainScope": "organization",
-      "role": "primaryEmail"
+      "role": "primaryEmail",
+      "label": {
+        "en": "Email",
+        "fr": "Adresse électronique"
+      }
     },
     "mailAlternateAddress": {
       "type": "array",
@@ -101,7 +145,11 @@
         "branches": ["__LDAP_BASE__"]
       },
       "mailDomainScope": "organization",
-      "role": "emailAliases"
+      "role": "emailAliases",
+      "label": {
+        "en": "Email aliases",
+        "fr": "Alias"
+      }
     },
     "twakeOtherMailbox": {
       "type": "array",
@@ -111,13 +159,21 @@
         "hint": "Expected an email address, e.g. jane.doe@example.org"
       },
       "required": false,
-      "group": "Mailbox Settings"
+      "group": "Mailbox Settings",
+      "label": {
+        "en": "Other mailboxes",
+        "fr": "Autres boîtes"
+      }
     },
     "mailQuota": {
       "type": "number",
       "required": false,
       "role": "emailQuota",
-      "group": "Mailbox Settings"
+      "group": "Mailbox Settings",
+      "label": {
+        "en": "Mail quota",
+        "fr": "Quota"
+      }
     },
     "mailQuotaSize": {
       "type": "number",
@@ -125,53 +181,92 @@
       "role": "emailQuotaSize",
       "normalize": "byteSize",
       "hint": "Expected pattern xGB, xMB, xKB or a number of bytes",
-      "group": "Mailbox Settings"
+      "group": "Mailbox Settings",
+      "label": {
+        "en": "Mailbox size",
+        "fr": "Taille de boîte"
+      }
     },
     "telephoneNumber": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Phone",
+        "fr": "Téléphone"
+      }
     },
     "mobile": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Mobile",
+        "fr": "Mobile"
+      }
     },
     "postalAddress": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Address",
+        "fr": "Adresse"
+      }
     },
     "postalCode": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Zip code",
+        "fr": "Code postal"
+      }
     },
     "l": {
       "type": "string",
       "required": false,
-      "label": "Locality"
+      "label": {
+        "en": "Locality",
+        "fr": "Commune"
+      }
     },
     "userPassword": {
       "type": "string",
       "required": false,
       "role": "password",
-      "neverReturn": true
+      "neverReturn": true,
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe"
+      }
     },
     "pwdReset": {
       "type": "boolean",
       "required": false,
       "role": "passwordReset",
-      "neverReturn": true
+      "neverReturn": true,
+      "label": {
+        "en": "Password reset required",
+        "fr": "Changement de mot de passe requis"
+      }
     },
     "twakeDepartmentLink": {
       "type": "pointer",
       "branch": ["__LDAP_BASE__"],
       "required": true,
-      "role": "organizationLink"
+      "role": "organizationLink",
+      "label": {
+        "en": "Department",
+        "fr": "Organisation"
+      }
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[^\\r\\n]{1,4096}$",
       "required": true,
       "generated": true,
-      "role": "organizationPath"
+      "role": "organizationPath",
+      "label": {
+        "en": "Department path",
+        "fr": "Chemin"
+      }
     },
     "twakeAccountStatus": {
       "type": "pointer",
@@ -185,6 +280,10 @@
         "disabled": "cn=disabled,ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__",
         "noAccess": "cn=noaccess,ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__",
         "toDelete": "cn=todelete,ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__"
+      },
+      "label": {
+        "en": "Status",
+        "fr": "État"
       }
     },
     "twakeDeliveryMode": {
@@ -195,13 +294,21 @@
       },
       "required": false,
       "readOnly": true,
-      "group": "Mailbox Settings"
+      "group": "Mailbox Settings",
+      "label": {
+        "en": "Delivery mode",
+        "fr": "Mode de distribution"
+      }
     },
     "twakeDeletionDate": {
       "type": "date",
       "required": false,
       "role": "accountExpiry",
-      "hint": "Expected a date not earlier than today"
+      "hint": "Expected a date not earlier than today",
+      "label": {
+        "en": "Deletion date",
+        "fr": "Date de suppression"
+      }
     },
     "twakeDelegatedUsers": {
       "type": "array",
@@ -210,7 +317,11 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
-      "group": "Mailbox Settings"
+      "group": "Mailbox Settings",
+      "label": {
+        "en": "Delegates",
+        "fr": "Délégués"
+      }
     },
     "memberOf": {
       "type": "array",
@@ -219,7 +330,11 @@
       },
       "required": false,
       "readOnly": true,
-      "role": "groupMemberships"
+      "role": "groupMemberships",
+      "label": {
+        "en": "Mailing lists",
+        "fr": "Listes de diffusion"
+      }
     }
   }
 }
