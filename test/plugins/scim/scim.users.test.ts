@@ -308,6 +308,77 @@ describe('SCIM Users (integration)', function () {
     });
   });
 
+  describe('active (RFC 7643 section 4.1.1)', () => {
+    beforeEach(async () => {
+      await supertest(server.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe', givenName: 'Alice' },
+        });
+    });
+
+    afterEach(async () => {
+      try {
+        await plugin.ldap.delete(`uid=scim-alice,${userBase}`);
+      } catch {
+        /* ignore */
+      }
+    });
+
+    it('asks the directory for the attribute that decides it', async () => {
+      // `active` is read from the presence of pwdAccountLockedTime, which is
+      // operational: a search that does not name it never answers it, so the
+      // read was `undefined == null` and every account — locked ones
+      // included — came back `active: true`.
+      //
+      // Asserted on the request rather than the answer because proving it
+      // end to end needs a directory with the ppolicy overlay, which the
+      // test directory does not load: writing the attribute here is refused
+      // with `attribute type undefined`.
+      const asked: string[][] = [];
+      const real = plugin.ldap.search.bind(plugin.ldap);
+      plugin.ldap.search = ((
+        options: Record<string, unknown>,
+        ...rest: unknown[]
+      ) => {
+        const attrs = options?.attributes;
+        if (Array.isArray(attrs)) asked.push(attrs as string[]);
+        return (real as (...a: unknown[]) => unknown)(options, ...rest);
+      }) as typeof plugin.ldap.search;
+      try {
+        const res = await supertest(server.app)
+          .get('/scim/v2/Users/scim-alice')
+          .expect(200);
+        expect(res.body.active).to.equal(true);
+      } finally {
+        plugin.ldap.search = real as typeof plugin.ldap.search;
+      }
+      expect(asked).to.not.be.empty;
+      expect(
+        asked.some(a => a.includes('pwdAccountLockedTime')),
+        `attributes requested: ${JSON.stringify(asked)}`
+      ).to.be.true;
+    });
+
+    it('answers "active pr" instead of sending an undefined attribute', async () => {
+      // `active` is not an LDAP attribute. The presence test emitted
+      // `(active=*)`, which the directory refuses with `attribute type
+      // undefined` — so a filter RFC 7644 allows returned a server error.
+      const res = await supertest(server.app)
+        .get(`/scim/v2/Users?filter=${encodeURIComponent('active pr')}`)
+        .expect(200);
+      expect(res.body.totalResults).to.be.greaterThan(0);
+      expect(
+        res.body.Resources.some(
+          (r: { userName: string }) => r.userName === 'scim-alice'
+        )
+      ).to.be.true;
+    });
+  });
+
   describe('Users list & filter', () => {
     beforeEach(async () => {
       await supertest(server.app)

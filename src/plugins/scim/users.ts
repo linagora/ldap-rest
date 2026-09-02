@@ -38,6 +38,7 @@ import {
   ldapToScimUser,
   scimUserToLdap,
   requiredLdapAttributes,
+  LOCK_ATTRIBUTE,
   type MappingContext,
 } from './mapping';
 import { scimFilterToLdap } from './filter';
@@ -134,7 +135,7 @@ export class ScimUsers {
         {
           paged: false,
           scope: 'base',
-          attributes: requiredLdapAttributes(this.mapping),
+          attributes: requiredLdapAttributes(this.mapping, [LOCK_ATTRIBUTE]),
         },
         dn,
         req
@@ -206,7 +207,7 @@ export class ScimUsers {
       ldap: this.ldap,
       base,
       filter: ldapFilter,
-      attributes: requiredLdapAttributes(this.mapping),
+      attributes: requiredLdapAttributes(this.mapping, [LOCK_ATTRIBUTE]),
       startIndex,
       count,
       maxScanned: this.maxScanned,
@@ -282,7 +283,7 @@ export class ScimUsers {
       {
         paged: false,
         scope: 'base',
-        attributes: requiredLdapAttributes(this.mapping),
+        attributes: requiredLdapAttributes(this.mapping, [LOCK_ATTRIBUTE]),
       },
       dn,
       req
@@ -312,6 +313,12 @@ export class ScimUsers {
       'createTimestamp',
       'modifyTimestamp',
       this.rdnAttribute,
+      // Requested by the read path so `active` can be answered truthfully,
+      // but it is not a mapped attribute and nothing writes it in this
+      // release: no body carries it, so the loop below would see it absent
+      // and delete it — releasing on every PUT a lock the directory owns, a
+      // ppolicy auto-lockout or one an administrator set.
+      LOCK_ATTRIBUTE,
     ]);
     const hasAttrValue = (v: unknown): boolean => {
       if (v == null) return false;
@@ -319,7 +326,7 @@ export class ScimUsers {
       if (Array.isArray(v)) return v.length > 0 && v.some(x => x != null);
       return true;
     };
-    for (const attr of requiredLdapAttributes(this.mapping)) {
+    for (const attr of requiredLdapAttributes(this.mapping, [LOCK_ATTRIBUTE])) {
       if (skipAttrs.has(attr)) continue;
       if (attributes[attr] != null) {
         changes.replace![attr] = attributes[attr];
@@ -352,15 +359,13 @@ export class ScimUsers {
     const changes = await patchToModifyRequest(patch, {
       mapping: this.mapping,
     });
-    if (
-      !changes.add &&
-      !changes.replace &&
-      (!changes.delete ||
-        (Array.isArray(changes.delete) && changes.delete.length === 0))
-    ) {
-      return this.get(req, id);
-    }
     const dn = this.dnForId(id, req);
+    // An empty change set still goes to ldapActions rather than returning
+    // early: `ldapmodifyrequest` — where write permission is checked — runs
+    // before the changes are examined, and an empty one touches the
+    // directory not at all. Answering 200 without it told a caller with no
+    // write permission that its write had succeeded.
+    //
     // `req` must reach ldapActions: the authorization plugins hook
     // `ldapmodifyrequest` and skip every check when it is missing.
     await this.ldap.modify(dn, changes, req);
