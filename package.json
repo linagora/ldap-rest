@@ -705,7 +705,8 @@
     "start:dev": "./.dev.mk start",
     "test": "npm run check:ts && mocha",
     "test:dev": "./.dev.mk test",
-    "test:one": "mocha --config .mocharc-one.json"
+    "test:one": "mocha --config .mocharc-one.json",
+    "audit:directory": "tsx scripts/audit-directory.ts"
   },
   "overrides": {
     "diff": ">=8.0.3",

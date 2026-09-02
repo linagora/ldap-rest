@@ -89,6 +89,13 @@
   untracked `scripts/client-values.txt` — a list of forbidden names has no
   business being published either
 
+- `npm run audit:directory` reads a branch and reports what a schema would
+  refuse — the patterns, the required attributes and the pointer branches —
+  quoting each rule's own `hint` so the fix and the rule read alike. Tightening
+  a pattern says nothing about the entries already stored, and finding out one
+  support ticket at a time is the expensive way. See
+  [directory-audit](docs/usage/directory-audit.md)
+
 - `--organization-schema` is settable on the command line. It was declared in
   the configuration type but never registered as an option, so only a plugin
   override could reach it
