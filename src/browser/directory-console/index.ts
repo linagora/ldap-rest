@@ -22,7 +22,7 @@ export {
   roleAttribute,
 } from './api/ConsoleApiClient';
 export { EntityForm } from './components/EntityForm';
-export { EntityList, SEARCH_MINIMUM } from './components/EntityList';
+export { EntityList, SEARCH_MINIMUM, csvCell } from './components/EntityList';
 export { EntityDetail } from './components/EntityDetail';
 export { OrganizationTree } from './components/OrganizationTree';
 export { Translator, availableLanguages } from './i18n';

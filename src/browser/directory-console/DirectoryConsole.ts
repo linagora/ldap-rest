@@ -116,7 +116,17 @@ export class DirectoryConsole {
   /** Read `#/entity/id` into the current route. */
   private readRoute(): void {
     const hash = window.location.hash.replace(/^#\/?/, '');
-    const [first, second] = hash.split('/').map(decodeURIComponent);
+    // A hash is typed, pasted and mailed around, so it is not always the one
+    // `go()` wrote: `#/users/50%` throws out of `decodeURIComponent`, and an
+    // exception here leaves the console on "Loading…" for good. A segment
+    // that does not decode is taken as it stands.
+    const [first, second] = hash.split('/').map(segment => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    });
     if (!first) {
       this.route = { view: 'dashboard' };
       return;
