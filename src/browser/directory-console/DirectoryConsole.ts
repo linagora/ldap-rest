@@ -47,7 +47,7 @@ export class DirectoryConsole {
 
   constructor(options: ConsoleOptions) {
     this.options = options;
-    this.api = new ConsoleApiClient(options.apiBaseUrl);
+    this.api = new ConsoleApiClient(options.apiBaseUrl, options.apiPrefix);
     this.translator = new Translator(options.language || this.storedLanguage());
   }
 

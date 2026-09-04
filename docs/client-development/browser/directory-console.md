@@ -33,9 +33,18 @@ node bin/index.mjs --plugin core/static --static-path . …
 new DirectoryConsole({
   containerId: 'console',
   apiBaseUrl: 'https://directory.example.org', // defaults to the page's origin
+  apiPrefix: '/ldap', // only if the server does not serve the API under `/api`
   language: 'fr', // defaults to the browser's, falling back to English
 });
 ```
+
+`apiPrefix` exists because everything else is asked at the prefix
+`GET {apiPrefix}/v1/config` advertises — and that one request has nothing to
+read it from. A server started without `--api-prefix` needs neither option.
+
+An `apiBaseUrl` on another origin makes every call a cross-origin one, sent
+with credentials: that deployment has to allow the console's origin _and_
+credentials in its CORS policy, or the browser drops the answer.
 
 ## What the server has to expose
 
