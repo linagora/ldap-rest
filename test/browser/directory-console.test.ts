@@ -284,6 +284,20 @@ describe('Directory console', () => {
       );
       expect(children.map(node => node.name)).to.deep.equal(['EU']);
     });
+
+    it('should read the configuration at the prefix it was given', async () => {
+      // Every other call uses the prefix the configuration advertises. The
+      // call that reads the configuration has nothing to read it from, so a
+      // server behind `--api-prefix /ldap` has to be told once.
+      nock(baseUrl).get('/ldap/v1/config').reply(200, {
+        apiPrefix: '/ldap',
+        ldapBase: 'dc=example,dc=com',
+        features: {},
+      });
+      expect(
+        await new ConsoleApiClient(baseUrl, '/ldap').discover()
+      ).to.deep.equal([]);
+    });
   });
 
   describe('EntityList', () => {

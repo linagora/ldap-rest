@@ -109,6 +109,12 @@ export interface ConsoleOptions {
   containerId: string;
   /** Origin of the API; defaults to the page's own */
   apiBaseUrl?: string;
+  /**
+   * Prefix the server serves its API under, when it is not the default
+   * `/api` — the console reads the rest from `GET {apiPrefix}/v1/config`,
+   * but that first request has nothing to read it from
+   */
+  apiPrefix?: string;
   /** Interface language; defaults to the browser's, falling back to English */
   language?: string;
 }
