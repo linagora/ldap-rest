@@ -134,20 +134,24 @@ export class EntityDetail {
    * route already takes an organization (`#/organizations/<dn>`) and selects
    * it, and the entry names its own one through the `organizationLink` role,
    * so the link goes to the department it is naming.
+   *
+   * An organization carries a path and no link — the path *is* its own place
+   * in the tree, not a way to somewhere else — so on its own card it stays
+   * text. A link from an entry to itself is one more thing to click for
+   * nothing.
    */
   private valueMarkup(name: string, value: string): string {
     const { entity, entry } = this.options;
-    if (name === entity.organizationPath) {
-      const link = entity.organizationLink
+    const link =
+      name === entity.organizationPath && entity.organizationLink
         ? values(entry[entity.organizationLink])[0]
         : undefined;
-      const href = link
-        ? `#/organizations/${encodeURIComponent(link)}`
-        : '#/organizations';
-      return `<a href="${escapeHtml(href)}" class="dc-path-link" title="${escapeHtml(
+    if (link)
+      return `<a href="#/organizations/${encodeURIComponent(
+        link
+      )}" class="dc-path-link" title="${escapeHtml(value)}">${escapeHtml(
         value
-      )}">${escapeHtml(value)}</a>`;
-    }
+      )}</a>`;
     const shown = displayValue(entity.schema.attributes[name], value);
     return `<span class="dc-value" title="${escapeHtml(value)}">${escapeHtml(shown)}</span>`;
   }
