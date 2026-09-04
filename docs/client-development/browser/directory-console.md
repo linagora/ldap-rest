@@ -1,0 +1,142 @@
+# Directory console
+
+A complete administration interface — the equivalent of what an administrator
+does in _Active Directory Users and Computers_ and in the _Exchange Admin
+Center_, served by `ldap-rest` itself.
+
+It is built entirely from what the server advertises. `GET /v1/config` gives
+the entities, their schemas and their endpoints; `GET /v1/authz/scope` gives
+what the signed-in administrator may do. No entity name, attribute name or
+label is written in the console, so a deployment that names its things
+differently gets its own interface without a change.
+
+## Using it
+
+```html
+<link rel="stylesheet" href="/static/browser/directory-console.css" />
+<div id="console"></div>
+<script type="module">
+  import { DirectoryConsole } from '/static/browser/directory-console.esm.js';
+  await new DirectoryConsole({ containerId: 'console' }).init();
+</script>
+```
+
+A ready-made page ships with the repository. Serve the repository root and
+open it:
+
+```sh
+node bin/index.mjs --plugin core/static --static-path . …
+# http://localhost:8081/static/examples/web/directory-console.html
+```
+
+```ts
+new DirectoryConsole({
+  containerId: 'console',
+  apiBaseUrl: 'https://directory.example.org', // defaults to the page's origin
+  apiPrefix: '/ldap', // only if the server does not serve the API under `/api`
+  language: 'fr', // defaults to the browser's, falling back to English
+});
+```
+
+`apiPrefix` exists because everything else is asked at the prefix
+`GET {apiPrefix}/v1/config` advertises — and that one request has nothing to
+read it from. A server started without `--api-prefix` needs neither option.
+
+An `apiBaseUrl` on another origin makes every call a cross-origin one, sent
+with credentials: that deployment has to allow the console's origin _and_
+credentials in its CORS policy, or the browser drops the answer.
+
+## What the server has to expose
+
+| Plugin                       | What the console does with it                      |
+| ---------------------------- | -------------------------------------------------- |
+| `core/configApi`             | Discovers the entities and their schemas           |
+| `core/ldap/flatGeneric`      | Lists, reads, creates, updates and deletes entries |
+| `core/ldap/groups`           | Same, for groups                                   |
+| `core/ldap/organizations`    | The tree, with `--organization-schema` set         |
+| `core/ldap/accountLifecycle` | The state and password actions on an account       |
+| `core/auth/authzScope`       | The scope banner, and which actions to offer       |
+
+Only `core/configApi` and one entity plugin are required; the rest add
+capabilities as they are loaded.
+
+## What the schema drives
+
+Everything the console shows about an attribute comes from its schema
+definition — see [flat-generic](../../usage/plugins/ldap/flat-generic.md).
+
+| Schema                  | Effect in the interface                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `label`                 | Column heading, field label, term in the detail card                      |
+| `hint`                  | Shown under the field, and repeated when a value is refused               |
+| `test`                  | Checked before the round trip, so the hint answers before the server does |
+| `required`              | Marked with `*`, with the legend that explains it                         |
+| `generated`, `readOnly` | Shown on the detail card, never offered for editing                       |
+| `neverReturn`           | Offered on the form, never shown back                                     |
+| `type: array`           | A list of removable tokens, with the instruction to press Enter           |
+| `type: pointer`         | A select filled from the branch the pointer names                         |
+| `type: boolean`, `date` | A yes/no select, a date picker                                            |
+| `group`                 | Groups the fields under a heading                                         |
+| `states`                | The states the account can be moved to                                    |
+| `role`                  | Which columns the table shows, and which actions appear                   |
+
+## Behaviour worth knowing
+
+- **Long forms open as a side panel**, short ones as a dialog. A form of
+  twenty fields inside a modal puts its Save button off screen.
+- **A large branch is not listed unfiltered.** Entities attached to an
+  organization ask for three characters before searching; the small reference
+  tables are listed whole.
+- **The page size is remembered**, along with the chosen language.
+- **A deep organization path is shortened** to its root and its leaf, with the
+  whole path in the cell's tooltip.
+- **The tree stays on screen** while a node is read or edited.
+- **The scope is shown permanently** — which branches the caller administers,
+  and with which rights. An action they cannot perform is not offered. A
+  server that does not load `core/auth/authzScope` restricts nothing and the
+  console says so; a scope request that _fails_ is a different thing, and the
+  console then offers no write action at all rather than every one of them.
+- **The interface is in one language at a time.** The catalogue holds only
+  interface words; entity and attribute names come from the schema, which is
+  the deployment's own vocabulary.
+
+## Exported pieces
+
+The bundle exports the components as well as the application, for a client
+that wants to assemble its own:
+
+```ts
+import {
+  DirectoryConsole,
+  ConsoleApiClient,
+  EntityList,
+  EntityDetail,
+  EntityForm,
+  OrganizationTree,
+  Translator,
+  roleAttribute,
+} from 'ldap-rest/browser-directory-console-index';
+```
+
+## Filling a pointer field
+
+A `pointer` names a branch, and the console fills the select from it:
+
+- the branch of the organization tree is walked through the organization
+  endpoints, so a department field lists organizations by their readable path;
+- a branch that is the base of a known entity is listed through that entity;
+- any other branch is read through `core/ldap/raw`, so load that plugin for
+  nomenclature branches (titles, list types, delivery modes) to be offered.
+  Without it the select keeps the value the entry already holds and offers no
+  others.
+
+## Known limits
+
+- The list endpoint returns a whole branch: the search guard keeps that
+  workable, but a search matching many thousands of entries is still fetched
+  in full. Server-side pagination would remove the need for the guard.
+- Moving an entry between organizations is exposed by the API
+  (`POST {entity}/:id/move`) but has no control in the interface yet.
+- Bulk actions cover export and deletion; assignment is not there yet.
+- The exported CSV neutralises a cell a spreadsheet would read as a formula by
+  prefixing it with an apostrophe, so such a value comes back with one.

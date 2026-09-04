@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directory console</title>
+    <!-- Relative, so the page works wherever the static root is mounted:
+         served from the repository root, this resolves to static/browser/. -->
+    <link rel="stylesheet" href="../../static/browser/directory-console.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="directory-console"></div>
+
+    <script type="module">
+      import { DirectoryConsole } from '../../static/browser/directory-console.esm.js';
+
+      // Everything the console shows — entities, attributes, labels, patterns,
+      // lifecycle states — comes from the server's own configuration, so this
+      // page has nothing to declare.
+      const console_ = new DirectoryConsole({
+        containerId: 'directory-console',
+      });
+
+      console_.init().catch(error => {
+        document.getElementById('directory-console').textContent =
+          `Cannot reach the API: ${error.message}`;
+      });
+    </script>
+  </body>
+</html>
