@@ -22,6 +22,12 @@ migration will refuse before it does.
   than writing an entry missing two required attributes. A `pointer` default
   is checked the same way, instead of a dangling DN on every entry
 
+- An array's `items.test` and `items.branch` are enforced on the flat routes,
+  where they never were: `mailAlternateAddress` has carried a pattern since
+  v0.7.0 and accepted anything, while the console's form refused the same
+  value and `groups` refused `items.test` server-side. Stored values are
+  untouched — `npm run audit:directory` lists what an update would now refuse
+
 - `twakeDepartmentPath` reads from the root down, the entry's own name last.
   The check demanded the reverse and refused every top-level organization
   anyway, so little can depend on it
@@ -68,10 +74,9 @@ migration will refuse before it does.
   across the Twake schemas, plus `static/schemas/example` — a worked
   configuration keeping every national format, mail domain and quota default
   in a schema rather than in the code, with `npm run check:no-client-values`
-  failing the build if one leaks back into `src/`
-
-- `--organization-schema` is settable on the command line. It was declared in
-  the configuration type but never registered as an option
+  failing the build if one leaks back into `src/`. `--organization-schema` is
+  settable on the command line at last: it was declared in the configuration
+  type but never registered as an option
 
 ### Bug Fixes
 
