@@ -187,6 +187,9 @@ describe('Enterprise rules', () => {
           sn: 'One',
           mail: 'rules.one@example.com',
           twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0001',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect(res.status).to.equal(201);
         expect(res.body).to.have.property('uid', 'rules.one');
@@ -208,6 +211,9 @@ describe('Enterprise rules', () => {
             sn: 'One',
             mail: 'rules.one@example.com',
             twakeDepartmentLink: subOrgDn,
+            employeeNumber: 'ENT0002',
+            givenName: 'Test',
+            displayName: 'Test Person',
           })
           .expect(201);
         const res = await request
@@ -228,6 +234,9 @@ describe('Enterprise rules', () => {
             sn: 'One',
             mail: 'rules.one@example.com',
             twakeDepartmentLink: subOrgDn,
+            employeeNumber: 'ENT0003',
+            givenName: 'Test',
+            displayName: 'Test Person',
           })
           .expect(201);
         // A second address with the same local part in another domain would
@@ -237,6 +246,9 @@ describe('Enterprise rules', () => {
           sn: 'One',
           mail: 'rules.one@lists.example.com',
           twakeDepartmentLink: otherOrgDn,
+          employeeNumber: 'ENT0004',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect(res.status).to.equal(201);
         expect(res.body).to.have.property('uid', 'rules.one-2');
@@ -250,6 +262,10 @@ describe('Enterprise rules', () => {
         await remove('rules.other');
       });
 
+      // A payroll number of its own per call: it is unique across the base, so
+      // a case about a duplicate *address* must not be refused for a number
+      // two payloads happened to share.
+      let payroll = 0;
       const create = (mail: string, extra: Record<string, unknown> = {}) =>
         request
           .post('/api/v1/ldap/users')
@@ -257,6 +273,9 @@ describe('Enterprise rules', () => {
           .send({
             cn: 'Rules Uniq',
             sn: 'Uniq',
+            givenName: 'Rules',
+            displayName: 'Rules Uniq',
+            employeeNumber: `ENU${++payroll}`,
             mail,
             twakeDepartmentLink: subOrgDn,
             ...extra,
@@ -318,6 +337,9 @@ describe('Enterprise rules', () => {
           sn: 'Domain',
           mail: 'rules.domain@example.com',
           twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0005',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect(res.status).to.equal(201);
       });
@@ -328,6 +350,9 @@ describe('Enterprise rules', () => {
           sn: 'Domain',
           mail: 'rules.domain@elsewhere.example',
           twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0006',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect(res.status).to.equal(409);
         expect(res.body.error).to.match(/not one of the authorised domains/);
@@ -339,6 +364,9 @@ describe('Enterprise rules', () => {
           sn: 'Domain',
           mail: 'rules.domain@elsewhere.example',
           twakeDepartmentLink: otherOrgDn,
+          employeeNumber: 'ENT0007',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect(res.status).to.equal(201);
       });
@@ -358,6 +386,9 @@ describe('Enterprise rules', () => {
             sn: 'Date',
             mail: 'rules.date@example.com',
             twakeDepartmentLink: subOrgDn,
+            employeeNumber: 'ENT0008',
+            givenName: 'Test',
+            displayName: 'Test Person',
           })
           .expect(201);
       });
@@ -419,6 +450,9 @@ describe('Enterprise rules', () => {
             mail: 'rules.ref@example.com',
             twakeDepartmentLink: subOrgDn,
             title: positionDn,
+            employeeNumber: 'ENT0009',
+            givenName: 'Test',
+            displayName: 'Test Person',
           })
           .expect(201);
         try {

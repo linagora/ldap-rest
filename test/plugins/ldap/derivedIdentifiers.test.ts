@@ -69,6 +69,9 @@ describe('Derived identifiers', function () {
       sn: 'Tag',
       mail: 'john+tag@example.com',
       twakeDepartmentLink: deptDn,
+      employeeNumber: 'DER0001',
+      givenName: 'Test',
+      displayName: 'Test Person',
     });
     expect(res.status, JSON.stringify(res.body)).to.equal(201);
     const found = (await server.ldap.search(
