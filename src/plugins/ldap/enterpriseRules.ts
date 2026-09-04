@@ -341,6 +341,24 @@ export default class LdapEnterpriseRules extends DmPlugin {
     creating: boolean
   ): Promise<void> {
     for (const [name, attr] of Object.entries(entity.schema.attributes)) {
+      // A default the server owns: the initial account status, a quota floor.
+      // It is applied only when the client said nothing, and only at creation
+      // — and *before* the normalisation below, so that a default is held to
+      // the same rules as a value the client sent. A schema is JSON, so a
+      // default may be a number; a directory stores strings, and handing
+      // ldapts a number throws from inside the encoder, well after the request
+      // was accepted.
+      if (
+        creating &&
+        values[name] === undefined &&
+        attr.default !== undefined &&
+        (attr.generated || attr.normalize)
+      ) {
+        values[name] = Array.isArray(attr.default)
+          ? attr.default.map(v => String(v))
+          : String(attr.default);
+      }
+
       if (attr.normalize === 'byteSize' && values[name] !== undefined) {
         const list = valueList(values[name]);
         try {
@@ -352,16 +370,6 @@ export default class LdapEnterpriseRules extends DmPlugin {
             `Invalid value for attribute "${name}"${attr.hint ? `: ${attr.hint}` : ''}`
           );
         }
-      }
-      // A default the server owns: the initial account status, a quota floor.
-      // It is applied only when the client said nothing, and only at creation.
-      if (
-        creating &&
-        values[name] === undefined &&
-        attr.default !== undefined &&
-        (attr.generated || attr.normalize)
-      ) {
-        values[name] = attr.default;
       }
     }
 
