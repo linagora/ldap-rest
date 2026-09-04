@@ -48,6 +48,16 @@ import {
 
 import DmPlugin from './plugin';
 
+/**
+ * One attribute value or many, always as a list of strings.
+ *
+ * @param value value as the client sent it
+ * @returns its elements
+ */
+function asList(value: AttributeValue): string[] {
+  return (Array.isArray(value) ? value : [value]).map(item => String(item));
+}
+
 export interface LdapFlatConfig {
   /**
    * LDAP branch where entries are stored
@@ -1442,13 +1452,30 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
 
-    if (attr.test) {
-      const regex =
-        typeof attr.test === 'string' ? getCompiledRegex(attr.test) : attr.test;
-      if (Array.isArray(value)) {
-        return value.every(v => regex.test(v as string));
+    // An array declares the rules of its *elements* under `items`, which is
+    // where the shipped schemas put them — `mailAlternateAddress` has carried
+    // `items.test` since v0.7.0 and `twakeDelegatedUsers` an `items.branch`.
+    // Neither was read here, so the flat routes accepted anything in them
+    // while the console's form refused it client-side and `groups` refused
+    // `items.test` server-side. The rule is the same rule; it applies here
+    // too.
+    if (attr.items?.branch?.length) {
+      for (const dnValue of asList(value)) {
+        const isInBranch = attr.items.branch.some(branch =>
+          getCompiledRegex(`,?${escapeRegex(branch)}$`, 'i').test(dnValue)
+        );
+        if (!isInBranch)
+          throw new BadRequestError(
+            `Field ${field} must point to a DN within allowed branches: ${attr.items.branch.join(', ')}`
+          );
       }
-      return regex.test(value as string);
+    }
+
+    const pattern = attr.test ?? attr.items?.test;
+    if (pattern) {
+      const regex =
+        typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
+      return asList(value).every(v => regex.test(v));
     }
     return true;
   }
