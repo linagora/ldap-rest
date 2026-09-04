@@ -85,11 +85,23 @@ export class ConsoleApiClient {
   private topOrganization?: string;
   /** Attribute carrying the readable path of an organization, from its role */
   private organizationPathAttribute?: string;
+  /**
+   * Whether the API lives on another origin than the page. `same-origin`
+   * attaches no cookie to a cross-origin request, so a deployment that points
+   * the console at its own API host would be answered `401` on every call —
+   * a session it holds and does not send. Such a deployment has to allow the
+   * origin and credentials in its CORS policy either way.
+   */
+  private readonly crossOrigin: boolean;
 
-  constructor(apiBaseUrl?: string) {
-    this.origin =
-      apiBaseUrl ??
-      (typeof window !== 'undefined' ? window.location.origin : '');
+  constructor(apiBaseUrl?: string, apiPrefix?: string) {
+    const own = typeof window !== 'undefined' ? window.location.origin : '';
+    this.origin = apiBaseUrl ?? own;
+    this.crossOrigin = this.origin !== '' && this.origin !== own;
+    // Everything else is asked at the prefix the configuration advertises;
+    // the request that reads that configuration cannot be, so a server
+    // started with `--api-prefix /ldap` has to be told once.
+    if (apiPrefix) this.apiPrefix = apiPrefix;
   }
 
   /** Separator the directory puts between the segments of an organization path. */
@@ -109,7 +121,7 @@ export class ConsoleApiClient {
    */
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.origin}${path}`, {
-      credentials: 'same-origin',
+      credentials: this.crossOrigin ? 'include' : 'same-origin',
       ...init,
       headers: {
         Accept: 'application/json',
@@ -137,8 +149,10 @@ export class ConsoleApiClient {
    * @returns one descriptor per entity the server exposes
    */
   async discover(): Promise<EntityDescriptor[]> {
-    const config = await this.call<ConfigResponse>('/api/v1/config');
-    this.apiPrefix = config.apiPrefix || '/api';
+    const config = await this.call<ConfigResponse>(
+      `${this.apiPrefix}/v1/config`
+    );
+    this.apiPrefix = config.apiPrefix || this.apiPrefix;
     this.ldapBase = config.ldapBase || '';
     const entities: EntityDescriptor[] = [];
 
