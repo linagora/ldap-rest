@@ -12,6 +12,7 @@ import supertest from 'supertest';
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('Generated attributes', function () {
@@ -33,6 +34,12 @@ describe('Generated attributes', function () {
     await server.ready;
     server.config.ldap_flat_schema = [schema];
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    // A plugin carrying the `consistency` role but filling none of these:
+    // the exemption must turn on the capability, not on the role.
+    await server.registerPlugin(
+      'ldapOrganizations',
+      new LdapOrganizations(server)
+    );
     if (withRules)
       await server.registerPlugin(
         'ldapEnterpriseRules',

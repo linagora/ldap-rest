@@ -171,6 +171,31 @@ export default class LdapEnterpriseRules extends DmPlugin {
   }
 
   /**
+   * Tell whether this plugin fills a given generated attribute.
+   *
+   * `ldapFlat` exempts a required attribute from its check when the schema
+   * marks it generated, which is only sound if something will honour the
+   * bargain. It asks every loaded plugin, so the answer has to be about this
+   * attribute, not about a role a dozen plugins happen to carry.
+   *
+   * @param name attribute the entity is about to demand
+   * @param attr its schema definition
+   * @param schema schema it belongs to
+   * @returns true when a hook here will supply a value
+   */
+  fillsGeneratedAttribute(
+    name: string,
+    attr: SchemaAttribute,
+    schema: Schema
+  ): boolean {
+    // A default the server owns, applied on creation.
+    if (attr.default !== undefined && (attr.generated || attr.normalize))
+      return true;
+    // The organization path, derived from the link or from the tree.
+    return roleAttribute(schema, 'organizationPath') === name;
+  }
+
+  /**
    * Entities the rules apply to, rebuilt on each call.
    *
    * The organization and group plugins read their schema asynchronously, so a
