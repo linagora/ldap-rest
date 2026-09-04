@@ -1035,10 +1035,15 @@ export default class LdapGroups extends DmPlugin {
         throw new Error(`Invalid value for field ${field}`);
       }
     }
-    // Check required fields
+    // Check required fields. A `generated` attribute is exempt, as it is on
+    // the flat and organization paths: it is filled by a hook *after*
+    // validation, so demanding it here would refuse the very payload the hook
+    // expects — the client sending nothing. The shipped group schema marks
+    // the organization path required and generated, so without this a
+    // schema-conformant creation could not succeed at all.
     for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] == undefined)
-        throw new Error(`Missing required field ${field}`);
+      if (test.required && !test.generated && entry[field] == undefined)
+        throw new BadRequestError(`Missing required field ${field}`);
     }
     return true;
   }
