@@ -289,7 +289,7 @@ mail: john.doe@example.com
 userPassword: {SSHA}...
 telephoneNumber: +1-555-0100
 twakeDepartmentLink: ou=Engineering,ou=organization,dc=example,dc=com
-twakeDepartmentPath: Engineering / organization
+twakeDepartmentPath: Engineering
 ```
 
 ## Operation Modes

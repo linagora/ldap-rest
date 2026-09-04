@@ -56,6 +56,10 @@
       "types": "./dist/src/plugins/auth/authzPerRoute.d.ts",
       "import": "./dist/plugins/auth/authzPerRoute.js"
     },
+    "./plugin-auth-authzscope": {
+      "types": "./dist/src/plugins/auth/authzScope.d.ts",
+      "import": "./dist/plugins/auth/authzScope.js"
+    },
     "./plugin-auth-crowdsec": {
       "types": "./dist/src/plugins/auth/crowdsec.d.ts",
       "import": "./dist/plugins/auth/crowdsec.js"
@@ -96,6 +100,10 @@
       "types": "./dist/src/plugins/demo/helloworld.d.ts",
       "import": "./dist/plugins/demo/helloworld.js"
     },
+    "./plugin-ldap-accountlifecycle": {
+      "types": "./dist/src/plugins/ldap/accountLifecycle.d.ts",
+      "import": "./dist/plugins/ldap/accountLifecycle.js"
+    },
     "./plugin-ldap-bulkimport": {
       "types": "./dist/src/plugins/ldap/bulkImport.d.ts",
       "import": "./dist/plugins/ldap/bulkImport.js"
@@ -103,6 +111,10 @@
     "./plugin-ldap-departmentsync": {
       "types": "./dist/src/plugins/ldap/departmentSync.d.ts",
       "import": "./dist/plugins/ldap/departmentSync.js"
+    },
+    "./plugin-ldap-enterpriserules": {
+      "types": "./dist/src/plugins/ldap/enterpriseRules.d.ts",
+      "import": "./dist/plugins/ldap/enterpriseRules.js"
     },
     "./plugin-ldap-externalusersingroups": {
       "types": "./dist/src/plugins/ldap/externalUsersInGroups.d.ts",
@@ -480,6 +492,26 @@
       "import": "./static/schemas/ad/users.json",
       "require": "./static/schemas/ad/users.json"
     },
+    "./schema-example-groups": {
+      "import": "./static/schemas/example/groups.json",
+      "require": "./static/schemas/example/groups.json"
+    },
+    "./schema-example-nomenclature-domains": {
+      "import": "./static/schemas/example/nomenclature/domains.json",
+      "require": "./static/schemas/example/nomenclature/domains.json"
+    },
+    "./schema-example-organizations": {
+      "import": "./static/schemas/example/organizations.json",
+      "require": "./static/schemas/example/organizations.json"
+    },
+    "./schema-example-positions": {
+      "import": "./static/schemas/example/positions.json",
+      "require": "./static/schemas/example/positions.json"
+    },
+    "./schema-example-users": {
+      "import": "./static/schemas/example/users.json",
+      "require": "./static/schemas/example/users.json"
+    },
     "./schema-obm-organizations": {
       "import": "./static/schemas/obm/organizations.json",
       "require": "./static/schemas/obm/organizations.json"
@@ -564,6 +596,10 @@
       "import": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json",
       "require": "./static/schemas/twake/nomenclature/twakeDeliveryMode.json"
     },
+    "./schema-twake-nomenclature-twakedomain": {
+      "import": "./static/schemas/twake/nomenclature/twakeDomain.json",
+      "require": "./static/schemas/twake/nomenclature/twakeDomain.json"
+    },
     "./schema-twake-nomenclature-twakelisttype": {
       "import": "./static/schemas/twake/nomenclature/twakeListType.json",
       "require": "./static/schemas/twake/nomenclature/twakeListType.json"
@@ -615,7 +651,8 @@
     "build:pages": "tsx scripts/build-pages.ts",
     "build:prod": "npm run clean && NODE_ENV=production rollup -c && npm run build:browser && node scripts/moveBrowserLibs.mjs && npm run build:dockerfile",
     "build:watch": "rollup -c --watch",
-    "check": "npm run check:ts && npm run lint && npm run format:check",
+    "check": "npm run check:ts && npm run lint && npm run format:check && npm run check:no-client-values",
+    "check:no-client-values": "sh scripts/check-no-client-values.sh",
     "check:ts": "tsc --noEmit",
     "clean": "rimraf dist/* static/browser/* coverage",
     "coverage": "c8 --config .c8rc.json mocha",

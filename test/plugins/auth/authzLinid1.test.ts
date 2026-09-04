@@ -112,7 +112,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -142,7 +142,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
 
@@ -171,7 +171,7 @@ describe('AuthzLinid1 Plugin', () => {
       const parentOrgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), parentOrgEntry);
@@ -204,7 +204,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -249,7 +249,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -316,7 +316,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -357,7 +357,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -391,7 +391,7 @@ describe('AuthzLinid1 Plugin', () => {
       const orgEntry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), orgEntry);
@@ -429,7 +429,7 @@ describe('AuthzLinid1 Plugin', () => {
       const org1Entry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg',
-        twakeDepartmentPath: 'TestOrg / organization',
+        twakeDepartmentPath: 'TestOrg',
         twakeLocalAdminLink: getTestUserDn(),
       };
       await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -438,7 +438,7 @@ describe('AuthzLinid1 Plugin', () => {
       const org2Entry = {
         objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
         ou: 'TestOrg2',
-        twakeDepartmentPath: 'TestOrg2 / organization',
+        twakeDepartmentPath: 'TestOrg2',
       };
       await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -532,7 +532,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -541,7 +541,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -575,7 +575,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -608,7 +608,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -617,7 +617,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -650,7 +650,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -659,7 +659,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -710,7 +710,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -770,7 +770,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -779,7 +779,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
@@ -791,7 +791,7 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'User1',
           cn: 'Test User 1',
           twakeDepartmentLink: getTestOrgDn(),
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await dm.ldap.add(getTestUser1Dn(), userEntry);
 
@@ -804,7 +804,7 @@ describe('AuthzLinid1 Plugin', () => {
           {
             replace: {
               twakeDepartmentLink: getTestOrg2Dn(),
-              twakeDepartmentPath: 'TestOrg2 / organization',
+              twakeDepartmentPath: 'TestOrg2',
             },
           },
           mockReq
@@ -839,7 +839,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -848,7 +848,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -859,7 +859,7 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'User1',
           cn: 'Test User 1',
           twakeDepartmentLink: getTestOrgDn(),
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await dm.ldap.add(getTestUser1Dn(), userEntry);
 
@@ -873,7 +873,7 @@ describe('AuthzLinid1 Plugin', () => {
             {
               replace: {
                 twakeDepartmentLink: getTestOrg2Dn(),
-                twakeDepartmentPath: 'TestOrg2 / organization',
+                twakeDepartmentPath: 'TestOrg2',
               },
             },
             mockReq
@@ -915,7 +915,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -923,7 +923,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
@@ -935,7 +935,7 @@ describe('AuthzLinid1 Plugin', () => {
           sn: 'User1',
           cn: 'Test User 1',
           twakeDepartmentLink: getTestOrgDn(),
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await dm.ldap.add(getTestUser1Dn(), userEntry);
 
@@ -950,7 +950,7 @@ describe('AuthzLinid1 Plugin', () => {
             {
               replace: {
                 twakeDepartmentLink: getTestOrg2Dn(),
-                twakeDepartmentPath: 'TestOrg2 / organization',
+                twakeDepartmentPath: 'TestOrg2',
               },
             },
             mockReq
@@ -1012,7 +1012,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -1073,7 +1073,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
           twakeLocalAdminLink: getTestUserDn(),
         };
         await dm.ldap.add(getTestOrgDn(), org1Entry);
@@ -1082,7 +1082,7 @@ describe('AuthzLinid1 Plugin', () => {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 

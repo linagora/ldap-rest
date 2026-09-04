@@ -395,7 +395,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -403,7 +403,7 @@ describe('AuthzPerBranch', function () {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -430,7 +430,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -457,7 +457,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -465,7 +465,7 @@ describe('AuthzPerBranch', function () {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
@@ -507,7 +507,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -548,7 +548,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -588,7 +588,7 @@ describe('AuthzPerBranch', function () {
         const org1Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg',
-          twakeDepartmentPath: 'TestOrg / organization',
+          twakeDepartmentPath: 'TestOrg',
         };
         await apiServer.ldap.add(getTestOrgDn(), org1Entry);
 
@@ -596,7 +596,7 @@ describe('AuthzPerBranch', function () {
         const org2Entry = {
           objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
           ou: 'TestOrg2',
-          twakeDepartmentPath: 'TestOrg2 / organization',
+          twakeDepartmentPath: 'TestOrg2',
         };
         await apiServer.ldap.add(getTestOrg2Dn(), org2Entry);
 
