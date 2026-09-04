@@ -32,6 +32,8 @@ const en: Catalogue = {
   'scope.title': 'You administer',
   'scope.none': 'You administer no branch',
   'scope.unrestricted': 'Unrestricted access',
+  'scope.unavailable':
+    'Your permissions could not be read ({error}) — read-only until they can',
   'scope.read': 'read',
   'scope.write': 'write',
   'scope.delete': 'delete',
@@ -116,6 +118,8 @@ const fr: Catalogue = {
   'scope.title': 'Vous administrez',
   'scope.none': 'Vous n’administrez aucune branche',
   'scope.unrestricted': 'Accès sans restriction',
+  'scope.unavailable':
+    'Vos permissions n’ont pas pu être lues ({error}) — lecture seule tant qu’elles ne le sont pas',
   'scope.read': 'lecture',
   'scope.write': 'écriture',
   'scope.delete': 'suppression',
