@@ -17,38 +17,65 @@
       "hint": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
       "required": true,
       "unique": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     },
     "telephoneNumber": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Phone",
+        "fr": "Téléphone"
+      }
     },
     "facsimileTelephoneNumber": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Fax",
+        "fr": "Fax"
+      }
     },
     "l": {
       "type": "string",
       "required": false,
-      "label": "Locality"
+      "label": {
+        "en": "Locality",
+        "fr": "Commune"
+      }
     },
     "postalAddress": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Address",
+        "fr": "Adresse"
+      }
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[^\\r\\n]{1,4096}$",
       "required": true,
       "generated": true,
-      "role": "organizationPath"
+      "role": "organizationPath",
+      "label": {
+        "en": "Path",
+        "fr": "Chemin"
+      }
     },
     "twakeManagerLink": {
       "type": "array",
@@ -57,7 +84,11 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
-      "role": "managers"
+      "role": "managers",
+      "label": {
+        "en": "Managers",
+        "fr": "Responsables"
+      }
     },
     "twakeDomainLink": {
       "type": "array",
@@ -67,7 +98,10 @@
       },
       "required": false,
       "role": "domainLink",
-      "label": "Mail domains"
+      "label": {
+        "en": "Mail domains",
+        "fr": "Domaines de messagerie"
+      }
     },
     "twakeLocalAdminLink": {
       "type": "array",
@@ -76,7 +110,11 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
-      "role": "localAdmins"
+      "role": "localAdmins",
+      "label": {
+        "en": "Local administrators",
+        "fr": "Administrateurs locaux"
+      }
     }
   }
 }

@@ -5,7 +5,15 @@
     "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
     "singularName": "group",
     "pluralName": "groups",
-    "base": "ou=groups,__ldap_base__"
+    "base": "ou=groups,__ldap_base__",
+    "label": {
+      "en": "Groups",
+      "fr": "Groupes"
+    },
+    "singularLabel": {
+      "en": "group",
+      "fr": "groupe"
+    }
   },
   "strict": true,
   "attributes": {
@@ -24,11 +32,19 @@
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
       "hint": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
       "required": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     },
     "mail": {
       "type": "string",
@@ -41,14 +57,21 @@
       },
       "mailDomainScope": "organization",
       "allowSubdomains": true,
-      "role": "primaryEmail"
+      "role": "primaryEmail",
+      "label": {
+        "en": "Email",
+        "fr": "Adresse électronique"
+      }
     },
     "businessCategory": {
       "type": "pointer",
       "branch": ["ou=twakeListType,ou=nomenclature,__LDAP_BASE__"],
       "required": false,
       "role": "writePolicy",
-      "label": "List type",
+      "label": {
+        "en": "List type",
+        "fr": "Type de liste"
+      },
       "group": "Mailbox Settings"
     },
     "twakeMailboxType": {
@@ -56,7 +79,11 @@
       "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
       "group": "Mailbox Settings",
       "required": false,
-      "role": "mailboxType"
+      "role": "mailboxType",
+      "label": {
+        "en": "Mailbox type",
+        "fr": "Type de boîte"
+      }
     },
     "member": {
       "type": "array",
@@ -66,7 +93,11 @@
         "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "members"
+      "role": "members",
+      "label": {
+        "en": "Members",
+        "fr": "Membres"
+      }
     },
     "owner": {
       "type": "array",
@@ -76,20 +107,32 @@
         "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "owners"
+      "role": "owners",
+      "label": {
+        "en": "Owners",
+        "fr": "Propriétaires"
+      }
     },
     "twakeDepartmentLink": {
       "type": "pointer",
       "branch": ["__LDAP_BASE__"],
       "required": true,
-      "role": "organizationLink"
+      "role": "organizationLink",
+      "label": {
+        "en": "Department",
+        "fr": "Organisation"
+      }
     },
     "twakeDepartmentPath": {
       "type": "string",
       "test": "^[^\\r\\n]{1,4096}$",
       "required": true,
       "generated": true,
-      "role": "organizationPath"
+      "role": "organizationPath",
+      "label": {
+        "en": "Department path",
+        "fr": "Chemin"
+      }
     }
   }
 }

@@ -2,96 +2,81 @@
 
 ## Unreleased
 
+An enterprise directory manager: the rules a real deployment needs, a console
+built from the server's own configuration, and a script that says what a
+migration will refuse before it does.
+
 ### Breaking Changes
 
-- `static/schemas/twake`: the shipped Twake schemas now describe an enterprise
-  directory rather than a bare CRUD surface, and three attributes changed
-  status on the API. `uid` is **generated** from the local part of `mail`, so
-  a creation must no longer send it — and no longer may;
-  `twakeDepartmentPath` and `twakeAccountStatus` are computed by the server;
-  `twakeDeliveryMode` became an array and is read-only. `twakeDepartmentLink`
-  became a `pointer`, so the organization it names must exist. Deployments
-  that were posting these values get a `400` naming the attribute. Keep the
-  old behaviour by copying the schema and dropping the markers — every one of
-  them is configuration. `PUT /ldap/organizations` and `PUT /ldap/groups`
-  refuse them too now, as their own documentation always claimed
+- `static/schemas/twake`: the shipped schemas describe an enterprise directory
+  rather than a bare CRUD surface. `uid` is **generated** from the local part
+  of `mail`, `twakeDepartmentPath` and `twakeAccountStatus` are computed,
+  `twakeDeliveryMode` is a read-only array, and `twakeDepartmentLink` is a
+  `pointer` whose target must exist. Posting any of them gets a `400` naming
+  the attribute — on the flat routes, and now on `PUT /ldap/organizations` and
+  `PUT /ldap/groups` too. Each is a schema marker: copy the schema and drop
+  them to keep the old behaviour
 
-- An attribute both `required` and `generated` needs a plugin that fills it.
-  The shipped Twake schemas without `core/ldap/enterpriseRules` answer `400`
-  instead of writing an entry missing two required attributes. Load the
-  plugin, or drop the markers
+- An attribute both `required` and `generated` needs a plugin that fills it,
+  so the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
+  than writing an entry missing two required attributes. A `pointer` default
+  is checked the same way, instead of a dangling DN on every entry
 
-- A `pointer` default is checked like a submitted value: a directory missing
-  the nomenclature entry a schema names gets a `400` naming that default,
-  instead of a dangling DN on every entry
+- An array's `items.test` and `items.branch` are enforced on the flat routes,
+  where they never were: `mailAlternateAddress` has carried a pattern since
+  v0.7.0 and accepted anything, while the console's form refused the same
+  value and `groups` refused `items.test` server-side. Stored values are
+  untouched — `npm run audit:directory` lists what an update would now refuse
 
 - `twakeDepartmentPath` reads from the root down, the entry's own name last.
   The check demanded the reverse and refused every top-level organization
-  anyway, so little can depend on it — reverse the stored paths only if a
-  custom schema leaves the attribute client-settable
+  anyway, so little can depend on it
 
 - `--ldap-flat-schema` twice with the same `entity.name` or `entity.pluralName`
-  drops the second and says which schema holds it. Both used to load, sharing
+  refuses the second and says which schema holds it. Both used to load, sharing
   a hook prefix and a URL, and the second was unreachable
 
 ### Features
 
-- `plugins/ldap/enterpriseRules`: the business rules an enterprise directory
-  needs on top of per-attribute validation — uniqueness across a shared
-  namespace (an address must not already be someone's alias, on accounts _or_
-  on lists), mail addresses confined to the domains an organization owns
-  (walking up the tree, `*` meaning "any"), computed organization paths,
-  byte-size normalisation, referential integrity on deletion and a guard on
-  deleting a group that still has members. Every rule is driven by markers in
-  the entity schemas, so the plugin holds no attribute name, no domain and no
-  nomenclature value
+- `plugins/ldap/enterpriseRules`: uniqueness across a shared namespace, mail
+  addresses confined to the domains an organization owns, computed
+  organization paths, byte-size normalisation, referential integrity on delete
+  and a guard on emptying a group. `plugins/ldap/accountLifecycle` adds
+  `POST {entity}/:id/status` and `POST {entity}/:id/password`, a generated
+  password being returned exactly once. `plugins/auth/authzScope` answers
+  `GET /v1/authz/scope`: which branches the caller administers, and what they
+  may create there. None of the three holds an attribute name, a domain or a
+  nomenclature value: every rule is a schema marker
 
-- `plugins/ldap/accountLifecycle`: `POST {entity}/:id/status` and
-  `POST {entity}/:id/password` — disable an account, reset a credential. Both
-  are written against semantic roles: what "disabled" _is_ in a directory, and
-  which attribute carries it, is schema configuration. A generated password is
-  returned exactly once, since the credential attributes are `neverReturn`
+- `abstract/ldapFlat`: the markers those plugins read. `role` says what an
+  attribute _means_, so core code finds it without knowing its name; `hint`
+  explains a `test` in words a client can show; `generated` and `readOnly`
+  refuse a value in a request body; `neverReturn` keeps a writable attribute
+  out of every answer; `generatedFrom` derives an identifier from another
+  attribute. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
 
 - `browser/directory-console`: an administration interface — entity lists with
   search, paging and bulk actions, an organization tree that stays on screen,
-  a detail card showing every attribute, schema-driven forms with the pattern
-  explained under the field, the lifecycle actions, and the caller's own scope
-  shown permanently. It is built from `GET /v1/config` and `GET /v1/authz/scope`
-  alone: no entity name, attribute name or label is written in it, so a
-  deployment that names its things differently gets its own interface without
-  a change. See
+  forms explaining each pattern under its field, the lifecycle actions and the
+  caller's own scope. Built from `GET /v1/config` and `GET /v1/authz/scope`
+  alone, so a deployment naming its things differently gets its own interface
+  — its own language included, since `label`, `entity.label` and
+  `entity.singularLabel` accept `{ "en": …, "fr": … }` while the console's
+  catalogue holds nothing but the interface words. See
   [directory-console](docs/client-development/browser/directory-console.md)
 
-- `plugins/auth/authzScope`: `GET /api/v1/authz/scope` answers what the
-  signed-in administrator may do — the branches they manage, named and with
-  their permissions, and per entity whether they may create one. In a
-  local-administration model an interface cannot show the scope, or hide the
-  buttons that would fail, without it
+- `npm run audit:directory` reads a branch and reports what a schema would
+  refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
+  about the entries already stored, and finding out one ticket at a time is
+  the expensive way. See [directory-audit](docs/usage/directory-audit.md)
 
-- `abstract/ldapFlat`: entity schemas gained the markers those plugins read.
-  `hint` explains a `test` in words a client shows under the field; `role`
-  names what an attribute _means_, so core code finds it without knowing its
-  name; `generated` and `readOnly` refuse a value in a request body;
-  `neverReturn` keeps a writable attribute out of every answer;
-  `generatedFrom` derives an identifier from another attribute, with collision
-  handling. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
-
-- `static/schemas/twake`: the missing `domains` nomenclature, plus
-  `employeeNumber`, `personalTitle`, `title`, `postalAddress`, `postalCode`,
-  `l`, `description`, `twakeOtherMailbox`, `twakeDeletionDate`, `pwdReset` and
-  a read-only `memberOf` on users; `businessCategory` on groups;
-  `twakeManagerLink` and `twakeDomainLink` on organizations
-
-- `static/schemas/example`: a worked deployment configuration, showing every
-  national format, mail domain, payroll-number rule and quota default living
-  in a schema rather than in the code. `npm run check:no-client-values` fails
-  the build if one leaks back into `src/`, reading its patterns from an
-  untracked `scripts/client-values.txt` — a list of forbidden names has no
-  business being published either
-
-- `--organization-schema` is settable on the command line. It was declared in
-  the configuration type but never registered as an option, so only a plugin
-  override could reach it
+- `static/schemas`: the missing `domains` nomenclature and a dozen attributes
+  across the Twake schemas, plus `static/schemas/example` — a worked
+  configuration keeping every national format, mail domain and quota default
+  in a schema rather than in the code, with `npm run check:no-client-values`
+  failing the build if one leaks back into `src/`. `--organization-schema` is
+  settable on the command line at last: it was declared in the configuration
+  type but never registered as an option
 
 ### Bug Fixes
 
@@ -100,16 +85,18 @@
   apostrophe or an `&`. Loading such a directory failed on its first
   organization
 
-- `abstract/ldapFlat`: a business rule that refused a creation answered `500`.
-  The add path wrapped every error in a plain `Error`, so a `409 "this address
-is already used"` reached the client as an internal error, and was logged as
-  an incident rather than as the ordinary outcome it is
+- `abstract/ldapFlat`: `searchEntriesByName` interpolated its value into an
+  LDAP filter raw. A name holding `*` became a pattern and matched whichever
+  entry came first; one holding `(` threw from the filter parser after the
+  entry was written, answering `500` on a creation that had succeeded
+
+- `abstract/ldapFlat`: a business rule that refused a creation answered `500`,
+  the add path having wrapped every error in a plain `Error`. A `409` reaches
+  the client as the ordinary outcome it is
 
 - `test/helpers`: a failing LDIF load reported "Already exists" whatever the
-  real cause. Every error was retried, and a first attempt that stopped
-  halfway left its earlier entries behind, so the retries could only fail on
-  them. Only a connection failure is retried now, and the directory's own
-  message is reported
+  real cause, every error being retried over the entries a half-finished first
+  attempt had left behind. Only a connection failure is retried now
 
 ## v0.7.0 (2026-09-02)
 

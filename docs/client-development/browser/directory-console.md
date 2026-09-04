@@ -96,9 +96,17 @@ definition — see [flat-generic](../../usage/plugins/ldap/flat-generic.md).
   server that does not load `core/auth/authzScope` restricts nothing and the
   console says so; a scope request that _fails_ is a different thing, and the
   console then offers no write action at all rather than every one of them.
-- **The interface is in one language at a time.** The catalogue holds only
-  interface words; entity and attribute names come from the schema, which is
-  the deployment's own vocabulary.
+- **The interface is in one language at a time**, and the whole of it, not
+  only the chrome. Two catalogues meet: the console's own, which holds the
+  interface words (`Search`, `Per page`, `Delete selection`) and ships with the
+  product; and the schema's `label` / `entity.label`, which names _your_
+  entities and attributes and travels with your configuration. Neither knows
+  the other's words, which is what lets a deployment be fully translated
+  without the product learning its vocabulary.
+
+  A lifecycle state is named by the console when it is one it knows —
+  `enabled`, `disabled`, `noAccess`, `toDelete` — and keeps the name the
+  deployment gave it otherwise. The chosen language is remembered.
 
 ## Exported pieces
 
@@ -130,6 +138,15 @@ A `pointer` names a branch, and the console fills the select from it:
   Without it the select keeps the value the entry already holds and offers no
   others.
 
+## Adding a language
+
+The console ships with English and French. A third one is a catalogue in
+`src/browser/directory-console/i18n.ts` plus, on the deployment side, the
+matching key in every schema `label`. The schema test in
+`test/schemas/twakeUsersSchema.test.ts` fails when a shipped schema leaves an
+attribute unnamed or untranslated, which is what keeps a half-translated
+screen from shipping.
+
 ## Known limits
 
 - The list endpoint returns a whole branch: the search guard keeps that
@@ -140,3 +157,10 @@ A `pointer` names a branch, and the console fills the select from it:
 - Bulk actions cover export and deletion; assignment is not there yet.
 - The exported CSV neutralises a cell a spreadsheet would read as a formula by
   prefixing it with an apostrophe, so such a value comes back with one.
+- There is no sign-out control. The console never authenticates anyone — it
+  sends whatever credential the browser already holds for the API — so ending
+  a session is the host application's to offer, not its own.
+- The members listed under an organization's card stop at
+  `ldap_organization_max_subnodes` (50 by default) and the card does not say
+  it truncated. The tree itself is unaffected: child organizations are asked
+  for by class and are not capped.

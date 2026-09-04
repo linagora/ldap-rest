@@ -17,11 +17,18 @@ describe('Twake schemas', () => {
   let users: Schema;
   let groups: Schema;
   let organizations: Schema;
+  let domains: Schema;
+  let labelled: Schema[];
 
   before(() => {
     users = read('twake/users.json');
     groups = read('twake/groups.json');
     organizations = read('twake/organizations.json');
+    domains = read('twake/nomenclature/twakeDomain.json');
+    // The nomenclature schemas reach a reader through the same selects and
+    // the same cards; leaving them out of the check left two attributes
+    // showing their own name in English.
+    labelled = [users, groups, organizations, domains];
   });
 
   describe('semantic roles', () => {
@@ -107,6 +114,53 @@ describe('Twake schemas', () => {
       for (const name of ['', ' leading space', 'a\nb', 'a+b']) {
         expect(pattern.test(name), JSON.stringify(name)).to.be.false;
       }
+    });
+  });
+
+  describe('labels', () => {
+    it('should name every attribute a client shows', () => {
+      const missing: string[] = [];
+      for (const schema of labelled)
+        for (const [name, attr] of Object.entries(schema.attributes)) {
+          if (name === 'objectClass') continue;
+          if (!attr.label) missing.push(name);
+        }
+      expect(missing).to.deep.equal([]);
+    });
+
+    it('should name them, not repeat them', () => {
+      // A label that *is* the attribute identifier passes "has a label" and
+      // shows the reader `dc` all the same. `Mobile` for `mobile` is a name
+      // that happens to look like one; `dc` for `dc` is the absence of one.
+      const raw: string[] = [];
+      for (const schema of labelled)
+        for (const [name, attr] of Object.entries(schema.attributes)) {
+          if (!attr.label || typeof attr.label === 'string') continue;
+          if (attr.label.en === name) raw.push(name);
+        }
+      expect(raw).to.deep.equal([]);
+    });
+
+    it('should translate those names rather than assume one language', () => {
+      // A label the interface cannot translate is the mixed-language screen
+      // this replaces, one field at a time.
+      const untranslated: string[] = [];
+      for (const schema of labelled)
+        for (const [name, attr] of Object.entries(schema.attributes)) {
+          if (!attr.label) continue;
+          if (typeof attr.label === 'string' || !attr.label.fr)
+            untranslated.push(name);
+        }
+      expect(untranslated).to.deep.equal([]);
+    });
+
+    it('should name the collections themselves', () => {
+      const entity = (users as unknown as { entity?: { label?: unknown } })
+        .entity;
+      expect(entity?.label).to.deep.equal({
+        en: 'Users',
+        fr: 'Utilisateurs',
+      });
     });
   });
 

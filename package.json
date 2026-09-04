@@ -280,6 +280,10 @@
       "types": "./dist/src/browser/directory-console/components/OrganizationTree.d.ts",
       "import": "./static/browser/directory-console/components/OrganizationTree.js"
     },
+    "./browser-directory-console-format": {
+      "types": "./dist/src/browser/directory-console/format.d.ts",
+      "import": "./static/browser/directory-console/format.js"
+    },
     "./browser-directory-console-i18n": {
       "types": "./dist/src/browser/directory-console/i18n.d.ts",
       "import": "./static/browser/directory-console/i18n.js"
@@ -679,6 +683,7 @@
     "package.json"
   ],
   "scripts": {
+    "audit:directory": "tsx scripts/audit-directory.ts",
     "build": "npm run build:prod",
     "build:browser": "rollup -c rollup.browser.config.mjs",
     "build:dev": "./.dev.mk builddev",

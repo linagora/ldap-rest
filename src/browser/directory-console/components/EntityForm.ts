@@ -15,6 +15,7 @@
  */
 
 import { escapeHtml } from '../../shared/utils/dom';
+import { attributeLabel } from '../format';
 import type { Translator } from '../i18n';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
@@ -98,9 +99,9 @@ export class EntityForm {
     return this.fields.length > PANEL_THRESHOLD;
   }
 
-  /** Label of an attribute: its schema label, or its own name. */
+  /** Label of an attribute: its schema label, or its name made readable. */
   private label(name: string, attr: SchemaAttribute): string {
-    return attr.label || name;
+    return attributeLabel(name, attr, this.options.translator.language);
   }
 
   /**
@@ -162,7 +163,7 @@ export class EntityForm {
       <div class="dc-field" data-field="${escapeHtml(name)}">
         <label for="${escapeHtml(id)}">${escapeHtml(this.label(name, attr))}${required}</label>
         ${control}
-        ${hint ? `<p class="dc-hint">${escapeHtml(hint)}</p>` : ''}
+        ${hint ? `<p class="dc-hint" data-hint>${escapeHtml(hint)}</p>` : ''}
         <p class="dc-error" data-error hidden></p>
       </div>`;
   }
@@ -415,13 +416,18 @@ export class EntityForm {
     const root = this.root;
     if (root) {
       for (const [name] of this.fields) {
-        const holder = root.querySelector<HTMLElement>(
-          `[data-field="${selectorValue(name)}"] [data-error]`
+        const field = root.querySelector<HTMLElement>(
+          `[data-field="${selectorValue(name)}"]`
         );
+        const holder = field?.querySelector<HTMLElement>('[data-error]');
         if (!holder) continue;
         const message = this.errors[name];
         holder.textContent = message || '';
         holder.hidden = !message;
+        // The refusal repeats the hint, so showing both says the same thing
+        // twice, once in grey and once in red.
+        const hint = field?.querySelector<HTMLElement>('[data-hint]');
+        if (hint) hint.hidden = Boolean(message);
       }
       const first = Object.keys(this.errors)[0];
       if (first)
