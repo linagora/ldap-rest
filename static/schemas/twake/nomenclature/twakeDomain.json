@@ -33,7 +33,7 @@
       "required": true,
       "role": "identifier",
       "label": {
-        "en": "dc",
+        "en": "Identifier",
         "fr": "Identifiant"
       }
     },
@@ -52,7 +52,7 @@
       "type": "string",
       "required": false,
       "label": {
-        "en": "description",
+        "en": "Description",
         "fr": "Description"
       }
     }
