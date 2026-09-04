@@ -92,7 +92,10 @@ definition — see [flat-generic](../../usage/plugins/ldap/flat-generic.md).
   whole path in the cell's tooltip.
 - **The tree stays on screen** while a node is read or edited.
 - **The scope is shown permanently** — which branches the caller administers,
-  and with which rights. An action they cannot perform is not offered.
+  and with which rights. An action they cannot perform is not offered. A
+  server that does not load `core/auth/authzScope` restricts nothing and the
+  console says so; a scope request that _fails_ is a different thing, and the
+  console then offers no write action at all rather than every one of them.
 - **The interface is in one language at a time.** The catalogue holds only
   interface words; entity and attribute names come from the schema, which is
   the deployment's own vocabulary.

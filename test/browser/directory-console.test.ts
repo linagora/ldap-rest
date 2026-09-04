@@ -298,6 +298,26 @@ describe('Directory console', () => {
         await new ConsoleApiClient(baseUrl, '/ldap').discover()
       ).to.deep.equal([]);
     });
+
+    it('should tell a scope the server does not serve from one it refused', async () => {
+      // No `auth/authzScope` is a 404 and means the server restricts nothing.
+      nock(baseUrl)
+        .get('/api/v1/authz/scope')
+        .reply(404, { error: 'Not found' });
+      expect(await new ConsoleApiClient(baseUrl).scope()).to.equal(null);
+
+      // Anything else is a failure, and reading it as "unrestricted" would
+      // show every button to a caller who was just refused.
+      nock(baseUrl)
+        .get('/api/v1/authz/scope')
+        .reply(401, { error: 'No authenticated user' });
+      try {
+        await new ConsoleApiClient(baseUrl).scope();
+        expect.fail('the refusal should have been raised');
+      } catch (err) {
+        expect((err as Error).message).to.equal('No authenticated user');
+      }
+    });
   });
 
   describe('EntityList', () => {

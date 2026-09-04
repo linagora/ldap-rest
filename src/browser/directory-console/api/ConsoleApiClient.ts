@@ -232,12 +232,20 @@ export class ConsoleApiClient {
     };
   }
 
-  /** The caller's administration scope, or null when the server serves none. */
+  /**
+   * The caller's administration scope, or null when the server serves none.
+   *
+   * A `404` is the answer of a server that does not load `auth/authzScope`:
+   * it has no scope to give, which is not the same thing as refusing to give
+   * one. Every other failure is raised, because reading it as "unrestricted"
+   * would show a caller who was just told `401` every button on the console.
+   */
   async scope(): Promise<Scope | null> {
     try {
       return await this.call<Scope>(`${this.apiPrefix}/v1/authz/scope`);
-    } catch {
-      return null;
+    } catch (err) {
+      if ((err as { status?: number }).status === 404) return null;
+      throw err;
     }
   }
 

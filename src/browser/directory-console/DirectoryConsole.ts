@@ -42,6 +42,13 @@ export class DirectoryConsole {
   private container: HTMLElement | null = null;
   private entities: EntityDescriptor[] = [];
   private scope: Scope | null = null;
+  /**
+   * Why the scope could not be read, when it could not. A missing endpoint
+   * is `scope = null` and means the server restricts nothing; a request that
+   * failed means the console does not know what the caller may do, and it
+   * offers nothing rather than every button.
+   */
+  private scopeError: string | null = null;
   private route: Route = { view: 'dashboard' };
   private tree: OrganizationTree | null = null;
 
@@ -76,12 +83,22 @@ export class DirectoryConsole {
 
     try {
       this.entities = await this.api.discover();
-      this.scope = await this.api.scope();
     } catch (err) {
       this.container.innerHTML = `<p class="dc-empty dc-error-block">${escapeHtml(
         (err as Error).message
       )}</p>`;
       return;
+    }
+
+    // The scope is not worth a dead page: a console that lists and reads is
+    // still a console. But it stops offering to write, since what came back
+    // was a failure rather than a permission.
+    try {
+      this.scope = await this.api.scope();
+      this.scopeError = null;
+    } catch (err) {
+      this.scope = null;
+      this.scopeError = (err as Error).message;
     }
 
     this.readRoute();
@@ -208,6 +225,10 @@ export class DirectoryConsole {
   private scopeMarkup(): string {
     const t = (key: string, values?: Record<string, string | number>): string =>
       this.translator.t(key, values);
+    if (this.scopeError)
+      return `<span class="dc-scope-error">${escapeHtml(
+        t('scope.unavailable', { error: this.scopeError })
+      )}</span>`;
     if (!this.scope)
       return `<span class="dc-scope-empty">${escapeHtml(t('scope.unrestricted'))}</span>`;
     if (this.scope.unrestricted)
@@ -275,20 +296,26 @@ export class DirectoryConsole {
 
   /** Whether the caller may create an entry of this entity. */
   private canCreate(entity: EntityDescriptor): boolean {
+    if (this.scopeError) return false;
     if (!this.scope || this.scope.unrestricted) return true;
     const declared = this.scope.entities.find(
       item => item.name === entity.pluralName
     );
-    return declared ? declared.create : this.scope.branches.length > 0;
+    // The server enumerates every entity it serves, so an entity it did not
+    // name is one it does not know: its add hook is what would answer, and it
+    // would answer 403.
+    return declared ? declared.create : false;
   }
 
   /** Whether the caller may write anywhere at all. */
   private canWrite(): boolean {
+    if (this.scopeError) return false;
     if (!this.scope || this.scope.unrestricted) return true;
     return this.scope.branches.some(branch => branch.write);
   }
 
   private canDelete(): boolean {
+    if (this.scopeError) return false;
     if (!this.scope || this.scope.unrestricted) return true;
     return this.scope.branches.some(branch => branch.delete);
   }
@@ -414,8 +441,15 @@ export class DirectoryConsole {
     let entry: Entry;
     try {
       entry = await this.api.get(entity, id);
-    } catch {
-      main.innerHTML = `<p class="dc-empty">${escapeHtml(t('detail.notFound'))}</p>`;
+    } catch (err) {
+      // Only a 404 means what "no longer exists" says. A 401, a 403 or a
+      // proxy error is a different thing entirely, and telling the operator
+      // the entry is gone sends them looking for the wrong problem.
+      const gone = (err as { status?: number }).status === 404;
+      const message = gone ? t('detail.notFound') : (err as Error).message;
+      main.innerHTML = `<p class="dc-empty${
+        gone ? '' : ' dc-error-block'
+      }">${escapeHtml(message)}</p>`;
       return;
     }
 
