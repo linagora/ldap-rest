@@ -96,9 +96,23 @@ export default class AuthzScope extends DmPlugin {
    * @returns the plugin, or undefined when the server is unrestricted
    */
   private authz(): AuthzLike | undefined {
-    return Object.values(this.server.loadedPlugins).find(plugin =>
-      plugin.roles?.includes('authz')
-    ) as AuthzLike | undefined;
+    // The `authz` role says a plugin restricts something, not that it can
+    // answer *who may do what where*: `authzPerRoute` gates URLs and
+    // `authzDynamic` reads a token, and neither resolves a user or a branch.
+    // Both carry the role, and `authzPerRoute` sits in priority.json, so it is
+    // registered before any branch-level plugin — picking by role alone made
+    // this endpoint answer 500 to every caller on any server combining the
+    // two. Ask for the capability instead, and fall through to the
+    // unrestricted answer when nothing provides it.
+    return Object.values(this.server.loadedPlugins).find(plugin => {
+      if (!plugin.roles?.includes('authz')) return false;
+      const candidate = plugin as unknown as Partial<AuthzLike>;
+      return (
+        typeof candidate.resolveUser === 'function' &&
+        typeof candidate.getAuthorizedBranches === 'function' &&
+        typeof candidate.getUserPermissions === 'function'
+      );
+    }) as AuthzLike | undefined;
   }
 
   /**
@@ -160,16 +174,16 @@ export default class AuthzScope extends DmPlugin {
     }
 
     // "Can I create a user?" is not a question about the user branch: an entry
-    // is scoped by the organization it is attached to, so the answer is yes as
-    // soon as the caller administers at least one branch. Organizations are
-    // the exception — they live in the tree itself.
+    // is scoped by the organization it is attached to, so the answer turns on
+    // the branches the caller administers rather than on where the entry
+    // lands. It turns on *write* on one of them, which is what the add hook
+    // checks — administering a branch read-only used to report `create: true`
+    // and every submission then came back 403, which is exactly the round trip
+    // this endpoint exists to spare the client.
+    const writable = await this.canWriteAny(authz, user, branchDns);
     const entities: CreatableEntity[] = [];
     for (const entity of this.entities()) {
-      const create =
-        branchDns.length > 0 &&
-        (entity.name !== 'organizations' ||
-          (await this.canWriteAny(authz, user, branchDns)));
-      entities.push({ ...entity, create });
+      entities.push({ ...entity, create: writable });
     }
 
     res.json({
