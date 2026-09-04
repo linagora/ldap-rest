@@ -93,19 +93,62 @@ export function parseOptions(argv: string[]): Options {
  * @param base directory suffix
  * @returns the resolved content
  */
-export function resolvePlaceholders(text: string, base: string): string {
-  return text.replace(/__(\S+?)__/g, (match, key: string) =>
-    key.toLowerCase() === 'ldap_base' ? base : match
-  );
+export function resolvePlaceholders(
+  text: string,
+  config: Record<string, string | undefined>
+): string {
+  return text.replace(/__(\S+)__/g, (match, key: string) => {
+    const value = config[key.trim().toLowerCase()];
+    return value ? value : match;
+  });
 }
 
-/** Attribute values, always as a list of strings. */
+/**
+ * The configuration a schema may name, as the server assembles it: every
+ * `DM_*` variable under its lowercased name, `--base` overriding `ldap_base`.
+ *
+ * The server resolves any `__KEY__` the configuration holds and leaves the
+ * literal when it holds none. Resolving only `ldap_base`, and resolving it to
+ * an empty string when it is unset, made every other placeholder audit
+ * against its own literal text and reported the whole branch as malformed.
+ *
+ * @param base value of `--base`, when given
+ * @returns the keys a schema may name, lowercased
+ */
+export function schemaConfig(base?: string): Record<string, string> {
+  const config: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env))
+    if (name.startsWith('DM_') && value)
+      config[name.slice(3).toLowerCase()] = value;
+  if (base) config.ldap_base = base;
+  return config;
+}
+
+/**
+ * Attribute values, always as a list of strings.
+ *
+ * A value the directory stores as binary — a certificate, a photo — is not
+ * text and decoding it would report every entry as failing a pattern the
+ * server never applies to it either. Such a value is dropped rather than
+ * mangled: a `Buffer` that does not survive a round trip through UTF-8 is not
+ * a string that was written, it is bytes that were.
+ *
+ * @param value value as the directory returned it
+ * @returns the values that can be read as text
+ */
 function valueList(value: unknown): string[] {
   if (value === undefined || value === null) return [];
   const list = Array.isArray(value) ? value : [value];
-  return list.map(item =>
-    Buffer.isBuffer(item) ? item.toString('utf8') : String(item)
-  );
+  const out: string[] = [];
+  for (const item of list) {
+    if (!Buffer.isBuffer(item)) {
+      out.push(String(item));
+      continue;
+    }
+    const text = item.toString('utf8');
+    if (Buffer.from(text, 'utf8').equals(item)) out.push(text);
+  }
+  return out;
 }
 
 /**
@@ -120,13 +163,21 @@ function valueList(value: unknown): string[] {
  * @param entry its attributes
  * @param schema schema to check against
  * @param report findings so far, updated in place
+ * @param sampleLimit offending entries to keep per finding
  */
 export function auditEntry(
   dn: string,
   entry: Record<string, unknown>,
   schema: Schema,
-  report: Map<string, Finding>
+  report: Map<string, Finding>,
+  sampleLimit = 100
 ): void {
+  // LDAP attribute names are case-insensitive (RFC 4512) and a directory
+  // answers with the case it was written in, which is not always the schema's.
+  // Read straight off the entry, `MAIL` was simply not audited.
+  const byName = new Map<string, unknown>();
+  for (const [key, entryValue] of Object.entries(entry))
+    byName.set(key.toLowerCase(), entryValue);
   const add = (
     attribute: string,
     reason: string,
@@ -149,12 +200,13 @@ export function auditEntry(
       report.set(key, finding);
     }
     finding.count++;
-    if (finding.samples.length < 100) finding.samples.push({ dn, value });
+    if (finding.samples.length < sampleLimit)
+      finding.samples.push({ dn, value });
   };
 
   for (const [name, definition] of Object.entries(schema.attributes)) {
     if (name === 'objectClass') continue;
-    const values = valueList(entry[name]);
+    const values = valueList(byName.get(name.toLowerCase()));
 
     if (definition.required && values.length === 0 && !definition.generated) {
       add(name, 'missing', '', definition);
@@ -238,18 +290,22 @@ export function printReport(
  */
 export async function audit(options: Options): Promise<boolean> {
   const raw = fs.readFileSync(options.schema, 'utf8');
-  const suffix = process.env.DM_LDAP_BASE || '';
-  const schema = JSON.parse(resolvePlaceholders(raw, suffix)) as Schema & {
+  const config = schemaConfig(options.base);
+  const suffix = config.ldap_base || '';
+  const schema = JSON.parse(resolvePlaceholders(raw, config)) as Schema & {
     entity?: { base?: string };
   };
 
   const client = new Client({ url: options.url });
   await client.bind(options.bindDn, options.bindPassword);
   try {
-    const base =
-      options.base ||
-      schema.entity?.base?.replace(/\{ldap_base\}/g, suffix) ||
-      suffix;
+    // `entity.base` names configuration keys the way `flatGeneric` reads them:
+    // any `{config_key}`, not `{ldap_base}` alone.
+    const declared = schema.entity?.base?.replace(
+      /\{([^}]+)\}/g,
+      (match, key: string) => config[key.trim().toLowerCase()] ?? match
+    );
+    const base = options.base || declared || suffix;
     if (!base)
       throw new Error(
         '--base is required when the schema declares no entity base'
@@ -266,7 +322,7 @@ export async function audit(options: Options): Promise<boolean> {
       // The base of the branch is not an entry of the entity.
       if (String(entry.dn).toLowerCase() === base.toLowerCase()) continue;
       total++;
-      auditEntry(String(entry.dn), entry, schema, report);
+      auditEntry(String(entry.dn), entry, schema, report, options.samples);
     }
     return printReport([...report.values()], total, options.samples);
   } finally {
