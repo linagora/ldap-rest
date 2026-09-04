@@ -12,7 +12,10 @@ import nock from 'nock';
 import { ConsoleApiClient } from '../../src/browser/directory-console/api/ConsoleApiClient';
 import { EntityDetail } from '../../src/browser/directory-console/components/EntityDetail';
 import { EntityForm } from '../../src/browser/directory-console/components/EntityForm';
-import { EntityList } from '../../src/browser/directory-console/components/EntityList';
+import {
+  EntityList,
+  csvCell,
+} from '../../src/browser/directory-console/components/EntityList';
 import { Translator } from '../../src/browser/directory-console/i18n';
 import type {
   EntityDescriptor,
@@ -391,6 +394,20 @@ describe('Directory console', () => {
 
       expect(container.innerHTML).to.contain('smith');
       expect(container.innerHTML).to.not.contain('>smi<');
+    });
+
+    it('should not let an exported cell become a formula', () => {
+      // A directory holds what was written into it, and a spreadsheet reads a
+      // cell opening on one of these as a formula. Quoting does not help: the
+      // quotes are stripped on import and the formula still runs.
+      expect(csvCell('=HYPERLINK("http://evil.example")')).to.equal(
+        '"\'=HYPERLINK(""http://evil.example"")"'
+      );
+      expect(csvCell('@SUM(A1)')).to.equal("'@SUM(A1)");
+      expect(csvCell('-1+1')).to.equal("'-1+1");
+      // Ordinary values are left alone, quoted only when they need it.
+      expect(csvCell('John Smith')).to.equal('John Smith');
+      expect(csvCell('Smith, John')).to.equal('"Smith, John"');
     });
   });
 

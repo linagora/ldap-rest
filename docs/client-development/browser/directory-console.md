@@ -138,3 +138,5 @@ A `pointer` names a branch, and the console fills the select from it:
 - Moving an entry between organizations is exposed by the API
   (`POST {entity}/:id/move`) but has no control in the interface yet.
 - Bulk actions cover export and deletion; assignment is not there yet.
+- The exported CSV neutralises a cell a spreadsheet would read as a formula by
+  prefixing it with an apostrophe, so such a value comes back with one.
