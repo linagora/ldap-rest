@@ -115,7 +115,7 @@ import {
   OrganizationTree,
   Translator,
   roleAttribute,
-} from 'ldap-rest/browser-directory-console';
+} from 'ldap-rest/browser-directory-console-index';
 ```
 
 ## Filling a pointer field

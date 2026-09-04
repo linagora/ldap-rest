@@ -617,7 +617,23 @@ export class DirectoryConsole {
   /* ------------------------------------------------------------ side panel */
 
   /** Open the side panel with a title and a body builder. */
-  private openPanel(title: string, build: (body: HTMLElement) => void): void {
+  /**
+   * Show the overlay.
+   *
+   * A long form docks to the side, so its Save button stays put instead of
+   * scrolling off the bottom of a modal — that was the complaint the brief
+   * makes. A form of three fields does not need half the screen, and reads
+   * better centred, which is what `modal` asks for.
+   *
+   * @param title heading of the overlay
+   * @param build fills the body
+   * @param modal centre it rather than docking it to the side
+   */
+  private openPanel(
+    title: string,
+    build: (body: HTMLElement) => void,
+    modal = false
+  ): void {
     const panel = this.container?.querySelector<HTMLElement>('[data-panel]');
     const heading =
       this.container?.querySelector<HTMLElement>('[data-panel-title]');
@@ -625,6 +641,7 @@ export class DirectoryConsole {
       this.container?.querySelector<HTMLElement>('[data-panel-body]');
     if (!panel || !heading || !body) return;
     heading.textContent = title;
+    panel.classList.toggle('dc-panel-modal', modal);
     body.innerHTML = '';
     build(body);
     panel.hidden = false;
@@ -681,7 +698,8 @@ export class DirectoryConsole {
         : t('dashboard.create', { entity: entity.singularName }),
       (body: HTMLElement): void => {
         void form.render(body);
-      }
+      },
+      !form.wantsPanel
     );
   }
 
@@ -736,7 +754,8 @@ export class DirectoryConsole {
         : t('dashboard.create', { entity: entity.singularName }),
       (body: HTMLElement): void => {
         void form.render(body);
-      }
+      },
+      !form.wantsPanel
     );
   }
 
