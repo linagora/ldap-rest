@@ -137,6 +137,20 @@ describe('Account lifecycle', () => {
         expect(res.body.error).to.match(/known states: .*disabled/);
       });
 
+      it('should refuse a name inherited from Object.prototype', async () => {
+        // `states` is a plain object, so `states.constructor` is a function
+        // rather than undefined. A `=== undefined` guard let it through into
+        // the LDAP modify, answering 500 instead of the documented 400.
+        for (const state of ['constructor', 'toString', 'hasOwnProperty']) {
+          const res = await request
+            .post('/api/v1/ldap/users/lifecycle.user/status')
+            .type('json')
+            .send({ state });
+          expect(res.status, state).to.equal(400);
+          expect(res.body.error, state).to.match(/known states: /);
+        }
+      });
+
       it('should refuse a body without a state', async () => {
         const res = await request
           .post('/api/v1/ldap/users/lifecycle.user/status')

@@ -212,12 +212,17 @@ export default class LdapAccountLifecycle extends DmPlugin {
   ): Promise<void> {
     const body = jsonBody(req, res, 'state') as { state: string } | false;
     if (!body) return;
-    const value = states[body.state];
-    if (value === undefined) {
+    // `states` is read from a JSON schema, so it carries Object.prototype on
+    // its chain: `states.constructor` and `states.toString` are functions, not
+    // undefined, and a plain `=== undefined` guard would let one through into
+    // an LDAP modify. Ask for an own property, which is what the error message
+    // below already claims to be checking.
+    if (!Object.prototype.hasOwnProperty.call(states, body.state)) {
       throw new BadRequestError(
         `Unknown state "${body.state}" for ${entity.singularName}; known states: ${Object.keys(states).join(', ')}`
       );
     }
+    const value = states[body.state];
     const id = decodeURIComponent(req.params.id as string);
     await this.modify(entity, id, { replace: { [attribute]: value } });
     res.json({ success: true, state: body.state });
