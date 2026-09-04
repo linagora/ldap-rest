@@ -453,6 +453,19 @@
   box-shadow: -4px 0 24px rgb(0 0 0 / 15%);
 }
 
+/* A short form does not need the whole height: it opens as a dialog. */
+.dc-panel-modal {
+  justify-content: center;
+  align-items: center;
+}
+
+.dc-panel-modal .dc-panel-inner {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100vh - 64px);
+  border-radius: var(--dc-radius);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 25%);
+}
+
 .dc-panel-header {
   display: flex;
   align-items: center;
