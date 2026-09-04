@@ -271,6 +271,18 @@ describe('Enterprise rules', () => {
         expect(res.body.error).to.match(/already used/);
       });
 
+      it('should not name the entry holding it', async () => {
+        // The uniqueness search runs with the server's own visibility, so its
+        // result must not be projected back: a manager scoped to one branch
+        // would otherwise probe any address and be told which entry, in which
+        // branch, holds it.
+        await create('rules.uniq@example.com').expect(201);
+        const res = await create('rules.uniq@example.com');
+        expect(res.status).to.equal(409);
+        expect(res.body.error).to.not.contain('uid=');
+        expect(res.body.error).to.not.contain(base);
+      });
+
       it('should refuse a duplicate employee number', async () => {
         await create('rules.uniq@example.com', {
           employeeNumber: 'E12345',
