@@ -368,6 +368,14 @@ export default abstract class LdapFlat extends DmPlugin {
       if (match) value = match[1] !== undefined ? match[1] : match[0];
     }
     if (rule.lowercase) value = value.toLowerCase();
+    // The source charset is rarely the target's. A mail local part may legally
+    // carry `+`, `'` or `!` — the shipped mail test admits them — while a
+    // `uid` may not, and the derived value is validated against the `uid`
+    // rule. Without a way to say which characters to drop, `john+tag@…` was
+    // refused for an attribute the client is forbidden to send, so no request
+    // could ever succeed.
+    if (rule.strip)
+      value = value.replace(getCompiledRegex(rule.strip, 'g'), '');
     if (!value) {
       throw new BadRequestError(
         `Cannot generate "${this.mainAttribute}" from "${rule.attribute}"`
@@ -1238,9 +1246,16 @@ export default abstract class LdapFlat extends DmPlugin {
     partial = false,
     attrs: string[] = [this.mainAttribute]
   ): Promise<LdapList> {
+    // `apiAdd` re-reads the entry it has just written through this, so an
+    // identifier the schema admits has to survive the trip: the shipped
+    // position and group schemas accept `( )` and `*`, which a raw
+    // interpolation turns into an unparseable filter — after the entry is
+    // committed, so the caller saw a 500 on a creation that had succeeded.
+    // A partial search means the value to look for, not a pattern to run.
+    const escaped = escapeLdapFilter(name);
     const filter = partial
-      ? `(${this.mainAttribute}=*${name}*)`
-      : `(${this.mainAttribute}=${name})`;
+      ? `(${this.mainAttribute}=*${escaped}*)`
+      : `(${this.mainAttribute}=${escaped})`;
     return await this.listEntries({ filter, attributes: attrs });
   }
 
