@@ -462,7 +462,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *   Returns all entries in the flat LDAP branch, keyed by their
      *   `mainAttribute` value (e.g. `uid` for users). The optional
      *   `match` and `attribute` query parameters filter results using
-     *   a substring LDAP search (`attribute=*match*`). The `attributes`
+     *   a substring LDAP search (`attribute=*match*`). `attribute` accepts
+     *   several names separated by commas, and the clauses are then joined
+     *   with `|`. The `attributes`
      *   parameter limits which LDAP attributes are returned.
      * tags:
      *   - Entities
@@ -481,7 +483,8 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       Substring to match. Must be used together with `attribute`.
-     *       The resulting LDAP filter is `(attribute=*match*)`.
+     *       The resulting LDAP filter is `(attribute=*match*)`, or
+     *       `(|(a=*match*)(b=*match*))` when several attributes are named.
      *     example: alice
      *   - in: query
      *     name: attribute
@@ -489,6 +492,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       LDAP attribute name to match against (used with `match`).
+     *       Several may be given, separated by commas; an entry matching any
+     *       of them is returned. Each name must be indexed for a substring
+     *       search, or the directory scans the branch.
      *     example: cn
      *   - in: query
      *     name: attributes
@@ -535,12 +541,25 @@ export default abstract class LdapFlat extends DmPlugin {
         ) {
           // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
           const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
-          if (!attributePattern.test(req.query.attribute)) {
+          // One name, or several separated by commas. Looking for a person by
+          // surname meant knowing to switch a selector to the attribute that
+          // holds it first, which is knowledge about the schema asked of
+          // someone searching precisely because they do not have it.
+          const names = req.query.attribute
+            .split(',')
+            .map(name => name.trim())
+            .filter(Boolean);
+          if (
+            names.length === 0 ||
+            !names.every(name => attributePattern.test(name))
+          ) {
             throw new BadRequestError('Invalid LDAP attribute name');
           }
           // Escape filter value to prevent LDAP injection
           const escapedMatch = escapeLdapFilter(req.query.match);
-          args.filter = `(${req.query.attribute}=*${escapedMatch}*)`;
+          const clauses = names.map(name => `(${name}=*${escapedMatch}*)`);
+          args.filter =
+            clauses.length === 1 ? clauses[0] : `(|${clauses.join('')})`;
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
