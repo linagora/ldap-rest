@@ -736,71 +736,37 @@ export default class LdapOrganizations extends DmPlugin {
         const ouName = (
           Array.isArray(ouValue) ? ouValue[0] : ouValue
         ) as string;
-        if (!path.startsWith(ouName + sep))
+        // A path reads from the root down: `Root / Branch / Leaf`, the entry's
+        // own name last. This asked for the reverse, so it refused every path
+        // the directories it serves actually hold — and refused a top-level
+        // organization outright, whose path is its own name and nothing else.
+        if (path === ouName) return;
+        if (!path.endsWith(sep + ouName))
           throw new BadRequestError(
-            `Organization path must start with its own name followed by separator "${sep}"`
+            `Organization path must end with its own name, preceded by separator "${sep}"`
           );
-        matchingPath = path.slice(ouName.length + sep.length);
+        matchingPath = path.slice(0, path.length - sep.length - ouName.length);
       }
-      const [ou, ouPath] = matchingPath.split(sep, 2);
 
-      // Search will benefit from cache for repeated validations
-      const entries = await this.server.ldap.search(
+      // What is left is the path of the organization this entry hangs from:
+      // the parent for an organization, the department itself for anything
+      // else. It has to be a path some organization actually holds — walking
+      // the chain element by element was both more work and wrong past two
+      // levels, since it compared an ancestor's name against its own
+      // ancestors' path.
+      const entries = (await this.server.ldap.search(
         {
           paged: false,
-          filter: `(ou=${escapeLdapFilter(ou)})`,
           scope: 'sub',
+          filter: `(${this.pathAttr}=${escapeLdapFilter(matchingPath)})`,
+          attributes: ['dn'],
         },
         this.config.ldap_top_organization
-      );
-      if ((entries as SearchResult).searchEntries.length === 0)
-        throw new BadRequestError(`Invalid organization path ${path}`);
-
-      // If ouPath is undefined, this references the top organization
-      // Verify it exists and has no parent path (or matches top org DN)
-      if (!ouPath) {
-        let found = false;
-        for (const entry of (entries as SearchResult).searchEntries) {
-          const entryDn = entry.dn;
-          const topOrgDn = this.config.ldap_top_organization as string;
-          // Check if this is the top organization (DN matches or is direct child)
-          if (
-            entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
-            entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
-          ) {
-            const pathValue = entry[this.pathAttr];
-            const entryPath = Array.isArray(pathValue)
-              ? (pathValue[0] as string | undefined)
-              : (pathValue as string | undefined);
-            // Top org should either have no path attribute or a simple path (just its name)
-            if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
-              found = true;
-              break;
-            }
-          }
-        }
-        if (!found)
-          throw new BadRequestError(
-            `Invalid organization path ${path}: no matching top-level entry for ${ou}`
-          );
-      } else {
-        // Verify parent organization exists with the specified path
-        let found = false;
-        for (const entry of (entries as SearchResult).searchEntries) {
-          const pathValue = entry[this.pathAttr];
-          const entryPath = Array.isArray(pathValue)
-            ? (pathValue[0] as string)
-            : (pathValue as string);
-          if (entryPath && entryPath === ouPath) {
-            found = true;
-            break;
-          }
-        }
-        if (!found)
-          throw new BadRequestError(
-            `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
-          );
-      }
+      )) as SearchResult;
+      if (!entries.searchEntries || entries.searchEntries.length === 0)
+        throw new BadRequestError(
+          `Invalid organization path ${path}: no organization holds "${matchingPath}"`
+        );
     }
   }
 

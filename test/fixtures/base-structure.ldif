@@ -209,7 +209,7 @@ userPassword: password123
 displayName: Bob User
 description: Test user in organization
 twakeDepartmentLink: ou=Sub Org 1,ou=Test Org 1,ou=organization,dc=example,dc=com
-twakeDepartmentPath: Test Org 1/Sub Org 1
+twakeDepartmentPath: Test Org 1 / Sub Org 1
 
 # Account status nomenclature (lifecycle states)
 dn: ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
