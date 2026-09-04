@@ -52,6 +52,16 @@
   which attribute carries it, is schema configuration. A generated password is
   returned exactly once, since the credential attributes are `neverReturn`
 
+- `browser/directory-console`: an administration interface — entity lists with
+  search, paging and bulk actions, an organization tree that stays on screen,
+  a detail card showing every attribute, schema-driven forms with the pattern
+  explained under the field, the lifecycle actions, and the caller's own scope
+  shown permanently. It is built from `GET /v1/config` and `GET /v1/authz/scope`
+  alone: no entity name, attribute name or label is written in it, so a
+  deployment that names its things differently gets its own interface without
+  a change. See
+  [directory-console](docs/client-development/browser/directory-console.md)
+
 - `plugins/auth/authzScope`: `GET /api/v1/authz/scope` answers what the
   signed-in administrator may do — the branches they manage, named and with
   their permissions, and per entity whether they may create one. In a

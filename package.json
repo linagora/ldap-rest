@@ -256,6 +256,42 @@
       "types": "./dist/src/abstract/twakePlugin.d.ts",
       "import": "./dist/abstract/twakePlugin.js"
     },
+    "./browser-directory-console-directoryconsole": {
+      "types": "./dist/src/browser/directory-console/DirectoryConsole.d.ts",
+      "import": "./static/browser/directory-console/DirectoryConsole.js"
+    },
+    "./browser-directory-console-api-consoleapiclient": {
+      "types": "./dist/src/browser/directory-console/api/ConsoleApiClient.d.ts",
+      "import": "./static/browser/directory-console/api/ConsoleApiClient.js"
+    },
+    "./browser-directory-console-components-entitydetail": {
+      "types": "./dist/src/browser/directory-console/components/EntityDetail.d.ts",
+      "import": "./static/browser/directory-console/components/EntityDetail.js"
+    },
+    "./browser-directory-console-components-entityform": {
+      "types": "./dist/src/browser/directory-console/components/EntityForm.d.ts",
+      "import": "./static/browser/directory-console/components/EntityForm.js"
+    },
+    "./browser-directory-console-components-entitylist": {
+      "types": "./dist/src/browser/directory-console/components/EntityList.d.ts",
+      "import": "./static/browser/directory-console/components/EntityList.js"
+    },
+    "./browser-directory-console-components-organizationtree": {
+      "types": "./dist/src/browser/directory-console/components/OrganizationTree.d.ts",
+      "import": "./static/browser/directory-console/components/OrganizationTree.js"
+    },
+    "./browser-directory-console-i18n": {
+      "types": "./dist/src/browser/directory-console/i18n.d.ts",
+      "import": "./static/browser/directory-console/i18n.js"
+    },
+    "./browser-directory-console-index": {
+      "types": "./dist/src/browser/directory-console/index.d.ts",
+      "import": "./static/browser/directory-console/index.js"
+    },
+    "./browser-directory-console-types": {
+      "types": "./dist/src/browser/directory-console/types.d.ts",
+      "import": "./static/browser/directory-console/types.js"
+    },
     "./browser-ldap-browser-ldapbrowser": {
       "types": "./dist/src/browser/ldap-browser/LdapBrowser.d.ts",
       "import": "./static/browser/ldap-browser/LdapBrowser.js"
