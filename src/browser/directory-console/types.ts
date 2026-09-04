@@ -38,6 +38,8 @@ export interface SchemaAttribute {
   fixed?: boolean;
   /** Server-side normalisation, which decides how the value reads back */
   normalize?: 'byteSize';
+  /** Whether "search everywhere" includes this attribute; see the schema doc */
+  searchable?: boolean;
   role?: SchemaRole | SchemaRole[];
   /** Computed server-side: shown, never edited */
   generated?: boolean;

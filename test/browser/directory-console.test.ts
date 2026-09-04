@@ -472,6 +472,68 @@ describe('Directory console', () => {
       );
     });
 
+    it('should search every field the schema marks, not just the identifier', async () => {
+      // Looking for a person by surname meant knowing which attribute holds
+      // it and switching a selector to it first — schema knowledge asked of
+      // someone searching precisely because they lack it.
+      const asked: string[] = [];
+      const list = new EntityList({
+        entity: {
+          ...users,
+          schema: {
+            attributes: {
+              uid: { type: 'string', role: 'identifier', searchable: true },
+              sn: { type: 'string', searchable: true },
+              userPassword: { type: 'string', neverReturn: true },
+              twakeSecret: { type: 'string' },
+            },
+          },
+        },
+        translator: new Translator('en'),
+        load: (_search: string, attribute: string) => {
+          asked.push(attribute);
+          return Promise.resolve({});
+        },
+        listable: true,
+        onOpen: () => undefined,
+        onDelete: () => Promise.resolve(),
+        canDelete: false,
+      });
+      await list.render(stubContainer());
+      // Marked attributes only: an unmarked one is not offered, because the
+      // marker says which the directory indexed.
+      expect(asked).to.deep.equal(['uid,sn']);
+    });
+
+    it('should guess when the schema marks nothing', async () => {
+      const asked: string[] = [];
+      const list = new EntityList({
+        entity: {
+          ...users,
+          schema: {
+            attributes: {
+              objectClass: { type: 'array' },
+              uid: { type: 'string' },
+              userPassword: { type: 'string', neverReturn: true },
+              manager: { type: 'pointer' },
+            },
+          },
+        },
+        translator: new Translator('en'),
+        load: (_search: string, attribute: string) => {
+          asked.push(attribute);
+          return Promise.resolve({});
+        },
+        listable: true,
+        onOpen: () => undefined,
+        onDelete: () => Promise.resolve(),
+        canDelete: false,
+      });
+      await list.render(stubContainer());
+      // Everything returnable, single-valued and not a DN.
+      expect(asked).to.deep.equal(['uid']);
+    });
+
     it('should show the answer to the last search, not the last answer', async () => {
       // Typing is debounced, not serialised: two loads are in flight whenever
       // the operator keeps typing, and the slow one used to overwrite the

@@ -21,6 +21,7 @@
     },
     "uid": {
       "type": "string",
+      "searchable": true,
       "test": "^[a-zA-Z0-9._-]{1,255}$",
       "required": true,
       "role": "identifier",
@@ -35,6 +36,7 @@
     },
     "employeeNumber": {
       "type": "string",
+      "searchable": true,
       "test": "^([A-Z0-9]{6,9}|[A-Z][A-Z0-9]{13}|UNIT)$",
       "hint": "Expected 6 to 9 characters, or a letter followed by 13 characters, or UNIT",
       "required": true,
@@ -46,11 +48,13 @@
     },
     "cn": {
       "type": "string",
+      "searchable": true,
       "required": true,
       "role": "displayName"
     },
     "sn": {
       "type": "string",
+      "searchable": true,
       "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
       "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
       "required": true,
@@ -58,6 +62,7 @@
     },
     "givenName": {
       "type": "string",
+      "searchable": true,
       "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
       "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
       "required": false,
@@ -88,6 +93,7 @@
     },
     "mail": {
       "type": "string",
+      "searchable": true,
       "test": "^[^@\\s]{1,64}@example\\.org$",
       "hint": "Expected an address in the example.org domain, at most 64 characters before the @",
       "required": true,

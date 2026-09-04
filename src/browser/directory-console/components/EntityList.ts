@@ -22,6 +22,14 @@ import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 /** Characters required before a search is issued. */
 export const SEARCH_MINIMUM = 3;
 
+/**
+ * The search scope meaning "every field worth searching" rather than one.
+ *
+ * Not an attribute name — `*` cannot be one — so it never collides with the
+ * schema's own names in the selector.
+ */
+export const SEARCH_ANYWHERE = '*';
+
 const PAGE_SIZES = [25, 50, 100, 200];
 const PAGE_SIZE_KEY = 'ldap-rest.console.pageSize';
 
@@ -113,7 +121,9 @@ export class EntityList {
   constructor(options: ListOptions) {
     this.options = options;
     this.columns = EntityList.chooseColumns(options.entity);
-    this.searchAttribute = options.entity.mainAttribute;
+    // Searching everywhere is the default: someone looking for a person by
+    // surname should not have to know which attribute holds it first.
+    this.searchAttribute = SEARCH_ANYWHERE;
   }
 
   /**
@@ -153,8 +163,44 @@ export class EntityList {
   }
 
   /** Attributes a search can be run against: the visible, single-valued ones. */
+  /**
+   * The term to search for: what was typed, without the spaces around it.
+   *
+   * `this.search` holds the box's contents exactly, because the box is
+   * redrawn from it — trimming on the way in deleted the space the operator
+   * had just typed between a first name and a surname, as soon as the
+   * debounce repainted. Only the question "is this long enough, and what do
+   * I send" wants it trimmed.
+   */
+  private get query(): string {
+    return this.search.trim();
+  }
+
+  /**
+   * The attribute, or attributes, the search is sent against.
+   *
+   * @returns one name, or the comma-separated list the endpoint joins with `|`
+   */
+  private get searchScope(): string {
+    if (this.searchAttribute !== SEARCH_ANYWHERE) return this.searchAttribute;
+    return this.searchableAttributes()
+      .map(([name]) => name)
+      .join(',');
+  }
+
+  /**
+   * The attributes offered in the scope selector, and searched together.
+   *
+   * A schema that marks any attribute `searchable` has said which ones its
+   * directory indexed, and that list is taken as it stands. One that marks
+   * none is guessed at — everything returnable, single-valued and not a DN —
+   * which suits a small branch and scans a large one.
+   */
   private searchableAttributes(): [string, SchemaAttribute][] {
-    return Object.entries(this.options.entity.schema.attributes).filter(
+    const all = Object.entries(this.options.entity.schema.attributes);
+    const declared = all.filter(([, attr]) => attr.searchable);
+    if (declared.length) return declared;
+    return all.filter(
       ([name, attr]) =>
         name !== 'objectClass' &&
         !attr.neverReturn &&
@@ -182,7 +228,7 @@ export class EntityList {
   /** Fetch the entries matching the current search. */
   private async reload(): Promise<void> {
     const generation = ++this.generation;
-    if (!this.listable() && this.search.length < SEARCH_MINIMUM) {
+    if (!this.listable() && this.query.length < SEARCH_MINIMUM) {
       this.entries = [];
       this.loaded = false;
       this.draw();
@@ -192,7 +238,7 @@ export class EntityList {
     this.error = null;
     this.draw();
     try {
-      const list = await this.options.load(this.search, this.searchAttribute);
+      const list = await this.options.load(this.query, this.searchScope);
       if (generation !== this.generation) return;
       this.entries = Object.entries(list).sort(([a], [b]) =>
         a.localeCompare(b, undefined, { sensitivity: 'base' })
@@ -237,6 +283,9 @@ export class EntityList {
             <label class="dc-search-scope">
               <span>${escapeHtml(translator.t('list.searchIn'))}</span>
               <select class="dc-input" data-search-attribute>
+                <option value="${SEARCH_ANYWHERE}"${
+                  this.searchAttribute === SEARCH_ANYWHERE ? ' selected' : ''
+                }>${escapeHtml(translator.t('list.searchAnywhere'))}</option>
                 ${this.searchableAttributes()
                   .map(
                     ([name, attr]) =>
@@ -325,7 +374,7 @@ export class EntityList {
       return `<p class="dc-empty">${escapeHtml(translator.t('app.loading'))}</p>`;
     if (this.error)
       return `<p class="dc-empty dc-error-block">${escapeHtml(this.error)}</p>`;
-    if (!this.listable() && this.search.length < SEARCH_MINIMUM)
+    if (!this.listable() && this.query.length < SEARCH_MINIMUM)
       return `<p class="dc-empty">${escapeHtml(
         translator.t('list.searchGuard', { count: SEARCH_MINIMUM })
       )}<br /><button type="button" class="dc-button" data-list-all>${escapeHtml(
@@ -333,7 +382,7 @@ export class EntityList {
       )}</button></p>`;
     if (this.entries.length === 0)
       return `<p class="dc-empty">${escapeHtml(
-        translator.t(this.search ? 'list.noMatch' : 'list.empty')
+        translator.t(this.query ? 'list.noMatch' : 'list.empty')
       )}</p>`;
 
     const attributes = this.options.entity.schema.attributes;
@@ -449,7 +498,7 @@ export class EntityList {
 
     const search = root.querySelector<HTMLInputElement>('[data-search]');
     search?.addEventListener('input', () => {
-      this.search = search.value.trim();
+      this.search = search.value;
       if (this.searchTimer) clearTimeout(this.searchTimer);
       this.searchTimer = setTimeout(() => void this.reload(), 250);
     });
