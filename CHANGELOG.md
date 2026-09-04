@@ -65,10 +65,17 @@ migration will refuse before it does.
   catalogue holds nothing but the interface words. See
   [directory-console](docs/client-development/browser/directory-console.md)
 
+- `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names
+  separated by commas and returns an entry matching any of them, so a search
+  box needs no field picker beside it. Which attributes are worth searching is
+  a new schema marker, `searchable` — a substring filter on an unindexed
+  attribute scans the branch, and what is indexed is the deployment's business.
+  The console searches them all by default
+
 - `npm run audit:directory` reads a branch and reports what a schema would
   refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
-  about the entries already stored, and finding out one ticket at a time is
-  the expensive way. See [directory-audit](docs/usage/directory-audit.md)
+  about the entries already stored. See
+  [directory-audit](docs/usage/directory-audit.md)
 
 - `static/schemas`: the missing `domains` nomenclature and a dozen attributes
   across the Twake schemas, plus `static/schemas/example` — a worked
@@ -79,6 +86,11 @@ migration will refuse before it does.
   type but never registered as an option
 
 ### Bug Fixes
+
+- `browser/directory-console`: the search box lost the caret on the keystroke
+  that caused a repaint, and dropped the space just typed between a first name
+  and a surname, repainting from a trimmed value. A mail quota showed as its
+  byte count, ten digits where the size was set as `4GB`
 
 - `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
   rejects the names real directories carry — every one with a space, an
