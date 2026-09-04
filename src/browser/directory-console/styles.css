@@ -169,9 +169,19 @@
 
 /* --------------------------------------------------------------- dashboard */
 
+/*
+ * A row of cards, each as wide as the widest one needs.
+ *
+ * A grid of `minmax(260px, 1fr)` tracks made every card 260px on a wide
+ * screen — `auto-fill` spends the space on empty columns — and 260px is not
+ * enough for two buttons whose text comes from the schema, so one card's
+ * actions wrapped and its neighbours' did not. Cards share a flex basis
+ * instead: they end up the same width, wide enough for the longest label
+ * among them, and the row stops depending on how a deployment names things.
+ */
 .dc-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   list-style: none;
   padding: 0;
@@ -199,6 +209,8 @@
   flex-direction: column;
   gap: 12px;
   margin-bottom: 0;
+  flex: 1 1 260px;
+  max-width: 380px;
 }
 
 .dc-cards .dc-card h3 {
@@ -218,6 +230,11 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* A label is a name, not a paragraph: it breaks the row, never itself. */
+.dc-card-actions .dc-button {
+  white-space: nowrap;
 }
 
 /* -------------------------------------------------------------------- list */
