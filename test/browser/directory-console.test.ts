@@ -21,6 +21,8 @@ import {
   csvCell,
 } from '../../src/browser/directory-console/components/EntityList';
 import { Translator } from '../../src/browser/directory-console/i18n';
+import { formatByteSize } from '../../src/browser/directory-console/format';
+import { parseByteSize } from '../../src/plugins/ldap/enterpriseRules';
 import type {
   EntityDescriptor,
   EntitySchema,
@@ -512,6 +514,33 @@ describe('Directory console', () => {
       // Ordinary values are left alone, quoted only when they need it.
       expect(csvCell('John Smith')).to.equal('John Smith');
       expect(csvCell('Smith, John')).to.equal('"Smith, John"');
+    });
+  });
+
+  describe('formatByteSize', () => {
+    it('should say a size the way it was set', () => {
+      // `normalize: byteSize` stores what `parseByteSize` computed, so a quota
+      // set as `4GB` reads back as ten digits nobody counts at a glance.
+      expect(formatByteSize('2000000000')).to.equal('4 GB');
+      expect(formatByteSize('1500000')).to.equal('1.5 MB');
+      expect(formatByteSize('999')).to.equal('999 B');
+      expect(formatByteSize('0')).to.equal('0 B');
+    });
+
+    it('should say it only when the short form is the same number', () => {
+      // The form hands what it shows back to the server, which reads it with
+      // `parseByteSize`: a rounded size would write a different quota than the
+      // one displayed. A value no unit states exactly stays as it is.
+      expect(formatByteSize('2000000001')).to.equal('2000000001');
+      expect(formatByteSize('1099511627776')).to.equal('1099511627776');
+      expect(formatByteSize('not a number')).to.equal('not a number');
+    });
+
+    it('should round-trip every value it chooses to format', () => {
+      for (const raw of ['2000000000', '2048', '1500000', '512000000000']) {
+        const shown = formatByteSize(raw);
+        expect(String(parseByteSize(shown)), shown).to.equal(raw);
+      }
     });
   });
 

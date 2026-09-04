@@ -36,6 +36,8 @@ export interface SchemaAttribute {
   hint?: string;
   branch?: string[];
   fixed?: boolean;
+  /** Server-side normalisation, which decides how the value reads back */
+  normalize?: 'byteSize';
   role?: SchemaRole | SchemaRole[];
   /** Computed server-side: shown, never edited */
   generated?: boolean;
