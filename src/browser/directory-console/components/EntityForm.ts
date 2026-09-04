@@ -326,7 +326,17 @@ export class EntityForm {
       Array.from(selects).map(async select => {
         const branch = select.dataset.pointer;
         if (!branch) return;
-        const options = await this.options.pointerOptions(branch);
+        // A branch the caller may not read answers 403, and the form is
+        // awaited by a caller that does not await it back: the rejection
+        // would surface as an unhandled one and leave the whole form
+        // half-built. The select keeps the value the entry already holds and
+        // offers nothing else, which is what an unreadable branch means.
+        let options: { dn: string; label: string }[];
+        try {
+          options = await this.options.pointerOptions(branch);
+        } catch {
+          options = [];
+        }
         const current = select.value;
         select.innerHTML =
           `<option value="">${escapeHtml(this.options.translator.t('form.choose'))}</option>` +

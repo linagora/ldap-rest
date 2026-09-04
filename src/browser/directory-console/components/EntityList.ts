@@ -36,6 +36,24 @@ export interface ListOptions {
   canDelete: boolean;
 }
 
+/**
+ * One value as a CSV cell.
+ *
+ * Two separate jobs. RFC 4180 quoting is what keeps a comma or a newline
+ * inside its own field; the leading apostrophe is what keeps a spreadsheet
+ * from *evaluating* the cell. A directory holds whatever was written into it,
+ * and Excel and LibreOffice both read a value opening on `= + - @` — or on a
+ * tab or a carriage return — as a formula rather than as text. Quoting does
+ * not help there: the quotes are stripped on import and the formula runs.
+ *
+ * @param value value to write
+ * @returns the cell, escaped and neutralised
+ */
+export function csvCell(value: string): string {
+  const cell = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+}
+
 /** Read an entry value as a display string. */
 function text(value: unknown): string {
   if (value === undefined || value === null) return '';
@@ -425,11 +443,9 @@ export class EntityList {
   private exportSelection(): void {
     const rows = this.entries.filter(([id]) => this.selected.has(id));
     const header = this.columns.join(',');
-    const escape = (value: string): string =>
-      /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
     const body = rows
       .map(([, entry]) =>
-        this.columns.map(name => escape(text(entry[name]))).join(',')
+        this.columns.map(name => csvCell(text(entry[name]))).join(',')
       )
       .join('\n');
     const blob = new Blob([`${header}\n${body}\n`], {
