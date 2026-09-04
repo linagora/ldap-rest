@@ -29,6 +29,7 @@
         "attribute": "mail",
         "extract": "^([^@]+)@",
         "lowercase": true,
+        "strip": "[^a-zA-Z0-9._-]",
         "onCollision": "suffix"
       }
     },

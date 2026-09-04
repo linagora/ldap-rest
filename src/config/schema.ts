@@ -108,6 +108,14 @@ export interface GeneratedFrom {
   /** Lowercase the result */
   lowercase?: boolean;
   /**
+   * Characters to drop from the extracted value, as an extended regular
+   * expression. A mail local part may legally hold `+`, `'` or `!`, which an
+   * identifier charset usually refuses; without this the entry becomes
+   * uncreatable, since the client may not send the generated attribute
+   * either. `[^a-zA-Z0-9._-]` keeps what a `uid` accepts.
+   */
+  strip?: string;
+  /**
    * What to do when the generated value is already taken. `error` (the
    * default) refuses the creation; `suffix` appends `-2`, `-3`, … until a free
    * value is found.
