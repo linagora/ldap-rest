@@ -29,6 +29,7 @@
     },
     "cn": {
       "type": "string",
+      "searchable": true,
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
       "hint": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
       "required": true,
@@ -40,6 +41,7 @@
     },
     "description": {
       "type": "string",
+      "searchable": true,
       "required": false,
       "label": {
         "en": "Description",
@@ -48,6 +50,7 @@
     },
     "mail": {
       "type": "string",
+      "searchable": true,
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
       "hint": "Expected an email address, e.g. all-staff@lists.example.org",
       "required": false,

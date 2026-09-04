@@ -13,6 +13,7 @@
     },
     "ou": {
       "type": "string",
+      "searchable": true,
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 ()&/,.'’_-]{0,254}$",
       "hint": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
       "required": true,
@@ -25,6 +26,7 @@
     },
     "description": {
       "type": "string",
+      "searchable": true,
       "required": false,
       "label": {
         "en": "Description",
