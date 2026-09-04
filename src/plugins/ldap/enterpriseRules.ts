@@ -437,8 +437,17 @@ export default class LdapEnterpriseRules extends DmPlugin {
           const foundDn = String(found.dn);
           if (selfDn && foundDn.toLowerCase() === selfDn.toLowerCase())
             continue;
+          // The search above runs with the server's own visibility, on
+          // purpose: the question is about the directory, not about what this
+          // caller may read. Naming the holder back would answer a question
+          // the caller was never allowed to ask — a manager scoped to one
+          // branch could probe any address and be told which entry, in which
+          // branch, already holds it. The operator gets the DN in the log.
+          this.logger.warn(
+            `${name}="${value}" refused for ${selfDn || 'a new entry'}: already held by ${foundDn}`
+          );
           throw new ConflictError(
-            `${entity.label}: "${value}" is already used by ${foundDn} (${name} must be unique)`
+            `${entity.label}: "${value}" is already used (${name} must be unique)`
           );
         }
       }
@@ -668,8 +677,13 @@ export default class LdapEnterpriseRules extends DmPlugin {
         )) as SearchResult;
         const referrer = (result.searchEntries || [])[0];
         if (referrer) {
+          // Same reasoning as checkUnique: the caller owns the DN being
+          // deleted, not the one pointing at it.
+          this.logger.warn(
+            `Delete of ${dn} refused: still referenced by ${String(referrer.dn)} (${name})`
+          );
           throw new ConflictError(
-            `Cannot delete ${dn}: still referenced by ${String(referrer.dn)} (${name})`
+            `Cannot delete ${dn}: still referenced by another entry (${name})`
           );
         }
       }
