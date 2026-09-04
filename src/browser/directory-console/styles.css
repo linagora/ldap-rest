@@ -185,6 +185,30 @@
   margin-bottom: 16px;
 }
 
+/*
+ * A card in the overview grid. Its buttons are named by the schema, so their
+ * width is the deployment's vocabulary and not something to design around:
+ * one card's actions wrap to a second line while its neighbours' do not, and
+ * a row of cards then has its buttons at three different heights. Laying the
+ * card out as a column and pushing the actions to the bottom lines them up
+ * whatever the labels say. The grid already gives every card the same height,
+ * which is what makes the bottom a shared baseline.
+ */
+.dc-cards .dc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.dc-cards .dc-card h3 {
+  margin: 0;
+}
+
+.dc-cards .dc-card-actions {
+  margin-top: auto;
+}
+
 .dc-card h3 {
   margin: 0 0 12px;
   font-size: 16px;
