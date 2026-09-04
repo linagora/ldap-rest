@@ -583,7 +583,7 @@ describe('Directory console', () => {
     it('should say a size the way it was set', () => {
       // `normalize: byteSize` stores what `parseByteSize` computed, so a quota
       // set as `4GB` reads back as ten digits nobody counts at a glance.
-      expect(formatByteSize('2000000000')).to.equal('4 GB');
+      expect(formatByteSize('2000000000')).to.equal('2 GB');
       expect(formatByteSize('1500000')).to.equal('1.5 MB');
       expect(formatByteSize('999')).to.equal('999 B');
       expect(formatByteSize('0')).to.equal('0 B');
