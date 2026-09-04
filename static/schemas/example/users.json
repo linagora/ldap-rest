@@ -49,8 +49,7 @@
     "cn": {
       "type": "string",
       "searchable": true,
-      "required": true,
-      "role": "displayName"
+      "required": false
     },
     "sn": {
       "type": "string",
@@ -65,12 +64,13 @@
       "searchable": true,
       "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
       "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
-      "required": false,
+      "required": true,
       "label": "First name"
     },
     "displayName": {
       "type": "string",
-      "required": false
+      "role": "displayName",
+      "required": true
     },
     "personalTitle": {
       "type": "pointer",

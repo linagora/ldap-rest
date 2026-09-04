@@ -68,6 +68,9 @@ describe('Element rules of an array attribute', function () {
     mail: `${local}@example.com`,
     twakeDepartmentLink: deptDn,
     ...extra,
+    employeeNumber: 'ITE0001',
+    givenName: 'Test',
+    displayName: 'Test Person',
   });
 
   it('should refuse an element the item pattern does not accept', async () => {
