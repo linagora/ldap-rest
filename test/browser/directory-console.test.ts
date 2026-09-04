@@ -360,6 +360,38 @@ describe('Directory console', () => {
       expect(children.map(node => node.name)).to.deep.equal(['EU']);
     });
 
+    it('should not offer the truncation row as a member', async () => {
+      // Past `ldap_organization_max_subnodes` the endpoint appends a row that
+      // is not an entry: its DN is `more-` plus the organization's own, and
+      // nothing answers there. Listed among the members it read as a colleague
+      // named after the department, and opening it went nowhere.
+      const dn = 'ou=Sales,ou=organization,dc=example,dc=com';
+      nock(baseUrl)
+        .get(`/api/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`)
+        .reply(200, [
+          {
+            dn: `ou=EU,${dn}`,
+            ou: ['EU'],
+            objectClass: ['organizationalUnit'],
+          },
+          {
+            dn: `uid=jsmith,ou=users,dc=example,dc=com`,
+            objectClass: ['inetOrgPerson'],
+          },
+          {
+            dn: `more-${dn}`,
+            objectClass: ['moreIndicator'],
+            _isMoreIndicator: 'true',
+            _totalCount: '312',
+          },
+        ]);
+
+      const members = await new ConsoleApiClient(baseUrl).organizationMembers(
+        dn
+      );
+      expect(members.map(member => member.label)).to.deep.equal(['jsmith']);
+    });
+
     it('should read the configuration at the prefix it was given', async () => {
       // Every other call uses the prefix the configuration advertises. The
       // call that reads the configuration has nothing to read it from, so a

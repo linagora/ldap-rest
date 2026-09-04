@@ -157,3 +157,7 @@ screen from shipping.
 - Bulk actions cover export and deletion; assignment is not there yet.
 - The exported CSV neutralises a cell a spreadsheet would read as a formula by
   prefixing it with an apostrophe, so such a value comes back with one.
+- The members listed under an organization's card stop at
+  `ldap_organization_max_subnodes` (50 by default) and the card does not say
+  it truncated. The tree itself is unaffected: child organizations are asked
+  for by class and are not capped.

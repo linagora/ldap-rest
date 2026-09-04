@@ -81,6 +81,23 @@ const ORGANIZATION_OPTION_LIMIT = 200;
  */
 const ORGANIZATION_CLASS = 'organizationalUnit';
 
+/**
+ * Tell the row `subnodes` appends when it truncated from a real entry.
+ *
+ * It is not an entry: its DN is `more-<the organization's own DN>` and its
+ * only class is `moreIndicator`. Nothing answers at that DN.
+ *
+ * @param entry entry to classify
+ * @returns true when the row only says how many were left out
+ */
+function isMoreIndicator(entry: Entry): boolean {
+  if (entry._isMoreIndicator) return true;
+  const classes = Array.isArray(entry.objectClass)
+    ? entry.objectClass
+    : [entry.objectClass ?? ''];
+  return classes.some(name => String(name) === 'moreIndicator');
+}
+
 export class ConsoleApiClient {
   private readonly origin: string;
   private apiPrefix = '/api';
@@ -452,7 +469,7 @@ export class ConsoleApiClient {
     dn: string
   ): Promise<{ dn: string; label: string }[]> {
     return (await this.subnodes(dn))
-      .filter(entry => !this.isOrganization(entry))
+      .filter(entry => !isMoreIndicator(entry) && !this.isOrganization(entry))
       .map(entry => ({
         dn: String(entry.dn || ''),
         label: String(entry.dn || '')
