@@ -30,8 +30,28 @@ npm run audit:directory -- --schema static/schemas/twake/users.json
 | `--bind-password` | `DM_LDAP_PWD`                | Its password                        |
 | `--samples`       | `5`                          | Offending entries named per finding |
 
-It exits `0` when the branch is clean and `1` when it is not, so a migration
-pipeline can gate on it.
+It exits `0` when the branch is clean, `1` when the schema would refuse
+something, and `2` when the audit itself could not run — an unreadable schema,
+a directory that would not answer — so a pipeline can tell "dirty" from
+"broken" rather than gating on both alike.
+
+`--bind-password` puts the password in `ps` and in the shell history of
+whoever runs it. `DM_LDAP_PWD` is the path to prefer, and the flag is there
+for parity with the server's own `--ldap-pwd`.
+
+## What it checks, and what only the server can
+
+The audit reads a schema and an entry, so it answers what an entry alone can
+answer: required attributes, the `test` pattern of a value and of an array's
+elements, and the branch a DN must land in. It replaces `__KEY__` placeholders
+and `{config_key}` in `entity.base` from the `DM_*` environment exactly as the
+server does, leaving a placeholder the configuration does not name.
+
+What it does not answer needs the rest of the directory, and belongs to a dry
+run rather than here: uniqueness across a namespace, the mail domains an
+organization owns, and anything a plugin computes after validation. A clean
+audit is not a promise that every entry will survive every rule — it is a
+promise that none of them fails on its own contents.
 
 ## Reading the report
 
