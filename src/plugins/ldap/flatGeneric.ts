@@ -56,6 +56,13 @@ export default class LdapFlatGeneric extends DmPlugin {
     super(server);
 
     const schemas = this.config.ldap_flat_schema || [];
+    // An entity is identified twice over: by `name`, which becomes the hook
+    // prefix every plugin listens on, and by `pluralName`, which becomes the
+    // URL. Two schemas claiming either would register the same hooks and the
+    // same routes, and Express answers with the first — the second entity
+    // would be advertised by the configuration API and unreachable in fact.
+    const claimedNames = new Map<string, string>();
+    const claimedPlurals = new Map<string, string>();
 
     if (schemas.length === 0) {
       this.logger.warn('No schemas provided for ldapFlatGeneric plugin');
@@ -91,6 +98,17 @@ export default class LdapFlatGeneric extends DmPlugin {
           }
         }
 
+        const clashingName = claimedNames.get(schema.entity.name);
+        if (clashingName)
+          throw new Error(
+            `entity "${schema.entity.name}" is already declared by ${clashingName}`
+          );
+        const clashingPlural = claimedPlurals.get(schema.entity.pluralName);
+        if (clashingPlural)
+          throw new Error(
+            `entity "${schema.entity.name}" wants the URL of "${schema.entity.pluralName}", already served by ${clashingPlural}`
+          );
+
         // Resolve base with config placeholders
         let base = schema.entity.base;
         // Replace all {config_key} patterns with actual config values
@@ -116,6 +134,8 @@ export default class LdapFlatGeneric extends DmPlugin {
         instance.name = `ldapFlat:${schema.entity.name}`;
         this.instances.push(instance);
         this.schemaPaths.push(schemaPath);
+        claimedNames.set(schema.entity.name, schemaPath);
+        claimedPlurals.set(schema.entity.pluralName, schemaPath);
 
         this.logger.info(
           `Created ldapFlat instance for "${schema.entity.name}" (${schema.entity.pluralName})`
