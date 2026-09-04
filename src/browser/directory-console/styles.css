@@ -132,6 +132,10 @@
   color: var(--dc-muted);
 }
 
+.dc-scope-error {
+  color: var(--dc-danger);
+}
+
 /* -------------------------------------------------------------------- main */
 
 .dc-main {
