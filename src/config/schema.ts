@@ -192,6 +192,18 @@ export interface SchemaAttribute {
    */
   normalize?: 'byteSize';
   /**
+   * Whether a client's "search everywhere" should include this attribute.
+   *
+   * Which attributes can be searched at all is a property of the deployment,
+   * not of the code: a substring filter on an attribute the directory has not
+   * indexed scans the branch. A schema that marks none leaves the client to
+   * guess — every returnable, single-valued, non-pointer attribute — which is
+   * right for a small branch and wrong for a large one. Marking even one
+   * attribute replaces the guess entirely, so the list is exactly what the
+   * deployment indexed.
+   */
+  searchable?: boolean;
+  /**
    * Named states of a lifecycle attribute, mapping a semantic name the API
    * speaks (`enabled`, `disabled`) to the concrete value this directory
    * stores. What "disabled" *is* — a DN in a nomenclature, a string, a

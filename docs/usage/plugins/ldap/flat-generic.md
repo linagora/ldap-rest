@@ -264,6 +264,27 @@ chose in its own. The roles the core looks for:
 An attribute may carry several roles (`"role": ["identifier", "displayName"]`),
 and a deployment is free to add its own for its plugins.
 
+### Which attributes a search covers: `searchable`
+
+`GET /{pluralName}?match=…&attribute=…` takes one attribute name or several
+separated by commas, and an entry matching any of them is returned. Which ones
+a client should offer is a property of the deployment rather than of the code:
+a substring filter on an attribute the directory has not indexed scans the
+branch.
+
+`"searchable": true` says so. A schema that marks even one attribute has
+declared its list, and that list is what a client searches; a schema that
+marks none leaves the client to guess — everything returnable, single-valued
+and not a DN, which suits a small branch and scans a large one. The shipped
+schemas mark the attributes an operator looks people up by:
+
+```json
+"sn": { "type": "string", "searchable": true, "label": { … } }
+```
+
+Align it with your indexes. In OpenLDAP that means `index sn,cn,mail sub` for
+the attributes you mark.
+
 The remaining markers — `unique`, `normalize`, `states`,
 `referentialIntegrity`, `deleteGuard`, `mailDomainScope` — are read by
 [enterprise-rules](enterprise-rules.md) and

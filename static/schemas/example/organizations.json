@@ -13,6 +13,7 @@
     },
     "ou": {
       "type": "string",
+      "searchable": true,
       "test": "^[A-ZÀ-ÖØ-Þ]((?!.*([-,’'()&]{2}|\\s{2}|\\s[-,’')]|[-’'(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-’'()&])*[a-zà-öø-ÿ)]$",
       "hint": "Starts with a capital and ends with a lowercase letter or ), no repeated punctuation",
       "required": true,
@@ -22,6 +23,7 @@
     },
     "description": {
       "type": "string",
+      "searchable": true,
       "required": false
     },
     "telephoneNumber": {
