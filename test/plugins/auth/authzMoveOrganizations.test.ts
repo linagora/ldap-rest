@@ -143,10 +143,12 @@ describe('Authorization for Organization Move', function () {
     await server.ldap.add(getParentOrg1Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'parent1',
+      twakeDepartmentPath: 'parent1',
     });
     await server.ldap.add(getParentOrg2Dn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'parent2',
+      twakeDepartmentPath: 'parent2',
     });
   });
 
@@ -168,7 +170,7 @@ describe('Authorization for Organization Move', function () {
     await server.ldap.add(getChildOrgDn(), {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'child',
-      twakeDepartmentPath: 'child / parent1',
+      twakeDepartmentPath: 'parent1 / child',
     });
   });
 
@@ -233,7 +235,7 @@ describe('Authorization for Organization Move', function () {
     await server.ldap.add(siblingOrgDn, {
       objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
       ou: 'sibling',
-      twakeDepartmentPath: 'sibling / parent1',
+      twakeDepartmentPath: 'parent1 / sibling',
     });
 
     try {
