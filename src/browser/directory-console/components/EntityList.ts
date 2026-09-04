@@ -55,6 +55,15 @@ export function csvCell(value: string): string {
   return /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
 }
 
+/** Controls a repaint must not steal the caret from. */
+const FOCUSABLE = ['[data-search]', '[data-search-attribute]'];
+
+interface FocusState {
+  selector: string;
+  start: number | null;
+  end: number | null;
+}
+
 /** Read an entry value as a display string. */
 function text(value: unknown): string {
   if (value === undefined || value === null) return '';
@@ -93,6 +102,13 @@ export class EntityList {
    * takes a ticket and drops its answer if another was issued meanwhile.
    */
   private generation = 0;
+  /**
+   * The pending debounce. It used to be a local of `bind()`, and `bind()` runs
+   * again on every repaint — so the timer a keystroke had set was forgotten
+   * rather than cleared, and fired anyway. Typing eight characters issued
+   * eight searches instead of one.
+   */
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(options: ListOptions) {
     this.options = options;
@@ -201,6 +217,11 @@ export class EntityList {
     const root = this.root;
     if (!root) return;
     const { translator } = this.options;
+    // The repaint replaces the search box along with everything else, and the
+    // box is where the operator's hands are: every keystroke past the
+    // debounce threw the caret out of the field they were typing in. What was
+    // focused, and where the caret sat in it, is put back afterwards.
+    const focus = this.focusState();
 
     const total = this.entries.length;
     const from = this.page * this.pageSize;
@@ -254,6 +275,48 @@ export class EntityList {
       </div>`;
 
     this.bind();
+    this.restoreFocus(focus);
+  }
+
+  /**
+   * What the operator is typing in, if anything, and where the caret sits.
+   *
+   * @returns the selector of the focused control and its selection
+   */
+  private focusState(): FocusState | null {
+    const root = this.root;
+    if (!root || typeof document === 'undefined') return null;
+    const active = document.activeElement as HTMLInputElement | null;
+    if (!active) return null;
+    for (const selector of FOCUSABLE) {
+      const candidate = root.querySelector(selector);
+      if (candidate && candidate === active)
+        return {
+          selector,
+          start: active.selectionStart ?? null,
+          end: active.selectionEnd ?? null,
+        };
+    }
+    return null;
+  }
+
+  /**
+   * Put the caret back where the repaint took it from.
+   *
+   * @param state what `focusState` saw before the repaint
+   */
+  private restoreFocus(state: FocusState | null): void {
+    const root = this.root;
+    if (!root || !state) return;
+    const target = root.querySelector<HTMLInputElement>(state.selector);
+    if (!target) return;
+    target.focus();
+    if (state.start !== null && typeof target.setSelectionRange === 'function')
+      try {
+        target.setSelectionRange(state.start, state.end ?? state.start);
+      } catch {
+        // A control whose type has no selection: focus alone is the point.
+      }
   }
 
   private bodyMarkup(slice: [string, Entry][]): string {
@@ -385,11 +448,10 @@ export class EntityList {
     if (!root) return;
 
     const search = root.querySelector<HTMLInputElement>('[data-search]');
-    let timer: ReturnType<typeof setTimeout> | undefined;
     search?.addEventListener('input', () => {
       this.search = search.value.trim();
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void this.reload(), 250);
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+      this.searchTimer = setTimeout(() => void this.reload(), 250);
     });
 
     root
