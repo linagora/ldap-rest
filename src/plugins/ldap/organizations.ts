@@ -34,6 +34,7 @@ import {
   ConflictError,
 } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
+import { assertClientMaySet } from '../../config/schema';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -501,6 +502,9 @@ export default class LdapOrganizations extends DmPlugin {
       | false;
     if (!body) return;
 
+    // The path and link attributes are the server's, as this endpoint's own
+    // description says. Only the flat entities enforced it.
+    assertClientMaySet(this.schema, Object.keys(body), 'ou');
     validateDnValue(body.ou, 'ou');
     const parentDn = body.parentDn || this.config.ldap_top_organization;
     const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
@@ -522,6 +526,10 @@ export default class LdapOrganizations extends DmPlugin {
     if (!body) return;
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
+    assertClientMaySet(this.schema, [
+      ...Object.keys(body.add || {}),
+      ...Object.keys(body.replace || {}),
+    ]);
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
   }
 

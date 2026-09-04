@@ -1,4 +1,5 @@
 import type { AttributeValue } from '../lib/ldapActions';
+import { BadRequestError } from '../lib/errors';
 
 /**
  * Scalar and container types an entity schema may declare.
@@ -273,4 +274,37 @@ export function roleAttributes(
   return Object.entries(schema.attributes)
     .filter(([, attr]) => hasRole(attr, role))
     .map(([name]) => name);
+}
+
+/**
+ * Refuse a payload naming an attribute the server owns.
+ *
+ * `generated` and `readOnly` say a value is not the client's to set. The flat
+ * entities enforce it on their own paths; organizations and groups have their
+ * own routes and need the same guard, or an endpoint promising that a computed
+ * path "cannot be changed here" quietly accepts one.
+ *
+ * @param schema entity schema, when one is loaded
+ * @param names attribute names carried by the request
+ * @param mainAttribute RDN attribute, exempt when nothing derives it
+ * @throws BadRequestError naming the first attribute the client may not set
+ */
+export function assertClientMaySet(
+  schema: Schema | undefined,
+  names: string[],
+  mainAttribute?: string
+): void {
+  if (!schema) return;
+  for (const name of names) {
+    if (name === 'dn') continue;
+    const attr = schema.attributes[name.split(';')[0]];
+    if (!attr) continue;
+    if (name === mainAttribute && !attr.generatedFrom) continue;
+    if (!attr.generated && !attr.readOnly) continue;
+    throw new BadRequestError(
+      attr.readOnly
+        ? `Attribute "${name}" is read-only and cannot be set`
+        : `Attribute "${name}" is computed by the server and cannot be set`
+    );
+  }
 }
