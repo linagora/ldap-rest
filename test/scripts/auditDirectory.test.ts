@@ -5,6 +5,7 @@ import {
   parseOptions,
   printReport,
   resolvePlaceholders,
+  schemaConfig,
   type Finding,
 } from '../../scripts/audit-directory';
 import type { Schema } from '../../src/config/schema';
@@ -53,27 +54,27 @@ const schema: Schema = {
 };
 
 describe('audit-directory', () => {
-  describe('parseOptions', () => {
-    const withEnv = <T>(
-      env: Record<string, string | undefined>,
-      run: () => T
-    ): T => {
-      const previous: Record<string, string | undefined> = {};
-      for (const [key, value] of Object.entries(env)) {
-        previous[key] = process.env[key];
+  const withEnv = <T>(
+    env: Record<string, string | undefined>,
+    run: () => T
+  ): T => {
+    const previous: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(env)) {
+      previous[key] = process.env[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    try {
+      return run();
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
-      try {
-        return run();
-      } finally {
-        for (const [key, value] of Object.entries(previous)) {
-          if (value === undefined) delete process.env[key];
-          else process.env[key] = value;
-        }
-      }
-    };
+    }
+  };
 
+  describe('parseOptions', () => {
     it('should accept both --flag value and --flag=value', () => {
       const options = withEnv({ DM_LDAP_URL: 'ldap://host' }, () =>
         parseOptions(['--schema', 'a.json', '--base=ou=users,dc=x'])
@@ -117,13 +118,51 @@ describe('audit-directory', () => {
   });
 
   describe('resolvePlaceholders', () => {
-    it('should substitute the directory suffix and leave the rest alone', () => {
+    it('should substitute every key the configuration holds', () => {
+      // The server substitutes any `__KEY__` the configuration names, not
+      // `__LDAP_BASE__` alone: a schema naming another one used to audit
+      // against its own literal text.
       expect(
         resolvePlaceholders(
-          '"branch": ["ou=users,__LDAP_BASE__"], "x": "__OTHER__"',
-          'dc=example,dc=com'
+          '"branch": ["ou=users,__LDAP_BASE__"], "d": "__MAIL_DOMAIN__"',
+          { ldap_base: 'dc=example,dc=com', mail_domain: 'example.org' }
         )
-      ).to.equal('"branch": ["ou=users,dc=example,dc=com"], "x": "__OTHER__"');
+      ).to.equal(
+        '"branch": ["ou=users,dc=example,dc=com"], "d": "example.org"'
+      );
+    });
+
+    it('should leave a placeholder the configuration does not hold', () => {
+      // And leave it *as written*, the way the server does. Replacing an
+      // unset key with the empty string turned every pattern using it into
+      // one nothing matches, so a clean branch audited as entirely broken.
+      expect(resolvePlaceholders('"x": "__OTHER__"', {})).to.equal(
+        '"x": "__OTHER__"'
+      );
+      expect(resolvePlaceholders('"b": "ou=u,__LDAP_BASE__"', {})).to.equal(
+        '"b": "ou=u,__LDAP_BASE__"'
+      );
+    });
+  });
+
+  describe('schemaConfig', () => {
+    it('should read the DM_ environment the way the server does', () => {
+      withEnv(
+        { DM_LDAP_BASE: 'dc=env,dc=test', DM_MAIL_DOMAIN: 'env.test' },
+        () => {
+          const config = schemaConfig();
+          expect(config.ldap_base).to.equal('dc=env,dc=test');
+          expect(config.mail_domain).to.equal('env.test');
+        }
+      );
+    });
+
+    it('should let --base win over the environment', () => {
+      withEnv({ DM_LDAP_BASE: 'dc=env,dc=test' }, () => {
+        expect(schemaConfig('dc=flag,dc=test').ldap_base).to.equal(
+          'dc=flag,dc=test'
+        );
+      });
     });
   });
 
@@ -199,6 +238,39 @@ describe('audit-directory', () => {
         ],
       ]);
       expect(findings[0].reason).to.equal('outside the allowed branch');
+    });
+  });
+
+  describe('auditEntry, the things a directory really holds', () => {
+    it('should audit an attribute whatever case it is stored in', () => {
+      // LDAP attribute names are case-insensitive and a directory answers
+      // with the case it was written in. Read straight off the entry, `MAIL`
+      // was not audited at all — a false negative on the tool's main job.
+      const report = new Map<string, Finding>();
+      auditEntry('uid=a', { MAIL: 'not an address' }, schema, report);
+      expect([...report.values()].map(f => f.reason)).to.contain(
+        'does not match'
+      );
+    });
+
+    it('should leave a value that is not text alone', () => {
+      // A certificate is bytes, not a string the pattern was written for,
+      // and the server never pattern-checks it either.
+      const report = new Map<string, Finding>();
+      auditEntry(
+        'uid=a',
+        { mail: Buffer.from([0xff, 0xfe, 0x00, 0x01]) },
+        schema,
+        report
+      );
+      expect([...report.values()].map(f => f.attribute)).to.not.contain('mail');
+    });
+
+    it('should keep as many samples as it was asked for', () => {
+      const report = new Map<string, Finding>();
+      for (let i = 0; i < 150; i++)
+        auditEntry(`uid=${i}`, { mail: 'bad' }, schema, report, 120);
+      expect([...report.values()][0].samples).to.have.length(120);
     });
   });
 
