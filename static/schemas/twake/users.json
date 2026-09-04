@@ -29,6 +29,7 @@
     },
     "uid": {
       "type": "string",
+      "searchable": true,
       "test": "^[a-zA-Z0-9._-]{1,255}$",
       "required": true,
       "role": "identifier",
@@ -47,6 +48,7 @@
     },
     "employeeNumber": {
       "type": "string",
+      "searchable": true,
       "required": false,
       "unique": true,
       "role": "employeeId",
@@ -57,6 +59,7 @@
     },
     "cn": {
       "type": "string",
+      "searchable": true,
       "required": true,
       "role": "displayName",
       "label": {
@@ -66,6 +69,7 @@
     },
     "sn": {
       "type": "string",
+      "searchable": true,
       "required": true,
       "label": {
         "en": "Last name",
@@ -74,6 +78,7 @@
     },
     "givenName": {
       "type": "string",
+      "searchable": true,
       "required": false,
       "label": {
         "en": "First name",
@@ -118,6 +123,7 @@
     },
     "mail": {
       "type": "string",
+      "searchable": true,
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
       "hint": "Expected an email address, e.g. jane.doe@example.org",
       "required": true,

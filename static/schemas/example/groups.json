@@ -21,6 +21,7 @@
     },
     "cn": {
       "type": "string",
+      "searchable": true,
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
       "hint": "Must match an email local part, at most 64 characters, no consecutive dots",
       "required": true,
@@ -29,10 +30,12 @@
     },
     "description": {
       "type": "string",
+      "searchable": true,
       "required": false
     },
     "mail": {
       "type": "string",
+      "searchable": true,
       "test": "^[^@\\s]{1,64}@([^@\\s]{1,245}\\.)?example\\.org$",
       "hint": "Expected an address in example.org or one of its subdomains",
       "required": true,

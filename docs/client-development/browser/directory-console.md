@@ -84,6 +84,11 @@ definition — see [flat-generic](../../usage/plugins/ldap/flat-generic.md).
 
 - **Long forms open as a side panel**, short ones as a dialog. A form of
   twenty fields inside a modal puts its Save button off screen.
+- **The search covers every field the schema marks `searchable`**, not the
+  identifier alone, and the selector still narrows it to one. A schema that
+  marks nothing is guessed at, which is why a large branch should mark its
+  indexed attributes — see
+  [flat-generic](../../usage/plugins/ldap/flat-generic.md).
 - **A large branch is not listed unfiltered.** Entities attached to an
   organization ask for three characters before searching; the small reference
   tables are listed whole.
