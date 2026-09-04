@@ -51,8 +51,10 @@ Organizations are hierarchical LDAP entries:
 
 - Use LDAP DN structure for hierarchy
 - Have a `twakeDepartmentPath` attribute showing their position in the tree
-- Example: `ou=IT,ou=Departments,dc=example,dc=com`
-  - Path: `IT / Departments / Top Organization`
+- The path reads from the root down, the entry's own name last, and stops
+  below the top organization: a top-level organization's path is its own name
+- Example: `ou=IT,ou=Departments,ou=organization,dc=example,dc=com`
+  - Path: `Departments / IT`
 
 ### Users and Groups
 
@@ -64,8 +66,8 @@ Users and groups reference organizations via:
   ```json
   {
     "uid": "john.doe",
-    "twakeDepartmentLink": "ou=IT,ou=Departments,dc=example,dc=com",
-    "twakeDepartmentPath": "IT / Departments / Top Organization"
+    "twakeDepartmentLink": "ou=IT,ou=Departments,ou=organization,dc=example,dc=com",
+    "twakeDepartmentPath": "Departments / IT"
   }
   ```
 
@@ -118,7 +120,7 @@ curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu
   "dn": "ou=IT,dc=example,dc=com",
   "ou": "IT",
   "description": "Information Technology Department",
-  "twakeDepartmentPath": "IT / Government"
+  "twakeDepartmentPath": "Government / IT"
 }
 ```
 
@@ -185,7 +187,7 @@ POST /api/v1/ldap/organizations
   "ou": "IT",
   "parentDn": "dc=example,dc=com",
   "description": "Information Technology Department",
-  "twakeDepartmentPath": "IT / Government"
+  "twakeDepartmentPath": "Government / IT"
 }
 ```
 
@@ -417,13 +419,13 @@ curl -X POST http://localhost:8081/api/v1/ldap/organizations \
   -H "Content-Type: application/json" \
   -d '{
     "ou": "Recruitment",
-    "parentDn": "ou=HR,dc=example,dc=com",
-    "description": "Recruitment Team",
-    "twakeDepartmentPath": "Recruitment / HR / Government"
+    "parentDn": "ou=HR,ou=organization,dc=example,dc=com",
+    "description": "Recruitment Team"
   }'
+# `twakeDepartmentPath` is computed by the server: `HR / Recruitment`
 ```
 
-This creates: `ou=Recruitment,ou=HR,dc=example,dc=com`
+This creates: `ou=Recruitment,ou=HR,ou=organization,dc=example,dc=com`
 
 ### Example 3: Get Organization Hierarchy
 
@@ -493,7 +495,7 @@ curl -X POST http://localhost:8081/api/v1/ldap/users \
     "sn": "Doe",
     "mail": "john.doe@example.com",
     "twakeDepartmentLink": "ou=IT,dc=example,dc=com",
-    "twakeDepartmentPath": "IT / Government"
+    "twakeDepartmentPath": "Government / IT"
   }'
 ```
 
@@ -513,7 +515,7 @@ curl -X POST http://localhost:8081/api/v1/ldap/groups \
     "cn": "it-admins",
     "description": "IT Administrators",
     "twakeDepartmentLink": "ou=IT,dc=example,dc=com",
-    "twakeDepartmentPath": "IT / Government",
+    "twakeDepartmentPath": "Government / IT",
     "member": ["uid=john.doe,ou=users,dc=example,dc=com"]
   }'
 ```
@@ -553,16 +555,20 @@ The path attribute follows this pattern:
 
 ### Example Path Validation
 
-For organization: `ou=Recruitment,ou=HR,dc=example,dc=com`
+For organization: `ou=Recruitment,ou=HR,ou=organization,dc=example,dc=com`
 
-Valid path: `Recruitment / HR / Government`
+Valid path: `HR / Recruitment`
 
-- `Recruitment` matches current ou
-- `HR / Government` must exist as path of `ou=HR,dc=example,dc=com`
+- it ends with `Recruitment`, the entry's own `ou`
+- what precedes it, `HR`, must be the stored path of an existing organization
 
-Invalid path: `Recruitment / IT / Government`
+Invalid path: `IT / Recruitment`
 
-- `IT / Government` doesn't match parent's actual path
+- no organization holds the path `IT`
+
+Invalid path: `Recruitment / HR`
+
+- it ends with `HR`, not with the entry's own name
 
 ## Troubleshooting
 
@@ -576,7 +582,7 @@ Invalid path: `Recruitment / IT / Government`
 # Create organization first
 curl -X POST http://localhost:8081/api/v1/ldap/organizations \
   -H "Content-Type: application/json" \
-  -d '{"ou": "IT", "twakeDepartmentPath": "IT / Government"}'
+  -d '{"ou": "IT"}'  # the path is computed by the server
 
 # Then create user with link
 curl -X POST http://localhost:8081/api/v1/ldap/users \

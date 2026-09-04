@@ -1,0 +1,41 @@
+{
+  "entity": {
+    "name": "domain",
+    "mainAttribute": "dc",
+    "objectClass": ["top", "domain", "domainRelatedObject"],
+    "singularName": "domain",
+    "pluralName": "domains",
+    "base": "ou=domains,ou=nomenclature,{ldap_base}"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["top", "domain", "domainRelatedObject"],
+      "required": true,
+      "fixed": true
+    },
+    "dc": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$",
+      "hint": "A single domain label: letters, digits and hyphens, e.g. example",
+      "required": true,
+      "role": "identifier"
+    },
+    "associatedDomain": {
+      "type": "string",
+      "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$|^\\*$",
+      "hint": "A fully qualified domain name (example.org), or * to allow every domain",
+      "required": true,
+      "role": "domainName",
+      "label": "Mail domain"
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

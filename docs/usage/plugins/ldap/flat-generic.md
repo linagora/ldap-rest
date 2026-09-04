@@ -139,6 +139,104 @@ Fixed attributes:
 - Cannot be modified after creation
 - Cannot be deleted
 
+### Explaining a pattern: `hint`
+
+A `test` tells the server what to refuse. A `hint` tells the person what to
+type, before they get it wrong:
+
+```json
+{
+  "telephoneNumber": {
+    "type": "string",
+    "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+    "hint": "Expected pattern (+99) 999 9999"
+  }
+}
+```
+
+The hint travels with the schema, so a client shows it under the field and the
+server repeats it when it rejects a value — the pattern and its explanation
+cannot drift apart, and neither is hardcoded in the interface.
+
+### Attributes a client may not send
+
+| Marker      | Meaning                                                                         |
+| ----------- | ------------------------------------------------------------------------------- |
+| `generated` | The server computes the value. A request that carries it is refused with a 400. |
+| `readOnly`  | The value is derived elsewhere — `memberOf` is driven from the group side.      |
+
+Both restrict the **request body** only: the core and its plugins still write
+these attributes.
+
+### Attributes a client never receives
+
+`neverReturn` strips an attribute from every API answer while leaving it
+writable. It is what makes "a manager may reset a password without being able
+to read it" a projection rather than an authorization engine:
+
+```json
+{
+  "userPassword": { "type": "string", "role": "password", "neverReturn": true },
+  "pwdReset": {
+    "type": "boolean",
+    "role": "passwordReset",
+    "neverReturn": true
+  }
+}
+```
+
+### Deriving the identifier
+
+When the RDN is not something a person chooses, `generatedFrom` says where it
+comes from. The client then posts without it:
+
+```json
+{
+  "uid": {
+    "type": "string",
+    "role": "identifier",
+    "generated": true,
+    "generatedFrom": {
+      "attribute": "mail",
+      "extract": "^([^@]+)@",
+      "lowercase": true,
+      "onCollision": "suffix"
+    }
+  }
+}
+```
+
+`onCollision` decides what happens when the value is taken — two directories'
+worth of `jean.dupont@a.example` and `jean.dupont@b.example` map to the same
+local part. `suffix` appends `-2`, `-3`, …; `error` (the default) refuses the
+creation with a 409.
+
+### Semantic roles
+
+`role` says what an attribute _means_, so core code and plugins can find it
+without knowing its name. `roleAttribute(schema, 'accountStatus')` returns
+`twakeAccountStatus` in a Twake directory and whatever another deployment
+chose in its own. The roles the core looks for:
+
+| Role                                   | Meaning                                       |
+| -------------------------------------- | --------------------------------------------- |
+| `identifier`, `displayName`            | RDN value, human-readable name                |
+| `primaryEmail`, `emailAliases`         | Mail addresses of the entry                   |
+| `emailQuota`                           | Mailbox size limit, in bytes                  |
+| `organizationLink`, `organizationPath` | Organization the entry belongs to             |
+| `members`, `owners`                    | Members of a group, and who may write to it   |
+| `accountStatus`, `accountExpiry`       | Lifecycle state and scheduled removal         |
+| `password`, `passwordReset`            | Credential and "change it at next login" flag |
+| `domainLink`, `domainName`             | Mail domains an organization may use          |
+
+An attribute may carry several roles (`"role": ["identifier", "displayName"]`),
+and a deployment is free to add its own for its plugins.
+
+The remaining markers — `unique`, `normalize`, `states`,
+`referentialIntegrity`, `deleteGuard`, `mailDomainScope` — are read by
+[enterprise-rules](enterprise-rules.md) and
+[account-lifecycle](account-lifecycle.md).
+
 ## Generated APIs
 
 For each schema, the plugin generates REST API endpoints:
