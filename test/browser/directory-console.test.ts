@@ -17,6 +17,7 @@ import { Translator } from '../../src/browser/directory-console/i18n';
 import type {
   EntityDescriptor,
   EntitySchema,
+  Entry,
 } from '../../src/browser/directory-console/types';
 
 const baseUrl = 'http://localhost:8099';
@@ -326,6 +327,36 @@ describe('Directory console', () => {
       expect(EntityList.shortenPath('<A> / B / <D>')).to.equal(
         '&lt;A&gt; / … / &lt;D&gt;'
       );
+    });
+
+    it('should show the answer to the last search, not the last answer', async () => {
+      // Typing is debounced, not serialised: two loads are in flight whenever
+      // the operator keeps typing, and the slow one used to overwrite the
+      // fast one — the box saying "smith" over a table of "smi" results.
+      const pending: ((value: Record<string, Entry>) => void)[] = [];
+      const list = new EntityList({
+        entity: users,
+        translator: new Translator('en'),
+        load: () =>
+          new Promise<Record<string, Entry>>(resolve => pending.push(resolve)),
+        listable: true,
+        onOpen: () => undefined,
+        onDelete: () => Promise.resolve(),
+        canDelete: false,
+      });
+      const container = stubContainer();
+
+      const first = list.render(container);
+      const second = list.refresh();
+      expect(pending).to.have.length(2);
+
+      // The newer search answers first, the older one after it.
+      pending[1]({ smith: { dn: 'uid=smith', uid: 'smith' } });
+      pending[0]({ smi: { dn: 'uid=smi', uid: 'smi' } });
+      await Promise.all([first, second]);
+
+      expect(container.innerHTML).to.contain('smith');
+      expect(container.innerHTML).to.not.contain('>smi<');
     });
   });
 
