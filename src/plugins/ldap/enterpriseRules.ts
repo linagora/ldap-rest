@@ -357,6 +357,20 @@ export default class LdapEnterpriseRules extends DmPlugin {
         values[name] = Array.isArray(attr.default)
           ? attr.default.map(v => String(v))
           : String(attr.default);
+        // A default is filled after validation, so it never met the existence
+        // check a submitted pointer meets. Left unchecked, a directory that
+        // was never seeded with the nomenclature row the schema names stores a
+        // dangling DN on every single entry — while the identical value, had
+        // the client sent it, would have been refused. The deployment is what
+        // is wrong here, so say which schema value has no target.
+        if (attr.type === 'pointer') {
+          for (const target of valueList(values[name])) {
+            if (!(await this.readEntry(target)))
+              throw new BadRequestError(
+                `Schema default for "${name}" points to a non-existent entry: ${target}`
+              );
+          }
+        }
       }
 
       if (attr.normalize === 'byteSize' && values[name] !== undefined) {
