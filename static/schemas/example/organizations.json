@@ -1,4 +1,14 @@
 {
+  "entity": {
+    "label": {
+      "en": "Organizations",
+      "fr": "Organisations"
+    },
+    "singularLabel": {
+      "en": "organization",
+      "fr": "organisation"
+    }
+  },
   "strict": true,
   "attributes": {
     "objectClass": {

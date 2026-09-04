@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import type { Schema } from '../../src/config/schema';
+import type { LocalizedText, Schema } from '../../src/config/schema';
 import { roleAttribute } from '../../src/config/schema';
 
 const read = (relative: string): Schema =>
@@ -155,12 +155,30 @@ describe('Twake schemas', () => {
     });
 
     it('should name the collections themselves', () => {
-      const entity = (users as unknown as { entity?: { label?: unknown } })
-        .entity;
-      expect(entity?.label).to.deep.equal({
-        en: 'Users',
-        fr: 'Utilisateurs',
-      });
+      // Every schema, not just the one that had them. Without an
+      // `entity.label` a client falls back to the plural name from the
+      // configuration, so a French interface offered "Créer : organization"
+      // beside "Créer : utilisateur".
+      const unnamed: string[] = [];
+      for (const schema of labelled) {
+        const entity = (
+          schema as unknown as {
+            entity?: { label?: LocalizedText; singularLabel?: LocalizedText };
+          }
+        ).entity;
+        for (const [key, text] of [
+          ['label', entity?.label],
+          ['singularLabel', entity?.singularLabel],
+        ] as [string, LocalizedText | undefined][]) {
+          const name =
+            entity?.label && typeof entity.label !== 'string'
+              ? (entity.label.en ?? '?')
+              : '?';
+          if (!text || typeof text === 'string' || !text.en || !text.fr)
+            unnamed.push(`${name}.${key}`);
+        }
+      }
+      expect(unnamed).to.deep.equal([]);
     });
   });
 
