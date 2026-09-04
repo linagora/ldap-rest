@@ -13,7 +13,26 @@
   became a `pointer`, so the organization it names must exist. Deployments
   that were posting these values get a `400` naming the attribute. Keep the
   old behaviour by copying the schema and dropping the markers — every one of
-  them is configuration
+  them is configuration. `PUT /ldap/organizations` and `PUT /ldap/groups`
+  refuse them too now, as their own documentation always claimed
+
+- An attribute both `required` and `generated` needs a plugin that fills it.
+  The shipped Twake schemas without `core/ldap/enterpriseRules` answer `400`
+  instead of writing an entry missing two required attributes. Load the
+  plugin, or drop the markers
+
+- A `pointer` default is checked like a submitted value: a directory missing
+  the nomenclature entry a schema names gets a `400` naming that default,
+  instead of a dangling DN on every entry
+
+- `twakeDepartmentPath` reads from the root down, the entry's own name last.
+  The check demanded the reverse and refused every top-level organization
+  anyway, so little can depend on it — reverse the stored paths only if a
+  custom schema leaves the attribute client-settable
+
+- `--ldap-flat-schema` twice with the same `entity.name` or `entity.pluralName`
+  drops the second and says which schema holds it. Both used to load, sharing
+  a hook prefix and a URL, and the second was unreachable
 
 ### Features
 
