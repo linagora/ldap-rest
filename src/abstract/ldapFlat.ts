@@ -1286,8 +1286,21 @@ export default abstract class LdapFlat extends DmPlugin {
     // Check required fields. A `generated` attribute is exempt: it is filled
     // by a hook *after* validation, on purpose — checks must see the payload
     // as the client sent it, never a value the server has already rewritten.
+    //
+    // Exempt only when something will actually fill it. `generatedFrom` is
+    // filled here; everything else is the business of a `consistency` plugin.
+    // With none loaded — a server upgraded without adding
+    // `core/ldap/enterpriseRules` — exempting would write an entry missing an
+    // attribute its own schema calls required, silently, and the client could
+    // not supply it either since `generated` is refused as input. The entry
+    // would be unwritable by any route, so demand it and say so instead.
+    const canFill =
+      Object.values(this.server.loadedPlugins).some(plugin =>
+        (plugin as { roles?: string[] }).roles?.includes('consistency')
+      ) === true;
     for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.required && !attr.generated && !entry[field]) {
+      const exempt = attr.generated && (canFill || attr.generatedFrom);
+      if (attr.required && !exempt && !entry[field]) {
         throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }

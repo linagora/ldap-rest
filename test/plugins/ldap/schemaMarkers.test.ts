@@ -3,6 +3,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 /**
@@ -36,6 +37,13 @@ describe('Schema markers over the API', () => {
       // already there
     }
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    // The shipped schema marks the path and the status required *and*
+    // generated, so it needs the plugin that fills them: without one, those
+    // attributes are unreachable from either side.
+    await server.registerPlugin(
+      'ldapEnterpriseRules',
+      new LdapEnterpriseRules(server)
+    );
     server.setupErrorMiddleware();
     request = supertest(server.app);
   });

@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
@@ -211,6 +212,13 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     let request: any;
     before(async () => {
       plugin.api(server.app);
+      // The shipped schema marks the path and the status required *and*
+      // generated: the plugin that fills them has to be there, as it is in
+      // any real deployment of this schema.
+      await server.registerPlugin(
+        'ldapEnterpriseRules',
+        new LdapEnterpriseRules(server)
+      );
       server.setupErrorMiddleware();
       request = supertest(server.app);
     });
