@@ -15,7 +15,7 @@
  */
 
 import { escapeHtml } from '../../shared/utils/dom';
-import { attributeLabel } from '../format';
+import { attributeLabel, formatByteSize } from '../format';
 import type { Translator } from '../i18n';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
@@ -172,7 +172,16 @@ export class EntityForm {
     const value = this.values[name][0] ?? '';
     const type =
       attr.type === 'date' ? 'date' : attr.neverReturn ? 'password' : 'text';
-    const shown = attr.type === 'date' ? EntityForm.toDateInput(value) : value;
+    // A normalised size is stored as a bare byte count and edited as one, so
+    // the operator counted zeros to change a quota. The field is text, and
+    // the server reads `4 GB` with the same `parseByteSize` that produced the
+    // number — the value shown is a value it accepts back.
+    const shown =
+      attr.type === 'date'
+        ? EntityForm.toDateInput(value)
+        : attr.normalize === 'byteSize'
+          ? formatByteSize(value)
+          : value;
     return `<input id="dc-field-${escapeHtml(name)}" name="${escapeHtml(name)}"
       type="${type}" class="dc-input" value="${escapeHtml(shown)}"
       ${attr.neverReturn ? 'autocomplete="new-password"' : ''} />`;
