@@ -71,6 +71,12 @@ export function roleAttribute(
 /** Organizations walked before a pointer listing stops asking for more. */
 const ORGANIZATION_OPTION_LIMIT = 200;
 
+/**
+ * The class `organizations` searches its own children on, and the one value
+ * its `subnodes` endpoint understands as "child organizations only".
+ */
+const ORGANIZATION_CLASS = 'organizationalUnit';
+
 export class ConsoleApiClient {
   private readonly origin: string;
   private apiPrefix = '/api';
@@ -339,10 +345,20 @@ export class ConsoleApiClient {
     }
   }
 
-  /** Direct children of an organization. */
+  /**
+   * Direct children of an organization.
+   *
+   * `subnodes` answers with the child organizations *and* the entries linked
+   * to this one — the accounts and groups it holds — capped at
+   * `ldap_organization_max_subnodes` and followed by a `moreIndicator` row
+   * when the cap bites. A tree of organizations wants none of that, so the
+   * filter the endpoint provides for exactly this is passed: it drops the
+   * linked entries, and with them the indicator that counted them.
+   */
   async organizationChildren(dn: string): Promise<OrganizationNode[]> {
     const entries = await this.call<Entry[]>(
-      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`
+      `${this.apiPrefix}/v1/ldap/organizations/${encodeURIComponent(dn)}` +
+        `/subnodes?objectClass=${encodeURIComponent(ORGANIZATION_CLASS)}`
     );
     return (entries || []).map(entry => this.toNode(entry));
   }
