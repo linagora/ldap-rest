@@ -86,6 +86,9 @@ describe('Generated attributes', function () {
         sn: 'User',
         mail: 'guards.user@example.com',
         twakeDepartmentLink: deptDn,
+        employeeNumber: 'GEN0001',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
       expect(res.body.error).to.match(/is required/);

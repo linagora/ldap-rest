@@ -91,6 +91,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-flat@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0001',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       const listEntries = await plugin.listUsers({});
       // @ts-ignore
@@ -112,6 +115,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         givenName: 'Test',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0002',
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -143,6 +147,8 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         mail: 'testuser-flat-3@example.org',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0004',
+        givenName: 'Test',
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -190,6 +196,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-flat-rename@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0005',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
@@ -229,6 +238,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser@example.org',
         twakeDepartmentLink: testDeptDn,
+        employeeNumber: 'FLA0006',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(res.status).to.equal(201);
       expect(res.body).to.have.property('uid', 'testuser');
@@ -255,6 +267,8 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         mail: 'testuser-flat-api-modify@example.org',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0007',
+        givenName: 'Test',
       });
       let res = await request
         .put('/api/v1/ldap/users/testuser')
@@ -284,6 +298,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser@example.org',
         twakeDepartmentLink: testDeptDn,
+        employeeNumber: 'FLA0008',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(res.status).to.equal(201);
       expect(res.body).to.have.property('uid', 'testuser');
@@ -355,6 +372,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0009',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user to second organization
@@ -393,6 +413,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0010',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       const userDn = `uid=testuser,${USER_BRANCH}`;
@@ -417,6 +440,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0011',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Try to move to non-existent org
@@ -469,6 +495,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0012',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user
@@ -539,6 +568,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0013',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user via API
@@ -604,6 +636,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           twakeDeliveryMode: [
             `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
           ],
+          employeeNumber: 'FLA0014',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
@@ -624,6 +659,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           twakeDeliveryMode: [
             `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
           ],
+          employeeNumber: 'FLA0015',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
@@ -644,6 +682,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDeliveryMode: [
           `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
         ],
+        employeeNumber: 'FLA0016',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       const users = await plugin.searchUsersByName('testuser');
       expect(users).to.have.property('testuser');
@@ -656,6 +697,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-pointer-modify@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0017',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       try {
         await plugin.modifyUser('testuser', {
