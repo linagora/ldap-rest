@@ -268,7 +268,23 @@ export default class LdapEnterpriseRules extends DmPlugin {
       if (Object.keys(submitted).length === 0) return [dn, changes, op, req];
 
       const current = await this.readEntry(dn);
-      await this.runChecks(entity, dn, submitted, current);
+
+      // Moving an entry replaces its organization link and nothing else, so
+      // the addresses already stored were never re-examined against the
+      // organization now responsible for them — `/move` walked straight past
+      // the domain rule this plugin exists to enforce. When the link changes,
+      // the stored mail-scoped values are checked as if they had been sent.
+      const linkAttr = roleAttribute(entity.schema, 'organizationLink');
+      const toCheck: AttributesList = { ...submitted };
+      if (linkAttr && linkAttr in submitted && current) {
+        for (const [name, attr] of Object.entries(entity.schema.attributes)) {
+          if (!attr.mailDomainScope) continue;
+          if (name in toCheck) continue;
+          if (current[name] !== undefined) toCheck[name] = current[name];
+        }
+      }
+
+      await this.runChecks(entity, dn, toCheck, current);
       await this.runTransformations(entity, dn, submitted, false);
 
       // Write the transformed values back where they came from.
@@ -396,7 +412,14 @@ export default class LdapEnterpriseRules extends DmPlugin {
       const link = valueList(values[linkAttr])[0];
       if (!link) return;
       const path = await this.organizationPath(link);
-      if (path !== undefined) values[pathAttr] = path;
+      if (path === undefined)
+        // Leaving the previous value in place made the path name a different
+        // organization than the link — the two attributes exist to say the
+        // same thing, and disagreeing silently is worse than refusing.
+        throw new BadRequestError(
+          `Organization ${link} has no ${pathAttr}, so "${pathAttr}" cannot be computed`
+        );
+      values[pathAttr] = path;
       return;
     }
 
