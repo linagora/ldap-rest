@@ -17,6 +17,7 @@ import { EntityDetail } from './components/EntityDetail';
 import { EntityForm } from './components/EntityForm';
 import { EntityList, SEARCH_MINIMUM } from './components/EntityList';
 import { OrganizationTree } from './components/OrganizationTree';
+import { attributeLabel, rdnValue, resolveText } from './format';
 import { availableLanguages, Translator } from './i18n';
 import type {
   ConsoleOptions,
@@ -49,6 +50,14 @@ export class DirectoryConsole {
    * offers nothing rather than every button.
    */
   private scopeError: string | null = null;
+  /**
+   * Which view is the current one. Opening an entry, then another before the
+   * first has answered, raced exactly the way the entity list did: whichever
+   * `get` resolved last wrote its card, so entry A could end up on entry B's
+   * URL. Every view takes a ticket and writes nothing once another has been
+   * asked for.
+   */
+  private viewGeneration = 0;
   private route: Route = { view: 'dashboard' };
   private tree: OrganizationTree | null = null;
 
@@ -165,7 +174,7 @@ export class DirectoryConsole {
                 entity =>
                   `<button type="button" class="dc-nav-item" data-nav="${escapeHtml(
                     entity.key
-                  )}">${escapeHtml(entity.pluralName)}</button>`
+                  )}">${escapeHtml(this.plural(entity))}</button>`
               )
               .join('')}
           </nav>
@@ -273,10 +282,16 @@ export class DirectoryConsole {
     return this.container?.querySelector<HTMLElement>('[data-main]') || null;
   }
 
+  /** True while the view this ticket was taken for is still the one asked for. */
+  private current(generation: number): boolean {
+    return generation === this.viewGeneration;
+  }
+
   /** Draw whatever the current route asks for. */
   private async renderMain(): Promise<void> {
     const main = this.main();
     if (!main) return;
+    const generation = ++this.viewGeneration;
 
     for (const button of Array.from(
       this.container?.querySelectorAll<HTMLElement>('[data-nav]') || []
@@ -296,12 +311,44 @@ export class DirectoryConsole {
     const entity = this.entity(this.route.entity);
     if (!entity) return this.renderDashboard(main);
     if (entity.kind === 'organization') return this.renderOrganizations(main);
-    if (this.route.id) return this.renderDetail(main, entity, this.route.id);
+    if (this.route.id)
+      return this.renderDetail(main, entity, this.route.id, generation);
     return this.renderList(main, entity);
   }
 
   private entity(key?: string): EntityDescriptor | undefined {
     return this.entities.find(entity => entity.key === key);
+  }
+
+  /**
+   * What to call a collection: the schema's label in the current language,
+   * falling back to the name the schema gives it.
+   *
+   * @param entity entity to name
+   * @returns the plural name to show
+   */
+  private plural(entity: EntityDescriptor): string {
+    return (
+      resolveText(entity.label, this.translator.language) ||
+      // The organization tree is the one collection the product itself names,
+      // because it is the product that draws it.
+      (entity.kind === 'organization'
+        ? this.translator.t('tree.title')
+        : entity.pluralName)
+    );
+  }
+
+  /**
+   * What to call one entry of a collection.
+   *
+   * @param entity entity to name
+   * @returns the singular name to show
+   */
+  private singular(entity: EntityDescriptor): string {
+    return (
+      resolveText(entity.singularLabel, this.translator.language) ||
+      entity.singularName
+    );
   }
 
   /** Whether the caller may create an entry of this entity. */
@@ -354,17 +401,19 @@ export class DirectoryConsole {
             .map(entity => {
               const allowed = this.canCreate(entity);
               return `<li class="dc-card">
-                <h3>${escapeHtml(entity.pluralName)}</h3>
+                <h3>${escapeHtml(this.plural(entity))}</h3>
                 <div class="dc-card-actions">
                   <button type="button" class="dc-button" data-open="${escapeHtml(
                     entity.key
-                  )}">${escapeHtml(entity.pluralName)}</button>
+                  )}">${escapeHtml(t('list.open'))}</button>
                   ${
                     allowed
                       ? `<button type="button" class="dc-button dc-button-primary" data-new="${escapeHtml(
                           entity.key
                         )}">${escapeHtml(
-                          t('dashboard.create', { entity: entity.singularName })
+                          t('dashboard.create', {
+                            entity: this.singular(entity),
+                          })
                         )}</button>`
                       : `<span class="dc-muted">${escapeHtml(t('dashboard.noCreate'))}</span>`
                   }
@@ -400,11 +449,11 @@ export class DirectoryConsole {
     main.innerHTML = `
       <section class="dc-view">
         <header class="dc-view-header">
-          <h1>${escapeHtml(entity.pluralName)}</h1>
+          <h1>${escapeHtml(this.plural(entity))}</h1>
           ${
             this.canCreate(entity)
               ? `<button type="button" class="dc-button dc-button-primary" data-new>${escapeHtml(
-                  t('dashboard.create', { entity: entity.singularName })
+                  t('dashboard.create', { entity: this.singular(entity) })
                 )}</button>`
               : ''
           }
@@ -443,7 +492,8 @@ export class DirectoryConsole {
   private async renderDetail(
     main: HTMLElement,
     entity: EntityDescriptor,
-    id: string
+    id: string,
+    generation: number
   ): Promise<void> {
     const t = (key: string, values?: Record<string, string | number>): string =>
       this.translator.t(key, values);
@@ -451,7 +501,9 @@ export class DirectoryConsole {
     let entry: Entry;
     try {
       entry = await this.api.get(entity, id);
+      if (!this.current(generation)) return;
     } catch (err) {
+      if (!this.current(generation)) return;
       // Only a 404 means what "no longer exists" says. A 401, a 403 or a
       // proxy error is a different thing entirely, and telling the operator
       // the entry is gone sends them looking for the wrong problem.
@@ -508,7 +560,13 @@ export class DirectoryConsole {
   private relations(
     entity: EntityDescriptor,
     entry: Entry
-  ): { title: string; items: { id: string; label: string }[] } | undefined {
+  ):
+    | {
+        title: string;
+        attribute: string;
+        items: { id: string; label: string }[];
+      }
+    | undefined {
     for (const role of ['members', 'groupMemberships']) {
       for (const [name, attr] of Object.entries(entity.schema.attributes)) {
         const roles = Array.isArray(attr.role) ? attr.role : [attr.role];
@@ -516,12 +574,11 @@ export class DirectoryConsole {
         const raw = entry[name];
         const list = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
         return {
-          title: attr.label || name,
+          title: attributeLabel(name, attr, this.translator.language),
+          attribute: name,
           items: list.map(dn => ({
             id: String(dn),
-            label: String(dn)
-              .split(',')[0]
-              .replace(/^[^=]+=/, ''),
+            label: rdnValue(String(dn)),
           })),
         };
       }
@@ -586,16 +643,26 @@ export class DirectoryConsole {
     const holder =
       this.container?.querySelector<HTMLElement>('[data-org-detail]');
     if (!holder || !entity) return;
+    // Clicking through a tree is navigation like any other: the node asked
+    // for last is the node whose card should end up on screen.
+    const generation = ++this.viewGeneration;
 
     let entry: Entry;
     try {
       entry = await this.api.organization(node.dn);
+      if (!this.current(generation)) return;
     } catch {
+      if (!this.current(generation)) return;
       holder.innerHTML = `<p class="dc-empty">${escapeHtml(
         this.translator.t('detail.notFound')
       )}</p>`;
       return;
     }
+
+    // "Who is in this department?" is the question an organization card is
+    // opened to answer, and the tree deliberately does not show accounts.
+    const members = await this.api.organizationMembers(node.dn).catch(() => []);
+    if (!this.current(generation)) return;
 
     new EntityDetail({
       entity,
@@ -603,6 +670,14 @@ export class DirectoryConsole {
       translator: this.translator,
       canWrite: this.canWrite(),
       canDelete: this.canDelete(),
+      relations: {
+        title: this.translator.t('detail.members'),
+        items: members.map(member => ({
+          id: member.dn,
+          label: member.label,
+        })),
+      },
+      onOpenRelation: (target: string): void => this.openRelation(target),
       onEdit: (): void => {
         void this.openOrganizationForm(entity, entry);
       },
@@ -695,7 +770,7 @@ export class DirectoryConsole {
     this.openPanel(
       entry
         ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
-        : t('dashboard.create', { entity: entity.singularName }),
+        : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
       },
@@ -751,7 +826,7 @@ export class DirectoryConsole {
     this.openPanel(
       entry
         ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
-        : t('dashboard.create', { entity: entity.singularName }),
+        : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
       },

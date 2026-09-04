@@ -12,6 +12,12 @@
 /** Semantic role of an attribute, as declared by the server-side schema. */
 export type SchemaRole = string;
 
+/**
+ * A piece of text the server supplies, in one or several languages. A plain
+ * string is the text itself; a map is keyed by language tag.
+ */
+export type LocalizedText = string | Record<string, string>;
+
 /** One attribute of an entity schema. */
 export interface SchemaAttribute {
   type:
@@ -49,13 +55,18 @@ export interface SchemaAttribute {
   states?: Record<string, string>;
   /** Grouping hint for the form */
   group?: string;
-  /** Label to show instead of the attribute name */
-  label?: string;
+  /** Name to show instead of the attribute name, in one or several languages */
+  label?: LocalizedText;
 }
 
 export interface EntitySchema {
   strict?: boolean;
   attributes: Record<string, SchemaAttribute>;
+  /** Metadata the server carries alongside the attributes */
+  entity?: {
+    label?: LocalizedText;
+    singularLabel?: LocalizedText;
+  };
 }
 
 /** An entity the console can browse, as advertised by the server. */
@@ -65,6 +76,9 @@ export interface EntityDescriptor {
   /** Plural name, from the schema — the deployment's own vocabulary */
   pluralName: string;
   singularName: string;
+  /** Names to show for the collection and for one entry, per language */
+  label?: LocalizedText;
+  singularLabel?: LocalizedText;
   /** Attribute holding the RDN value */
   mainAttribute: string;
   base: string;
