@@ -65,6 +65,13 @@ export class EntityList {
   private loading = false;
   private loaded = false;
   private error: string | null = null;
+  /**
+   * Which load is the current one. A search is debounced, not serialised, so
+   * two requests are in flight whenever the operator keeps typing — and the
+   * one that answers last is not the one that was asked last. Every load
+   * takes a ticket and drops its answer if another was issued meanwhile.
+   */
+  private generation = 0;
 
   constructor(options: ListOptions) {
     this.options = options;
@@ -132,6 +139,7 @@ export class EntityList {
 
   /** Fetch the entries matching the current search. */
   private async reload(): Promise<void> {
+    const generation = ++this.generation;
     if (!this.options.listable && this.search.length < SEARCH_MINIMUM) {
       this.entries = [];
       this.loaded = false;
@@ -143,6 +151,7 @@ export class EntityList {
     this.draw();
     try {
       const list = await this.options.load(this.search, this.searchAttribute);
+      if (generation !== this.generation) return;
       this.entries = Object.entries(list).sort(([a], [b]) =>
         a.localeCompare(b, undefined, { sensitivity: 'base' })
       );
@@ -150,11 +159,14 @@ export class EntityList {
       this.page = 0;
       this.selected.clear();
     } catch (err) {
+      if (generation !== this.generation) return;
       this.error = (err as Error).message;
       this.entries = [];
     } finally {
-      this.loading = false;
-      this.draw();
+      if (generation === this.generation) {
+        this.loading = false;
+        this.draw();
+      }
     }
   }
 
