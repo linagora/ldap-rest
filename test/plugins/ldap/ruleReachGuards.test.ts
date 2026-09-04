@@ -115,6 +115,9 @@ describe('Rules reach the other routes too', function () {
       sn: 'User',
       mail: 'reach.user@example.com',
       twakeDepartmentLink: mainOrgDn,
+      employeeNumber: 'RUL0001',
+      givenName: 'Test',
+      displayName: 'Test Person',
     });
 
   it('should refuse a group mail already held, with the status the rule chose', async () => {

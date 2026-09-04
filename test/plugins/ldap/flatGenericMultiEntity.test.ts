@@ -123,6 +123,9 @@ describe('flatGeneric with several entities', function () {
         sn: 'User',
         mail: 'multi.user@example.com',
         twakeDepartmentLink: deptDn,
+        employeeNumber: 'FLA0001',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(res.status, JSON.stringify(res.body)).to.be.oneOf([200, 201]);
     });
@@ -167,6 +170,9 @@ describe('flatGeneric with several entities', function () {
         sn: 'Clone',
         mail: 'multi.user@example.com',
         twakeDepartmentLink: deptDn,
+        employeeNumber: 'FLA0002',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(res.status, JSON.stringify(res.body)).to.equal(409);
     });

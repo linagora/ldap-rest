@@ -17,6 +17,14 @@ migration will refuse before it does.
   `PUT /ldap/groups` too. Each is a schema marker: copy the schema and drop
   them to keep the old behaviour
 
+- `static/schemas/twake/users.json` requires what the interface it replaces
+  required: `employeeNumber`, `displayName` and `givenName`, none of which it
+  asked for. `cn` stops being required, as it was there — 689 accounts of the
+  reference directory have none, and the schema demanded it of every creation.
+  The `displayName` role moves from `cn` to `displayName`: `cn` holds the name
+  surname-first (88% of that directory), `displayName` the readable order, and
+  a client shows the readable one
+
 - An attribute both `required` and `generated` needs a plugin that fills it,
   so the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
   than writing an entry missing two required attributes. A `pointer` default

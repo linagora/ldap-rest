@@ -66,6 +66,9 @@ describe('Schema markers over the API', () => {
     mail: 'marker.user@example.com',
     twakeDepartmentLink: deptDn,
     ...extra,
+    employeeNumber: 'SCH0001',
+    givenName: 'Test',
+    displayName: 'Test Person',
   });
 
   afterEach(async () => {

@@ -63,6 +63,8 @@ describe('Enterprise rules: schema defaults', function () {
         employeeNumber: 'E90001',
         twakeDepartmentLink: deptDn,
         ...extra,
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
   const read = async (attribute: string) => {

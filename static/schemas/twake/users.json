@@ -49,7 +49,7 @@
     "employeeNumber": {
       "type": "string",
       "searchable": true,
-      "required": false,
+      "required": true,
       "unique": true,
       "role": "employeeId",
       "label": {
@@ -60,11 +60,10 @@
     "cn": {
       "type": "string",
       "searchable": true,
-      "required": true,
-      "role": "displayName",
+      "required": false,
       "label": {
-        "en": "Name",
-        "fr": "Nom"
+        "en": "Common name",
+        "fr": "Nom d'annuaire"
       }
     },
     "sn": {
@@ -79,7 +78,7 @@
     "givenName": {
       "type": "string",
       "searchable": true,
-      "required": false,
+      "required": true,
       "label": {
         "en": "First name",
         "fr": "Prénom"
@@ -87,10 +86,11 @@
     },
     "displayName": {
       "type": "string",
-      "required": false,
+      "role": "displayName",
+      "required": true,
       "label": {
-        "en": "Display name",
-        "fr": "Nom affiché"
+        "en": "Full name",
+        "fr": "Nom complet"
       }
     },
     "personalTitle": {

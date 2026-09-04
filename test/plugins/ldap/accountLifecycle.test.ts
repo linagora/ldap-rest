@@ -79,6 +79,9 @@ describe('Account lifecycle', () => {
         twakeDepartmentLink: deptDn,
         twakeDepartmentPath: 'LifecycleOrg',
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${base}`,
+        employeeNumber: 'ACC0001',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
     });
 
