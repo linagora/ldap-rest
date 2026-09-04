@@ -259,6 +259,30 @@ describe('Directory console', () => {
       // No interceptor: a request here would fail the test.
       await new ConsoleApiClient(baseUrl).update(users, 'jsmith', {}, []);
     });
+
+    it('should ask an organization for its child organizations only', async () => {
+      // `subnodes` answers with the child OUs *and* the entries linked to the
+      // node — up to fifty accounts, plus a `moreIndicator` row counting the
+      // rest. Unfiltered, all of that was drawn as organizations: a member
+      // clicked in the tree answered "no longer exists", and the department
+      // select of every form offered user DNs as candidate organizations.
+      const dn = 'ou=Sales,ou=organization,dc=example,dc=com';
+      nock(baseUrl)
+        .get(`/api/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`)
+        .query({ objectClass: 'organizationalUnit' })
+        .reply(200, [
+          {
+            dn: `ou=EU,${dn}`,
+            ou: ['EU'],
+            twakeDepartmentPath: ['Sales / EU'],
+          },
+        ]);
+
+      const children = await new ConsoleApiClient(baseUrl).organizationChildren(
+        dn
+      );
+      expect(children.map(node => node.name)).to.deep.equal(['EU']);
+    });
   });
 
   describe('EntityList', () => {
