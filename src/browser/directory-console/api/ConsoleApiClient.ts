@@ -17,6 +17,7 @@ import type {
   Scope,
   SchemaAttribute,
 } from '../types';
+import { rdnValue } from '../format';
 
 interface FlatResource {
   name: string;
@@ -472,9 +473,9 @@ export class ConsoleApiClient {
       .filter(entry => !isMoreIndicator(entry) && !this.isOrganization(entry))
       .map(entry => ({
         dn: String(entry.dn || ''),
-        label: String(entry.dn || '')
-          .split(',')[0]
-          .replace(/^[^=]+=/, ''),
+        // `rdnValue` is what the rest of the console reads a DN's own name
+        // with: splitting on the first comma loses `cn=Smith\, John`.
+        label: rdnValue(String(entry.dn || '')),
       }));
   }
 
