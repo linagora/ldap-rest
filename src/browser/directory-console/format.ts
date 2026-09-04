@@ -78,10 +78,50 @@ export function rdnValue(dn: string): string {
  * @param value value as stored
  * @returns the text to show
  */
+/**
+ * Decimal units, the ones `parseByteSize` reads and the ones mail servers
+ * report: 1 GB is 10^9 bytes, not 2^30.
+ */
+const SIZE_UNITS: [string, number][] = [
+  ['TB', 1e12],
+  ['GB', 1e9],
+  ['MB', 1e6],
+  ['KB', 1e3],
+];
+
+/**
+ * A byte count as the size a reader recognises.
+ *
+ * The directory stores what `normalize: "byteSize"` computed — a bare number
+ * of bytes — so a mail quota reads as ten digits where the operator set
+ * `4GB`. It is turned back only when the shorter form means exactly the same
+ * number: a value that needs more than three decimals is not made clearer by
+ * a unit, and the form hands what is shown straight back to the server, which
+ * reads it with `parseByteSize`.
+ *
+ * @param value value as stored
+ * @returns the size in the largest unit that says it exactly
+ */
+export function formatByteSize(value: string): string {
+  const text = value.trim();
+  if (!/^\d+$/.test(text)) return value;
+  const bytes = Number(text);
+  if (!Number.isSafeInteger(bytes)) return value;
+  for (const [unit, size] of SIZE_UNITS) {
+    if (bytes < size) continue;
+    const quantity = (bytes / size).toFixed(3).replace(/\.?0+$/, '');
+    if (Math.round(Number(quantity) * size) !== bytes) return value;
+    return `${quantity} ${unit}`;
+  }
+  return `${bytes} B`;
+}
+
 export function displayValue(
   attr: SchemaAttribute | undefined,
   value: string
 ): string {
   const pointer = attr?.type === 'pointer' || attr?.items?.type === 'pointer';
-  return pointer ? rdnValue(value) : value;
+  if (pointer) return rdnValue(value);
+  if (attr?.normalize === 'byteSize') return formatByteSize(value);
+  return value;
 }
