@@ -128,13 +128,26 @@ export class EntityDetail {
   /**
    * One value. An organization path is clickable — it is both the answer to
    * "where is this entry?" and the way to get there.
+   *
+   * "The way to get there" was a link to the tree and nothing more: it opened
+   * on the root, leaving the reader to find the department again by hand. The
+   * route already takes an organization (`#/organizations/<dn>`) and selects
+   * it, and the entry names its own one through the `organizationLink` role,
+   * so the link goes to the department it is naming.
    */
   private valueMarkup(name: string, value: string): string {
-    const { entity } = this.options;
-    if (name === entity.organizationPath)
-      return `<a href="#/organizations" class="dc-path-link" title="${escapeHtml(
+    const { entity, entry } = this.options;
+    if (name === entity.organizationPath) {
+      const link = entity.organizationLink
+        ? values(entry[entity.organizationLink])[0]
+        : undefined;
+      const href = link
+        ? `#/organizations/${encodeURIComponent(link)}`
+        : '#/organizations';
+      return `<a href="${escapeHtml(href)}" class="dc-path-link" title="${escapeHtml(
         value
-      )}" data-path>${escapeHtml(value)}</a>`;
+      )}">${escapeHtml(value)}</a>`;
+    }
     const shown = displayValue(entity.schema.attributes[name], value);
     return `<span class="dc-value" title="${escapeHtml(value)}">${escapeHtml(shown)}</span>`;
   }

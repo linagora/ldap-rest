@@ -50,6 +50,14 @@ export class DirectoryConsole {
    * offers nothing rather than every button.
    */
   private scopeError: string | null = null;
+  /**
+   * Which view is the current one. Opening an entry, then another before the
+   * first has answered, raced exactly the way the entity list did: whichever
+   * `get` resolved last wrote its card, so entry A could end up on entry B's
+   * URL. Every view takes a ticket and writes nothing once another has been
+   * asked for.
+   */
+  private viewGeneration = 0;
   private route: Route = { view: 'dashboard' };
   private tree: OrganizationTree | null = null;
 
@@ -274,10 +282,16 @@ export class DirectoryConsole {
     return this.container?.querySelector<HTMLElement>('[data-main]') || null;
   }
 
+  /** True while the view this ticket was taken for is still the one asked for. */
+  private current(generation: number): boolean {
+    return generation === this.viewGeneration;
+  }
+
   /** Draw whatever the current route asks for. */
   private async renderMain(): Promise<void> {
     const main = this.main();
     if (!main) return;
+    const generation = ++this.viewGeneration;
 
     for (const button of Array.from(
       this.container?.querySelectorAll<HTMLElement>('[data-nav]') || []
@@ -297,7 +311,8 @@ export class DirectoryConsole {
     const entity = this.entity(this.route.entity);
     if (!entity) return this.renderDashboard(main);
     if (entity.kind === 'organization') return this.renderOrganizations(main);
-    if (this.route.id) return this.renderDetail(main, entity, this.route.id);
+    if (this.route.id)
+      return this.renderDetail(main, entity, this.route.id, generation);
     return this.renderList(main, entity);
   }
 
@@ -477,7 +492,8 @@ export class DirectoryConsole {
   private async renderDetail(
     main: HTMLElement,
     entity: EntityDescriptor,
-    id: string
+    id: string,
+    generation: number
   ): Promise<void> {
     const t = (key: string, values?: Record<string, string | number>): string =>
       this.translator.t(key, values);
@@ -485,7 +501,9 @@ export class DirectoryConsole {
     let entry: Entry;
     try {
       entry = await this.api.get(entity, id);
+      if (!this.current(generation)) return;
     } catch (err) {
+      if (!this.current(generation)) return;
       // Only a 404 means what "no longer exists" says. A 401, a 403 or a
       // proxy error is a different thing entirely, and telling the operator
       // the entry is gone sends them looking for the wrong problem.
@@ -625,11 +643,16 @@ export class DirectoryConsole {
     const holder =
       this.container?.querySelector<HTMLElement>('[data-org-detail]');
     if (!holder || !entity) return;
+    // Clicking through a tree is navigation like any other: the node asked
+    // for last is the node whose card should end up on screen.
+    const generation = ++this.viewGeneration;
 
     let entry: Entry;
     try {
       entry = await this.api.organization(node.dn);
+      if (!this.current(generation)) return;
     } catch {
+      if (!this.current(generation)) return;
       holder.innerHTML = `<p class="dc-empty">${escapeHtml(
         this.translator.t('detail.notFound')
       )}</p>`;
@@ -639,6 +662,7 @@ export class DirectoryConsole {
     // "Who is in this department?" is the question an organization card is
     // opened to answer, and the tree deliberately does not show accounts.
     const members = await this.api.organizationMembers(node.dn).catch(() => []);
+    if (!this.current(generation)) return;
 
     new EntityDetail({
       entity,
