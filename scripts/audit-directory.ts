@@ -29,6 +29,9 @@ import fs from 'fs';
 import { Client } from 'ldapts';
 
 import type { Schema, SchemaAttribute } from '../src/config/schema';
+// `isDnInBranch` only reads DNs; it brings in the error classes and the
+// response helpers and nothing else, so the script stays a script.
+import { isDnInBranch } from '../src/lib/utils';
 
 interface Options {
   schema: string;
@@ -231,13 +234,13 @@ export function auditEntry(
       definition.type === 'pointer'
         ? definition.branch
         : definition.items?.branch;
+    // Asked RDN by RDN, the way the server asks it: a text suffix reads
+    // `uid=x,xou=users,dc=example,dc=com` as being inside
+    // `ou=users,dc=example,dc=com`, and the audit would report clean a value
+    // the server refuses.
     if (branches?.length)
       for (const value of values)
-        if (
-          !branches.some(branch =>
-            value.toLowerCase().endsWith(branch.toLowerCase())
-          )
-        )
+        if (!branches.some(branch => isDnInBranch(value, branch)))
           add(name, 'outside the allowed branch', value, definition);
   }
 }
