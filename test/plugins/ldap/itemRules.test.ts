@@ -51,6 +51,7 @@ describe('Element rules of an array attribute', function () {
       `uid=itemrules,ou=users,${base}`,
       `uid=itemrulesa,ou=users,${base}`,
       `uid=itemrulesb,ou=users,${base}`,
+      `uid=itemrulesc,ou=users,${base}`,
       deptDn,
     ])
       await server.ldap.delete(dn).catch(() => undefined);
@@ -91,6 +92,23 @@ describe('Element rules of an array attribute', function () {
       .send(
         account('itemrulesb', {
           twakeDelegatedUsers: [`cn=nobody,ou=groups,${base}`],
+        })
+      );
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(JSON.stringify(res.body)).to.contain('branches');
+  });
+
+  it('should refuse a DN that merely ends with the branch its items name', async () => {
+    // The branch was tested as a text suffix with the separating comma made
+    // optional, so `xou=users,<base>` read as `ou=users,<base>`: an element
+    // naming an entry of another branch entirely was stored, and nothing
+    // else checks an array element's target.
+    const res = await request
+      .post('/api/v1/ldap/users')
+      .type('json')
+      .send(
+        account('itemrulesc', {
+          twakeDelegatedUsers: [`uid=nobody,xou=users,${base}`],
         })
       );
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
