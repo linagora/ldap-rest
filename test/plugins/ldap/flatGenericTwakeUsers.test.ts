@@ -701,6 +701,35 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       }
     });
 
+    it('should reject a pointer DN that merely ends with the branch', async () => {
+      // The branch was tested as a text suffix with the separating comma
+      // made optional, so `xou=twakeAccountStatus,ou=nomenclature,<base>`
+      // read as the branch itself. The refusal has to name the branch, not
+      // the DN's existence — reaching the existence check at all means the
+      // branch test let it through.
+      try {
+        await plugin.addUser('testuser', {
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-pointer-suffix@example.org',
+          twakeDepartmentPath: 'Test / SubTest',
+          twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+          twakeAccountStatus: `cn=active,xou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: [
+            `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          ],
+          employeeNumber: 'FLA0019',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.include(
+          'must point to a DN within allowed branches'
+        );
+      }
+    });
+
     it('should accept user with valid pointer DNs', async () => {
       await plugin.addUser('testuser', {
         cn: 'Test User',
