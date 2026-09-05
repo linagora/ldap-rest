@@ -108,6 +108,42 @@ describe('Schema markers over the API', () => {
     });
   });
 
+  describe('delivery mode', () => {
+    it('should get a default delivery mode instead of none', async () => {
+      await request
+        .post('/api/v1/ldap/users')
+        .type('json')
+        .send(body())
+        .expect(201);
+
+      const res = await request
+        .get('/api/v1/ldap/users/marker.user')
+        .set('Accept', 'application/json');
+      expect(res.status).to.equal(200);
+      // A single value comes back unwrapped from the directory driver, an
+      // array quirk shared with every other multivalued attribute here —
+      // what matters is that a value exists at all.
+      expect([].concat(res.body.twakeDeliveryMode)).to.deep.equal([
+        `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${base}`,
+      ]);
+    });
+
+    it('should refuse a client-supplied delivery mode: the server owns it', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users')
+        .type('json')
+        .send(
+          body({
+            twakeDeliveryMode: [
+              `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${base}`,
+            ],
+          })
+        );
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.match(/computed by the server/);
+    });
+  });
+
   describe('read-only attributes', () => {
     it('should refuse memberships, which the group side owns', async () => {
       const res = await request
