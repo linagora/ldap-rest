@@ -1226,6 +1226,15 @@ export default abstract class LdapFlat extends DmPlugin {
       );
       return orgDn;
     } catch (err) {
+      // Let a NotFoundError we raised ourselves - or an LDAP NoSuchObjectError
+      // (code 32) - travel out as a NotFoundError instead of being wrapped
+      // into a generic 500.
+      if (err instanceof NotFoundError) {
+        throw err;
+      }
+      if ((err as { code?: number }).code === 32) {
+        throw new NotFoundError(`Organization ${orgDn} not found`);
+      }
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
     }
