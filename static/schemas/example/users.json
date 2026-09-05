@@ -218,8 +218,11 @@
         "type": "pointer",
         "branch": ["ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"]
       },
-      "required": false,
-      "readOnly": true,
+      "required": true,
+      "generated": true,
+      "default": [
+        "cn=normal,ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"
+      ],
       "group": "Mailbox Settings"
     },
     "twakeDeletionDate": {

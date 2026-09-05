@@ -198,4 +198,35 @@ describe('Generated attributes', function () {
       expect(res.body.error).to.match(/points to a non-existent entry/);
     });
   });
+
+  describe('when the schema default is an array of pointers to nowhere', () => {
+    let server: DM;
+    let request: ReturnType<typeof supertest>;
+
+    before(async () => {
+      ({ server, request } = await serve(
+        './test/fixtures/schemas/danglingPointerArrayDefault.json',
+        true
+      ));
+    });
+
+    after(async () => {
+      await server.ldap
+        .delete(`uid=dangling.array.user,ou=users,${base}`)
+        .catch(() => undefined);
+    });
+
+    it('should refuse it, the same as a single dangling pointer default', async () => {
+      const res = await request
+        .post('/api/v1/ldap/danglingArrayUsers')
+        .type('json')
+        .send({
+          uid: 'dangling.array.user',
+          cn: 'Dangling Array User',
+          sn: 'User',
+        });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.match(/points to a non-existent entry/);
+    });
+  });
 });
