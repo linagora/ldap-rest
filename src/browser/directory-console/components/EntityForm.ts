@@ -15,7 +15,7 @@
  */
 
 import { escapeHtml } from '../../shared/utils/dom';
-import { attributeLabel, formatByteSize } from '../format';
+import { attributeLabel, entryValue, formatByteSize } from '../format';
 import type { Translator } from '../i18n';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
@@ -73,7 +73,7 @@ export class EntityForm {
     this.options = options;
     this.fields = this.editableFields();
     for (const [name] of this.fields)
-      this.values[name] = toList(options.entry?.[name]);
+      this.values[name] = toList(entryValue(options.entry, name));
   }
 
   /**
@@ -378,7 +378,7 @@ export class EntityForm {
     const cleared: string[] = [];
     for (const [name, attr] of this.fields) {
       const list = this.values[name];
-      const before = toList(this.options.entry?.[name]);
+      const before = toList(entryValue(this.options.entry, name));
       if (list.length === 0) {
         if (before.length > 0) cleared.push(name);
         continue;

@@ -826,6 +826,87 @@ describe('Directory console', () => {
       expect(container.innerHTML).to.not.contain('>smi<');
     });
 
+    it('should show a value the directory answered in another case than the schema’s', async () => {
+      // LDAP attribute names are case-insensitive (RFC 4512): a directory that
+      // answers `MAIL` where the schema says `mail` still holds the value, and
+      // reading the entry by the schema's exact spelling missed it — the cell
+      // showed empty for a value that was there.
+      const list = new EntityList({
+        entity: users,
+        translator: new Translator('en'),
+        load: () =>
+          Promise.resolve({
+            jsmith: {
+              dn: 'uid=jsmith,ou=users,dc=example,dc=com',
+              UID: 'jsmith',
+              CN: 'John Smith',
+              MAIL: 'jsmith@example.com',
+            },
+          }),
+        listable: true,
+        onOpen: () => undefined,
+        onDelete: () => Promise.resolve(),
+        canDelete: false,
+      });
+      const container = stubContainer();
+      await list.render(container);
+      expect(container.innerHTML).to.contain('jsmith@example.com');
+    });
+
+    it('should carry a value the directory answered in another case, into the export', async () => {
+      const list = new EntityList({
+        entity: users,
+        translator: new Translator('en'),
+        load: () =>
+          Promise.resolve({
+            jsmith: {
+              dn: 'uid=jsmith,ou=users,dc=example,dc=com',
+              UID: 'jsmith',
+              CN: 'John Smith',
+              MAIL: 'jsmith@example.com',
+            },
+          }),
+        listable: true,
+        onOpen: () => undefined,
+        onDelete: () => Promise.resolve(),
+        canDelete: false,
+      });
+      await list.render(stubContainer());
+      (list as unknown as { selected: Set<string> }).selected = new Set([
+        'jsmith',
+      ]);
+
+      // `exportSelection` reaches for `document` and `URL` the way a browser
+      // provides them; only `document` is missing under Node, so it alone is
+      // stubbed here, and the real `Blob`/`URL.createObjectURL` are left in
+      // place to carry the CSV text out for inspection.
+      const originalDocument = (globalThis as Record<string, unknown>).document;
+      const originalCreateObjectURL = URL.createObjectURL;
+      const originalRevokeObjectURL = URL.revokeObjectURL;
+      let captured: Blob | undefined;
+      (globalThis as Record<string, unknown>).document = {
+        createElement: () => ({
+          click: () => undefined,
+          href: '',
+          download: '',
+        }),
+      };
+      URL.createObjectURL = (blob: Blob): string => {
+        captured = blob;
+        return 'blob:stub';
+      };
+      URL.revokeObjectURL = () => undefined;
+      try {
+        (list as unknown as { exportSelection(): void }).exportSelection();
+      } finally {
+        (globalThis as Record<string, unknown>).document = originalDocument;
+        URL.createObjectURL = originalCreateObjectURL;
+        URL.revokeObjectURL = originalRevokeObjectURL;
+      }
+      const csv = await captured?.text();
+      expect(csv).to.contain('jsmith@example.com');
+    });
+
     it('should not let an exported cell become a formula', () => {
       // A directory holds what was written into it, and a spreadsheet reads a
       // cell opening on one of these as a formula. Quoting does not help: the
@@ -919,6 +1000,14 @@ describe('Directory console', () => {
       const container = stubContainer();
       await build({ uid: 'jsmith', cn: 'John' }).render(container);
       expect(container.innerHTML).to.not.include('data-field="uid"');
+    });
+
+    it('should prefill a field from a value the directory answered in another case', async () => {
+      // The schema spells the attribute `cn`; a directory that answered `CN`
+      // instead used to leave the field blank on an entry that has a name.
+      const container = stubContainer();
+      await build({ uid: 'jsmith', CN: 'John Smith' }).render(container);
+      expect(container.innerHTML).to.include('value="John Smith"');
     });
 
     it('should stay a modal while the form is short', () => {
@@ -1029,6 +1118,16 @@ describe('Directory console', () => {
 
     it('should never show a write-only attribute', () => {
       expect(render({ uid: 'jsmith' })).to.not.include('userPassword');
+    });
+
+    it('should show a value the directory answered in another case than the schema’s', () => {
+      // LDAP attribute names are case-insensitive (RFC 4512); a directory
+      // that answers `MAIL` where the schema says `mail` still has the value,
+      // and the card used to show it empty. The title, read from the schema's
+      // `mainAttribute` (`uid`), is affected the same way.
+      const html = render({ UID: 'jsmith', MAIL: 'jsmith@example.com' });
+      expect(html).to.include('<h2>jsmith</h2>');
+      expect(html).to.include('jsmith@example.com');
     });
 
     it('should offer the states the schema declares, and no others', () => {
