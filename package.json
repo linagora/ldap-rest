@@ -773,5 +773,8 @@
     "express-openid-connect": "^2.19.2",
     "lemonldap-ng-handler": "^0.7.3",
     "re2": "^1.22.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
