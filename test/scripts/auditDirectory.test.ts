@@ -239,6 +239,22 @@ describe('audit-directory', () => {
       ]);
       expect(findings[0].reason).to.equal('outside the allowed branch');
     });
+
+    it('should report a pointer that merely ends with the branch', () => {
+      // The branch was compared as a text suffix, so
+      // `uid=b,xou=users,dc=example,dc=com` read as being inside
+      // `ou=users,dc=example,dc=com`: the audit reported clean a value the
+      // server refuses, which is the one thing this tool must not do.
+      const findings = run([
+        [
+          'uid=a,ou=users,dc=example,dc=com',
+          { cn: 'A', manager: 'uid=b,xou=users,dc=example,dc=com' },
+        ],
+      ]);
+      expect(findings.map(f => f.reason)).to.deep.equal([
+        'outside the allowed branch',
+      ]);
+    });
   });
 
   describe('auditEntry, the things a directory really holds', () => {

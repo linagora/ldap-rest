@@ -38,7 +38,12 @@ import type {
   UniqueConstraint,
 } from '../../config/schema';
 import { hasRole, roleAttribute } from '../../config/schema';
-import { escapeLdapFilter, getParentDn, rdnValue } from '../../lib/utils';
+import {
+  escapeLdapFilter,
+  getParentDn,
+  isDnInBranch,
+  rdnValue,
+} from '../../lib/utils';
 import { BadRequestError, ConflictError } from '../../lib/errors';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
@@ -771,18 +776,17 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @throws ConflictError naming the first referencing entry
    */
   private async guardReferences(dn: string): Promise<void> {
-    const parent = getParentDn(dn).toLowerCase();
+    const parent = getParentDn(dn);
     for (const binding of this.bindings()) {
       for (const [name, attr] of Object.entries(binding.schema.attributes)) {
         const pointer = attr.type === 'pointer' ? attr : attr.items;
         if (!pointer) continue;
         if (attr.referentialIntegrity !== 'restrict') continue;
-        // Only search when the deleted entry could be a legal target.
-        const branches = (pointer.branch || []).map(b => b.toLowerCase());
-        if (
-          branches.length > 0 &&
-          !branches.some(b => parent === b || parent.endsWith(`,${b}`))
-        )
+        // Only search when the deleted entry could be a legal target. The
+        // question is the one `isDnInBranch` answers, and asking it here too
+        // leaves one spelling of the rule in the code rather than four.
+        const branches = pointer.branch || [];
+        if (branches.length > 0 && !branches.some(b => isDnInBranch(parent, b)))
           continue;
 
         const result = (await this.server.ldap.search(
