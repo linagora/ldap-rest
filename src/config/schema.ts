@@ -336,3 +336,65 @@ export function assertClientMaySet(
     );
   }
 }
+
+/**
+ * A plugin able to say whether it fills a given generated attribute.
+ *
+ * Declaring the method is the whole contract: an entity asks before it
+ * exempts a required attribute from its check, so the answer has to be about
+ * that attribute, not about a role the plugin happens to carry.
+ */
+export interface GeneratedAttributeFiller {
+  fillsGeneratedAttribute?: (
+    name: string,
+    attr: SchemaAttribute,
+    schema: Schema
+  ) => boolean;
+}
+
+/**
+ * Name the first required attribute a new entry fails to provide.
+ *
+ * A `generated` attribute is exempt: it is filled by a hook *after*
+ * validation, on purpose — checks must see the payload as the client sent it,
+ * never a value the server has already rewritten.
+ *
+ * Exempt only when something will actually fill it. `generatedFrom` is
+ * derived by the entity itself; for the rest, ask the loaded plugins about
+ * *this* attribute rather than trusting a role a dozen of them carry. With no
+ * filler — a server upgraded without adding `core/ldap/enterpriseRules` —
+ * exempting would write an entry missing an attribute its own schema calls
+ * required, silently, and the client could not supply it either since
+ * `generated` is refused as input. The entry would be unwritable by any
+ * route, so demand it and say so instead.
+ *
+ * Every entity runs this check: the flat branches, the organizations and the
+ * groups, each wording the refusal in its own terms.
+ *
+ * @param schema entity schema, when one is loaded
+ * @param entry entry as the client sent it
+ * @param plugins loaded plugins, asked about each generated attribute
+ * @returns the attribute name to complain about, or undefined
+ */
+export function missingRequiredAttribute(
+  schema: Schema | undefined,
+  entry: Record<string, unknown>,
+  plugins: Record<string, unknown>
+): string | undefined {
+  if (!schema) return undefined;
+  const filledByAPlugin = (field: string, attr: SchemaAttribute): boolean =>
+    Object.values(plugins).some(plugin => {
+      const filler = (plugin as GeneratedAttributeFiller)
+        .fillsGeneratedAttribute;
+      return (
+        typeof filler === 'function' && filler.call(plugin, field, attr, schema)
+      );
+    });
+  for (const [field, attr] of Object.entries(schema.attributes)) {
+    if (!attr.required || entry[field]) continue;
+    if (attr.generated && (attr.generatedFrom || filledByAPlugin(field, attr)))
+      continue;
+    return field;
+  }
+  return undefined;
+}

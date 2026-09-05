@@ -36,8 +36,12 @@ describe('Organization paths', function () {
   });
 
   after(() => {
-    if (previousOrgSchema)
-      process.env.DM_ORGANIZATION_SCHEMA = previousOrgSchema;
+    // The whole suite shares one process: leaving this set would hand the
+    // organization schema to every server built afterwards, which then
+    // demands of them the attributes it declares.
+    if (previousOrgSchema === undefined)
+      delete process.env.DM_ORGANIZATION_SCHEMA;
+    else process.env.DM_ORGANIZATION_SCHEMA = previousOrgSchema;
   });
 
   const serve = async (
