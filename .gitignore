@@ -3,7 +3,7 @@ CLAUDE.md
 CLAUDE.md
 coverage/
 dist/
-node_modules/
+node_modules
 static/browser/
 static/*.html
 openapi.json
