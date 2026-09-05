@@ -38,7 +38,7 @@ import type {
   UniqueConstraint,
 } from '../../config/schema';
 import { hasRole, roleAttribute } from '../../config/schema';
-import { escapeLdapFilter, getParentDn } from '../../lib/utils';
+import { escapeLdapFilter, getParentDn, rdnValue } from '../../lib/utils';
 import { BadRequestError, ConflictError } from '../../lib/errors';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
@@ -57,17 +57,6 @@ function valueList(value: AttributeValue | undefined): string[] {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value.map(v => String(v));
   return [String(value)];
-}
-
-/**
- * Value of the first RDN of a DN, with its escapes removed.
- *
- * @param dn distinguished name
- * @returns the value, or an empty string when the DN has no RDN
- */
-function rdnValue(dn: string): string {
-  const match = /^[^=]+=((?:\\.|[^,])*)/.exec(dn);
-  return match ? match[1].replace(/\\(.)/g, '$1') : '';
 }
 
 /**

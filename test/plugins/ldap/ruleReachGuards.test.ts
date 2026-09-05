@@ -104,9 +104,14 @@ describe('Rules reach the other routes too', function () {
       noPathOrgDn,
     ])
       await server.ldap.delete(dn).catch(() => undefined);
-    if (previousOrgSchema)
-      process.env.DM_ORGANIZATION_SCHEMA = previousOrgSchema;
-    if (previousGroupSchema) process.env.DM_GROUP_SCHEMA = previousGroupSchema;
+    // The whole suite shares one process: leaving these set would hand the
+    // organization and group schemas to every server built afterwards, which
+    // then demands of them the attributes they declare.
+    if (previousOrgSchema === undefined)
+      delete process.env.DM_ORGANIZATION_SCHEMA;
+    else process.env.DM_ORGANIZATION_SCHEMA = previousOrgSchema;
+    if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
+    else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
   });
 
   const createUser = () =>
