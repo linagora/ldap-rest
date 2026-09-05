@@ -4,6 +4,7 @@ import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import { NotFoundError } from '../../../src/lib/errors';
 
 /**
  * The Twake user schema generates `uid` from the mail address, computes the
@@ -450,9 +451,11 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         await plugin.moveEntry('testuser', `ou=NonExistent,${DM_LDAP_BASE}`);
         expect.fail('Should have thrown an error');
       } catch (err: any) {
-        expect(err.message).to.match(
-          /Organization.*not found|Failed to fetch organization/
-        );
+        // A move to a nonexistent target organization must be reported as
+        // "not found", not wrapped into a generic error (which the API
+        // layer would otherwise answer as a 500).
+        expect(err).to.be.instanceOf(NotFoundError);
+        expect(err.message).to.match(/Organization.*not found/);
       }
     });
 
@@ -620,6 +623,33 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
 
       expect(res.status).to.equal(500);
       expect(res.body).to.have.property('error');
+    });
+
+    it('should return 404 when target organization does not exist', async () => {
+      // Create user to move
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-missing-target@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0018',
+        givenName: 'Test',
+        displayName: 'Test Person',
+      });
+
+      const res = await request
+        .post('/api/v1/ldap/users/testuser/move')
+        .type('json')
+        .send({ targetOrgDn: `ou=NonExistent,${DM_LDAP_BASE}` });
+
+      expect(res.status).to.equal(404);
+      expect(res.body).to.have.property('error');
+      expect(res.body.error).to.match(/Organization.*not found/);
     });
   });
 
