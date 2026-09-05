@@ -181,9 +181,21 @@ export default class AuthzScope extends DmPlugin {
     // and every submission then came back 403, which is exactly the round trip
     // this endpoint exists to spare the client.
     const writable = await this.canWriteAny(authz, user, branchDns);
+    // Organizations are the exception: they are not attached to a branch, they
+    // *are* one, so the add hook checks write permission on the node the new
+    // one hangs from — the top of the tree, which is where the create endpoint
+    // puts it when the client names no parent. A local administrator of
+    // ou=Sales writes in their own branch and not there, and answering
+    // `writable` offered them a "new organization" button whose every
+    // submission came back 403.
+    const tree = this.config.ldap_top_organization;
     const entities: CreatableEntity[] = [];
     for (const entity of this.entities()) {
-      entities.push({ ...entity, create: writable });
+      const create =
+        tree && entity.base === tree
+          ? (await authz.getUserPermissions(user, tree)).write === true
+          : writable;
+      entities.push({ ...entity, create });
     }
 
     res.json({
