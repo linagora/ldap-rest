@@ -159,9 +159,12 @@ export default class LdapAccountLifecycle extends DmPlugin {
          * description: |
          *   Replaces the credential. When the body carries no `password`, one
          *   is generated and returned **once** in the response — it is never
-         *   readable afterwards. When the schema declares a `passwordReset`
-         *   attribute, `forceChange` (true by default) also flags the account
-         *   so the directory asks for a new password at next login.
+         *   readable afterwards. A `password` that is present must be a
+         *   non-empty string: an empty one is refused with a `400` rather
+         *   than silently replaced by a generated password the caller never
+         *   sees. When the schema declares a `passwordReset` attribute,
+         *   `forceChange` (true by default) also flags the account so the
+         *   directory asks for a new password at next login.
          * tags:
          *   - Entities
          * requestBody:
@@ -172,7 +175,10 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *         properties:
          *           password:
          *             type: string
-         *             description: New password; generated when absent.
+         *             minLength: 1
+         *             description: >-
+         *               New password; generated when absent. An empty string
+         *               is refused.
          *           forceChange:
          *             type: boolean
          *             default: true
@@ -183,6 +189,11 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *     content:
          *       application/json:
          *         example: { success: true, generated: true, password: 'xY3…' }
+         *   '400':
+         *     description: Empty or non-textual password.
+         *     content:
+         *       application/json:
+         *         schema: { $ref: '#/components/schemas/Error' }
          */
         app.post(
           `${prefix}/${entity.pluralName}/:id/password`,
@@ -244,12 +255,26 @@ export default class LdapAccountLifecycle extends DmPlugin {
     res: Response
   ): Promise<void> {
     const body = jsonBody(req, res) as
-      | { password?: string; forceChange?: boolean }
+      | { password?: unknown; forceChange?: boolean }
       | false;
     if (!body) return;
 
-    const generated = !body.password;
-    const password = body.password || generatePassword();
+    // A `password` the body does not carry asks for a generated one; a
+    // `password` it does carry is the one to set. An empty string is falsy,
+    // so it used to mean "generate one": the answer said `success` after
+    // writing a random credential the caller never saw, and a client that
+    // emptied the field by accident believed it had set the password it
+    // typed. `null` and anything that is not text are refused for the same
+    // reason — they are a value the client meant to send, not an absence.
+    const given = body.password;
+    if (given !== undefined && (typeof given !== 'string' || given === '')) {
+      throw new BadRequestError(
+        'Field password must be a non-empty string; omit it to have one generated'
+      );
+    }
+
+    const generated = given === undefined;
+    const password = generated ? generatePassword() : given;
 
     const replace: AttributesList = { [attribute]: password };
     const resetAttr = roleAttribute(entity.schema, 'passwordReset');
