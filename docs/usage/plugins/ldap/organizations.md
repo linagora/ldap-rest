@@ -342,10 +342,14 @@ The plugin enforces several validation rules through hooks:
 ### For Organizations
 
 1. **Path Validation**: The `twakeDepartmentPath` must:
-   - Start with the organization's own `ou` name
-   - Be followed by the path separator
-   - Reference an existing parent organization in the hierarchy
-   - Match the actual LDAP DN structure
+   - End with the organization's own `ou` name, preceded by the path separator
+   - Be preceded by the stored path of an existing organization
+   - Be its own name alone only when the entry hangs directly from the top
+     organization, which its DN has to say
+   - A path written the other way round, the entry's own name first and the
+     top organization's name last, is accepted as it stands: it is what
+     directories written before this convention hold. The server never
+     computes one.
 
 2. **Deletion Protection**: Organizations can only be deleted if:
    - No users have `twakeDepartmentLink` pointing to it
@@ -387,9 +391,10 @@ hooks: {
     if (!isOrganization(entry)) {
       await checkDeptLink(entry); // Validates link exists
     }
-    // If entry is an organization, validate path
+    // If entry is an organization, validate path against the DN it is
+    // written at: that is what says where the entry hangs from
     if (isOrganization(entry)) {
-      await checkDeptPath(entry); // Validates path matches hierarchy
+      await checkDeptPath(entry, dn); // Validates path matches hierarchy
     }
     return [dn, entry];
   };
@@ -540,18 +545,22 @@ You must first:
 
 ### Path Format
 
-The path attribute follows this pattern:
+The path attribute follows this pattern, the top organization excluded:
 
 ```
-{current_ou} / {parent_ou} / {grandparent_ou} / ... / {top_org}
+{parent_of_parent_ou} / {parent_ou} / {current_ou}
 ```
 
 ### Validation Process
 
-1. **Extract Components**: Split path by separator
-2. **Verify First Component**: Must match organization's own `ou`
-3. **Validate Parent Path**: Search for parent organization with matching path
-4. **Verify Hierarchy**: Ensure path matches actual LDAP DN structure
+1. **Verify Last Component**: Must match the organization's own `ou`
+2. **Validate Parent Path**: What precedes it must be the stored path of an
+   existing organization
+3. **Verify Hierarchy**: An organization whose path is its own name alone must
+   hang directly from the top organization
+4. **Accept The Old Form**: A path reading the other way round, ending in the
+   top organization's own name, is left alone — the directories that hold
+   them predate this convention and their entries have to stay writable
 
 ### Example Path Validation
 
@@ -569,6 +578,14 @@ Invalid path: `IT / Recruitment`
 Invalid path: `Recruitment / HR`
 
 - it ends with `HR`, not with the entry's own name
+
+Invalid path: `Recruitment`
+
+- it names no parent, and the entry does not hang from the top organization
+
+Accepted path: `Recruitment / HR / organization`
+
+- the old form, the top organization last: read, not written
 
 ## Troubleshooting
 
@@ -597,7 +614,7 @@ curl -X POST http://localhost:8081/api/v1/ldap/users \
 
 1. Ensure parent path exists and matches LDAP hierarchy
 2. Verify separator matches configured separator (default: `" / "`)
-3. Check that path starts with organization's own `ou` name
+3. Check that the path ends with the organization's own `ou` name
 
 ### Cannot Delete Organization
 
