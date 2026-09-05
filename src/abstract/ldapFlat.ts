@@ -35,10 +35,12 @@ import {
   getParentDn,
   launchHooks,
   launchHooksChained,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../lib/utils';
-import type { Schema, SchemaAttribute } from '../config/schema';
+import type { Schema } from '../config/schema';
+import { missingRequiredAttribute } from '../config/schema';
 import {
   BadRequestError,
   ConflictError,
@@ -539,27 +541,10 @@ export default abstract class LdapFlat extends DmPlugin {
           req.query.attribute &&
           typeof req.query.attribute === 'string'
         ) {
-          // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
-          const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
-          // One name, or several separated by commas. Looking for a person by
-          // surname meant knowing to switch a selector to the attribute that
-          // holds it first, which is knowledge about the schema asked of
-          // someone searching precisely because they do not have it.
-          const names = req.query.attribute
-            .split(',')
-            .map(name => name.trim())
-            .filter(Boolean);
-          if (
-            names.length === 0 ||
-            !names.every(name => attributePattern.test(name))
-          ) {
-            throw new BadRequestError('Invalid LDAP attribute name');
-          }
-          // Escape filter value to prevent LDAP injection
-          const escapedMatch = escapeLdapFilter(req.query.match);
-          const clauses = names.map(name => `(${name}=*${escapedMatch}*)`);
-          args.filter =
-            clauses.length === 1 ? clauses[0] : `(|${clauses.join('')})`;
+          args.filter = substringSearchFilter(
+            req.query.match,
+            req.query.attribute
+          );
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
@@ -1336,41 +1321,15 @@ export default abstract class LdapFlat extends DmPlugin {
         throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
-    // Check required fields. A `generated` attribute is exempt: it is filled
-    // by a hook *after* validation, on purpose — checks must see the payload
-    // as the client sent it, never a value the server has already rewritten.
-    //
-    // Exempt only when something will actually fill it. `generatedFrom` is
-    // filled here; for the rest, ask the loaded plugins about *this*
-    // attribute rather than trusting a role a dozen of them carry. With no
-    // filler — a server upgraded without adding `core/ldap/enterpriseRules` —
-    // exempting would write an entry missing an attribute its own schema
-    // calls required, silently, and the client could not supply it either
-    // since `generated` is refused as input. The entry would be unwritable by
-    // any route, so demand it and say so instead.
-    type Filler = {
-      fillsGeneratedAttribute?: (
-        name: string,
-        attr: SchemaAttribute,
-        schema: Schema
-      ) => boolean;
-    };
-    const schema = this.schema;
-    const filledByAPlugin = (field: string, attr: SchemaAttribute): boolean =>
-      Object.values(this.server.loadedPlugins).some(plugin => {
-        const filler = (plugin as Filler).fillsGeneratedAttribute;
-        return (
-          typeof filler === 'function' &&
-          filler.call(plugin, field, attr, schema)
-        );
-      });
-    for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      const exempt =
-        attr.generated && (attr.generatedFrom || filledByAPlugin(field, attr));
-      if (attr.required && !exempt && !entry[field]) {
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      }
-    }
+    // Check required fields, granting a `generated` attribute the exemption
+    // only when something will honour it. See `missingRequiredAttribute`.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing)
+      throw new BadRequestError(`Attribute "${missing}" is required`);
     return true;
   }
 

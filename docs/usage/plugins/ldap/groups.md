@@ -55,13 +55,17 @@ GET /api/v1/ldap/groups
 
 **Query Parameters:**
 
-- `match` (optional): Filter by group name (supports wildcards and LDAP filters)
+- `match` (optional): Value to look for
+- `attribute` (optional): Attribute(s) `match` is looked for in, as a
+  substring, several separated by commas — the same semantics as the flat
+  entity lists. Without it, `match` is either a raw LDAP filter (when it
+  contains `=`) or an exact group name.
 - `attributes` (optional): Comma-separated list of attributes to return
 
 **Example:**
 
 ```bash
-curl "http://localhost:8081/api/v1/ldap/groups?match=admin*&attributes=cn,member,description"
+curl "http://localhost:8081/api/v1/ldap/groups?match=admin&attribute=cn,mail&attributes=cn,member,description"
 ```
 
 **Response (200):**
