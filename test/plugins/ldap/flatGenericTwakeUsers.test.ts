@@ -1,39 +1,44 @@
 import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import { NotFoundError } from '../../../src/lib/errors';
 
-const { DM_LDAP_BASE } = process.env;
-const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
-
-const twakeAttr = {
-  twakeDepartmentPath: 'Test / SubTest',
-  twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
-  twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-  twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
-};
-
+/**
+ * The Twake user schema generates `uid` from the mail address, computes the
+ * organization path and owns the account status, so a client sends none of
+ * them. Internal calls still pass whatever they like: the restriction is on
+ * the request body, not on the entry.
+ */
 describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapUsersFlat tests: DM_LDAP_BASE and LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
+  let DM_LDAP_BASE: string;
+  let USER_BRANCH: string;
+  let twakeAttr: Record<string, unknown>;
+  let testDeptDn: string;
 
   let server: DM;
   let genericPlugin: LdapFlatGeneric;
   let plugin: any; // The users instance from flatGeneric
 
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
   before(async () => {
+    DM_LDAP_BASE = process.env.DM_LDAP_BASE as string;
+    USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
+    testDeptDn = `ou=Test,${DM_LDAP_BASE}`;
+    twakeAttr = {
+      twakeDepartmentPath: 'Test / SubTest',
+      twakeDepartmentLink: testDeptDn,
+      twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+      twakeDeliveryMode: [
+        `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+      ],
+    };
+
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
     server = new DM();
     genericPlugin = new LdapFlatGeneric(server);
@@ -45,6 +50,25 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     plugin.renameUser = plugin.renameEntry.bind(plugin);
     plugin.listUsers = plugin.listEntries.bind(plugin);
     plugin.searchUsersByName = plugin.searchEntriesByName.bind(plugin);
+
+    // `twakeDepartmentLink` is a pointer now: the branch it names has to exist.
+    try {
+      await server.ldap.add(testDeptDn, {
+        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+        ou: 'Test',
+        twakeDepartmentPath: 'Test / SubTest',
+      });
+    } catch (e) {
+      // already there
+    }
+  });
+
+  after(async () => {
+    try {
+      await server.ldap.delete(testDeptDn);
+    } catch (e) {
+      // ignore
+    }
   });
 
   afterEach(async () => {
@@ -68,6 +92,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-flat@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0001',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       const listEntries = await plugin.listUsers({});
       // @ts-ignore
@@ -89,6 +116,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         givenName: 'Test',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0002',
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -120,6 +148,8 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         mail: 'testuser-flat-3@example.org',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0004',
+        givenName: 'Test',
       });
       expect(
         await plugin.searchUsersByName('testuser', false, [
@@ -167,6 +197,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-flat-rename@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0005',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
         testuser: {
@@ -189,21 +222,27 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     let request: any;
     before(async () => {
       plugin.api(server.app);
+      // The shipped schema marks the path and the status required *and*
+      // generated: the plugin that fills them has to be there, as it is in
+      // any real deployment of this schema.
+      await server.registerPlugin(
+        'ldapEnterpriseRules',
+        new LdapEnterpriseRules(server)
+      );
       server.setupErrorMiddleware();
       request = supertest(server.app);
     });
 
     it('should add/del user via API', async () => {
-      let res = await request
-        .post('/api/v1/ldap/users')
-        .type('json')
-        .send({
-          uid: 'testuser',
-          cn: 'Test User',
-          sn: 'User',
-          mail: 'testuser-flat-api@example.org',
-          ...twakeAttr,
-        });
+      let res = await request.post('/api/v1/ldap/users').type('json').send({
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser@example.org',
+        twakeDepartmentLink: testDeptDn,
+        employeeNumber: 'FLA0006',
+        givenName: 'Test',
+        displayName: 'Test Person',
+      });
       expect(res.status).to.equal(201);
       expect(res.body).to.have.property('uid', 'testuser');
       expect(await plugin.searchUsersByName('testuser')).to.deep.equal({
@@ -229,6 +268,8 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         mail: 'testuser-flat-api-modify@example.org',
         displayName: 'Test User',
         ...twakeAttr,
+        employeeNumber: 'FLA0007',
+        givenName: 'Test',
       });
       let res = await request
         .put('/api/v1/ldap/users/testuser')
@@ -253,16 +294,15 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
     });
 
     it('should list via API', async () => {
-      let res = await request
-        .post('/api/v1/ldap/users')
-        .type('json')
-        .send({
-          uid: 'testuser',
-          cn: 'Test User',
-          sn: 'User',
-          mail: 'testuser-flat-api-list@example.org',
-          ...twakeAttr,
-        });
+      let res = await request.post('/api/v1/ldap/users').type('json').send({
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser@example.org',
+        twakeDepartmentLink: testDeptDn,
+        employeeNumber: 'FLA0008',
+        givenName: 'Test',
+        displayName: 'Test Person',
+      });
       expect(res.status).to.equal(201);
       expect(res.body).to.have.property('uid', 'testuser');
       res = await request
@@ -273,16 +313,18 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(res.body.testuser).to.deep.equal({
         dn: `uid=testuser,${USER_BRANCH}`,
         uid: 'testuser',
-        mail: 'testuser-flat-api-list@example.org',
+        mail: 'testuser@example.org',
       });
     });
   });
 
   describe('Move user between departments', () => {
-    const testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
-    const testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
+    let testOrgDn: string;
+    let testOrg2Dn: string;
 
     beforeEach(async () => {
+      testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
+      testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
       // Create test organizations
       try {
         await server.ldap.add(testOrgDn, {
@@ -328,7 +370,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / Org',
         twakeDepartmentLink: testOrgDn,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0009',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user to second organization
@@ -364,7 +411,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / Org',
         twakeDepartmentLink: testOrgDn,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0010',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       const userDn = `uid=testuser,${USER_BRANCH}`;
@@ -386,7 +438,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / Org',
         twakeDepartmentLink: testOrgDn,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0011',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Try to move to non-existent org
@@ -394,9 +451,11 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         await plugin.moveEntry('testuser', `ou=NonExistent,${DM_LDAP_BASE}`);
         expect.fail('Should have thrown an error');
       } catch (err: any) {
-        expect(err.message).to.match(
-          /Organization.*not found|Failed to fetch organization/
-        );
+        // A move to a nonexistent target organization must be reported as
+        // "not found", not wrapped into a generic error (which the API
+        // layer would otherwise answer as a 500).
+        expect(err).to.be.instanceOf(NotFoundError);
+        expect(err.message).to.match(/Organization.*not found/);
       }
     });
 
@@ -436,7 +495,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / Org',
         twakeDepartmentLink: testOrgDn,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0012',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user
@@ -450,10 +514,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
 
   describe('Move API endpoint', () => {
     let request: any;
-    const testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
-    const testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
+    let testOrgDn: string;
+    let testOrg2Dn: string;
 
     before(async () => {
+      testOrgDn = `ou=TestOrg,${DM_LDAP_BASE}`;
+      testOrg2Dn = `ou=TestOrg2,${DM_LDAP_BASE}`;
       plugin.api(server.app);
       request = supertest(server.app);
 
@@ -502,7 +568,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / Org',
         twakeDepartmentLink: testOrgDn,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0013',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
 
       // Move user via API
@@ -553,6 +624,33 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(res.status).to.equal(500);
       expect(res.body).to.have.property('error');
     });
+
+    it('should return 404 when target organization does not exist', async () => {
+      // Create user to move
+      await plugin.addUser('testuser', {
+        cn: 'Test User',
+        sn: 'User',
+        mail: 'testuser-move-missing-target@example.org',
+        twakeDepartmentPath: 'Test / Org',
+        twakeDepartmentLink: testOrgDn,
+        twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0018',
+        givenName: 'Test',
+        displayName: 'Test Person',
+      });
+
+      const res = await request
+        .post('/api/v1/ldap/users/testuser/move')
+        .type('json')
+        .send({ targetOrgDn: `ou=NonExistent,${DM_LDAP_BASE}` });
+
+      expect(res.status).to.equal(404);
+      expect(res.body).to.have.property('error');
+      expect(res.body.error).to.match(/Organization.*not found/);
+    });
   });
 
   describe('Pointer type validation', () => {
@@ -565,7 +663,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           twakeDepartmentPath: 'Test / SubTest',
           twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
           twakeAccountStatus: `cn=nonexistent,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-          twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: [
+            `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          ],
+          employeeNumber: 'FLA0014',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
@@ -583,7 +686,41 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
           twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
           // Using a DN from wrong branch
           twakeAccountStatus: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
-          twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: [
+            `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          ],
+          employeeNumber: 'FLA0015',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect.fail('Should have thrown an error');
+      } catch (err: any) {
+        expect(err.message).to.include(
+          'must point to a DN within allowed branches'
+        );
+      }
+    });
+
+    it('should reject a pointer DN that merely ends with the branch', async () => {
+      // The branch was tested as a text suffix with the separating comma
+      // made optional, so `xou=twakeAccountStatus,ou=nomenclature,<base>`
+      // read as the branch itself. The refusal has to name the branch, not
+      // the DN's existence — reaching the existence check at all means the
+      // branch test let it through.
+      try {
+        await plugin.addUser('testuser', {
+          cn: 'Test User',
+          sn: 'User',
+          mail: 'testuser-pointer-suffix@example.org',
+          twakeDepartmentPath: 'Test / SubTest',
+          twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
+          twakeAccountStatus: `cn=active,xou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
+          twakeDeliveryMode: [
+            `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+          ],
+          employeeNumber: 'FLA0019',
+          givenName: 'Test',
+          displayName: 'Test Person',
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
@@ -601,7 +738,12 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         twakeDepartmentPath: 'Test / SubTest',
         twakeDepartmentLink: `ou=Test,${DM_LDAP_BASE}`,
         twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${DM_LDAP_BASE}`,
-        twakeDeliveryMode: `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        twakeDeliveryMode: [
+          `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,${DM_LDAP_BASE}`,
+        ],
+        employeeNumber: 'FLA0016',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       const users = await plugin.searchUsersByName('testuser');
       expect(users).to.have.property('testuser');
@@ -614,6 +756,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         sn: 'User',
         mail: 'testuser-pointer-modify@example.org',
         ...twakeAttr,
+        employeeNumber: 'FLA0017',
+        givenName: 'Test',
+        displayName: 'Test Person',
       });
       try {
         await plugin.modifyUser('testuser', {

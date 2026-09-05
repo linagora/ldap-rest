@@ -61,6 +61,26 @@ describe('LdapFlatGeneric plugin', function () {
       expect(res.body).to.be.an('object');
       expect(res.body).to.have.property('Dr');
     });
+
+    it('should match any of several attributes', async () => {
+      // One attribute meant a client had to know which one holds what is
+      // being looked for. Several are joined with `|`, so an entry matching
+      // any of them comes back — here `cn`, since `description` does not.
+      const res = await request.get(
+        '/api/v1/ldap/titles?match=Dr&attribute=description,cn'
+      );
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('Dr');
+    });
+
+    it('should refuse a list holding a name that is not one', async () => {
+      // Every name is validated, not just the first: the value goes into a
+      // filter.
+      const res = await request.get(
+        '/api/v1/ldap/titles?match=Dr&attribute=cn,bad(name'
+      );
+      expect(res.status).to.equal(400);
+    });
   });
 
   describe('CRUD operations', () => {

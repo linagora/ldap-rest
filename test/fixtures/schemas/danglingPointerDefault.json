@@ -1,0 +1,32 @@
+{
+  "strict": true,
+  "entity": {
+    "name": "danglingUser",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
+    "singularName": "danglingUser",
+    "pluralName": "danglingUsers",
+    "base": "ou=users,__ldap_base__"
+  },
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "default": ["top", "twakeAccount", "twakeWhitePages"]
+    },
+    "uid": {
+      "type": "string",
+      "required": true,
+      "test": "^[a-zA-Z0-9._-]{1,255}$"
+    },
+    "cn": { "type": "string", "required": true },
+    "sn": { "type": "string", "required": true },
+    "twakeAccountStatus": {
+      "type": "pointer",
+      "branch": ["ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__"],
+      "generated": true,
+      "required": false,
+      "default": "cn=nowhere,ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__"
+    }
+  }
+}

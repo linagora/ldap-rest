@@ -24,7 +24,10 @@ import {
   getParentDn,
   getRdn,
   isChildOf,
+  isDnInBranch,
   launchHooksChained,
+  normalizeDn,
+  rdnValue,
   transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
@@ -34,6 +37,10 @@ import {
   ConflictError,
 } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
+import {
+  assertClientMaySet,
+  missingRequiredAttribute,
+} from '../../config/schema';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -501,6 +508,9 @@ export default class LdapOrganizations extends DmPlugin {
       | false;
     if (!body) return;
 
+    // The path and link attributes are the server's, as this endpoint's own
+    // description says. Only the flat entities enforced it.
+    assertClientMaySet(this.schema, Object.keys(body), 'ou');
     validateDnValue(body.ou, 'ou');
     const parentDn = body.parentDn || this.config.ldap_top_organization;
     const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
@@ -522,6 +532,10 @@ export default class LdapOrganizations extends DmPlugin {
     if (!body) return;
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
+    assertClientMaySet(this.schema, [
+      ...Object.keys(body.add || {}),
+      ...Object.keys(body.replace || {}),
+    ]);
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
   }
 
@@ -580,7 +594,7 @@ export default class LdapOrganizations extends DmPlugin {
         await this.checkDeptLink(entry);
       }
       // Only check path for organizations, not for users/groups
-      if (this.isOu(entry)) await this.checkDeptPath(entry);
+      if (this.isOu(entry)) await this.checkDeptPath(entry, dn);
       return req !== undefined
         ? [dn, entry, req]
         : ([dn, entry] as [string, AttributesList, Request?]);
@@ -662,7 +676,7 @@ export default class LdapOrganizations extends DmPlugin {
       if (Object.keys(fakeEntryP).length > 0) {
         const isOu = await checkIsOu();
         if (isOu) {
-          await this.checkDeptPath(fakeEntryP);
+          await this.checkDeptPath(fakeEntryP, dn);
         }
       }
       return [dn, changes, op, req];
@@ -712,87 +726,102 @@ export default class LdapOrganizations extends DmPlugin {
 
   /**
    * Check if the department path is valid
+   *
    * @param entry LDAP entry to check
+   * @param dn DN the entry is written at, when the caller knows it. It is
+   *   what says whether the entry is an organization and where it hangs
+   *   from; a modify carries the changed attributes alone, neither `ou` nor
+   *   `objectClass`, so without it the invariants below cannot be checked.
    */
-  async checkDeptPath(entry: AttributesList): Promise<void> {
+  async checkDeptPath(entry: AttributesList, dn?: string): Promise<void> {
     if (entry[this.pathAttr]) {
       const pathValue = entry[this.pathAttr];
       const path = (
         Array.isArray(pathValue) ? pathValue[0] : pathValue
       ) as string;
       const sep = this.config.ldap_organization_path_separator || ' / ';
+      const topOrg = (this.config.ldap_top_organization as string) || '';
+
+      // An organization, told from its DN: an `ou=` entry inside the top
+      // organization branch. The payload says so too on a creation, and says
+      // nothing at all on a modify.
+      const nameFromDn =
+        dn && topOrg && /^ou=/i.test(getRdn(dn)) && isDnInBranch(dn, topOrg)
+          ? rdnValue(dn)
+          : undefined;
+      const ouValue = entry.ou;
+      const ouName =
+        ((Array.isArray(ouValue) ? ouValue[0] : ouValue) as
+          | string
+          | undefined) || nameFromDn;
 
       let matchingPath = path;
-      if (this.isOu(entry)) {
-        const ouValue = entry.ou;
-        const ouName = (
-          Array.isArray(ouValue) ? ouValue[0] : ouValue
-        ) as string;
-        if (!path.startsWith(ouName + sep))
-          throw new BadRequestError(
-            `Organization path must start with its own name followed by separator "${sep}"`
-          );
-        matchingPath = path.slice(ouName.length + sep.length);
-      }
-      const [ou, ouPath] = matchingPath.split(sep, 2);
+      if ((this.isOu(entry) || nameFromDn !== undefined) && ouName) {
+        // Directories written before the order was settled hold the reverse
+        // path, the entry's own name first and the top organization's own
+        // name last (`TestOrg / organization`). The server never computes
+        // that any more, but it is what those directories contain, and
+        // refusing it would make every organization of theirs unwritable on
+        // an upgrade. The stored form is taken as it stands; only what the
+        // server computes has to follow the new convention.
+        const topName = topOrg ? rdnValue(topOrg) : '';
+        if (
+          topName &&
+          path.startsWith(ouName + sep) &&
+          path.endsWith(sep + topName)
+        )
+          return;
 
-      // Search will benefit from cache for repeated validations
-      const entries = await this.server.ldap.search(
+        // A path reads from the root down: `Root / Branch / Leaf`, the
+        // entry's own name last. This asked for the reverse, so it refused
+        // every path the directories it serves actually hold.
+        if (path === ouName) {
+          // A path that is only the entry's own name says it hangs straight
+          // from the top organization. That is not the payload's word to
+          // give: an organization anywhere lower would keep a path naming
+          // none of its parents, against the very invariant this checks. The
+          // DN settles it, when the caller passed one — and it settles
+          // nothing for an `ou=` entry outside the organization tree, whose
+          // path names no place in a hierarchy this check can read.
+          const top = topOrg ? normalizeDn(topOrg) : '';
+          if (
+            !dn ||
+            !top ||
+            !isDnInBranch(dn, topOrg) ||
+            normalizeDn(dn) === top ||
+            normalizeDn(getParentDn(dn)) === top
+          )
+            return;
+          throw new BadRequestError(
+            `Organization path "${path}" names no parent, but ${dn} is not directly under ${topOrg}`
+          );
+        }
+        if (!path.endsWith(sep + ouName))
+          throw new BadRequestError(
+            `Organization path must end with its own name, preceded by separator "${sep}"`
+          );
+        matchingPath = path.slice(0, path.length - sep.length - ouName.length);
+      }
+
+      // What is left is the path of the organization this entry hangs from:
+      // the parent for an organization, the department itself for anything
+      // else. It has to be a path some organization actually holds — walking
+      // the chain element by element was both more work and wrong past two
+      // levels, since it compared an ancestor's name against its own
+      // ancestors' path.
+      const entries = (await this.server.ldap.search(
         {
           paged: false,
-          filter: `(ou=${escapeLdapFilter(ou)})`,
           scope: 'sub',
+          filter: `(${this.pathAttr}=${escapeLdapFilter(matchingPath)})`,
+          attributes: ['dn'],
         },
         this.config.ldap_top_organization
-      );
-      if ((entries as SearchResult).searchEntries.length === 0)
-        throw new BadRequestError(`Invalid organization path ${path}`);
-
-      // If ouPath is undefined, this references the top organization
-      // Verify it exists and has no parent path (or matches top org DN)
-      if (!ouPath) {
-        let found = false;
-        for (const entry of (entries as SearchResult).searchEntries) {
-          const entryDn = entry.dn;
-          const topOrgDn = this.config.ldap_top_organization as string;
-          // Check if this is the top organization (DN matches or is direct child)
-          if (
-            entryDn.toLowerCase() === topOrgDn.toLowerCase() ||
-            entryDn.toLowerCase().endsWith(`,${topOrgDn.toLowerCase()}`)
-          ) {
-            const pathValue = entry[this.pathAttr];
-            const entryPath = Array.isArray(pathValue)
-              ? (pathValue[0] as string | undefined)
-              : (pathValue as string | undefined);
-            // Top org should either have no path attribute or a simple path (just its name)
-            if (!entryPath || entryPath === ou || !entryPath.includes(sep)) {
-              found = true;
-              break;
-            }
-          }
-        }
-        if (!found)
-          throw new BadRequestError(
-            `Invalid organization path ${path}: no matching top-level entry for ${ou}`
-          );
-      } else {
-        // Verify parent organization exists with the specified path
-        let found = false;
-        for (const entry of (entries as SearchResult).searchEntries) {
-          const pathValue = entry[this.pathAttr];
-          const entryPath = Array.isArray(pathValue)
-            ? (pathValue[0] as string)
-            : (pathValue as string);
-          if (entryPath && entryPath === ouPath) {
-            found = true;
-            break;
-          }
-        }
-        if (!found)
-          throw new BadRequestError(
-            `Invalid organization path ${path}: no matching entry for ${ou} with path ${ouPath}`
-          );
-      }
+      )) as SearchResult;
+      if (!entries.searchEntries || entries.searchEntries.length === 0)
+        throw new BadRequestError(
+          `Invalid organization path ${path}: no organization holds "${matchingPath}"`
+        );
     }
   }
 
@@ -980,16 +1009,39 @@ export default class LdapOrganizations extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!this._validateOneChange(field, value)) {
-        throw new BadRequestError(`Invalid value for field ${field}`);
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
     }
 
-    // Check required fields
-    for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] == undefined)
-        throw new BadRequestError(`Missing required field ${field}`);
-    }
+    // Check required fields. A `generated` attribute is exempt — it is filled
+    // by a hook after validation, so demanding it here would refuse the very
+    // payload the hook expects — but only when a loaded plugin says it will
+    // fill it. Exempting it unconditionally wrote an organization missing the
+    // path its own schema calls required, which no client could ever repair:
+    // a generated attribute is refused as input. Same check as the flat path.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
     return true;
+  }
+
+  /**
+   * Build the rejection message for a value that failed its schema `test`,
+   * quoting the `hint` when the schema carries one so the answer says what a
+   * valid value looks like.
+   *
+   * @param field attribute name
+   * @returns message for a `BadRequestError`
+   */
+  invalidValueMessage(field: string): string {
+    const attr = this.schema?.attributes[field];
+    const hint = attr?.hint || attr?.items?.hint;
+    return hint
+      ? `Invalid value for field ${field}: ${hint}`
+      : `Invalid value for field ${field}`;
   }
 
   validateChanges(dn: string, changes: ModifyRequest): boolean {
@@ -998,7 +1050,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
         if (!this._validateOneChange(field, value)) {
-          throw new BadRequestError(`Invalid value for field ${field}`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1006,7 +1058,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
         if (!this._validateOneChange(field, value)) {
-          throw new BadRequestError(`Invalid value for field ${field}`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }

@@ -1,7 +1,13 @@
 name: Test Node.js Module
 
+# A change reaches `master` through a pull request, and a pull request is
+# already tested: listening to every push as well ran the whole matrix twice
+# for each one. The push trigger is kept for the default branch, so what
+# lands there is tested as it lands.
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 permissions:
@@ -12,8 +18,11 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      # Each version answers for itself: one of them stumbling should report
+      # that version, not cancel the verdict of the others.
+      fail-fast: false
       matrix:
-        node-version: [22.x]
+        node-version: [20.x, 22.x, 24.x, 26.x]
 
     steps:
       - name: Checkout code
@@ -33,10 +42,17 @@ jobs:
 
       # Nothing ran ESLint here, which is how fourteen errors accumulated
       # unnoticed. Warnings stay warnings: only errors fail the build.
+      #
+      # Neither of these reads the runtime, so one version answers for all
+      # of them: running them across the matrix repeats the same work and,
+      # worse, reports a dependency that did not install on an old Node as a
+      # lint error about unresolved types.
       - name: Lint
+        if: matrix.node-version == '24.x'
         run: npm run lint
 
       - name: Check formatting
+        if: matrix.node-version == '24.x'
         run: npm run format:check
 
       # Runs the suite once and gates on coverage at the same time, rather

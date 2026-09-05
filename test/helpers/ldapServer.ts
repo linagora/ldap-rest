@@ -246,6 +246,41 @@ export class LdapTestServer {
       );
     }
 
+    // Enable the ppolicy overlay. Its schema is already in the image, but
+    // `pwdReset` — the flag an administrator sets to make the directory ask
+    // for a new password at next login — is an operational attribute the
+    // *overlay* registers, so without it a password reset fails with
+    // "attribute type undefined".
+    try {
+      console.log(`Enabling ppolicy overlay...`);
+      const overlayLdif = [
+        'dn: cn=module{0},cn=config',
+        'changetype: modify',
+        'add: olcModuleLoad',
+        'olcModuleLoad: ppolicy',
+        '',
+        'dn: olcOverlay=ppolicy,olcDatabase={1}mdb,cn=config',
+        'changetype: add',
+        'objectClass: olcOverlayConfig',
+        'objectClass: olcPPolicyConfig',
+        'olcOverlay: ppolicy',
+        '',
+      ].join('\n');
+      await this.execLdapi(
+        `docker exec -i ${this.containerName} sh -c ` +
+          `"cat > /tmp/ppolicy.ldif <<'PPOLICY_EOF'\n${overlayLdif}PPOLICY_EOF\n` +
+          `ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/ppolicy.ldif"`,
+        'ppolicy overlay'
+      );
+      console.log(`✓ ppolicy overlay enabled`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (err: any) {
+      // Not fatal: the tests that need `pwdReset` say so themselves.
+      console.warn(
+        `ppolicy overlay not enabled: ${err.stderr?.toString() || err.message}`
+      );
+    }
+
     // Load Twake custom schema
     // Try to use the official schema from the container first
     try {
@@ -393,8 +428,13 @@ export class LdapTestServer {
         });
       });
 
-      // Load LDIF using ldapadd with retry logic
-      let lastError: Error | undefined;
+      // Load LDIF using ldapadd with retry logic.
+      //
+      // Only a connection failure is worth retrying. Retrying anything else
+      // hides the real cause: a first attempt that stopped halfway through the
+      // file leaves its earlier entries behind, so every retry fails on them
+      // with "Already exists" and that is the only error ever reported.
+      let lastError = '';
       for (let i = 0; i < maxRetries; i++) {
         try {
           execSync(
@@ -408,16 +448,27 @@ export class LdapTestServer {
           });
           return;
         } catch (err) {
-          lastError = err as Error;
-          // Wait before retry
+          const e = err as {
+            stderr?: Buffer;
+            stdout?: Buffer;
+            message?: string;
+          };
+          lastError = [
+            e.stderr?.toString().trim(),
+            e.stdout?.toString().trim(),
+            e.message,
+          ]
+            .filter(Boolean)
+            .join(' | ');
+          const unreachable =
+            lastError.includes("Can't contact LDAP server") ||
+            lastError.includes('ldap_sasl_interactive_bind_s');
+          if (!unreachable) break;
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
-      // All retries failed
-      throw new Error(
-        `Failed to load LDIF after ${maxRetries} attempts: ${lastError?.message}`
-      );
+      throw new Error(`ldapadd failed: ${lastError}`);
     } catch (err) {
       throw new Error(`Failed to load LDIF: ${(err as Error).message}`);
     }

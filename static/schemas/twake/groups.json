@@ -5,7 +5,15 @@
     "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
     "singularName": "group",
     "pluralName": "groups",
-    "base": "ou=groups,__ldap_base__"
+    "base": "ou=groups,__ldap_base__",
+    "label": {
+      "en": "Groups",
+      "fr": "Groupes"
+    },
+    "singularLabel": {
+      "en": "group",
+      "fr": "groupe"
+    }
   },
   "strict": true,
   "attributes": {
@@ -21,55 +29,113 @@
     },
     "cn": {
       "type": "string",
-      "test": "^[a-zA-Z][a-zA-Z0-9-]{0,254}$",
+      "searchable": true,
+      "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
+      "hint": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
       "required": true,
-      "role": "identifier"
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "searchable": true,
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     },
     "mail": {
       "type": "string",
+      "searchable": true,
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "hint": "Expected an email address, e.g. all-staff@lists.example.org",
       "required": false,
-      "role": "primaryEmail"
+      "unique": {
+        "attributes": ["mailAlternateAddress"],
+        "branches": ["__LDAP_BASE__"]
+      },
+      "mailDomainScope": "organization",
+      "allowSubdomains": true,
+      "role": "primaryEmail",
+      "label": {
+        "en": "Email",
+        "fr": "Adresse électronique"
+      }
+    },
+    "businessCategory": {
+      "type": "pointer",
+      "branch": ["ou=twakeListType,ou=nomenclature,__LDAP_BASE__"],
+      "required": false,
+      "role": "writePolicy",
+      "label": {
+        "en": "List type",
+        "fr": "Type de liste"
+      },
+      "group": "Mailbox Settings"
     },
     "twakeMailboxType": {
       "type": "pointer",
       "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
       "group": "Mailbox Settings",
-      "required": false
+      "required": false,
+      "role": "mailboxType",
+      "label": {
+        "en": "Mailbox type",
+        "fr": "Type de boîte"
+      }
     },
     "member": {
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
+        "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "members"
+      "role": "members",
+      "label": {
+        "en": "Members",
+        "fr": "Membres"
+      }
     },
     "owner": {
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$"
+        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$",
+        "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "owners"
+      "role": "owners",
+      "label": {
+        "en": "Owners",
+        "fr": "Propriétaires"
+      }
     },
     "twakeDepartmentLink": {
-      "type": "string",
-      "test": "^.*,__LDAP_BASE__",
+      "type": "pointer",
+      "branch": ["__LDAP_BASE__"],
       "required": true,
-      "role": "organizationLink"
+      "role": "organizationLink",
+      "label": {
+        "en": "Department",
+        "fr": "Organisation"
+      }
     },
     "twakeDepartmentPath": {
       "type": "string",
-      "test": "^[\\w\\s/,]+$",
+      "test": "^[^\\r\\n]{1,4096}$",
       "required": true,
-      "role": "organizationPath"
+      "generated": true,
+      "role": "organizationPath",
+      "label": {
+        "en": "Department path",
+        "fr": "Chemin"
+      }
     }
   }
 }

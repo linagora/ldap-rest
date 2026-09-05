@@ -1,4 +1,14 @@
 {
+  "entity": {
+    "label": {
+      "en": "Organizations",
+      "fr": "Organisations"
+    },
+    "singularLabel": {
+      "en": "organization",
+      "fr": "organisation"
+    }
+  },
   "strict": true,
   "attributes": {
     "objectClass": {
@@ -13,40 +23,110 @@
     },
     "ou": {
       "type": "string",
-      "test": "^[a-zA-Z0-9._-]{1,255}$",
-      "required": true
+      "searchable": true,
+      "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 ()&/,.'’_-]{0,254}$",
+      "hint": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
+      "required": true,
+      "unique": true,
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "searchable": true,
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     },
     "telephoneNumber": {
-      "type": "string",
-      "required": false
-    },
-    "facsimileTelephoneNumber": {
-      "type": "string",
-      "required": false
-    },
-    "l": {
-      "type": "string",
-      "required": false
-    },
-    "postalAddress": {
-      "type": "string",
-      "required": false
-    },
-    "twakeDepartmentPath": {
-      "type": "string",
-      "test": "^[\\w\\s/,]+$",
-      "required": true
-    },
-    "twakeLocalAdminLink": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Phone",
+        "fr": "Téléphone"
+      }
+    },
+    "facsimileTelephoneNumber": {
+      "type": "string",
+      "required": false,
+      "label": {
+        "en": "Fax",
+        "fr": "Fax"
+      }
+    },
+    "l": {
+      "type": "string",
+      "required": false,
+      "label": {
+        "en": "Locality",
+        "fr": "Commune"
+      }
+    },
+    "postalAddress": {
+      "type": "string",
+      "required": false,
+      "label": {
+        "en": "Address",
+        "fr": "Adresse"
+      }
+    },
+    "twakeDepartmentPath": {
+      "type": "string",
+      "test": "^[^\\r\\n]{1,4096}$",
+      "required": true,
+      "generated": true,
+      "role": "organizationPath",
+      "label": {
+        "en": "Path",
+        "fr": "Chemin"
+      }
+    },
+    "twakeManagerLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "managers",
+      "label": {
+        "en": "Managers",
+        "fr": "Responsables"
+      }
+    },
+    "twakeDomainLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=domains,ou=nomenclature,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "domainLink",
+      "label": {
+        "en": "Mail domains",
+        "fr": "Domaines de messagerie"
+      }
+    },
+    "twakeLocalAdminLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "localAdmins",
+      "label": {
+        "en": "Local administrators",
+        "fr": "Administrateurs locaux"
+      }
     }
   }
 }

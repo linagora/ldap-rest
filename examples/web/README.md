@@ -4,6 +4,25 @@ This directory contains interactive HTML examples demonstrating the use of LDAP-
 
 ## Available Examples
 
+### 🗂️ Directory console (`directory-console.html`)
+
+The full administration interface: entity lists with search and paging, an
+organization tree, schema-driven forms, lifecycle actions and the caller's own
+scope. It reads everything from `GET /api/v1/config`, so the page declares
+nothing.
+
+**Usage:**
+
+```bash
+node bin/index.mjs --plugin core/static --static-path . \
+  --plugin core/configApi --plugin core/ldap/flatGeneric …
+
+# Open in browser
+http://localhost:8081/static/examples/web/directory-console.html
+```
+
+See [the documentation](../../docs/client-development/browser/directory-console.md).
+
 ### 🔐 TOTP Client (`totp-client.html`)
 
 Interactive demonstration of the TOTP authentication client library.

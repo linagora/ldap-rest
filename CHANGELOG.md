@@ -1,5 +1,124 @@
 # Changelog
 
+## Unreleased
+
+An enterprise directory manager: the rules a real deployment needs, a console
+built from the server's own configuration, and a script that says what a
+migration will refuse before it does.
+
+See [Upgrading](docs/usage/upgrading.md) before deploying this one.
+
+### Breaking Changes
+
+- Node 20 is the floor — the version Debian 13 ships — declared in `engines`
+  and stood behind by a CI that runs the suite on 20, 22, 24 and 26
+
+- `static/schemas/twake`: the shipped schemas describe an enterprise directory
+  rather than a bare CRUD surface. `uid` is **generated** from the local part
+  of `mail`, `twakeDepartmentPath` and `twakeAccountStatus` are computed,
+  `twakeDeliveryMode` is filled with `cn=normal`, and `twakeDepartmentLink` is
+  a `pointer` whose target must exist. Posting any of them gets a `400` naming
+  the attribute — on the flat routes, on `PUT /ldap/organizations` and on
+  `PUT /ldap/groups`. Each is a schema marker: copy the schema and drop them
+  to keep the old behaviour
+
+- `static/schemas/twake/users.json` requires what the interface it replaces
+  required: `employeeNumber`, `displayName` and `givenName`. `cn` stops being
+  required, as it was there — 689 accounts of the reference directory have
+  none. The `displayName` role moves from `cn` to `displayName`, `cn` holding
+  the name surname-first and `displayName` the readable order
+
+- An attribute both `required` and `generated` needs a plugin that fills it:
+  the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
+  than writing an entry missing an attribute no client could then supply. A
+  `pointer` default is checked against the directory the same way, one value
+  or a list of them, instead of a dangling DN on every entry
+
+- An array's `items.test` and `items.branch` are enforced on the flat routes,
+  where they never were — `mailAlternateAddress` has carried a pattern since
+  v0.7.0 and accepted anything. Stored values are untouched:
+  `npm run audit:directory` lists what an update would now refuse
+
+- `twakeDepartmentPath` reads from the root down, the entry's own name last;
+  the check demanded the reverse and refused every top-level organization
+  anyway. What a directory of the old convention holds is still accepted as it
+  stands, so an upgrade leaves those organizations writable
+
+- A flat schema claiming an `entity.name` or an `entity.pluralName` another
+  schema — or an LDAP plugin — already serves is refused and says who holds
+  it. Both used to load, sharing a hook prefix and a URL, and the loser was
+  advertised by the configuration API while being unreachable in fact
+
+### Features
+
+- `plugins/ldap/enterpriseRules`: uniqueness across a shared namespace, mail
+  addresses confined to the domains an organization owns, computed
+  organization paths, byte-size normalisation, referential integrity on delete
+  and a guard on emptying a group. `plugins/ldap/accountLifecycle` adds
+  `POST {entity}/:id/status` and `POST {entity}/:id/password`, a generated
+  password being returned exactly once. `plugins/auth/authzScope` answers
+  `GET /v1/authz/scope`: which branches the caller administers, and what they
+  may create there. None of the three holds an attribute name, a domain or a
+  nomenclature value: every rule is a schema marker
+
+- `abstract/ldapFlat`: the markers those plugins read. `role` says what an
+  attribute _means_, so core code finds it without knowing its name; `hint`
+  explains a `test` in words a client can show; `generated` and `readOnly`
+  refuse a value in a request body; `neverReturn` keeps a writable attribute
+  out of every answer; `generatedFrom` derives an identifier from another
+  attribute. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
+
+- `browser/directory-console`: an administration interface — entity lists with
+  search, paging and bulk actions, an organization tree that stays on screen,
+  forms explaining each pattern under its field, the lifecycle actions and the
+  caller's own scope. Built from `GET /v1/config` and `GET /v1/authz/scope`
+  alone, so a deployment naming its things differently gets its own interface,
+  its own language included. See
+  [directory-console](docs/client-development/browser/directory-console.md)
+
+- `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names
+  separated by commas and answers on any of them, so a search box needs no
+  field picker beside it. Which attributes are worth searching is a new schema
+  marker, `searchable` — what is indexed is the deployment's business.
+  `GET /ldap/groups` answers on the same terms rather than on its RDN
+  attribute alone
+
+- `npm run audit:directory` reads a branch and reports what a schema would
+  refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
+  about the entries already stored. See
+  [directory-audit](docs/usage/directory-audit.md)
+
+- `static/schemas`: the missing `domains` nomenclature and a dozen attributes
+  across the Twake schemas, plus `static/schemas/example` — a worked
+  configuration keeping every national format, mail domain and quota default
+  in a schema rather than in the code, with `npm run check:no-client-values`
+  failing the build if one leaks back into `src/`. `--organization-schema` is
+  settable on the command line at last
+
+### Bug Fixes
+
+- `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix with
+  the comma optional, so `uid=x,xou=users,dc=example,dc=com` passed for being
+  inside `ou=users,dc=example,dc=com`. It is compared RDN by RDN now
+
+- `abstract/ldapFlat`: `searchEntriesByName` interpolated its value into an
+  LDAP filter raw. A name holding `*` became a pattern and matched whichever
+  entry came first; one holding `(` threw from the filter parser after the
+  entry was written, answering `500` on a creation that had succeeded
+
+- `abstract/ldapFlat`: a business rule that refused a creation answered `500`,
+  the add path having wrapped every error in a plain `Error`. A `409` reaches
+  the client as the ordinary outcome it is
+
+- `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
+  rejects the names real directories carry — every one with a space, an
+  apostrophe or an `&`. Loading such a directory failed on its first
+  organization
+
+- `test/helpers`: a failing LDIF load reported "Already exists" whatever the
+  real cause, every error being retried over the entries a half-finished first
+  attempt had left behind. Only a connection failure is retried now
+
 ## v0.7.0 (2026-09-02)
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.

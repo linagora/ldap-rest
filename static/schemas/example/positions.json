@@ -1,0 +1,35 @@
+{
+  "entity": {
+    "name": "position",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "twakePosition"],
+    "singularName": "position",
+    "pluralName": "positions",
+    "base": "ou=positions,{ldap_base}"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "twakePosition"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[a-zA-ZÀ-ÖØ-öø-ÿ](?!.*([-'’/,&()]{2}|\\s{2}|\\s[-,'’]|\\s[-'’]\\s|\\s\\)|\\(\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ'’ \\-/,&()]+[a-zA-Z]$",
+      "hint": "Letters, spaces and ' - / , & ( ), starting and ending with a letter, no repeated punctuation",
+      "required": true,
+      "role": "identifier",
+      "label": "Position name"
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

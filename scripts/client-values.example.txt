@@ -1,0 +1,17 @@
+# Values that must never appear in src/: they belong to one deployment, not to
+# the product. One extended regular expression per line; blank lines and lines
+# starting with # are ignored.
+#
+# Copy this file to scripts/client-values.txt, which is deliberately untracked,
+# and add a line whenever a deployment gives you a value the core must not
+# learn: its LDAP suffix, its mail domains, its national formats, its
+# nomenclature values, its quota defaults. Set CLIENT_VALUES_FILE instead to
+# read the list from outside the repository, a CI secret for instance.
+#
+# Uncomment and replace with your own:
+#
+# acme-corp
+# o=acme,c=us
+# \+1555
+# @acme\.example
+# 4294967296

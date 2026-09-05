@@ -36,11 +36,16 @@ import {
   getCompiledRegex,
   launchHooks,
   launchHooksChained,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
+import {
+  assertClientMaySet,
+  missingRequiredAttribute,
+} from '../../config/schema';
 
 export interface postAdd {
   cn?: string;
@@ -191,14 +196,25 @@ export default class LdapGroups extends DmPlugin {
      * summary: List groups
      * description: |
      *   Returns every group under the configured group base. The optional
-     *   `match` query supports either a raw LDAP filter (when it contains
-     *   `=`) or a simple value matched against the RDN attribute.
+     *   `match` query is matched against the attributes named by
+     *   `attribute`, as a substring — the same semantics as the flat entity
+     *   lists. Without `attribute` it is either a raw LDAP filter (when it
+     *   contains `=`) or an exact value of the RDN attribute.
      * parameters:
      *   - in: query
      *     name: match
      *     schema: { type: string }
-     *     description: LDAP filter or simple value.
-     *     example: admin*
+     *     description: Substring to look for, LDAP filter, or exact value.
+     *     example: admin
+     *   - in: query
+     *     name: attribute
+     *     schema: { type: string }
+     *     description: |
+     *       LDAP attribute name to match `match` against, as a substring.
+     *       Several may be given, separated by commas; a group matching any
+     *       of them is returned. Each name must be indexed for a substring
+     *       search, or the directory scans the branch.
+     *     example: cn,mail
      *   - in: query
      *     name: attributes
      *     schema: { type: string }
@@ -238,7 +254,16 @@ export default class LdapGroups extends DmPlugin {
           if (typeof req.query.match !== 'string') {
             throw new BadRequestError('Invalid match query');
           }
-          if (/=/.test(req.query.match)) {
+          if (typeof req.query.attribute === 'string' && req.query.attribute) {
+            // The client named what it is searching in, so search in it — as
+            // a substring, as the flat lists do. Building the filter on the
+            // RDN attribute whatever was asked answered "no entry matches"
+            // to every search by mail address the console sends.
+            args.filter = substringSearchFilter(
+              req.query.match,
+              req.query.attribute
+            );
+          } else if (/=/.test(req.query.match)) {
             // Custom filter syntax - validate strictly to prevent LDAP injection
             // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
             if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
@@ -569,6 +594,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<void> {
     const body = jsonBody(req, res, ...requiredFields) as postAdd | false;
     if (!body) return;
+    assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
     const members = body.member ? body.member : [];
     const additional: AttributesList = Object.fromEntries(
@@ -596,6 +622,10 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
+    assertClientMaySet(this.schema, [
+      ...Object.keys((body as { add?: object }).add || {}),
+      ...Object.keys((body as { replace?: object }).replace || {}),
+    ]);
     // Filter out fixed fields from schema
     const filteredBody = Object.fromEntries(
       Object.entries(body).filter(
@@ -670,6 +700,10 @@ export default class LdapGroups extends DmPlugin {
     try {
       res = await this.ldap.add(dn, entry);
     } catch (err) {
+      // A rule that refused the write chose its own status: wrapping it in a
+      // plain Error turned a 409 into a 500. The schema now carries `unique`
+      // and `mailDomainScope`, so this is the ordinary path, not the rare one.
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add group ${dn}: ${err}`);
     }
@@ -771,6 +805,7 @@ export default class LdapGroups extends DmPlugin {
         add: { member },
       })
       .catch(err => {
+        if (err instanceof HttpError) throw err;
         throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
       });
   }
@@ -790,6 +825,7 @@ export default class LdapGroups extends DmPlugin {
         delete: { member: member },
       })
       .catch(err => {
+        if (err instanceof HttpError) throw err;
         throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
       });
   }
@@ -1035,11 +1071,20 @@ export default class LdapGroups extends DmPlugin {
         throw new Error(`Invalid value for field ${field}`);
       }
     }
-    // Check required fields
-    for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] == undefined)
-        throw new Error(`Missing required field ${field}`);
-    }
+    // Check required fields. A `generated` attribute is exempt, as it is on
+    // the flat and organization paths: it is filled by a hook *after*
+    // validation, so demanding it here would refuse the very payload the hook
+    // expects — the client sending nothing. The shipped group schema marks
+    // the organization path required and generated, so without this a
+    // schema-conformant creation could not succeed at all. The exemption
+    // holds only while a loaded plugin says it fills the attribute: with none,
+    // the group would be written without a path nobody could ever add back.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
     return true;
   }
 

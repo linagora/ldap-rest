@@ -13,7 +13,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
 import { transformSchemas } from '../../lib/utils';
-import type { Schema } from '../../config/schema';
+import type { LocalizedText, Schema } from '../../config/schema';
 import type { AttributesList } from '../../lib/ldapActions';
 
 interface EnrichedSchema extends Schema {
@@ -25,7 +25,56 @@ interface EnrichedSchema extends Schema {
     pluralName: string;
     base: string;
     defaultAttributes?: Record<string, unknown>;
+    /** Name a client shows for the collection, in one or several languages */
+    label?: LocalizedText;
+    /** Same, for a single entry */
+    singularLabel?: LocalizedText;
   };
+}
+
+/**
+ * Collections the other LDAP plugins serve under the same `/v1/ldap/` prefix,
+ * with the plugin that serves each: its registry name, and the module paths a
+ * configuration loads it by.
+ *
+ * They are listed rather than read from the plugins because those write their
+ * routes literally — `scripts/generate-openapi.ts` reads the route text, and a
+ * `${this.pluralName}` there would document `/v1/ldap/{resource}` instead of
+ * the real path. `test/plugins/ldap/flatGenericPluginClash.test.ts` checks
+ * this list against the routes those plugins really register, so it cannot
+ * drift away from them in silence.
+ */
+export const ldapPluginCollections = [
+  { plugin: 'ldapGroups', modules: ['ldap/groups'], collection: 'groups' },
+  {
+    plugin: 'ldapOrganizations',
+    // `core/ldap/organization` is the deprecated shim: same class, same routes.
+    modules: ['ldap/organizations', 'ldap/organization'],
+    collection: 'organizations',
+  },
+  { plugin: 'ldapRaw', modules: ['ldap/raw'], collection: 'raw' },
+  {
+    plugin: 'ldapBulkImport',
+    modules: ['ldap/bulkImport'],
+    collection: 'bulk-import',
+  },
+];
+
+/**
+ * The module a `--plugin` value names, as `directory/file`: the option carries
+ * `module:name:{overrides}`, and the module itself is written `core/ldap/raw`
+ * from the command line and `./dist/plugins/ldap/raw.js` from a build.
+ *
+ * @param declared value of one `--plugin` option
+ * @returns its last two path elements, without the extension
+ */
+function pluginModule(declared: string): string {
+  return declared
+    .split(':')[0]
+    .replace(/\.[cm]?js$/, '')
+    .split('/')
+    .slice(-2)
+    .join('/');
 }
 
 /**
@@ -34,6 +83,10 @@ interface EnrichedSchema extends Schema {
 class LdapFlatInstance extends LdapFlat {
   name: string = 'ldapFlatInstance';
   roles: Role[] = ['api'] as const;
+
+  /** Names a client shows for the collection and for one entry */
+  label?: LocalizedText;
+  singularLabel?: LocalizedText;
 
   // Ensure department sync is loaded to maintain consistency
   // when organizations are renamed/moved
@@ -56,10 +109,41 @@ export default class LdapFlatGeneric extends DmPlugin {
     super(server);
 
     const schemas = this.config.ldap_flat_schema || [];
+    // An entity is identified twice over: by `name`, which becomes the hook
+    // prefix every plugin listens on, and by `pluralName`, which becomes the
+    // URL. Two schemas claiming either would register the same hooks and the
+    // same routes, and Express answers with the first — the second entity
+    // would be advertised by the configuration API and unreachable in fact.
+    const claimedNames = new Map<string, string>();
+    const claimedPlurals = new Map<string, string>();
 
     if (schemas.length === 0) {
       this.logger.warn('No schemas provided for ldapFlatGeneric plugin');
       return;
+    }
+
+    // The same clash happens between a schema and another LDAP plugin, and
+    // costs the same: `pluralName: "groups"` and `core/ldap/groups` both
+    // answer `/v1/ldap/groups`, Express answers with the first registered,
+    // and the loser is still advertised by the configuration API. It is not
+    // hypothetical — `static/schemas/twake/groups.json` claims `groups`, and
+    // `.dev.mk` drops it from the schema list by hand to run the server with
+    // every plugin.
+    //
+    // A plugin already loaded is asked from the registry, the way
+    // `missingRequiredAttribute` does. That answer alone would depend on the
+    // order the loader happens to reach the two plugins, since they are
+    // loaded in parallel and this constructor may well run first, so the
+    // configuration is read too: it names what will be served whatever the
+    // order.
+    const declared = (this.config.plugin || []).map(pluginModule);
+    const claimedByPlugins = new Map<string, string>();
+    for (const { plugin, modules, collection } of ldapPluginCollections) {
+      if (
+        this.server.loadedPlugins[plugin] ||
+        modules.some(module => declared.includes(module))
+      )
+        claimedByPlugins.set(collection, `plugin ${plugin}`);
     }
 
     // Load each schema and create an instance
@@ -91,6 +175,19 @@ export default class LdapFlatGeneric extends DmPlugin {
           }
         }
 
+        const clashingName = claimedNames.get(schema.entity.name);
+        if (clashingName)
+          throw new Error(
+            `entity "${schema.entity.name}" is already declared by ${clashingName}`
+          );
+        const clashingPlural =
+          claimedPlurals.get(schema.entity.pluralName) ||
+          claimedByPlugins.get(schema.entity.pluralName);
+        if (clashingPlural)
+          throw new Error(
+            `entity "${schema.entity.name}" wants the URL of "${schema.entity.pluralName}", already served by ${clashingPlural}`
+          );
+
         // Resolve base with config placeholders
         let base = schema.entity.base;
         // Replace all {config_key} patterns with actual config values
@@ -113,9 +210,13 @@ export default class LdapFlatGeneric extends DmPlugin {
           hookPrefix: `ldap${schema.entity.name}`,
         });
 
+        instance.label = schema.entity.label;
+        instance.singularLabel = schema.entity.singularLabel;
         instance.name = `ldapFlat:${schema.entity.name}`;
         this.instances.push(instance);
         this.schemaPaths.push(schemaPath);
+        claimedNames.set(schema.entity.name, schemaPath);
+        claimedPlurals.set(schema.entity.pluralName, schemaPath);
 
         this.logger.info(
           `Created ldapFlat instance for "${schema.entity.name}" (${schema.entity.pluralName})`
@@ -159,6 +260,8 @@ export default class LdapFlatGeneric extends DmPlugin {
         name: instance.name.replace('ldapFlat:', ''),
         singularName: instance.singularName,
         pluralName: instance.pluralName,
+        label: instance.label,
+        singularLabel: instance.singularLabel,
         mainAttribute: instance.mainAttribute,
         objectClass: instance.objectClass,
         base: instance.base,

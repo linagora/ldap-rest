@@ -139,6 +139,157 @@ Fixed attributes:
 - Cannot be modified after creation
 - Cannot be deleted
 
+### Naming things, in the reader's language
+
+`label` is what a client shows instead of the attribute name, and `entity.label`
+/ `entity.singularLabel` are what it calls the collection and one of its
+entries. Each may be a plain string, or a map keyed by language tag:
+
+```json
+{
+  "entity": {
+    "name": "twakeUser",
+    "singularName": "user",
+    "pluralName": "users",
+    "label": { "en": "Users", "fr": "Utilisateurs" },
+    "singularLabel": { "en": "user", "fr": "utilisateur" }
+  },
+  "attributes": {
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "role": "organizationLink",
+      "label": { "en": "Department", "fr": "Organisation" }
+    }
+  }
+}
+```
+
+These words name _your_ entities and attributes, so their translations belong
+in your schemas rather than in a catalogue shipped with the product — which is
+also why an interface can be fully translated without the product learning what
+you call a department. A client picks the exact tag, then its language, then
+English, then whatever the map does hold; with no label at all it falls back to
+the attribute name made readable.
+
+### Explaining a pattern: `hint`
+
+A `test` tells the server what to refuse. A `hint` tells the person what to
+type, before they get it wrong:
+
+```json
+{
+  "telephoneNumber": {
+    "type": "string",
+    "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+    "hint": "Expected pattern (+99) 999 9999"
+  }
+}
+```
+
+The hint travels with the schema, so a client shows it under the field and the
+server repeats it when it rejects a value — the pattern and its explanation
+cannot drift apart, and neither is hardcoded in the interface.
+
+### Attributes a client may not send
+
+| Marker      | Meaning                                                                         |
+| ----------- | ------------------------------------------------------------------------------- |
+| `generated` | The server computes the value. A request that carries it is refused with a 400. |
+| `readOnly`  | The value is derived elsewhere — `memberOf` is driven from the group side.      |
+
+Both restrict the **request body** only: the core and its plugins still write
+these attributes.
+
+### Attributes a client never receives
+
+`neverReturn` strips an attribute from every API answer while leaving it
+writable. It is what makes "a manager may reset a password without being able
+to read it" a projection rather than an authorization engine:
+
+```json
+{
+  "userPassword": { "type": "string", "role": "password", "neverReturn": true },
+  "pwdReset": {
+    "type": "boolean",
+    "role": "passwordReset",
+    "neverReturn": true
+  }
+}
+```
+
+### Deriving the identifier
+
+When the RDN is not something a person chooses, `generatedFrom` says where it
+comes from. The client then posts without it:
+
+```json
+{
+  "uid": {
+    "type": "string",
+    "role": "identifier",
+    "generated": true,
+    "generatedFrom": {
+      "attribute": "mail",
+      "extract": "^([^@]+)@",
+      "lowercase": true,
+      "onCollision": "suffix"
+    }
+  }
+}
+```
+
+`onCollision` decides what happens when the value is taken — two directories'
+worth of `jean.dupont@a.example` and `jean.dupont@b.example` map to the same
+local part. `suffix` appends `-2`, `-3`, …; `error` (the default) refuses the
+creation with a 409.
+
+### Semantic roles
+
+`role` says what an attribute _means_, so core code and plugins can find it
+without knowing its name. `roleAttribute(schema, 'accountStatus')` returns
+`twakeAccountStatus` in a Twake directory and whatever another deployment
+chose in its own. The roles the core looks for:
+
+| Role                                   | Meaning                                       |
+| -------------------------------------- | --------------------------------------------- |
+| `identifier`, `displayName`            | RDN value, human-readable name                |
+| `primaryEmail`, `emailAliases`         | Mail addresses of the entry                   |
+| `emailQuota`                           | Mailbox size limit, in bytes                  |
+| `organizationLink`, `organizationPath` | Organization the entry belongs to             |
+| `members`, `owners`                    | Members of a group, and who may write to it   |
+| `accountStatus`, `accountExpiry`       | Lifecycle state and scheduled removal         |
+| `password`, `passwordReset`            | Credential and "change it at next login" flag |
+| `domainLink`, `domainName`             | Mail domains an organization may use          |
+
+An attribute may carry several roles (`"role": ["identifier", "displayName"]`),
+and a deployment is free to add its own for its plugins.
+
+### Which attributes a search covers: `searchable`
+
+`GET /{pluralName}?match=…&attribute=…` takes one attribute name or several
+separated by commas, and an entry matching any of them is returned. Which ones
+a client should offer is a property of the deployment rather than of the code:
+a substring filter on an attribute the directory has not indexed scans the
+branch.
+
+`"searchable": true` says so. A schema that marks even one attribute has
+declared its list, and that list is what a client searches; a schema that
+marks none leaves the client to guess — everything returnable, single-valued
+and not a DN, which suits a small branch and scans a large one. The shipped
+schemas mark the attributes an operator looks people up by:
+
+```json
+"sn": { "type": "string", "searchable": true, "label": { … } }
+```
+
+Align it with your indexes. In OpenLDAP that means `index sn,cn,mail sub` for
+the attributes you mark.
+
+The remaining markers — `unique`, `normalize`, `states`,
+`referentialIntegrity`, `deleteGuard`, `mailDomainScope` — are read by
+[enterprise-rules](enterprise-rules.md) and
+[account-lifecycle](account-lifecycle.md).
+
 ## Generated APIs
 
 For each schema, the plugin generates REST API endpoints:

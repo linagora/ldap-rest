@@ -4,6 +4,113 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 0.8.0
+
+### Node 20 is the floor
+
+**Who is affected:** anyone installing on Node 18 or older.
+
+`engines` declares `>=20` — the version Debian 13 ships — and the CI runs the
+suite on 20, 22, 24 and 26. Older runtimes are neither tested nor supported.
+
+**`core/auth/llng` is the one plugin that does not follow.** It needs
+`lemonldap-ng-handler`, which depends on the native `re2`, and no single `re2`
+release installs on every supported Node: up to `1.24.0` it builds on 20 but
+not on 26, and from `1.24.1` it declares `engines: >=22`. npm answers an
+unsatisfied dependency of this kind by leaving an _optional_ package out
+without a word, so on some runtimes the handler is simply absent.
+
+Everything else builds, tests and runs there regardless. A server that
+configures `core/auth/llng` on a runtime where the handler could not be
+installed now fails at startup, naming the plugin and the missing package,
+rather than accepting requests an authentication plugin cannot check. Check
+after upgrading that the runtime you deploy on carries it:
+
+```bash
+node -e "require('lemonldap-ng-handler'); console.log('present')"
+```
+
+### The Twake schemas now need `core/ldap/enterpriseRules`
+
+**Who is affected:** every deployment loading `static/schemas/twake/*`.
+
+Those schemas mark `twakeDepartmentPath`, `twakeAccountStatus` and
+`twakeDeliveryMode` both `required` and `generated` — a client may not send
+them, and a plugin has to fill them. Load the one that does:
+
+```bash
+--plugin core/ldap/enterpriseRules
+```
+
+Without it, a creation answers `400` naming the attribute, on the flat routes
+as on `POST /ldap/organizations` and `POST /ldap/groups`. That refusal is
+deliberate: the previous release wrote the entry anyway, missing an attribute
+its own schema called required and that no client could ever add.
+
+**The nomenclature has to hold what the schema defaults name.** The user
+schema points at `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,<base>` and
+`cn=active,ou=twakeAccountStatus,ou=nomenclature,<base>`. A directory never
+seeded with those entries answers `400` on every creation, naming the DN that
+does not resolve — rather than storing a dangling one on each account.
+
+### Clients must stop sending the computed attributes
+
+**Who is affected:** anything that creates or updates users, groups or
+organizations against the Twake schemas.
+
+`uid` (generated from the local part of `mail`), `twakeDepartmentPath`,
+`twakeAccountStatus` and `twakeDeliveryMode` are refused in a request body
+with a `400` naming the attribute. Drop them from the payload — the server
+fills them.
+
+To keep the old behaviour, copy the schema and remove the markers: each of
+these is a `generated` or `readOnly` flag in the JSON, not code.
+
+### Run the audit before switching
+
+**Who is affected:** every directory holding entries written before this
+release.
+
+```bash
+npm run audit:directory -- --schema static/schemas/twake/users.json
+```
+
+It reads the branch as it stands and reports what the schema would now refuse,
+quoting each rule's own `hint`. Two rules tightened in ways that only show on
+stored data:
+
+- an array's `items.test` and `items.branch` are enforced on the flat routes,
+  where they never were — `mailAlternateAddress` has carried a pattern since
+  0.7.0 and accepted anything;
+- a pointer's `branch` is compared RDN by RDN. A DN that merely ended with the
+  branch as text, `uid=x,xou=users,dc=example,dc=com` against
+  `ou=users,dc=example,dc=com`, used to pass.
+
+Stored values are left alone. The refusal comes at the next update of an
+offending entry, which is why it is worth knowing beforehand.
+
+### A flat schema may not claim a URL an LDAP plugin serves
+
+**Who is affected:** anyone passing `--ldap-flat-schema` a schema whose
+`entity.pluralName` is `groups`, `organizations`, `raw` or `bulk-import`
+beside the plugin of the same name — `static/schemas/twake/groups.json` is
+exactly that.
+
+Both used to load, sharing a hook prefix and a URL; Express answered with
+whichever registered first, and the loser stayed advertised by the
+configuration API while being unreachable in fact. The schema is now dropped
+with an error naming the holder. **Load one or the other, not both.**
+
+### Organization paths: nothing to convert
+
+**Who is affected:** directories written before the path order was settled.
+
+`twakeDepartmentPath` reads from the root down, the entry's own name last.
+What is already stored in the old order — the entry's own name first, the top
+organization's last — is still accepted as it stands, so no organization
+becomes unwritable on upgrade. Only paths the server computes from now on
+follow the new order, and the two forms coexist until an entry is rewritten.
+
 ## To 0.7.0
 
 ### `externalId` on Groups is no longer served

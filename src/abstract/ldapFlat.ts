@@ -33,15 +33,33 @@ import {
   escapeRegex,
   getCompiledRegex,
   getParentDn,
+  isDnInBranch,
   launchHooks,
   launchHooksChained,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
-import { BadRequestError, NotFoundError, ConflictError } from '../lib/errors';
+import { missingRequiredAttribute } from '../config/schema';
+import {
+  BadRequestError,
+  ConflictError,
+  HttpError,
+  NotFoundError,
+} from '../lib/errors';
 
 import DmPlugin from './plugin';
+
+/**
+ * One attribute value or many, always as a list of strings.
+ *
+ * @param value value as the client sent it
+ * @returns its elements
+ */
+function asList(value: AttributeValue): string[] {
+  return (Array.isArray(value) ? value : [value]).map(item => String(item));
+}
 
 export interface LdapFlatConfig {
   /**
@@ -235,6 +253,208 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
+   * Attributes a client is not allowed to supply: those the server computes
+   * (`generated`) and those it only ever derives from elsewhere (`readOnly`,
+   * such as `memberOf`, which is driven from the group side).
+   *
+   * The core and its plugins still write them — the restriction is on the
+   * request body, not on the entry.
+   *
+   * @returns lowercased attribute names
+   */
+  protected clientForbiddenAttributes(): Set<string> {
+    const forbidden = new Set<string>();
+    if (!this.schema) return forbidden;
+    for (const [name, attr] of Object.entries(this.schema.attributes)) {
+      // A `generated` identifier with no derivation rule has nothing to be
+      // generated from: the client still has to supply it.
+      if (name === this.mainAttribute && !attr.generatedFrom) continue;
+      if (attr.generated || attr.readOnly) forbidden.add(name.toLowerCase());
+    }
+    return forbidden;
+  }
+
+  /**
+   * Attributes never sent back over the API. A manager may reset a password
+   * without being able to read it back: the asymmetry is a projection, not an
+   * authorization rule, so it lives with the schema.
+   *
+   * @returns lowercased attribute names
+   */
+  protected hiddenAttributes(): Set<string> {
+    const hidden = new Set<string>();
+    if (!this.schema) return hidden;
+    for (const [name, attr] of Object.entries(this.schema.attributes)) {
+      if (attr.neverReturn) hidden.add(name.toLowerCase());
+    }
+    return hidden;
+  }
+
+  /**
+   * Remove the `neverReturn` attributes from an entry about to be serialised.
+   * LDAP attribute names are case-insensitive and may carry options
+   * (`userPassword;binary`), so both are normalised before comparison.
+   *
+   * @param entry entry as read from the directory
+   * @returns a copy without the hidden attributes
+   */
+  protected project<T extends Record<string, unknown>>(entry: T): T {
+    const hidden = this.hiddenAttributes();
+    if (hidden.size === 0) return entry;
+    const out: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(entry)) {
+      if (hidden.has(name.split(';')[0].toLowerCase())) continue;
+      out[name] = value;
+    }
+    return out as T;
+  }
+
+  /**
+   * Same as {@link project}, for a map of entries keyed by identifier.
+   *
+   * @param list entries as read from the directory
+   * @returns a copy without the hidden attributes
+   */
+  protected projectList(list: LdapList): LdapList {
+    if (this.hiddenAttributes().size === 0) return list;
+    const out: LdapList = {};
+    for (const [id, entry] of Object.entries(list))
+      out[id] = this.project(entry);
+    return out;
+  }
+
+  /**
+   * Refuse a request body that carries an attribute the client may not set.
+   *
+   * Failing loudly matters more than ignoring the value: a client that sends
+   * `twakeDepartmentPath` believes it is setting the path, and silently
+   * overwriting it with the computed one would leave it thinking otherwise.
+   *
+   * @param names attribute names present in the request
+   * @throws BadRequestError naming the first offending attribute
+   */
+  protected rejectForbiddenInput(names: string[]): void {
+    const forbidden = this.clientForbiddenAttributes();
+    if (forbidden.size === 0) return;
+    for (const name of names) {
+      if (name === 'dn') continue;
+      if (!forbidden.has(name.split(';')[0].toLowerCase())) continue;
+      const attr = this.schema?.attributes[name];
+      throw new BadRequestError(
+        attr?.readOnly
+          ? `Attribute "${name}" is read-only and cannot be set`
+          : `Attribute "${name}" is computed by the server and cannot be set`
+      );
+    }
+  }
+
+  /**
+   * Derive the RDN value of a new entry when the schema says the server
+   * generates it — an account identifier taken from the local part of its mail
+   * address, typically.
+   *
+   * The derivation itself (source attribute, extraction pattern, collision
+   * strategy) is schema configuration; this method only applies it.
+   *
+   * @param body creation payload
+   * @returns the generated value, or undefined when nothing is generated
+   * @throws BadRequestError when the source attribute is missing, or when the
+   *         value collides and the schema asks for an error
+   */
+  protected async generateMainAttribute(
+    body: Record<string, AttributeValue>
+  ): Promise<string | undefined> {
+    const attr = this.schema?.attributes[this.mainAttribute];
+    const rule = attr?.generatedFrom;
+    if (!rule) return undefined;
+
+    const raw = body[rule.attribute];
+    const source = Array.isArray(raw) ? raw[0] : raw;
+    if (source === undefined || source === null || source === '') {
+      throw new BadRequestError(
+        `Attribute "${rule.attribute}" is required to generate "${this.mainAttribute}"`
+      );
+    }
+    let value = String(source);
+    if (rule.extract) {
+      const match = getCompiledRegex(rule.extract).exec(value);
+      if (match) value = match[1] !== undefined ? match[1] : match[0];
+    }
+    if (rule.lowercase) value = value.toLowerCase();
+    // The source charset is rarely the target's. A mail local part may legally
+    // carry `+`, `'` or `!` — the shipped mail test admits them — while a
+    // `uid` may not, and the derived value is validated against the `uid`
+    // rule. Without a way to say which characters to drop, `john+tag@…` was
+    // refused for an attribute the client is forbidden to send, so no request
+    // could ever succeed.
+    if (rule.strip)
+      value = value.replace(getCompiledRegex(rule.strip, 'g'), '');
+    if (!value) {
+      throw new BadRequestError(
+        `Cannot generate "${this.mainAttribute}" from "${rule.attribute}"`
+      );
+    }
+
+    // The generated value becomes the RDN, so a collision is a duplicate DN.
+    // The source of the identifier is rarely unique on its own: two mail
+    // domains give `jean.dupont@a.example` and `jean.dupont@b.example` the
+    // same local part.
+    if (!(await this.rdnExists(value))) return value;
+    if (rule.onCollision !== 'suffix') {
+      throw new ConflictError(
+        `${this.singularName} "${value}" already exists (generated from ${rule.attribute})`
+      );
+    }
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${value}-${n}`;
+      if (!(await this.rdnExists(candidate))) return candidate;
+    }
+    throw new ConflictError(
+      `Cannot generate a free "${this.mainAttribute}" from "${rule.attribute}"`
+    );
+  }
+
+  /**
+   * Tell whether an entry already uses this RDN value in the branch.
+   *
+   * @param value candidate RDN value
+   * @returns true when the DN is taken
+   */
+  protected async rdnExists(value: string): Promise<boolean> {
+    try {
+      const res = (await this.ldap.search(
+        { paged: false, scope: 'base' },
+        `${this.mainAttribute}=${escapeDnValue(value)},${this.base}`
+      )) as SearchResult;
+      return (res?.searchEntries?.length ?? 0) > 0;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      // A missing entry is reported as an error by the directory (code 32);
+      // any other failure would resurface on the add itself.
+      return false;
+    }
+  }
+
+  /**
+   * Build the rejection message for a value that failed its schema `test`.
+   *
+   * When the schema carries a `hint`, the message says what a valid value
+   * looks like instead of only that this one was not. The hint lives next to
+   * the pattern so the two cannot drift apart, and so a client can show it
+   * under the field *before* the user gets it wrong.
+   *
+   * @param field attribute name
+   * @returns message for a `BadRequestError`
+   */
+  protected invalidValueMessage(field: string): string {
+    const attr = this.schema?.attributes[field];
+    const hint = attr?.hint || attr?.items?.hint;
+    return hint
+      ? `Invalid value for attribute "${field}": ${hint}`
+      : `Invalid value for attribute "${field}"`;
+  }
+
+  /**
    * API routes
    */
   api(app: Express): void {
@@ -245,7 +465,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *   Returns all entries in the flat LDAP branch, keyed by their
      *   `mainAttribute` value (e.g. `uid` for users). The optional
      *   `match` and `attribute` query parameters filter results using
-     *   a substring LDAP search (`attribute=*match*`). The `attributes`
+     *   a substring LDAP search (`attribute=*match*`). `attribute` accepts
+     *   several names separated by commas, and the clauses are then joined
+     *   with `|`. The `attributes`
      *   parameter limits which LDAP attributes are returned.
      * tags:
      *   - Entities
@@ -264,7 +486,8 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       Substring to match. Must be used together with `attribute`.
-     *       The resulting LDAP filter is `(attribute=*match*)`.
+     *       The resulting LDAP filter is `(attribute=*match*)`, or
+     *       `(|(a=*match*)(b=*match*))` when several attributes are named.
      *     example: alice
      *   - in: query
      *     name: attribute
@@ -272,6 +495,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       LDAP attribute name to match against (used with `match`).
+     *       Several may be given, separated by commas; an entry matching any
+     *       of them is returned. Each name must be indexed for a substring
+     *       search, or the directory scans the branch.
      *     example: cn
      *   - in: query
      *     name: attributes
@@ -316,20 +542,16 @@ export default abstract class LdapFlat extends DmPlugin {
           req.query.attribute &&
           typeof req.query.attribute === 'string'
         ) {
-          // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
-          const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
-          if (!attributePattern.test(req.query.attribute)) {
-            throw new BadRequestError('Invalid LDAP attribute name');
-          }
-          // Escape filter value to prevent LDAP injection
-          const escapedMatch = escapeLdapFilter(req.query.match);
-          args.filter = `(${req.query.attribute}=*${escapedMatch}*)`;
+          args.filter = substringSearchFilter(
+            req.query.match,
+            req.query.attribute
+          );
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
         }
         const list = await this.listEntries(args);
-        res.json(list);
+        res.json(this.projectList(list));
       })
     );
 
@@ -597,7 +819,7 @@ export default abstract class LdapFlat extends DmPlugin {
       if (result.searchEntries.length === 0) {
         throw new NotFoundError(`${this.singularName} not found`);
       }
-      res.json(result.searchEntries[0]);
+      res.json(this.project(result.searchEntries[0]));
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
       if (
@@ -611,12 +833,21 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {
-    const body = jsonBody(req, res, this.mainAttribute) as
-      | Record<string, AttributeValue>
-      | false;
+    // When the schema says the server derives the identifier, the client is
+    // not expected — nor allowed — to send it.
+    const generatesId = Boolean(
+      this.schema?.attributes[this.mainAttribute]?.generatedFrom
+    );
+    const body = (
+      generatesId ? jsonBody(req, res) : jsonBody(req, res, this.mainAttribute)
+    ) as Record<string, AttributeValue> | false;
     if (!body) return;
 
-    const id = body[this.mainAttribute] as string;
+    this.rejectForbiddenInput(Object.keys(body));
+
+    const id = generatesId
+      ? ((await this.generateMainAttribute(body)) as string)
+      : (body[this.mainAttribute] as string);
     const additional = { ...body };
     delete additional[this.mainAttribute];
     // Remove dn if provided - it will be constructed by addEntry
@@ -624,7 +855,7 @@ export default abstract class LdapFlat extends DmPlugin {
 
     await this.addEntry(id, additional, req);
     const entry = await this.searchEntriesByName(id, false);
-    return created(res, entry[id]);
+    return created(res, this.project(entry[id]));
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
@@ -636,6 +867,13 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
+    this.rejectForbiddenInput([
+      ...Object.keys(body.add || {}),
+      ...Object.keys(body.replace || {}),
+      ...(Array.isArray(body.delete)
+        ? body.delete
+        : Object.keys(body.delete || {})),
+    ]);
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.modifyEntry.bind(this), id, body);
   }
@@ -767,12 +1005,17 @@ export default abstract class LdapFlat extends DmPlugin {
     try {
       res = await this.ldap.add(dn, entry, req);
     } catch (err) {
-      // Log detailed error information
-      this.logger.error('LDAP add failed:', {
+      // A business rule that refused the entry already said what happened and
+      // with which status; wrapping it would turn a 409 "this address is
+      // already used" into an opaque 500. A refusal is also an ordinary
+      // outcome, not an incident, so it is not logged as one.
+      const refusal = err instanceof HttpError && err.statusCode < 500;
+      this.logger[refusal ? 'debug' : 'error']('LDAP add failed:', {
         dn,
         entry: JSON.stringify(entry, null, 2),
         error: err,
       });
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }
@@ -969,6 +1212,15 @@ export default abstract class LdapFlat extends DmPlugin {
       );
       return orgDn;
     } catch (err) {
+      // Let a NotFoundError we raised ourselves - or an LDAP NoSuchObjectError
+      // (code 32) - travel out as a NotFoundError instead of being wrapped
+      // into a generic 500.
+      if (err instanceof NotFoundError) {
+        throw err;
+      }
+      if ((err as { code?: number }).code === 32) {
+        throw new NotFoundError(`Organization ${orgDn} not found`);
+      }
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
     }
@@ -1018,9 +1270,16 @@ export default abstract class LdapFlat extends DmPlugin {
     partial = false,
     attrs: string[] = [this.mainAttribute]
   ): Promise<LdapList> {
+    // `apiAdd` re-reads the entry it has just written through this, so an
+    // identifier the schema admits has to survive the trip: the shipped
+    // position and group schemas accept `( )` and `*`, which a raw
+    // interpolation turns into an unparseable filter — after the entry is
+    // committed, so the caller saw a 500 on a creation that had succeeded.
+    // A partial search means the value to look for, not a pattern to run.
+    const escaped = escapeLdapFilter(name);
     const filter = partial
-      ? `(${this.mainAttribute}=*${name}*)`
-      : `(${this.mainAttribute}=${name})`;
+      ? `(${this.mainAttribute}=*${escaped}*)`
+      : `(${this.mainAttribute}=${escaped})`;
     return await this.listEntries({ filter, attributes: attrs });
   }
 
@@ -1057,18 +1316,21 @@ export default abstract class LdapFlat extends DmPlugin {
       }
 
       if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(`Invalid value for attribute "${field}"`);
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
-      if (attr.required && !value) {
+      if (attr.required && !value && !attr.generated) {
         throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
-    // Check required fields
-    for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.required && !entry[field]) {
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      }
-    }
+    // Check required fields, granting a `generated` attribute the exemption
+    // only when something will honour it. See `missingRequiredAttribute`.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing)
+      throw new BadRequestError(`Attribute "${missing}" is required`);
     return true;
   }
 
@@ -1090,7 +1352,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.add)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1098,7 +1360,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.replace)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1140,15 +1402,14 @@ export default abstract class LdapFlat extends DmPlugin {
 
       const dnValue: string = value;
 
-      // Check branch restriction if provided
+      // Check branch restriction if provided. Asked RDN by RDN: a suffix
+      // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`
+      // as being inside `ou=users,dc=example,dc=com`, so a pointer could name
+      // an entry of a branch the schema never allowed.
       if (attr.branch && attr.branch.length > 0) {
-        const isInBranch = attr.branch.some(branch => {
-          const branchPattern = getCompiledRegex(
-            `,?${escapeRegex(branch)}$`,
-            'i'
-          );
-          return branchPattern.test(dnValue);
-        });
+        const isInBranch = attr.branch.some(branch =>
+          isDnInBranch(dnValue, branch)
+        );
         if (!isInBranch) {
           throw new BadRequestError(
             `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
@@ -1178,13 +1439,31 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
 
-    if (attr.test) {
-      const regex =
-        typeof attr.test === 'string' ? getCompiledRegex(attr.test) : attr.test;
-      if (Array.isArray(value)) {
-        return value.every(v => regex.test(v as string));
+    // An array declares the rules of its *elements* under `items`, which is
+    // where the shipped schemas put them — `mailAlternateAddress` has carried
+    // `items.test` since v0.7.0 and `twakeDelegatedUsers` an `items.branch`.
+    // Neither was read here, so the flat routes accepted anything in them
+    // while the console's form refused it client-side and `groups` refused
+    // `items.test` server-side. The rule is the same rule; it applies here
+    // too.
+    if (attr.items?.branch?.length) {
+      for (const dnValue of asList(value)) {
+        // Same rule as a pointer's own branch, and asked the same way.
+        const isInBranch = attr.items.branch.some(branch =>
+          isDnInBranch(dnValue, branch)
+        );
+        if (!isInBranch)
+          throw new BadRequestError(
+            `Field ${field} must point to a DN within allowed branches: ${attr.items.branch.join(', ')}`
+          );
       }
-      return regex.test(value as string);
+    }
+
+    const pattern = attr.test ?? attr.items?.test;
+    if (pattern) {
+      const regex =
+        typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
+      return asList(value).every(v => regex.test(v));
     }
     return true;
   }
