@@ -33,6 +33,51 @@ interface EnrichedSchema extends Schema {
 }
 
 /**
+ * Collections the other LDAP plugins serve under the same `/v1/ldap/` prefix,
+ * with the plugin that serves each: its registry name, and the module paths a
+ * configuration loads it by.
+ *
+ * They are listed rather than read from the plugins because those write their
+ * routes literally — `scripts/generate-openapi.ts` reads the route text, and a
+ * `${this.pluralName}` there would document `/v1/ldap/{resource}` instead of
+ * the real path. `test/plugins/ldap/flatGenericPluginClash.test.ts` checks
+ * this list against the routes those plugins really register, so it cannot
+ * drift away from them in silence.
+ */
+export const ldapPluginCollections = [
+  { plugin: 'ldapGroups', modules: ['ldap/groups'], collection: 'groups' },
+  {
+    plugin: 'ldapOrganizations',
+    // `core/ldap/organization` is the deprecated shim: same class, same routes.
+    modules: ['ldap/organizations', 'ldap/organization'],
+    collection: 'organizations',
+  },
+  { plugin: 'ldapRaw', modules: ['ldap/raw'], collection: 'raw' },
+  {
+    plugin: 'ldapBulkImport',
+    modules: ['ldap/bulkImport'],
+    collection: 'bulk-import',
+  },
+];
+
+/**
+ * The module a `--plugin` value names, as `directory/file`: the option carries
+ * `module:name:{overrides}`, and the module itself is written `core/ldap/raw`
+ * from the command line and `./dist/plugins/ldap/raw.js` from a build.
+ *
+ * @param declared value of one `--plugin` option
+ * @returns its last two path elements, without the extension
+ */
+function pluginModule(declared: string): string {
+  return declared
+    .split(':')[0]
+    .replace(/\.[cm]?js$/, '')
+    .split('/')
+    .slice(-2)
+    .join('/');
+}
+
+/**
  * Concrete implementation of LdapFlat for generic instances
  */
 class LdapFlatInstance extends LdapFlat {
@@ -77,6 +122,30 @@ export default class LdapFlatGeneric extends DmPlugin {
       return;
     }
 
+    // The same clash happens between a schema and another LDAP plugin, and
+    // costs the same: `pluralName: "groups"` and `core/ldap/groups` both
+    // answer `/v1/ldap/groups`, Express answers with the first registered,
+    // and the loser is still advertised by the configuration API. It is not
+    // hypothetical — `static/schemas/twake/groups.json` claims `groups`, and
+    // `.dev.mk` drops it from the schema list by hand to run the server with
+    // every plugin.
+    //
+    // A plugin already loaded is asked from the registry, the way
+    // `missingRequiredAttribute` does. That answer alone would depend on the
+    // order the loader happens to reach the two plugins, since they are
+    // loaded in parallel and this constructor may well run first, so the
+    // configuration is read too: it names what will be served whatever the
+    // order.
+    const declared = (this.config.plugin || []).map(pluginModule);
+    const claimedByPlugins = new Map<string, string>();
+    for (const { plugin, modules, collection } of ldapPluginCollections) {
+      if (
+        this.server.loadedPlugins[plugin] ||
+        modules.some(module => declared.includes(module))
+      )
+        claimedByPlugins.set(collection, `plugin ${plugin}`);
+    }
+
     // Load each schema and create an instance
     schemas.forEach(schemaPath => {
       try {
@@ -111,7 +180,9 @@ export default class LdapFlatGeneric extends DmPlugin {
           throw new Error(
             `entity "${schema.entity.name}" is already declared by ${clashingName}`
           );
-        const clashingPlural = claimedPlurals.get(schema.entity.pluralName);
+        const clashingPlural =
+          claimedPlurals.get(schema.entity.pluralName) ||
+          claimedByPlugins.get(schema.entity.pluralName);
         if (clashingPlural)
           throw new Error(
             `entity "${schema.entity.name}" wants the URL of "${schema.entity.pluralName}", already served by ${clashingPlural}`
