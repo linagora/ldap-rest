@@ -452,7 +452,14 @@ export class EntityList {
    * @returns the shortened, escaped form
    */
   static shortenPath(path: string): string {
-    const segments = path.split(/\s*\/\s*/).filter(Boolean);
+    // Split on the separator alone and trim the pieces, rather than on
+    // `/\s*\/\s*/`: that pattern scans the run of blanks before every
+    // position, so a path made of blanks — and a path is whatever the
+    // directory holds — costs the square of its length to cut up.
+    const segments = path
+      .split('/')
+      .map(segment => segment.trim())
+      .filter(Boolean);
     if (segments.length <= 2) return escapeHtml(path);
     return `${escapeHtml(segments[0])} / … / ${escapeHtml(
       segments[segments.length - 1]

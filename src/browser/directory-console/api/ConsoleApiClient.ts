@@ -99,6 +99,35 @@ function isMoreIndicator(entry: Entry): boolean {
   return classes.some(name => String(name) === 'moreIndicator');
 }
 
+/**
+ * Read an attribute value as a list, whatever shape the API gave it.
+ *
+ * @param value value as stored, or as the form submitted it
+ * @returns its values, in order
+ */
+function toValues(value: string | string[] | undefined): string[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value.map(String) : [String(value)];
+}
+
+/**
+ * An `Error` carrying the status the answer came with. The status is what
+ * tells an endpoint the server does not serve from one it refused, so it is
+ * attached whatever the body turned out to hold.
+ *
+ * @param message message to show
+ * @param status HTTP status of the answer
+ * @returns the error to throw
+ */
+function statusError(
+  message: string,
+  status: number
+): Error & { status: number } {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
+}
+
 export class ConsoleApiClient {
   private readonly origin: string;
   private apiPrefix = '/api';
@@ -142,6 +171,13 @@ export class ConsoleApiClient {
    * Issue a request and turn a failure into an `Error` carrying the server's
    * own message — the API explains what it refused and why, and repeating that
    * verbatim is more useful than any wording invented here.
+   *
+   * The body is read as JSON only after the status has been looked at: not
+   * every answer comes from the API. Express's own `404` page, a proxy's `502`
+   * and a gateway's sign-in redirect are all HTML, and parsing them first
+   * raised a `SyntaxError` carrying no status at all — which is how a server
+   * without `auth/authzScope` came to be read as a refusal rather than as the
+   * `404` it answered, and hid every write button on the console.
    */
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.origin}${path}`, {
@@ -154,15 +190,24 @@ export class ConsoleApiClient {
       },
     });
     const text = await response.text();
-    const payload = text ? (JSON.parse(text) as unknown) : null;
-    if (!response.ok) {
-      const message =
-        (payload as { error?: string } | null)?.error ||
-        `${response.status} ${response.statusText}`;
-      const error = new Error(message) as Error & { status: number };
-      error.status = response.status;
-      throw error;
+    const status = `${response.status} ${response.statusText}`;
+    let payload: unknown = null;
+    let isJson = true;
+    if (text) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        isJson = false;
+      }
     }
+    if (!response.ok)
+      throw statusError(
+        (isJson && (payload as { error?: string } | null)?.error) || status,
+        response.status
+      );
+    // A success nobody can read is still a failure, and it is one the caller
+    // should be able to tell apart by its status like any other.
+    if (!isJson) throw statusError(status, response.status);
     return payload as T;
   }
 
@@ -321,21 +366,125 @@ export class ConsoleApiClient {
     });
   }
 
-  /** Replace the given attributes of an entry. */
+  /**
+   * Replace the given attributes of an entry.
+   *
+   * A group's membership is the one thing the modify endpoint does not take:
+   * it answers `Use dedicated API to replace members` to `replace.member` and
+   * to `delete: ['member']` alike, because adding and removing a member is
+   * hooked server-side and has endpoints of its own. The form edits that list
+   * like any other attribute — which is right, it is one — so what it
+   * submitted is turned back here into the additions and the removals it
+   * means, and the rest of the entry goes out as usual.
+   *
+   * @param entity entity the entry belongs to
+   * @param id identifier of the entry
+   * @param replace attributes to write
+   * @param remove attributes to clear
+   * @param previous the entry as stored, which the membership is diffed
+   *   against; without it every submitted member reads as an addition
+   */
   async update(
     entity: EntityDescriptor,
     id: string,
     replace: Record<string, string | string[]>,
-    remove: string[] = []
+    remove: string[] = [],
+    previous?: Entry
   ): Promise<void> {
+    const attributes = { ...replace };
+    const cleared = [...remove];
+    const membership = this.membershipAttribute(entity);
+    let members: string[] | undefined;
+    if (
+      membership &&
+      (membership in attributes || cleared.includes(membership))
+    ) {
+      members = toValues(attributes[membership]);
+      delete attributes[membership];
+      const index = cleared.indexOf(membership);
+      if (index >= 0) cleared.splice(index, 1);
+    }
+
     const body: Record<string, unknown> = {};
-    if (Object.keys(replace).length) body.replace = replace;
-    if (remove.length) body.delete = remove;
-    if (!Object.keys(body).length) return;
-    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(body),
+    if (Object.keys(attributes).length) body.replace = attributes;
+    if (cleared.length) body.delete = cleared;
+    if (Object.keys(body).length)
+      await this.call(`${entity.endpoint}/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    if (members && membership)
+      await this.setMembers(
+        entity,
+        id,
+        members,
+        toValues(previous?.[membership])
+      );
+  }
+
+  /**
+   * The attribute holding the members of a group, when the entity is one. It
+   * is read from its role, like everything else the console knows.
+   *
+   * @param entity entity to look at
+   * @returns the attribute name, or undefined when there is no such thing
+   */
+  private membershipAttribute(entity: EntityDescriptor): string | undefined {
+    return entity.kind === 'group'
+      ? roleAttribute(entity.schema, 'members')
+      : undefined;
+  }
+
+  /**
+   * Bring a group's members to the list given, through the endpoints the
+   * server reserves for it.
+   *
+   * @param entity group entity
+   * @param id identifier of the group
+   * @param members members the group should hold
+   * @param current members it holds today
+   */
+  async setMembers(
+    entity: EntityDescriptor,
+    id: string,
+    members: string[],
+    current: string[] = []
+  ): Promise<void> {
+    // A DN is case-insensitive as an identifier, so a member listed under
+    // another case is the same member and not one to add and drop again.
+    const held = new Set(current.map(dn => dn.toLowerCase()));
+    const wanted = new Set(members.map(dn => dn.toLowerCase()));
+    const added = members.filter(dn => !held.has(dn.toLowerCase()));
+    const removed = current.filter(dn => !wanted.has(dn.toLowerCase()));
+    if (added.length) await this.addMembers(entity, id, added);
+    // One request per departure: the endpoint names the member in its path.
+    for (const dn of removed) await this.removeMember(entity, id, dn);
+  }
+
+  /** Add members to a group. */
+  async addMembers(
+    entity: EntityDescriptor,
+    id: string,
+    members: string[]
+  ): Promise<void> {
+    if (!members.length) return;
+    await this.call(`${entity.endpoint}/${encodeURIComponent(id)}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ member: members }),
     });
+  }
+
+  /** Remove one member from a group. */
+  async removeMember(
+    entity: EntityDescriptor,
+    id: string,
+    member: string
+  ): Promise<void> {
+    await this.call(
+      `${entity.endpoint}/${encodeURIComponent(id)}/members/` +
+        encodeURIComponent(member),
+      { method: 'DELETE' }
+    );
   }
 
   /** Delete an entry. */
@@ -389,15 +538,24 @@ export class ConsoleApiClient {
     );
   }
 
-  /** Top of the organization tree. */
+  /**
+   * Top of the organization tree, or null when the server serves none.
+   *
+   * A `404` is the answer of a server with no top organization configured:
+   * there is no tree to draw, which is not the same thing as failing to read
+   * it. Every other failure is raised, the way `scope()` raises its own —
+   * read as "no tree", a `403` left the tree on its loading message and the
+   * department select of every form empty, without a word said.
+   */
   async organizationTop(): Promise<OrganizationNode | null> {
     try {
       const entry = await this.call<Entry>(
         `${this.apiPrefix}/v1/ldap/organizations/top`
       );
       return entry?.dn ? this.toNode(entry) : null;
-    } catch {
-      return null;
+    } catch (err) {
+      if ((err as { status?: number }).status === 404) return null;
+      throw err;
     }
   }
 
@@ -566,7 +724,8 @@ export class ConsoleApiClient {
       );
       return (answer.children || []).map(child => ({
         dn: child.dn,
-        label: child.rdn.replace(/^[^=]+=/, ''),
+        // `rdnValue` again: an RDN is escaped like the DN it comes from.
+        label: rdnValue(child.rdn),
       }));
     } catch {
       return [];
@@ -611,8 +770,10 @@ export class ConsoleApiClient {
     };
     return {
       dn,
-      name:
-        value('ou') || value('o') || dn.split(',')[0].replace(/^[^=]+=/, ''),
+      // An organization names itself with `ou` or `o`; a directory that used
+      // neither is read from its DN, through the reader that knows LDAP's
+      // escapes.
+      name: value('ou') || value('o') || rdnValue(dn),
       path: this.organizationPathAttribute
         ? value(this.organizationPathAttribute)
         : undefined,

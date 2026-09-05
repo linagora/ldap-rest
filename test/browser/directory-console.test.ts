@@ -10,8 +10,10 @@ import { expect } from 'chai';
 import nock from 'nock';
 
 import { ConsoleApiClient } from '../../src/browser/directory-console/api/ConsoleApiClient';
+import { readFailure } from '../../src/browser/directory-console/DirectoryConsole';
 import {
   attributeLabel,
+  rdnValue,
   resolveText,
 } from '../../src/browser/directory-console/format';
 import { EntityDetail } from '../../src/browser/directory-console/components/EntityDetail';
@@ -112,6 +114,34 @@ const users: EntityDescriptor = {
   password: 'userPassword',
 };
 
+const groups: EntityDescriptor = {
+  key: 'groups',
+  pluralName: 'groups',
+  singularName: 'group',
+  mainAttribute: 'cn',
+  base: 'ou=groups,dc=example,dc=com',
+  schema: {
+    attributes: {
+      cn: { type: 'string', role: 'identifier', required: true },
+      description: { type: 'string' },
+      member: { type: 'array', role: 'members', items: { type: 'string' } },
+    },
+  },
+  endpoint: '/api/v1/ldap/groups',
+  kind: 'group',
+};
+
+/** A group as the directory holds it, before the form edits it. */
+const staff: Entry = {
+  dn: 'cn=staff,ou=groups,dc=example,dc=com',
+  cn: 'staff',
+  description: 'Staff',
+  member: [
+    'uid=alice,ou=users,dc=example,dc=com',
+    'uid=bob,ou=users,dc=example,dc=com',
+  ],
+};
+
 describe('Directory console', () => {
   afterEach(() => nock.cleanAll());
 
@@ -179,6 +209,46 @@ describe('Directory console', () => {
       expect(
         attributeLabel('twakeDepartmentPath', { type: 'string' }, 'fr')
       ).to.equal('Twake Department Path');
+    });
+  });
+
+  describe('reading a DN', () => {
+    it('should read the value of the first RDN, escapes undone', () => {
+      expect(rdnValue('uid=jsmith,ou=users,dc=example,dc=com')).to.equal(
+        'jsmith'
+      );
+      // The comma inside a value is escaped, so the first comma of the DN is
+      // not always the end of the first RDN: splitting on it navigated to
+      // `Smith\` and the console answered "This entry no longer exists".
+      expect(
+        rdnValue('cn=Smith\\, John,ou=positions,dc=example,dc=com')
+      ).to.equal('Smith, John');
+      expect(rdnValue('not a dn')).to.equal('not a dn');
+    });
+  });
+
+  describe('reading a failed read', () => {
+    it('should say the entry is gone only when it is', () => {
+      const translator = new Translator('en');
+      const gone = Object.assign(new Error('Not found'), { status: 404 });
+      expect(readFailure(gone, translator)).to.deep.equal({
+        gone: true,
+        message: 'This entry no longer exists',
+      });
+    });
+
+    it('should show what a refusal said, not that the entry is gone', () => {
+      // Telling the operator an entry no longer exists when they were in fact
+      // refused sends them looking for the wrong problem. The organization
+      // card said it for every failure; the entry card never did.
+      const translator = new Translator('en');
+      const refused = Object.assign(new Error('Out of your scope'), {
+        status: 403,
+      });
+      expect(readFailure(refused, translator)).to.deep.equal({
+        gone: false,
+        message: 'Out of your scope',
+      });
     });
   });
 
@@ -408,6 +478,185 @@ describe('Directory console', () => {
       ).to.deep.equal([]);
     });
 
+    it('should not turn a membership edit into a request the server refuses', async () => {
+      // `modifyGroup` answers `Use dedicated API to replace members` to
+      // `replace.member`, and the same to `delete: ['member']`: every
+      // membership edit made from the form came back as a 500. The form edits
+      // the list, as it should; what the server takes is who joined and who
+      // left, through the endpoints it keeps for them.
+      let modified: unknown;
+      let joined: unknown;
+      // The interceptors are the assertion: the DELETE names the member that
+      // left, and a request nobody declared reaches nothing and fails.
+      const scope = nock(baseUrl)
+        .put('/api/v1/ldap/groups/staff', received => {
+          modified = received;
+          return true;
+        })
+        .reply(200, { success: true })
+        .post('/api/v1/ldap/groups/staff/members', received => {
+          joined = received;
+          return true;
+        })
+        .reply(200, { success: true })
+        .delete(
+          '/api/v1/ldap/groups/staff/members/' +
+            encodeURIComponent('uid=bob,ou=users,dc=example,dc=com')
+        )
+        .reply(200, { success: true });
+
+      await new ConsoleApiClient(baseUrl).update(
+        groups,
+        'staff',
+        {
+          description: 'All staff',
+          member: [
+            'uid=alice,ou=users,dc=example,dc=com',
+            'uid=carol,ou=users,dc=example,dc=com',
+          ],
+        },
+        [],
+        staff
+      );
+
+      expect(modified).to.deep.equal({ replace: { description: 'All staff' } });
+      expect(joined).to.deep.equal({
+        member: ['uid=carol,ou=users,dc=example,dc=com'],
+      });
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it('should empty a membership through the endpoint that takes it', async () => {
+      // Clearing the field is `delete: ['member']`, refused just the same.
+      // Nothing else was edited, so there is no modify request left to make:
+      // an interceptor is declared for the two departures only, and a PUT
+      // here would fail the test.
+      const scope = nock(baseUrl)
+        .delete(
+          '/api/v1/ldap/groups/staff/members/' +
+            encodeURIComponent('uid=alice,ou=users,dc=example,dc=com')
+        )
+        .reply(200, { success: true })
+        .delete(
+          '/api/v1/ldap/groups/staff/members/' +
+            encodeURIComponent('uid=bob,ou=users,dc=example,dc=com')
+        )
+        .reply(200, { success: true });
+
+      await new ConsoleApiClient(baseUrl).update(
+        groups,
+        'staff',
+        {},
+        ['member'],
+        staff
+      );
+      expect(scope.isDone()).to.be.true;
+    });
+
+    it('should leave an entity that is not a group alone', async () => {
+      // The dedicated endpoints are the group plugin's; an attribute named
+      // `member` on a flat entity is an attribute like any other.
+      let body: unknown;
+      nock(baseUrl)
+        .put('/api/v1/ldap/users/jsmith', received => {
+          body = received;
+          return true;
+        })
+        .reply(200, { success: true });
+      await new ConsoleApiClient(baseUrl).update(users, 'jsmith', {
+        mailAlternateAddress: ['j@example.com'],
+      });
+      expect(body).to.deep.equal({
+        replace: { mailAlternateAddress: ['j@example.com'] },
+      });
+    });
+
+    it('should read the escaped RDN of an organization as its name', async () => {
+      // A DN escapes the comma inside a value: splitting on the first one cut
+      // `ou=Sales\, EU` down to `Sales\`.
+      const dn = 'ou=organization,dc=example,dc=com';
+      nock(baseUrl)
+        .get(`/api/v1/ldap/organizations/${encodeURIComponent(dn)}/subnodes`)
+        .query({ objectClass: 'organizationalUnit' })
+        .reply(200, [{ dn: `ou=Sales\\, EU,${dn}` }]);
+
+      const children = await new ConsoleApiClient(baseUrl).organizationChildren(
+        dn
+      );
+      expect(children.map(node => node.name)).to.deep.equal(['Sales, EU']);
+    });
+
+    it('should label a raw branch by the value of its RDN', async () => {
+      const branch = 'ou=positions,ou=nomenclature,dc=example,dc=com';
+      nock(baseUrl)
+        .get(`/api/v1/ldap/raw/children/${encodeURIComponent(branch)}`)
+        .reply(200, {
+          children: [
+            {
+              dn: `cn=Smith\\, John,${branch}`,
+              rdn: 'cn=Smith\\, John',
+            },
+          ],
+        });
+
+      const options = await new ConsoleApiClient(baseUrl).pointerOptions(
+        branch,
+        []
+      );
+      expect(options.map(option => option.label)).to.deep.equal([
+        'Smith, John',
+      ]);
+    });
+
+    it('should give a failure its status whatever the body it came with', async () => {
+      // Not every answer comes from the API: Express's own 404 page and a
+      // proxy's 502 are HTML, and reading the body as JSON first threw a
+      // `SyntaxError` carrying no status at all. `scope()` then read a server
+      // without `auth/authzScope` as a refusal and hid every write button.
+      nock(baseUrl)
+        .get('/api/v1/authz/scope')
+        .reply(404, '<!DOCTYPE html><title>Error</title>', {
+          'Content-Type': 'text/html',
+        });
+      expect(await new ConsoleApiClient(baseUrl).scope()).to.equal(null);
+
+      nock(baseUrl)
+        .get('/api/v1/ldap/users')
+        .reply(502, '<html><body>Bad gateway</body></html>', {
+          'Content-Type': 'text/html',
+        });
+      try {
+        await new ConsoleApiClient(baseUrl).list(users);
+        expect.fail('the failure should have been raised');
+      } catch (err) {
+        expect((err as Error & { status: number }).status).to.equal(502);
+        expect((err as Error).message).to.contain('502');
+      }
+    });
+
+    it('should tell an absent organization tree from one it could not read', async () => {
+      // A 404 is a server with no top organization: there is no tree to draw.
+      nock(baseUrl)
+        .get('/api/v1/ldap/organizations/top')
+        .reply(404, { error: 'Not found' });
+      expect(await new ConsoleApiClient(baseUrl).organizationTop()).to.equal(
+        null
+      );
+
+      // Anything else is a failure, and reading it as "no tree" left the tree
+      // on its loading message and every department select empty.
+      nock(baseUrl)
+        .get('/api/v1/ldap/organizations/top')
+        .reply(403, { error: 'Out of your scope' });
+      try {
+        await new ConsoleApiClient(baseUrl).organizationTop();
+        expect.fail('the refusal should have been raised');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Out of your scope');
+        expect((err as Error & { status: number }).status).to.equal(403);
+      }
+    });
+
     it('should tell a scope the server does not serve from one it refused', async () => {
       // No `auth/authzScope` is a 404 and means the server restricts nothing.
       nock(baseUrl)
@@ -464,6 +713,19 @@ describe('Directory console', () => {
       expect(EntityList.shortenPath('A / B / C / D')).to.equal('A / … / D');
       expect(EntityList.shortenPath('A / B')).to.equal('A &#x2F; B');
       expect(EntityList.shortenPath('A')).to.equal('A');
+    });
+
+    it('should not cut a path up with a scanner that squares its length', () => {
+      // `path.split(/\s*\/\s*/)` walks back over the run of blanks before
+      // every position it tries, so a path holding one long run costs the
+      // square of its length — and a path is whatever the directory holds.
+      // The shortened form is the same either way; the time it takes is not:
+      // this input took over seven seconds before, and no measurable time
+      // now.
+      const path = `A / B${' '.repeat(100000)}x / C`;
+      const started = Date.now();
+      expect(EntityList.shortenPath(path)).to.equal('A / … / C');
+      expect(Date.now() - started).to.be.below(1000);
     });
 
     it('should escape a path it shortens', () => {
