@@ -95,6 +95,26 @@ describe('Twake schemas', () => {
     });
   });
 
+  describe('delivery mode', () => {
+    it('should be a server-owned array with a default, not left empty', () => {
+      const attr = users.attributes.twakeDeliveryMode;
+      // Multivalued and not settable by the client, per the business rules
+      // (`deliveryMode` is documented as forbidden as input) — but `required`
+      // and `generated` together, like `twakeAccountStatus`, mean a plugin
+      // has to fill it, so a created account is never left without one.
+      expect(attr.type).to.equal('array');
+      expect(attr.items?.type).to.equal('pointer');
+      expect(attr.required).to.be.true;
+      expect(attr.generated).to.be.true;
+      expect(attr.default).to.be.an('array').that.is.not.empty;
+      for (const value of attr.default as string[]) {
+        expect(value).to.match(
+          /,ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__$/
+        );
+      }
+    });
+  });
+
   describe('organization names', () => {
     it('should accept the names real directories carry', () => {
       const pattern = new RegExp(organizations.attributes.ou.test as string);
