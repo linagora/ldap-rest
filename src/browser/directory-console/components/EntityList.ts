@@ -16,7 +16,7 @@
 import { escapeHtml } from '../../shared/utils/dom';
 import type { Translator } from '../i18n';
 import { hasRole } from '../api/ConsoleApiClient';
-import { attributeLabel, displayValue } from '../format';
+import { attributeLabel, displayValue, entryValue } from '../format';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
 /** Characters required before a search is issued. */
@@ -428,9 +428,10 @@ export class EntityList {
         ${this.columns
           .map(name => {
             const attr = entity.schema.attributes[name];
-            const raw = text(entry[name]);
+            const value = entryValue(entry, name);
+            const raw = text(value);
             const shown = text(
-              (Array.isArray(entry[name]) ? entry[name] : [entry[name]])
+              (Array.isArray(value) ? value : [value])
                 .filter((v): v is string => v !== undefined)
                 .map(v => displayValue(attr, String(v)))
             );
@@ -596,7 +597,9 @@ export class EntityList {
     const header = this.columns.join(',');
     const body = rows
       .map(([, entry]) =>
-        this.columns.map(name => csvCell(text(entry[name]))).join(',')
+        this.columns
+          .map(name => csvCell(text(entryValue(entry, name))))
+          .join(',')
       )
       .join('\n');
     const blob = new Blob([`${header}\n${body}\n`], {

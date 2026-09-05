@@ -10,7 +10,7 @@
  */
 
 import { escapeHtml } from '../../shared/utils/dom';
-import { attributeLabel, displayValue } from '../format';
+import { attributeLabel, displayValue, entryValue } from '../format';
 import type { Translator } from '../i18n';
 import type { EntityDescriptor, Entry, SchemaAttribute } from '../types';
 
@@ -54,7 +54,7 @@ export class EntityDetail {
    */
   render(container: HTMLElement): void {
     const { entity, entry, translator, canWrite, canDelete } = this.options;
-    const title = values(entry[entity.mainAttribute])[0] || '';
+    const title = values(entryValue(entry, entity.mainAttribute))[0] || '';
 
     container.innerHTML = `
       <article class="dc-detail">
@@ -107,7 +107,7 @@ export class EntityDetail {
       if (attr.neverReturn) continue;
       // The related-entries section below shows this one in full.
       if (name === this.options.relations?.attribute) continue;
-      const list = values(entry[name]);
+      const list = values(entryValue(entry, name));
       rows.push(`
         <div class="dc-attribute">
           <dt>${escapeHtml(this.label(name, attr))}</dt>
@@ -144,7 +144,7 @@ export class EntityDetail {
     const { entity, entry } = this.options;
     const link =
       name === entity.organizationPath && entity.organizationLink
-        ? values(entry[entity.organizationLink])[0]
+        ? values(entryValue(entry, entity.organizationLink))[0]
         : undefined;
     if (link)
       return `<a href="#/organizations/${encodeURIComponent(
