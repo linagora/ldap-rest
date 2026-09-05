@@ -143,6 +143,50 @@ export function escapeLdapFilter(value: string): string {
 }
 
 /**
+ * Build the LDAP filter of a list search: a substring match on one attribute,
+ * or on any of several.
+ *
+ * The value is escaped, so nothing a client types can reach the filter as
+ * syntax; the attribute names cannot be escaped — they *are* syntax — so they
+ * are checked against what an LDAP attribute name may contain and refused
+ * otherwise.
+ *
+ * Every list route builds the same filter, and a client asking for a mail
+ * address expects the same answer whichever entity it is asking about.
+ *
+ * @param match - The substring to look for
+ * @param attribute - One attribute name, or several separated by commas
+ * @returns The LDAP filter
+ * @throws BadRequestError when an attribute name is not one
+ *
+ * @example
+ * ```typescript
+ * substringSearchFilter('ali', 'cn,mail')
+ * // => '(|(cn=*ali*)(mail=*ali*))'
+ * ```
+ */
+export function substringSearchFilter(
+  match: string,
+  attribute: string
+): string {
+  // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
+  const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
+  // One name, or several separated by commas. Looking for a person by
+  // surname meant knowing to switch a selector to the attribute that holds it
+  // first, which is knowledge about the schema asked of someone searching
+  // precisely because they do not have it.
+  const names = attribute
+    .split(',')
+    .map(name => name.trim())
+    .filter(Boolean);
+  if (names.length === 0 || !names.every(name => attributePattern.test(name)))
+    throw new BadRequestError('Invalid LDAP attribute name');
+  const escapedMatch = escapeLdapFilter(match);
+  const clauses = names.map(name => `(${name}=*${escapedMatch}*)`);
+  return clauses.length === 1 ? clauses[0] : `(|${clauses.join('')})`;
+}
+
+/**
  * Escape special characters in LDAP DN attribute values according to RFC 4514
  * Prevents LDAP injection attacks by escaping characters that have special meaning in DNs
  *
@@ -372,6 +416,26 @@ export function getParentDn(dn: string): string {
 export function getRdn(dn: string): string {
   const parts = parseDn(dn);
   return parts[0] || '';
+}
+
+/**
+ * Extract the *value* of the first RDN of a DN, with its escapes removed
+ *
+ * Where {@link getRdn} returns `ou=Test Org`, this returns `Test Org`: the
+ * name the entry is known by, which is what a path or a label is built from.
+ *
+ * @param dn - The DN to read
+ * @returns The value, or an empty string when the DN has no RDN
+ *
+ * @example
+ * ```typescript
+ * rdnValue('ou=Test\\, Org,ou=organization,dc=example,dc=com')
+ * // => 'Test, Org'
+ * ```
+ */
+export function rdnValue(dn: string): string {
+  const match = /^[^=]+=((?:\\.|[^,])*)/.exec(dn);
+  return match ? match[1].replace(/\\(.)/g, '$1') : '';
 }
 
 /**

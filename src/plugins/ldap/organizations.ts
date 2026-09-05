@@ -24,7 +24,10 @@ import {
   getParentDn,
   getRdn,
   isChildOf,
+  isDnInBranch,
   launchHooksChained,
+  normalizeDn,
+  rdnValue,
   transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
@@ -34,7 +37,10 @@ import {
   ConflictError,
 } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
-import { assertClientMaySet } from '../../config/schema';
+import {
+  assertClientMaySet,
+  missingRequiredAttribute,
+} from '../../config/schema';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -588,7 +594,7 @@ export default class LdapOrganizations extends DmPlugin {
         await this.checkDeptLink(entry);
       }
       // Only check path for organizations, not for users/groups
-      if (this.isOu(entry)) await this.checkDeptPath(entry);
+      if (this.isOu(entry)) await this.checkDeptPath(entry, dn);
       return req !== undefined
         ? [dn, entry, req]
         : ([dn, entry] as [string, AttributesList, Request?]);
@@ -670,7 +676,7 @@ export default class LdapOrganizations extends DmPlugin {
       if (Object.keys(fakeEntryP).length > 0) {
         const isOu = await checkIsOu();
         if (isOu) {
-          await this.checkDeptPath(fakeEntryP);
+          await this.checkDeptPath(fakeEntryP, dn);
         }
       }
       return [dn, changes, op, req];
@@ -720,27 +726,76 @@ export default class LdapOrganizations extends DmPlugin {
 
   /**
    * Check if the department path is valid
+   *
    * @param entry LDAP entry to check
+   * @param dn DN the entry is written at, when the caller knows it. It is
+   *   what says whether the entry is an organization and where it hangs
+   *   from; a modify carries the changed attributes alone, neither `ou` nor
+   *   `objectClass`, so without it the invariants below cannot be checked.
    */
-  async checkDeptPath(entry: AttributesList): Promise<void> {
+  async checkDeptPath(entry: AttributesList, dn?: string): Promise<void> {
     if (entry[this.pathAttr]) {
       const pathValue = entry[this.pathAttr];
       const path = (
         Array.isArray(pathValue) ? pathValue[0] : pathValue
       ) as string;
       const sep = this.config.ldap_organization_path_separator || ' / ';
+      const topOrg = (this.config.ldap_top_organization as string) || '';
+
+      // An organization, told from its DN: an `ou=` entry inside the top
+      // organization branch. The payload says so too on a creation, and says
+      // nothing at all on a modify.
+      const nameFromDn =
+        dn && topOrg && /^ou=/i.test(getRdn(dn)) && isDnInBranch(dn, topOrg)
+          ? rdnValue(dn)
+          : undefined;
+      const ouValue = entry.ou;
+      const ouName =
+        ((Array.isArray(ouValue) ? ouValue[0] : ouValue) as
+          | string
+          | undefined) || nameFromDn;
 
       let matchingPath = path;
-      if (this.isOu(entry)) {
-        const ouValue = entry.ou;
-        const ouName = (
-          Array.isArray(ouValue) ? ouValue[0] : ouValue
-        ) as string;
-        // A path reads from the root down: `Root / Branch / Leaf`, the entry's
-        // own name last. This asked for the reverse, so it refused every path
-        // the directories it serves actually hold — and refused a top-level
-        // organization outright, whose path is its own name and nothing else.
-        if (path === ouName) return;
+      if ((this.isOu(entry) || nameFromDn !== undefined) && ouName) {
+        // Directories written before the order was settled hold the reverse
+        // path, the entry's own name first and the top organization's own
+        // name last (`TestOrg / organization`). The server never computes
+        // that any more, but it is what those directories contain, and
+        // refusing it would make every organization of theirs unwritable on
+        // an upgrade. The stored form is taken as it stands; only what the
+        // server computes has to follow the new convention.
+        const topName = topOrg ? rdnValue(topOrg) : '';
+        if (
+          topName &&
+          path.startsWith(ouName + sep) &&
+          path.endsWith(sep + topName)
+        )
+          return;
+
+        // A path reads from the root down: `Root / Branch / Leaf`, the
+        // entry's own name last. This asked for the reverse, so it refused
+        // every path the directories it serves actually hold.
+        if (path === ouName) {
+          // A path that is only the entry's own name says it hangs straight
+          // from the top organization. That is not the payload's word to
+          // give: an organization anywhere lower would keep a path naming
+          // none of its parents, against the very invariant this checks. The
+          // DN settles it, when the caller passed one — and it settles
+          // nothing for an `ou=` entry outside the organization tree, whose
+          // path names no place in a hierarchy this check can read.
+          const top = topOrg ? normalizeDn(topOrg) : '';
+          if (
+            !dn ||
+            !top ||
+            !isDnInBranch(dn, topOrg) ||
+            normalizeDn(dn) === top ||
+            normalizeDn(getParentDn(dn)) === top
+          )
+            return;
+          throw new BadRequestError(
+            `Organization path "${path}" names no parent, but ${dn} is not directly under ${topOrg}`
+          );
+        }
         if (!path.endsWith(sep + ouName))
           throw new BadRequestError(
             `Organization path must end with its own name, preceded by separator "${sep}"`
@@ -958,13 +1013,18 @@ export default class LdapOrganizations extends DmPlugin {
       }
     }
 
-    // Check required fields. A `generated` attribute is exempt: it is filled
+    // Check required fields. A `generated` attribute is exempt — it is filled
     // by a hook after validation, so demanding it here would refuse the very
-    // payload the hook expects — the client sending nothing.
-    for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && !test.generated && entry[field] == undefined)
-        throw new BadRequestError(`Missing required field ${field}`);
-    }
+    // payload the hook expects — but only when a loaded plugin says it will
+    // fill it. Exempting it unconditionally wrote an organization missing the
+    // path its own schema calls required, which no client could ever repair:
+    // a generated attribute is refused as input. Same check as the flat path.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
     return true;
   }
 
