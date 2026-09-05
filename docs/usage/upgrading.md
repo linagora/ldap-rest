@@ -6,12 +6,22 @@ decision or a configuration change appear here; see the
 
 ## To 0.8.0
 
-### Node 22 is the floor
+### Node 20 is the floor
 
-**Who is affected:** anyone installing on Node 20 or older.
+**Who is affected:** anyone installing on Node 18 or older.
 
-`engines` declares `>=22`, and the CI runs the suite on 22, 24 and 26. Older
-runtimes are not tested and not supported.
+`engines` declares `>=20` — the version Debian 13 ships — and the CI runs the
+suite on 20, 22, 24 and 26. Older runtimes are neither tested nor supported.
+
+Supporting 20 costs one pin: `re2` is held at exactly `1.24.0`. From `1.24.1`
+it declares `engines: >=22`, and npm answers an unsatisfied engine on an
+_optional_ dependency by silently leaving it out — taking
+`lemonldap-ng-handler`, which depends on it, along. The install then succeeds
+with 39 packages missing, and the first sign of it is a type error in
+`src/plugins/auth/llng.ts`.
+
+**If you upgrade `re2` yourself, upgrade Node with it.** The pin is what keeps
+`core/auth/llng` available on 20; nothing else in this codebase imports `re2`.
 
 ### The Twake schemas now need `core/ldap/enterpriseRules`
 
