@@ -436,7 +436,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
         // dangling DN on every single entry — while the identical value, had
         // the client sent it, would have been refused. The deployment is what
         // is wrong here, so say which schema value has no target.
-        if (attr.type === 'pointer') {
+        if (attr.type === 'pointer' || attr.items?.type === 'pointer') {
           for (const target of valueList(values[name])) {
             if (!(await this.readEntry(target)))
               throw new BadRequestError(
