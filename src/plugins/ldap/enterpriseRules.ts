@@ -70,6 +70,33 @@ function rdnValue(dn: string): string {
   return match ? match[1].replace(/\\(.)/g, '$1') : '';
 }
 
+/**
+ * Branches a uniqueness search has to cover: the entity's own base, plus the
+ * extra branches the schema declares.
+ *
+ * A branch another one already contains is dropped: the searches are subtree
+ * scoped, so a nested branch would only be walked twice for the same answer —
+ * which is what every shipped schema does, declaring the whole base next to an
+ * entity living in one of its branches.
+ *
+ * @param own base of the entity being written
+ * @param extra branches the constraint declares besides it
+ * @returns the branches to search, the widest ones kept
+ */
+function uniquenessBases(own: string, extra?: string[]): string[] {
+  const contains = (branch: string, dn: string): boolean =>
+    dn === branch || dn.endsWith(`,${branch}`);
+  const kept: string[] = [];
+  for (const candidate of [own, ...(extra || [])]) {
+    const low = candidate.toLowerCase();
+    if (kept.some(k => contains(k.toLowerCase(), low))) continue;
+    for (let i = kept.length - 1; i >= 0; i--)
+      if (contains(low, kept[i].toLowerCase())) kept.splice(i, 1);
+    kept.push(candidate);
+  }
+  return kept;
+}
+
 /** Byte multipliers, decimal as directories and mail servers count them. */
 const SIZE_UNITS: Record<string, number> = {
   B: 1,
@@ -120,6 +147,22 @@ export function parseDirectoryDate(raw: AttributeValue): Date | null {
   }
   const parsed = new Date(text);
   return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Start of a day, in UTC.
+ *
+ * A directory stores generalized times in UTC, and a console that lets someone
+ * pick a day stores it as `yyyyMMdd000000Z`. Comparing that against the
+ * server's *local* midnight refused a date picked today on every server west
+ * of UTC, where local midnight comes hours after midnight UTC: the deployment's
+ * timezone decided whether the form worked. Both sides are in UTC now.
+ *
+ * @param now instant to take the day from, the current one by default
+ * @returns midnight UTC of that day, in milliseconds
+ */
+export function startOfUtcDay(now: Date = new Date()): number {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
 /**
@@ -456,7 +499,21 @@ export default class LdapEnterpriseRules extends DmPlugin {
       valueList(values[roleAttribute(entity.schema, 'identifier') || ''])[0] ||
       rdnValue(dn);
     if (!name) return;
-    const parentPath = await this.organizationPath(getParentDn(dn));
+    // The path stops below the top organization, the way `organizationDomains`
+    // stops its walk there: a directory migrated from the old convention keeps
+    // a path on the top organization itself, and reading it as the parent's
+    // gave every organization created since a path starting with a name no
+    // organization path is supposed to hold.
+    const parent = getParentDn(dn);
+    const stop = (
+      this.topOrganization ||
+      this.config.ldap_base ||
+      ''
+    ).toLowerCase();
+    const parentPath =
+      !stop || parent.toLowerCase().endsWith(`,${stop}`)
+        ? await this.organizationPath(parent)
+        : undefined;
     const separator = this.config.ldap_organization_path_separator || ' / ';
     values[pathAttr] = parentPath ? `${parentPath}${separator}${name}` : name;
   }
@@ -485,9 +542,12 @@ export default class LdapEnterpriseRules extends DmPlugin {
     const constraint: UniqueConstraint =
       typeof attr.unique === 'object' ? attr.unique : {};
     const attributes = [name, ...(constraint.attributes || [])];
-    const bases = constraint.branches?.length
-      ? constraint.branches
-      : [entity.base];
+    // `branches` widens the search, it does not move it: it used to *replace*
+    // the entity's own base, so a schema naming only a neighbouring branch —
+    // the lists a mail address is also shared with, say — stopped enforcing
+    // uniqueness where its own entries live, and two users could hold the
+    // same address. The shipped schemas hid it by naming the whole base.
+    const bases = uniquenessBases(entity.base, constraint.branches);
 
     for (const value of values) {
       if (constraint.sentinel !== undefined && value === constraint.sentinel)
@@ -635,9 +695,10 @@ export default class LdapEnterpriseRules extends DmPlugin {
 
   /**
    * Refuse a lifecycle date that has already passed. The comparison is against
-   * the start of the current day, so scheduling something for today is
-   * allowed — which is what "not earlier than today" means to the person
-   * filling the form.
+   * the start of the current day *in UTC*, the timezone the values themselves
+   * are written in, so scheduling something for today is allowed — which is
+   * what "not earlier than today" means to the person filling the form,
+   * wherever the server happens to stand.
    *
    * @param name attribute being checked
    * @param attr its schema definition
@@ -649,8 +710,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     attr: SchemaAttribute,
     values: string[]
   ): void {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday = startOfUtcDay();
     for (const value of values) {
       const date = parseDirectoryDate(value);
       if (!date) {
@@ -658,7 +718,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
           `Invalid value for attribute "${name}"${attr.hint ? `: ${attr.hint}` : ''}`
         );
       }
-      if (date.getTime() < startOfToday.getTime()) {
+      if (date.getTime() < startOfToday) {
         throw new BadRequestError(
           `Attribute "${name}" must not be earlier than today`
         );
