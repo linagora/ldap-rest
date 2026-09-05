@@ -33,10 +33,17 @@ jobs:
 
       # Nothing ran ESLint here, which is how fourteen errors accumulated
       # unnoticed. Warnings stay warnings: only errors fail the build.
+      #
+      # Neither of these reads the runtime, so one version answers for all
+      # of them: running them across the matrix repeats the same work and,
+      # worse, reports a dependency that did not install on an old Node as a
+      # lint error about unresolved types.
       - name: Lint
+        if: matrix.node-version == '24.x'
         run: npm run lint
 
       - name: Check formatting
+        if: matrix.node-version == '24.x'
         run: npm run format:check
 
       # Runs the suite once and gates on coverage at the same time, rather
