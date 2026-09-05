@@ -191,6 +191,31 @@ describe('Account lifecycle', () => {
         expect(res.body).to.not.have.property('password');
       });
 
+      it('should refuse an empty password rather than generate one', async () => {
+        // An empty string is falsy, so it used to read as "no password
+        // given": the answer said `success` after setting a random
+        // credential, and the caller — who had sent an empty field by
+        // accident — believed it had set the password it typed.
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/password')
+          .type('json')
+          .send({ password: '' });
+        expect(res.status, JSON.stringify(res.body)).to.equal(400);
+        expect(JSON.stringify(res.body)).to.contain('non-empty string');
+      });
+
+      it('should refuse a password that is not text', async () => {
+        // `null` and a number are values the client meant to send, not an
+        // absence, so neither asks for a generated password either.
+        for (const password of [null, 42]) {
+          const res = await request
+            .post('/api/v1/ldap/users/lifecycle.user/password')
+            .type('json')
+            .send({ password });
+          expect(res.status, JSON.stringify(res.body)).to.equal(400);
+        }
+      });
+
       it('should flag the account for a change at next login', async () => {
         await request
           .post('/api/v1/ldap/users/lifecycle.user/password')

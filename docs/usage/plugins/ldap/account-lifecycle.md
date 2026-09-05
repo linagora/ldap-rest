@@ -85,6 +85,20 @@ credential attributes are marked `neverReturn` in the schema precisely so a
 later read cannot hand it back. Supply `password` to set a chosen one; the
 answer then carries `"generated": false` and does not echo it.
 
+A `password` that is present has to be a non-empty string. An empty one — or
+`null`, or anything that is not text — is refused with a `400`:
+
+```json
+{
+  "error": "Field password must be a non-empty string; omit it to have one generated"
+}
+```
+
+It used to be taken as an absent one, so `{"password": ""}` answered
+`success` after setting a random credential the caller never saw: a client
+that emptied the field by accident believed it had set the password it typed.
+Omitting the field is how a generated password is asked for.
+
 `forceChange` (true by default) also writes the `passwordReset`-role attribute
 so the directory asks for a new password at next login. For a boolean
 attribute the values written are `TRUE` and `FALSE`; a directory that spells
@@ -102,10 +116,11 @@ them otherwise says so through `states.required` and `states.cleared`.
 
 ## Errors
 
-| Status | When                                     |
-| ------ | ---------------------------------------- |
-| `400`  | Unknown state, or a body with no `state` |
-| `404`  | No such account                          |
+| Status | When                                                           |
+| ------ | -------------------------------------------------------------- |
+| `400`  | Unknown state, or a body with no `state`                       |
+| `400`  | A `password` that is present but empty, `null` or not a string |
+| `404`  | No such account                                                |
 
 ## See also
 
