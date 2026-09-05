@@ -17,7 +17,7 @@ import type {
   Scope,
   SchemaAttribute,
 } from '../types';
-import { rdnValue } from '../format';
+import { entryValue, rdnValue } from '../format';
 
 interface FlatResource {
   name: string;
@@ -418,7 +418,7 @@ export class ConsoleApiClient {
         entity,
         id,
         members,
-        toValues(previous?.[membership])
+        toValues(entryValue(previous, membership))
       );
   }
 
@@ -765,7 +765,7 @@ export class ConsoleApiClient {
   private toNode(entry: Entry): OrganizationNode {
     const dn = String(entry.dn || '');
     const value = (name: string): string | undefined => {
-      const raw = entry[name];
+      const raw = entryValue(entry, name);
       return Array.isArray(raw) ? raw[0] : raw;
     };
     return {
