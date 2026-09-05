@@ -11,11 +11,11 @@ migration will refuse before it does.
 - `static/schemas/twake`: the shipped schemas describe an enterprise directory
   rather than a bare CRUD surface. `uid` is **generated** from the local part
   of `mail`, `twakeDepartmentPath` and `twakeAccountStatus` are computed,
-  `twakeDeliveryMode` is a read-only array, and `twakeDepartmentLink` is a
-  `pointer` whose target must exist. Posting any of them gets a `400` naming
-  the attribute — on the flat routes, and now on `PUT /ldap/organizations` and
-  `PUT /ldap/groups` too. Each is a schema marker: copy the schema and drop
-  them to keep the old behaviour
+  `twakeDeliveryMode` is an array the server fills with `cn=normal`, and
+  `twakeDepartmentLink` is a `pointer` whose target must exist. Posting any of
+  them gets a `400` naming the attribute — on the flat routes, and now on
+  `PUT /ldap/organizations` and `PUT /ldap/groups` too. Each is a schema
+  marker: copy the schema and drop them to keep the old behaviour
 
 - `static/schemas/twake/users.json` requires what the interface it replaces
   required: `employeeNumber`, `displayName` and `givenName`, none of which it
@@ -27,8 +27,10 @@ migration will refuse before it does.
 
 - An attribute both `required` and `generated` needs a plugin that fills it,
   so the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
-  than writing an entry missing two required attributes. A `pointer` default
-  is checked the same way, instead of a dangling DN on every entry
+  than writing an entry missing two required attributes — on the flat routes,
+  on `POST /ldap/organizations` and on `POST /ldap/groups` alike. A `pointer`
+  default is checked the same way, one value or a list of them, instead of a
+  dangling DN on every entry
 
 - An array's `items.test` and `items.branch` are enforced on the flat routes,
   where they never were: `mailAlternateAddress` has carried a pattern since
@@ -38,7 +40,11 @@ migration will refuse before it does.
 
 - `twakeDepartmentPath` reads from the root down, the entry's own name last.
   The check demanded the reverse and refused every top-level organization
-  anyway, so little can depend on it
+  anyway. What a directory of the old convention already holds is still
+  accepted as it stands — its own name first, the top organization's last —
+  so an upgrade leaves those organizations writable; only what the server
+  computes follows the new order. A path naming no parent is read as the mark
+  of a top-level organization, and the DN says whether it is one
 
 - `--ldap-flat-schema` twice with the same `entity.name` or `entity.pluralName`
   refuses the second and says which schema holds it. Both used to load, sharing
@@ -78,7 +84,8 @@ migration will refuse before it does.
   box needs no field picker beside it. Which attributes are worth searching is
   a new schema marker, `searchable` — a substring filter on an unindexed
   attribute scans the branch, and what is indexed is the deployment's business.
-  The console searches them all by default
+  The console searches them all by default, and `GET /ldap/groups` answers on
+  the same terms rather than on its RDN attribute alone
 
 - `npm run audit:directory` reads a branch and reports what a schema would
   refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
