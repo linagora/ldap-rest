@@ -6,12 +6,29 @@ decision or a configuration change appear here; see the
 
 ## To 0.8.0
 
-### Node 22 is the floor
+### Node 20 is the floor
 
-**Who is affected:** anyone installing on Node 20 or older.
+**Who is affected:** anyone installing on Node 18 or older.
 
-`engines` declares `>=22`, and the CI runs the suite on 22, 24 and 26. Older
-runtimes are not tested and not supported.
+`engines` declares `>=20` — the version Debian 13 ships — and the CI runs the
+suite on 20, 22, 24 and 26. Older runtimes are neither tested nor supported.
+
+**`core/auth/llng` is the one plugin that does not follow.** It needs
+`lemonldap-ng-handler`, which depends on the native `re2`, and no single `re2`
+release installs on every supported Node: up to `1.24.0` it builds on 20 but
+not on 26, and from `1.24.1` it declares `engines: >=22`. npm answers an
+unsatisfied dependency of this kind by leaving an _optional_ package out
+without a word, so on some runtimes the handler is simply absent.
+
+Everything else builds, tests and runs there regardless. A server that
+configures `core/auth/llng` on a runtime where the handler could not be
+installed now fails at startup, naming the plugin and the missing package,
+rather than accepting requests an authentication plugin cannot check. Check
+after upgrading that the runtime you deploy on carries it:
+
+```bash
+node -e "require('lemonldap-ng-handler'); console.log('present')"
+```
 
 ### The Twake schemas now need `core/ldap/enterpriseRules`
 

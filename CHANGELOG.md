@@ -10,8 +10,8 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
 ### Breaking Changes
 
-- Node 22 is the floor, declared in `engines` and stood behind by a CI that
-  runs the suite on 22, 24 and 26
+- Node 20 is the floor — the version Debian 13 ships — declared in `engines`
+  and stood behind by a CI that runs the suite on 20, 22, 24 and 26
 
 - `static/schemas/twake`: the shipped schemas describe an enterprise directory
   rather than a bare CRUD surface. `uid` is **generated** from the local part
