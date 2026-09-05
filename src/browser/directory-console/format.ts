@@ -12,7 +12,7 @@
 
 import { toTitleCase } from '../shared/utils/dom';
 
-import type { LocalizedText, SchemaAttribute } from './types';
+import type { Entry, LocalizedText, SchemaAttribute } from './types';
 
 /**
  * Pick the text for a language.
@@ -65,6 +65,54 @@ export function attributeLabel(
 export function rdnValue(dn: string): string {
   const match = /^[^=]+=((?:\\.|[^,])*)/.exec(dn);
   return match ? match[1].replace(/\\(.)/g, '$1') : dn;
+}
+
+/**
+ * Case-insensitive index of an entry's own keys, so a schema attribute is
+ * found however the directory spelled it.
+ *
+ * LDAP attribute names are case-insensitive (RFC 4512) and a directory
+ * answers with whatever case it holds them in, which does not always match
+ * the schema's — `scripts/audit-directory.ts` hit the same mismatch and
+ * lowercases its keys for the same reason. Built the first time an entry
+ * needs it and cached on the entry itself with a `WeakMap`, so a table
+ * showing many entries, each read for many columns, pays the scan once per
+ * entry rather than once per cell.
+ */
+const caseIndexes = new WeakMap<Entry, Map<string, string>>();
+
+function caseIndex(entry: Entry): Map<string, string> {
+  let index = caseIndexes.get(entry);
+  if (!index) {
+    index = new Map();
+    for (const key of Object.keys(entry)) index.set(key.toLowerCase(), key);
+    caseIndexes.set(entry, index);
+  }
+  return index;
+}
+
+/**
+ * Read an entry's attribute by the schema's own name, falling back to
+ * whatever case the directory actually answered with.
+ *
+ * Every place the console reads an entry by a schema attribute name goes
+ * through here rather than indexing the entry directly, so a directory that
+ * answers `mailQuotaSize` where the schema says `mailquotasize` (or the
+ * reverse) still shows the value instead of an empty cell.
+ *
+ * @param entry entry as the API returned it, or undefined when there is none
+ * @param name attribute name, as the schema spells it
+ * @returns the value, under either spelling, or undefined when the entry
+ *   carries it under neither
+ */
+export function entryValue(
+  entry: Entry | undefined,
+  name: string
+): string | string[] | undefined {
+  if (!entry) return undefined;
+  if (name in entry) return entry[name];
+  const actual = caseIndex(entry).get(name.toLowerCase());
+  return actual === undefined ? undefined : entry[actual];
 }
 
 /**
