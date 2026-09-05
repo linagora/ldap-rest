@@ -33,6 +33,7 @@ import {
   escapeRegex,
   getCompiledRegex,
   getParentDn,
+  isDnInBranch,
   launchHooks,
   launchHooksChained,
   substringSearchFilter,
@@ -1401,15 +1402,14 @@ export default abstract class LdapFlat extends DmPlugin {
 
       const dnValue: string = value;
 
-      // Check branch restriction if provided
+      // Check branch restriction if provided. Asked RDN by RDN: a suffix
+      // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`
+      // as being inside `ou=users,dc=example,dc=com`, so a pointer could name
+      // an entry of a branch the schema never allowed.
       if (attr.branch && attr.branch.length > 0) {
-        const isInBranch = attr.branch.some(branch => {
-          const branchPattern = getCompiledRegex(
-            `,?${escapeRegex(branch)}$`,
-            'i'
-          );
-          return branchPattern.test(dnValue);
-        });
+        const isInBranch = attr.branch.some(branch =>
+          isDnInBranch(dnValue, branch)
+        );
         if (!isInBranch) {
           throw new BadRequestError(
             `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
@@ -1448,8 +1448,9 @@ export default abstract class LdapFlat extends DmPlugin {
     // too.
     if (attr.items?.branch?.length) {
       for (const dnValue of asList(value)) {
+        // Same rule as a pointer's own branch, and asked the same way.
         const isInBranch = attr.items.branch.some(branch =>
-          getCompiledRegex(`,?${escapeRegex(branch)}$`, 'i').test(dnValue)
+          isDnInBranch(dnValue, branch)
         );
         if (!isInBranch)
           throw new BadRequestError(
