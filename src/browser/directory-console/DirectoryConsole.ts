@@ -619,8 +619,14 @@ export class DirectoryConsole {
       onSelect: (node: OrganizationNode): void => {
         void this.showOrganization(node);
       },
+      // A "+" on a node asks a different question from the card on the
+      // overview: the card creates at the top of the tree, which is what the
+      // scope's `organizations.create` answers for, while the "+" creates
+      // under the node it sits on. A local administrator writes in their own
+      // branch and not at the root, and the tree they are shown *is* their
+      // branch, so the offer holds as soon as they may write somewhere.
       onCreateChild:
-        entity && this.canCreate(entity)
+        entity && this.canWrite()
           ? (node: OrganizationNode): void => {
               void this.openOrganizationForm(entity, undefined, node.dn);
             }
