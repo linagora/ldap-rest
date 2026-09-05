@@ -7,6 +7,7 @@ import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import type { DmRequest } from '../../../src/lib/auth/base';
 import {
   skipIfMissingEnvVars,
@@ -31,7 +32,11 @@ describe('Authorization scope endpoint', () => {
   const serve = async (
     user: string | undefined,
     withAuthz: boolean,
-    opts: { perRoute?: boolean; perBranch?: string } = {}
+    opts: {
+      perRoute?: boolean;
+      perBranch?: string;
+      organizations?: boolean;
+    } = {}
   ): Promise<ReturnType<typeof supertest>> => {
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
     if (opts.perRoute) process.env.DM_AUTHZ_PER_ROUTES = `${user ?? ''}:*`;
@@ -43,6 +48,11 @@ describe('Authorization scope endpoint', () => {
       next();
     });
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    if (opts.organizations)
+      await server.registerPlugin(
+        'ldapOrganizations',
+        new LdapOrganizations(server)
+      );
     // Registered first on purpose: authzPerRoute sits in priority.json, so a
     // server combining route-level and branch-level authorization always has
     // it in hand before the branch-level one.
@@ -163,6 +173,56 @@ describe('Authorization scope endpoint', () => {
       ),
       JSON.stringify(res.body.entities)
     ).to.be.true;
+  });
+
+  it('should not offer a new organization at a tree top it cannot write', async () => {
+    // A local administrator of one branch may write in it, but a new
+    // organization is created at the top of the tree unless the client names
+    // a parent — and that is not their branch. Answering `create: true` here
+    // drew a "new organization" button whose every submission came back 403.
+    const request = await serve('alice.admin', true, { organizations: true });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    const entities = res.body.entities as { name: string; create: boolean }[];
+    expect(
+      entities.find(e => e.name === 'organizations'),
+      JSON.stringify(entities)
+    ).to.have.property('create', false);
+    // What they administer, they may still fill: an ordinary entry is scoped
+    // by the organization it is attached to, and theirs is writable.
+    expect(entities.find(e => e.name === 'users')).to.have.property(
+      'create',
+      true
+    );
+  });
+
+  it('should offer a new organization to whoever administers the tree top', async () => {
+    const request = await serve('alice.admin', false, {
+      organizations: true,
+      perBranch: JSON.stringify({
+        default: { read: false, write: false, delete: false },
+        users: {
+          'alice.admin': {
+            [`ou=organization,${base}`]: {
+              read: true,
+              write: true,
+              delete: true,
+            },
+          },
+        },
+      }),
+    });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    const entities = res.body.entities as { name: string; create: boolean }[];
+    expect(
+      entities.find(e => e.name === 'organizations'),
+      JSON.stringify(entities)
+    ).to.have.property('create', true);
   });
 
   it('should refuse an anonymous caller', async () => {
