@@ -12,8 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      # Every version reports its own verdict: the point here is to see
+      # what Node 20 does, and fail-fast would cancel the others the moment
+      # it stumbled.
+      fail-fast: false
       matrix:
-        node-version: [22.x, 24.x, 26.x]
+        node-version: [20.x, 22.x, 24.x, 26.x]
 
     steps:
       - name: Checkout code
