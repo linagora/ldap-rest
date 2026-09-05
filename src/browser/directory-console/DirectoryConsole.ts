@@ -36,6 +36,29 @@ interface Route {
 
 const LANGUAGE_KEY = 'ldap-rest.console.language';
 
+/**
+ * What a failed read means for the reader.
+ *
+ * Only a `404` means what "no longer exists" says. A `401`, a `403` or a proxy
+ * error is a different thing entirely, and telling the operator the entry is
+ * gone sends them looking for the wrong problem — so every view that reads one
+ * entry reads its failures here.
+ *
+ * @param err failure raised by the API client
+ * @param translator interface language
+ * @returns the message to show, and whether the entry is simply gone
+ */
+export function readFailure(
+  err: unknown,
+  translator: Translator
+): { gone: boolean; message: string } {
+  const gone = (err as { status?: number }).status === 404;
+  return {
+    gone,
+    message: gone ? translator.t('detail.notFound') : (err as Error).message,
+  };
+}
+
 export class DirectoryConsole {
   private readonly options: ConsoleOptions;
   private readonly api: ConsoleApiClient;
@@ -504,14 +527,10 @@ export class DirectoryConsole {
       if (!this.current(generation)) return;
     } catch (err) {
       if (!this.current(generation)) return;
-      // Only a 404 means what "no longer exists" says. A 401, a 403 or a
-      // proxy error is a different thing entirely, and telling the operator
-      // the entry is gone sends them looking for the wrong problem.
-      const gone = (err as { status?: number }).status === 404;
-      const message = gone ? t('detail.notFound') : (err as Error).message;
+      const failure = readFailure(err, this.translator);
       main.innerHTML = `<p class="dc-empty${
-        gone ? '' : ' dc-error-block'
-      }">${escapeHtml(message)}</p>`;
+        failure.gone ? '' : ' dc-error-block'
+      }">${escapeHtml(failure.message)}</p>`;
       return;
     }
 
@@ -594,7 +613,9 @@ export class DirectoryConsole {
         dn.toLowerCase().endsWith(`,${entity.base.toLowerCase()}`)
     );
     if (!owner) return;
-    const id = dn.split(',')[0].replace(/^[^=]+=/, '');
+    // `rdnValue`, not a split on the first comma: `cn=Smith\, John,…` holds
+    // one, and the truncated id it produced answered "no longer exists".
+    const id = rdnValue(dn);
     this.go(`${owner.key}/${encodeURIComponent(id)}`);
   }
 
@@ -651,11 +672,12 @@ export class DirectoryConsole {
     try {
       entry = await this.api.organization(node.dn);
       if (!this.current(generation)) return;
-    } catch {
+    } catch (err) {
       if (!this.current(generation)) return;
-      holder.innerHTML = `<p class="dc-empty">${escapeHtml(
-        this.translator.t('detail.notFound')
-      )}</p>`;
+      const failure = readFailure(err, this.translator);
+      holder.innerHTML = `<p class="dc-empty${
+        failure.gone ? '' : ' dc-error-block'
+      }">${escapeHtml(failure.message)}</p>`;
       return;
     }
 
@@ -732,6 +754,13 @@ export class DirectoryConsole {
     entity: EntityDescriptor,
     entry?: Entry
   ): Promise<void> {
+    // Organizations are written through their own endpoints, whatever offered
+    // the form. The dashboard's "New organization" button came through here,
+    // and this path reads the new entry's id from the create response, which
+    // the organizations endpoint does not return: the organization was
+    // created and the console then navigated to no entry at all.
+    if (entity.kind === 'organization')
+      return this.openOrganizationForm(entity, entry);
     const t = (key: string, values?: Record<string, string | number>): string =>
       this.translator.t(key, values);
     const form = new EntityForm({
@@ -750,7 +779,8 @@ export class DirectoryConsole {
         try {
           if (entry) {
             const id = String(entry[entity.mainAttribute] ?? '');
-            await this.api.update(entity, id, values, cleared);
+            // The entry as stored: what a membership change is diffed against.
+            await this.api.update(entity, id, values, cleared, entry);
             this.toast(t('save.done'));
             this.closePanel();
             await this.renderMain();
