@@ -6,49 +6,48 @@ An enterprise directory manager: the rules a real deployment needs, a console
 built from the server's own configuration, and a script that says what a
 migration will refuse before it does.
 
+See [Upgrading](docs/usage/upgrading.md) before deploying this one.
+
 ### Breaking Changes
+
+- Node 22 is the floor, declared in `engines` and stood behind by a CI that
+  runs the suite on 22, 24 and 26
 
 - `static/schemas/twake`: the shipped schemas describe an enterprise directory
   rather than a bare CRUD surface. `uid` is **generated** from the local part
   of `mail`, `twakeDepartmentPath` and `twakeAccountStatus` are computed,
-  `twakeDeliveryMode` is an array the server fills with `cn=normal`, and
-  `twakeDepartmentLink` is a `pointer` whose target must exist. Posting any of
-  them gets a `400` naming the attribute — on the flat routes, and now on
-  `PUT /ldap/organizations` and `PUT /ldap/groups` too. Each is a schema
-  marker: copy the schema and drop them to keep the old behaviour
+  `twakeDeliveryMode` is filled with `cn=normal`, and `twakeDepartmentLink` is
+  a `pointer` whose target must exist. Posting any of them gets a `400` naming
+  the attribute — on the flat routes, on `PUT /ldap/organizations` and on
+  `PUT /ldap/groups`. Each is a schema marker: copy the schema and drop them
+  to keep the old behaviour
 
 - `static/schemas/twake/users.json` requires what the interface it replaces
-  required: `employeeNumber`, `displayName` and `givenName`, none of which it
-  asked for. `cn` stops being required, as it was there — 689 accounts of the
-  reference directory have none, and the schema demanded it of every creation.
-  The `displayName` role moves from `cn` to `displayName`: `cn` holds the name
-  surname-first (88% of that directory), `displayName` the readable order, and
-  a client shows the readable one
+  required: `employeeNumber`, `displayName` and `givenName`. `cn` stops being
+  required, as it was there — 689 accounts of the reference directory have
+  none. The `displayName` role moves from `cn` to `displayName`, `cn` holding
+  the name surname-first and `displayName` the readable order
 
-- An attribute both `required` and `generated` needs a plugin that fills it,
-  so the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
-  than writing an entry missing two required attributes — on the flat routes,
-  on `POST /ldap/organizations` and on `POST /ldap/groups` alike. A `pointer`
-  default is checked the same way, one value or a list of them, instead of a
-  dangling DN on every entry
+- An attribute both `required` and `generated` needs a plugin that fills it:
+  the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
+  than writing an entry missing an attribute no client could then supply. A
+  `pointer` default is checked against the directory the same way, one value
+  or a list of them, instead of a dangling DN on every entry
 
 - An array's `items.test` and `items.branch` are enforced on the flat routes,
-  where they never were: `mailAlternateAddress` has carried a pattern since
-  v0.7.0 and accepted anything, while the console's form refused the same
-  value and `groups` refused `items.test` server-side. Stored values are
-  untouched — `npm run audit:directory` lists what an update would now refuse
+  where they never were — `mailAlternateAddress` has carried a pattern since
+  v0.7.0 and accepted anything. Stored values are untouched:
+  `npm run audit:directory` lists what an update would now refuse
 
-- `twakeDepartmentPath` reads from the root down, the entry's own name last.
-  The check demanded the reverse and refused every top-level organization
-  anyway. What a directory of the old convention already holds is still
-  accepted as it stands — its own name first, the top organization's last —
-  so an upgrade leaves those organizations writable; only what the server
-  computes follows the new order. A path naming no parent is read as the mark
-  of a top-level organization, and the DN says whether it is one
+- `twakeDepartmentPath` reads from the root down, the entry's own name last;
+  the check demanded the reverse and refused every top-level organization
+  anyway. What a directory of the old convention holds is still accepted as it
+  stands, so an upgrade leaves those organizations writable
 
-- `--ldap-flat-schema` twice with the same `entity.name` or `entity.pluralName`
-  refuses the second and says which schema holds it. Both used to load, sharing
-  a hook prefix and a URL, and the second was unreachable
+- A flat schema claiming an `entity.name` or an `entity.pluralName` another
+  schema — or an LDAP plugin — already serves is refused and says who holds
+  it. Both used to load, sharing a hook prefix and a URL, and the loser was
+  advertised by the configuration API while being unreachable in fact
 
 ### Features
 
@@ -73,19 +72,16 @@ migration will refuse before it does.
   search, paging and bulk actions, an organization tree that stays on screen,
   forms explaining each pattern under its field, the lifecycle actions and the
   caller's own scope. Built from `GET /v1/config` and `GET /v1/authz/scope`
-  alone, so a deployment naming its things differently gets its own interface
-  — its own language included, since `label`, `entity.label` and
-  `entity.singularLabel` accept `{ "en": …, "fr": … }` while the console's
-  catalogue holds nothing but the interface words. See
+  alone, so a deployment naming its things differently gets its own interface,
+  its own language included. See
   [directory-console](docs/client-development/browser/directory-console.md)
 
 - `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names
-  separated by commas and returns an entry matching any of them, so a search
-  box needs no field picker beside it. Which attributes are worth searching is
-  a new schema marker, `searchable` — a substring filter on an unindexed
-  attribute scans the branch, and what is indexed is the deployment's business.
-  The console searches them all by default, and `GET /ldap/groups` answers on
-  the same terms rather than on its RDN attribute alone
+  separated by commas and answers on any of them, so a search box needs no
+  field picker beside it. Which attributes are worth searching is a new schema
+  marker, `searchable` — what is indexed is the deployment's business.
+  `GET /ldap/groups` answers on the same terms rather than on its RDN
+  attribute alone
 
 - `npm run audit:directory` reads a branch and reports what a schema would
   refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
@@ -97,20 +93,13 @@ migration will refuse before it does.
   configuration keeping every national format, mail domain and quota default
   in a schema rather than in the code, with `npm run check:no-client-values`
   failing the build if one leaks back into `src/`. `--organization-schema` is
-  settable on the command line at last: it was declared in the configuration
-  type but never registered as an option
+  settable on the command line at last
 
 ### Bug Fixes
 
-- `browser/directory-console`: the search box lost the caret on the keystroke
-  that caused a repaint, and dropped the space just typed between a first name
-  and a surname, repainting from a trimmed value. A mail quota showed as its
-  byte count, ten digits where the size was set as `4GB`
-
-- `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
-  rejects the names real directories carry — every one with a space, an
-  apostrophe or an `&`. Loading such a directory failed on its first
-  organization
+- `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix with
+  the comma optional, so `uid=x,xou=users,dc=example,dc=com` passed for being
+  inside `ou=users,dc=example,dc=com`. It is compared RDN by RDN now
 
 - `abstract/ldapFlat`: `searchEntriesByName` interpolated its value into an
   LDAP filter raw. A name holding `*` became a pattern and matched whichever
@@ -120,6 +109,11 @@ migration will refuse before it does.
 - `abstract/ldapFlat`: a business rule that refused a creation answered `500`,
   the add path having wrapped every error in a plain `Error`. A `409` reaches
   the client as the ordinary outcome it is
+
+- `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
+  rejects the names real directories carry — every one with a space, an
+  apostrophe or an `&`. Loading such a directory failed on its first
+  organization
 
 - `test/helpers`: a failing LDIF load reported "Already exists" whatever the
   real cause, every error being retried over the entries a half-finished first
