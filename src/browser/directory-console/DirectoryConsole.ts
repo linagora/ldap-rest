@@ -17,7 +17,7 @@ import { EntityDetail } from './components/EntityDetail';
 import { EntityForm } from './components/EntityForm';
 import { EntityList, SEARCH_MINIMUM } from './components/EntityList';
 import { OrganizationTree } from './components/OrganizationTree';
-import { attributeLabel, rdnValue, resolveText } from './format';
+import { attributeLabel, entryValue, rdnValue, resolveText } from './format';
 import { availableLanguages, Translator } from './i18n';
 import type {
   ConsoleOptions,
@@ -590,7 +590,7 @@ export class DirectoryConsole {
       for (const [name, attr] of Object.entries(entity.schema.attributes)) {
         const roles = Array.isArray(attr.role) ? attr.role : [attr.role];
         if (!roles.includes(role)) continue;
-        const raw = entry[name];
+        const raw = entryValue(entry, name);
         const list = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
         return {
           title: attributeLabel(name, attr, this.translator.language),
@@ -784,7 +784,7 @@ export class DirectoryConsole {
       ): Promise<void> => {
         try {
           if (entry) {
-            const id = String(entry[entity.mainAttribute] ?? '');
+            const id = String(entryValue(entry, entity.mainAttribute) ?? '');
             // The entry as stored: what a membership change is diffed against.
             await this.api.update(entity, id, values, cleared, entry);
             this.toast(t('save.done'));
@@ -805,7 +805,7 @@ export class DirectoryConsole {
 
     this.openPanel(
       entry
-        ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
+        ? `${t('app.edit')} — ${String(entryValue(entry, entity.mainAttribute) ?? '')}`
         : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
@@ -861,7 +861,7 @@ export class DirectoryConsole {
 
     this.openPanel(
       entry
-        ? `${t('app.edit')} — ${String(entry[entity.mainAttribute] ?? '')}`
+        ? `${t('app.edit')} — ${String(entryValue(entry, entity.mainAttribute) ?? '')}`
         : t('dashboard.create', { entity: this.singular(entity) }),
       (body: HTMLElement): void => {
         void form.render(body);
