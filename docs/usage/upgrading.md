@@ -4,6 +4,27 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### `calendarResources` is renamed `calendar`
+
+**Who is affected:** deployments loading `core/twake/calendarResources`, and
+plugins importing `ldap-rest/plugin-twake-calendarresources` or looking the
+plugin up by name.
+
+Besides calendar resources, the plugin propagates user email and name changes
+to the Twake Calendar registered users; the old name hid that. Nothing breaks
+yet: `core/twake/calendarResources` still loads the same plugin, registered
+under its old name, and logs a deprecation warning. It will be removed in a
+future major release, so switch now:
+
+```bash
+DM_PLUGINS="…,core/twake/calendar"
+```
+
+Plugin code should import `ldap-rest/plugin-twake-calendar` and look the
+plugin up as `calendar`. Configuration flags (`--calendar-*`) are unchanged.
+
 ## To 0.7.0
 
 ### `externalId` on Groups is no longer served
