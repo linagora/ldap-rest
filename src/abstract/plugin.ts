@@ -133,21 +133,17 @@ export default abstract class DmPlugin {
     }
     const hidden = neverReturnAttributes(schemas);
     if (hidden.size === 0 || !data || typeof data !== 'object') return data;
-    if (Array.isArray(data))
-      return (data as unknown[]).map((entry: unknown) =>
-        entry && typeof entry === 'object'
-          ? withoutAttributes(entry, hidden)
-          : entry
-      ) as T;
+    // Only a plain object is an entry: projecting an array as one turns it
+    // into an object keyed by index.
+    const project = (entry: unknown): unknown =>
+      entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? withoutAttributes(entry, hidden)
+        : entry;
+    if (Array.isArray(data)) return (data as unknown[]).map(project) as T;
     // An entry carries its dn; a keyed list carries entries as values
     if ('dn' in data) return withoutAttributes(data, hidden);
     return Object.fromEntries(
-      Object.entries(data).map(([key, entry]) => [
-        key,
-        entry && typeof entry === 'object'
-          ? withoutAttributes(entry as object, hidden)
-          : entry,
-      ])
+      Object.entries(data).map(([key, entry]) => [key, project(entry)])
     ) as T;
   }
 
