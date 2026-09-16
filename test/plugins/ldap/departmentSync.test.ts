@@ -1,5 +1,7 @@
 import { expect } from 'chai';
 import LdapDepartmentSync from '../../../src/plugins/ldap/departmentSync';
+import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
 import type { SearchResult } from 'ldapts';
 import {
@@ -466,5 +468,107 @@ describe('LDAP Department Sync Plugin', function () {
       // Path should be constructed from ou attribute
       expect(user[pathAttr]).to.exist;
     });
+  });
+});
+
+describe('LDAP Department Sync Plugin, attributes named by their roles', function () {
+  // A deployment that names the path and link attributes only through the
+  // schema roles, none of them the configured defaults: the enterprise rules
+  // read the roles, and reading only the configuration here recomputed
+  // nothing for it, silently.
+  let server: DM;
+  let plugin: LdapDepartmentSync;
+  let top: string;
+  let base: string;
+  let previousOrgSchema: string | undefined;
+  let previousFlatSchema: string | undefined;
+  const orgClass = ['top', 'organizationalUnit'];
+
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
+  });
+
+  before(async () => {
+    top = process.env.DM_LDAP_TOP_ORGANIZATION!;
+    base = process.env.DM_LDAP_BASE!;
+    previousOrgSchema = process.env.DM_ORGANIZATION_SCHEMA;
+    previousFlatSchema = process.env.DM_LDAP_FLAT_SCHEMA;
+    process.env.DM_ORGANIZATION_SCHEMA =
+      './test/fixtures/schemas/roleNamedOrganizations.json';
+    process.env.DM_LDAP_FLAT_SCHEMA =
+      './test/fixtures/schemas/roleNamedPeople.json';
+    server = new DM();
+    await server.ready;
+    const organizations = new LdapOrganizations(server);
+    await server.registerPlugin('ldapOrganizations', organizations);
+    await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    for (let i = 0; i < 50 && !organizations.schema; i++)
+      await new Promise(r => setTimeout(r, 100));
+    plugin = new LdapDepartmentSync(server);
+  });
+
+  const source = () => `ou=RoleSource,${top}`;
+  const target = () => `ou=RoleTarget,${top}`;
+  const person = () => `uid=role.person,ou=users,${base}`;
+
+  after(async () => {
+    for (const dn of [
+      person(),
+      `ou=Sub,${target()}`,
+      `ou=Sub,${source()}`,
+      source(),
+      target(),
+    ])
+      await server.ldap.delete(dn).catch(() => undefined);
+    if (previousOrgSchema === undefined)
+      delete process.env.DM_ORGANIZATION_SCHEMA;
+    else process.env.DM_ORGANIZATION_SCHEMA = previousOrgSchema;
+    if (previousFlatSchema === undefined)
+      delete process.env.DM_LDAP_FLAT_SCHEMA;
+    else process.env.DM_LDAP_FLAT_SCHEMA = previousFlatSchema;
+  });
+
+  it('should recompute the tree and the linked entries through the roles', async () => {
+    await server.ldap.add(source(), {
+      objectClass: orgClass,
+      ou: 'RoleSource',
+      description: 'RoleSource',
+    });
+    await server.ldap.add(target(), {
+      objectClass: orgClass,
+      ou: 'RoleTarget',
+      description: 'RoleTarget',
+    });
+    await server.ldap.add(`ou=Sub,${source()}`, {
+      objectClass: orgClass,
+      ou: 'Sub',
+      description: 'RoleSource / Sub',
+    });
+    await server.ldap.add(person(), {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'role.person',
+      cn: 'Role Person',
+      sn: 'Person',
+      seeAlso: `ou=Sub,${source()}`,
+      departmentNumber: 'RoleSource / Sub',
+    });
+
+    const moved = `ou=Sub,${target()}`;
+    await server.ldap.rename(`ou=Sub,${source()}`, moved);
+    await plugin.hooks.ldaprenamedone?.([`ou=Sub,${source()}`, moved]);
+
+    const read = async (dn: string, attr: string): Promise<string> => {
+      const result = (await server.ldap.search(
+        { paged: false, scope: 'base', attributes: [attr] },
+        dn
+      )) as SearchResult;
+      const value = result.searchEntries[0][attr];
+      return String(Array.isArray(value) ? value[0] : value);
+    };
+    expect(await read(moved, 'description')).to.equal('RoleTarget / Sub');
+    expect(await read(person(), 'seeAlso')).to.equal(moved);
+    expect(await read(person(), 'departmentNumber')).to.equal(
+      'RoleTarget / Sub'
+    );
   });
 });
