@@ -469,8 +469,8 @@ export class LdapTestServer {
       DM_EXTERNAL_MEMBERS_BRANCH: `ou=external,${this.config.baseDn}`,
       // Applicative accounts branch
       DM_APPLICATIVE_ACCOUNT_BASE: `ou=applicative,${this.config.baseDn}`,
-      // Calendar resources branch
-      DM_CALENDAR_RESOURCES_BASE: `ou=calendarResources,${this.config.baseDn}`,
+      // Calendar resources branch, where the calendar tests create them
+      DM_CALENDAR_RESOURCE_BASE: `ou=resources,${this.config.baseDn}`,
       // Trash branch
       DM_TRASH_BRANCH: `ou=trash,${this.config.baseDn}`,
       // Keep legacy names for hasExternalLdap() check

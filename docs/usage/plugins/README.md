@@ -52,12 +52,12 @@ Protection and rate limiting:
 
 Connect to external systems:
 
-| Plugin                                                   | Description                  |
-| -------------------------------------------------------- | ---------------------------- |
-| [james-mail](integrations/james-mail.md)                 | Apache James synchronization |
-| [james-mailboxes](integrations/james-mailboxes.md)       | Apache James team mailboxes  |
-| [calendar-resources](integrations/calendar-resources.md) | Twake calendar resources     |
-| [app-accounts](integrations/app-accounts.md)             | Applicative accounts API     |
+| Plugin                                             | Description                        |
+| -------------------------------------------------- | ---------------------------------- |
+| [james-mail](integrations/james-mail.md)           | Apache James synchronization       |
+| [james-mailboxes](integrations/james-mailboxes.md) | Apache James team mailboxes        |
+| [calendar](integrations/calendar.md)               | Twake Calendar resources and users |
+| [app-accounts](integrations/app-accounts.md)       | Applicative accounts API           |
 
 ## Utility Plugins
 

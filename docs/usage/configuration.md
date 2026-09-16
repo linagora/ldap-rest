@@ -35,7 +35,7 @@ All LDAP-Rest configuration options.
     - [core/auth/trustedProxy](#coreauthtrustedproxy)
   - [Twake Integration Plugins](#twake-integration-plugins)
     - [core/twake/james](#coretwakejames)
-    - [core/twake/calendarResources](#coretwakecalendarresources)
+    - [core/twake/calendar](#coretwakecalendar)
     - [core/twake/applicativeAccounts](#coretwakeapplicativeaccounts)
     - [core/twake/appAccountsConsistency](#coretwakeappaccountsconsistency)
   - [Utility Plugins](#utility-plugins)
@@ -308,7 +308,9 @@ Empty means the plugin guards every path. Scoping several instances to different
 | `--james-mailbox-type-attribute` |                                 | `DM_JAMES_MAILBOX_TYPE_ATTRIBUTE` | `twakeMailboxType`      | Mailbox type attribute      |
 | `--ldap-concurrency`             |                                 | `DM_LDAP_CONCURRENCY`             | `10`                    | LDAP operations concurrency |
 
-#### `core/twake/calendarResources`
+#### `core/twake/calendar`
+
+Formerly `core/twake/calendarResources`, still accepted as a deprecated alias.
 
 | CLI                               | Env                                | Default                 | Description                   |
 | --------------------------------- | ---------------------------------- | ----------------------- | ----------------------------- |
@@ -319,6 +321,8 @@ Empty means the plugin guards every path. Scoping several instances to different
 | `--calendar-resource-objectclass` | `DM_CALENDAR_RESOURCE_OBJECTCLASS` |                         | Resource objectClass          |
 | `--calendar-resource-creator`     | `DM_CALENDAR_RESOURCE_CREATOR`     |                         | Resource creator              |
 | `--calendar-resource-domain`      | `DM_CALENDAR_RESOURCE_DOMAIN`      |                         | Resource domain               |
+| `--calendar-firstname-attribute`  | `DM_CALENDAR_FIRSTNAME_ATTRIBUTE`  | `givenName`             | Registered user first name    |
+| `--calendar-lastname-attribute`   | `DM_CALENDAR_LASTNAME_ATTRIBUTE`   | `sn`                    | Registered user last name     |
 
 #### `core/twake/applicativeAccounts`
 

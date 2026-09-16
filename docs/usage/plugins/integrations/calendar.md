@@ -1,6 +1,13 @@
-# Twake Calendar Resources Plugin
+# Twake Calendar Plugin
 
-Plugin to automatically synchronize LDAP resources (meeting rooms, equipment, etc.) with Twake Calendar via its WebAdmin API.
+Plugin to keep Twake Calendar in sync with LDAP via its WebAdmin API:
+
+- resources (meeting rooms, equipment, etc.) stored in an LDAP branch
+- registered users, whose email, first name and last name follow LDAP
+
+> Formerly `core/twake/calendarResources`. That name still loads the plugin,
+> registered as `calendarResources`, but logs a deprecation warning and will
+> be removed in a future major release.
 
 ## Features
 
@@ -8,6 +15,7 @@ Plugin to automatically synchronize LDAP resources (meeting rooms, equipment, et
 - **Automatic Updates**: When a resource is modified in LDAP, changes are synced to Twake Calendar
 - **Automatic Deletion**: When a resource is removed from LDAP, it's deleted from Twake Calendar
 - **Flexible Configuration**: Configure which LDAP branch and objectClass to monitor
+- **User Identity Propagation**: When a user's email, first name or last name changes in LDAP, the matching Calendar registered user is updated
 
 ## Configuration
 
@@ -19,6 +27,11 @@ Plugin to automatically synchronize LDAP resources (meeting rooms, equipment, et
 - `DM_CALENDAR_RESOURCE_OBJECTCLASS`: Optional objectClass filter (only process entries with this objectClass)
 - `DM_CALENDAR_RESOURCE_CREATOR`: Default creator email for resources (default: `admin@example.com`)
 - `DM_CALENDAR_RESOURCE_DOMAIN`: Default domain for resources (extracted from DN if not specified)
+- `DM_CALENDAR_FIRSTNAME_ATTRIBUTE`: LDAP attribute holding a user's first name (default: `givenName`)
+- `DM_CALENDAR_LASTNAME_ATTRIBUTE`: LDAP attribute holding a user's last name (default: `sn`)
+
+The resource variables are only needed for resource synchronization; user
+identity propagation only needs the WebAdmin URL and token.
 
 ### Required Dependencies
 
@@ -66,6 +79,17 @@ The plugin uses the following WebAdmin API endpoints:
 - `POST /resources` - Create a new resource
 - `PATCH /resources/{id}` - Update an existing resource
 - `DELETE /resources/{id}` - Delete a resource
+- `GET /registeredUsers` - Find the registered user to update
+- `PATCH /registeredUsers?id={id}` - Update a registered user's email, first and last name
+- `POST /users/{mail}?action=deleteData` - Delete a user's data (see `deleteUserData`)
+
+### Registered Users
+
+A change of the configured mail attribute updates the registered user found by
+its **previous** address; a change of the first or last name attribute updates
+the one found by its current address. In both cases the email, first name and
+last name are re-read from LDAP and sent together. Adding or removing the mail
+attribute, and users not registered in Calendar, are skipped.
 
 ### Resource Data Format
 
@@ -103,7 +127,7 @@ DM_LDAP_FLAT_SCHEMA="/path/to/calendar-resources-schema.json"
 3. Add the plugin to `DM_PLUGINS`:
 
    ```bash
-   DM_PLUGINS="core/ldap/onChange,core/ldap/flatGeneric,twake/calendarResources"
+   DM_PLUGINS="core/ldap/onChange,core/ldap/flatGeneric,twake/calendar"
    ```
 
 4. Start ldap-rest - resources will be automatically synced
@@ -121,7 +145,7 @@ Example log:
 
 ```json
 {
-  "plugin": "calendarResources",
+  "plugin": "calendar",
   "event": "ldapcalendarResourceadddone",
   "result": "success",
   "http_status": 201,
@@ -149,18 +173,17 @@ Use `DM_CALENDAR_RESOURCE_BASE` and `DM_CALENDAR_RESOURCE_OBJECTCLASS` to filter
 
 ## Public Methods
 
-Public methods available on the CalendarResources plugin instance.
+Public methods available on the Calendar plugin instance.
 
 ### Usage
 
 ```typescript
 import type { DM } from 'ldap-rest';
-import type CalendarResources from 'ldap-rest/plugin-twake-calendarresources';
+import type Calendar from 'ldap-rest/plugin-twake-calendar';
 
 // Get the plugin instance from another plugin
-const calendar = this.server.getPlugin(
-  'calendarResources'
-) as CalendarResources;
+// (declare `dependencies = { calendar: 'core/twake/calendar' }` so it loads first)
+const calendar = this.requirePlugin<Calendar>('calendar');
 ```
 
 ### deleteUserData(mail)
@@ -182,7 +205,8 @@ async deleteUserData(mail: string): Promise<{ taskId: string } | null>
 **Example:**
 
 ```typescript
-const result = await calendar.deleteUserData('user@example.com');
+// requirePlugin() returns null when the plugin is not loaded
+const result = await calendar?.deleteUserData('user@example.com');
 if (result) {
   console.log(`Deletion task started: ${result.taskId}`);
 }

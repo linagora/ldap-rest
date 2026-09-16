@@ -1,32 +1,18 @@
 import nock from 'nock';
 
 import { DM } from '../../../src/bin';
+import Calendar from '../../../src/plugins/twake/calendar';
 import CalendarResources from '../../../src/plugins/twake/calendarResources';
 import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapFlat from '../../../src/plugins/ldap/flatGeneric';
 
 import { waitFor } from '../../helpers/waitFor';
-describe('Calendar Resources Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping Calendar Resources tests: DM_LDAP_DN or DM_LDAP_PWD or DM_LDAP_BASE not set'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
+describe('Twake Calendar Plugin', function () {
   let resourceBase: string;
   let testResourceDN: string;
   let dm: DM;
-  let calendarResources: CalendarResources;
+  let calendar: Calendar;
   let ldapFlat: LdapFlat;
   let resourceInstance: any; // The resources instance from ldapFlat
   let scope: nock.Scope;
@@ -66,13 +52,13 @@ describe('Calendar Resources Plugin', function () {
       // Ignore if already exists
     }
 
-    calendarResources = new CalendarResources(dm);
+    calendar = new Calendar(dm);
     ldapFlat = new LdapFlat(dm);
     resourceInstance = ldapFlat.instances[0];
 
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
     await dm.registerPlugin('ldapFlat', ldapFlat);
-    await dm.registerPlugin('calendarResources', calendarResources);
+    await dm.registerPlugin('calendar', calendar);
   });
 
   afterEach(async () => {
@@ -197,6 +183,32 @@ describe('Calendar Resources Plugin', function () {
     nock.cleanAll();
   });
 
+  it('should ignore entries outside the resources branch', async () => {
+    const apiScope = nock(
+      process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+    )
+      .post('/resources')
+      .reply(201);
+
+    await calendar.hooks.ldapcalendarResourceadddone!([
+      `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`,
+      { cn: 'Conference Room A', description: 'Large meeting room' },
+    ]);
+
+    expect(apiScope.isDone()).to.be.false;
+    nock.cleanAll();
+  });
+
+  describe('calendarResources alias', () => {
+    it('is the same plugin, still registered under its historical name', () => {
+      const alias = new CalendarResources(dm);
+
+      expect(alias).to.be.instanceOf(Calendar);
+      expect(alias.name).to.equal('calendarResources');
+      expect(calendar.name).to.equal('calendar');
+    });
+  });
+
   describe('deleteUserData', () => {
     it('should call POST /users/{mail}?action=deleteData and return taskId', async () => {
       const deleteDataScope = nock(
@@ -205,7 +217,7 @@ describe('Calendar Resources Plugin', function () {
         .post('/users/user@test.org?action=deleteData')
         .reply(201, { taskId: 'calendar-task-123' });
 
-      const result = await calendarResources.deleteUserData('user@test.org');
+      const result = await calendar.deleteUserData('user@test.org');
 
       expect(result).to.deep.equal({ taskId: 'calendar-task-123' });
       expect(deleteDataScope.isDone()).to.be.true;
@@ -220,7 +232,7 @@ describe('Calendar Resources Plugin', function () {
         .post('/users/baduser@test.org?action=deleteData')
         .reply(400, { error: 'Bad request' });
 
-      const result = await calendarResources.deleteUserData('baduser@test.org');
+      const result = await calendar.deleteUserData('baduser@test.org');
 
       expect(result).to.be.null;
       expect(deleteDataScope.isDone()).to.be.true;
@@ -286,7 +298,7 @@ describe('Calendar Resources Plugin', function () {
           return [204];
         });
 
-      await calendarResources.syncRegisteredUser('test', userDN);
+      await calendar.syncRegisteredUser('test', userDN);
 
       expect(scope.isDone()).to.be.true;
       expect(patchUri).to.contain('id=5f50a663');
@@ -321,7 +333,7 @@ describe('Calendar Resources Plugin', function () {
         });
 
       // LDAP now holds caluser@test.org; Calendar still has old@test.org
-      await calendarResources.hooks.onLdapChange!(userDN, {
+      await calendar.hooks.onLdapChange!(userDN, {
         mail: ['old@test.org', 'caluser@test.org'],
       });
 
@@ -339,19 +351,23 @@ describe('Calendar Resources Plugin', function () {
         .get('/registeredUsers')
         .reply(200, [{ id: 'other', email: 'someoneelse@test.org' }]);
 
-      await calendarResources.syncRegisteredUser('test', userDN);
+      await calendar.syncRegisteredUser('test', userDN);
 
       // GET happened, no PATCH was issued (would throw on unmocked request)
       expect(scope.isDone()).to.be.true;
     });
 
     it('skips sync when the mail is added (no previous mail)', async () => {
-      // No nock scope: any HTTP call would throw (netConnect disabled)
-      await calendarResources.hooks.onLdapChange!(userDN, {
+      // An unmocked request would not do: syncRegisteredUser catches the
+      // error nock throws. The interceptor stays pending only if no call
+      // was made.
+      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+
+      await calendar.hooks.onLdapChange!(userDN, {
         mail: [null, 'caluser@test.org'],
       });
-      // Reaching here without a thrown unmocked-request error proves no call
-      expect(nock.pendingMocks()).to.have.length(0);
+
+      expect(scope.isDone()).to.be.false;
     });
 
     it('syncs names when a configured name attribute changes', async () => {
@@ -378,7 +394,7 @@ describe('Calendar Resources Plugin', function () {
         });
 
       // sn is the default configured lastname attribute
-      await calendarResources.hooks.onLdapChange!(userDN, {
+      await calendar.hooks.onLdapChange!(userDN, {
         sn: ['Name', 'TELLIER'],
       });
 
@@ -392,11 +408,14 @@ describe('Calendar Resources Plugin', function () {
     });
 
     it('ignores changes to unrelated attributes', async () => {
-      // No nock scope: any HTTP call would throw (netConnect disabled)
-      await calendarResources.hooks.onLdapChange!(userDN, {
+      // See 'skips sync when the mail is added' for why an interceptor
+      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+
+      await calendar.hooks.onLdapChange!(userDN, {
         description: ['before', 'after'],
       });
-      expect(nock.pendingMocks()).to.have.length(0);
+
+      expect(scope.isDone()).to.be.false;
     });
   });
 });

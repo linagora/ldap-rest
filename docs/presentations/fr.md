@@ -100,7 +100,7 @@ export default class MyPlugin extends DmPlugin {
 ## Intégrations
 
 - **twake/james** - Synchronisation Apache James (mail)
-- **twake/calendarResources** - Ressources calendrier
+- **twake/calendar** - Ressources et utilisateurs Twake Calendar
 
 <!-- end_slide -->
 

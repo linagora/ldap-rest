@@ -3,8 +3,7 @@
 # These are no longer needed since the embedded LDAP server sets them automatically
 
 FILES=(
-  "test/plugins/twake/calendarResources.test.ts"
-  "test/plugins/twake/appAccountsConsistency.test.ts"
+  "test/plugins/twake/calendar.test.ts"
   "test/plugins/ldap/flatGenericTwakeUsers.test.ts"
   "test/plugins/ldap/flatGenericStandardUsers.test.ts"
   "test/plugins/ldap/getApis.test.ts"

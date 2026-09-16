@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Deprecations
+
+- `plugins/twake/calendarResources` is renamed `plugins/twake/calendar`, see
+  [Upgrading](docs/usage/upgrading.md#calendarresources-is-renamed-calendar)
+
 ## v0.7.0 (2026-09-02)
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.
