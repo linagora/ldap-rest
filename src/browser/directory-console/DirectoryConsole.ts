@@ -59,6 +59,82 @@ export function readFailure(
   };
 }
 
+/**
+ * Identifier of an entry the console has just created, to open it.
+ *
+ * A flat entity answers the entry, keyed with the schema's spelling — or with
+ * the directory's, which is not always the same: reading `created[uid]`
+ * straight threw on a directory answering `UID`, and the console reported an
+ * error for an entry it had created. A group answers only `{success: true}`,
+ * so its identifier is the one the form sent: without it the console opened
+ * `#/groups/` and the operator never saw the group.
+ *
+ * @param entity entity the entry belongs to
+ * @param created what the create endpoint answered
+ * @param values what the form submitted
+ * @returns the identifier, or an empty string when neither holds one
+ */
+export function createdEntryId(
+  entity: EntityDescriptor,
+  created: unknown,
+  values: Record<string, string | string[]>
+): string {
+  const first = (value: unknown): string | undefined => {
+    const one = Array.isArray(value) ? (value[0] as unknown) : value;
+    return typeof one === 'string' && one !== '' ? one : undefined;
+  };
+  const answered =
+    created && typeof created === 'object'
+      ? first(entryValue(created as Entry, entity.mainAttribute))
+      : undefined;
+  return answered ?? first(values[entity.mainAttribute]) ?? '';
+}
+
+/**
+ * The console's one toast element: a message, then hidden after a while.
+ *
+ * Every message replaces the previous one, and so must its timer. A timer left
+ * running from an earlier message hid the next one early — including the
+ * generated password, which is shown once and sticky precisely because the
+ * server cannot hand it back.
+ */
+export class ToastController {
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * @param element finds the toast element, which survives re-renders
+   * @param delay how long a non-sticky message stays, in milliseconds
+   */
+  constructor(
+    private readonly element: () => HTMLElement | null | undefined,
+    private readonly delay = 5000
+  ) {}
+
+  /** Show a message; a sticky one waits to be dismissed. */
+  show(message: string, isError = false, sticky = false): void {
+    const toast = this.element();
+    if (!toast) return;
+    if (this.timer !== undefined) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    toast.textContent = message;
+    toast.classList.toggle('dc-toast-error', isError);
+    toast.hidden = false;
+    if (sticky) {
+      toast.onclick = (): void => {
+        toast.hidden = true;
+      };
+      return;
+    }
+    toast.onclick = null;
+    this.timer = setTimeout((): void => {
+      this.timer = undefined;
+      toast.hidden = true;
+    }, this.delay);
+  }
+}
+
 export class DirectoryConsole {
   private readonly options: ConsoleOptions;
   private readonly api: ConsoleApiClient;
@@ -82,6 +158,9 @@ export class DirectoryConsole {
    */
   private viewGeneration = 0;
   private route: Route = { view: 'dashboard' };
+  private readonly toasts = new ToastController(() =>
+    this.container?.querySelector<HTMLElement>('[data-toast]')
+  );
   private tree: OrganizationTree | null = null;
 
   constructor(options: ConsoleOptions) {
@@ -794,8 +873,10 @@ export class DirectoryConsole {
             const created = await this.api.create(entity, values as Entry);
             this.toast(t('create.done'));
             this.closePanel();
-            const id = String(created[entity.mainAttribute] ?? '');
-            this.go(`${entity.key}/${encodeURIComponent(id)}`);
+            const id = createdEntryId(entity, created, values);
+            this.go(
+              id ? `${entity.key}/${encodeURIComponent(id)}` : entity.key
+            );
           }
         } catch (err) {
           this.toast((err as Error).message, true);
@@ -1005,19 +1086,6 @@ export class DirectoryConsole {
 
   /** Show a short message; a sticky one waits to be dismissed. */
   private toast(message: string, isError = false, sticky = false): void {
-    const toast = this.container?.querySelector<HTMLElement>('[data-toast]');
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.toggle('dc-toast-error', isError);
-    toast.hidden = false;
-    if (sticky) {
-      toast.onclick = (): void => {
-        toast.hidden = true;
-      };
-      return;
-    }
-    window.setTimeout((): void => {
-      toast.hidden = true;
-    }, 5000);
+    this.toasts.show(message, isError, sticky);
   }
 }
