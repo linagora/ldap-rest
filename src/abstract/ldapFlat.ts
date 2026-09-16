@@ -367,7 +367,10 @@ export default abstract class LdapFlat extends DmPlugin {
   ): Promise<string | undefined> {
     const attr = this.schema?.attributes[this.mainAttribute];
     const rule = attr?.generatedFrom;
-    if (!rule) return undefined;
+    // `generated` is the switch, `generatedFrom` only the recipe: an operator
+    // told to drop the marker to take the value from the client gets exactly
+    // that, rather than the derived value silently replacing the one sent.
+    if (!rule || !attr.generated) return undefined;
 
     const raw = body[rule.attribute];
     const source = Array.isArray(raw) ? raw[0] : raw;
@@ -836,9 +839,8 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiAdd(req: Request, res: Response): Promise<void> {
     // When the schema says the server derives the identifier, the client is
     // not expected — nor allowed — to send it.
-    const generatesId = Boolean(
-      this.schema?.attributes[this.mainAttribute]?.generatedFrom
-    );
+    const idAttr = this.schema?.attributes[this.mainAttribute];
+    const generatesId = Boolean(idAttr?.generated && idAttr.generatedFrom);
     const body = (
       generatesId ? jsonBody(req, res) : jsonBody(req, res, this.mainAttribute)
     ) as Record<string, AttributeValue> | false;

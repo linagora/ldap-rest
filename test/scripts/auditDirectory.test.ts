@@ -31,7 +31,18 @@ const schema: Schema = {
   strict: true,
   attributes: {
     objectClass: { type: 'array', fixed: true },
-    uid: { type: 'string', required: true, generated: true },
+    uid: {
+      type: 'string',
+      required: true,
+      generated: true,
+      generatedFrom: { attribute: 'mail' },
+    },
+    twakeDepartmentPath: {
+      type: 'string',
+      required: true,
+      generated: true,
+      role: 'organizationPath',
+    },
     cn: { type: 'string', required: true },
     mail: {
       type: 'string',
@@ -75,6 +86,22 @@ describe('audit-directory', () => {
   };
 
   describe('parseOptions', () => {
+    it('should collect every --plugin', () => {
+      const options = parseOptions([
+        '--schema',
+        's.json',
+        '--url',
+        'ldap://x',
+        '--plugin',
+        'core/ldap/enterpriseRules',
+        '--plugin=core/ldap/other',
+      ]);
+      expect(options.plugins).to.deep.equal([
+        'core/ldap/enterpriseRules',
+        'core/ldap/other',
+      ]);
+    });
+
     it('should accept both --flag value and --flag=value', () => {
       const options = withEnv({ DM_LDAP_URL: 'ldap://host' }, () =>
         parseOptions(['--schema', 'a.json', '--base=ou=users,dc=x'])
@@ -167,9 +194,14 @@ describe('audit-directory', () => {
   });
 
   describe('auditEntry', () => {
-    const run = (entries: [string, Record<string, unknown>][]): Finding[] => {
+    // As a server loading the rules that fill the path would be audited
+    const run = (
+      entries: [string, Record<string, unknown>][],
+      plugins = ['core/ldap/enterpriseRules']
+    ): Finding[] => {
       const report = new Map<string, Finding>();
-      for (const [dn, entry] of entries) auditEntry(dn, entry, schema, report);
+      for (const [dn, entry] of entries)
+        auditEntry(dn, entry, schema, report, 100, plugins);
       return [...report.values()];
     };
 
@@ -223,11 +255,29 @@ describe('audit-directory', () => {
       expect(findings.map(f => f.attribute)).to.deep.equal(['cn']);
     });
 
-    it('should not ask for an attribute the server computes', () => {
-      // `uid` is required *and* generated: the server fills it, so an entry
-      // without it is not a migration problem.
+    it('should not ask for an attribute the entity derives itself', () => {
+      // `uid` is required, generated *and* derived from `mail`: the entity
+      // fills it whatever plugins are loaded.
       const findings = run([['uid=a,ou=users,dc=example,dc=com', { cn: 'A' }]]);
       expect(findings.map(f => f.attribute)).to.not.include('uid');
+    });
+
+    it('should ask for a generated attribute nothing declared fills', () => {
+      // The server exempts it only when a loaded plugin fills it; reporting
+      // clean without one hid the 400 every creation then gets.
+      const findings = run(
+        [['uid=a,ou=users,dc=example,dc=com', { cn: 'A' }]],
+        []
+      );
+      const path = findings.find(f => f.attribute === 'twakeDepartmentPath');
+      expect(path?.reason).to.equal('missing, and no --plugin fills it');
+    });
+
+    it('should not ask for it once the plugin that fills it is declared', () => {
+      const findings = run([['uid=a,ou=users,dc=example,dc=com', { cn: 'A' }]]);
+      expect(findings.map(f => f.attribute)).to.not.include(
+        'twakeDepartmentPath'
+      );
     });
 
     it('should report a pointer outside its branch', () => {
