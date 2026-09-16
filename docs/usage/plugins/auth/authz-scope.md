@@ -65,12 +65,15 @@ GET /api/v1/authz/scope
 `name` and `path` come from the branch entry itself, so an interface can show
 the scope in the directory's own words rather than as a raw DN.
 
-`create` answers "may I add one of these?". An ordinary entry is scoped by the
-organization it is attached to, so the answer is yes as soon as the caller may
-write in a branch they administer; organizations are the exception, since they
-live in the tree itself and need write permission on the node they hang from —
-the top of the tree, which is where a new organization goes when the client
-names no parent. A local administrator of one branch therefore reads
+`create` answers "may I add one of these?", on the rule the add hook enforces.
+An entry that can carry the organization link (its schema declares the
+configured link attribute) is scoped by the organization it is attached to, so
+the answer is yes as soon as the caller may write in a branch they administer.
+One that cannot — a position, a nomenclature row — is checked against the
+branch it lands in, so the answer is whether the caller may write there.
+Organizations are the other exception, since they live in the tree itself and
+need write permission on the node they hang from — the top of the tree, which
+is where a new organization goes when the client names no parent. A local administrator of one branch therefore reads
 `create: false` for organizations, and creates sub-organizations under their own
 node by naming it as `parentDn`.
 
