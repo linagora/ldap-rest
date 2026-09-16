@@ -20,6 +20,7 @@ import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { asyncHandler } from '../../lib/utils';
 import { UnauthorizedError } from '../../lib/errors';
+import { roleAttribute, type Schema } from '../../config/schema';
 
 /** The part of an authorization plugin this endpoint needs. */
 interface AuthzLike {
@@ -277,7 +278,14 @@ export default class AuthzScope extends DmPlugin {
   private async branchLabel(
     dn: string
   ): Promise<{ name?: string; path?: string }> {
-    const pathAttr = this.config.ldap_organization_path_attribute;
+    // The role first, as the enterprise rules read it: a deployment naming
+    // the path attribute only through the schema got raw DNs in the sidebar.
+    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
+      | { schema?: Schema }
+      | undefined;
+    const pathAttr =
+      roleAttribute(organizations?.schema, 'organizationPath') ||
+      this.config.ldap_organization_path_attribute;
     try {
       const result = (await this.server.ldap.search(
         {

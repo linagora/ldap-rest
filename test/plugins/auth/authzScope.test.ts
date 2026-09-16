@@ -107,6 +107,28 @@ describe('Authorization scope endpoint', () => {
     expect(branches[0]).to.have.property('write', true);
   });
 
+  it('should read the branch path through the organizationPath role', async () => {
+    // Named only by the schema role, here on `description`: reading the
+    // configured attribute alone showed the configured one instead.
+    const previous = process.env.DM_ORGANIZATION_SCHEMA;
+    process.env.DM_ORGANIZATION_SCHEMA =
+      './test/fixtures/schemas/roleNamedOrganizations.json';
+    try {
+      const request = await serve('alice.admin', true, { organizations: true });
+      const res = await request
+        .get('/api/v1/authz/scope')
+        .set('Accept', 'application/json');
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      const branch = (
+        res.body.branches as { dn: string; path?: string }[]
+      ).find(b => b.dn === `ou=Test Org 1,ou=organization,${base}`);
+      expect(branch).to.have.property('path', 'Test organization 1');
+    } finally {
+      if (previous === undefined) delete process.env.DM_ORGANIZATION_SCHEMA;
+      else process.env.DM_ORGANIZATION_SCHEMA = previous;
+    }
+  });
+
   it('should say which entities the caller may create', async () => {
     const request = await serve('alice.admin', true);
     const res = await request
