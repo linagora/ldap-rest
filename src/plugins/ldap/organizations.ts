@@ -39,6 +39,8 @@ import {
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
+  checkDnValues,
+  matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
 } from '../../config/schema';
@@ -987,7 +989,7 @@ export default class LdapOrganizations extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     // Validate with schema if available
-    this.validateNewOrganization(dn, entry);
+    await this.validateNewOrganization(dn, entry);
     // Hooks will validate the organization link and path
     return await this.server.ldap.add(dn, entry, req);
   }
@@ -997,17 +999,20 @@ export default class LdapOrganizations extends DmPlugin {
     changes: ModifyRequest
   ): Promise<boolean> {
     // Validate with schema if available
-    this.validateChanges(dn, changes);
+    await this.validateChanges(dn, changes);
     // Hooks will validate any changes to organization link and path
     return await this.server.ldap.modify(dn, changes);
   }
 
-  validateNewOrganization(dn: string, entry: AttributesList): boolean {
+  async validateNewOrganization(
+    dn: string,
+    entry: AttributesList
+  ): Promise<boolean> {
     if (!this.schema) return true;
 
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
-      if (!this._validateOneChange(field, value)) {
+      if (!(await this._validateOneChange(field, value))) {
         throw new BadRequestError(this.invalidValueMessage(field));
       }
     }
@@ -1043,12 +1048,12 @@ export default class LdapOrganizations extends DmPlugin {
       : `Invalid value for field ${field}`;
   }
 
-  validateChanges(dn: string, changes: ModifyRequest): boolean {
+  async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
     if (!this.schema) return true;
 
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
-        if (!this._validateOneChange(field, value)) {
+        if (!(await this._validateOneChange(field, value))) {
           throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
@@ -1056,7 +1061,7 @@ export default class LdapOrganizations extends DmPlugin {
 
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
-        if (!this._validateOneChange(field, value)) {
+        if (!(await this._validateOneChange(field, value))) {
           throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
@@ -1065,47 +1070,53 @@ export default class LdapOrganizations extends DmPlugin {
     return true;
   }
 
-  _validateOneChange(field: string, value: AttributeValue | null): boolean {
+  async _validateOneChange(
+    field: string,
+    value: AttributeValue | null
+  ): Promise<boolean> {
     if (!this.schema) return true;
+    // Every refusal here is the client's value, so a 400: a plain Error
+    // reached the client as a 500 "check logs", which also left the hint-
+    // quoting message of the callers unreachable.
     const fieldTest = this.schema.attributes[field];
     if (!fieldTest) {
-      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      if (this.schema.strict)
+        throw new BadRequestError(`Field ${field} is not allowed`);
       return true;
     }
     if (value === null || value === undefined) {
-      if (fieldTest.required) throw new Error(`Field ${field} is required`);
+      if (fieldTest.required)
+        throw new BadRequestError(`Field ${field} is required`);
       return true;
     }
 
-    // Type validation
-    if (fieldTest.type) {
-      switch (fieldTest.type) {
-        case 'string':
-          if (Array.isArray(value))
-            throw new Error(`Field ${field} must be a single value`);
-          break;
-        case 'array':
-          if (!Array.isArray(value))
-            throw new Error(`Field ${field} must be an array`);
-          break;
-        case 'pointer':
-          // Pointer validation is handled by other hooks
-          break;
-      }
-    }
+    // A single-valued attribute takes one value. A multi-valued one takes one
+    // value or several, as on the flat routes and in LDAP itself: requiring a
+    // list refused, with a 500, the string an existing client still sends for
+    // an attribute a schema turned into an array (`telephoneNumber`).
+    if (fieldTest.type === 'string' && Array.isArray(value))
+      throw new BadRequestError(`Field ${field} must be a single value`);
 
-    // Test/pattern validation
-    if (fieldTest.test) {
-      const valueStr = Array.isArray(value) ? value[0] : value;
-      const regex =
-        typeof fieldTest.test === 'string'
-          ? new RegExp(fieldTest.test)
-          : fieldTest.test;
-      if (!regex.test(String(valueStr)))
-        throw new Error(`Field ${field} does not match required pattern`);
-    }
+    await checkDnValues(field, fieldTest, value, dn => this.entryExists(dn));
+    return matchesPattern(fieldTest, value);
+  }
 
-    return true;
+  /**
+   * Tell whether a DN names an existing entry.
+   *
+   * @param dn DN to look up
+   * @returns true when the directory holds it
+   */
+  private async entryExists(dn: string): Promise<boolean> {
+    try {
+      const result = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['dn'] },
+        dn
+      )) as SearchResult;
+      return result.searchEntries.length > 0;
+    } catch {
+      return false;
+    }
   }
 
   /**

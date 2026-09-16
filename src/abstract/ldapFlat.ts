@@ -42,6 +42,7 @@ import {
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
 import {
+  checkDnValues,
   missingRequiredAttribute,
   modifiedAttributeNames,
   neverReturnAttributes,
@@ -1440,18 +1441,17 @@ export default abstract class LdapFlat extends DmPlugin {
     // while the console's form refused it client-side and `groups` refused
     // `items.test` server-side. The rule is the same rule; it applies here
     // too.
-    if (attr.items?.branch?.length) {
-      for (const dnValue of asList(value)) {
-        // Same rule as a pointer's own branch, and asked the same way.
-        const isInBranch = attr.items.branch.some(branch =>
-          isDnInBranch(dnValue, branch)
-        );
-        if (!isInBranch)
-          throw new BadRequestError(
-            `Field ${field} must point to a DN within allowed branches: ${attr.items.branch.join(', ')}`
-          );
-      }
-    }
+    // Same rule as a pointer's own branch, and asked the same way; an array
+    // of pointers has each element's target looked up too, as a single
+    // pointer's is.
+    if (attr.type !== 'pointer')
+      await checkDnValues(field, attr, value, async dn => {
+        const result = (await this.ldap.search(
+          { paged: false, scope: 'base', attributes: ['dn'] },
+          dn
+        )) as SearchResult;
+        return result.searchEntries.length > 0;
+      });
 
     const pattern = attr.test ?? attr.items?.test;
     if (pattern) {
