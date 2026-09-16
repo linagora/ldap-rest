@@ -36,6 +36,7 @@ describe('Authorization scope endpoint', () => {
       perRoute?: boolean;
       perBranch?: string;
       organizations?: boolean;
+      flatSchemas?: string[];
     } = {}
   ): Promise<ReturnType<typeof supertest>> => {
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
@@ -43,6 +44,7 @@ describe('Authorization scope endpoint', () => {
     if (opts.perBranch) process.env.DM_AUTHZ_PER_BRANCH_CONFIG = opts.perBranch;
     const server = new DM();
     await server.ready;
+    if (opts.flatSchemas) server.config.ldap_flat_schema = opts.flatSchemas;
     server.app.use((req, _res, next) => {
       if (user) (req as DmRequest).user = user;
       next();
@@ -223,6 +225,33 @@ describe('Authorization scope endpoint', () => {
       entities.find(e => e.name === 'organizations'),
       JSON.stringify(entities)
     ).to.have.property('create', true);
+  });
+
+  it('should not offer an entry the caller cannot attach to their branch', async () => {
+    // A position carries no organization link, so the add hook checks write on
+    // ou=positions, where the entry lands — not on the branch the caller
+    // administers. `create: true` drew a button every submission of which
+    // came back 403.
+    const request = await serve('alice.admin', true, {
+      flatSchemas: [
+        './static/schemas/twake/users.json',
+        './static/schemas/twake/positions.json',
+      ],
+    });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    const entities = res.body.entities as { name: string; create: boolean }[];
+    expect(
+      entities.find(e => e.name === 'positions'),
+      JSON.stringify(entities)
+    ).to.have.property('create', false);
+    // A user carries the link, and alice writes in the branch she administers
+    expect(entities.find(e => e.name === 'users')).to.have.property(
+      'create',
+      true
+    );
   });
 
   it('should refuse an anonymous caller', async () => {
