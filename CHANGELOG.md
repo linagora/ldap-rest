@@ -21,9 +21,9 @@
 
 - `plugins/twake/calendar`: a user email or name change looks the Calendar
   registered user up with `GET /registeredUsers?email=…` instead of
-  downloading every registered user. A lookup that finds nothing is retried
-  with the address lowercased, since the previous match ignored case; Calendar
-  releases before 1.0.0.1, which ignore the parameter, keep working
+  downloading every registered user. Calendar lower-cases the address itself;
+  a legacy record stored with upper case is no longer found. Calendar releases
+  before 1.0.0.1, which ignore the parameter, keep working
 
 ### Deprecations
 

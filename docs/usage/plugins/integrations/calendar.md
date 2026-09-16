@@ -91,10 +91,14 @@ the one found by its current address. In both cases the email, first name and
 last name are re-read from LDAP and sent together. Adding or removing the mail
 attribute, and users not registered in Calendar, are skipped.
 
-Calendar matches the address exactly, so a lookup that finds nothing is
-retried with the address lowercased. Calendar releases before 1.0.0.1 ignore
-the `email` parameter and answer the full list of registered users; the plugin
-then picks the user from it, which works but costs a full listing per change.
+Calendar lower-cases the address before looking it up, which is also how it
+stores addresses, so a case difference between LDAP and Calendar does not
+matter. The exception is a legacy record whose stored address kept upper case
+(written without Calendar's normalisation, e.g. migrated data): it is not
+found, and its user is logged as not registered. Calendar releases before
+1.0.0.1 ignore the `email` parameter and answer the full list of registered
+users; the plugin then picks the user from it, which works but costs a full
+listing per change.
 
 ### Resource Data Format
 

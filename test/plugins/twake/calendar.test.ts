@@ -359,49 +359,71 @@ describe('Twake Calendar Plugin', function () {
       expect(patch.isDone()).to.be.false;
     });
 
-    it('stops on a lookup error, without retrying or PATCHing', async () => {
+    it('stops on a lookup error, without PATCHing', async () => {
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .query({ email: 'Old.Name@Test.org' })
+        .query({ email: 'old@test.org' })
         .reply(500);
-      const other = nock(calendarUrl)
-        .get('/registeredUsers')
-        .query(true)
-        .reply(200, { id: 'lc1', email: 'old.name@test.org' })
+      const patch = nock(calendarUrl)
         .patch('/registeredUsers')
         .query(true)
         .reply(204);
 
       await calendar.hooks.onLdapChange!(userDN, {
-        mail: ['Old.Name@Test.org', 'caluser@test.org'],
+        mail: ['old@test.org', 'caluser@test.org'],
       });
 
       expect(scope.isDone()).to.be.true;
-      expect(other.pendingMocks()).to.have.length(2);
+      expect(patch.isDone()).to.be.false;
     });
 
-    it('retries lowercased when Calendar holds the address in lower case', async () => {
-      let patchUri = '';
+    it('does not PATCH when the answer is not JSON, and says which lookup failed', async () => {
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .query({ email: 'Old.Name@Test.org' })
-        .reply(404, { message: 'User does not exist' })
-        .get('/registeredUsers')
-        .query({ email: 'old.name@test.org' })
-        .reply(200, { id: 'lc1', email: 'old.name@test.org' })
+        .query({ email: 'caluser@test.org' })
+        .reply(200, '<html>Bad gateway</html>');
+      const patch = nock(calendarUrl)
         .patch('/registeredUsers')
         .query(true)
-        .reply(function (uri) {
-          patchUri = uri;
-          return [204];
-        });
+        .reply(204);
+      const errors: Record<string, unknown>[] = [];
+      const logger = calendar.logger;
+      const originalError = logger.error.bind(logger);
+      logger.error = ((entry: Record<string, unknown>) => {
+        errors.push(entry);
+        return logger;
+      }) as typeof logger.error;
 
-      await calendar.hooks.onLdapChange!(userDN, {
-        mail: ['Old.Name@Test.org', 'caluser@test.org'],
-      });
+      try {
+        await calendar.syncRegisteredUser('test', userDN);
+      } finally {
+        logger.error = originalError;
+      }
 
       expect(scope.isDone()).to.be.true;
-      expect(patchUri).to.contain('id=lc1');
+      expect(patch.isDone()).to.be.false;
+      expect(errors).to.have.length(1);
+      expect(errors[0]).to.include({
+        step: 'find_registered_user',
+        searchEmail: 'caluser@test.org',
+        http_status: 200,
+      });
+    });
+
+    it('does not PATCH when the answer has no id', async () => {
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'caluser@test.org' })
+        .reply(200, { message: 'User does not exist' });
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
+
+      await calendar.syncRegisteredUser('test', userDN);
+
+      expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
     });
 
     it('picks the user from the full list on Calendar before 1.0.0.1', async () => {
