@@ -181,7 +181,7 @@ export interface Config {
   twake_drive_domain_attribute?: string;
   twake_drive_default_domain_template?: string;
 
-  // Calendar Resources plugin
+  // Twake Calendar plugin
   calendar_webadmin_url?: string;
   calendar_webadmin_token?: string;
   calendar_concurrency?: number;
@@ -521,7 +521,7 @@ const configArgs: ConfigTemplate = [
     '',
   ],
 
-  // Calendar Resources plugin
+  // Twake Calendar plugin
   [
     '--calendar-webadmin-url',
     'DM_CALENDAR_WEBADMIN_URL',

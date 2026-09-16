@@ -11,7 +11,7 @@
 import Calendar from './calendar';
 
 console.warn(
-  '[ldap-rest] Plugin `core/twake/calendarResources` is deprecated; use `core/twake/calendar` instead.'
+  '[ldap-rest] Plugin `core/twake/calendarResources` is deprecated; replace it with `core/twake/calendar` — do not load both, each would sync Calendar.'
 );
 
 export default class CalendarResources extends Calendar {

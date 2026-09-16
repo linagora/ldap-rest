@@ -192,7 +192,8 @@ dependencies = {
 
 #### `calendar` (twake/calendar)
 
-- **Dependencies**: None
+- **Dependencies**:
+  - `onLdapChange: 'core/ldap/onChange'` ⚠️ **Required**
 - **Provides Hooks**:
   - `ldapcalendarResourceadddone` - After calendar resource added
   - `ldapcalendarResourcemodifydone` - After calendar resource modified

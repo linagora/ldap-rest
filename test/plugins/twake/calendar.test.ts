@@ -183,6 +183,22 @@ describe('Twake Calendar Plugin', function () {
     nock.cleanAll();
   });
 
+  it('should ignore entries outside the resources branch', async () => {
+    const apiScope = nock(
+      process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
+    )
+      .post('/resources')
+      .reply(201);
+
+    await calendar.hooks.ldapcalendarResourceadddone!([
+      `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`,
+      { cn: 'Conference Room A', description: 'Large meeting room' },
+    ]);
+
+    expect(apiScope.isDone()).to.be.false;
+    nock.cleanAll();
+  });
+
   describe('calendarResources alias', () => {
     it('is the same plugin, still registered under its historical name', () => {
       const alias = new CalendarResources(dm);
@@ -342,12 +358,16 @@ describe('Twake Calendar Plugin', function () {
     });
 
     it('skips sync when the mail is added (no previous mail)', async () => {
-      // No nock scope: any HTTP call would throw (netConnect disabled)
+      // An unmocked request would not do: syncRegisteredUser catches the
+      // error nock throws. The interceptor stays pending only if no call
+      // was made.
+      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+
       await calendar.hooks.onLdapChange!(userDN, {
         mail: [null, 'caluser@test.org'],
       });
-      // Reaching here without a thrown unmocked-request error proves no call
-      expect(nock.pendingMocks()).to.have.length(0);
+
+      expect(scope.isDone()).to.be.false;
     });
 
     it('syncs names when a configured name attribute changes', async () => {
@@ -388,11 +408,14 @@ describe('Twake Calendar Plugin', function () {
     });
 
     it('ignores changes to unrelated attributes', async () => {
-      // No nock scope: any HTTP call would throw (netConnect disabled)
+      // See 'skips sync when the mail is added' for why an interceptor
+      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+
       await calendar.hooks.onLdapChange!(userDN, {
         description: ['before', 'after'],
       });
-      expect(nock.pendingMocks()).to.have.length(0);
+
+      expect(scope.isDone()).to.be.false;
     });
   });
 });

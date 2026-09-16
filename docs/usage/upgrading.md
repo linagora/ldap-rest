@@ -16,11 +16,19 @@ Besides calendar resources, the plugin propagates user email and name changes
 to the Twake Calendar registered users; the old name hid that. Nothing breaks
 yet: `core/twake/calendarResources` still loads the same plugin, registered
 under its old name, and logs a deprecation warning. It will be removed in a
-future major release, so switch now:
+future major release, so switch now by **replacing** the old name with the new
+one:
 
 ```bash
+# before
+DM_PLUGINS="…,core/twake/calendarResources"
+# after
 DM_PLUGINS="…,core/twake/calendar"
 ```
+
+Do not list both: they register under different names, so the loader does not
+see a duplicate and runs two instances — every resource change and every user
+email or name change is then sent to Calendar twice.
 
 Plugin code should import `ldap-rest/plugin-twake-calendar` and look the
 plugin up as `calendar`. Configuration flags (`--calendar-*`) are unchanged.

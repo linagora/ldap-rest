@@ -182,7 +182,8 @@ import type { DM } from 'ldap-rest';
 import type Calendar from 'ldap-rest/plugin-twake-calendar';
 
 // Get the plugin instance from another plugin
-const calendar = this.server.getPlugin('calendar') as Calendar;
+// (declare `dependencies = { calendar: 'core/twake/calendar' }` so it loads first)
+const calendar = this.requirePlugin<Calendar>('calendar');
 ```
 
 ### deleteUserData(mail)
@@ -204,7 +205,8 @@ async deleteUserData(mail: string): Promise<{ taskId: string } | null>
 **Example:**
 
 ```typescript
-const result = await calendar.deleteUserData('user@example.com');
+// requirePlugin() returns null when the plugin is not loaded
+const result = await calendar?.deleteUserData('user@example.com');
 if (result) {
   console.log(`Deletion task started: ${result.taskId}`);
 }

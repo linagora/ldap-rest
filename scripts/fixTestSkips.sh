@@ -4,7 +4,6 @@
 
 FILES=(
   "test/plugins/twake/calendar.test.ts"
-  "test/plugins/twake/appAccountsConsistency.test.ts"
   "test/plugins/ldap/flatGenericTwakeUsers.test.ts"
   "test/plugins/ldap/flatGenericStandardUsers.test.ts"
   "test/plugins/ldap/getApis.test.ts"
