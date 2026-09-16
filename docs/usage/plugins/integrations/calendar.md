@@ -79,7 +79,7 @@ The plugin uses the following WebAdmin API endpoints:
 - `POST /resources` - Create a new resource
 - `PATCH /resources/{id}` - Update an existing resource
 - `DELETE /resources/{id}` - Delete a resource
-- `GET /registeredUsers` - Find the registered user to update
+- `GET /registeredUsers?email={mail}` - Find the registered user to update
 - `PATCH /registeredUsers?id={id}` - Update a registered user's email, first and last name
 - `POST /users/{mail}?action=deleteData` - Delete a user's data (see `deleteUserData`)
 
@@ -90,6 +90,11 @@ its **previous** address; a change of the first or last name attribute updates
 the one found by its current address. In both cases the email, first name and
 last name are re-read from LDAP and sent together. Adding or removing the mail
 attribute, and users not registered in Calendar, are skipped.
+
+Calendar matches the address exactly, so a lookup that finds nothing is
+retried with the address lowercased. Calendar releases before 1.0.0.1 ignore
+the `email` parameter and answer the full list of registered users; the plugin
+then picks the user from it, which works but costs a full listing per change.
 
 ### Resource Data Format
 
