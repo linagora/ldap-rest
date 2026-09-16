@@ -26,6 +26,51 @@ export interface LdapServerConfig {
   domainComponents?: string[];
 }
 
+/**
+ * The embedded server's directory. Fixed, so that everything about it but its
+ * port is known before it starts: see embeddedLdapEnvVars().
+ */
+export const EMBEDDED_LDAP_CONFIG = {
+  baseDn: 'dc=example,dc=com',
+  adminDn: 'cn=admin,dc=example,dc=com',
+  adminPassword: 'adminpassword',
+  organization: 'Example Inc',
+  domainComponents: ['example', 'com'],
+};
+
+/**
+ * Environment variables describing a directory, all but its URL
+ */
+function directoryEnvVars(config: {
+  baseDn: string;
+  adminDn: string;
+  adminPassword: string;
+}): Record<string, string> {
+  return {
+    DM_LDAP_DN: config.adminDn,
+    DM_LDAP_PWD: config.adminPassword,
+    DM_LDAP_BASE: config.baseDn,
+    DM_LDAP_GROUP_BASE: `ou=groups,${config.baseDn}`,
+    DM_LDAP_TOP_ORGANIZATION: `ou=organization,${config.baseDn}`,
+    // External members branch for groups
+    DM_EXTERNAL_MEMBERS_BRANCH: `ou=external,${config.baseDn}`,
+    // Applicative accounts branch
+    DM_APPLICATIVE_ACCOUNT_BASE: `ou=applicative,${config.baseDn}`,
+    // Calendar resources branch, where the calendar tests create them
+    DM_CALENDAR_RESOURCE_BASE: `ou=resources,${config.baseDn}`,
+    // Trash branch
+    DM_TRASH_BRANCH: `ou=trash,${config.baseDn}`,
+  };
+}
+
+/**
+ * Environment variables of the embedded directory that do not depend on the
+ * port it will listen on, so they can be set before it starts.
+ */
+export function embeddedLdapEnvVars(): Record<string, string> {
+  return directoryEnvVars(EMBEDDED_LDAP_CONFIG);
+}
+
 export class LdapTestServer {
   private containerName: string;
   private config: Required<LdapServerConfig>;
@@ -459,21 +504,10 @@ export class LdapTestServer {
    */
   getEnvVars(): Record<string, string> {
     return {
+      ...directoryEnvVars(this.config),
       // DM uses these env vars (with DM_ prefix)
       DM_LDAP_URL: `ldap://localhost:${this.port}`,
-      DM_LDAP_DN: this.config.adminDn,
-      DM_LDAP_PWD: this.config.adminPassword,
-      DM_LDAP_BASE: this.config.baseDn,
-      DM_LDAP_GROUP_BASE: `ou=groups,${this.config.baseDn}`,
-      // External members branch for groups
-      DM_EXTERNAL_MEMBERS_BRANCH: `ou=external,${this.config.baseDn}`,
-      // Applicative accounts branch
-      DM_APPLICATIVE_ACCOUNT_BASE: `ou=applicative,${this.config.baseDn}`,
-      // Calendar resources branch, where the calendar tests create them
-      DM_CALENDAR_RESOURCE_BASE: `ou=resources,${this.config.baseDn}`,
-      // Trash branch
-      DM_TRASH_BRANCH: `ou=trash,${this.config.baseDn}`,
-      // Keep legacy names for hasExternalLdap() check
+      // Legacy name
       DM_LDAP_URI: `ldap://localhost:${this.port}`,
     };
   }
@@ -485,14 +519,7 @@ export class LdapTestServer {
 export async function createTestLdapServer(
   ldifFile?: string
 ): Promise<LdapTestServer> {
-  const server = new LdapTestServer({
-    baseDn: 'dc=example,dc=com',
-    adminDn: 'cn=admin,dc=example,dc=com',
-    adminPassword: 'adminpassword',
-    organization: 'Example Inc',
-    domainComponents: ['example', 'com'],
-    ldifFile,
-  });
+  const server = new LdapTestServer({ ...EMBEDDED_LDAP_CONFIG, ldifFile });
 
   await server.start();
   return server;

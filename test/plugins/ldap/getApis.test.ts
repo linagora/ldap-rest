@@ -114,16 +114,6 @@ describe('GET APIs for individual entities', function () {
   });
 
   describe('Organizations GET and subnodes', function () {
-    if (!process.env.DM_LDAP_TOP_ORGANIZATION) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Skipping organizations tests: DM_LDAP_TOP_ORGANIZATION not set'
-      );
-      // @ts-ignore
-      this.skip?.();
-      return;
-    }
-
     it('should get top organization', async () => {
       const res = await request.get('/api/v1/ldap/organizations/top');
       expect(res.status).to.equal(200);

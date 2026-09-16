@@ -3,21 +3,6 @@ import { DM } from '../../../src/bin';
 import TrashPlugin from '../../../src/plugins/ldap/trash';
 
 describe('Trash Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping trash tests: DM_LDAP_BASE, DM_LDAP_DN, and DM_LDAP_PWD env vars are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let plugin: TrashPlugin;
 

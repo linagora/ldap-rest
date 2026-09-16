@@ -73,10 +73,21 @@ export const LDAP_AND_DRIVE_ENV_VARS = [
 ] as const;
 
 /**
- * Check if external LDAP is configured (i.e., all required env vars are set)
+ * Whether an external LDAP was configured, read once when this module loads.
+ *
+ * test/setup.ts imports this before it sets the embedded directory's variables
+ * itself, so this reflects what the developer or CI provided. Reading the
+ * environment on every call answered `true` as soon as the embedded server
+ * was up, since its variables are then set too.
+ */
+const EXTERNAL_LDAP = LDAP_ENV_VARS.every(v => !!process.env[v]);
+
+/**
+ * Check if external LDAP is configured (i.e., all required env vars were set
+ * before the tests started)
  * Used to determine if we should use external LDAP or start embedded LDAP
  * @returns true if external LDAP is configured
  */
 export function hasExternalLdap(): boolean {
-  return LDAP_ENV_VARS.every(v => !!process.env[v]);
+  return EXTERNAL_LDAP;
 }

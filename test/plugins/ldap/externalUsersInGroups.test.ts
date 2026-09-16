@@ -8,21 +8,6 @@ const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
 
 describe('External users in groups', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_GROUP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldap/groups tests: DM_GROUP_BASE and LDAP_LIB env vars are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let plugin: LdapGroups;
   const user1 = `mail=toto@toto.org,${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
@@ -73,19 +58,20 @@ describe('External users in groups', function () {
   });
 
   describe('Mail domain validation', function () {
-    // Skip if mail_domain is not configured
-    if (!process.env.DM_MAIL_DOMAIN) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Skipping mail domain validation tests: DM_MAIL_DOMAIN not configured'
-      );
-      // @ts-ignore
-      this.skip?.();
-      return;
-    }
-
-    const managedDomain = process.env.DM_MAIL_DOMAIN.split(',')[0];
+    // Configured here rather than read from DM_MAIL_DOMAIN, which nothing
+    // sets: the plugin reads mail_domain from the shared config on each call
+    const managedDomain = 'managed.example.org';
     const managedUser = `mail=internal@${managedDomain},${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
+    let savedMailDomain: string[] | undefined;
+
+    before(() => {
+      savedMailDomain = server.config.mail_domain;
+      server.config.mail_domain = [managedDomain];
+    });
+
+    after(() => {
+      server.config.mail_domain = savedMailDomain;
+    });
 
     afterEach(async () => {
       try {
