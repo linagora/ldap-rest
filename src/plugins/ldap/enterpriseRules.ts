@@ -42,6 +42,7 @@ import {
   escapeLdapFilter,
   getParentDn,
   isDnInBranch,
+  normalizeDn,
   rdnValue,
 } from '../../lib/utils';
 import { BadRequestError, ConflictError } from '../../lib/errors';
@@ -191,8 +192,6 @@ export default class LdapEnterpriseRules extends DmPlugin {
   name = 'ldapEnterpriseRules';
   roles: Role[] = ['consistency'] as const;
 
-  /** Attribute holding the mail domain of a domain entry */
-  private domainNameAttribute: string;
   /** Placeholder member some directories keep to satisfy `groupOfNames` */
   private dummyMember?: string;
   /** Root of the organization tree */
@@ -200,8 +199,6 @@ export default class LdapEnterpriseRules extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    this.domainNameAttribute =
-      this.config.enterprise_domain_name_attribute || 'associatedDomain';
     this.dummyMember = this.config.group_dummy_user;
     this.topOrganization = this.config.ldap_top_organization;
     this.logger.info('Enterprise directory rules enabled');
@@ -292,14 +289,22 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @returns the binding, or undefined when the DN belongs to no known entity
    */
   private resolveEntity(dn: string): EntityBinding | undefined {
-    const target = dn.toLowerCase();
+    // By DN components, not by text: `uid=x, ou=users,…` addresses the same
+    // entry as `uid=x,ou=users,…`, and matching the text let the spaced form
+    // skip every rule — uniqueness, domains, dates, the path, the delete guard.
+    const target = normalizeDn(dn);
     let best: EntityBinding | undefined;
+    let bestDepth = -1;
     for (const binding of this.bindings()) {
-      const base = binding.base.toLowerCase();
+      const base = normalizeDn(binding.base);
       if (target === base) continue;
-      if (!target.endsWith(`,${base}`)) continue;
-      if (!binding.subtree && getParentDn(dn).toLowerCase() !== base) continue;
-      if (!best || binding.base.length > best.base.length) best = binding;
+      if (!isDnInBranch(dn, binding.base)) continue;
+      if (!binding.subtree && normalizeDn(getParentDn(dn)) !== base) continue;
+      const depth = base.split(',').length;
+      if (depth > bestDepth) {
+        best = binding;
+        bestDepth = depth;
+      }
     }
     return best;
   }
@@ -652,12 +657,20 @@ export default class LdapEnterpriseRules extends DmPlugin {
       ''
     ).toLowerCase();
 
+    const domainNameAttr = this.domainNameAttribute();
     while (cursor && !seen.has(cursor.toLowerCase())) {
       seen.add(cursor.toLowerCase());
       const org = await this.readEntry(cursor);
       for (const domainDn of valueList(org?.[domainLinkAttr])) {
         const domain = await this.readEntry(domainDn);
-        domains.push(...valueList(domain?.[this.domainNameAttribute]));
+        const names = valueList(domain?.[domainNameAttr]);
+        // A link to a domain that yields no name lifts the restriction for
+        // the whole subtree: say so rather than accept every address quietly.
+        if (names.length === 0)
+          this.logger.warn(
+            `Organization ${cursor} links to domain ${domainDn}, which has no "${domainNameAttr}": no mail domain restriction comes from it`
+          );
+        domains.push(...names);
       }
       if (cursor.toLowerCase() === stop) break;
       const parent = getParentDn(cursor);
@@ -666,24 +679,41 @@ export default class LdapEnterpriseRules extends DmPlugin {
     return domains;
   }
 
+  /**
+   * Attribute holding the mail domain of a domain entry.
+   *
+   * Role first, as its sibling `domainLink` is: a deployment naming the
+   * attribute otherwise and declaring the role is exactly what the marker is
+   * for, and reading only the option made the rule search an attribute its
+   * entries do not have — and accept every address, silently.
+   *
+   * @returns the attribute name
+   */
+  private domainNameAttribute(): string {
+    for (const binding of this.bindings()) {
+      const name = roleAttribute(binding.schema, 'domainName');
+      if (name) return name;
+    }
+    return this.config.enterprise_domain_name_attribute || 'associatedDomain';
+  }
+
   /** Every mail domain declared anywhere in the directory. */
   private async directoryDomains(): Promise<string[]> {
     const base = this.config.ldap_base;
     if (!base) return [];
+    const domainNameAttr = this.domainNameAttribute();
     const result = (await this.server.ldap.search(
       {
         paged: false,
         scope: 'sub',
-        filter: `(${this.domainNameAttribute}=*)`,
-        attributes: [this.domainNameAttribute],
+        filter: `(${domainNameAttr}=*)`,
+        attributes: [domainNameAttr],
       },
       base
     )) as SearchResult;
     const domains: string[] = [];
     for (const entry of result.searchEntries || [])
-      domains.push(
-        ...valueList(entry[this.domainNameAttribute] as AttributeValue)
-      );
+      domains.push(...valueList(entry[domainNameAttr] as AttributeValue));
     return domains;
   }
 

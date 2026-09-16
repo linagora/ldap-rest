@@ -25,7 +25,7 @@ The organizations plugin only exposes its schema when one is given:
 
 | Option                               | Default             | Purpose                                                             |
 | ------------------------------------ | ------------------- | ------------------------------------------------------------------- |
-| `--enterprise-domain-name-attribute` | `associatedDomain`  | Attribute holding the mail domain of a domain entry                 |
+| `--enterprise-domain-name-attribute` | `associatedDomain`  | Fallback when no loaded schema declares a `domainName` role         |
 | `--enterprise-domain-link-attribute` | _(from the schema)_ | Fallback when the organization schema declares no `domainLink` role |
 | `--group-dummy-user`                 | `cn=fakeuser`       | Placeholder member that does not count towards `deleteGuard`        |
 

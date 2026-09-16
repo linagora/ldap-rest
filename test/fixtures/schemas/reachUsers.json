@@ -1,0 +1,41 @@
+{
+  "strict": true,
+  "entity": {
+    "name": "reachUser",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
+    "singularName": "reachUser",
+    "pluralName": "reachUsers",
+    "base": "ou=users,__ldap_base__"
+  },
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "default": ["top", "twakeAccount", "twakeWhitePages"]
+    },
+    "uid": {
+      "type": "string",
+      "required": true,
+      "test": "^[a-zA-Z0-9._-]{1,255}$"
+    },
+    "cn": { "type": "string", "required": true },
+    "sn": { "type": "string", "required": true },
+    "mail": {
+      "type": "string",
+      "required": true,
+      "mailDomainScope": "organization"
+    },
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "required": false,
+      "role": "organizationLink"
+    },
+    "twakeDeletionDate": {
+      "type": "date",
+      "required": false,
+      "role": "accountExpiry",
+      "hint": "Expected a date not earlier than today"
+    }
+  }
+}
