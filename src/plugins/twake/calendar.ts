@@ -6,6 +6,22 @@ import type { AttributesList } from '../../lib/ldapActions';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { Hooks } from '../../hooks';
 
+/** A Twake Calendar registered user, as the WebAdmin API returns it */
+interface RegisteredUser {
+  id: string;
+  email: string;
+  firstname?: string;
+  lastname?: string;
+}
+
+function isRegisteredUser(value: unknown): value is RegisteredUser {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'string'
+  );
+}
+
 /**
  * Plugin to sync LDAP resources and users with Twake Calendar
  *
@@ -267,12 +283,96 @@ export default class Calendar extends TwakePlugin {
   }
 
   /**
+   * Find a Calendar registered user by email.
+   *
+   * `GET /registeredUsers?email=…` answers the one user, or 404. Calendar
+   * lower-cases the address before matching it (James's `Username` folds both
+   * parts), which is also how it stores every address, so a case difference
+   * between LDAP and Calendar does not matter. The one record this misses is
+   * a legacy one whose stored address kept upper case, written without going
+   * through `Username`; the full-list lookup used before did find it.
+   *
+   * Calendar releases before 1.0.0.1 ignore the `email` parameter and answer
+   * the full list; the user is then picked from it, case-insensitively.
+   *
+   * @param email Address Calendar holds for the user
+   * @param log Log context of the calling sync
+   * @returns The registered user, or null when it is not registered or the
+   *   lookup failed (both logged)
+   */
+  private async findRegisteredUser(
+    email: string,
+    log: Record<string, unknown>
+  ): Promise<RegisteredUser | null> {
+    const lookupLog = {
+      ...log,
+      step: 'find_registered_user',
+      searchEmail: email,
+    };
+    const url = new URL(`${this.webadminUrl}/registeredUsers`);
+    url.searchParams.set('email', email);
+    const res = await this.requestLimit(() =>
+      fetch(url.toString(), {
+        method: 'GET',
+        headers: this.createHeaders(),
+      })
+    );
+
+    if (res.status !== 404) {
+      if (!res.ok) {
+        this.logger.error({
+          ...lookupLog,
+          http_status: res.status,
+          http_status_text: res.statusText,
+        });
+        return null;
+      }
+
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch (err) {
+        this.logger.error({
+          ...lookupLog,
+          http_status: res.status,
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          error: `unreadable answer: ${err}`,
+        });
+        return null;
+      }
+
+      if (!Array.isArray(body)) {
+        if (isRegisteredUser(body)) return body;
+        // Without an id there is nothing to PATCH: `?id=undefined` would go out
+        this.logger.error({
+          ...lookupLog,
+          http_status: res.status,
+          error: 'answer is not a registered user',
+        });
+        return null;
+      }
+
+      const user = body.find(
+        u =>
+          isRegisteredUser(u) && u.email?.toLowerCase() === email.toLowerCase()
+      ) as RegisteredUser | undefined;
+      if (user) return user;
+    }
+
+    this.logger.warn({
+      ...lookupLog,
+      message: 'user not registered in Calendar',
+    });
+    return null;
+  }
+
+  /**
    * Synchronize an LDAP user's identity (email, first and last name) to the
    * Twake Calendar registered users via the WebAdmin API.
    *
-   * Registered users are keyed by an internal id, and `GET /registeredUsers`
-   * exposes no filter, so we list all registered users, locate the entry by
-   * email, then `PATCH /registeredUsers?id={id}` with the LDAP values.
+   * Registered users are keyed by an internal id: the user is looked up with
+   * `GET /registeredUsers?email=…` (see findRegisteredUser), then
+   * `PATCH /registeredUsers?id={id}` with the LDAP values.
    *
    * @param event Hook name, used for logging
    * @param dn LDAP DN of the user
@@ -320,41 +420,9 @@ export default class Calendar extends TwakePlugin {
     const searchEmail = lookupEmail || mail;
 
     try {
-      // Step 1: list registered users and find the one matching searchEmail
-      const listRes = await this.requestLimit(() =>
-        fetch(`${this.webadminUrl}/registeredUsers`, {
-          method: 'GET',
-          headers: this.createHeaders(),
-        })
-      );
-      if (!listRes.ok) {
-        this.logger.error({
-          ...log,
-          step: 'list_registered_users',
-          http_status: listRes.status,
-          http_status_text: listRes.statusText,
-        });
-        return;
-      }
-
-      const users = (await listRes.json()) as Array<{
-        id: string;
-        email: string;
-        firstname?: string;
-        lastname?: string;
-      }>;
-      const existing = users.find(
-        u => u.email?.toLowerCase() === searchEmail.toLowerCase()
-      );
-      if (!existing) {
-        this.logger.warn({
-          ...log,
-          step: 'find_registered_user',
-          searchEmail,
-          message: 'user not registered in Calendar',
-        });
-        return;
-      }
+      // Step 1: find the registered user by email
+      const existing = await this.findRegisteredUser(searchEmail, log);
+      if (!existing) return;
 
       // Step 2: PATCH the registered user by id with the LDAP values
       const patchUrl = new URL(`${this.webadminUrl}/registeredUsers`);

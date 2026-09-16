@@ -274,20 +274,18 @@ describe('Twake Calendar Plugin', function () {
       nock.cleanAll();
     });
 
-    it('lists registered users and PATCHes the one matching the email', async () => {
+    it('looks the user up by email and PATCHes it', async () => {
       let patchBody: Record<string, unknown> | null = null;
       let patchUri = '';
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .reply(200, [
-          {
-            id: '5f50a663',
-            email: 'caluser@test.org',
-            firstname: 'Old',
-            lastname: 'Name',
-          },
-          { id: 'other', email: 'someoneelse@test.org' },
-        ])
+        .query({ email: 'caluser@test.org' })
+        .reply(200, {
+          id: '5f50a663',
+          email: 'caluser@test.org',
+          firstname: 'Old',
+          lastname: 'Name',
+        })
         .patch('/registeredUsers', body => {
           patchBody = body as Record<string, unknown>;
           return true;
@@ -314,14 +312,13 @@ describe('Twake Calendar Plugin', function () {
       let patchUri = '';
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .reply(200, [
-          {
-            id: 'abc123',
-            email: 'old@test.org',
-            firstname: 'Benoit',
-            lastname: 'TELLIER',
-          },
-        ])
+        .query({ email: 'old@test.org' })
+        .reply(200, {
+          id: 'abc123',
+          email: 'old@test.org',
+          firstname: 'Benoit',
+          lastname: 'TELLIER',
+        })
         .patch('/registeredUsers', body => {
           patchBody = body as Record<string, unknown>;
           return true;
@@ -349,19 +346,133 @@ describe('Twake Calendar Plugin', function () {
     it('does not PATCH when the user is not registered in Calendar', async () => {
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .reply(200, [{ id: 'other', email: 'someoneelse@test.org' }]);
+        .query({ email: 'caluser@test.org' })
+        .reply(404, { message: 'User does not exist' });
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
 
       await calendar.syncRegisteredUser('test', userDN);
 
-      // GET happened, no PATCH was issued (would throw on unmocked request)
       expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
+    });
+
+    it('stops on a lookup error, without PATCHing', async () => {
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'old@test.org' })
+        .reply(500);
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
+
+      await calendar.hooks.onLdapChange!(userDN, {
+        mail: ['old@test.org', 'caluser@test.org'],
+      });
+
+      expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
+    });
+
+    it('does not PATCH when the answer is not JSON, and says which lookup failed', async () => {
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'caluser@test.org' })
+        .reply(200, '<html>Bad gateway</html>');
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
+      const errors: Record<string, unknown>[] = [];
+      const logger = calendar.logger;
+      const originalError = logger.error.bind(logger);
+      logger.error = ((entry: Record<string, unknown>) => {
+        errors.push(entry);
+        return logger;
+      }) as typeof logger.error;
+
+      try {
+        await calendar.syncRegisteredUser('test', userDN);
+      } finally {
+        logger.error = originalError;
+      }
+
+      expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
+      expect(errors).to.have.length(1);
+      expect(errors[0]).to.include({
+        step: 'find_registered_user',
+        searchEmail: 'caluser@test.org',
+        http_status: 200,
+      });
+    });
+
+    it('does not PATCH when the answer has no id', async () => {
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'caluser@test.org' })
+        .reply(200, { message: 'User does not exist' });
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
+
+      await calendar.syncRegisteredUser('test', userDN);
+
+      expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
+    });
+
+    it('picks the user from the full list on Calendar before 1.0.0.1', async () => {
+      // Older releases ignore ?email= and answer every registered user
+      let patchUri = '';
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'caluser@test.org' })
+        .reply(200, [
+          { id: 'other', email: 'someoneelse@test.org' },
+          { id: 'legacy1', email: 'CalUser@test.org' },
+        ])
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(function (uri) {
+          patchUri = uri;
+          return [204];
+        });
+
+      await calendar.syncRegisteredUser('test', userDN);
+
+      expect(scope.isDone()).to.be.true;
+      expect(patchUri).to.contain('id=legacy1');
+    });
+
+    it('does not PATCH when the user is missing from the full list', async () => {
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query({ email: 'caluser@test.org' })
+        .reply(200, [{ id: 'other', email: 'someoneelse@test.org' }]);
+      const patch = nock(calendarUrl)
+        .patch('/registeredUsers')
+        .query(true)
+        .reply(204);
+
+      await calendar.syncRegisteredUser('test', userDN);
+
+      expect(scope.isDone()).to.be.true;
+      expect(patch.isDone()).to.be.false;
     });
 
     it('skips sync when the mail is added (no previous mail)', async () => {
       // An unmocked request would not do: syncRegisteredUser catches the
       // error nock throws. The interceptor stays pending only if no call
       // was made.
-      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query(true)
+        .reply(200, []);
 
       await calendar.hooks.onLdapChange!(userDN, {
         mail: [null, 'caluser@test.org'],
@@ -375,14 +486,13 @@ describe('Twake Calendar Plugin', function () {
       let patchUri = '';
       const scope = nock(calendarUrl)
         .get('/registeredUsers')
-        .reply(200, [
-          {
-            id: 'nm1',
-            email: 'caluser@test.org',
-            firstname: 'Old',
-            lastname: 'Name',
-          },
-        ])
+        .query({ email: 'caluser@test.org' })
+        .reply(200, {
+          id: 'nm1',
+          email: 'caluser@test.org',
+          firstname: 'Old',
+          lastname: 'Name',
+        })
         .patch('/registeredUsers', body => {
           patchBody = body as Record<string, unknown>;
           return true;
@@ -409,7 +519,10 @@ describe('Twake Calendar Plugin', function () {
 
     it('ignores changes to unrelated attributes', async () => {
       // See 'skips sync when the mail is added' for why an interceptor
-      const scope = nock(calendarUrl).get('/registeredUsers').reply(200, []);
+      const scope = nock(calendarUrl)
+        .get('/registeredUsers')
+        .query(true)
+        .reply(200, []);
 
       await calendar.hooks.onLdapChange!(userDN, {
         description: ['before', 'after'],

@@ -17,6 +17,14 @@
   with a non-breaking space are now trimmed, and a BOM before the first header
   no longer ends up in the column name
 
+### Improvements
+
+- `plugins/twake/calendar`: a user email or name change looks the Calendar
+  registered user up with `GET /registeredUsers?email=…` instead of
+  downloading every registered user. Calendar lower-cases the address itself;
+  a legacy record stored with upper case is no longer found. Calendar releases
+  before 1.0.0.1, which ignore the parameter, keep working
+
 ### Deprecations
 
 - `plugins/twake/calendarResources` is renamed `plugins/twake/calendar`, see
