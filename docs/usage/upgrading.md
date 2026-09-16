@@ -89,6 +89,33 @@ stored data:
 Stored values are left alone. The refusal comes at the next update of an
 offending entry, which is why it is worth knowing beforehand.
 
+### `employeeNumber` is unique, placeholders included
+
+**Who is affected:** directories where several accounts share a placeholder
+employee number (a value standing for "not an individual", say).
+
+`static/schemas/twake/users.json` declares `employeeNumber` `unique: true`,
+with no exemption. Once `core/ldap/enterpriseRules` is loaded, every creation
+or update carrying a value another account already holds answers `409` — the
+second account given the placeholder included, and every existing holder of it
+at its next update of that attribute. The audit above cannot warn: uniqueness
+spans the whole directory, and it only checks what each entry says on its own.
+
+Find the shared values before switching:
+
+```bash
+ldapsearch -LLL -b "ou=users,<base>" "(employeeNumber=*)" employeeNumber \
+  | awk '/^employeeNumber:/ {print $2}' | sort | uniq -cd
+```
+
+A placeholder is a deployment's convention, not the product's, so the shipped
+schema does not name one. Declare yours in a copy of the schema, the way
+`static/schemas/example/users.json` does:
+
+```json
+"unique": { "sentinel": "YOUR-PLACEHOLDER" }
+```
+
 ### A flat schema may not claim a URL an LDAP plugin serves
 
 **Who is affected:** anyone passing `--ldap-flat-schema` a schema whose

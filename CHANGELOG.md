@@ -26,7 +26,9 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   required: `employeeNumber`, `displayName` and `givenName`. `cn` stops being
   required, as it was there — 689 accounts of the reference directory have
   none. The `displayName` role moves from `cn` to `displayName`, `cn` holding
-  the name surname-first and `displayName` the readable order
+  the name surname-first and `displayName` the readable order. `employeeNumber`
+  is unique with no placeholder exempt, see
+  [Upgrading](docs/usage/upgrading.md#employeenumber-is-unique-placeholders-included)
 
 - An attribute both `required` and `generated` needs a plugin that fills it:
   the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
