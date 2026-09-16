@@ -266,7 +266,10 @@ POST /api/v1/ldap/organizations/:dn/move
 
 - Moves an organization to a different parent organization
 - The organization will become a child of the target organization
-- All sub-organizations and linked entities (users/groups) move with it
+- All sub-organizations and linked entities (users/groups) move with it. With
+  `core/ldap/departmentSync` loaded, the path of the organization and of every
+  sub-organization is recomputed, then the linked entities take the new link
+  and path; without it, those paths keep naming the former parent
 - Cannot move an organization into itself or its own descendants (circular reference prevention)
 - Cannot move to the same parent (no-op)
 - Target must be a valid organizational unit

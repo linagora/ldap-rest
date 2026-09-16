@@ -115,6 +115,11 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   apostrophe or an `&`. Loading such a directory failed on its first
   organization
 
+- `plugins/ldap/departmentSync`: moving or renaming an organization left the
+  organization and its whole subtree with the path of their former parent, and
+  rewrote the linked users and groups to those stale paths. The paths of the
+  tree are recomputed first now, then the linked entries copy them
+
 - `test/helpers`: a failing LDIF load reported "Already exists" whatever the
   real cause, every error being retried over the entries a half-finished first
   attempt had left behind. Only a connection failure is retried now
