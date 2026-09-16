@@ -121,6 +121,29 @@ export function parseByteSize(raw: AttributeValue): number {
 }
 
 /**
+ * Tell whether the enterprise rules fill a generated attribute: a default the
+ * server owns, applied on creation, or the organization path, derived from the
+ * link or from the tree.
+ *
+ * A function of the schema alone, so that `audit:directory` asks the same
+ * question the server asks without loading the plugin.
+ *
+ * @param name attribute name
+ * @param attr its schema definition
+ * @param schema schema it belongs to
+ * @returns true when the rules supply a value
+ */
+export function fillsGeneratedAttribute(
+  name: string,
+  attr: SchemaAttribute,
+  schema: Schema
+): boolean {
+  if (attr.default !== undefined && (attr.generated || attr.normalize))
+    return true;
+  return roleAttribute(schema, 'organizationPath') === name;
+}
+
+/**
  * Parse a directory date: an LDAP generalized time or anything `Date`
  * understands.
  *
@@ -251,11 +274,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     attr: SchemaAttribute,
     schema: Schema
   ): boolean {
-    // A default the server owns, applied on creation.
-    if (attr.default !== undefined && (attr.generated || attr.normalize))
-      return true;
-    // The organization path, derived from the link or from the tree.
-    return roleAttribute(schema, 'organizationPath') === name;
+    return fillsGeneratedAttribute(name, attr, schema);
   }
 
   /**
@@ -501,6 +520,15 @@ export default class LdapEnterpriseRules extends DmPlugin {
 
     const pathAttr = roleAttribute(entity.schema, 'organizationPath');
     if (!pathAttr) return;
+    // Computed when the schema says the server owns it, or when nobody sent
+    // one. A schema copy that drops `generated` hands the path back to the
+    // client, as the upgrade notes promise: overwriting what it sent would
+    // turn that promise into a silent substitution.
+    if (
+      !entity.schema.attributes[pathAttr]?.generated &&
+      values[pathAttr] !== undefined
+    )
+      return;
 
     const linkAttr = roleAttribute(entity.schema, 'organizationLink');
     if (linkAttr) {

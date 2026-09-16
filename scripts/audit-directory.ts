@@ -32,6 +32,19 @@ import type { Schema, SchemaAttribute } from '../src/config/schema';
 // `isDnInBranch` only reads DNs; it brings in the error classes and the
 // response helpers and nothing else, so the script stays a script.
 import { isDnInBranch } from '../src/lib/utils';
+import { fillsGeneratedAttribute } from '../src/plugins/ldap/enterpriseRules';
+
+/**
+ * The plugins that fill generated attributes, and what each fills — the
+ * question the server asks every loaded plugin before exempting a required
+ * attribute from its check.
+ */
+const GENERATED_FILLERS: Record<
+  string,
+  (name: string, attr: SchemaAttribute, schema: Schema) => boolean
+> = {
+  'core/ldap/enterpriseRules': fillsGeneratedAttribute,
+};
 
 interface Options {
   schema: string;
@@ -42,6 +55,8 @@ interface Options {
   filter: string;
   /** Offending entries listed per attribute before the report stops naming them */
   samples: number;
+  /** Plugins the server loads, as `--plugin` names them */
+  plugins: string[];
 }
 
 /** One attribute's worth of findings. */
@@ -63,13 +78,22 @@ export interface Finding {
  */
 export function parseOptions(argv: string[]): Options {
   const flags: Record<string, string> = {};
+  const plugins: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith('--')) continue;
     const eq = arg.indexOf('=');
-    if (eq > 0) flags[arg.slice(2, eq)] = arg.slice(eq + 1);
-    else flags[arg.slice(2)] = argv[++i] ?? '';
+    const name = eq > 0 ? arg.slice(2, eq) : arg.slice(2);
+    const value = eq > 0 ? arg.slice(eq + 1) : (argv[++i] ?? '');
+    // Repeatable, as on the server
+    if (name === 'plugin') plugins.push(value);
+    else flags[name] = value;
   }
+  for (const plugin of plugins)
+    if (!GENERATED_FILLERS[plugin])
+      process.stderr.write(
+        `audit-directory: --plugin ${plugin} fills no generated attribute the audit knows of, ignored\n`
+      );
 
   const schema = flags.schema;
   if (!schema) throw new Error('--schema <file> is required');
@@ -85,6 +109,7 @@ export function parseOptions(argv: string[]): Options {
     bindPassword: flags['bind-password'] || process.env.DM_LDAP_PWD || '',
     filter: flags.filter || '(objectClass=*)',
     samples: Number(flags.samples || 5),
+    plugins,
   };
 }
 
@@ -167,13 +192,15 @@ function valueList(value: unknown): string[] {
  * @param schema schema to check against
  * @param report findings so far, updated in place
  * @param sampleLimit offending entries to keep per finding
+ * @param plugins plugins the server loads, as `--plugin` names them
  */
 export function auditEntry(
   dn: string,
   entry: Record<string, unknown>,
   schema: Schema,
   report: Map<string, Finding>,
-  sampleLimit = 100
+  sampleLimit = 100,
+  plugins: string[] = []
 ): void {
   // LDAP attribute names are case-insensitive (RFC 4512) and a directory
   // answers with the case it was written in, which is not always the schema's.
@@ -211,8 +238,23 @@ export function auditEntry(
     if (name === 'objectClass') continue;
     const values = valueList(byName.get(name.toLowerCase()));
 
-    if (definition.required && values.length === 0 && !definition.generated) {
-      add(name, 'missing', '', definition);
+    // Exempt what the server exempts, and no more: a generated attribute
+    // derived by the entity itself, or one a loaded plugin fills. Exempting
+    // every `generated` one reported clean a branch the server refuses to
+    // create into when nothing fills the attribute.
+    const filled =
+      definition.generated &&
+      (definition.generatedFrom ||
+        plugins.some(plugin =>
+          GENERATED_FILLERS[plugin]?.(name, definition, schema)
+        ));
+    if (definition.required && values.length === 0 && !filled) {
+      add(
+        name,
+        definition.generated ? 'missing, and no --plugin fills it' : 'missing',
+        '',
+        definition
+      );
       continue;
     }
 
@@ -325,7 +367,14 @@ export async function audit(options: Options): Promise<boolean> {
       // The base of the branch is not an entry of the entity.
       if (String(entry.dn).toLowerCase() === base.toLowerCase()) continue;
       total++;
-      auditEntry(String(entry.dn), entry, schema, report, options.samples);
+      auditEntry(
+        String(entry.dn),
+        entry,
+        schema,
+        report,
+        options.samples,
+        options.plugins
+      );
     }
     return printReport([...report.values()], total, options.samples);
   } finally {

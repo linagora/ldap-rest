@@ -72,7 +72,8 @@ these is a `generated` or `readOnly` flag in the JSON, not code.
 release.
 
 ```bash
-npm run audit:directory -- --schema static/schemas/twake/users.json
+npm run audit:directory -- --schema static/schemas/twake/users.json \
+  --plugin core/ldap/enterpriseRules
 ```
 
 It reads the branch as it stands and reports what the schema would now refuse,
