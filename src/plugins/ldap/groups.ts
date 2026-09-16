@@ -1144,7 +1144,9 @@ export default class LdapGroups extends DmPlugin {
         throw new Error(
           `Schema error: array of array not supported for ${field}`
         );
-      if (test.items.type !== 'pointer')
+      // Element types are checked where they always were: alongside a
+      // pattern. Doing it for every array tightened what groups accept.
+      if (test.items.test && test.items.type !== 'pointer')
         for (const v of value)
           if (typeof v !== test.items.type)
             throw new BadRequestError(
