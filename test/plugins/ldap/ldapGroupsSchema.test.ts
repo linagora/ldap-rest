@@ -7,9 +7,11 @@ import { fileURLToPath } from 'url';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 
+// The link must name an organization that exists: the group schema's pointer
+// is checked. Test Org 1 comes from test/fixtures/base-structure.ldif.
 const twakeAttr = {
-  twakeDepartmentPath: 'Test / SubTest',
-  twakeDepartmentLink: `ou=Test,${process.env.DM_LDAP_GROUP_BASE}`,
+  twakeDepartmentPath: 'Test Org 1',
+  twakeDepartmentLink: `ou=Test Org 1,${process.env.DM_LDAP_TOP_ORGANIZATION}`,
 };
 
 describe('LdapGroups validation', function () {
@@ -18,9 +20,11 @@ describe('LdapGroups validation', function () {
 
   const user1 = `uid=user1,${process.env.DM_LDAP_BASE}`;
   const user2 = `uid=user2,${process.env.DM_LDAP_BASE}`;
+  let previousGroupSchema: string | undefined;
 
   before(async () => {
     server = new DM();
+    previousGroupSchema = process.env.DM_GROUP_SCHEMA;
     process.env.DM_GROUP_SCHEMA = join(
       dirname(fileURLToPath(import.meta.url)),
       '..',
@@ -50,6 +54,8 @@ describe('LdapGroups validation', function () {
     } catch (e) {
       // ignore
     }
+    if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
+    else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
   });
 
   afterEach(async () => {
