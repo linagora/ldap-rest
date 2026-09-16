@@ -32,8 +32,6 @@ import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
-  escapeRegex,
-  getCompiledRegex,
   launchHooks,
   launchHooksChained,
   substringSearchFilter,
@@ -44,6 +42,8 @@ import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
+  checkDnValues,
+  matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
 } from '../../config/schema';
@@ -1071,7 +1071,7 @@ export default class LdapGroups extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
-        throw new Error(`Invalid value for field ${field}`);
+        throw new BadRequestError(`Invalid value for field ${field}`);
       }
     }
     // Check required fields. A `generated` attribute is exempt, as it is on
@@ -1122,102 +1122,53 @@ export default class LdapGroups extends DmPlugin {
     value: AttributeValue | null
   ): Promise<boolean> {
     if (!this.schema) return true;
+    // Every refusal of a value is a 400: a plain Error reached the client as
+    // a 500 "check logs".
     const test = this.schema.attributes[field];
     if (!test) {
-      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      if (this.schema.strict)
+        throw new BadRequestError(`Field ${field} is not allowed`);
       return true;
     }
     if (value === null || value === undefined) {
-      if (test.required) throw new Error(`Field ${field} is required`);
+      if (test.required)
+        throw new BadRequestError(`Field ${field} is required`);
       return true;
     }
     if (test.type === 'array') {
       if (!Array.isArray(value))
-        throw new Error(`Field ${field} must be an array`);
+        throw new BadRequestError(`Field ${field} must be an array`);
       if (!test.items)
         throw new Error(`Schema error: no item for array ${field}`);
       if (test.items.type === 'array')
         throw new Error(
           `Schema error: array of array not supported for ${field}`
         );
-      if (test.items.test) {
-        const itemRegex =
-          typeof test.items.test === 'string'
-            ? getCompiledRegex(test.items.test)
-            : test.items.test;
-        for (let v of value) {
+      if (test.items.type !== 'pointer')
+        for (const v of value)
           if (typeof v !== test.items.type)
-            throw new Error(
+            throw new BadRequestError(
               `Field ${field} must be of type ${test.items.type}`
             );
-          if (typeof v !== 'string') v = v.toString();
-          if (!itemRegex.test(v))
-            throw new Error(`Field ${field} has invalid value ${v}`);
-        }
-      }
-    } else if (test.type === 'pointer') {
-      if (typeof value !== 'string')
-        throw new Error(`Field ${field} must be a string (DN pointer)`);
-
-      const dnValue: string = value;
-
-      // Check branch restriction if provided
-      if (test.branch && test.branch.length > 0) {
-        const isInBranch = test.branch.some(branch => {
-          const branchPattern = getCompiledRegex(
-            `,?${escapeRegex(branch)}$`,
-            'i'
-          );
-          return branchPattern.test(dnValue);
-        });
-        if (!isInBranch) {
-          throw new Error(
-            `Field ${field} must point to a DN within allowed branches: ${test.branch.join(', ')}`
-          );
-        }
-      }
-
-      // Verify that the DN exists in LDAP (will use cache)
-      try {
-        const result = (await this.ldap.search(
-          { paged: false, scope: 'base' },
-          dnValue
-        )) as SearchResult;
-        if (
-          !result ||
-          !result.searchEntries ||
-          result.searchEntries.length === 0
-        )
-          throw new Error(
-            `Field ${field} points to non-existent DN: ${dnValue}`
-          );
-      } catch (err) {
-        throw new Error(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `Field ${field} points to invalid or non-existent DN: ${dnValue}: ${err}`
-        );
-      }
-      // Also check test regex if provided
-      if (test.test) {
-        const testRegex =
-          typeof test.test === 'string'
-            ? getCompiledRegex(test.test)
-            : test.test;
-        if (!testRegex.test(dnValue))
-          throw new Error(`Field ${field} has invalid value ${dnValue}`);
-      }
-    } else {
-      if (typeof value !== test.type) return false;
-      if (typeof value !== 'string') value = value.toString();
-      if (test.test) {
-        const testRegex =
-          typeof test.test === 'string'
-            ? getCompiledRegex(test.test)
-            : test.test;
-        if (!testRegex.test(value))
-          throw new Error(`Field ${field} has invalid value ${value}`);
-      }
+    } else if (test.type !== 'pointer' && typeof value !== test.type) {
+      return false;
     }
+    // A pointer, or the elements of an array of them, checked the way the
+    // flat entities check theirs: branch compared RDN by RDN — the `,?<branch>$`
+    // pattern read `uid=x,xou=users,…` as inside `ou=users,…` — and the target
+    // looked up. `items.branch` and the existence of array elements were not
+    // read at all here.
+    await checkDnValues(field, test, value, async dn => {
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: ['dn'] },
+        dn
+      )) as SearchResult;
+      return result.searchEntries.length > 0;
+    });
+    if (!matchesPattern(test, value))
+      throw new BadRequestError(
+        `Field ${field} has invalid value ${String(value)}`
+      );
     return true;
   }
 

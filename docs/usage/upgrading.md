@@ -79,9 +79,10 @@ It reads the branch as it stands and reports what the schema would now refuse,
 quoting each rule's own `hint`. Two rules tightened in ways that only show on
 stored data:
 
-- an array's `items.test` and `items.branch` are enforced on the flat routes,
-  where they never were — `mailAlternateAddress` has carried a pattern since
-  0.7.0 and accepted anything;
+- an array's `items.test` and `items.branch` are enforced on the flat,
+  organization and group routes, where they never were —
+  `mailAlternateAddress` has carried a pattern since 0.7.0 and accepted
+  anything — and an array of pointers must name existing entries;
 - a pointer's `branch` is compared RDN by RDN. A DN that merely ended with the
   branch as text, `uid=x,xou=users,dc=example,dc=com` against
   `ou=users,dc=example,dc=com`, used to pass.
