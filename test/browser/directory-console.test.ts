@@ -10,7 +10,11 @@ import { expect } from 'chai';
 import nock from 'nock';
 
 import { ConsoleApiClient } from '../../src/browser/directory-console/api/ConsoleApiClient';
-import { readFailure } from '../../src/browser/directory-console/DirectoryConsole';
+import {
+  ToastController,
+  createdEntryId,
+  readFailure,
+} from '../../src/browser/directory-console/DirectoryConsole';
 import {
   attributeLabel,
   rdnValue,
@@ -224,6 +228,77 @@ describe('Directory console', () => {
         rdnValue('cn=Smith\\, John,ou=positions,dc=example,dc=com')
       ).to.equal('Smith, John');
       expect(rdnValue('not a dn')).to.equal('not a dn');
+    });
+  });
+
+  describe('opening a created entry', () => {
+    it('should read the identifier the flat endpoint answered', () => {
+      expect(
+        createdEntryId(users, { uid: 'jdoe' }, { mail: 'jdoe@example.com' })
+      ).to.equal('jdoe');
+    });
+
+    it('should read it whatever case the directory answered in', () => {
+      // `created.uid` threw on `UID`, and the console reported an error for
+      // an entry it had just created.
+      expect(createdEntryId(users, { UID: ['jdoe'] }, {})).to.equal('jdoe');
+    });
+
+    it('should fall back to what the form sent when the answer holds no entry', () => {
+      // The groups endpoint answers `{success: true}`: the console used to
+      // open `#/groups/` and never show the group just created.
+      expect(
+        createdEntryId(groups, { success: true }, { cn: 'staff' })
+      ).to.equal('staff');
+      expect(createdEntryId(groups, null, { cn: ['staff'] })).to.equal('staff');
+    });
+
+    it('should answer nothing rather than a bogus identifier', () => {
+      expect(createdEntryId(groups, { success: true }, {})).to.equal('');
+    });
+  });
+
+  describe('the toast', () => {
+    /** A toast element and a clock the test advances by hand. */
+    const setup = () => {
+      const element = {
+        textContent: '',
+        hidden: true,
+        onclick: null as unknown,
+        classList: { toggle: () => undefined },
+      } as unknown as HTMLElement;
+      return { element, toasts: new ToastController(() => element, 20) };
+    };
+    const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    it('should hide an ordinary message after a while', async () => {
+      const { element, toasts } = setup();
+      toasts.show('Saved');
+      expect(element.hidden).to.be.false;
+      await wait(40);
+      expect(element.hidden).to.be.true;
+    });
+
+    it('should keep a sticky message shown after an earlier one', async () => {
+      // An earlier message's timer went on running and hid the generated
+      // password, which is shown once and cannot be fetched again.
+      const { element, toasts } = setup();
+      toasts.show('Status changed');
+      toasts.show('Generated password: s3cret', false, true);
+      await wait(40);
+      expect(element.hidden).to.be.false;
+      expect(element.textContent).to.equal('Generated password: s3cret');
+    });
+
+    it('should give a new message its whole delay', async () => {
+      const { element, toasts } = setup();
+      toasts.show('First');
+      await wait(12);
+      toasts.show('Second');
+      await wait(12);
+      expect(element.hidden, 'hidden by the first timer').to.be.false;
+      await wait(20);
+      expect(element.hidden).to.be.true;
     });
   });
 
