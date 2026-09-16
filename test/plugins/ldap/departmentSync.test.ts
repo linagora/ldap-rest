@@ -48,10 +48,14 @@ describe('LDAP Department Sync Plugin', function () {
 
   afterEach(async () => {
     // Clean up all test entries
+    const targetOrgDn = `ou=SyncTarget,${DM_LDAP_TOP_ORGANIZATION}`;
     const cleanupEntries = [
       testUser2Dn,
       testUserDn,
       testGroupDn,
+      `ou=SubOrg2,ou=SubOrg1,${targetOrgDn}`,
+      `ou=SubOrg1,${targetOrgDn}`,
+      targetOrgDn,
       `ou=SubOrg2,ou=SubOrg1,${movedOrgDn}`,
       `ou=SubOrg1,${movedOrgDn}`,
       testSubOrg2Dn,
@@ -107,7 +111,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.add(testOrgDn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SyncTestOrg',
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Create user linked to organization
@@ -118,16 +122,11 @@ describe('LDAP Department Sync Plugin', function () {
         sn: 'User',
         mail: 'synctestuser@example.org',
         [linkAttr]: testOrgDn,
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Rename organization
       await server.ldap.rename(testOrgDn, movedOrgDn);
-
-      // Update the organization's path attribute (normally done by organization plugin)
-      await server.ldap.modify(movedOrgDn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved' },
-      });
 
       // Trigger the hook
       await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
@@ -147,7 +146,7 @@ describe('LDAP Department Sync Plugin', function () {
         : String(user[pathAttr]);
 
       expect(userLink).to.equal(movedOrgDn);
-      expect(userPath).to.equal('/SyncTestOrgMoved');
+      expect(userPath).to.equal('SyncTestOrgMoved');
     });
 
     it('should update resources linked to sub-organizations when parent is renamed', async () => {
@@ -160,13 +159,13 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.add(testOrgDn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SyncTestOrg',
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       await server.ldap.add(testSubOrg1Dn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SubOrg1',
-        [pathAttr]: '/SyncTestOrg/SubOrg1',
+        [pathAttr]: 'SyncTestOrg / SubOrg1',
       });
 
       // Create user linked to sub-organization
@@ -176,7 +175,7 @@ describe('LDAP Department Sync Plugin', function () {
         cn: 'Sync Test User',
         sn: 'User',
         [linkAttr]: testSubOrg1Dn,
-        [pathAttr]: '/SyncTestOrg/SubOrg1',
+        [pathAttr]: 'SyncTestOrg / SubOrg1',
       });
 
       // Rename parent organization (this moves sub-org automatically)
@@ -184,14 +183,6 @@ describe('LDAP Department Sync Plugin', function () {
 
       // The new sub-org DN after parent rename
       const movedSubOrg1Dn = `ou=SubOrg1,${movedOrgDn}`;
-
-      // Update the organizations' path attributes (normally done by organization plugin)
-      await server.ldap.modify(movedOrgDn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved' },
-      });
-      await server.ldap.modify(movedSubOrg1Dn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved/SubOrg1' },
-      });
 
       // Trigger the hook
       await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
@@ -211,7 +202,7 @@ describe('LDAP Department Sync Plugin', function () {
         : String(user[pathAttr]);
 
       expect(userLink).to.equal(movedSubOrg1Dn);
-      expect(userPath).to.equal('/SyncTestOrgMoved/SubOrg1');
+      expect(userPath).to.equal('SyncTestOrgMoved / SubOrg1');
     });
 
     it('should update multiple resources at once', async () => {
@@ -224,7 +215,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.add(testOrgDn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SyncTestOrg',
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Create multiple resources linked to organization
@@ -235,7 +226,7 @@ describe('LDAP Department Sync Plugin', function () {
         sn: 'User',
         mail: 'synctestuser@example.org',
         [linkAttr]: testOrgDn,
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       await server.ldap.add(testUser2Dn, {
@@ -245,7 +236,7 @@ describe('LDAP Department Sync Plugin', function () {
         sn: 'User',
         mail: 'synctestuser2@example.org',
         [linkAttr]: testOrgDn,
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       await server.ldap.add(testGroupDn, {
@@ -253,16 +244,11 @@ describe('LDAP Department Sync Plugin', function () {
         cn: 'synctestgroup',
         member: testUserDn,
         [linkAttr]: testOrgDn,
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Rename organization
       await server.ldap.rename(testOrgDn, movedOrgDn);
-
-      // Update the organization's path attribute (normally done by organization plugin)
-      await server.ldap.modify(movedOrgDn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved' },
-      });
 
       // Trigger the hook
       await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
@@ -285,7 +271,7 @@ describe('LDAP Department Sync Plugin', function () {
           : String(entry[pathAttr]);
 
         expect(entryLink).to.equal(movedOrgDn);
-        expect(entryPath).to.equal('/SyncTestOrgMoved');
+        expect(entryPath).to.equal('SyncTestOrgMoved');
       }
     });
 
@@ -299,19 +285,19 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.add(testOrgDn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SyncTestOrg',
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       await server.ldap.add(testSubOrg1Dn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SubOrg1',
-        [pathAttr]: '/SyncTestOrg/SubOrg1',
+        [pathAttr]: 'SyncTestOrg / SubOrg1',
       });
 
       await server.ldap.add(testSubOrg2Dn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SubOrg2',
-        [pathAttr]: '/SyncTestOrg/SubOrg1/SubOrg2',
+        [pathAttr]: 'SyncTestOrg / SubOrg1 / SubOrg2',
       });
 
       // Create user linked to deepest sub-organization
@@ -321,7 +307,7 @@ describe('LDAP Department Sync Plugin', function () {
         cn: 'Sync Test User',
         sn: 'User',
         [linkAttr]: testSubOrg2Dn,
-        [pathAttr]: '/SyncTestOrg/SubOrg1/SubOrg2',
+        [pathAttr]: 'SyncTestOrg / SubOrg1 / SubOrg2',
       });
 
       // Rename top-level organization
@@ -330,17 +316,6 @@ describe('LDAP Department Sync Plugin', function () {
       // New DNs after parent rename
       const movedSubOrg1Dn = `ou=SubOrg1,${movedOrgDn}`;
       const movedSubOrg2Dn = `ou=SubOrg2,${movedSubOrg1Dn}`;
-
-      // Update organizations' path attributes (normally done by organization plugin)
-      await server.ldap.modify(movedOrgDn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved' },
-      });
-      await server.ldap.modify(movedSubOrg1Dn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved/SubOrg1' },
-      });
-      await server.ldap.modify(movedSubOrg2Dn, {
-        replace: { [pathAttr]: '/SyncTestOrgMoved/SubOrg1/SubOrg2' },
-      });
 
       // Trigger the hook
       await plugin.hooks.ldaprenamedone?.([testOrgDn, movedOrgDn]);
@@ -360,7 +335,72 @@ describe('LDAP Department Sync Plugin', function () {
         : String(user[pathAttr]);
 
       expect(userLink).to.equal(movedSubOrg2Dn);
-      expect(userPath).to.equal('/SyncTestOrgMoved/SubOrg1/SubOrg2');
+      expect(userPath).to.equal('SyncTestOrgMoved / SubOrg1 / SubOrg2');
+    });
+
+    it('should recompute the paths of a moved subtree before the linked entries', async () => {
+      const linkAttr =
+        DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE || 'twakeDepartmentLink';
+      const pathAttr =
+        DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE || 'twakeDepartmentPath';
+      const orgClass = ['organizationalUnit', 'twakeDepartment', 'top'];
+      const targetOrgDn = `ou=SyncTarget,${DM_LDAP_TOP_ORGANIZATION}`;
+
+      await server.ldap.add(testOrgDn, {
+        objectClass: orgClass,
+        ou: 'SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
+      });
+      await server.ldap.add(testSubOrg1Dn, {
+        objectClass: orgClass,
+        ou: 'SubOrg1',
+        [pathAttr]: 'SyncTestOrg / SubOrg1',
+      });
+      await server.ldap.add(testSubOrg2Dn, {
+        objectClass: orgClass,
+        ou: 'SubOrg2',
+        [pathAttr]: 'SyncTestOrg / SubOrg1 / SubOrg2',
+      });
+      await server.ldap.add(targetOrgDn, {
+        objectClass: orgClass,
+        ou: 'SyncTarget',
+        [pathAttr]: 'SyncTarget',
+      });
+      await server.ldap.add(testUserDn, {
+        objectClass: ['twakeAccount', 'twakeWhitePages', 'top'],
+        uid: 'synctestuser',
+        cn: 'Sync Test User',
+        sn: 'User',
+        mail: 'synctestuser@example.org',
+        [linkAttr]: testSubOrg2Dn,
+        [pathAttr]: 'SyncTestOrg / SubOrg1 / SubOrg2',
+      });
+
+      // Move SubOrg1 (and SubOrg2 with it) under another organization
+      const movedSub1 = `ou=SubOrg1,${targetOrgDn}`;
+      const movedSub2 = `ou=SubOrg2,${movedSub1}`;
+      await server.ldap.rename(testSubOrg1Dn, movedSub1);
+      await plugin.hooks.ldaprenamedone?.([testSubOrg1Dn, movedSub1]);
+
+      const read = async (dn: string, attr: string): Promise<string> => {
+        const result = (await server.ldap.search(
+          { paged: false, scope: 'base', attributes: [attr] },
+          dn
+        )) as SearchResult;
+        const value = result.searchEntries[0][attr];
+        return String(Array.isArray(value) ? value[0] : value);
+      };
+
+      // The tree itself follows the move…
+      expect(await read(movedSub1, pathAttr)).to.equal('SyncTarget / SubOrg1');
+      expect(await read(movedSub2, pathAttr)).to.equal(
+        'SyncTarget / SubOrg1 / SubOrg2'
+      );
+      // …and the linked entry copies the new path, not the stale one
+      expect(await read(testUserDn, linkAttr)).to.equal(movedSub2);
+      expect(await read(testUserDn, pathAttr)).to.equal(
+        'SyncTarget / SubOrg1 / SubOrg2'
+      );
     });
 
     it('should not fail when organization has no linked resources', async () => {
@@ -371,7 +411,7 @@ describe('LDAP Department Sync Plugin', function () {
       await server.ldap.add(testOrgDn, {
         objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
         ou: 'SyncTestOrg',
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Rename organization
@@ -402,7 +442,7 @@ describe('LDAP Department Sync Plugin', function () {
         sn: 'User',
         mail: 'synctestuser@example.org',
         [linkAttr]: testOrgDn,
-        [pathAttr]: '/SyncTestOrg',
+        [pathAttr]: 'SyncTestOrg',
       });
 
       // Rename organization

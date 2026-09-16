@@ -1,0 +1,25 @@
+{
+  "strict": true,
+  "entity": {
+    "name": "roleNamedDomain",
+    "mainAttribute": "dc",
+    "objectClass": ["top", "domain"],
+    "singularName": "roleNamedDomain",
+    "pluralName": "roleNamedDomains",
+    "base": "ou=domains,ou=nomenclature,__ldap_base__"
+  },
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "default": ["top", "domain"],
+      "fixed": true
+    },
+    "dc": { "type": "string", "required": true, "role": "identifier" },
+    "description": {
+      "type": "string",
+      "required": true,
+      "role": "domainName"
+    }
+  }
+}

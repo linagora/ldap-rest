@@ -12,6 +12,13 @@ import type { SearchResult } from 'ldapts';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
+import {
+  getParentDn,
+  isDnInBranch,
+  normalizeDn,
+  parseDn,
+  rdnValue,
+} from '../../lib/utils';
 
 export default class LdapDepartmentSync extends DmPlugin {
   name = 'ldapDepartmentSync';
@@ -51,6 +58,9 @@ export default class LdapDepartmentSync extends DmPlugin {
           ''
         );
 
+        // The tree first: the linked entries copy their path from it
+        await this.updateOrganizationPaths(newDn);
+
         // Update resources linked to the renamed organization
         await this.updateLinkedResources(oldDn, newDn, baseDn);
 
@@ -66,6 +76,109 @@ export default class LdapDepartmentSync extends DmPlugin {
       }
     },
   };
+
+  /**
+   * Recompute the path of a renamed or moved organization and of every
+   * organization below it.
+   *
+   * A path names an organization's ancestors, root first, its own name last,
+   * the top organization left out. Moving or renaming one therefore changes
+   * the path of its whole subtree. Only the entries *linked* to the tree used
+   * to be updated, from paths the tree itself still held: the organizations
+   * kept the path of their former parent, the linked users were rewritten to
+   * it, and nothing could correct it since the path is computed by the server.
+   *
+   * Only organizations already holding a path are written.
+   *
+   * @param orgDn DN of the organization after the rename
+   */
+  private async updateOrganizationPaths(orgDn: string): Promise<void> {
+    const top = this.config.ldap_top_organization;
+    if (!top || !isDnInBranch(orgDn, top)) return;
+    const separator =
+      (this.config.ldap_organization_path_separator as string) || ' / ';
+
+    const results = await this.server.ldap.search(
+      {
+        paged: true,
+        scope: 'sub',
+        filter: `(${this.pathAttr}=*)`,
+        attributes: [this.pathAttr],
+      },
+      orgDn
+    );
+    const organizations: { dn: string; path: string }[] = [];
+    for await (const result of results as AsyncGenerator<SearchResult>) {
+      for (const entry of result.searchEntries) {
+        const dn = String(entry.dn);
+        if (!/^ou=/i.test(dn)) continue;
+        const value = entry[this.pathAttr];
+        organizations.push({
+          dn,
+          path: String(Array.isArray(value) ? value[0] : value),
+        });
+      }
+    }
+    // Parents before their children, so each one reads a parent already fixed
+    organizations.sort((a, b) => parseDn(a.dn).length - parseDn(b.dn).length);
+
+    const topKey = normalizeDn(top);
+    const computed = new Map<string, string>();
+    let updated = 0;
+    for (const { dn, path } of organizations) {
+      const parent = getParentDn(dn);
+      const parentKey = normalizeDn(parent);
+      let parentPath: string | undefined;
+      if (parentKey !== topKey) {
+        parentPath =
+          computed.get(parentKey) ?? (await this.readPath(parent)) ?? undefined;
+        if (parentPath === undefined) {
+          this.logger.warn(
+            `Organization ${parent} has no ${this.pathAttr}: the path of ${dn} is left as it is`
+          );
+          continue;
+        }
+      }
+      const name = rdnValue(dn);
+      const newPath = parentPath ? `${parentPath}${separator}${name}` : name;
+      computed.set(normalizeDn(dn), newPath);
+      if (newPath === path) continue;
+      try {
+        await this.server.ldap.modify(dn, {
+          replace: { [this.pathAttr]: newPath },
+        });
+        updated++;
+      } catch (err) {
+        this.logger.error(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          `Failed to update the path of ${dn} after organization rename: ${err}`
+        );
+      }
+    }
+    this.logger.info(
+      `Updated the path of ${updated} organizations below ${orgDn}`
+    );
+  }
+
+  /**
+   * Read the path an organization holds.
+   *
+   * @param dn organization DN
+   * @returns its path, or null when it holds none or cannot be read
+   */
+  private async readPath(dn: string): Promise<string | null> {
+    try {
+      const result = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: [this.pathAttr] },
+        dn
+      )) as SearchResult;
+      const value = result.searchEntries[0]?.[this.pathAttr];
+      if (value === undefined) return null;
+      return String(Array.isArray(value) ? value[0] : value);
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Update resources that are directly linked to the renamed organization
