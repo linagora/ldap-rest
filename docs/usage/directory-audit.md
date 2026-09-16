@@ -17,7 +17,8 @@ export DM_LDAP_DN='cn=admin,dc=example,dc=com'
 export DM_LDAP_PWD='…'
 export DM_LDAP_BASE='dc=example,dc=com'
 
-npm run audit:directory -- --schema static/schemas/twake/users.json
+npm run audit:directory -- --schema static/schemas/twake/users.json \
+  --plugin core/ldap/enterpriseRules
 ```
 
 | Option            | Default                      | Purpose                             |
@@ -29,6 +30,14 @@ npm run audit:directory -- --schema static/schemas/twake/users.json
 | `--bind-dn`       | `DM_LDAP_DN`                 | Identity to read with               |
 | `--bind-password` | `DM_LDAP_PWD`                | Its password                        |
 | `--samples`       | `5`                          | Offending entries named per finding |
+| `--plugin`        | _(none)_                     | A plugin the server loads, repeated |
+
+`--plugin` matters for the attributes a schema marks both `required` and
+`generated`. The server exempts one from its check only when something fills
+it: the entity itself (`generatedFrom`), or a loaded plugin. Name the plugins
+the server loads and the audit exempts what they fill; without them it reports
+those attributes as `missing, and no --plugin fills it` — which is what every
+creation would be refused for on a server that does not load them.
 
 It exits `0` when the branch is clean, `1` when the schema would refuse
 something, and `2` when the audit itself could not run — an unreadable schema,
