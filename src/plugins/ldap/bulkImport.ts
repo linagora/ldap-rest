@@ -32,6 +32,18 @@ interface BulkImportSchema {
   };
 }
 
+/**
+ * A CSV column name: an LDAP attribute description (RFC 4512 section 2.5), a
+ * `descr` or a `numericoid`, optionally followed by options (`cn;lang-fr`).
+ *
+ * Each column is copied onto the entry as a property of that name, so a name
+ * like `__proto__` would not become an attribute: it would invoke the setter
+ * and replace the entry's prototype. csv-parse 7 hands such a header over as
+ * an ordinary key; nothing that is not an attribute name gets that far.
+ */
+const CSV_COLUMN_NAME =
+  /^([A-Za-z][A-Za-z0-9-]*|\d+(\.\d+)+)(;[A-Za-z0-9-]+)*$/;
+
 interface BulkImportResource {
   name: string;
   schema: BulkImportSchema;
@@ -364,12 +376,25 @@ export default class LdapBulkImport extends DmPlugin {
     try {
       // Parse CSV
       const csvContent = req.file.buffer.toString('utf-8');
+      let columns: string[] = [];
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       const records = csvParse(csvContent, {
-        columns: true,
+        columns: (header: string[]) => (columns = header),
         skip_empty_lines: true,
         trim: true,
       }) as Record<string, string>[];
+
+      // An empty name (a trailing comma) was always tolerated: its values
+      // are empty too and never reach the entry.
+      const invalidColumns = columns.filter(
+        name => name !== '' && !CSV_COLUMN_NAME.test(name)
+      );
+      if (invalidColumns.length > 0) {
+        return badRequest(
+          res,
+          `Invalid column name(s): ${invalidColumns.join(', ')}`
+        );
+      }
 
       result.total = records.length;
 

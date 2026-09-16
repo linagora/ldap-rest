@@ -137,6 +137,10 @@ jdoe,John Doe,Doe,John,john.doe@example.com,password123,ou=IT,ou=organization,dc
 asmith,Alice Smith,Smith,Alice,alice.smith@example.com,secret456,ou=HR,ou=organization,dc=example,dc=com
 ```
 
+Each column name must be an LDAP attribute name (`mail`, `2.5.4.3`),
+optionally with options (`cn;lang-fr`). A file with any other column name is
+refused with `400` before anything is imported.
+
 ### Special Column: `organizationDn`
 
 The `organizationDn` column is special and triggers automatic calculation of:

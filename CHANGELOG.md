@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Security
+
+- `plugins/ldap/bulkImport`: a CSV column whose name is not an LDAP attribute
+  name is refused with `400`. csv-parse 7 hands a `__proto__` header over as
+  an ordinary key, and copying it onto the entry replaced the entry's
+  prototype instead of setting an attribute
+
+- Bump `csv-parse` to 7.0.2 (GHSA-8cw4-87c7-c6xx). The prototype replacement
+  it fixes needs `group_columns_by_name`, which ldap-rest does not use
+
 ### Deprecations
 
 - `plugins/twake/calendarResources` is renamed `plugins/twake/calendar`, see
