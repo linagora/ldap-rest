@@ -12,6 +12,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import DmPlugin from '../../../src/abstract/plugin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapGroups from '../../../src/plugins/ldap/groups';
@@ -70,6 +71,46 @@ describe('Schema guards on every route', function () {
       expect(modifiedAttributeNames({ delete: { d: null } })).to.deep.equal([
         'd',
       ]);
+    });
+  });
+
+  describe('hideNeverReturn', () => {
+    /** A plugin on a server whose only loaded schema hides userPassword. */
+    class Probe extends DmPlugin {
+      name = 'probe';
+      hide<T>(data: T): T {
+        return this.hideNeverReturn(data);
+      }
+    }
+    const probe = new Probe({
+      config: {},
+      logger: console,
+      hooks: {},
+      loadedPlugins: {
+        users: {
+          schema: {
+            strict: false,
+            attributes: { userPassword: { type: 'string', neverReturn: true } },
+          },
+        },
+      },
+    } as unknown as DM);
+
+    it('should hide the attribute in an entry, a list and a keyed list', () => {
+      const entry = { dn: 'uid=a', uid: 'a', userPassword: 'x' };
+      expect(probe.hide(entry)).to.deep.equal({ dn: 'uid=a', uid: 'a' });
+      expect(probe.hide([entry])).to.deep.equal([{ dn: 'uid=a', uid: 'a' }]);
+      expect(probe.hide({ a: entry })).to.deep.equal({
+        a: { dn: 'uid=a', uid: 'a' },
+      });
+    });
+
+    it('should leave a nested list a list', () => {
+      // Projected as an entry, an array came back as {"0": …, "1": …}
+      expect(probe.hide({ members: ['uid=a', 'uid=b'] })).to.deep.equal({
+        members: ['uid=a', 'uid=b'],
+      });
+      expect(probe.hide([['uid=a']])).to.deep.equal([['uid=a']]);
     });
   });
 
