@@ -8,21 +8,6 @@ const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
 
 describe('LdapGroups Plugin', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_GROUP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapGroups tests: DM_GROUP_BASE and LDAP_LIB env vars are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let plugin: LdapGroups;
 
@@ -294,17 +279,6 @@ describe('LdapGroups Plugin', function () {
   });
 
   describe('moveGroup', function () {
-    // Skip tests if no organization plugin configured
-    if (!process.env.DM_LDAP_TOP_ORGANIZATION) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        'Skipping moveGroup tests: DM_LDAP_TOP_ORGANIZATION env var is required'
-      );
-      // @ts-ignore
-      this.skip?.();
-      return;
-    }
-
     const org1Dn = `ou=testorg1,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     const org2Dn = `ou=testorg2,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     const groupDn = `cn=testgroup,${DM_LDAP_GROUP_BASE}`;

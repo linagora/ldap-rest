@@ -6,20 +6,6 @@ const { DM_LDAP_BASE } = process.env;
 const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
 
 describe('Fixed attributes validation', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    console.warn(
-      'Skipping fixed attributes tests: DM_LDAP_BASE and LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let genericPlugin: LdapFlatGeneric;
   let plugin: any;

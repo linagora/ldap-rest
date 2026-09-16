@@ -62,7 +62,27 @@ objectClass: organizationalUnit
 ou: twakeMailboxType
 description: Mailbox type nomenclature
 
+dn: ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeAccountStatus
+description: Account status nomenclature
+
+dn: ou=twakeDeliveryMode,ou=nomenclature,dc=example,dc=com
+objectClass: organizationalUnit
+ou: twakeDeliveryMode
+description: Delivery mode nomenclature
+
 # Standard nomenclature entries
+dn: cn=active,ou=twakeAccountStatus,ou=nomenclature,dc=example,dc=com
+objectClass: top
+objectClass: applicationProcess
+cn: active
+
+dn: cn=normal,ou=twakeDeliveryMode,ou=nomenclature,dc=example,dc=com
+objectClass: top
+objectClass: applicationProcess
+cn: normal
+
 dn: cn=Dr,ou=twakeTitle,ou=nomenclature,dc=example,dc=com
 objectClass: device
 cn: Dr

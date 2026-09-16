@@ -13,21 +13,6 @@ const twakeAttr = {
 };
 
 describe('LdapGroups validation', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_GROUP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapGroups tests: DM_GROUP_BASE and LDAP_LIB env vars are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let plugin: LdapGroups;
 

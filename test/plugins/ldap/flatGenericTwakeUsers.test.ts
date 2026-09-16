@@ -14,21 +14,6 @@ const twakeAttr = {
 };
 
 describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
-  // Skip all tests if required env vars are not set
-  if (
-    !process.env.DM_LDAP_DN ||
-    !process.env.DM_LDAP_PWD ||
-    !process.env.DM_LDAP_BASE
-  ) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'Skipping ldapUsersFlat tests: DM_LDAP_BASE and LDAP credentials are required'
-    );
-    // @ts-ignore
-    this.skip?.();
-    return;
-  }
-
   let server: DM;
   let genericPlugin: LdapFlatGeneric;
   let plugin: any; // The users instance from flatGeneric

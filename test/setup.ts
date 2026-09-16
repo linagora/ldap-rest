@@ -8,11 +8,21 @@
  */
 
 import {
+  embeddedLdapEnvVars,
   getGlobalTestLdapServer,
   stopGlobalTestLdapServer,
   LdapTestServer,
 } from './helpers/ldapServer';
 import { hasExternalLdap } from './helpers/env';
+
+// Mocha loads every spec file, running its describe bodies, before the root
+// beforeAll below starts the embedded server. Everything about that directory
+// but its URL is known now: set it, so a describe body or a module constant
+// reading process.env sees the directory the tests will run against, instead
+// of undefined — which silently disabled whole suites.
+if (!hasExternalLdap()) {
+  Object.assign(process.env, embeddedLdapEnvVars());
+}
 
 // Export the global server reference so other modules can access it
 export let globalServer: LdapTestServer | null = null;
@@ -47,9 +57,6 @@ export const mochaHooks = {
         Object.entries(envVars).forEach(([key, value]) => {
           process.env[key] = value;
         });
-
-        // Set top organization for tests requiring it
-        process.env.DM_LDAP_TOP_ORGANIZATION = `ou=organization,${envVars.DM_LDAP_BASE}`;
 
         console.log('✓ Embedded LDAP server ready');
         console.log(`  URL: ${envVars.DM_LDAP_URL}`);
