@@ -29,12 +29,15 @@ describe('Group schema: a generated attribute is not asked of the client', funct
   let plugin: LdapGroups;
   let groupDn: string;
   let orgDn: string;
+  // Restored in after(): suites that run later build their DM from the env
+  let previousGroupSchema: string | undefined;
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
   });
 
   before(async () => {
+    previousGroupSchema = process.env.DM_GROUP_SCHEMA;
     process.env.DM_GROUP_SCHEMA = join(
       dirname(fileURLToPath(import.meta.url)),
       '../../../static/schemas/twake/groups.json'
@@ -69,6 +72,8 @@ describe('Group schema: a generated attribute is not asked of the client', funct
   after(async () => {
     await server.ldap.delete(groupDn).catch(() => undefined);
     await server.ldap.delete(orgDn).catch(() => undefined);
+    if (previousGroupSchema === undefined) delete process.env.DM_GROUP_SCHEMA;
+    else process.env.DM_GROUP_SCHEMA = previousGroupSchema;
   });
 
   it('should have a schema marking the path required and generated', () => {
