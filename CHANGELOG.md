@@ -148,7 +148,9 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 - `plugins/ldap/departmentSync`: moving or renaming an organization left the
   organization and its whole subtree with the path of their former parent, and
   rewrote the linked users and groups to those stale paths. The paths of the
-  tree are recomputed first now, then the linked entries copy them
+  tree are recomputed first now, then the linked entries copy them. The path
+  and link attributes are read from the schema roles first, as the enterprise
+  rules read them, then from the configuration
 
 - `test/helpers`: a failing LDIF load reported "Already exists" whatever the
   real cause, every error being retried over the entries a half-finished first
