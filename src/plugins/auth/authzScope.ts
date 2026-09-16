@@ -36,6 +36,18 @@ interface CreatableEntity {
   create: boolean;
 }
 
+/** An entity a client can create into, as the plugins declare it. */
+interface EntityInfo {
+  name: string;
+  base: string;
+  /**
+   * Whether its entries may carry the organization link. The add hook checks
+   * write on the linked organization for those, and on the branch the entry
+   * lands in for the others.
+   */
+  linkable: boolean;
+}
+
 export default class AuthzScope extends DmPlugin {
   name = 'authzScope';
   roles: Role[] = ['api'] as const;
@@ -120,18 +132,46 @@ export default class AuthzScope extends DmPlugin {
    *
    * @returns entity name and branch, one per creatable entity
    */
-  private entities(): { name: string; base: string }[] {
-    const out: { name: string; base: string }[] = [];
+  private entities(): EntityInfo[] {
+    const linkAttr = (
+      this.config.ldap_organization_link_attribute || ''
+    ).toLowerCase();
+    // The add hook reads the configured link attribute, so the question is
+    // whether the schema lets an entry carry it. With no schema, nothing stops
+    // a client sending it.
+    const linkable = (schema?: { attributes?: object }): boolean =>
+      Boolean(linkAttr) &&
+      (!schema?.attributes ||
+        Object.keys(schema.attributes).some(
+          name => name.toLowerCase() === linkAttr
+        ));
+
+    const out: EntityInfo[] = [];
     const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | { instances?: { base: string; pluralName: string }[] }
+      | {
+          instances?: {
+            base: string;
+            pluralName: string;
+            schema?: { attributes?: object };
+          }[];
+        }
       | undefined;
     for (const instance of flat?.instances || [])
-      out.push({ name: instance.pluralName, base: instance.base });
+      out.push({
+        name: instance.pluralName,
+        base: instance.base,
+        linkable: linkable(instance.schema),
+      });
 
     const groups = this.server.loadedPlugins['ldapGroups'] as
-      | { base?: string }
+      | { base?: string; schema?: { attributes?: object } }
       | undefined;
-    if (groups?.base) out.push({ name: 'groups', base: groups.base });
+    if (groups?.base)
+      out.push({
+        name: 'groups',
+        base: groups.base,
+        linkable: linkable(groups.schema),
+      });
 
     if (
       this.server.loadedPlugins['ldapOrganizations'] &&
@@ -140,6 +180,7 @@ export default class AuthzScope extends DmPlugin {
       out.push({
         name: 'organizations',
         base: this.config.ldap_top_organization,
+        linkable: false,
       });
     return out;
   }
@@ -157,7 +198,11 @@ export default class AuthzScope extends DmPlugin {
         user: req.user ?? null,
         unrestricted: true,
         branches: [],
-        entities: this.entities().map(e => ({ ...e, create: true })),
+        entities: this.entities().map(({ name, base }) => ({
+          name,
+          base,
+          create: true,
+        })),
       });
       return;
     }
@@ -168,8 +213,17 @@ export default class AuthzScope extends DmPlugin {
 
     const branchDns = await authz.getAuthorizedBranches(user);
     const branches = [];
+    const known = new Map<string, BranchPermissions>();
+    const permissionsOn = async (dn: string): Promise<BranchPermissions> => {
+      let permissions = known.get(dn);
+      if (!permissions) {
+        permissions = await authz.getUserPermissions(user, dn);
+        known.set(dn, permissions);
+      }
+      return permissions;
+    };
     for (const dn of branchDns) {
-      const permissions = await authz.getUserPermissions(user, dn);
+      const permissions = await permissionsOn(dn);
       branches.push({ dn, ...permissions, ...(await this.branchLabel(dn)) });
     }
 
@@ -180,7 +234,7 @@ export default class AuthzScope extends DmPlugin {
     // checks — administering a branch read-only used to report `create: true`
     // and every submission then came back 403, which is exactly the round trip
     // this endpoint exists to spare the client.
-    const writable = await this.canWriteAny(authz, user, branchDns);
+    const writable = branchDns.some(dn => known.get(dn)?.write === true);
     // Organizations are the exception: they are not attached to a branch, they
     // *are* one, so the add hook checks write permission on the node the new
     // one hangs from — the top of the tree, which is where the create endpoint
@@ -188,14 +242,21 @@ export default class AuthzScope extends DmPlugin {
     // ou=Sales writes in their own branch and not there, and answering
     // `writable` offered them a "new organization" button whose every
     // submission came back 403.
+    //
+    // Only an entry that can carry the link is scoped that way, though. The
+    // add hook checks the others — positions, nomenclature rows — against the
+    // branch they land in, so answering `writable` for them offered a "new
+    // position" to an administrator of ou=Sales, and the creation was refused.
     const tree = this.config.ldap_top_organization;
     const entities: CreatableEntity[] = [];
-    for (const entity of this.entities()) {
+    for (const { name, base, linkable } of this.entities()) {
       const create =
-        tree && entity.base === tree
-          ? (await authz.getUserPermissions(user, tree)).write === true
-          : writable;
-      entities.push({ ...entity, create });
+        tree && base === tree
+          ? (await permissionsOn(tree)).write === true
+          : linkable
+            ? writable
+            : (await permissionsOn(base)).write === true;
+      entities.push({ name, base, create });
     }
 
     res.json({
@@ -204,26 +265,6 @@ export default class AuthzScope extends DmPlugin {
       branches,
       entities,
     });
-  }
-
-  /**
-   * Tell whether the user may write in at least one of their branches.
-   *
-   * @param authz authorization plugin
-   * @param user resolved user identity
-   * @param branches branches the user administers
-   * @returns true when at least one grants write
-   */
-  private async canWriteAny(
-    authz: AuthzLike,
-    user: string,
-    branches: string[]
-  ): Promise<boolean> {
-    for (const branch of branches) {
-      const permissions = await authz.getUserPermissions(user, branch);
-      if (permissions.write) return true;
-    }
-    return false;
   }
 
   /**
