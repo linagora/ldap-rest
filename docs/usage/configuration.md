@@ -188,7 +188,7 @@ Monitors LDAP modifications and triggers hooks for attribute changes. No configu
 
 #### `core/ldap/departmentSync`
 
-Maintains consistency of department links when organizations are renamed/moved: it recomputes the path of the organization and of its sub-organizations (those already holding one), then updates the link and path of the entries linked to any of them. No configuration options - uses [core/ldap/organizations](#coreldaporganizations) settings.
+Maintains consistency of department links when organizations are renamed/moved: it recomputes the path of the organization and of its sub-organizations (those already holding one), then updates the link and path of the entries linked to any of them. The attributes are those the loaded schemas declare through the `organizationPath` and `organizationLink` roles, then the configured `--ldap-organization-path-attribute` and `--ldap-organization-link-attribute`. No configuration options of its own - uses [core/ldap/organizations](#coreldaporganizations) settings.
 
 #### `core/ldap/raw`
 
