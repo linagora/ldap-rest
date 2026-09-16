@@ -1,5 +1,6 @@
 import type { AttributeValue } from '../lib/ldapActions';
 import { BadRequestError } from '../lib/errors';
+import { getCompiledRegex, isDnInBranch } from '../lib/utils';
 
 /**
  * Scalar and container types an entity schema may declare.
@@ -393,6 +394,80 @@ export function withoutAttributes<T extends object>(
     out[name] = value;
   }
   return out as T;
+}
+
+/**
+ * Check the DNs an attribute carries: a `pointer`, or an array whose `items`
+ * are pointers or declare a `branch`.
+ *
+ * Each DN has to sit inside one of the declared branches, compared RDN by RDN
+ * (a suffix match reads `uid=x,xou=users,…` as inside `ou=users,…`), and a
+ * pointer has to name an entry that exists. The flat entities checked the
+ * branch of a single pointer; organizations and groups read neither `items`
+ * rule, so an organization accepted a domain link to a DN outside the domains
+ * branch, or to none at all — and lost its mail-domain restriction with it.
+ *
+ * @param field attribute name, for the messages
+ * @param attr its schema definition
+ * @param value value submitted
+ * @param entryExists tells whether a DN names an existing entry
+ * @throws BadRequestError naming the first DN that breaks a rule
+ */
+export async function checkDnValues(
+  field: string,
+  attr: SchemaAttribute,
+  value: AttributeValue,
+  entryExists: (dn: string) => Promise<boolean>
+): Promise<void> {
+  const single = attr.type === 'pointer';
+  const branches = single ? attr.branch : attr.items?.branch;
+  const mustExist = single || attr.items?.type === 'pointer';
+  if (!mustExist && !branches?.length) return;
+  if (single && typeof value !== 'string')
+    throw new BadRequestError(`Field ${field} must be a string (DN pointer)`);
+
+  const dns = (Array.isArray(value) ? value : [value]).map(item =>
+    String(item)
+  );
+  for (const dn of dns) {
+    if (branches?.length && !branches.some(branch => isDnInBranch(dn, branch)))
+      throw new BadRequestError(
+        `Field ${field} must point to a DN within allowed branches: ${branches.join(', ')}`
+      );
+    let exists = false;
+    if (mustExist) {
+      try {
+        exists = await entryExists(dn);
+      } catch {
+        exists = false;
+      }
+      if (!exists)
+        throw new BadRequestError(
+          `Field ${field} points to invalid or non-existent DN: ${dn}`
+        );
+    }
+  }
+}
+
+/**
+ * Tell whether every value of an attribute matches its pattern: `test`, or
+ * `items.test` for the elements of an array.
+ *
+ * @param attr schema definition
+ * @param value value submitted
+ * @returns false when one value does not match
+ */
+export function matchesPattern(
+  attr: SchemaAttribute,
+  value: AttributeValue
+): boolean {
+  const pattern = attr.test ?? attr.items?.test;
+  if (!pattern) return true;
+  const regex =
+    typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
+  return (Array.isArray(value) ? value : [value]).every(item =>
+    regex.test(String(item))
+  );
 }
 
 /**

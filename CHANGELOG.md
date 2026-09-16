@@ -36,10 +36,12 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   `pointer` default is checked against the directory the same way, one value
   or a list of them, instead of a dangling DN on every entry
 
-- An array's `items.test` and `items.branch` are enforced on the flat routes,
-  where they never were — `mailAlternateAddress` has carried a pattern since
-  v0.7.0 and accepted anything. Stored values are untouched:
-  `npm run audit:directory` lists what an update would now refuse
+- An array's `items.test` and `items.branch` are enforced on the flat,
+  organization and group routes, where they never were — `mailAlternateAddress`
+  has carried a pattern since v0.7.0 and accepted anything. An array of
+  pointers has each target looked up, as a single pointer's is. Stored values
+  are untouched: `npm run audit:directory` lists what an update would now
+  refuse
 
 - `twakeDepartmentPath` reads from the root down, the entry's own name last;
   the check demanded the reverse and refused every top-level organization
