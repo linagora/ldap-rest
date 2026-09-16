@@ -39,6 +39,7 @@ import {
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
+  modifiedAttributeNames,
   missingRequiredAttribute,
 } from '../../config/schema';
 
@@ -205,7 +206,9 @@ export default class LdapOrganizations extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/v1/ldap/organizations/top`,
       async (req, res) => {
-        await tryMethodData(res, this.getOrganisationTop.bind(this), req);
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(await this.getOrganisationTop(req))
+        );
       }
     );
 
@@ -239,7 +242,9 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn`,
       async (req, res) => {
         const dn = decodeURIComponent(req.params.dn);
-        await tryMethodData(res, this.getOrganisationByDn.bind(this), dn, req);
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(await this.getOrganisationByDn(dn, req))
+        );
       }
     );
 
@@ -289,11 +294,8 @@ export default class LdapOrganizations extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/organizations/:dn/subnodes`,
       async (req, res) => {
         const dn = decodeURIComponent(req.params.dn);
-        await tryMethodData(
-          res,
-          this.getOrganisationSubnodes.bind(this),
-          dn,
-          req
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(await this.getOrganisationSubnodes(dn, req))
         );
       }
     );
@@ -339,11 +341,8 @@ export default class LdapOrganizations extends DmPlugin {
         const query = req.query.q as string;
         if (!query)
           throw new BadRequestError('query parameter "q" is required');
-        await tryMethodData(
-          res,
-          this.searchOrganisationSubnodes.bind(this),
-          dn,
-          query
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(await this.searchOrganisationSubnodes(dn, query))
         );
       })
     );
@@ -532,10 +531,7 @@ export default class LdapOrganizations extends DmPlugin {
     if (!body) return;
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
-    assertClientMaySet(this.schema, [
-      ...Object.keys(body.add || {}),
-      ...Object.keys(body.replace || {}),
-    ]);
+    assertClientMaySet(this.schema, modifiedAttributeNames(body));
     await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
   }
 
@@ -631,12 +627,15 @@ export default class LdapOrganizations extends DmPlugin {
        * - Users/groups cannot delete link or path
        */
       if (changes.delete) {
-        const hasLinkDelete = Array.isArray(changes.delete)
-          ? changes.delete.includes(this.linkAttr)
-          : changes.delete[this.linkAttr];
-        const hasPathDelete = Array.isArray(changes.delete)
-          ? changes.delete.includes(this.pathAttr)
-          : changes.delete[this.pathAttr];
+        // By name, whatever its case and whatever value the object form pairs
+        // with it: `{"twakeDepartmentPath": null}` removes the whole attribute.
+        const deleted = (
+          Array.isArray(changes.delete)
+            ? changes.delete.map(String)
+            : Object.keys(changes.delete)
+        ).map(name => name.split(';')[0].toLowerCase());
+        const hasLinkDelete = deleted.includes(this.linkAttr.toLowerCase());
+        const hasPathDelete = deleted.includes(this.pathAttr.toLowerCase());
 
         if (hasLinkDelete || hasPathDelete) {
           const isOu = await checkIsOu();

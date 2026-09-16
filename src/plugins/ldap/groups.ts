@@ -44,6 +44,7 @@ import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
+  modifiedAttributeNames,
   missingRequiredAttribute,
 } from '../../config/schema';
 
@@ -282,7 +283,7 @@ export default class LdapGroups extends DmPlugin {
         if (req.query.attributes && typeof req.query.attributes === 'string')
           args.attributes = req.query.attributes.split(',');
         const list = await this.listGroups(args);
-        return ok(res, list);
+        return ok(res, this.hideNeverReturn(list));
       })
     );
 
@@ -574,7 +575,7 @@ export default class LdapGroups extends DmPlugin {
       if (result.searchEntries.length === 0) {
         throw new NotFoundError('Group not found');
       }
-      res.json(result.searchEntries[0]);
+      res.json(this.hideNeverReturn(result.searchEntries[0]));
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
       if (
@@ -622,10 +623,12 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
-    assertClientMaySet(this.schema, [
-      ...Object.keys((body as { add?: object }).add || {}),
-      ...Object.keys((body as { replace?: object }).replace || {}),
-    ]);
+    assertClientMaySet(
+      this.schema,
+      modifiedAttributeNames(
+        body as Parameters<typeof modifiedAttributeNames>[0]
+      )
+    );
     // Filter out fixed fields from schema
     const filteredBody = Object.fromEntries(
       Object.entries(body).filter(
