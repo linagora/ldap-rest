@@ -120,8 +120,14 @@ export function parseByteSize(raw: AttributeValue): number {
 }
 
 /**
- * Parse a directory date: an LDAP generalized time
- * (`yyyyMMddHHmmss[.SSS](Z|±HHMM)`) or anything `Date` understands.
+ * Parse a directory date: an LDAP generalized time or anything `Date`
+ * understands.
+ *
+ * A generalized time (RFC 4517 section 3.3.13) is `yyyyMMddHH`, then optional
+ * minutes and seconds, an optional fraction of the last unit given, and a zone:
+ * `Z` or an offset of hours with optional minutes (`+02`, `-0530`). `Date` reads
+ * none of the shorter forms, and not an offset of bare hours, so they are
+ * computed here rather than rewritten into an ISO string it might refuse.
  *
  * @param raw value as stored or submitted
  * @returns the date, or null when it cannot be read
@@ -129,18 +135,41 @@ export function parseByteSize(raw: AttributeValue): number {
 export function parseDirectoryDate(raw: AttributeValue): Date | null {
   const text = String(raw).trim();
   const generalized =
-    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}(?::?\d{2})?)?$/.exec(
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})?(\d{2})?(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)?$/.exec(
       text
     );
-  if (generalized) {
-    const [, y, mo, d, h, mi, s, ms, zone] = generalized;
-    const offset = !zone || zone === 'Z' ? 'Z' : zone;
-    const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}.${(ms || '0').padEnd(3, '0')}${offset}`;
-    const parsed = new Date(iso);
+  if (!generalized) {
+    const parsed = new Date(text);
     return isNaN(parsed.getTime()) ? null : parsed;
   }
-  const parsed = new Date(text);
-  return isNaN(parsed.getTime()) ? null : parsed;
+
+  const [, y, mo, d, h, mi, s, fraction, zone] = generalized;
+  // Seconds without minutes cannot be told from minutes: the regex fills the
+  // minutes first, so a lone pair is always read as minutes.
+  const [year, month, day, hour, minute, second] = [y, mo, d, h, mi, s].map(
+    v => (v === undefined ? 0 : Number(v))
+  );
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 60)
+    return null;
+  let time = Date.UTC(year, month - 1, day, hour, minute, second);
+  const check = new Date(time);
+  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day)
+    return null;
+
+  if (fraction !== undefined) {
+    const unit = s !== undefined ? 1000 : mi !== undefined ? 60000 : 3600000;
+    time += Math.round(Number(`0.${fraction}`) * unit);
+  }
+
+  if (zone && zone !== 'Z') {
+    const digits = zone.slice(1).replace(':', '');
+    const offsetHours = Number(digits.slice(0, 2));
+    const offsetMinutes = digits.length > 2 ? Number(digits.slice(2, 4)) : 0;
+    if (offsetHours > 23 || offsetMinutes > 59) return null;
+    const sign = zone[0] === '-' ? -1 : 1;
+    time -= sign * (offsetHours * 60 + offsetMinutes) * 60000;
+  }
+  return new Date(time);
 }
 
 /**

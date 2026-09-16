@@ -48,9 +48,40 @@ describe('Enterprise rules', () => {
       ).to.equal('2024-09-30T22:00:00.000Z');
     });
 
+    it('should read an offset of bare hours, as RFC 4517 allows', () => {
+      expect(parseDirectoryDate('20240930000000+02')?.toISOString()).to.equal(
+        '2024-09-29T22:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000-05')?.toISOString()).to.equal(
+        '2024-09-30T05:00:00.000Z'
+      );
+      expect(parseDirectoryDate('20240930000000+0530')?.toISOString()).to.equal(
+        '2024-09-29T18:30:00.000Z'
+      );
+      expect(
+        parseDirectoryDate('20240930000000+02:00')?.toISOString()
+      ).to.equal('2024-09-29T22:00:00.000Z');
+    });
+
+    it('should read the forms without minutes or seconds', () => {
+      expect(parseDirectoryDate('2024093012Z')?.toISOString()).to.equal(
+        '2024-09-30T12:00:00.000Z'
+      );
+      expect(parseDirectoryDate('202409301230Z')?.toISOString()).to.equal(
+        '2024-09-30T12:30:00.000Z'
+      );
+      // A fraction applies to the last unit given: half an hour here
+      expect(parseDirectoryDate('2024093012.5Z')?.toISOString()).to.equal(
+        '2024-09-30T12:30:00.000Z'
+      );
+    });
+
     it('should return null for anything unreadable', () => {
       expect(parseDirectoryDate('not a date')).to.be.null;
       expect(parseDirectoryDate('20241340220000Z')).to.be.null;
+      expect(parseDirectoryDate('20240231000000Z')).to.be.null;
+      expect(parseDirectoryDate('20240930250000Z')).to.be.null;
+      expect(parseDirectoryDate('20240930000000+25')).to.be.null;
     });
   });
 
