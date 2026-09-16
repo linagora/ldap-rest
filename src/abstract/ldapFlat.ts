@@ -41,7 +41,12 @@ import {
   validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
-import { missingRequiredAttribute } from '../config/schema';
+import {
+  missingRequiredAttribute,
+  modifiedAttributeNames,
+  neverReturnAttributes,
+  schemaAttribute,
+} from '../config/schema';
 import {
   BadRequestError,
   ConflictError,
@@ -282,12 +287,7 @@ export default abstract class LdapFlat extends DmPlugin {
    * @returns lowercased attribute names
    */
   protected hiddenAttributes(): Set<string> {
-    const hidden = new Set<string>();
-    if (!this.schema) return hidden;
-    for (const [name, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.neverReturn) hidden.add(name.toLowerCase());
-    }
-    return hidden;
+    return neverReturnAttributes([this.schema]);
   }
 
   /**
@@ -339,7 +339,7 @@ export default abstract class LdapFlat extends DmPlugin {
     for (const name of names) {
       if (name === 'dn') continue;
       if (!forbidden.has(name.split(';')[0].toLowerCase())) continue;
-      const attr = this.schema?.attributes[name];
+      const attr = schemaAttribute(this.schema, name)?.[1];
       throw new BadRequestError(
         attr?.readOnly
           ? `Attribute "${name}" is read-only and cannot be set`
@@ -867,13 +867,7 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
-    this.rejectForbiddenInput([
-      ...Object.keys(body.add || {}),
-      ...Object.keys(body.replace || {}),
-      ...(Array.isArray(body.delete)
-        ? body.delete
-        : Object.keys(body.delete || {})),
-    ]);
+    this.rejectForbiddenInput(modifiedAttributeNames(body));
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.modifyEntry.bind(this), id, body);
   }

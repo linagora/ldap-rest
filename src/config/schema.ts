@@ -305,6 +305,97 @@ export function roleAttributes(
 }
 
 /**
+ * Find an attribute definition by the name a request or the directory uses.
+ *
+ * LDAP attribute names are case-insensitive and may carry options
+ * (`cn;lang-fr`), while schema keys are written in one spelling. Looking a
+ * name up verbatim lets `TWAKEDEPARTMENTPATH` slip past a rule written for
+ * `twakeDepartmentPath`, though the directory treats both as the same.
+ *
+ * @param schema entity schema
+ * @param name attribute name, in any case, with or without options
+ * @returns the schema's own spelling and the definition, or undefined
+ */
+export function schemaAttribute(
+  schema: Schema | undefined,
+  name: string
+): [string, SchemaAttribute] | undefined {
+  if (!schema) return undefined;
+  const base = name.split(';')[0];
+  const exact = schema.attributes[base];
+  if (exact) return [base, exact];
+  const lower = base.toLowerCase();
+  for (const [key, attr] of Object.entries(schema.attributes)) {
+    if (key.toLowerCase() === lower) return [key, attr];
+  }
+  return undefined;
+}
+
+/**
+ * Every attribute name a modify request touches: added, replaced or deleted.
+ *
+ * A delete counts as much as a replace: removing a computed attribute is
+ * setting it, to nothing, and nothing the client does afterwards can put it
+ * back. `delete` comes as a list of names or as an object of values to remove.
+ *
+ * @param body modify request
+ * @returns attribute names, as the client spelt them
+ */
+export function modifiedAttributeNames(body: {
+  add?: object;
+  replace?: object;
+  delete?: string[] | object;
+}): string[] {
+  return [
+    ...Object.keys(body.add || {}),
+    ...Object.keys(body.replace || {}),
+    ...(Array.isArray(body.delete)
+      ? body.delete.map(String)
+      : Object.keys(body.delete || {})),
+  ];
+}
+
+/**
+ * Lowercased names of the attributes marked `neverReturn` in any of the given
+ * schemas.
+ *
+ * @param schemas schemas to read, undefined entries skipped
+ * @returns lowercased attribute names
+ */
+export function neverReturnAttributes(
+  schemas: Iterable<Schema | undefined>
+): Set<string> {
+  const hidden = new Set<string>();
+  for (const schema of schemas) {
+    if (!schema) continue;
+    for (const [name, attr] of Object.entries(schema.attributes)) {
+      if (attr.neverReturn) hidden.add(name.toLowerCase());
+    }
+  }
+  return hidden;
+}
+
+/**
+ * Copy an entry without the attributes of a hidden set.
+ *
+ * @param entry entry about to be serialised
+ * @param hidden lowercased attribute names to leave out
+ * @returns the entry itself when nothing is hidden, a filtered copy otherwise
+ */
+export function withoutAttributes<T extends object>(
+  entry: T,
+  hidden: Set<string>
+): T {
+  if (hidden.size === 0) return entry;
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(entry)) {
+    if (hidden.has(name.split(';')[0].toLowerCase())) continue;
+    out[name] = value;
+  }
+  return out as T;
+}
+
+/**
  * Refuse a payload naming an attribute the server owns.
  *
  * `generated` and `readOnly` say a value is not the client's to set. The flat
@@ -325,9 +416,15 @@ export function assertClientMaySet(
   if (!schema) return;
   for (const name of names) {
     if (name === 'dn') continue;
-    const attr = schema.attributes[name.split(';')[0]];
-    if (!attr) continue;
-    if (name === mainAttribute && !attr.generatedFrom) continue;
+    const found = schemaAttribute(schema, name);
+    if (!found) continue;
+    const [key, attr] = found;
+    if (
+      mainAttribute &&
+      key.toLowerCase() === mainAttribute.toLowerCase() &&
+      !attr.generatedFrom
+    )
+      continue;
     if (!attr.generated && !attr.readOnly) continue;
     throw new BadRequestError(
       attr.readOnly
