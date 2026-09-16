@@ -338,29 +338,57 @@ describe('LDAP Bulk Import Plugin', function () {
       );
     });
 
-    it('should reject column names that are not attribute names', async () => {
+    it('should fail a line whose value sits under a non-attribute column', async () => {
+      // csv-parse 7 turns a __proto__ header into an ordinary key: copied onto
+      // the entry, "a;b" would replace its prototype instead of being refused
       const csvContent = [
         'uid,cn,sn,givenName,mail,__proto__,organizationDn',
         `bulkuser1,Bulk User 1,User1,Bulk,bulkuser1@test.org,a;b,"${getTestOrg1Dn()}"`,
+        `bulkuser2,Bulk User 2,User2,Bulk,bulkuser2@test.org,,"${getTestOrg1Dn()}"`,
       ].join('\n');
 
       const res = await request
         .post('/api/v1/ldap/bulk-import/testusers')
         .attach('file', Buffer.from(csvContent), 'test.csv');
 
-      expect(res.status).to.equal(400);
-      expect(res.body.error).to.include('__proto__');
+      expect(res.status).to.equal(200);
+      expect(res.body).to.include({ created: 1, failed: 1 });
+      expect(res.body.errors).to.deep.equal([
+        {
+          line: 2,
+          identifier: 'bulkuser1',
+          error: 'Invalid column name: __proto__',
+        },
+      ]);
 
-      const exists = await server.ldap
-        .search(
-          { paged: false, scope: 'base' },
-          `uid=bulkuser1,${process.env.DM_LDAP_BASE}`
-        )
-        .then(
-          r => (r as any).searchEntries.length > 0,
-          () => false
-        );
-      expect(exists).to.be.false;
+      const exists = async (uid: string) =>
+        server.ldap
+          .search(
+            { paged: false, scope: 'base' },
+            `uid=${uid},${process.env.DM_LDAP_BASE}`
+          )
+          .then(
+            r => (r as any).searchEntries.length > 0,
+            () => false
+          );
+      expect(await exists('bulkuser1')).to.be.false;
+      expect(await exists('bulkuser2')).to.be.true;
+    });
+
+    it('should accept attribute options, numeric OIDs and empty extra columns', async () => {
+      // 2.5.4.13 is description; Commentaire is empty on every line and the
+      // trailing comma adds an unnamed column, both imported fine before
+      const csvContent = [
+        'uid,cn,sn,givenName,title;lang-fr,2.5.4.13,Commentaire,organizationDn,',
+        `bulkuser1,Bulk User 1,User1,Bulk,Ingénieur,Imported,,"${getTestOrg1Dn()}",`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/testusers')
+        .attach('file', Buffer.from(csvContent), 'test.csv');
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.include({ created: 1, failed: 0 });
     });
 
     it('should handle multi-value attributes', async function () {

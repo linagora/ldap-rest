@@ -6,22 +6,6 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
-### CSV imports refuse columns that are not attribute names
-
-**Who is affected:** anyone importing CSV files through
-`POST /api/v1/ldap/bulk-import/{resource}` with hand-made headers.
-
-Every column name must now be an LDAP attribute name (`mail`, `2.5.4.3`),
-optionally with options (`cn;lang-fr`); `organizationDn` is accepted as
-before. A file with any other name is refused with `400`, listing the
-offending columns, and nothing is imported. It used to be accepted, each line
-then failing on the directory side — or, for a `__proto__` column, the value
-replacing the prototype of the entry being built instead of setting an
-attribute.
-
-Templates downloaded from `GET …/template.csv` are unaffected. Empty column
-names (a trailing comma) are still tolerated.
-
 ### `calendarResources` is renamed `calendar`
 
 **Who is affected:** deployments loading `core/twake/calendarResources`, and
