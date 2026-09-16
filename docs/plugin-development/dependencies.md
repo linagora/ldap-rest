@@ -190,15 +190,17 @@ dependencies = {
 - **Consumes Hooks**: (Hooks provided by `onLdapChange`)
 - **Notes**: Synchronizes LDAP users/groups with Apache James mail server
 
-#### `calendarResources` (twake/calendarResources)
+#### `calendar` (twake/calendar)
 
 - **Dependencies**: None
 - **Provides Hooks**:
   - `ldapcalendarResourceadddone` - After calendar resource added
   - `ldapcalendarResourcemodifydone` - After calendar resource modified
   - `ldapcalendarResourcedeletedone` - After calendar resource deleted
-- **Consumes Hooks**: None
-- **Notes**: Synchronizes calendar resources with Twake Calendar
+  - `onLdapChange` - Propagates user email / name changes
+- **Consumes Hooks**: (Hooks provided by `onLdapChange`)
+- **Notes**: Synchronizes calendar resources and registered users with Twake
+  Calendar. Formerly `calendarResources`, still loadable under that name
 
 #### `appAccountsConsistency` (twake/appAccountsConsistency)
 
@@ -361,7 +363,7 @@ ldapOrganizations (core/ldap/organization)
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌────────────────────────────┐      ┌──────────────────────────┐          │
-│  │        james               │      │  calendarResources       │          │
+│  │        james               │      │  calendar                │          │
 │  │  (Apache James sync)       │      │  (Twake Calendar sync)   │          │
 │  │                            │      │                          │          │
 │  │  Requires:                 │      │                          │          │
@@ -466,7 +468,7 @@ graph TB
 
     %% Twake Integration
     james[james]
-    calendar[calendarResources]
+    calendar[calendar]
 
     %% Utility
     static[static]
@@ -521,7 +523,7 @@ graph TB
 ### 4. Integration Plugins
 
 13. `james` - After `onChange` and `groups`
-14. `calendarResources` - Calendar sync (optional)
+14. `calendar` - Twake Calendar sync (optional)
 
 ### 5. Utility Plugins (can load anytime)
 

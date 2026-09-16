@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Deprecations
+
+- `plugins/twake/calendarResources` is renamed `plugins/twake/calendar`: it
+  also propagates user email and name changes to Twake Calendar, which the old
+  name hid. `core/twake/calendarResources` still loads, registers under its
+  old name and logs a deprecation warning; it will be removed in a future major
+  release. Package export: `ldap-rest/plugin-twake-calendar`
+
 ## v0.7.0 (2026-09-02)
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.

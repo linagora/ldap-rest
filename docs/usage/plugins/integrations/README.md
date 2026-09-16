@@ -11,10 +11,10 @@ Plugins for connecting LDAP-Rest to external systems.
 
 ## Twake
 
-| Plugin                                      | Description                              |
-| ------------------------------------------- | ---------------------------------------- |
-| [calendar-resources](calendar-resources.md) | Calendar resource synchronization        |
-| [app-accounts](app-accounts.md)             | Applicative accounts API (devices, apps) |
+| Plugin                          | Description                              |
+| ------------------------------- | ---------------------------------------- |
+| [calendar](calendar.md)         | Calendar resources and users sync        |
+| [app-accounts](app-accounts.md) | Applicative accounts API (devices, apps) |
 
 ## Prerequisites
 
@@ -37,6 +37,6 @@ James plugins require:
 core/twake/james
   └─ requires: core/ldap/onChange
 
-core/twake/calendarResources
+core/twake/calendar
   └─ requires: core/ldap/onChange
 ```

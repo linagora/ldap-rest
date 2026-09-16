@@ -208,6 +208,10 @@
       "types": "./dist/src/plugins/twake/appAccountsConsistency.d.ts",
       "import": "./dist/plugins/twake/appAccountsConsistency.js"
     },
+    "./plugin-twake-calendar": {
+      "types": "./dist/src/plugins/twake/calendar.d.ts",
+      "import": "./dist/plugins/twake/calendar.js"
+    },
     "./plugin-twake-calendarresources": {
       "types": "./dist/src/plugins/twake/calendarResources.d.ts",
       "import": "./dist/plugins/twake/calendarResources.js"

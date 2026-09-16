@@ -220,7 +220,7 @@ private pluginTags: Map<string, string> = new Map([
   ['ldapFlatGeneric', 'Entities'],
   ['ldapBulkImport', 'Bulk Import'],
   ['james', 'Apache James Integration'],
-  ['calendarResources', 'Calendar Resources'],
+  ['calendar', 'Twake Calendar'],
   ['configApi', 'Configuration'],
   ['static', 'Static Files'],
 ]);
