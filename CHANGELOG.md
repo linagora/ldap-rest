@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Security
+
+- Bump `csv-parse` to 7.0.2 (GHSA-8cw4-87c7-c6xx). The advisory's trigger,
+  `group_columns_by_name`, is not used here, but 7.0.2 hands a `__proto__`
+  header over as an ordinary key, which `plugins/ldap/bulkImport` would have
+  copied onto the entry being built, replacing its prototype. A value under a
+  column whose name is not an LDAP attribute name now fails its line; empty
+  cells are still ignored whatever their column
+
+### Dependencies
+
+- `csv-parse` 7 trims ECMAScript whitespace: in bulk imports, cells padded
+  with a non-breaking space are now trimmed, and a BOM before the first header
+  no longer ends up in the column name
+
 ### Deprecations
 
 - `plugins/twake/calendarResources` is renamed `plugins/twake/calendar`, see

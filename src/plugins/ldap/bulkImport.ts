@@ -32,6 +32,20 @@ interface BulkImportSchema {
   };
 }
 
+/**
+ * A CSV column name: an LDAP attribute description (RFC 4512 section 2.5), a
+ * `descr` or a `numericoid`, optionally followed by options (`cn;lang-fr`).
+ * Syntax only: an unknown attribute passes and fails on the directory side.
+ *
+ * Each column is copied onto the entry as a property of that name, so a name
+ * like `__proto__` would not become an attribute: it would invoke the setter
+ * and replace the entry's prototype. csv-parse 7 hands such a header over as
+ * an ordinary key (6.x dropped it); a value under any name that is not an
+ * attribute name fails its line instead of reaching the entry.
+ */
+const CSV_COLUMN_NAME =
+  /^([A-Za-z][A-Za-z0-9-]*|\d+(\.\d+)+)(;[A-Za-z0-9-]+)*$/;
+
 interface BulkImportResource {
   name: string;
   schema: BulkImportSchema;
@@ -455,9 +469,14 @@ export default class LdapBulkImport extends DmPlugin {
       }
     }
 
-    // 3. Add fields from CSV
+    // 3. Add fields from CSV. Empty cells are skipped whatever their column
+    // is called, so a spreadsheet's comment column or a trailing comma still
+    // imports; only a value under a name that is not an attribute fails.
     for (const [attr, value] of Object.entries(csvLine)) {
       if (value && value.trim() !== '') {
+        if (!CSV_COLUMN_NAME.test(attr)) {
+          throw new Error(`Invalid column name: ${attr}`);
+        }
         // Support multi-value: "val1;val2;val3"
         entry[attr] = value.includes(';')
           ? value.split(';').map(v => v.trim())

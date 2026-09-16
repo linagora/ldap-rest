@@ -137,6 +137,13 @@ jdoe,John Doe,Doe,John,john.doe@example.com,password123,ou=IT,ou=organization,dc
 asmith,Alice Smith,Smith,Alice,alice.smith@example.com,secret456,ou=HR,ou=organization,dc=example,dc=com
 ```
 
+A value must sit under a column whose name is a syntactically valid LDAP
+attribute name (`mail`, `2.5.4.3`, `cn;lang-fr`). Otherwise its line fails
+with `Invalid column name` and is counted in `failed`. The check is on syntax
+only: an unknown attribute such as `maill` passes it and fails on the
+directory side. Empty cells are ignored whatever their column is called, so a
+comment column left empty, or a trailing comma, does not prevent the import.
+
 ### Special Column: `organizationDn`
 
 The `organizationDn` column is special and triggers automatic calculation of:
