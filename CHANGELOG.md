@@ -94,8 +94,9 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   about the entries already stored. See
   [directory-audit](docs/usage/directory-audit.md)
 
-- `static/schemas`: the missing `domains` nomenclature and a dozen attributes
-  across the Twake schemas, plus `static/schemas/example` — a worked
+- `static/schemas`: the missing `domains` nomenclature, English and French
+  labels on every Twake nomenclature, and a dozen attributes across the Twake
+  schemas, plus `static/schemas/example` — a worked
   configuration keeping every national format, mail domain and quota default
   in a schema rather than in the code, with `npm run check:no-client-values`
   failing the build if one leaks back into `src/`. `--organization-schema` is

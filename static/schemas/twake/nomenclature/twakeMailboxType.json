@@ -5,6 +5,14 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "mailboxType",
     "pluralName": "mailboxTypes",
+    "label": {
+      "en": "Mailbox types",
+      "fr": "Types de boîte"
+    },
+    "singularLabel": {
+      "en": "mailbox type",
+      "fr": "type de boîte"
+    },
     "base": "ou=twakeMailboxType,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

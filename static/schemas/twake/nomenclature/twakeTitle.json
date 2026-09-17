@@ -5,6 +5,14 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "title",
     "pluralName": "titles",
+    "label": {
+      "en": "Titles",
+      "fr": "Civilités"
+    },
+    "singularLabel": {
+      "en": "title",
+      "fr": "civilité"
+    },
     "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

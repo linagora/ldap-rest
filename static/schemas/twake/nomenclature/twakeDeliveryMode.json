@@ -5,6 +5,14 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "deliveryMode",
     "pluralName": "deliveryModes",
+    "label": {
+      "en": "Delivery modes",
+      "fr": "Modes de distribution"
+    },
+    "singularLabel": {
+      "en": "delivery mode",
+      "fr": "mode de distribution"
+    },
     "base": "ou=twakeDeliveryMode,ou=nomenclature,{ldap_base}"
   },
   "strict": true,
