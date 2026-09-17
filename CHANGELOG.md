@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-An enterprise directory manager: the rules a real deployment needs, a console
-built from the server's own configuration, and a script that says what a
-migration will refuse before it does.
+An enterprise directory manager: the rules a real deployment needs, the
+endpoints an administration console reads, and a script that says what a
+migration will refuse before it does. The console itself is
+[Twake Directory Manager](https://github.com/linagora/twake-directory-manager).
 
 See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
@@ -80,15 +81,6 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   refuse a value in a request body; `neverReturn` keeps a writable attribute
   out of every answer; `generatedFrom` derives an identifier from another
   attribute. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
-
-- `browser/directory-console`: an administration interface — entity lists with
-  search, paging and bulk actions, an organization tree that stays on screen,
-  forms explaining each pattern under its field, the lifecycle actions and the
-  caller's own scope. Built from `GET /v1/config` and `GET /v1/authz/scope`
-  alone, so a deployment naming its things differently gets its own interface,
-  its own language included. It follows the look of the Twake applications,
-  light and dark, and is restyled through CSS custom properties. See
-  [directory-console](docs/client-development/browser/directory-console.md)
 
 - `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names
   separated by commas and answers on any of them, so a search box needs no

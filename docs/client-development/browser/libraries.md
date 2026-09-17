@@ -5,7 +5,6 @@ This guide covers LDAP-Rest's browser libraries for building LDAP management int
 ## Table of Contents
 
 - [Overview](#overview)
-- [DirectoryConsole](directory-console.md)
 - [LdapTreeViewer](#ldaptreeviewer)
   - [Installation](#ldaptreeviewer-installation)
   - [Basic Usage](#ldaptreeviewer-basic-usage)
@@ -37,7 +36,6 @@ This guide covers LDAP-Rest's browser libraries for building LDAP management int
 
 LDAP-Rest provides ready-to-use browser libraries for building LDAP management interfaces:
 
-- **DirectoryConsole** - The complete administration interface, built from the server's own configuration — see [directory-console.md](directory-console.md)
 - **LdapTreeViewer** - Interactive hierarchical tree view of LDAP organizations
 - **LdapUserEditor** - Complete user management interface with organization tree, user list, and edit form
 - **LdapUnitEditor** - Organization management interface with create, move, edit, and delete operations
