@@ -13,6 +13,20 @@
       "en": "group type",
       "fr": "type de groupe"
     },
+    "valueLabels": {
+      "group": {
+        "en": "Group",
+        "fr": "Groupe"
+      },
+      "mailingList": {
+        "en": "Distribution list",
+        "fr": "Liste de diffusion"
+      },
+      "teamMailbox": {
+        "en": "Shared mailbox",
+        "fr": "Boîte partagée"
+      }
+    },
     "base": "ou=twakeMailboxType,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

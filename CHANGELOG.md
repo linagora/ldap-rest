@@ -95,7 +95,9 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   [directory-audit](docs/usage/directory-audit.md)
 
 - `static/schemas`: the missing `domains` nomenclature, English and French
-  labels on every Twake nomenclature, and a dozen attributes across the Twake
+  labels on every Twake nomenclature and on its values — a new
+  `entity.valueLabels`, so a client shows _Shared mailbox_ rather than
+  `teamMailbox` — and a dozen attributes across the Twake
   schemas, plus `static/schemas/example` — a worked
   configuration keeping every national format, mail domain and quota default
   in a schema rather than in the code, with `npm run check:no-client-values`

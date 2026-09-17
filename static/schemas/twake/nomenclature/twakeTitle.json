@@ -13,6 +13,32 @@
       "en": "title",
       "fr": "civilité"
     },
+    "valueLabels": {
+      "Dr": {
+        "en": "Dr",
+        "fr": "Dr"
+      },
+      "Mr": {
+        "en": "Mr",
+        "fr": "M."
+      },
+      "Mrs": {
+        "en": "Mrs",
+        "fr": "Mme"
+      },
+      "Miss": {
+        "en": "Miss",
+        "fr": "Mlle"
+      },
+      "Ms": {
+        "en": "Ms",
+        "fr": "Mme"
+      },
+      "Prof": {
+        "en": "Prof.",
+        "fr": "Pr"
+      }
+    },
     "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

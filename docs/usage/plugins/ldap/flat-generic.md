@@ -171,6 +171,27 @@ you call a department. A client picks the exact tag, then its language, then
 English, then whatever the map does hold; with no label at all it falls back to
 the attribute name made readable.
 
+A nomenclature names its values too. `entity.valueLabels` maps the main
+attribute value of an entry to what a client shows for it, so a group whose
+type is `cn=teamMailbox,…` reads _Shared mailbox_ — or _Boîte partagée_ —
+wherever a pointer lands on it:
+
+```json
+{
+  "entity": {
+    "name": "twakeMailboxType",
+    "mainAttribute": "cn",
+    "valueLabels": {
+      "group": { "en": "Group", "fr": "Groupe" },
+      "teamMailbox": { "en": "Shared mailbox", "fr": "Boîte partagée" }
+    }
+  }
+}
+```
+
+A value the map does not hold is shown as it is stored: a directory with a
+value of its own keeps working, and names it by adding it to its schema.
+
 ### Explaining a pattern: `hint`
 
 A `test` tells the server what to refuse. A `hint` tells the person what to

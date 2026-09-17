@@ -29,6 +29,11 @@ interface EnrichedSchema extends Schema {
     label?: LocalizedText;
     /** Same, for a single entry */
     singularLabel?: LocalizedText;
+    /**
+     * What a client shows for an entry, keyed by its main attribute value:
+     * the readable name of a nomenclature value a pointer lands on
+     */
+    valueLabels?: Record<string, LocalizedText>;
   };
 }
 
