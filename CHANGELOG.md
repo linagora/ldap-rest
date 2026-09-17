@@ -125,6 +125,11 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
 ### Bug Fixes
 
+- `plugins/auth/llng` never initialized the LemonLDAP::NG handler: `--llng-ini`
+  was parsed and never read, and every request failed with a `500`. The
+  handler is now initialized from it when the server starts, and a file or a
+  configuration it cannot use stops the server with the reason
+
 - `abstract/ldapFlat`: creating an entry that already exists answered `500`
   when two creations of it raced past the existence checks, which a bulk
   import holding one person twice does. It answers `409`

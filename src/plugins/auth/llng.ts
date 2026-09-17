@@ -41,8 +41,9 @@ export default class AuthLLNG extends AuthBase {
   // awaits it — this override just uses the async result that permits.
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   async api(app: Express): Promise<void> {
+    let handler: LlngHandler;
     try {
-      this.handler = await this.loadHandler();
+      handler = await this.loadHandler();
     } catch (err) {
       throw new Error(
         `${this.name}: requires the optional dependency "lemonldap-ng-handler", ` +
@@ -52,6 +53,25 @@ export default class AuthLLNG extends AuthBase {
           })`
       );
     }
+    // The handler knows nothing until it is initialized: which virtual hosts
+    // it protects, where the configuration and the sessions live. `run()`
+    // before `init()` reads an instance that does not exist yet and throws on
+    // every request, so the plugin used to answer 500 to all of them while
+    // `--llng-ini` was parsed and never read.
+    const confFile = this.config.llng_ini;
+    try {
+      await handler.init({ configStorage: { confFile } });
+    } catch (err) {
+      throw new Error(
+        `${this.name}: cannot initialize the LemonLDAP::NG handler from ` +
+          `${confFile || 'its default configuration'}. Check that the file ` +
+          'exists, that its [configuration] section is reachable and that ' +
+          `[node-handler] lists this server in nodeVhosts. (${
+            err instanceof Error ? err.message : String(err)
+          })`
+      );
+    }
+    this.handler = handler;
     super.api(app);
   }
 

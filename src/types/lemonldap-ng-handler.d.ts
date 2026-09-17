@@ -20,5 +20,10 @@ declare module 'lemonldap-ng-handler' {
 
   import type { DmRequest } from '../lib/auth/base';
 
+  export function init(args: {
+    configStorage?: { confFile?: string; [key: string]: unknown };
+    type?: string;
+  }): Promise<unknown>;
+
   export function run(req: DmRequest, res: Response, next: () => void): void;
 }

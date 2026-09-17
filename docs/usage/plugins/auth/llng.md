@@ -21,6 +21,23 @@ DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
 2. **LLNG Configuration**: Valid `lemonldap-ng.ini` file
 3. **Virtual Host Configuration**: LDAP-Rest must be configured as a protected application in LLNG
 
+The handler runs inside LDAP-Rest and reads `lemonldap-ng.ini` when the server
+starts. The file tells it where the LLNG configuration is, and which virtual
+hosts it protects — a Node.js handler serves only those listed in
+`nodeVhosts`:
+
+```ini
+[configuration]
+type = REST
+baseConfigUrl = https://auth.example.com/index.fcgi/config
+
+[node-handler]
+nodeVhosts = api.example.com
+```
+
+A file that cannot be read, a configuration that cannot be reached or a
+missing `nodeVhosts` stops the server at startup, with the reason.
+
 ## How It Works
 
 1. Uses the LemonLDAP::NG Handler to validate requests

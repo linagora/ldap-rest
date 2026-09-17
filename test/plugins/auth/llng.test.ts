@@ -1,7 +1,8 @@
 import { expect } from 'chai';
-import type { Express } from 'express';
+import type { Express, Response } from 'express';
 
 import { DM } from '../../../src/bin';
+import type { DmRequest } from '../../../src/lib/auth/base';
 import AuthLLNG from '../../../src/plugins/auth/llng';
 
 /**
@@ -40,20 +41,92 @@ describe('LemonLDAP::NG auth plugin', () => {
   });
 
   describe('when lemonldap-ng-handler is installed', () => {
-    it('loads the real handler and authenticates a request', async function () {
+    /**
+     * The handler as the plugin sees it: `init()` records its arguments,
+     * `run()` refuses to work before it — like the real module, whose `run()`
+     * reads an instance only `init()` creates — and otherwise sets the header
+     * a protected virtual host receives.
+     */
+    const fakeHandler = (options: { failInit?: Error } = {}) => {
+      const calls: { init?: unknown } = {};
+      let ready = false;
+      const handler = {
+        init: async (args: unknown): Promise<unknown> => {
+          calls.init = args;
+          if (options.failInit) throw options.failInit;
+          ready = true;
+          return {};
+        },
+        run: (
+          req: { headers: Record<string, string> },
+          _res: unknown,
+          next: () => void
+        ): void => {
+          if (!ready)
+            throw new TypeError(
+              "Cannot read properties of undefined (reading 'run')"
+            );
+          req.headers['Lm-Remote-User'] = 'dwho';
+          next();
+        },
+      };
+      return { handler, calls };
+    };
+
+    const withHandler = (handler: unknown) =>
+      class extends AuthLLNG {
+        protected async loadHandler(): Promise<never> {
+          return handler as never;
+        }
+      };
+
+    it('initializes the handler from --llng-ini before serving', async () => {
       const dm = new DM();
       await dm.ready;
+      dm.config.llng_ini = '/etc/llng/test.ini';
+      const { handler, calls } = fakeHandler();
+      const plugin = new (withHandler(handler))(dm);
 
-      const plugin = new AuthLLNG(dm);
+      await plugin.api({} as Express);
+      expect(calls.init).to.deep.equal({
+        configStorage: { confFile: '/etc/llng/test.ini' },
+      });
+
+      const req = { headers: {} } as unknown as DmRequest;
+      let passed = false;
+      plugin.authMethod(req, {} as Response, () => {
+        passed = true;
+      });
+      expect(passed).to.equal(true);
+      expect(req.user).to.equal('dwho');
+    });
+
+    it('fails at startup, naming the file, when the handler cannot start', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.config.llng_ini = '/nowhere/lemonldap-ng.ini';
+      const { handler } = fakeHandler({
+        failInit: new Error('No Virtualhosts configured for Node.js'),
+      });
+      const plugin = new (withHandler(handler))(dm);
+
+      let thrown: Error | undefined;
       try {
-        await plugin.api(dm.app);
+        await plugin.api({} as Express);
       } catch (err) {
-        // Not installed on this runtime (e.g. re2's engines constraint
-        // excludes it here) — the case above covers the failure path.
-        this.skip();
+        thrown = err as Error;
       }
-
-      expect(plugin.name).to.equal('authLemonldapNg');
+      expect(thrown?.message).to.include(plugin.name);
+      expect(thrown?.message).to.include('/nowhere/lemonldap-ng.ini');
+      expect(thrown?.message).to.include('No Virtualhosts configured');
+      // Nothing is served by a handler that did not start.
+      expect(() =>
+        plugin.authMethod(
+          { headers: {} } as unknown as DmRequest,
+          {} as Response,
+          () => undefined
+        )
+      ).to.throw(/not loaded/);
     });
   });
 });
