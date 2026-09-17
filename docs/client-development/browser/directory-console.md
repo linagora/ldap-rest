@@ -113,6 +113,38 @@ definition — see [flat-generic](../../usage/plugins/ldap/flat-generic.md).
   `enabled`, `disabled`, `noAccess`, `toDelete` — and keeps the name the
   deployment gave it otherwise. The chosen language is remembered.
 
+## Appearance
+
+The console follows the Twake Workplace applications: quiet neutrals, one
+blue, rounded surfaces and pill buttons, in light and dark following the
+system setting. Its mark — an organization chart on the gradient tile the
+Twake applications share — is drawn inline, and ships on its own as
+[`examples/web/directory-console-logo.svg`](../../../examples/web/directory-console-logo.svg)
+for a page that wants it as a favicon.
+
+Everything is written against custom properties on `.dc-app`, so a deployment
+restyles the console from its own stylesheet without forking it:
+
+```css
+.dc-app {
+  --dc-accent: #6b2fd6; /* buttons, links, selection, focus */
+  --dc-accent-dark: #5623b0; /* primary button hover */
+  --dc-accent-soft: rgb(107 47 214 / 10%); /* active and selected tints */
+  --dc-focus: 0 0 0 3px rgb(107 47 214 / 28%);
+  --dc-radius: 14px;
+}
+```
+
+The other tokens are `--dc-ink`, `--dc-muted`, `--dc-line`,
+`--dc-line-strong`, `--dc-surface`, `--dc-ground`, `--dc-hover`,
+`--dc-danger`, `--dc-danger-soft`, `--dc-radius-small`, `--dc-shadow` and
+`--dc-shadow-raised`. A deployment overriding colours sets them for dark mode
+too, inside `@media (prefers-color-scheme: dark)`.
+
+Text is set in Inter when the page provides it, the system font otherwise:
+the console loads no font of its own, so an intranet deployment makes no
+request outside it.
+
 ## Exported pieces
 
 The bundle exports the components as well as the application, for a client

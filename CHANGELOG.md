@@ -86,7 +86,8 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   forms explaining each pattern under its field, the lifecycle actions and the
   caller's own scope. Built from `GET /v1/config` and `GET /v1/authz/scope`
   alone, so a deployment naming its things differently gets its own interface,
-  its own language included. See
+  its own language included. It follows the look of the Twake applications,
+  light and dark, and is restyled through CSS custom properties. See
   [directory-console](docs/client-development/browser/directory-console.md)
 
 - `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names

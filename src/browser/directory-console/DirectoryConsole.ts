@@ -13,6 +13,7 @@
 import { escapeHtml } from '../shared/utils/dom';
 
 import { ConsoleApiClient } from './api/ConsoleApiClient';
+import { CONSOLE_LOGO, LINAGORA_LOGO } from './assets';
 import { EntityDetail } from './components/EntityDetail';
 import { EntityForm } from './components/EntityForm';
 import { EntityList, SEARCH_MINIMUM } from './components/EntityList';
@@ -35,6 +36,23 @@ interface Route {
 }
 
 const LANGUAGE_KEY = 'ldap-rest.console.language';
+
+/**
+ * The letter standing for a collection in the navigation and on its card.
+ * Collections are named by the deployment, so a drawn icon could only guess
+ * what one holds; its own initial never does.
+ */
+function initial(label: string): string {
+  return (Array.from(label.trim())[0] || '').toLocaleUpperCase();
+}
+
+/** Four squares: the overview, which is every collection at once. */
+const OVERVIEW_ICON =
+  '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">' +
+  '<rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.6"/>' +
+  '<rect x="9" y="1.5" width="5.5" height="5.5" rx="1.6"/>' +
+  '<rect x="1.5" y="9" width="5.5" height="5.5" rx="1.6"/>' +
+  '<rect x="9" y="9" width="5.5" height="5.5" rx="1.6"/></svg>';
 
 /**
  * What a failed read means for the reader.
@@ -266,17 +284,26 @@ export class DirectoryConsole {
     container.innerHTML = `
       <div class="dc-app">
         <aside class="dc-sidebar">
-          <div class="dc-brand">${escapeHtml(t('app.title'))}</div>
+          <div class="dc-brand">
+            <span class="dc-brand-logo" aria-hidden="true">${CONSOLE_LOGO}</span>
+            <span class="dc-brand-name">${escapeHtml(t('app.title'))}</span>
+          </div>
           <nav class="dc-nav">
-            <button type="button" class="dc-nav-item" data-nav="">${escapeHtml(
-              t('nav.dashboard')
-            )}</button>
+            <button type="button" class="dc-nav-item" data-nav="">
+              <span class="dc-nav-icon">${OVERVIEW_ICON}</span>
+              <span class="dc-nav-label">${escapeHtml(t('nav.dashboard'))}</span>
+            </button>
             ${this.entities
               .map(
                 entity =>
                   `<button type="button" class="dc-nav-item" data-nav="${escapeHtml(
                     entity.key
-                  )}">${escapeHtml(this.plural(entity))}</button>`
+                  )}">
+                    <span class="dc-nav-icon" aria-hidden="true">${escapeHtml(
+                      initial(this.plural(entity))
+                    )}</span>
+                    <span class="dc-nav-label">${escapeHtml(this.plural(entity))}</span>
+                  </button>`
               )
               .join('')}
           </nav>
@@ -311,6 +338,10 @@ export class DirectoryConsole {
           </div>
         </div>
         <div class="dc-toast" data-toast hidden></div>
+        <a class="dc-powered" href="https://linagora.com" target="_blank"
+          rel="noopener noreferrer">
+          <img src="${LINAGORA_LOGO}" alt="LINAGORA" width="100" height="21" />
+        </a>
       </div>`;
 
     for (const button of Array.from(
@@ -503,7 +534,12 @@ export class DirectoryConsole {
             .map(entity => {
               const allowed = this.canCreate(entity);
               return `<li class="dc-card">
-                <h3>${escapeHtml(this.plural(entity))}</h3>
+                <header class="dc-card-title">
+                  <span class="dc-entity-icon" aria-hidden="true">${escapeHtml(
+                    initial(this.plural(entity))
+                  )}</span>
+                  <h3>${escapeHtml(this.plural(entity))}</h3>
+                </header>
                 <div class="dc-card-actions">
                   <button type="button" class="dc-button" data-open="${escapeHtml(
                     entity.key
