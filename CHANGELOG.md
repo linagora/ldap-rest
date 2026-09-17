@@ -125,6 +125,11 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
 ### Bug Fixes
 
+- `plugins/ldap/groups`: `GET /ldap/groups/:cn` returned the placeholder
+  member `--group-dummy-user` adds to keep a `groupOfNames` valid, which the
+  listing already hid — a client showed it as a person. It is hidden on both,
+  and recognised however the directory spells its DN
+
 - `plugins/auth/llng` never initialized the LemonLDAP::NG handler: `--llng-ini`
   was parsed and never read, and every request failed with a `500`. The
   handler is now initialized from it when the server starts, and a file or a

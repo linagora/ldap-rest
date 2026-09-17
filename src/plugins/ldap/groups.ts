@@ -34,6 +34,7 @@ import {
   escapeLdapFilter,
   launchHooks,
   launchHooksChained,
+  normalizeDn,
   substringSearchFilter,
   transformSchemas,
   validateDnValue,
@@ -561,6 +562,47 @@ export default class LdapGroups extends DmPlugin {
     );
   }
 
+  /**
+   * Whether a member is the placeholder `groupOfNames` needs to stay valid
+   * with no real member.
+   *
+   * Compared as DNs, not as text: the directory answers with its own spelling
+   * of a DN, and `uid=fakeUser,ou=users,…` configured must match the
+   * `uid=fakeuser, ou=users,…` it may hold.
+   *
+   * @param member DN of a member
+   * @returns true for the placeholder
+   */
+  isDummyMember(member: string): boolean {
+    const dummy = this.config.group_dummy_user;
+    if (!dummy || typeof member !== 'string') return false;
+    if (member === dummy) return true;
+    try {
+      return normalizeDn(member) === normalizeDn(dummy);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * An entry with the placeholder taken out of its members. It is there for
+   * the directory's schema, not for anyone reading the group: listed, it
+   * reads as a person, and a client editing the list would offer to remove
+   * the one member the server refuses to remove.
+   *
+   * @param entry group as read
+   * @returns the same entry, members filtered
+   */
+  withoutDummyMember<T extends Record<string, unknown>>(entry: T): T {
+    const members = entry.member;
+    if (members === undefined) return entry;
+    const list = Array.isArray(members) ? members : [members];
+    return {
+      ...entry,
+      member: list.filter(m => !this.isDummyMember(m as string)),
+    };
+  }
+
   async apiGet(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
@@ -575,7 +617,9 @@ export default class LdapGroups extends DmPlugin {
       if (result.searchEntries.length === 0) {
         throw new NotFoundError('Group not found');
       }
-      res.json(this.hideNeverReturn(result.searchEntries[0]));
+      res.json(
+        this.hideNeverReturn(this.withoutDummyMember(result.searchEntries[0]))
+      );
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
       if (
@@ -821,7 +865,7 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
     );
-    if (member === this.config.group_dummy_user)
+    if (this.isDummyMember(member))
       throw new Error('Cannot delete dummy member from group');
     return await this.ldap
       .modify(dn, {
@@ -990,9 +1034,7 @@ export default class LdapGroups extends DmPlugin {
         if (!Array.isArray(entries[s].member))
           entries[s].member = [entries[s].member as string];
         entries[s].member = (entries[s].member as string[]).filter(
-          (m: string) => {
-            return m !== this.config.group_dummy_user;
-          }
+          (m: string) => !this.isDummyMember(m)
         );
       });
     }

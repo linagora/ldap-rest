@@ -222,6 +222,28 @@ describe('LdapGroups Plugin', function () {
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
     });
 
+    it('should hide the placeholder member when a group is read', async () => {
+      // The placeholder is spelled differently from the configured DN, as a
+      // directory may hold it: a text comparison would let it through.
+      const configured = server.config.group_dummy_user as string;
+      const spelled = configured.toUpperCase().replace(',', ', ');
+      await plugin.addGroup('testgroup', [user1]);
+      await plugin.ldap.modify(`cn=testgroup,${DM_LDAP_GROUP_BASE}`, {
+        replace: { member: [spelled, user1] },
+      });
+
+      const res = await request
+        .get('/api/v1/ldap/groups/testgroup')
+        .set('Accept', 'application/json');
+      expect(res.status).to.equal(200);
+      expect(res.body.member).to.deep.equal([user1]);
+      expect(
+        (await plugin.listGroups()).testgroup.member as string[]
+      ).to.deep.equal([user1]);
+      expect(plugin.isDummyMember(spelled)).to.equal(true);
+      expect(plugin.isDummyMember(user1)).to.equal(false);
+    });
+
     it('should add/del member via API', async () => {
       await plugin.addGroup('testgroup');
       let res = await request
