@@ -32,15 +32,21 @@ import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
-  escapeRegex,
-  getCompiledRegex,
   launchHooks,
   launchHooksChained,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
-import { BadRequestError, NotFoundError } from '../../lib/errors';
+import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
 import type { Schema } from '../../config/schema';
+import {
+  assertClientMaySet,
+  checkDnValues,
+  matchesPattern,
+  modifiedAttributeNames,
+  missingRequiredAttribute,
+} from '../../config/schema';
 
 export interface postAdd {
   cn?: string;
@@ -191,14 +197,25 @@ export default class LdapGroups extends DmPlugin {
      * summary: List groups
      * description: |
      *   Returns every group under the configured group base. The optional
-     *   `match` query supports either a raw LDAP filter (when it contains
-     *   `=`) or a simple value matched against the RDN attribute.
+     *   `match` query is matched against the attributes named by
+     *   `attribute`, as a substring — the same semantics as the flat entity
+     *   lists. Without `attribute` it is either a raw LDAP filter (when it
+     *   contains `=`) or an exact value of the RDN attribute.
      * parameters:
      *   - in: query
      *     name: match
      *     schema: { type: string }
-     *     description: LDAP filter or simple value.
-     *     example: admin*
+     *     description: Substring to look for, LDAP filter, or exact value.
+     *     example: admin
+     *   - in: query
+     *     name: attribute
+     *     schema: { type: string }
+     *     description: |
+     *       LDAP attribute name to match `match` against, as a substring.
+     *       Several may be given, separated by commas; a group matching any
+     *       of them is returned. Each name must be indexed for a substring
+     *       search, or the directory scans the branch.
+     *     example: cn,mail
      *   - in: query
      *     name: attributes
      *     schema: { type: string }
@@ -238,7 +255,16 @@ export default class LdapGroups extends DmPlugin {
           if (typeof req.query.match !== 'string') {
             throw new BadRequestError('Invalid match query');
           }
-          if (/=/.test(req.query.match)) {
+          if (typeof req.query.attribute === 'string' && req.query.attribute) {
+            // The client named what it is searching in, so search in it — as
+            // a substring, as the flat lists do. Building the filter on the
+            // RDN attribute whatever was asked answered "no entry matches"
+            // to every search by mail address the console sends.
+            args.filter = substringSearchFilter(
+              req.query.match,
+              req.query.attribute
+            );
+          } else if (/=/.test(req.query.match)) {
             // Custom filter syntax - validate strictly to prevent LDAP injection
             // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
             if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
@@ -257,7 +283,7 @@ export default class LdapGroups extends DmPlugin {
         if (req.query.attributes && typeof req.query.attributes === 'string')
           args.attributes = req.query.attributes.split(',');
         const list = await this.listGroups(args);
-        return ok(res, list);
+        return ok(res, this.hideNeverReturn(list));
       })
     );
 
@@ -549,7 +575,7 @@ export default class LdapGroups extends DmPlugin {
       if (result.searchEntries.length === 0) {
         throw new NotFoundError('Group not found');
       }
-      res.json(result.searchEntries[0]);
+      res.json(this.hideNeverReturn(result.searchEntries[0]));
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
       if (
@@ -569,6 +595,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<void> {
     const body = jsonBody(req, res, ...requiredFields) as postAdd | false;
     if (!body) return;
+    assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
     const members = body.member ? body.member : [];
     const additional: AttributesList = Object.fromEntries(
@@ -596,6 +623,12 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
+    assertClientMaySet(
+      this.schema,
+      modifiedAttributeNames(
+        body as Parameters<typeof modifiedAttributeNames>[0]
+      )
+    );
     // Filter out fixed fields from schema
     const filteredBody = Object.fromEntries(
       Object.entries(body).filter(
@@ -670,6 +703,10 @@ export default class LdapGroups extends DmPlugin {
     try {
       res = await this.ldap.add(dn, entry);
     } catch (err) {
+      // A rule that refused the write chose its own status: wrapping it in a
+      // plain Error turned a 409 into a 500. The schema now carries `unique`
+      // and `mailDomainScope`, so this is the ordinary path, not the rare one.
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add group ${dn}: ${err}`);
     }
@@ -771,6 +808,7 @@ export default class LdapGroups extends DmPlugin {
         add: { member },
       })
       .catch(err => {
+        if (err instanceof HttpError) throw err;
         throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
       });
   }
@@ -790,6 +828,7 @@ export default class LdapGroups extends DmPlugin {
         delete: { member: member },
       })
       .catch(err => {
+        if (err instanceof HttpError) throw err;
         throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
       });
   }
@@ -1032,14 +1071,23 @@ export default class LdapGroups extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
-        throw new Error(`Invalid value for field ${field}`);
+        throw new BadRequestError(`Invalid value for field ${field}`);
       }
     }
-    // Check required fields
-    for (const [field, test] of Object.entries(this.schema.attributes)) {
-      if (test.required && entry[field] == undefined)
-        throw new Error(`Missing required field ${field}`);
-    }
+    // Check required fields. A `generated` attribute is exempt, as it is on
+    // the flat and organization paths: it is filled by a hook *after*
+    // validation, so demanding it here would refuse the very payload the hook
+    // expects — the client sending nothing. The shipped group schema marks
+    // the organization path required and generated, so without this a
+    // schema-conformant creation could not succeed at all. The exemption
+    // holds only while a loaded plugin says it fills the attribute: with none,
+    // the group would be written without a path nobody could ever add back.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
     return true;
   }
 
@@ -1074,102 +1122,55 @@ export default class LdapGroups extends DmPlugin {
     value: AttributeValue | null
   ): Promise<boolean> {
     if (!this.schema) return true;
+    // Every refusal of a value is a 400: a plain Error reached the client as
+    // a 500 "check logs".
     const test = this.schema.attributes[field];
     if (!test) {
-      if (this.schema.strict) throw new Error(`Field ${field} is not allowed`);
+      if (this.schema.strict)
+        throw new BadRequestError(`Field ${field} is not allowed`);
       return true;
     }
     if (value === null || value === undefined) {
-      if (test.required) throw new Error(`Field ${field} is required`);
+      if (test.required)
+        throw new BadRequestError(`Field ${field} is required`);
       return true;
     }
     if (test.type === 'array') {
       if (!Array.isArray(value))
-        throw new Error(`Field ${field} must be an array`);
+        throw new BadRequestError(`Field ${field} must be an array`);
       if (!test.items)
         throw new Error(`Schema error: no item for array ${field}`);
       if (test.items.type === 'array')
         throw new Error(
           `Schema error: array of array not supported for ${field}`
         );
-      if (test.items.test) {
-        const itemRegex =
-          typeof test.items.test === 'string'
-            ? getCompiledRegex(test.items.test)
-            : test.items.test;
-        for (let v of value) {
+      // Element types are checked where they always were: alongside a
+      // pattern. Doing it for every array tightened what groups accept.
+      if (test.items.test && test.items.type !== 'pointer')
+        for (const v of value)
           if (typeof v !== test.items.type)
-            throw new Error(
+            throw new BadRequestError(
               `Field ${field} must be of type ${test.items.type}`
             );
-          if (typeof v !== 'string') v = v.toString();
-          if (!itemRegex.test(v))
-            throw new Error(`Field ${field} has invalid value ${v}`);
-        }
-      }
-    } else if (test.type === 'pointer') {
-      if (typeof value !== 'string')
-        throw new Error(`Field ${field} must be a string (DN pointer)`);
-
-      const dnValue: string = value;
-
-      // Check branch restriction if provided
-      if (test.branch && test.branch.length > 0) {
-        const isInBranch = test.branch.some(branch => {
-          const branchPattern = getCompiledRegex(
-            `,?${escapeRegex(branch)}$`,
-            'i'
-          );
-          return branchPattern.test(dnValue);
-        });
-        if (!isInBranch) {
-          throw new Error(
-            `Field ${field} must point to a DN within allowed branches: ${test.branch.join(', ')}`
-          );
-        }
-      }
-
-      // Verify that the DN exists in LDAP (will use cache)
-      try {
-        const result = (await this.ldap.search(
-          { paged: false, scope: 'base' },
-          dnValue
-        )) as SearchResult;
-        if (
-          !result ||
-          !result.searchEntries ||
-          result.searchEntries.length === 0
-        )
-          throw new Error(
-            `Field ${field} points to non-existent DN: ${dnValue}`
-          );
-      } catch (err) {
-        throw new Error(
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          `Field ${field} points to invalid or non-existent DN: ${dnValue}: ${err}`
-        );
-      }
-      // Also check test regex if provided
-      if (test.test) {
-        const testRegex =
-          typeof test.test === 'string'
-            ? getCompiledRegex(test.test)
-            : test.test;
-        if (!testRegex.test(dnValue))
-          throw new Error(`Field ${field} has invalid value ${dnValue}`);
-      }
-    } else {
-      if (typeof value !== test.type) return false;
-      if (typeof value !== 'string') value = value.toString();
-      if (test.test) {
-        const testRegex =
-          typeof test.test === 'string'
-            ? getCompiledRegex(test.test)
-            : test.test;
-        if (!testRegex.test(value))
-          throw new Error(`Field ${field} has invalid value ${value}`);
-      }
+    } else if (test.type !== 'pointer' && typeof value !== test.type) {
+      return false;
     }
+    // A pointer, or the elements of an array of them, checked the way the
+    // flat entities check theirs: branch compared RDN by RDN — the `,?<branch>$`
+    // pattern read `uid=x,xou=users,…` as inside `ou=users,…` — and the target
+    // looked up. `items.branch` and the existence of array elements were not
+    // read at all here.
+    await checkDnValues(field, test, value, async dn => {
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: ['dn'] },
+        dn
+      )) as SearchResult;
+      return result.searchEntries.length > 0;
+    });
+    if (!matchesPattern(test, value))
+      throw new BadRequestError(
+        `Field ${field} has invalid value ${String(value)}`
+      );
     return true;
   }
 

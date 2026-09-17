@@ -1,0 +1,106 @@
+{
+  "entity": {
+    "label": {
+      "en": "Organizations",
+      "fr": "Organisations"
+    },
+    "singularLabel": {
+      "en": "organization",
+      "fr": "organisation"
+    }
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "organizationalUnit", "twakeDepartment"],
+      "required": true,
+      "fixed": true
+    },
+    "ou": {
+      "type": "string",
+      "searchable": true,
+      "test": "^[A-ZÀ-ÖØ-Þ]((?!.*([-,’'()&]{2}|\\s{2}|\\s[-,’')]|[-’'(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-’'()&])*[a-zà-öø-ÿ)]$",
+      "hint": "Starts with a capital and ends with a lowercase letter or ), no repeated punctuation",
+      "required": true,
+      "unique": true,
+      "role": "identifier",
+      "label": "Department name"
+    },
+    "description": {
+      "type": "string",
+      "searchable": true,
+      "required": false
+    },
+    "telephoneNumber": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+        "hint": "Expected pattern (+99) 999 9999"
+      },
+      "required": false,
+      "label": "Phone"
+    },
+    "facsimileTelephoneNumber": {
+      "type": "string",
+      "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
+      "hint": "Expected pattern (+99) 999 9999",
+      "required": false,
+      "label": "Fax"
+    },
+    "l": {
+      "type": "string",
+      "required": false,
+      "label": "Locality"
+    },
+    "postalAddress": {
+      "type": "string",
+      "test": "^[A-Z0-9À-ÖØ-öø-ÿ]((?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.])*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
+      "hint": "Starts with a capital or a digit, no repeated punctuation, ends with a letter, a digit or )",
+      "required": false,
+      "label": "Address"
+    },
+    "twakeDepartmentPath": {
+      "type": "string",
+      "test": "^[^\\r\\n]{1,4096}$",
+      "required": true,
+      "generated": true,
+      "role": "organizationPath"
+    },
+    "twakeManagerLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "managers",
+      "label": "Managers"
+    },
+    "twakeDomainLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=domains,ou=nomenclature,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "domainLink",
+      "label": "Mail domains"
+    },
+    "twakeLocalAdminLink": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      },
+      "required": false,
+      "role": "localAdmins",
+      "label": "Local administrators"
+    }
+  }
+}

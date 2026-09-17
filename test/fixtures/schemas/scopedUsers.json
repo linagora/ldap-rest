@@ -1,0 +1,36 @@
+{
+  "strict": true,
+  "entity": {
+    "name": "scopedUser",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "twakeAccount", "twakeWhitePages"],
+    "singularName": "scopedUser",
+    "pluralName": "scopedUsers",
+    "base": "ou=users,__ldap_base__"
+  },
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "default": ["top", "twakeAccount", "twakeWhitePages"]
+    },
+    "uid": {
+      "type": "string",
+      "required": true,
+      "test": "^[a-zA-Z0-9._-]{1,255}$"
+    },
+    "cn": { "type": "string", "required": true },
+    "sn": { "type": "string", "required": true },
+    "mail": {
+      "type": "string",
+      "required": true,
+      "unique": { "branches": ["ou=lists,ou=groups,__LDAP_BASE__"] }
+    },
+    "twakeDeletionDate": {
+      "type": "date",
+      "required": false,
+      "role": "accountExpiry",
+      "hint": "Expected a date not earlier than today"
+    }
+  }
+}

@@ -314,5 +314,50 @@ export default async () => {
         }),
       ],
     },
+    // UMD/ESM bundles for directory-console
+    {
+      input: 'src/browser/directory-console/index.ts',
+      output: [
+        {
+          file: 'static/browser/directory-console.js',
+          format: 'umd',
+          name: 'DirectoryConsole',
+          sourcemap: true,
+          exports: 'named',
+        },
+        {
+          file: 'static/browser/directory-console.esm.js',
+          format: 'esm',
+          sourcemap: true,
+        },
+        {
+          file: 'static/browser/directory-console.min.js',
+          format: 'umd',
+          name: 'DirectoryConsole',
+          sourcemap: true,
+          exports: 'named',
+          plugins: [terser()],
+        },
+      ],
+      plugins: [
+        resolve({
+          browser: true,
+        }),
+        commonjs(),
+        typescript({
+          tsconfig: './tsconfig.browser.json',
+          compilerOptions: {
+            declaration: false, // No types for bundles
+            declarationDir: undefined, // Override tsconfig.browser.json
+          },
+          sourceMap: true,
+        }),
+        postcss({
+          extract: 'directory-console.css',
+          minimize: true,
+          sourceMap: true,
+        }),
+      ],
+    },
   ];
 };

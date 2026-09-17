@@ -4,17 +4,19 @@ Plugins for LDAP entity management.
 
 ## Overview
 
-| Plugin                                | Entity                   | Features                            |
-| ------------------------------------- | ------------------------ | ----------------------------------- |
-| [flat-generic](flat-generic.md)       | Users, Positions, Custom | Schema-driven, Validation, Pointers |
-| [groups](groups.md)                   | Groups                   | Member validation, Nested groups    |
-| [organizations](organizations.md)     | Organizational Units     | Tree navigation, Search             |
-| [bulk-import](bulk-import.md)         | All (bulk operations)    | CSV import, Template generation     |
-| [trash](trash.md)                     | All (soft delete)        | Trash system, Recovery              |
-| [external-users](external-users.md)   | Contacts                 | Automatic creation                  |
-| [on-change](on-change.md)             | All                      | Change detection                    |
-| [password-policy](password-policy.md) | Password management      | Expiration, Lockout, Unlock         |
-| [raw](raw.md)                         | Whole directory (read)   | Root DSE, Schema, Tree, Raw search  |
+| Plugin                                    | Entity                   | Features                                |
+| ----------------------------------------- | ------------------------ | --------------------------------------- |
+| [flat-generic](flat-generic.md)           | Users, Positions, Custom | Schema-driven, Validation, Pointers     |
+| [groups](groups.md)                       | Groups                   | Member validation, Nested groups        |
+| [organizations](organizations.md)         | Organizational Units     | Tree navigation, Search                 |
+| [bulk-import](bulk-import.md)             | All (bulk operations)    | CSV import, Template generation         |
+| [trash](trash.md)                         | All (soft delete)        | Trash system, Recovery                  |
+| [external-users](external-users.md)       | Contacts                 | Automatic creation                      |
+| [on-change](on-change.md)                 | All                      | Change detection                        |
+| [enterprise-rules](enterprise-rules.md)   | All (business rules)     | Uniqueness, Mail domains, Delete guards |
+| [account-lifecycle](account-lifecycle.md) | Accounts                 | Enable/disable, Password reset          |
+| [password-policy](password-policy.md)     | Password management      | Expiration, Lockout, Unlock             |
+| [raw](raw.md)                             | Whole directory (read)   | Root DSE, Schema, Tree, Raw search      |
 
 ## API Endpoints
 
