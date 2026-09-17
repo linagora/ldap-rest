@@ -1013,6 +1013,12 @@ export default abstract class LdapFlat extends DmPlugin {
         error: err,
       });
       if (err instanceof HttpError) throw err;
+      // entryAlreadyExists. The checks above look before writing, so two
+      // creations of the same entry sent at once both pass them, and the
+      // directory refuses the second: a bulk import whose file holds one
+      // person twice does exactly that. It is a conflict, not a fault.
+      if ((err as { code?: unknown }).code === 68)
+        throw new ConflictError(`${this.singularName} ${dn} already exists`);
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }

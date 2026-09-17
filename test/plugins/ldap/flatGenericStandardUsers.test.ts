@@ -64,6 +64,26 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
       expect(await plugin.deleteUser('testuser2')).to.be.true;
     });
 
+    it('should answer 409 when the same entry is created twice at once', async () => {
+      // Both requests pass the existence checks before either writes, so the
+      // directory itself refuses the second. That refusal is a conflict the
+      // caller can act on, not a 500.
+      const entry = {
+        cn: 'Test User 3',
+        sn: 'User',
+        mail: 'testuser3-schema@example.org',
+      };
+      const results = await Promise.allSettled([
+        plugin.addUser('testuser3', entry),
+        plugin.addUser('testuser3', entry),
+      ]);
+      const refused = results.filter(result => result.status === 'rejected');
+      expect(refused).to.have.length(1);
+      const reason = (refused[0] as PromiseRejectedResult).reason;
+      expect(reason).to.have.property('statusCode', 409);
+      expect(reason.message).to.match(/already exists/);
+    });
+
     it('should reject user with invalid uid format', async () => {
       try {
         await plugin.addUser('test user!', {

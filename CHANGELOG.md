@@ -125,6 +125,10 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
 
 ### Bug Fixes
 
+- `abstract/ldapFlat`: creating an entry that already exists answered `500`
+  when two creations of it raced past the existence checks, which a bulk
+  import holding one person twice does. It answers `409`
+
 - `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix with
   the comma optional, so `uid=x,xou=users,dc=example,dc=com` passed for being
   inside `ou=users,dc=example,dc=com`. It is compared RDN by RDN now
