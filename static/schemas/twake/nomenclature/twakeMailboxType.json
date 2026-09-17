@@ -6,12 +6,12 @@
     "singularName": "mailboxType",
     "pluralName": "mailboxTypes",
     "label": {
-      "en": "Mailbox types",
-      "fr": "Types de boîte"
+      "en": "Group types",
+      "fr": "Types de groupe"
     },
     "singularLabel": {
-      "en": "mailbox type",
-      "fr": "type de boîte"
+      "en": "group type",
+      "fr": "type de groupe"
     },
     "base": "ou=twakeMailboxType,ou=nomenclature,{ldap_base}"
   },

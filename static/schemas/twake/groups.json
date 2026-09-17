@@ -84,8 +84,8 @@
       "required": false,
       "role": "mailboxType",
       "label": {
-        "en": "Mailbox type",
-        "fr": "Type de boîte"
+        "en": "Group type",
+        "fr": "Type de groupe"
       }
     },
     "member": {
