@@ -92,18 +92,34 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 
 ## LDAP Connection
 
-| CLI                          | Plural           | Env                      | Default                            | Description                |
-| ---------------------------- | ---------------- | ------------------------ | ---------------------------------- | -------------------------- |
-| `--ldap-url`                 | `--ldap-urls`    | `DM_LDAP_URL`            | `ldap://localhost`                 | LDAP server URL(s)         |
-| `--ldap-dn`                  |                  | `DM_LDAP_DN`             | `cn=admin,dc=example,dc=com`       | Bind DN                    |
-| `--ldap-pwd`                 |                  | `DM_LDAP_PWD`            | `admin`                            | Password                   |
-| `--ldap-base`                |                  | `DM_LDAP_BASE`           |                                    | Base DN for searches       |
-| `--ldap-user-main-attribute` |                  | `DM_LDAP_USER_ATTRIBUTE` | `uid`                              | User identifier attribute  |
-| `--ldap-cache-max`           |                  | `DM_LDAP_CACHE_MAX`      | `1000`                             | Max cache entries          |
-| `--ldap-cache-ttl`           |                  | `DM_LDAP_CACHE_TTL`      | `300`                              | Cache TTL (seconds)        |
-| `--ldap-pool-size`           |                  | `DM_LDAP_POOL_SIZE`      | `5`                                | Connection pool size       |
-| `--ldap-connection-ttl`      |                  | `DM_LDAP_CONNECTION_TTL` | `60`                               | Connection TTL (seconds)   |
-| `--user-class`               | `--user-classes` | `DM_USER_CLASSES`        | `top,twakeAccount,twakeWhitePages` | Default user objectClasses |
+| CLI                          | Plural           | Env                      | Default                            | Description                                 |
+| ---------------------------- | ---------------- | ------------------------ | ---------------------------------- | ------------------------------------------- |
+| `--ldap-url`                 | `--ldap-urls`    | `DM_LDAP_URL`            | `ldap://localhost`                 | LDAP server URL(s)                          |
+| `--ldap-dn`                  |                  | `DM_LDAP_DN`             | `cn=admin,dc=example,dc=com`       | Bind DN                                     |
+| `--ldap-pwd`                 |                  | `DM_LDAP_PWD`            | `admin`                            | Password                                    |
+| `--ldap-base`                |                  | `DM_LDAP_BASE`           |                                    | Base DN for searches                        |
+| `--ldap-user-main-attribute` |                  | `DM_LDAP_USER_ATTRIBUTE` | `uid`                              | User identifier attribute                   |
+| `--ldap-cache-max`           |                  | `DM_LDAP_CACHE_MAX`      | `1000`                             | Max cache entries                           |
+| `--ldap-cache-ttl`           |                  | `DM_LDAP_CACHE_TTL`      | `0`                                | Search cache TTL (seconds), `0` disables it |
+| `--ldap-pool-size`           |                  | `DM_LDAP_POOL_SIZE`      | `5`                                | Connection pool size                        |
+| `--ldap-connection-ttl`      |                  | `DM_LDAP_CONNECTION_TTL` | `60`                               | Connection TTL (seconds)                    |
+| `--user-class`               | `--user-classes` | `DM_USER_CLASSES`        | `top,twakeAccount,twakeWhitePages` | Default user objectClasses                  |
+
+### The search cache
+
+`--ldap-cache-ttl` holds the answers of non-paginated, base-scope searches —
+single-entry lookups by DN — for that many seconds. It is **off by default**:
+until the branch storing a result was repaired, nothing was ever cached, so no
+deployment has run with it on, and a cache that silently serves stale entries
+is not something to switch on for everyone at once.
+
+Writes made through this service (add, modify, rename, move, delete) drop what
+they change, the moved subtree included. Writes made anywhere else do not:
+another replica of this service, an LSC synchronisation, a hand-run
+`ldapmodify`. Each process caches on its own, and only its own writes drop what
+it cached. Turn the cache on when this service is the only writer, or when
+serving an entry up to `--ldap-cache-ttl` seconds old is acceptable; leave it
+at `0` otherwise.
 
 ## Special Attributes
 

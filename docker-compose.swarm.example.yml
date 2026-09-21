@@ -28,9 +28,13 @@ services:
       DM_LDAP_USER_ATTRIBUTE: 'uid'
       DM_MAIL_DOMAIN: 'example.com'
 
-      # Caching LDAP
+      # Caching LDAP. DM_LDAP_CACHE_TTL is the lifetime in seconds of the
+      # base-scope search cache; 0 turns it off, and off is the default.
+      # Leave it off when anything else writes this directory — another
+      # replica of this service included: each one caches on its own, and
+      # only its own writes drop what it cached.
       DM_LDAP_CACHE_MAX: '1000'
-      DM_LDAP_CACHE_TTL: '300'
+      DM_LDAP_CACHE_TTL: '0'
       DM_LDAP_POOL_SIZE: '5'
 
       # Application
