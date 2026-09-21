@@ -139,8 +139,6 @@ export interface GeneratedFrom {
    * value is found.
    */
   onCollision?: 'error' | 'suffix';
-  /** Recompute when the source attribute changes (renames the entry) */
-  regenerateOnChange?: boolean;
 }
 
 export interface SchemaAttribute {
@@ -168,6 +166,13 @@ export interface SchemaAttribute {
   /**
    * Computed server-side. Refused when a client supplies it; still writable by
    * the core and by plugins.
+   *
+   * The refusal is about *attribute names in a payload*, not about the entry
+   * being immutable: an endpoint parameter that happens to end up in a
+   * generated attribute is not one of them. `POST /ldap/{resource}/{id}/rename`
+   * takes a `newId` and `POST /ldap/{resource}/{id}/move` a `targetOrgDn`, and
+   * both then write a `generated` attribute themselves — while
+   * `PUT /ldap/{resource}/{id}` naming that attribute is still refused.
    */
   generated?: boolean;
   /** How a `generated` value is derived from another attribute */
