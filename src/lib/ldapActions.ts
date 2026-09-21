@@ -748,6 +748,14 @@ class ldapActions {
 
     const pooled = await this.acquireConnection();
     try {
+      // Dropped before the write is issued as well as after it lands. The
+      // directory commits somewhere inside this `await`, and the invalidation
+      // below runs only once the answer has come back: a read landing in that
+      // round trip would find the entry still cached and answer what it held
+      // before the write. Dropping it early costs a miss if the write then
+      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // overtook from putting it back.
+      this.invalidateCache(dn);
       await pooled.client.add(dn, attributes);
       // Drop any cached read of this DN.
       //
@@ -847,6 +855,14 @@ class ldapActions {
     if (ldapChanges.length !== 0) {
       const pooled = await this.acquireConnection();
       try {
+        // Dropped before the write is issued as well as after it lands. The
+        // directory commits somewhere inside this `await`, and the invalidation
+        // below runs only once the answer has come back: a read landing in that
+        // round trip would find the entry still cached and answer what it held
+        // before the write. Dropping it early costs a miss if the write then
+        // fails, which is harmless, and `cacheGeneration` keeps a read the write
+        // overtook from putting it back.
+        this.invalidateCache(dn);
         await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
@@ -910,6 +926,15 @@ class ldapActions {
     );
     const pooled = await this.acquireConnection();
     try {
+      // Dropped before the write is issued as well as after it lands. The
+      // directory commits somewhere inside this `await`, and the invalidation
+      // below runs only once the answer has come back: a read landing in that
+      // round trip would find the entry still cached and answer what it held
+      // before the write. Dropping it early costs a miss if the write then
+      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // overtook from putting it back.
+      this.invalidateCache(dn);
+      this.invalidateCache(newRdn);
       await pooled.client.modifyDN(dn, newRdn);
       // Invalidate both ends. A base-scope read of the old DN would
       // otherwise keep answering the entry that is no longer there, and a
@@ -949,6 +974,15 @@ class ldapActions {
     newDn = this.setDn(newDn);
     const pooled = await this.acquireConnection();
     try {
+      // Dropped before the write is issued as well as after it lands. The
+      // directory commits somewhere inside this `await`, and the invalidation
+      // below runs only once the answer has come back: a read landing in that
+      // round trip would find the entry still cached and answer what it held
+      // before the write. Dropping it early costs a miss if the write then
+      // fails, which is harmless, and `cacheGeneration` keeps a read the write
+      // overtook from putting it back.
+      this.invalidateCache(dn);
+      this.invalidateCache(newDn);
       await pooled.client.modifyDN(dn, newDn);
       // Invalidate both ends — see rename() above for why both matter.
       this.invalidateCache(dn);
@@ -981,6 +1015,14 @@ class ldapActions {
     try {
       for (const entry of dn) {
         try {
+          // Dropped before the write is issued as well as after it lands. The
+          // directory commits somewhere inside this `await`, and the invalidation
+          // below runs only once the answer has come back: a read landing in that
+          // round trip would find the entry still cached and answer what it held
+          // before the write. Dropping it early costs a miss if the write then
+          // fails, which is harmless, and `cacheGeneration` keeps a read the write
+          // overtook from putting it back.
+          this.invalidateCache(entry);
           await pooled.client.del(entry);
           // Invalidate cache for this DN
           this.invalidateCache(entry);
