@@ -247,6 +247,24 @@ export interface Schema {
   attributes: {
     [key: string]: SchemaAttribute;
   };
+  /**
+   * Metadata about the entity itself, present in a schema file loaded by
+   * `ldapFlatGeneric` (the whole file is parsed as a `Schema`, so this is what
+   * that parse actually carries — narrowing to the declared type must not
+   * silently drop it). A schema attached to a plugin without its own file
+   * carries none of this.
+   */
+  entity?: {
+    /** Name a client shows for the collection, in one or several languages */
+    label?: LocalizedText;
+    /** Same, for a single entry */
+    singularLabel?: LocalizedText;
+    /**
+     * What a client shows for an entry, keyed by its main attribute value:
+     * the readable name of a nomenclature value a pointer lands on
+     */
+    valueLabels?: Record<string, LocalizedText>;
+  };
 }
 
 /**

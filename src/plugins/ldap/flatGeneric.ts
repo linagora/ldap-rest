@@ -92,6 +92,14 @@ class LdapFlatInstance extends LdapFlat {
   /** Names a client shows for the collection and for one entry */
   label?: LocalizedText;
   singularLabel?: LocalizedText;
+  /**
+   * What a client shows for an entry, keyed by its main attribute value. Also
+   * reachable nested in `schema.entity.valueLabels` (the whole schema file is
+   * exposed as `schema`); mirrored here, like `label`, so a client finds it
+   * at the top level of a `flatResources` entry rather than three levels
+   * down under a property `Schema` never declared.
+   */
+  valueLabels?: Record<string, LocalizedText>;
 
   // Ensure department sync is loaded to maintain consistency
   // when organizations are renamed/moved
@@ -217,6 +225,7 @@ export default class LdapFlatGeneric extends DmPlugin {
 
         instance.label = schema.entity.label;
         instance.singularLabel = schema.entity.singularLabel;
+        instance.valueLabels = schema.entity.valueLabels;
         instance.name = `ldapFlat:${schema.entity.name}`;
         this.instances.push(instance);
         this.schemaPaths.push(schemaPath);
@@ -267,6 +276,7 @@ export default class LdapFlatGeneric extends DmPlugin {
         pluralName: instance.pluralName,
         label: instance.label,
         singularLabel: instance.singularLabel,
+        valueLabels: instance.valueLabels,
         mainAttribute: instance.mainAttribute,
         objectClass: instance.objectClass,
         base: instance.base,
