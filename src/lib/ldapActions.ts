@@ -15,6 +15,7 @@ import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
 import { escapeDnValue, launchHooks, launchHooksChained } from './utils';
+import { ConflictError } from './errors';
 
 // Typescript interface
 
@@ -162,6 +163,29 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
   searchEntries: result.searchEntries.map(entry => ({ ...entry })),
   searchReferences: [...result.searchReferences],
 });
+
+/**
+ * Wrap an add failure, turning entryAlreadyExists (68) into a 409.
+ *
+ * Every creation route ends here, so this is the one place that knows a
+ * duplicate is a conflict: mapped in each caller instead, the flat routes
+ * answered 409 while `POST /ldap/groups` and the organization routes turned
+ * the same refusal into a 500. The checks callers run look before writing, so
+ * two creations of the same entry sent at once both pass them and the
+ * directory refuses the second — a bulk import whose file holds one person
+ * twice does exactly that. That is a conflict, not a fault.
+ *
+ * The numeric code is carried over onto the `ConflictError`: callers that
+ * read it to recognise a duplicate (SCIM's uniqueness mapping, the
+ * idempotent applicative-account creation) keep working unchanged.
+ */
+function ldapAddError(dn: string, error: unknown): Error {
+  const wrapped = ldapError('LDAP add error', error);
+  if ((wrapped as { code?: number }).code !== 68) return wrapped;
+  const conflict = new ConflictError(`Entry ${dn} already exists`);
+  (conflict as { code?: number }).code = 68;
+  return conflict;
+}
 
 class ldapActions {
   config: Config;
@@ -741,7 +765,7 @@ class ldapActions {
       );
       return true;
     } catch (error) {
-      throw ldapError(`LDAP add error`, error);
+      throw ldapAddError(dn, error);
     } finally {
       this.releaseConnection(pooled);
     }

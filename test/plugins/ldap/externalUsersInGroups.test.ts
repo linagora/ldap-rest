@@ -40,6 +40,20 @@ describe('External users in groups', function () {
     expect(plugin.constructor.name).to.equal('LdapGroups');
   });
 
+  it('should surface a duplicate external member as a 409, not a 500', async () => {
+    // Listing the same external member twice makes both concurrent
+    // creations race for the same entry: the directory refuses the second
+    // one with entryAlreadyExists (68), which must reach the caller as a
+    // ConflictError (409), not the plain Error the catch block used to
+    // rewrap it into (a 500).
+    try {
+      await plugin.addGroup('testgroup', [user1, user1]);
+      expect.fail('Should reject duplicate external member creation');
+    } catch (e) {
+      expect(e).to.have.property('statusCode', 409);
+    }
+  });
+
   it('should accept external member in group', async () => {
     await plugin.addGroup('testgroup', [user1]);
     expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({

@@ -100,6 +100,20 @@ describe('LdapFlatGeneric plugin', function () {
       expect(res.body).to.have.property('cn', 'TestTitle');
     });
 
+    it('should answer 409 when the entry is posted twice', async () => {
+      // The route has documented a 409 for a duplicate all along; only the
+      // plugin level was ever asserted, and the answer was a 500.
+      await request
+        .post('/api/v1/ldap/titles')
+        .send({ cn: 'TestTitle' })
+        .expect(201);
+      const res = await request
+        .post('/api/v1/ldap/titles')
+        .send({ cn: 'TestTitle' });
+      expect(res.status).to.equal(409);
+      expect(res.body.error).to.match(/already exists/);
+    });
+
     it('should update a title', async () => {
       await plugin.instances[0].addEntry('TestTitle', {
         description: 'Original',
