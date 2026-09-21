@@ -41,7 +41,7 @@ This plugin manages groups stored as `groupOfNames` or similar object classes in
 
 ### Important Notes
 
-- **Empty Groups**: `groupOfNames` requires at least one member. The plugin uses a dummy member (configurable via `--group-dummy-user`) for empty groups.
+- **Empty Groups**: `groupOfNames` requires at least one member. The plugin uses a dummy member (configurable via `--group-dummy-user`) for empty groups. That dummy member is hidden from `member` on both `GET /ldap/groups` and `GET /ldap/groups/{cn}`, so a client never sees it as a real one.
 - **Member Validation**: By default, the plugin validates that all members exist in LDAP before adding them. Set `--groups-allow-unexistent-members true` to disable validation.
 - **Automatic Cleanup**: When a user is deleted, the plugin automatically removes them from all groups via the `ldapdeleterequest` hook.
 
@@ -154,7 +154,9 @@ POST /api/v1/ldap/groups
 
 - `cn` is required
 - `member` can be a string (single member) or array (multiple members)
-- If no members provided, a dummy member is automatically added
+- If no members provided, a dummy member is automatically added, and it is
+  left out of `member` when the group is read back, on both the list and the
+  single-group endpoint
 - Additional attributes can be included based on schema
 
 **Response (200):**

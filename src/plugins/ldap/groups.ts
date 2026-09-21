@@ -32,9 +32,9 @@ import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
+  isDummyMemberDn,
   launchHooks,
   launchHooksChained,
-  normalizeDn,
   substringSearchFilter,
   transformSchemas,
   validateDnValue,
@@ -574,14 +574,7 @@ export default class LdapGroups extends DmPlugin {
    * @returns true for the placeholder
    */
   isDummyMember(member: string): boolean {
-    const dummy = this.config.group_dummy_user;
-    if (!dummy || typeof member !== 'string') return false;
-    if (member === dummy) return true;
-    try {
-      return normalizeDn(member) === normalizeDn(dummy);
-    } catch {
-      return false;
-    }
+    return isDummyMemberDn(member, this.config.group_dummy_user);
   }
 
   /**

@@ -18,6 +18,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   isChildOf,
+  isDummyMemberDn,
   launchHooks,
   launchHooksChained,
   validateDnValue,
@@ -163,8 +164,10 @@ export class ScimGroups {
       (this.config.group_dummy_user as string) || 'cn=fakeuser';
     return (dn: string): MultiValued | undefined => {
       if (!dn) return undefined;
-      // Hide the schema-placeholder member from SCIM responses
-      if (dn.toLowerCase() === placeholder.toLowerCase()) return undefined;
+      // Hide the schema-placeholder member from SCIM responses. Compared as
+      // a DN: the directory's own spelling of the configured placeholder is
+      // still the placeholder.
+      if (isDummyMemberDn(dn, placeholder)) return undefined;
       // Extract RDN value from DN
       const rdnMatch = /^([^=]+)=((?:\\.|[^,])+)/.exec(dn);
       if (!rdnMatch) return undefined;

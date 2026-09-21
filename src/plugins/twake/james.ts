@@ -12,7 +12,7 @@ import type {
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { escapeLdapFilter } from '../../lib/utils';
+import { escapeLdapFilter, isDummyMemberDn } from '../../lib/utils';
 
 /**
  * OpenAPI schemas specific to the James integration.
@@ -1333,7 +1333,11 @@ export default class James extends TwakePlugin {
   async getMemberEmails(memberDns: string[]): Promise<string[]> {
     // Create promises for each member DN, with global concurrency limit
     const emailPromises = memberDns
-      .filter(memberDn => memberDn !== this.config.group_dummy_user)
+      // Compared as a DN: the placeholder as the directory spells it is not
+      // a person, and looking up its address is a query for nothing.
+      .filter(
+        memberDn => !isDummyMemberDn(memberDn, this.config.group_dummy_user)
+      )
       .map(memberDn =>
         this.server.ldap.queryLimit(async () => {
           const entry = await this.ldapGetAttributes(memberDn, [this.mailAttr]);

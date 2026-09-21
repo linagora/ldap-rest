@@ -522,6 +522,44 @@ export function normalizeDn(dn: string): string {
 }
 
 /**
+ * Whether a member DN is the placeholder a `groupOfNames` holds so it stays
+ * valid with no real member (`--group-dummy-user`).
+ *
+ * Compared as DNs rather than as text: the directory answers with its own
+ * spelling, so the configured `uid=fakeUser,ou=users,…` has to match the
+ * `uid=fakeuser, ou=users,…` a group may actually hold. A textual comparison
+ * counted such a member as a real one — enough to make an empty group refuse
+ * deletion, and to show the placeholder to SCIM clients.
+ *
+ * Every reader of the member list asks here, so the four of them cannot drift
+ * apart again.
+ *
+ * @param member - The member DN to test
+ * @param dummy - The configured placeholder DN, if any
+ * @returns true when `member` is that placeholder; false when none is
+ *          configured, as there is then no placeholder to hide
+ *
+ * @example
+ * ```typescript
+ * isDummyMemberDn('uid=fakeuser, ou=users,dc=e,dc=c', 'uid=fakeUser,ou=users,dc=e,dc=c')
+ * // => true
+ * ```
+ */
+export function isDummyMemberDn(
+  member: unknown,
+  dummy: string | undefined
+): boolean {
+  if (!dummy || typeof member !== 'string') return false;
+  if (member === dummy) return true;
+  try {
+    return normalizeDn(member) === normalizeDn(dummy);
+  } catch {
+    // An unparsable DN is simply not the placeholder.
+    return false;
+  }
+}
+
+/**
  * Check whether a DN is a branch base itself or sits anywhere below it.
  *
  * Comparison is done RDN by RDN on the {@link normalizeDn} form, so it is

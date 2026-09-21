@@ -42,6 +42,7 @@ import {
   escapeLdapFilter,
   getParentDn,
   isDnInBranch,
+  isDummyMemberDn,
   normalizeDn,
   rdnValue,
 } from '../../lib/utils';
@@ -839,10 +840,11 @@ export default class LdapEnterpriseRules extends DmPlugin {
       for (const [name, attr] of Object.entries(entity.schema.attributes)) {
         if (attr.deleteGuard !== 'nonEmpty') continue;
         const entry = await this.readEntry(dn);
+        // Compared as a DN: a placeholder the directory spells
+        // `uid=fakeuser, ou=users,…` counted as a real member, and an empty
+        // group then refused to be deleted.
         const members = valueList(entry?.[name]).filter(
-          member =>
-            !this.dummyMember ||
-            member.toLowerCase() !== this.dummyMember.toLowerCase()
+          member => !isDummyMemberDn(member, this.dummyMember)
         );
         if (members.length > 0) {
           throw new ConflictError(
