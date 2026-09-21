@@ -343,6 +343,20 @@ describe('Enterprise rules', () => {
         expect(res.status).to.equal(409);
       });
 
+      // The shipped schema exempts `UNIT`, the placeholder the interface
+      // these schemas replace gives an account standing for a unit rather
+      // than a person. The reference directory holds 2118 of them, so a
+      // uniqueness rule refusing the second would refuse accounts the
+      // deployment already has.
+      it('should let every account carry the UNIT placeholder', async () => {
+        await create('rules.uniq@example.com', {
+          employeeNumber: 'UNIT',
+        }).expect(201);
+        await create('rules.other@example.com', {
+          employeeNumber: 'UNIT',
+        }).expect(201);
+      });
+
       it('should not conflict with the entry being updated', async () => {
         await create('rules.uniq@example.com', {
           employeeNumber: 'E999',

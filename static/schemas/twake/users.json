@@ -50,7 +50,7 @@
       "type": "string",
       "searchable": true,
       "required": true,
-      "unique": true,
+      "unique": { "sentinel": "UNIT" },
       "role": "employeeId",
       "label": {
         "en": "Employee ID",

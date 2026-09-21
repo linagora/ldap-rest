@@ -24,8 +24,8 @@ below is explained there, with what to do about it.
 
 - `static/schemas/twake/users.json` requires `employeeNumber`, `displayName`
   and `givenName`, `cn` stops being required, and `employeeNumber` is unique
-  with no placeholder exempt —
-  [notes](docs/usage/upgrading.md#employeenumber-is-unique-placeholders-included)
+  apart from the `UNIT` placeholder —
+  [notes](docs/usage/upgrading.md#employeenumber-is-unique-apart-from-the-unit-placeholder)
 
 - An array's `items.test` and `items.branch` are enforced on the flat,
   organization and group routes, where they never were. Stored values are
