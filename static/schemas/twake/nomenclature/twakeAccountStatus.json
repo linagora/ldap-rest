@@ -5,6 +5,32 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "accountStatus",
     "pluralName": "accountStatuses",
+    "label": {
+      "en": "Account states",
+      "fr": "États de compte"
+    },
+    "singularLabel": {
+      "en": "account state",
+      "fr": "état de compte"
+    },
+    "valueLabels": {
+      "active": {
+        "en": "Active",
+        "fr": "Actif"
+      },
+      "disabled": {
+        "en": "Disabled",
+        "fr": "Désactivé"
+      },
+      "noaccess": {
+        "en": "No access",
+        "fr": "Sans accès"
+      },
+      "todelete": {
+        "en": "To delete",
+        "fr": "À supprimer"
+      }
+    },
     "base": "ou=twakeAccountStatus,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

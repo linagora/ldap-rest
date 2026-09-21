@@ -5,6 +5,28 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "listType",
     "pluralName": "listTypes",
+    "label": {
+      "en": "List types",
+      "fr": "Types de liste"
+    },
+    "singularLabel": {
+      "en": "list type",
+      "fr": "type de liste"
+    },
+    "valueLabels": {
+      "openList": {
+        "en": "Open to all",
+        "fr": "Ouverte à tous"
+      },
+      "memberRestrictedList": {
+        "en": "Members only",
+        "fr": "Réservée aux membres"
+      },
+      "ownerRestrictedList": {
+        "en": "Owners only",
+        "fr": "Réservée aux propriétaires"
+      }
+    },
     "base": "ou=twakeListType,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

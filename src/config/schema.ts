@@ -1,19 +1,595 @@
 import type { AttributeValue } from '../lib/ldapActions';
+import { BadRequestError } from '../lib/errors';
+import { getCompiledRegex, isDnInBranch } from '../lib/utils';
+
+/**
+ * Scalar and container types an entity schema may declare.
+ *
+ * `pointer` is a DN reference validated against `branch`; `date` is an LDAP
+ * generalized time (`yyyyMMddHHmmss[.SSS]Z`).
+ */
+export type SchemaAttributeType =
+  | 'string'
+  | 'number'
+  | 'integer'
+  | 'boolean'
+  | 'date'
+  | 'array'
+  | 'pointer';
+
+/**
+ * Semantic role of an attribute: what it *means*, independent of the concrete
+ * LDAP attribute holding it. Core code is written against roles so that a
+ * deployment with a different directory layout reuses it unchanged — the name
+ * of the attribute and the values it takes are configuration.
+ *
+ * The type is a plain string: the list below is what the core itself looks
+ * for, and a deployment is free to add its own for its plugins.
+ *
+ * | Role               | Meaning                                              |
+ * | ------------------ | ---------------------------------------------------- |
+ * | `identifier`       | RDN value of the entry                               |
+ * | `displayName`      | Human-readable name                                  |
+ * | `primaryEmail`     | Main mail address                                    |
+ * | `emailAliases`     | Further addresses of the same mailbox                |
+ * | `emailQuota`       | Mailbox size limit, in bytes                         |
+ * | `organizationLink` | DN of the organization the entry belongs to          |
+ * | `organizationPath` | Human-readable path of that organization             |
+ * | `members`          | DNs of the members of a group                        |
+ * | `owners`           | DNs allowed to write to a restricted group           |
+ * | `accountStatus`    | Lifecycle state of an account (enabled / disabled…)  |
+ * | `password`         | Credential                                           |
+ * | `passwordReset`    | Flag forcing a password change at next login         |
+ * | `accountExpiry`    | Date after which the account is to be removed        |
+ * | `domainLink`       | DNs of the mail domains an organization may use      |
+ * | `domainName`       | Domain name carried by a domain entry                |
+ */
+export type SchemaRole = string;
+
+/**
+ * A piece of text a client shows, in one or several languages.
+ *
+ * A plain string is the text itself. A map is keyed by language tag, and a
+ * client picks the closest one it can:
+ *
+ * ```json
+ * "label": { "en": "Department", "fr": "Département" }
+ * ```
+ *
+ * These words belong to the deployment, not to the product — they name *its*
+ * entities and attributes — so their translations belong in its schemas
+ * rather than in a catalogue shipped with the code.
+ */
+export type LocalizedText = string | Record<string, string>;
+
+/** Roles the core itself looks for. See {@link SchemaRole}. */
+export const CORE_ROLES = [
+  'identifier',
+  'displayName',
+  'primaryEmail',
+  'emailAliases',
+  'emailQuota',
+  'organizationLink',
+  'organizationPath',
+  'members',
+  'owners',
+  'accountStatus',
+  'password',
+  'passwordReset',
+  'accountExpiry',
+  'domainLink',
+  'domainName',
+] as const;
+
+/**
+ * How a uniqueness constraint is evaluated.
+ *
+ * By default the value must be unique among the entries of the entity's own
+ * branch. `branches` widens the search to a shared namespace — a mail address
+ * belongs to accounts *and* to distribution lists — and `attributes` names the
+ * other attributes that hold values of that same namespace.
+ */
+export interface UniqueConstraint {
+  /**
+   * Extra branches searched besides the entity's own base. Each entry may use
+   * the `__ldap_base__` placeholder, like `branch`.
+   */
+  branches?: string[];
+  /**
+   * Other attributes sharing the value namespace, searched alongside the
+   * attribute itself (e.g. `mailAlternateAddress` for `mail`).
+   */
+  attributes?: string[];
+  /**
+   * Value exempted from the check. A directory may use a placeholder for
+   * non-individual entries (a shared payroll number, say); that value is
+   * allowed to repeat.
+   */
+  sentinel?: string;
+  /** Extra LDAP filter narrowing the search, e.g. `(objectClass=twakeAccount)` */
+  filter?: string;
+}
+
+/**
+ * Derivation of a generated attribute from another attribute of the same
+ * entry. Used for identifiers built from the mail address, where the client
+ * never supplies the value.
+ */
+export interface GeneratedFrom {
+  /** Source attribute, e.g. `mail` */
+  attribute: string;
+  /**
+   * Regex whose first capturing group is the generated value. Applied to the
+   * source value; when it does not match, the whole source value is used.
+   */
+  extract?: string;
+  /** Lowercase the result */
+  lowercase?: boolean;
+  /**
+   * Characters to drop from the extracted value, as an extended regular
+   * expression. A mail local part may legally hold `+`, `'` or `!`, which an
+   * identifier charset usually refuses; without this the entry becomes
+   * uncreatable, since the client may not send the generated attribute
+   * either. `[^a-zA-Z0-9._-]` keeps what a `uid` accepts.
+   */
+  strip?: string;
+  /**
+   * What to do when the generated value is already taken. `error` (the
+   * default) refuses the creation; `suffix` appends `-2`, `-3`, … until a free
+   * value is found.
+   */
+  onCollision?: 'error' | 'suffix';
+}
+
+export interface SchemaAttribute {
+  type: SchemaAttributeType;
+  items?: {
+    type: string;
+    test?: string | RegExp;
+    hint?: string;
+    branch?: string[];
+  };
+  default?: AttributeValue;
+  required?: boolean;
+  test?: string | RegExp;
+  /**
+   * Plain-language description of `test`, shown to the user *before* they get
+   * a value wrong — "Expected pattern 999 9999". It travels with the
+   * schema so the pattern and its explanation cannot drift apart, and so a
+   * client never has to hardcode either.
+   */
+  hint?: string;
+  branch?: string[];
+  fixed?: boolean;
+  /** Semantic role(s) — see {@link SchemaRole} */
+  role?: SchemaRole | SchemaRole[];
+  /**
+   * Computed server-side. Refused when a client supplies it; still writable by
+   * the core and by plugins.
+   *
+   * The refusal is about *attribute names in a payload*, not about the entry
+   * being immutable: an endpoint parameter that happens to end up in a
+   * generated attribute is not one of them. `POST /ldap/{resource}/{id}/rename`
+   * takes a `newId` and `POST /ldap/{resource}/{id}/move` a `targetOrgDn`, and
+   * both then write a `generated` attribute themselves — while
+   * `PUT /ldap/{resource}/{id}` naming that attribute is still refused.
+   */
+  generated?: boolean;
+  /** How a `generated` value is derived from another attribute */
+  generatedFrom?: GeneratedFrom;
+  /**
+   * Operational or derived attribute: refused in input and never written.
+   * `memberOf` is the archetype — membership is driven from the group side.
+   */
+  readOnly?: boolean;
+  /**
+   * Never returned to a client, though it may still be written. Covers the
+   * write-only attributes of a password reset.
+   */
+  neverReturn?: boolean;
+  /** Value must be unique; `true` means "unique within this entity" */
+  unique?: boolean | UniqueConstraint;
+  /**
+   * Canonicalisation applied to an incoming value before it is stored.
+   *
+   * `byteSize` reads a human-readable size (`5GB`, `500MB`, `2048`) and stores
+   * the number of bytes, so the same value means the same thing whether it
+   * arrived on a creation or an update.
+   */
+  normalize?: 'byteSize';
+  /**
+   * Whether a client's "search everywhere" should include this attribute.
+   *
+   * Which attributes can be searched at all is a property of the deployment,
+   * not of the code: a substring filter on an attribute the directory has not
+   * indexed scans the branch. A schema that marks none leaves the client to
+   * guess — every returnable, single-valued, non-pointer attribute — which is
+   * right for a small branch and wrong for a large one. Marking even one
+   * attribute replaces the guess entirely, so the list is exactly what the
+   * deployment indexed.
+   */
+  searchable?: boolean;
+  /**
+   * Named states of a lifecycle attribute, mapping a semantic name the API
+   * speaks (`enabled`, `disabled`) to the concrete value this directory
+   * stores. What "disabled" *is* — a DN in a nomenclature, a string, a
+   * boolean — is a property of the deployment, never of the code.
+   */
+  states?: Record<string, AttributeValue>;
+  /**
+   * For a `pointer`: refuse to delete the entry it points at while any entry
+   * still references it. `ignore` (the default) leaves the reference dangling.
+   */
+  referentialIntegrity?: 'restrict' | 'ignore';
+  /**
+   * For a `members`-role attribute: refuse to delete the entry while it still
+   * has members. The placeholder member some directories need to keep a
+   * `groupOfNames` valid (`--group-dummy-user`) does not count.
+   */
+  deleteGuard?: 'nonEmpty';
+  /**
+   * For a mail attribute: which set of domains the address must belong to.
+   *
+   * `organization` walks up from the entry's organization, collecting the
+   * domains declared on it and on each of its ancestors; `directory` accepts
+   * any domain declared anywhere in the directory. When no domain is declared
+   * at all, any address passes.
+   */
+  mailDomainScope?: 'organization' | 'directory';
+  /**
+   * Accept a subdomain of an authorised domain — `list@lists.example.org`
+   * under `example.org`. Off by default: the domain must match exactly.
+   */
+  allowSubdomains?: boolean;
+  /** Grouping hint for a form, e.g. `Mailbox Settings` */
+  group?: string;
+  /** Name a client shows for this attribute, in one or several languages */
+  label?: LocalizedText;
+}
 
 export interface Schema {
   strict: boolean;
   attributes: {
-    [key: string]: {
-      type: 'string' | 'array' | 'pointer';
-      items?: {
-        type: string;
-        test?: string | RegExp;
-      };
-      default?: AttributeValue;
-      required?: boolean;
-      test?: string | RegExp;
-      branch?: string[];
-      fixed?: boolean;
-    };
+    [key: string]: SchemaAttribute;
   };
+  /**
+   * Metadata about the entity itself, present in a schema file loaded by
+   * `ldapFlatGeneric` (the whole file is parsed as a `Schema`, so this is what
+   * that parse actually carries — narrowing to the declared type must not
+   * silently drop it). A schema attached to a plugin without its own file
+   * carries none of this.
+   */
+  entity?: {
+    /** Name a client shows for the collection, in one or several languages */
+    label?: LocalizedText;
+    /** Same, for a single entry */
+    singularLabel?: LocalizedText;
+    /**
+     * What a client shows for an entry, keyed by its main attribute value:
+     * the readable name of a nomenclature value a pointer lands on
+     */
+    valueLabels?: Record<string, LocalizedText>;
+  };
+}
+
+/**
+ * Tell whether an attribute carries a given semantic role.
+ *
+ * @param attr attribute definition
+ * @param role role to look for
+ * @returns true when the attribute declares that role
+ */
+export function hasRole(
+  attr: SchemaAttribute | undefined,
+  role: SchemaRole
+): boolean {
+  if (!attr?.role) return false;
+  return Array.isArray(attr.role)
+    ? attr.role.includes(role)
+    : attr.role === role;
+}
+
+/**
+ * Find the attribute of a schema carrying a given semantic role.
+ *
+ * This is the lookup that keeps core code free of concrete attribute names:
+ * `roleAttribute(schema, 'accountStatus')` returns `twakeAccountStatus` for a
+ * Twake directory and whatever another deployment chose for its own.
+ *
+ * @param schema entity schema
+ * @param role role to look for
+ * @returns attribute name, or undefined when no attribute declares that role
+ */
+export function roleAttribute(
+  schema: Schema | undefined,
+  role: SchemaRole
+): string | undefined {
+  if (!schema) return undefined;
+  for (const [name, attr] of Object.entries(schema.attributes)) {
+    if (hasRole(attr, role)) return name;
+  }
+  return undefined;
+}
+
+/**
+ * Find every attribute of a schema carrying a given semantic role.
+ *
+ * @param schema entity schema
+ * @param role role to look for
+ * @returns attribute names, in declaration order
+ */
+export function roleAttributes(
+  schema: Schema | undefined,
+  role: SchemaRole
+): string[] {
+  if (!schema) return [];
+  return Object.entries(schema.attributes)
+    .filter(([, attr]) => hasRole(attr, role))
+    .map(([name]) => name);
+}
+
+/**
+ * Find an attribute definition by the name a request or the directory uses.
+ *
+ * LDAP attribute names are case-insensitive and may carry options
+ * (`cn;lang-fr`), while schema keys are written in one spelling. Looking a
+ * name up verbatim lets `TWAKEDEPARTMENTPATH` slip past a rule written for
+ * `twakeDepartmentPath`, though the directory treats both as the same.
+ *
+ * @param schema entity schema
+ * @param name attribute name, in any case, with or without options
+ * @returns the schema's own spelling and the definition, or undefined
+ */
+export function schemaAttribute(
+  schema: Schema | undefined,
+  name: string
+): [string, SchemaAttribute] | undefined {
+  if (!schema) return undefined;
+  const base = name.split(';')[0];
+  const exact = schema.attributes[base];
+  if (exact) return [base, exact];
+  const lower = base.toLowerCase();
+  for (const [key, attr] of Object.entries(schema.attributes)) {
+    if (key.toLowerCase() === lower) return [key, attr];
+  }
+  return undefined;
+}
+
+/**
+ * Every attribute name a modify request touches: added, replaced or deleted.
+ *
+ * A delete counts as much as a replace: removing a computed attribute is
+ * setting it, to nothing, and nothing the client does afterwards can put it
+ * back. `delete` comes as a list of names or as an object of values to remove.
+ *
+ * @param body modify request
+ * @returns attribute names, as the client spelt them
+ */
+export function modifiedAttributeNames(body: {
+  add?: object;
+  replace?: object;
+  delete?: string[] | object;
+}): string[] {
+  return [
+    ...Object.keys(body.add || {}),
+    ...Object.keys(body.replace || {}),
+    ...(Array.isArray(body.delete)
+      ? body.delete.map(String)
+      : Object.keys(body.delete || {})),
+  ];
+}
+
+/**
+ * Lowercased names of the attributes marked `neverReturn` in any of the given
+ * schemas.
+ *
+ * @param schemas schemas to read, undefined entries skipped
+ * @returns lowercased attribute names
+ */
+export function neverReturnAttributes(
+  schemas: Iterable<Schema | undefined>
+): Set<string> {
+  const hidden = new Set<string>();
+  for (const schema of schemas) {
+    if (!schema) continue;
+    for (const [name, attr] of Object.entries(schema.attributes)) {
+      if (attr.neverReturn) hidden.add(name.toLowerCase());
+    }
+  }
+  return hidden;
+}
+
+/**
+ * Copy an entry without the attributes of a hidden set.
+ *
+ * @param entry entry about to be serialised
+ * @param hidden lowercased attribute names to leave out
+ * @returns the entry itself when nothing is hidden, a filtered copy otherwise
+ */
+export function withoutAttributes<T extends object>(
+  entry: T,
+  hidden: Set<string>
+): T {
+  if (hidden.size === 0) return entry;
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(entry)) {
+    if (hidden.has(name.split(';')[0].toLowerCase())) continue;
+    out[name] = value;
+  }
+  return out as T;
+}
+
+/**
+ * Check the DNs an attribute carries: a `pointer`, or an array whose `items`
+ * are pointers or declare a `branch`.
+ *
+ * Each DN has to sit inside one of the declared branches, compared RDN by RDN
+ * (a suffix match reads `uid=x,xou=users,…` as inside `ou=users,…`), and a
+ * pointer has to name an entry that exists. The flat entities checked the
+ * branch of a single pointer; organizations and groups read neither `items`
+ * rule, so an organization accepted a domain link to a DN outside the domains
+ * branch, or to none at all — and lost its mail-domain restriction with it.
+ *
+ * @param field attribute name, for the messages
+ * @param attr its schema definition
+ * @param value value submitted
+ * @param entryExists tells whether a DN names an existing entry
+ * @throws BadRequestError naming the first DN that breaks a rule
+ */
+export async function checkDnValues(
+  field: string,
+  attr: SchemaAttribute,
+  value: AttributeValue,
+  entryExists: (dn: string) => Promise<boolean>
+): Promise<void> {
+  const single = attr.type === 'pointer';
+  const branches = single ? attr.branch : attr.items?.branch;
+  const mustExist = single || attr.items?.type === 'pointer';
+  if (!mustExist && !branches?.length) return;
+  if (single && typeof value !== 'string')
+    throw new BadRequestError(`Field ${field} must be a string (DN pointer)`);
+
+  const dns = (Array.isArray(value) ? value : [value]).map(item =>
+    String(item)
+  );
+  for (const dn of dns) {
+    if (branches?.length && !branches.some(branch => isDnInBranch(dn, branch)))
+      throw new BadRequestError(
+        `Field ${field} must point to a DN within allowed branches: ${branches.join(', ')}`
+      );
+    let exists = false;
+    if (mustExist) {
+      try {
+        exists = await entryExists(dn);
+      } catch {
+        exists = false;
+      }
+      if (!exists)
+        throw new BadRequestError(
+          `Field ${field} points to invalid or non-existent DN: ${dn}`
+        );
+    }
+  }
+}
+
+/**
+ * Tell whether every value of an attribute matches its pattern: `test`, or
+ * `items.test` for the elements of an array.
+ *
+ * @param attr schema definition
+ * @param value value submitted
+ * @returns false when one value does not match
+ */
+export function matchesPattern(
+  attr: SchemaAttribute,
+  value: AttributeValue
+): boolean {
+  const pattern = attr.test ?? attr.items?.test;
+  if (!pattern) return true;
+  const regex =
+    typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
+  return (Array.isArray(value) ? value : [value]).every(item =>
+    regex.test(String(item))
+  );
+}
+
+/**
+ * Refuse a payload naming an attribute the server owns.
+ *
+ * `generated` and `readOnly` say a value is not the client's to set. The flat
+ * entities enforce it on their own paths; organizations and groups have their
+ * own routes and need the same guard, or an endpoint promising that a computed
+ * path "cannot be changed here" quietly accepts one.
+ *
+ * @param schema entity schema, when one is loaded
+ * @param names attribute names carried by the request
+ * @param mainAttribute RDN attribute, exempt when nothing derives it
+ * @throws BadRequestError naming the first attribute the client may not set
+ */
+export function assertClientMaySet(
+  schema: Schema | undefined,
+  names: string[],
+  mainAttribute?: string
+): void {
+  if (!schema) return;
+  for (const name of names) {
+    if (name === 'dn') continue;
+    const found = schemaAttribute(schema, name);
+    if (!found) continue;
+    const [key, attr] = found;
+    if (
+      mainAttribute &&
+      key.toLowerCase() === mainAttribute.toLowerCase() &&
+      !attr.generatedFrom
+    )
+      continue;
+    if (!attr.generated && !attr.readOnly) continue;
+    throw new BadRequestError(
+      attr.readOnly
+        ? `Attribute "${name}" is read-only and cannot be set`
+        : `Attribute "${name}" is computed by the server and cannot be set`
+    );
+  }
+}
+
+/**
+ * A plugin able to say whether it fills a given generated attribute.
+ *
+ * Declaring the method is the whole contract: an entity asks before it
+ * exempts a required attribute from its check, so the answer has to be about
+ * that attribute, not about a role the plugin happens to carry.
+ */
+export interface GeneratedAttributeFiller {
+  fillsGeneratedAttribute?: (
+    name: string,
+    attr: SchemaAttribute,
+    schema: Schema
+  ) => boolean;
+}
+
+/**
+ * Name the first required attribute a new entry fails to provide.
+ *
+ * A `generated` attribute is exempt: it is filled by a hook *after*
+ * validation, on purpose — checks must see the payload as the client sent it,
+ * never a value the server has already rewritten.
+ *
+ * Exempt only when something will actually fill it. `generatedFrom` is
+ * derived by the entity itself; for the rest, ask the loaded plugins about
+ * *this* attribute rather than trusting a role a dozen of them carry. With no
+ * filler — a server upgraded without adding `core/ldap/enterpriseRules` —
+ * exempting would write an entry missing an attribute its own schema calls
+ * required, silently, and the client could not supply it either since
+ * `generated` is refused as input. The entry would be unwritable by any
+ * route, so demand it and say so instead.
+ *
+ * Every entity runs this check: the flat branches, the organizations and the
+ * groups, each wording the refusal in its own terms.
+ *
+ * @param schema entity schema, when one is loaded
+ * @param entry entry as the client sent it
+ * @param plugins loaded plugins, asked about each generated attribute
+ * @returns the attribute name to complain about, or undefined
+ */
+export function missingRequiredAttribute(
+  schema: Schema | undefined,
+  entry: Record<string, unknown>,
+  plugins: Record<string, unknown>
+): string | undefined {
+  if (!schema) return undefined;
+  const filledByAPlugin = (field: string, attr: SchemaAttribute): boolean =>
+    Object.values(plugins).some(plugin => {
+      const filler = (plugin as GeneratedAttributeFiller)
+        .fillsGeneratedAttribute;
+      return (
+        typeof filler === 'function' && filler.call(plugin, field, attr, schema)
+      );
+    });
+  for (const [field, attr] of Object.entries(schema.attributes)) {
+    if (!attr.required || entry[field]) continue;
+    if (attr.generated && (attr.generatedFrom || filledByAPlugin(field, attr)))
+      continue;
+    return field;
+  }
+  return undefined;
 }

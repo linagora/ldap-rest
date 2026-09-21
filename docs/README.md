@@ -11,6 +11,7 @@ Installation, configuration and plugin usage.
 - **[Getting Started](usage/README.md)** - Quick start guide
 - **[Configuration](usage/configuration.md)** - CLI options and environment variables
 - **[Upgrading](usage/upgrading.md)** - What to check before deploying a new version
+- **[Directory audit](usage/directory-audit.md)** - What a schema would refuse in an existing directory
 - **[Plugins](usage/plugins/README.md)** - Documentation for all available plugins
 
 ### [Plugin Development](plugin-development/README.md)

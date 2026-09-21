@@ -82,6 +82,12 @@ describe('ConfigApi Plugin', () => {
     expect(resource).to.have.property('base');
     expect(resource).to.have.property('schema');
     expect(resource).to.have.property('endpoints');
+    // A client names a nomenclature value from its schema: the map has to
+    // reach it along with the rest of the entity.
+    expect(resource.schema.entity.valueLabels.normal).to.deep.equal({
+      en: 'Normal',
+      fr: 'Normale',
+    });
   });
 
   it('should include groups configuration when ldapGroups is loaded', async function () {

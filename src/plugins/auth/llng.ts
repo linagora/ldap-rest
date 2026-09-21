@@ -6,18 +6,125 @@
  * Lemonldap::NG authentication plugin
  * This plugin enables authentication and authorization using Lemonldap::NG.
  */
-import * as llng from 'lemonldap-ng-handler';
-import type { Response } from 'express';
+import type { Express, Response } from 'express';
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
+
+// The ambient declaration for `lemonldap-ng-handler` lives in
+// src/types/lemonldap-ng-handler.d.ts: `skipLibCheck` lets that fallback
+// coexist with the package's own types when it is installed, whereas the
+// same declaration written here, in a regular source file, would conflict
+// with them.
+type LlngHandler = typeof import('lemonldap-ng-handler');
+
+/**
+ * `lemonldap-ng-handler` keeps its state at the module level — `init()`
+ * writes it, `run()` reads it, and both live in the package, not in any
+ * object this plugin holds. `import()` caches the module, so every instance
+ * of this plugin that goes through the real `loadHandler()` gets back the
+ * very same object. Two instances of this plugin are a supported way to load
+ * the same plugin twice, each under its own name and its own `llng_ini`
+ * override (`--plugin 'core/auth/llng:llng2:{"llng_ini":"…"}'`, see
+ * `DM.registerPlugin`); for this one plugin that pattern cannot work, because
+ * the second `init()` would silently overwrite what the first one set, and
+ * `authMethod` on either instance would then read whichever configuration
+ * was initialized last. Track, per handler object, what it was initialized
+ * from, and refuse a second, different one instead of leaving that silent.
+ * Keyed on the handler rather than kept as a single module-level value so
+ * that tests, which each hand `loadHandler()` a fresh fake object, do not
+ * collide with one another.
+ */
+const initializedFrom = new WeakMap<LlngHandler, string>();
 
 export default class AuthLLNG extends AuthBase {
   name = 'authLemonldapNg';
   roles: Role[] = ['auth'] as const;
 
+  private handler?: LlngHandler;
+
+  /**
+   * Load the optional `lemonldap-ng-handler` dependency before the server
+   * starts serving requests, rather than importing it statically.
+   *
+   * A static import would throw the moment this file is loaded — as soon as
+   * this plugin is configured — with Node's own opaque "Cannot find
+   * package" error. Loading it here instead means a server that never
+   * configures this plugin never touches the package at all, and one that
+   * does configure it gets a clear failure naming both the plugin and the
+   * missing dependency, at startup, instead of on the first request an auth
+   * plugin that cannot run must not pretend to succeed.
+   */
+  // AuthBase declares api() as returning void; DmPlugin's own api?() field
+  // already allows MaybePromise<void>, and the caller in bin/index.ts always
+  // awaits it — this override just uses the async result that permits.
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  async api(app: Express): Promise<void> {
+    let handler: LlngHandler;
+    try {
+      handler = await this.loadHandler();
+    } catch (err) {
+      throw new Error(
+        `${this.name}: requires the optional dependency "lemonldap-ng-handler", ` +
+          'which is not installed. Install it to use this plugin, or remove ' +
+          `it from the configuration. (${
+            err instanceof Error ? err.message : String(err)
+          })`
+      );
+    }
+    // The handler knows nothing until it is initialized: which virtual hosts
+    // it protects, where the configuration and the sessions live. `run()`
+    // before `init()` reads an instance that does not exist yet and throws on
+    // every request, so the plugin used to answer 500 to all of them while
+    // `--llng-ini` was parsed and never read.
+    // `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`
+    // (src/config/args.ts), so it names a real path in every deployment —
+    // there is no "default configuration" case distinct from a confFile to
+    // report. `Config` types every field optional regardless
+    // (src/config/args.ts), which `?? ''` satisfies for the type checker
+    // alone.
+    const confFile = this.config.llng_ini ?? '';
+    const previouslyFrom = initializedFrom.get(handler);
+    if (previouslyFrom !== undefined && previouslyFrom !== confFile) {
+      throw new Error(
+        `${this.name}: lemonldap-ng-handler is already initialized from ` +
+          `"${previouslyFrom}"; it keeps its state at the module level, so ` +
+          `a second instance of this plugin cannot also use "${confFile}". ` +
+          'Load one instance of this plugin, or point every instance at the ' +
+          'same lemonldap-ng.ini.'
+      );
+    }
+    try {
+      await handler.init({ configStorage: { confFile } });
+    } catch (err) {
+      throw new Error(
+        `${this.name}: cannot initialize the LemonLDAP::NG handler from ` +
+          `${confFile}. Check that the file exists, that its [configuration] ` +
+          'section is reachable and that [node-handler] lists this server ' +
+          `in nodeVhosts. (${err instanceof Error ? err.message : String(err)})`
+      );
+    }
+    initializedFrom.set(handler, confFile);
+    this.handler = handler;
+    super.api(app);
+  }
+
+  /**
+   * Load the handler. Split out so tests can override it to simulate the
+   * dependency being absent, without actually uninstalling it.
+   */
+  protected async loadHandler(): Promise<LlngHandler> {
+    return import('lemonldap-ng-handler');
+  }
+
   authMethod(req: DmRequest, res: Response, next: () => void): void {
-    llng.run(req, res, () => {
+    // api() runs before any request reaches here and would already have
+    // thrown if the dependency were missing, so this only guards against
+    // authMethod being called out of order.
+    if (!this.handler) {
+      throw new Error(`${this.name}: lemonldap-ng-handler is not loaded`);
+    }
+    this.handler.run(req, res, () => {
       req.user = req.headers['Lm-Remote-User'] as string;
       next();
     });

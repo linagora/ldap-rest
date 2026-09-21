@@ -35,7 +35,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'npm'
 
       - name: Install dependencies
@@ -242,14 +242,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: 'npm'
       # registry-url is intentionally omitted: it makes setup-node write an
       # .npmrc carrying a dummy auth token that can shadow OIDC. npmjs.org is
       # already the default registry, so OIDC publishing works without it.
 
-      # Trusted Publishing requires npm >= 11.5.1, newer than the version
-      # bundled with Node 22.
+      # Trusted Publishing requires npm >= 11.5.1. Node 24 bundles a newer one
+      # than that, so this is no longer the workaround it was under Node 22 --
+      # it is a floor, kept because a publish is the wrong place to find out
+      # that a patch release of Node shipped something older.
       - name: Update npm for Trusted Publishing
         run: npm install -g npm@latest
 

@@ -626,6 +626,25 @@ describe('LDAP Organizations Plugin', function () {
         expect(org).to.have.property('ou', 'testorg');
       });
 
+      it('should answer 409 when the organization already exists', async () => {
+        // The directory refuses the second write; that is a conflict the
+        // caller can act on, not a server fault.
+        await request
+          .post('/api/v1/ldap/organizations')
+          .type('json')
+          .send({ ou: 'testorg' })
+          .expect(200);
+
+        const res = await request
+          .post('/api/v1/ldap/organizations')
+          .type('json')
+          .send({ ou: 'testorg' });
+
+        expect(res.status).to.equal(409);
+        expect(res.body.error).to.match(/already exists/);
+        expect(res.body.error).to.contain(testOrgDn);
+      });
+
       it('should return error when ou is missing', async () => {
         const res = await request
           .post('/api/v1/ldap/organizations')

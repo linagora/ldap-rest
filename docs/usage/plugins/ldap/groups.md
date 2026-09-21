@@ -41,7 +41,7 @@ This plugin manages groups stored as `groupOfNames` or similar object classes in
 
 ### Important Notes
 
-- **Empty Groups**: `groupOfNames` requires at least one member. The plugin uses a dummy member (configurable via `--group-dummy-user`) for empty groups.
+- **Empty Groups**: `groupOfNames` requires at least one member. The plugin uses a dummy member (configurable via `--group-dummy-user`) for empty groups. That dummy member is hidden from `member` on both `GET /ldap/groups` and `GET /ldap/groups/{cn}`, so a client never sees it as a real one.
 - **Member Validation**: By default, the plugin validates that all members exist in LDAP before adding them. Set `--groups-allow-unexistent-members true` to disable validation.
 - **Automatic Cleanup**: When a user is deleted, the plugin automatically removes them from all groups via the `ldapdeleterequest` hook.
 
@@ -55,13 +55,17 @@ GET /api/v1/ldap/groups
 
 **Query Parameters:**
 
-- `match` (optional): Filter by group name (supports wildcards and LDAP filters)
+- `match` (optional): Value to look for
+- `attribute` (optional): Attribute(s) `match` is looked for in, as a
+  substring, several separated by commas — the same semantics as the flat
+  entity lists. Without it, `match` is either a raw LDAP filter (when it
+  contains `=`) or an exact group name.
 - `attributes` (optional): Comma-separated list of attributes to return
 
 **Example:**
 
 ```bash
-curl "http://localhost:8081/api/v1/ldap/groups?match=admin*&attributes=cn,member,description"
+curl "http://localhost:8081/api/v1/ldap/groups?match=admin&attribute=cn,mail&attributes=cn,member,description"
 ```
 
 **Response (200):**
@@ -150,7 +154,9 @@ POST /api/v1/ldap/groups
 
 - `cn` is required
 - `member` can be a string (single member) or array (multiple members)
-- If no members provided, a dummy member is automatically added
+- If no members provided, a dummy member is automatically added, and it is
+  left out of `member` when the group is read back, on both the list and the
+  single-group endpoint
 - Additional attributes can be included based on schema
 
 **Response (200):**

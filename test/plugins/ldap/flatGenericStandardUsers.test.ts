@@ -1,16 +1,23 @@
 import { expect } from 'chai';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import { DM } from '../../../src/bin';
-
-const { DM_LDAP_BASE } = process.env;
-const USER_BRANCH = `ou=users,${DM_LDAP_BASE}`;
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('LdapUsersFlat validation with standard schema (via flatGeneric)', function () {
+  let USER_BRANCH: string;
+
   let server: DM;
   let genericPlugin: LdapFlatGeneric;
   let plugin: any;
 
+  // The embedded directory is started by a root hook, so the environment only
+  // exists once the suite runs — never at file load.
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
   before(async function () {
+    USER_BRANCH = `ou=users,${process.env.DM_LDAP_BASE}`;
     this.timeout(5000);
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/standard/users.json';
     server = new DM();
@@ -55,6 +62,26 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
         },
       });
       expect(await plugin.deleteUser('testuser2')).to.be.true;
+    });
+
+    it('should answer 409 when the same entry is created twice at once', async () => {
+      // Both requests pass the existence checks before either writes, so the
+      // directory itself refuses the second. That refusal is a conflict the
+      // caller can act on, not a 500.
+      const entry = {
+        cn: 'Test User 3',
+        sn: 'User',
+        mail: 'testuser3-schema@example.org',
+      };
+      const results = await Promise.allSettled([
+        plugin.addUser('testuser3', entry),
+        plugin.addUser('testuser3', entry),
+      ]);
+      const refused = results.filter(result => result.status === 'rejected');
+      expect(refused).to.have.length(1);
+      const reason = (refused[0] as PromiseRejectedResult).reason;
+      expect(reason).to.have.property('statusCode', 409);
+      expect(reason.message).to.match(/already exists/);
     });
 
     it('should reject user with invalid uid format', async () => {

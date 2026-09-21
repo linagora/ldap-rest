@@ -8,6 +8,7 @@
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
+import { HttpError } from '../../lib/errors';
 import ldapActions, { AttributesList } from '../../lib/ldapActions';
 import { launchHooks, launchHooksChained } from '../../lib/utils';
 
@@ -82,6 +83,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
                   );
                   return true;
                 } catch (e) {
+                  if (e instanceof HttpError) throw e;
                   throw new Error(
                     `Unable to insert ${m}: ${e instanceof Error ? e.message : String(e)}`
                   );

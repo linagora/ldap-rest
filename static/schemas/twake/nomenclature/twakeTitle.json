@@ -5,6 +5,48 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "title",
     "pluralName": "titles",
+    "label": {
+      "en": "Titles",
+      "fr": "Civilités"
+    },
+    "singularLabel": {
+      "en": "title",
+      "fr": "civilité"
+    },
+    "valueLabels": {
+      "Dr": {
+        "en": "Dr",
+        "fr": "Dr"
+      },
+      "Mr": {
+        "en": "Mr",
+        "fr": "M."
+      },
+      "Mrs": {
+        "en": "Mrs",
+        "fr": "Mme"
+      },
+      "Miss": {
+        "en": "Miss",
+        "fr": "Mlle"
+      },
+      "Ms": {
+        "en": "Ms",
+        "fr": "Mme"
+      },
+      "Prof": {
+        "en": "Prof.",
+        "fr": "Pr"
+      },
+      "Hon": {
+        "en": "Hon.",
+        "fr": "Honorable"
+      },
+      "Excellence": {
+        "en": "Excellency",
+        "fr": "Excellence"
+      }
+    },
     "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

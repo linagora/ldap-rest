@@ -5,6 +5,28 @@
     "objectClass": ["top", "applicationProcess"],
     "singularName": "deliveryMode",
     "pluralName": "deliveryModes",
+    "label": {
+      "en": "Delivery modes",
+      "fr": "Modes de distribution"
+    },
+    "singularLabel": {
+      "en": "delivery mode",
+      "fr": "mode de distribution"
+    },
+    "valueLabels": {
+      "normal": {
+        "en": "Normal",
+        "fr": "Normale"
+      },
+      "forward": {
+        "en": "Forwarded",
+        "fr": "Transférée"
+      },
+      "localDelivery": {
+        "en": "Forwarded, local copy kept",
+        "fr": "Transférée, copie locale conservée"
+      }
+    },
     "base": "ou=twakeDeliveryMode,ou=nomenclature,{ldap_base}"
   },
   "strict": true,

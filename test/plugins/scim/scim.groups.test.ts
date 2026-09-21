@@ -149,6 +149,30 @@ describe('SCIM Groups (integration)', function () {
     expect(user.type).to.equal('User');
   });
 
+  it('hides the schema placeholder however its DN is spelled', async () => {
+    // The configuration holds one spelling, the directory answers with its
+    // own: compared as text, the placeholder was served to the client as an
+    // ordinary member.
+    const saved = server.config.group_dummy_user;
+    server.config.group_dummy_user = 'CN = FakeUser';
+    try {
+      await supertest(server.app)
+        .post('/scim/v2/Groups')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'scim-testgroup',
+        })
+        .expect(201);
+      const res = await supertest(server.app)
+        .get('/scim/v2/Groups/scim-testgroup')
+        .expect(200);
+      expect(res.body.members || []).to.deep.equal([]);
+    } finally {
+      server.config.group_dummy_user = saved;
+    }
+  });
+
   it('PATCH adds a member', async () => {
     await supertest(server.app)
       .post('/scim/v2/Groups')

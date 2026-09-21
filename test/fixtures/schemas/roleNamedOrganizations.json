@@ -1,0 +1,7 @@
+{
+  "strict": false,
+  "attributes": {
+    "ou": { "type": "string", "required": true, "role": "identifier" },
+    "description": { "type": "string", "role": "organizationPath" }
+  }
+}

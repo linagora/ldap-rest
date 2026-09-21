@@ -4,7 +4,244 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## To 0.8.0
+
+### Node 20 is the floor
+
+**Who is affected:** anyone installing on Node 18 or older.
+
+`engines` declares `>=20` — the version Debian 13 ships — and the CI runs the
+suite on 20, 22, 24 and 26. Older runtimes are neither tested nor supported.
+
+**`core/auth/llng` is the one plugin that does not follow.** It needs
+`lemonldap-ng-handler`, which depends on the native `re2`, and no single `re2`
+release installs on every supported Node: up to `1.24.0` it builds on 20 but
+not on 26, and from `1.24.1` it declares `engines: >=22`. npm answers an
+unsatisfied dependency of this kind by leaving an _optional_ package out
+without a word, so on some runtimes the handler is simply absent.
+
+Everything else builds, tests and runs there regardless. A server that
+configures `core/auth/llng` on a runtime where the handler could not be
+installed now fails at startup, naming the plugin and the missing package,
+rather than accepting requests an authentication plugin cannot check. Check
+after upgrading that the runtime you deploy on carries it:
+
+```bash
+node -e "require('lemonldap-ng-handler'); console.log('present')"
+```
+
+### The LLNG handler now needs a working configuration at startup
+
+**Who is affected:** every deployment configuring `core/auth/llng`.
+
+The handler used to do nothing at startup: `--llng-ini` was read into the
+configuration but never handed to it, so every request failed with a `500`
+regardless of what the file said. It is now initialized once, before the
+server starts serving — which means the file finally matters, and two ways
+it can be wrong now stop the server instead of answering `500`:
+
+- `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`, and a file at
+  that path with no `[node-handler] nodeVhosts` listing this server — the
+  normal state until now, since nothing read it — refuses to start where it
+  used to start and answer `500` to every request instead;
+- an LLNG configuration store (`[configuration] baseConfigUrl` and the rest)
+  unreachable when the server boots crash-loops it under an orchestrator,
+  until the portal or config store it depends on comes up.
+
+List this server before upgrading:
+
+```ini
+[node-handler]
+nodeVhosts = api.example.com
+```
+
+and, if the LLNG configuration store starts after this server does, sequence
+the two or give the container a restart policy that tolerates a few
+failures at boot.
+
+### The Twake schemas now need `core/ldap/enterpriseRules`
+
+**Who is affected:** every deployment loading `static/schemas/twake/*`.
+
+Those schemas mark `twakeDepartmentPath`, `twakeAccountStatus` and
+`twakeDeliveryMode` both `required` and `generated` — a client may not send
+them, and a plugin has to fill them. Load the one that does:
+
+```bash
+--plugin core/ldap/enterpriseRules
+```
+
+Without it, a creation answers `400` naming the attribute, on the flat routes
+as on `POST /ldap/organizations` and `POST /ldap/groups`. That refusal is
+deliberate: the previous release wrote the entry anyway, missing an attribute
+its own schema called required and that no client could ever add.
+
+**The nomenclature has to hold what the schema defaults name.** The user
+schema points at `cn=normal,ou=twakeDeliveryMode,ou=nomenclature,<base>` and
+`cn=active,ou=twakeAccountStatus,ou=nomenclature,<base>`. A directory never
+seeded with those entries answers `400` on every creation, naming the DN that
+does not resolve — rather than storing a dangling one on each account.
+
+### Clients must stop sending the computed attributes
+
+**Who is affected:** anything that creates or updates users, groups or
+organizations against the Twake schemas.
+
+`uid` (generated from the local part of `mail`), `twakeDepartmentPath`,
+`twakeAccountStatus` and `twakeDeliveryMode` are refused in a request body
+with a `400` naming the attribute. Drop them from the payload — the server
+fills them.
+
+To keep the old behaviour, copy the schema and remove the markers: each of
+these is a `generated` or `readOnly` flag in the JSON, not code.
+
+### Run the audit before switching
+
+**Who is affected:** every directory holding entries written before this
+release.
+
+```bash
+npm run audit:directory -- --schema static/schemas/twake/users.json \
+  --plugin core/ldap/enterpriseRules
+```
+
+It reads the branch as it stands and reports what the schema would now refuse,
+quoting each rule's own `hint`. Two rules tightened in ways that only show on
+stored data:
+
+- an array's `items.test` and `items.branch` are enforced on the flat,
+  organization and group routes, where they never were —
+  `mailAlternateAddress` has carried a pattern since 0.7.0 and accepted
+  anything — and an array of pointers must name existing entries;
+- a pointer's `branch` is compared RDN by RDN. A DN that merely ended with the
+  branch as text, `uid=x,xou=users,dc=example,dc=com` against
+  `ou=users,dc=example,dc=com`, used to pass.
+
+Stored values are left alone. The refusal comes at the next update of an
+offending entry, which is why it is worth knowing beforehand.
+
+### `employeeNumber` is unique, apart from the `UNIT` placeholder
+
+**Who is affected:** directories where accounts share a placeholder employee
+number other than `UNIT`.
+
+`static/schemas/twake/users.json` declares `employeeNumber` unique, exempting
+the value `UNIT` — the placeholder the interface these schemas replace uses
+for an account standing for a unit rather than a person. Once
+`core/ldap/enterpriseRules` is loaded, every creation or update carrying a
+value another account already holds answers `409`; `UNIT` is let through
+however many accounts carry it.
+
+A deployment whose placeholder is spelled otherwise has to say so, or its
+second holder of that value is refused, and every existing holder at its next
+update of the attribute. The audit cannot warn: uniqueness spans the whole
+directory, and it only checks what each entry says on its own.
+
+Find the shared values before switching:
+
+```bash
+ldapsearch -LLL -b "ou=users,<base>" "(employeeNumber=*)" employeeNumber \
+  | awk '/^employeeNumber:/ {print $2}' | sort | uniq -cd
+```
+
+Then name yours in a copy of the schema, as
+`static/schemas/example/users.json` does:
+
+```json
+"unique": { "sentinel": "YOUR-PLACEHOLDER" }
+```
+
+### Renaming an entry, and what the cascade reaches
+
+**Who is affected:** anyone calling the new
+`POST /v1/ldap/{resource}/{id}/rename`. Nothing changes for a deployment
+that does not.
+
+The identifier of a flat entry can be changed. The entry's DN changes with
+it, so everything naming that DN has to be rewritten, and the endpoint waits
+for that before it answers.
+
+What it rewrites is read from the schemas, never from a list of attribute
+names: every `pointer` — single or in an array — whose `branch` admits the
+renamed entry, and every attribute carrying the `members` or `owners` role.
+**Load `core/ldap/enterpriseRules`**: without it the entry is renamed and
+nothing else is touched.
+
+What it cannot reach is a DN held in a plain `string` attribute that carries
+no role. Declare it a `pointer`, or give it its role, and it is covered.
+
+A directory running OpenLDAP's `refint` overlay already fixes the attributes
+it is configured for — usually `member`, `owner`, `uniqueMember` and
+`memberOf` — in a task of its own, after the rename has answered. The server
+converges with it rather than fighting it: what the overlay has already
+fixed counts as done. `refint` is not a substitute, though. It never sees a
+deployment's own pointers, `twakeManagerLink` and `twakeLocalAdminLink`
+among them — and losing the second one silently costs an administrator every
+branch they administer.
+
+### A rename answers `207` when it could not finish
+
+The rename of the entry and the rewrite of what points at it are separate
+writes, and a directory has no transaction to hold them together.
+
+If the rename itself fails, nothing else has happened and the directory's own
+refusal is what you get. Once it succeeds the rename is a fact, and an error
+would tell you the opposite — so a rewrite that fails answers `207` with the
+attributes and the counts that could not be written. The referring DNs are
+not in the body, where the caller has no business reading them; they are in
+the log, at `error`, with the attribute and both DNs.
+
+**Re-issue the identical request to finish it.** A rename whose source is
+already gone and whose target is already there runs the rewrite alone. That
+is also what to do if the server dies between the two writes.
+
+### `unique` is not widened on a rename
+
+A schema marking its identifier `unique: { "branches": [...] }` gets the
+RDN's own branch checked on a rename, and nothing more: the wider check runs
+from the add and modify hooks, which a rename does not go through. The
+endpoint's own description says so too.
+
+### Creating an entry that already exists answers `409`
+
+**Who is affected:** any client that reads a failed creation by its status
+code or by the text of its message — a bulk import recording per-line errors
+most of all.
+
+Two creations of the same entry racing past the existence checks answered
+`500`, the add path having wrapped every LDAP error in a plain `Error`. The
+directory's own `entryAlreadyExists` is now recognised once, in
+`lib/ldapActions`, so every creation route answers `409` alike: the flat
+routes, `POST /ldap/groups`, the organization routes, and the external
+members `core/ldap/externalUsersInGroups` inserts.
+
+The message is `Entry <dn> already exists`. The flat routes used to say
+`<entity> <dn> already exists`, and `core/ldap/bulkImport` used to record
+`LDAP add error: …` in its per-line `errors[]`; both read the same now.
+SCIM still answers `uniqueness`, the numeric code being carried on the
+error it is given.
+
+### A flat schema may not claim a URL an LDAP plugin serves
+
+**Who is affected:** anyone passing `--ldap-flat-schema` a schema whose
+`entity.pluralName` is `groups`, `organizations`, `raw` or `bulk-import`
+beside the plugin of the same name — `static/schemas/twake/groups.json` is
+exactly that.
+
+Both used to load, sharing a hook prefix and a URL; Express answered with
+whichever registered first, and the loser stayed advertised by the
+configuration API while being unreachable in fact. The schema is now dropped
+with an error naming the holder. **Load one or the other, not both.**
+
+### Organization paths: nothing to convert
+
+**Who is affected:** directories written before the path order was settled.
+
+`twakeDepartmentPath` reads from the root down, the entry's own name last.
+What is already stored in the old order — the entry's own name first, the top
+organization's last — is still accepted as it stands, so no organization
+becomes unwritable on upgrade. Only paths the server computes from now on
+follow the new order, and the two forms coexist until an entry is rewritten.
 
 ### The search cache works now, and is off by default
 

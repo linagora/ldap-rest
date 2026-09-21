@@ -23,6 +23,7 @@ import type {
 import {
   created,
   jsonBody,
+  multiStatus,
   tryMethod,
   wantJson,
 } from '../lib/expressFormatedResponses';
@@ -33,15 +34,68 @@ import {
   escapeRegex,
   getCompiledRegex,
   getParentDn,
+  isDnInBranch,
+  isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  normalizeDn,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
-import { BadRequestError, NotFoundError, ConflictError } from '../lib/errors';
+import {
+  checkDnValues,
+  missingRequiredAttribute,
+  modifiedAttributeNames,
+  neverReturnAttributes,
+  schemaAttribute,
+} from '../config/schema';
+import {
+  BadRequestError,
+  ConflictError,
+  HttpError,
+  NotFoundError,
+} from '../lib/errors';
 
 import DmPlugin from './plugin';
+
+/**
+ * One attribute value or many, always as a list of strings.
+ *
+ * @param value value as the client sent it
+ * @returns its elements
+ */
+function asList(value: AttributeValue): string[] {
+  return (Array.isArray(value) ? value : [value]).map(item => String(item));
+}
+
+/**
+ * What a rename needs from the plugin that knows what references what.
+ *
+ * Declared here by its shape rather than imported from
+ * `plugins/ldap/enterpriseRules`: nothing under `abstract/` depends on a
+ * plugin, and a server that does not load the rules must still be able to
+ * rename — it just renames without a cascade, which is what
+ * {@link DmPlugin.requirePlugin} answers.
+ *
+ * The references themselves are opaque: they are found on one side and handed
+ * back on the other, and this class has no business reading them.
+ */
+interface ReferenceRewriter extends DmPlugin {
+  /** Every reference the directory holds to an entry, before it is renamed */
+  findReferences(dn: string): Promise<unknown[]>;
+  /** Point them all at the new DN, collecting what could not be written */
+  rewriteReferences(
+    references: unknown[],
+    oldDn: string,
+    newDn: string,
+    req?: Request
+  ): Promise<{
+    updated: number;
+    failed: { attribute: string; count: number }[];
+  }>;
+}
 
 export interface LdapFlatConfig {
   /**
@@ -191,6 +245,50 @@ export interface LdapFlatConfig {
  *       example: ou=engineering,ou=departments,dc=example,dc=com
  *   example:
  *     targetOrgDn: ou=engineering,ou=departments,dc=example,dc=com
+ * FlatRenameRequest:
+ *   type: object
+ *   description: |
+ *     Body for changing the identifier of an entry. The field is named
+ *     `newId` for every resource, whatever that resource calls its
+ *     `mainAttribute`.
+ *   required: [newId]
+ *   properties:
+ *     newId:
+ *       type: string
+ *       description: |
+ *         New value of the resource's `mainAttribute`. A value, not a DN.
+ *       example: bob
+ *   example:
+ *     newId: bob
+ * FlatRenameResult:
+ *   type: object
+ *   description: |
+ *     Outcome of a rename: the entry's new DN, and how many references to
+ *     the old one were rewritten.
+ *   properties:
+ *     success:
+ *       type: boolean
+ *       description: False when a reference could not be rewritten.
+ *     dn:
+ *       type: string
+ *       description: DN the entry now has.
+ *     referencesUpdated:
+ *       type: integer
+ *       description: References rewritten to the new DN.
+ *     referencesFailed:
+ *       type: array
+ *       description: |
+ *         References left naming the old DN, counted per attribute. The
+ *         referring entries are named in the server log, not here.
+ *       items:
+ *         type: object
+ *         properties:
+ *           attribute: { type: string }
+ *           count: { type: integer }
+ *   example:
+ *     success: true
+ *     dn: uid=bob,ou=users,dc=example,dc=com
+ *     referencesUpdated: 3
  */
 export default abstract class LdapFlat extends DmPlugin {
   base: string;
@@ -235,6 +333,206 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
+   * Attributes a client is not allowed to supply: those the server computes
+   * (`generated`) and those it only ever derives from elsewhere (`readOnly`,
+   * such as `memberOf`, which is driven from the group side).
+   *
+   * The core and its plugins still write them — the restriction is on the
+   * request body, not on the entry.
+   *
+   * @returns lowercased attribute names
+   */
+  protected clientForbiddenAttributes(): Set<string> {
+    const forbidden = new Set<string>();
+    if (!this.schema) return forbidden;
+    for (const [name, attr] of Object.entries(this.schema.attributes)) {
+      // A `generated` identifier with no derivation rule has nothing to be
+      // generated from: the client still has to supply it.
+      if (name === this.mainAttribute && !attr.generatedFrom) continue;
+      if (attr.generated || attr.readOnly) forbidden.add(name.toLowerCase());
+    }
+    return forbidden;
+  }
+
+  /**
+   * Attributes never sent back over the API. A manager may reset a password
+   * without being able to read it back: the asymmetry is a projection, not an
+   * authorization rule, so it lives with the schema.
+   *
+   * @returns lowercased attribute names
+   */
+  protected hiddenAttributes(): Set<string> {
+    return neverReturnAttributes([this.schema]);
+  }
+
+  /**
+   * Remove the `neverReturn` attributes from an entry about to be serialised.
+   * LDAP attribute names are case-insensitive and may carry options
+   * (`userPassword;binary`), so both are normalised before comparison.
+   *
+   * @param entry entry as read from the directory
+   * @returns a copy without the hidden attributes
+   */
+  protected project<T extends Record<string, unknown>>(entry: T): T {
+    const hidden = this.hiddenAttributes();
+    if (hidden.size === 0) return entry;
+    const out: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(entry)) {
+      if (hidden.has(name.split(';')[0].toLowerCase())) continue;
+      out[name] = value;
+    }
+    return out as T;
+  }
+
+  /**
+   * Same as {@link project}, for a map of entries keyed by identifier.
+   *
+   * @param list entries as read from the directory
+   * @returns a copy without the hidden attributes
+   */
+  protected projectList(list: LdapList): LdapList {
+    if (this.hiddenAttributes().size === 0) return list;
+    const out: LdapList = {};
+    for (const [id, entry] of Object.entries(list))
+      out[id] = this.project(entry);
+    return out;
+  }
+
+  /**
+   * Refuse a request body that carries an attribute the client may not set.
+   *
+   * Failing loudly matters more than ignoring the value: a client that sends
+   * `twakeDepartmentPath` believes it is setting the path, and silently
+   * overwriting it with the computed one would leave it thinking otherwise.
+   *
+   * @param names attribute names present in the request
+   * @throws BadRequestError naming the first offending attribute
+   */
+  protected rejectForbiddenInput(names: string[]): void {
+    const forbidden = this.clientForbiddenAttributes();
+    if (forbidden.size === 0) return;
+    for (const name of names) {
+      if (name === 'dn') continue;
+      if (!forbidden.has(name.split(';')[0].toLowerCase())) continue;
+      const attr = schemaAttribute(this.schema, name)?.[1];
+      throw new BadRequestError(
+        attr?.readOnly
+          ? `Attribute "${name}" is read-only and cannot be set`
+          : `Attribute "${name}" is computed by the server and cannot be set`
+      );
+    }
+  }
+
+  /**
+   * Derive the RDN value of a new entry when the schema says the server
+   * generates it — an account identifier taken from the local part of its mail
+   * address, typically.
+   *
+   * The derivation itself (source attribute, extraction pattern, collision
+   * strategy) is schema configuration; this method only applies it.
+   *
+   * @param body creation payload
+   * @returns the generated value, or undefined when nothing is generated
+   * @throws BadRequestError when the source attribute is missing, or when the
+   *         value collides and the schema asks for an error
+   */
+  protected async generateMainAttribute(
+    body: Record<string, AttributeValue>
+  ): Promise<string | undefined> {
+    const attr = this.schema?.attributes[this.mainAttribute];
+    const rule = attr?.generatedFrom;
+    // `generated` is the switch, `generatedFrom` only the recipe: an operator
+    // told to drop the marker to take the value from the client gets exactly
+    // that, rather than the derived value silently replacing the one sent.
+    if (!rule || !attr.generated) return undefined;
+
+    const raw = body[rule.attribute];
+    const source = Array.isArray(raw) ? raw[0] : raw;
+    if (source === undefined || source === null || source === '') {
+      throw new BadRequestError(
+        `Attribute "${rule.attribute}" is required to generate "${this.mainAttribute}"`
+      );
+    }
+    let value = String(source);
+    if (rule.extract) {
+      const match = getCompiledRegex(rule.extract).exec(value);
+      if (match) value = match[1] !== undefined ? match[1] : match[0];
+    }
+    if (rule.lowercase) value = value.toLowerCase();
+    // The source charset is rarely the target's. A mail local part may legally
+    // carry `+`, `'` or `!` — the shipped mail test admits them — while a
+    // `uid` may not, and the derived value is validated against the `uid`
+    // rule. Without a way to say which characters to drop, `john+tag@…` was
+    // refused for an attribute the client is forbidden to send, so no request
+    // could ever succeed.
+    if (rule.strip)
+      value = value.replace(getCompiledRegex(rule.strip, 'g'), '');
+    if (!value) {
+      throw new BadRequestError(
+        `Cannot generate "${this.mainAttribute}" from "${rule.attribute}"`
+      );
+    }
+
+    // The generated value becomes the RDN, so a collision is a duplicate DN.
+    // The source of the identifier is rarely unique on its own: two mail
+    // domains give `jean.dupont@a.example` and `jean.dupont@b.example` the
+    // same local part.
+    if (!(await this.rdnExists(value))) return value;
+    if (rule.onCollision !== 'suffix') {
+      throw new ConflictError(
+        `${this.singularName} "${value}" already exists (generated from ${rule.attribute})`
+      );
+    }
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${value}-${n}`;
+      if (!(await this.rdnExists(candidate))) return candidate;
+    }
+    throw new ConflictError(
+      `Cannot generate a free "${this.mainAttribute}" from "${rule.attribute}"`
+    );
+  }
+
+  /**
+   * Tell whether an entry already uses this RDN value in the branch.
+   *
+   * @param value candidate RDN value
+   * @returns true when the DN is taken
+   */
+  protected async rdnExists(value: string): Promise<boolean> {
+    try {
+      const res = (await this.ldap.search(
+        { paged: false, scope: 'base' },
+        `${this.mainAttribute}=${escapeDnValue(value)},${this.base}`
+      )) as SearchResult;
+      return (res?.searchEntries?.length ?? 0) > 0;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      // A missing entry is reported as an error by the directory (code 32);
+      // any other failure would resurface on the add itself.
+      return false;
+    }
+  }
+
+  /**
+   * Build the rejection message for a value that failed its schema `test`.
+   *
+   * When the schema carries a `hint`, the message says what a valid value
+   * looks like instead of only that this one was not. The hint lives next to
+   * the pattern so the two cannot drift apart, and so a client can show it
+   * under the field *before* the user gets it wrong.
+   *
+   * @param field attribute name
+   * @returns message for a `BadRequestError`
+   */
+  protected invalidValueMessage(field: string): string {
+    const attr = this.schema?.attributes[field];
+    const hint = attr?.hint || attr?.items?.hint;
+    return hint
+      ? `Invalid value for attribute "${field}": ${hint}`
+      : `Invalid value for attribute "${field}"`;
+  }
+
+  /**
    * API routes
    */
   api(app: Express): void {
@@ -245,7 +543,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *   Returns all entries in the flat LDAP branch, keyed by their
      *   `mainAttribute` value (e.g. `uid` for users). The optional
      *   `match` and `attribute` query parameters filter results using
-     *   a substring LDAP search (`attribute=*match*`). The `attributes`
+     *   a substring LDAP search (`attribute=*match*`). `attribute` accepts
+     *   several names separated by commas, and the clauses are then joined
+     *   with `|`. The `attributes`
      *   parameter limits which LDAP attributes are returned.
      * tags:
      *   - Entities
@@ -264,7 +564,8 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       Substring to match. Must be used together with `attribute`.
-     *       The resulting LDAP filter is `(attribute=*match*)`.
+     *       The resulting LDAP filter is `(attribute=*match*)`, or
+     *       `(|(a=*match*)(b=*match*))` when several attributes are named.
      *     example: alice
      *   - in: query
      *     name: attribute
@@ -272,6 +573,9 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       LDAP attribute name to match against (used with `match`).
+     *       Several may be given, separated by commas; an entry matching any
+     *       of them is returned. Each name must be indexed for a substring
+     *       search, or the directory scans the branch.
      *     example: cn
      *   - in: query
      *     name: attributes
@@ -316,20 +620,16 @@ export default abstract class LdapFlat extends DmPlugin {
           req.query.attribute &&
           typeof req.query.attribute === 'string'
         ) {
-          // Validate LDAP attribute name (alphanumeric + hyphen, starting with letter)
-          const attributePattern = /^[a-zA-Z][a-zA-Z0-9-]*$/;
-          if (!attributePattern.test(req.query.attribute)) {
-            throw new BadRequestError('Invalid LDAP attribute name');
-          }
-          // Escape filter value to prevent LDAP injection
-          const escapedMatch = escapeLdapFilter(req.query.match);
-          args.filter = `(${req.query.attribute}=*${escapedMatch}*)`;
+          args.filter = substringSearchFilter(
+            req.query.match,
+            req.query.attribute
+          );
         }
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
         }
         const list = await this.listEntries(args);
-        res.json(list);
+        res.json(this.projectList(list));
       })
     );
 
@@ -583,6 +883,101 @@ export default abstract class LdapFlat extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
       asyncHandler(async (req, res) => this.apiMove(req, res))
     );
+
+    /**
+     * @openapi
+     * summary: Rename entry (change its identifier)
+     * description: |
+     *   Changes the `mainAttribute` value of the entry — its RDN, and so its
+     *   DN — and rewrites the references other entries hold to the old DN:
+     *   group memberships and ownerships, delegations, managers, every
+     *   pointer a loaded schema declares towards this branch. The rewrite is
+     *   finished when the call returns.
+     *
+     *   The body field is `newId` for every resource, whatever that resource
+     *   calls its `mainAttribute`, and it carries a value, not a DN.
+     *
+     *   The new value is held to the same `test` as a creation would hold it
+     *   to, and refused when the identifier is already taken in this branch.
+     *   A `unique` constraint the schema widens to other branches is **not**
+     *   applied here: it is enforced from the add and modify hooks, while
+     *   what a rename needs is the RDN's own branch — which is the namespace
+     *   the directory itself enforces.
+     *
+     *   Re-issuing the same rename is a repair, not an error: when the entry
+     *   already carries the new identifier, the reference rewrite runs alone.
+     *   That is how a `207` is finished off.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/FlatRenameRequest' }
+     *       example:
+     *         newId: bob
+     * responses:
+     *   '200':
+     *     description: Entry renamed and every reference rewritten.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatRenameResult' }
+     *         example:
+     *           success: true
+     *           dn: uid=bob,ou=users,dc=example,dc=com
+     *           referencesUpdated: 3
+     *   '207':
+     *     description: |
+     *       Entry renamed, but at least one reference could not be
+     *       rewritten. The rename is done and is not rolled back; re-issue
+     *       the same request to finish the rewrite.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatRenameResult' }
+     *         example:
+     *           success: false
+     *           dn: uid=bob,ou=users,dc=example,dc=com
+     *           referencesUpdated: 1
+     *           referencesFailed:
+     *             - attribute: member
+     *               count: 2
+     *   '400':
+     *     description: |
+     *       Missing or invalid `newId`, a value the schema refuses, or an
+     *       attribute sent beside it.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '403':
+     *     description: No write permission on the branch.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: The identifier is already taken.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Rename entry (change its identifier)
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/rename`,
+      asyncHandler(async (req, res) => this.apiRename(req, res))
+    );
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
@@ -597,7 +992,7 @@ export default abstract class LdapFlat extends DmPlugin {
       if (result.searchEntries.length === 0) {
         throw new NotFoundError(`${this.singularName} not found`);
       }
-      res.json(result.searchEntries[0]);
+      res.json(this.project(result.searchEntries[0]));
     } catch (err) {
       // LDAP NoSuchObjectError (code 32) means not found
       if (
@@ -611,12 +1006,20 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiAdd(req: Request, res: Response): Promise<void> {
-    const body = jsonBody(req, res, this.mainAttribute) as
-      | Record<string, AttributeValue>
-      | false;
+    // When the schema says the server derives the identifier, the client is
+    // not expected — nor allowed — to send it.
+    const idAttr = this.schema?.attributes[this.mainAttribute];
+    const generatesId = Boolean(idAttr?.generated && idAttr.generatedFrom);
+    const body = (
+      generatesId ? jsonBody(req, res) : jsonBody(req, res, this.mainAttribute)
+    ) as Record<string, AttributeValue> | false;
     if (!body) return;
 
-    const id = body[this.mainAttribute] as string;
+    this.rejectForbiddenInput(Object.keys(body));
+
+    const id = generatesId
+      ? ((await this.generateMainAttribute(body)) as string)
+      : (body[this.mainAttribute] as string);
     const additional = { ...body };
     delete additional[this.mainAttribute];
     // Remove dn if provided - it will be constructed by addEntry
@@ -624,7 +1027,7 @@ export default abstract class LdapFlat extends DmPlugin {
 
     await this.addEntry(id, additional, req);
     const entry = await this.searchEntriesByName(id, false);
-    return created(res, entry[id]);
+    return created(res, this.project(entry[id]));
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
@@ -636,6 +1039,7 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
+    this.rejectForbiddenInput(modifiedAttributeNames(body));
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.modifyEntry.bind(this), id, body);
   }
@@ -662,6 +1066,152 @@ export default abstract class LdapFlat extends DmPlugin {
       success: true,
       ...result,
     });
+  }
+
+  /**
+   * Change an entry's identifier, and make the directory consistent again
+   * before answering.
+   *
+   * Shaped like `apiMove`, and deliberately not on `tryMethod`: that helper
+   * flattens every outcome to `{success: true}`, which cannot say how many
+   * references were rewritten nor that one was not.
+   *
+   * @param req request, carrying `newId`
+   * @param res response
+   */
+  async apiRename(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'newId') as Record<string, unknown> | false;
+    if (!body) return;
+
+    const newId = body.newId;
+    if (typeof newId !== 'string') {
+      throw new BadRequestError('Missing or invalid newId in request body');
+    }
+
+    // Everything else in the body is an attribute name, and one the client is
+    // not allowed to set is refused here as it is on a creation — a caller
+    // that slips `twakeDepartmentPath` in beside `newId` is told so instead of
+    // seeing it ignored. `newId` itself is this endpoint's parameter, not an
+    // attribute name, exactly as `/move`'s `targetOrgDn` is: see the
+    // `generated` marker.
+    this.rejectForbiddenInput(Object.keys(body).filter(key => key !== 'newId'));
+
+    // A value, not a DN. `resolveDn` accepts either, so without this the field
+    // would quietly take two kinds of input where it documents one.
+    if (new RegExp(`^${escapeRegex(this.mainAttribute)}=`, 'i').test(newId)) {
+      throw new BadRequestError(
+        `newId must be a ${this.mainAttribute} value, not a DN`
+      );
+    }
+    try {
+      validateDnValue(newId, this.mainAttribute);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error — an empty or control-character
+      // identifier came back as a 500 on a request that was simply wrong.
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid newId'
+      );
+    }
+    // The schema's own rule, the one a creation applies. `renameEntry` checked
+    // only for emptiness and control characters, so a value the schema refuses
+    // on the way in was accepted on the way past.
+    if (!(await this._validateOneChange(this.mainAttribute, newId))) {
+      throw new BadRequestError(this.invalidValueMessage(this.mainAttribute));
+    }
+
+    const id = decodeURIComponent(req.params.id as string);
+    const dn = this.resolveDn(id);
+    const newDn = this.resolveDn(newId);
+
+    // The placeholder some directories keep to satisfy `groupOfNames` is a
+    // configuration value, not an entry: renaming it — or onto it — would
+    // leave `isDummyMemberDn` naming something else, and every empty group
+    // would then refuse to be deleted by `deleteGuard: nonEmpty`.
+    const dummy = this.config.group_dummy_user;
+    if (
+      dummy &&
+      (isDummyMemberDn(dn, dummy) || isDummyMemberDn(newDn, dummy))
+    ) {
+      throw new ConflictError(
+        `${dummy} is the configured placeholder member and cannot be renamed`
+      );
+    }
+
+    const sameName = normalizeDn(dn) === normalizeDn(newDn);
+    const source = await this.entryExists(dn);
+    const target = sameName ? source : await this.entryExists(newDn);
+
+    const rules = this.requirePlugin<ReferenceRewriter>('ldapEnterpriseRules');
+    let references: unknown[] = [];
+
+    if (sameName) {
+      // Re-issuing a rename that already happened. Nothing to rename, and
+      // nothing to rewrite either: the references were rewritten to this very
+      // DN. Answering 200 is what makes a retry safe.
+      if (!source) throw new NotFoundError(`${this.singularName} not found`);
+    } else if (source) {
+      if (target) {
+        throw new ConflictError(
+          `${this.singularName} "${newId}" already exists`
+        );
+      }
+      // Asked while the old DN is still live: afterwards nothing answers for
+      // it, and the entries left pointing at it could only be found by walking
+      // the whole directory.
+      references = (await rules?.findReferences(dn)) || [];
+      // The commit point. Everything above can still refuse; nothing below
+      // can put this back, and a failure here leaves the directory untouched,
+      // so the directory's own status is what the caller gets.
+      await this.renameEntry(dn, newDn, req);
+    } else if (target) {
+      // The old DN is gone and the new one is there: the rename happened and
+      // the rewrite did not finish — a 207, or a crash between the two. Same
+      // request, and it becomes the repair.
+      references = (await rules?.findReferences(dn)) || [];
+    } else {
+      throw new NotFoundError(`${this.singularName} not found`);
+    }
+
+    const report =
+      rules && references.length > 0
+        ? await rules.rewriteReferences(references, dn, newDn, req)
+        : { updated: 0, failed: [] as { attribute: string; count: number }[] };
+
+    const answer = {
+      success: report.failed.length === 0,
+      dn: newDn,
+      referencesUpdated: report.updated,
+    };
+    if (report.failed.length === 0) {
+      res.json(answer);
+      return;
+    }
+    // The rename is a fact; hiding it behind an error would describe a
+    // directory that does not exist.
+    multiStatus(res, { ...answer, referencesFailed: report.failed });
+  }
+
+  /**
+   * Whether an entry exists, asked without narrowing by the caller's own
+   * permissions — as `apiGet` asks it.
+   *
+   * @param dn entry to look for
+   * @returns true when the directory holds it
+   */
+  private async entryExists(dn: string): Promise<boolean> {
+    try {
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: ['dn'] },
+        dn
+      )) as SearchResult;
+      return (result?.searchEntries?.length ?? 0) > 0;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      // A missing entry is reported as an error by the directory (code 32).
+      return false;
+    }
   }
 
   /**
@@ -767,12 +1317,20 @@ export default abstract class LdapFlat extends DmPlugin {
     try {
       res = await this.ldap.add(dn, entry, req);
     } catch (err) {
-      // Log detailed error information
-      this.logger.error('LDAP add failed:', {
+      // A business rule that refused the entry already said what happened and
+      // with which status; wrapping it would turn a 409 "this address is
+      // already used" into an opaque 500. A refusal is also an ordinary
+      // outcome, not an incident, so it is not logged as one.
+      const refusal = err instanceof HttpError && err.statusCode < 500;
+      this.logger[refusal ? 'debug' : 'error']('LDAP add failed:', {
         dn,
         entry: JSON.stringify(entry, null, 2),
         error: err,
       });
+      // `ldapActions.add` already turned entryAlreadyExists into a
+      // `ConflictError`, for every creation route at once, so a duplicate
+      // arrives here as a refusal like any other.
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to add ${this.singularName} ${dn}: ${err}`);
     }
@@ -827,7 +1385,26 @@ export default abstract class LdapFlat extends DmPlugin {
     return res;
   }
 
-  async renameEntry(id: string, newId: string): Promise<boolean> {
+  /**
+   * Change the RDN of an entry.
+   *
+   * The request is not optional in practice: `ldapActions` hands it to the
+   * `ldaprenamerequest` hook, and every authorization plugin skips its check
+   * when there is none (`AuthzBase.shouldSkipAuthorization`). Renaming
+   * without one therefore renames without authorization — silently. It stays
+   * optional in the signature for the callers that genuinely belong to no
+   * request, as the rest of this class does.
+   *
+   * @param id current identifier, or the entry's DN
+   * @param newId new identifier, or the entry's new DN
+   * @param req request this comes from, so the branch check runs
+   * @returns true when the directory accepted the rename
+   */
+  async renameEntry(
+    id: string,
+    newId: string,
+    req?: Request
+  ): Promise<boolean> {
     if (!/,/.test(id)) {
       validateDnValue(id, this.mainAttribute);
     }
@@ -840,7 +1417,9 @@ export default abstract class LdapFlat extends DmPlugin {
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
     );
-    const res = await this.ldap.rename(dn, newDn);
+    const res = await (req
+      ? this.ldap.forRequest(req).rename(dn, newDn)
+      : this.ldap.rename(dn, newDn));
     void launchHooks(this.registeredHooks[`${this.hookPrefix}renamedone`], [
       dn,
       newDn,
@@ -969,6 +1548,15 @@ export default abstract class LdapFlat extends DmPlugin {
       );
       return orgDn;
     } catch (err) {
+      // Let a NotFoundError we raised ourselves - or an LDAP NoSuchObjectError
+      // (code 32) - travel out as a NotFoundError instead of being wrapped
+      // into a generic 500.
+      if (err instanceof NotFoundError) {
+        throw err;
+      }
+      if ((err as { code?: number }).code === 32) {
+        throw new NotFoundError(`Organization ${orgDn} not found`);
+      }
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
     }
@@ -1018,9 +1606,16 @@ export default abstract class LdapFlat extends DmPlugin {
     partial = false,
     attrs: string[] = [this.mainAttribute]
   ): Promise<LdapList> {
+    // `apiAdd` re-reads the entry it has just written through this, so an
+    // identifier the schema admits has to survive the trip: the shipped
+    // position and group schemas accept `( )` and `*`, which a raw
+    // interpolation turns into an unparseable filter — after the entry is
+    // committed, so the caller saw a 500 on a creation that had succeeded.
+    // A partial search means the value to look for, not a pattern to run.
+    const escaped = escapeLdapFilter(name);
     const filter = partial
-      ? `(${this.mainAttribute}=*${name}*)`
-      : `(${this.mainAttribute}=${name})`;
+      ? `(${this.mainAttribute}=*${escaped}*)`
+      : `(${this.mainAttribute}=${escaped})`;
     return await this.listEntries({ filter, attributes: attrs });
   }
 
@@ -1057,18 +1652,21 @@ export default abstract class LdapFlat extends DmPlugin {
       }
 
       if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(`Invalid value for attribute "${field}"`);
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
-      if (attr.required && !value) {
+      if (attr.required && !value && !attr.generated) {
         throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
-    // Check required fields
-    for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.required && !entry[field]) {
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      }
-    }
+    // Check required fields, granting a `generated` attribute the exemption
+    // only when something will honour it. See `missingRequiredAttribute`.
+    const missing = missingRequiredAttribute(
+      this.schema,
+      entry,
+      this.server.loadedPlugins
+    );
+    if (missing)
+      throw new BadRequestError(`Attribute "${missing}" is required`);
     return true;
   }
 
@@ -1090,7 +1688,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.add)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1098,7 +1696,7 @@ export default abstract class LdapFlat extends DmPlugin {
       for (const [field, value] of Object.entries(changes.replace)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(`Invalid value for attribute "${field}"`);
+          throw new BadRequestError(this.invalidValueMessage(field));
         }
       }
     }
@@ -1140,15 +1738,14 @@ export default abstract class LdapFlat extends DmPlugin {
 
       const dnValue: string = value;
 
-      // Check branch restriction if provided
+      // Check branch restriction if provided. Asked RDN by RDN: a suffix
+      // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`
+      // as being inside `ou=users,dc=example,dc=com`, so a pointer could name
+      // an entry of a branch the schema never allowed.
       if (attr.branch && attr.branch.length > 0) {
-        const isInBranch = attr.branch.some(branch => {
-          const branchPattern = getCompiledRegex(
-            `,?${escapeRegex(branch)}$`,
-            'i'
-          );
-          return branchPattern.test(dnValue);
-        });
+        const isInBranch = attr.branch.some(branch =>
+          isDnInBranch(dnValue, branch)
+        );
         if (!isInBranch) {
           throw new BadRequestError(
             `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
@@ -1178,13 +1775,30 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
 
-    if (attr.test) {
+    // An array declares the rules of its *elements* under `items`, which is
+    // where the shipped schemas put them — `mailAlternateAddress` has carried
+    // `items.test` since v0.7.0 and `twakeDelegatedUsers` an `items.branch`.
+    // Neither was read here, so the flat routes accepted anything in them
+    // while the console's form refused it client-side and `groups` refused
+    // `items.test` server-side. The rule is the same rule; it applies here
+    // too.
+    // Same rule as a pointer's own branch, and asked the same way; an array
+    // of pointers has each element's target looked up too, as a single
+    // pointer's is.
+    if (attr.type !== 'pointer')
+      await checkDnValues(field, attr, value, async dn => {
+        const result = (await this.ldap.search(
+          { paged: false, scope: 'base', attributes: ['dn'] },
+          dn
+        )) as SearchResult;
+        return result.searchEntries.length > 0;
+      });
+
+    const pattern = attr.test ?? attr.items?.test;
+    if (pattern) {
       const regex =
-        typeof attr.test === 'string' ? getCompiledRegex(attr.test) : attr.test;
-      if (Array.isArray(value)) {
-        return value.every(v => regex.test(v as string));
-      }
-      return regex.test(value as string);
+        typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
+      return asList(value).every(v => regex.test(v));
     }
     return true;
   }

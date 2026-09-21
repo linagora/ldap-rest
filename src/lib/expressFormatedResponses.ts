@@ -71,6 +71,23 @@ export const noContent = (res: Response): void => {
   res.status(204).send();
 };
 
+/**
+ * A request whose parts did not all succeed, and whose failure cannot be
+ * undone (RFC 4918 section 13).
+ *
+ * An entry rename rewrites the references other entries hold to it. The
+ * rename itself is the only rollback point: once the directory has accepted
+ * it, a reference that could not be rewritten leaves the directory partly
+ * inconsistent, and answering 200 would hide it while answering 500 would
+ * claim nothing happened. The body says what was done and what was not.
+ *
+ * @param res express response
+ * @param data report of what succeeded and what did not
+ */
+export const multiStatus = (res: Response, data: object): void => {
+  res.status(207).json(data);
+};
+
 // 40x responses
 export const badRequest = (res: Response, message = 'Bad request'): void =>
   _rejectResponse(400, res, message);

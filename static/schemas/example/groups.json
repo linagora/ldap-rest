@@ -1,0 +1,94 @@
+{
+  "entity": {
+    "name": "mailingList",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
+    "singularName": "mailingList",
+    "pluralName": "mailingLists",
+    "base": "ou=lists,ou=groups,__ldap_base__"
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "groupOfNames", "twakeStaticGroup"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "searchable": true,
+      "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
+      "hint": "Must match an email local part, at most 64 characters, no consecutive dots",
+      "required": true,
+      "role": "identifier",
+      "label": "Mailing list name"
+    },
+    "description": {
+      "type": "string",
+      "searchable": true,
+      "required": false
+    },
+    "mail": {
+      "type": "string",
+      "searchable": true,
+      "test": "^[^@\\s]{1,64}@([^@\\s]{1,245}\\.)?example\\.org$",
+      "hint": "Expected an address in example.org or one of its subdomains",
+      "required": true,
+      "unique": {
+        "attributes": ["mailAlternateAddress"],
+        "branches": ["__LDAP_BASE__"]
+      },
+      "mailDomainScope": "organization",
+      "allowSubdomains": true,
+      "role": "primaryEmail"
+    },
+    "businessCategory": {
+      "type": "pointer",
+      "branch": ["ou=twakeListType,ou=nomenclature,__LDAP_BASE__"],
+      "required": false,
+      "role": "writePolicy",
+      "label": "List type"
+    },
+    "member": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
+        "hint": "Expected the DN of an entry of this directory"
+      },
+      "required": false,
+      "deleteGuard": "nonEmpty",
+      "role": "members",
+      "label": "Members"
+    },
+    "owner": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
+        "hint": "Expected the DN of an entry of this directory"
+      },
+      "required": false,
+      "role": "owners"
+    },
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "branch": ["ou=organization,__LDAP_BASE__"],
+      "required": true,
+      "role": "organizationLink",
+      "label": "Department"
+    },
+    "twakeDepartmentPath": {
+      "type": "string",
+      "test": "^[^\\r\\n]{1,4096}$",
+      "required": true,
+      "generated": true,
+      "role": "organizationPath"
+    }
+  }
+}
