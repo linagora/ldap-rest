@@ -18,6 +18,25 @@ import type { Role } from '../../abstract/plugin';
 // with them.
 type LlngHandler = typeof import('lemonldap-ng-handler');
 
+/**
+ * `lemonldap-ng-handler` keeps its state at the module level — `init()`
+ * writes it, `run()` reads it, and both live in the package, not in any
+ * object this plugin holds. `import()` caches the module, so every instance
+ * of this plugin that goes through the real `loadHandler()` gets back the
+ * very same object. Two instances of this plugin are a supported way to load
+ * the same plugin twice, each under its own name and its own `llng_ini`
+ * override (`--plugin 'core/auth/llng:llng2:{"llng_ini":"…"}'`, see
+ * `DM.registerPlugin`); for this one plugin that pattern cannot work, because
+ * the second `init()` would silently overwrite what the first one set, and
+ * `authMethod` on either instance would then read whichever configuration
+ * was initialized last. Track, per handler object, what it was initialized
+ * from, and refuse a second, different one instead of leaving that silent.
+ * Keyed on the handler rather than kept as a single module-level value so
+ * that tests, which each hand `loadHandler()` a fresh fake object, do not
+ * collide with one another.
+ */
+const initializedFrom = new WeakMap<LlngHandler, string>();
+
 export default class AuthLLNG extends AuthBase {
   name = 'authLemonldapNg';
   roles: Role[] = ['auth'] as const;
@@ -58,19 +77,34 @@ export default class AuthLLNG extends AuthBase {
     // before `init()` reads an instance that does not exist yet and throws on
     // every request, so the plugin used to answer 500 to all of them while
     // `--llng-ini` was parsed and never read.
-    const confFile = this.config.llng_ini;
+    // `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`
+    // (src/config/args.ts), so it names a real path in every deployment —
+    // there is no "default configuration" case distinct from a confFile to
+    // report. `Config` types every field optional regardless
+    // (src/config/args.ts), which `?? ''` satisfies for the type checker
+    // alone.
+    const confFile = this.config.llng_ini ?? '';
+    const previouslyFrom = initializedFrom.get(handler);
+    if (previouslyFrom !== undefined && previouslyFrom !== confFile) {
+      throw new Error(
+        `${this.name}: lemonldap-ng-handler is already initialized from ` +
+          `"${previouslyFrom}"; it keeps its state at the module level, so ` +
+          `a second instance of this plugin cannot also use "${confFile}". ` +
+          'Load one instance of this plugin, or point every instance at the ' +
+          'same lemonldap-ng.ini.'
+      );
+    }
     try {
       await handler.init({ configStorage: { confFile } });
     } catch (err) {
       throw new Error(
         `${this.name}: cannot initialize the LemonLDAP::NG handler from ` +
-          `${confFile || 'its default configuration'}. Check that the file ` +
-          'exists, that its [configuration] section is reachable and that ' +
-          `[node-handler] lists this server in nodeVhosts. (${
-            err instanceof Error ? err.message : String(err)
-          })`
+          `${confFile}. Check that the file exists, that its [configuration] ` +
+          'section is reachable and that [node-handler] lists this server ' +
+          `in nodeVhosts. (${err instanceof Error ? err.message : String(err)})`
       );
     }
+    initializedFrom.set(handler, confFile);
     this.handler = handler;
     super.api(app);
   }

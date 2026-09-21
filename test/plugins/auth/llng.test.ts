@@ -128,5 +128,43 @@ describe('LemonLDAP::NG auth plugin', () => {
         )
       ).to.throw(/not loaded/);
     });
+
+    it('refuses a second instance pointed at a different confFile, the handler being a module-level singleton', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const { handler } = fakeHandler();
+      const LlngWithHandler = withHandler(handler);
+
+      dm.config.llng_ini = '/etc/llng/first.ini';
+      const first = new LlngWithHandler(dm);
+      await first.api({} as Express);
+
+      dm.config.llng_ini = '/etc/llng/second.ini';
+      const second = new LlngWithHandler(dm);
+
+      let thrown: Error | undefined;
+      try {
+        await second.api({} as Express);
+      } catch (err) {
+        thrown = err as Error;
+      }
+      expect(thrown?.message).to.include(second.name);
+      expect(thrown?.message).to.include('/etc/llng/first.ini');
+      expect(thrown?.message).to.include('/etc/llng/second.ini');
+    });
+
+    it('accepts a second instance pointed at the same confFile', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const { handler } = fakeHandler();
+      const LlngWithHandler = withHandler(handler);
+
+      dm.config.llng_ini = '/etc/llng/shared.ini';
+      const first = new LlngWithHandler(dm);
+      await first.api({} as Express);
+
+      const second = new LlngWithHandler(dm);
+      await second.api({} as Express);
+    });
   });
 });
