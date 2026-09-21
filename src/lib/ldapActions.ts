@@ -2,6 +2,8 @@
  * LDAP low-level library
  * @author Xavier Guimard <xguimard@linagora.com>
  */
+import { createHash } from 'node:crypto';
+
 import type { Request } from 'express';
 import { Client, Attribute, Change } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
@@ -103,9 +105,18 @@ function ldapError(context: string, error: unknown): Error {
  */
 const CACHE_KEY_SEPARATOR = '\u0000';
 
-/** Cache key, spelled for a log line rather than for a lookup. */
-const displayKey = (key: string): string =>
-  key.split(CACHE_KEY_SEPARATOR).join(' | ');
+/**
+ * Short, stable stand-in for a cache key in a log line.
+ *
+ * The key is built from the search base, which comes from configuration and
+ * therefore ultimately from the environment — logging it verbatim is what
+ * CodeQL flags as clear-text logging of environment-derived data. A digest
+ * carries none of the key's content, but the same key always digests to the
+ * same token, so a "cache hit" line can still be matched back to the
+ * "cached" line that filled the entry it hit.
+ */
+const digestKey = (key: string): string =>
+  createHash('sha256').update(key).digest('hex').slice(0, 12);
 
 /**
  * Fold a DN to the form cache keys are matched on.
@@ -121,12 +132,21 @@ const displayKey = (key: string): string =>
  * reverse — folding into the key itself — would merge two entries whose RDN
  * values differ only in case, which a case-exact naming attribute makes two
  * different entries.
+ *
+ * Written as a split/trim/join rather than a `\s*,\s*` regex: that shape is
+ * polynomial-backtracking on a long run of spaces containing no comma, and
+ * `dn` comes from caller-controlled input (a URL path segment, among
+ * others), so the cost was quadratic in an attacker-chosen length. Splitting
+ * on the literal comma and trimming each part does the same folding in
+ * linear time.
  */
 const foldDn = (dn: string): string =>
   dn
     .trim()
     .toLowerCase()
-    .replace(/\s*,\s*/g, ',');
+    .split(',')
+    .map(part => part.trim())
+    .join(',');
 
 /**
  * Copy a search result at the cache boundary.
@@ -551,7 +571,7 @@ class ldapActions {
     if (cacheable) {
       const cached = this.searchCache.get(cacheKey);
       if (cached) {
-        this.logger.debug(`LDAP search cache hit: ${displayKey(cacheKey)}`);
+        this.logger.debug(`LDAP search cache hit: ${digestKey(cacheKey)}`);
         return cloneSearchResult(cached);
       }
     }
@@ -582,7 +602,7 @@ class ldapActions {
       if (cacheable) {
         const result = res as unknown as SearchResult;
         this.searchCache.set(cacheKey, cloneSearchResult(result));
-        this.logger.debug(`LDAP search cached: ${displayKey(cacheKey)}`);
+        this.logger.debug(`LDAP search cached: ${digestKey(cacheKey)}`);
         return result;
       }
 
