@@ -199,6 +199,204 @@ describe('Twake Calendar Plugin', function () {
     nock.cleanAll();
   });
 
+  // What makes an entry a calendar resource, and what the resource is called
+  // in Calendar. The hooks are called directly: the point is what the plugin
+  // does with a DN, not what the directory does with an entry.
+  describe('resource identification', () => {
+    const calendarUrl =
+      process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080';
+
+    // A plugin whose resource base is the one given, to exercise a base other
+    // than the one the test environment configures
+    const calendarWithBase = (base: string): Calendar => {
+      dm.config.calendar_resource_base = base;
+      return new Calendar(dm);
+    };
+
+    afterEach(() => {
+      dm.config.calendar_resource_base = process.env.DM_CALENDAR_RESOURCE_BASE;
+    });
+
+    it('does not take a sibling branch whose name starts with the base for the resource branch', async () => {
+      const apiScope = nock(calendarUrl).post('/resources').reply(201);
+
+      await calendar.hooks.ldapcalendarResourceadddone!([
+        `cn=Conference Room A,ou=resourcesArchive,${process.env.DM_LDAP_BASE}`,
+        { cn: 'Conference Room A', description: 'Archived room' },
+      ]);
+
+      expect(apiScope.isDone()).to.be.false;
+      nock.cleanAll();
+    });
+
+    it('does not take a sibling branch for the resource branch when the base is given without the directory suffix', async () => {
+      // `ou=resourcesArchive,…` contains the `ou=resources` text, which is
+      // what a substring test looked for
+      const partial = calendarWithBase('ou=resources');
+      const apiScope = nock(calendarUrl).post('/resources').reply(201);
+
+      await partial.hooks.ldapcalendarResourceadddone!([
+        `cn=Conference Room A,ou=resourcesArchive,${process.env.DM_LDAP_BASE}`,
+        { cn: 'Conference Room A', description: 'Archived room' },
+      ]);
+
+      expect(apiScope.isDone()).to.be.false;
+      nock.cleanAll();
+    });
+
+    it('recognises a resource whose DN is written with spaces after the commas', async () => {
+      let createdName: unknown = null;
+      const apiScope = nock(calendarUrl)
+        .post('/resources', body => {
+          createdName = (body as { name?: unknown }).name;
+          return true;
+        })
+        .reply(201);
+
+      await calendar.hooks.ldapcalendarResourceadddone!([
+        `cn=Conference Room A, ou=resources, ${process.env.DM_LDAP_BASE}`,
+        { cn: 'Conference Room A', description: 'Large meeting room' },
+      ]);
+
+      expect(apiScope.isDone()).to.be.true;
+      expect(createdName).to.equal('Conference Room A');
+      nock.cleanAll();
+    });
+
+    it('does not PATCH Calendar when the modified entry is outside the resource base', async () => {
+      const apiScope = nock(calendarUrl)
+        .patch(/^\/resources\//)
+        .reply(204);
+
+      await calendar.hooks.ldapcalendarResourcemodifydone!([
+        `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`,
+        { replace: { description: 'Updated description' } },
+        1,
+      ]);
+
+      expect(apiScope.isDone()).to.be.false;
+      nock.cleanAll();
+    });
+
+    it('does not DELETE from Calendar when the deleted entry is outside the resource base', async () => {
+      const apiScope = nock(calendarUrl)
+        .delete(/^\/resources\//)
+        .reply(204);
+
+      await calendar.hooks.ldapcalendarResourcedeletedone!(
+        `cn=Conference Room A,ou=elsewhere,${process.env.DM_LDAP_BASE}`
+      );
+
+      expect(apiScope.isDone()).to.be.false;
+      nock.cleanAll();
+    });
+
+    it('keeps an id carrying a slash in one path segment', async () => {
+      let patchPath = '';
+      const apiScope = nock(calendarUrl)
+        .patch(/^\/resources\//)
+        .reply(function (uri) {
+          patchPath = uri;
+          return [204];
+        });
+
+      await calendar.hooks.ldapcalendarResourcemodifydone!([
+        `cn=Salle A/B,ou=resources,${process.env.DM_LDAP_BASE}`,
+        { replace: { description: 'Updated description' } },
+        1,
+      ]);
+
+      expect(apiScope.isDone()).to.be.true;
+      expect(patchPath).to.equal('/resources/Salle%20A%2FB');
+      nock.cleanAll();
+    });
+
+    it('reads the whole value of an RDN carrying an escaped comma', async () => {
+      let deletePath = '';
+      const apiScope = nock(calendarUrl)
+        .delete(/^\/resources\//)
+        .reply(function (uri) {
+          deletePath = uri;
+          return [204];
+        });
+
+      await calendar.hooks.ldapcalendarResourcedeletedone!(
+        `cn=Salle\\, 2,ou=resources,${process.env.DM_LDAP_BASE}`
+      );
+
+      expect(apiScope.isDone()).to.be.true;
+      expect(decodeURIComponent(deletePath)).to.equal('/resources/Salle, 2');
+      nock.cleanAll();
+    });
+
+    it('does not borrow an ancestor id when the RDN is neither cn nor uid', async () => {
+      let patchPath = '';
+      const apiScope = nock(calendarUrl)
+        .patch(/^\/resources\//)
+        .reply(function (uri) {
+          patchPath = uri;
+          return [204];
+        });
+
+      // cn=zone is the parent's RDN, not this entry's
+      await calendar.hooks.ldapcalendarResourcemodifydone!([
+        `o=Room 12,cn=zone,ou=resources,${process.env.DM_LDAP_BASE}`,
+        { replace: { description: 'Updated description' } },
+        1,
+      ]);
+
+      expect(patchPath).to.not.equal('/resources/zone');
+      expect(decodeURIComponent(patchPath)).to.equal('/resources/Room 12');
+      apiScope.done();
+      nock.cleanAll();
+    });
+
+    it('derives the same id in the add, modify and delete hooks', async () => {
+      const dn = `o=Room 12,ou=resources,${process.env.DM_LDAP_BASE}`;
+      let createdId: unknown = null;
+      let patchPath = '';
+      let deletePath = '';
+      const apiScope = nock(calendarUrl)
+        .post('/resources', body => {
+          createdId = (body as { id?: unknown }).id;
+          return true;
+        })
+        .reply(201)
+        .patch(/^\/resources\//)
+        .reply(function (uri) {
+          patchPath = uri;
+          return [204];
+        })
+        .delete(/^\/resources\//)
+        .reply(function (uri) {
+          deletePath = uri;
+          return [204];
+        });
+
+      // The name is not the RDN value, so an id derived from one is not the
+      // id derived from the other
+      await calendar.hooks.ldapcalendarResourceadddone!([
+        dn,
+        { cn: 'Salle Rouge', description: 'Large meeting room' },
+      ]);
+      await calendar.hooks.ldapcalendarResourcemodifydone!([
+        dn,
+        { replace: { description: 'Updated description' } },
+        1,
+      ]);
+      await calendar.hooks.ldapcalendarResourcedeletedone!(dn);
+
+      expect(apiScope.isDone()).to.be.true;
+      expect(patchPath).to.equal(
+        `/resources/${encodeURIComponent(String(createdId))}`
+      );
+      expect(deletePath).to.equal(
+        `/resources/${encodeURIComponent(String(createdId))}`
+      );
+      nock.cleanAll();
+    });
+  });
+
   describe('calendarResources alias', () => {
     it('is the same plugin, still registered under its historical name', () => {
       const alias = new CalendarResources(dm);
@@ -210,6 +408,8 @@ describe('Twake Calendar Plugin', function () {
   });
 
   describe('deleteUserData', () => {
+    // The address goes out percent-encoded — `user@test.org` — since it is
+    // a value in a path, not a path; the WebAdmin decodes it back
     it('should call POST /users/{mail}?action=deleteData and return taskId', async () => {
       const deleteDataScope = nock(
         process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'

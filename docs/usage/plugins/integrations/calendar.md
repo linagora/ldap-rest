@@ -23,8 +23,8 @@ Plugin to keep Twake Calendar in sync with LDAP via its WebAdmin API:
 
 - `DM_CALENDAR_WEBADMIN_URL`: URL of the Twake Calendar WebAdmin API (default: `http://localhost:8080`)
 - `DM_CALENDAR_WEBADMIN_TOKEN`: Bearer token for WebAdmin API authentication
-- `DM_CALENDAR_RESOURCE_BASE`: LDAP branch to monitor for resources (e.g., `ou=resources,dc=example,dc=com`)
-- `DM_CALENDAR_RESOURCE_OBJECTCLASS`: Optional objectClass filter (only process entries with this objectClass)
+- `DM_CALENDAR_RESOURCE_BASE`: LDAP branch to monitor for resources, as a full DN (e.g., `ou=resources,dc=example,dc=com`). It is compared to an entry's DN part by part, so a partial value such as `ou=resources` names no branch and matches nothing (the plugin warns at startup when the value is not a DN of the directory).
+- `DM_CALENDAR_RESOURCE_OBJECTCLASS`: Optional objectClass filter, applied when a resource is **created** (see [Resource identity](#resource-identity))
 - `DM_CALENDAR_RESOURCE_CREATOR`: Default creator email for resources (default: `admin@example.com`)
 - `DM_CALENDAR_RESOURCE_DOMAIN`: Default domain for resources (extracted from DN if not specified)
 - `DM_CALENDAR_FIRSTNAME_ATTRIBUTE`: LDAP attribute holding a user's first name (default: `givenName`)
@@ -83,6 +83,10 @@ The plugin uses the following WebAdmin API endpoints:
 - `PATCH /registeredUsers?id={id}` - Update a registered user's email, first and last name
 - `POST /users/{mail}?action=deleteData` - Delete a user's data (see `deleteUserData`)
 
+Values that go in a path — the resource id, the user's address — are
+percent-encoded, so a `/` or a `#` in them cannot build a path naming
+something else. An address therefore travels as `user%40example.com`.
+
 ### Registered Users
 
 A change of the configured mail attribute updates the registered user found by
@@ -99,6 +103,23 @@ found, and its user is logged as not registered. Calendar releases before
 1.0.0.1 ignore the `email` parameter and answer the full list of registered
 users; the plugin then picks the user from it, which works but costs a full
 listing per change.
+
+### Resource identity
+
+A resource is known to Calendar by an `id`, which is the value of its LDAP
+entry's own RDN with the escapes removed: `cn=Meeting Room 1,ou=resources,…`
+gives `Meeting Room 1`, and `o=Room 12,ou=resources,…` gives `Room 12`. The
+creation, the update and the deletion hooks all read it that way, so the three
+name the same resource; an entry whose DN yields no value is not synchronised.
+
+Only entries in `DM_CALENDAR_RESOURCE_BASE` are synchronised, on all three
+hooks. `DM_CALENDAR_RESOURCE_OBJECTCLASS` filters creations only: a
+modification carries the attributes that changed, so an untouched objectClass
+is not there to compare, and a deleted entry cannot be read any more. The
+branch is the guard that remains on those two paths.
+
+Renaming an entry changes its RDN, hence its id: Calendar is not told, and the
+resource keeps its former id there.
 
 ### Resource Data Format
 
@@ -171,6 +192,7 @@ Example log:
 2. Verify that `DM_CALENDAR_WEBADMIN_TOKEN` is valid
 3. Check logs for API errors
 4. Ensure the ldapFlat schema has `entity.name` set to `calendarResource`
+5. Ensure `DM_CALENDAR_RESOURCE_BASE` is the full DN of the branch the entries are in: a partial value matches no entry, and the plugin says so at startup
 
 ### Authentication errors
 
@@ -178,7 +200,7 @@ Ensure `DM_CALENDAR_WEBADMIN_TOKEN` is set and valid. The token is sent as a Bea
 
 ### Wrong resources being synced
 
-Use `DM_CALENDAR_RESOURCE_BASE` and `DM_CALENDAR_RESOURCE_OBJECTCLASS` to filter which LDAP entries are considered resources.
+Use `DM_CALENDAR_RESOURCE_BASE` and `DM_CALENDAR_RESOURCE_OBJECTCLASS` to filter which LDAP entries are considered resources. Note that the objectClass filter only applies to creations, so an entry of the resource entity that must never reach Calendar has to sit outside the branch.
 
 ## Public Methods
 
