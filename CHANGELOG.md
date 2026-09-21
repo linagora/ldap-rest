@@ -17,6 +17,17 @@
   with a non-breaking space are now trimmed, and a BOM before the first header
   no longer ends up in the column name
 
+### Bug Fixes
+
+- `lib/ldapActions`: the base-scope search cache never stored a result — the
+  condition guarding the store could not be true — so `--ldap-cache-ttl`
+  bought nothing since it was written. It caches now, and every write drops
+  what it changed: `rename` and `move` invalidated nothing at all, `modify`
+  and `delete` missed a DN spelled in another case and never dropped the
+  entries below a container they moved. The option defaults to `0`, no
+  caching, see
+  [Upgrading](docs/usage/upgrading.md#the-search-cache-works-now-and-is-off-by-default)
+
 ### Improvements
 
 - `plugins/twake/calendar`: a user email or name change looks the Calendar
