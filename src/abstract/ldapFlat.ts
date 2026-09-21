@@ -23,6 +23,7 @@ import type {
 import {
   created,
   jsonBody,
+  multiStatus,
   tryMethod,
   wantJson,
 } from '../lib/expressFormatedResponses';
@@ -34,8 +35,10 @@ import {
   getCompiledRegex,
   getParentDn,
   isDnInBranch,
+  isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  normalizeDn,
   substringSearchFilter,
   transformSchemas,
   validateDnValue,
@@ -65,6 +68,33 @@ import DmPlugin from './plugin';
  */
 function asList(value: AttributeValue): string[] {
   return (Array.isArray(value) ? value : [value]).map(item => String(item));
+}
+
+/**
+ * What a rename needs from the plugin that knows what references what.
+ *
+ * Declared here by its shape rather than imported from
+ * `plugins/ldap/enterpriseRules`: nothing under `abstract/` depends on a
+ * plugin, and a server that does not load the rules must still be able to
+ * rename — it just renames without a cascade, which is what
+ * {@link DmPlugin.requirePlugin} answers.
+ *
+ * The references themselves are opaque: they are found on one side and handed
+ * back on the other, and this class has no business reading them.
+ */
+interface ReferenceRewriter extends DmPlugin {
+  /** Every reference the directory holds to an entry, before it is renamed */
+  findReferences(dn: string): Promise<unknown[]>;
+  /** Point them all at the new DN, collecting what could not be written */
+  rewriteReferences(
+    references: unknown[],
+    oldDn: string,
+    newDn: string,
+    req?: Request
+  ): Promise<{
+    updated: number;
+    failed: { attribute: string; count: number }[];
+  }>;
 }
 
 export interface LdapFlatConfig {
@@ -215,6 +245,50 @@ export interface LdapFlatConfig {
  *       example: ou=engineering,ou=departments,dc=example,dc=com
  *   example:
  *     targetOrgDn: ou=engineering,ou=departments,dc=example,dc=com
+ * FlatRenameRequest:
+ *   type: object
+ *   description: |
+ *     Body for changing the identifier of an entry. The field is named
+ *     `newId` for every resource, whatever that resource calls its
+ *     `mainAttribute`.
+ *   required: [newId]
+ *   properties:
+ *     newId:
+ *       type: string
+ *       description: |
+ *         New value of the resource's `mainAttribute`. A value, not a DN.
+ *       example: bob
+ *   example:
+ *     newId: bob
+ * FlatRenameResult:
+ *   type: object
+ *   description: |
+ *     Outcome of a rename: the entry's new DN, and how many references to
+ *     the old one were rewritten.
+ *   properties:
+ *     success:
+ *       type: boolean
+ *       description: False when a reference could not be rewritten.
+ *     dn:
+ *       type: string
+ *       description: DN the entry now has.
+ *     referencesUpdated:
+ *       type: integer
+ *       description: References rewritten to the new DN.
+ *     referencesFailed:
+ *       type: array
+ *       description: |
+ *         References left naming the old DN, counted per attribute. The
+ *         referring entries are named in the server log, not here.
+ *       items:
+ *         type: object
+ *         properties:
+ *           attribute: { type: string }
+ *           count: { type: integer }
+ *   example:
+ *     success: true
+ *     dn: uid=bob,ou=users,dc=example,dc=com
+ *     referencesUpdated: 3
  */
 export default abstract class LdapFlat extends DmPlugin {
   base: string;
@@ -809,6 +883,101 @@ export default abstract class LdapFlat extends DmPlugin {
       `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
       asyncHandler(async (req, res) => this.apiMove(req, res))
     );
+
+    /**
+     * @openapi
+     * summary: Rename entry (change its identifier)
+     * description: |
+     *   Changes the `mainAttribute` value of the entry — its RDN, and so its
+     *   DN — and rewrites the references other entries hold to the old DN:
+     *   group memberships and ownerships, delegations, managers, every
+     *   pointer a loaded schema declares towards this branch. The rewrite is
+     *   finished when the call returns.
+     *
+     *   The body field is `newId` for every resource, whatever that resource
+     *   calls its `mainAttribute`, and it carries a value, not a DN.
+     *
+     *   The new value is held to the same `test` as a creation would hold it
+     *   to, and refused when the identifier is already taken in this branch.
+     *   A `unique` constraint the schema widens to other branches is **not**
+     *   applied here: it is enforced from the add and modify hooks, while
+     *   what a rename needs is the RDN's own branch — which is the namespace
+     *   the directory itself enforces.
+     *
+     *   Re-issuing the same rename is a repair, not an error: when the entry
+     *   already carries the new identifier, the reference rewrite runs alone.
+     *   That is how a `207` is finished off.
+     * tags:
+     *   - Entities
+     * parameters:
+     *   - in: path
+     *     name: resource
+     *     required: true
+     *     schema: { type: string }
+     *     description: |
+     *       Plural name of the flat resource (e.g. `users`, `mailgroups`).
+     *       Each concrete plugin sets its own value.
+     *     example: users
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema: { $ref: '#/components/schemas/FlatRenameRequest' }
+     *       example:
+     *         newId: bob
+     * responses:
+     *   '200':
+     *     description: Entry renamed and every reference rewritten.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatRenameResult' }
+     *         example:
+     *           success: true
+     *           dn: uid=bob,ou=users,dc=example,dc=com
+     *           referencesUpdated: 3
+     *   '207':
+     *     description: |
+     *       Entry renamed, but at least one reference could not be
+     *       rewritten. The rename is done and is not rolled back; re-issue
+     *       the same request to finish the rewrite.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/FlatRenameResult' }
+     *         example:
+     *           success: false
+     *           dn: uid=bob,ou=users,dc=example,dc=com
+     *           referencesUpdated: 1
+     *           referencesFailed:
+     *             - attribute: member
+     *               count: 2
+     *   '400':
+     *     description: |
+     *       Missing or invalid `newId`, a value the schema refuses, or an
+     *       attribute sent beside it.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '403':
+     *     description: No write permission on the branch.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: Entry not found.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '409':
+     *     description: The identifier is already taken.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Rename entry (change its identifier)
+    app.post(
+      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/rename`,
+      asyncHandler(async (req, res) => this.apiRename(req, res))
+    );
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
@@ -897,6 +1066,152 @@ export default abstract class LdapFlat extends DmPlugin {
       success: true,
       ...result,
     });
+  }
+
+  /**
+   * Change an entry's identifier, and make the directory consistent again
+   * before answering.
+   *
+   * Shaped like `apiMove`, and deliberately not on `tryMethod`: that helper
+   * flattens every outcome to `{success: true}`, which cannot say how many
+   * references were rewritten nor that one was not.
+   *
+   * @param req request, carrying `newId`
+   * @param res response
+   */
+  async apiRename(req: Request, res: Response): Promise<void> {
+    if (!wantJson(req, res)) return;
+
+    const body = jsonBody(req, res, 'newId') as Record<string, unknown> | false;
+    if (!body) return;
+
+    const newId = body.newId;
+    if (typeof newId !== 'string') {
+      throw new BadRequestError('Missing or invalid newId in request body');
+    }
+
+    // Everything else in the body is an attribute name, and one the client is
+    // not allowed to set is refused here as it is on a creation — a caller
+    // that slips `twakeDepartmentPath` in beside `newId` is told so instead of
+    // seeing it ignored. `newId` itself is this endpoint's parameter, not an
+    // attribute name, exactly as `/move`'s `targetOrgDn` is: see the
+    // `generated` marker.
+    this.rejectForbiddenInput(Object.keys(body).filter(key => key !== 'newId'));
+
+    // A value, not a DN. `resolveDn` accepts either, so without this the field
+    // would quietly take two kinds of input where it documents one.
+    if (new RegExp(`^${escapeRegex(this.mainAttribute)}=`, 'i').test(newId)) {
+      throw new BadRequestError(
+        `newId must be a ${this.mainAttribute} value, not a DN`
+      );
+    }
+    try {
+      validateDnValue(newId, this.mainAttribute);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error — an empty or control-character
+      // identifier came back as a 500 on a request that was simply wrong.
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid newId'
+      );
+    }
+    // The schema's own rule, the one a creation applies. `renameEntry` checked
+    // only for emptiness and control characters, so a value the schema refuses
+    // on the way in was accepted on the way past.
+    if (!(await this._validateOneChange(this.mainAttribute, newId))) {
+      throw new BadRequestError(this.invalidValueMessage(this.mainAttribute));
+    }
+
+    const id = decodeURIComponent(req.params.id as string);
+    const dn = this.resolveDn(id);
+    const newDn = this.resolveDn(newId);
+
+    // The placeholder some directories keep to satisfy `groupOfNames` is a
+    // configuration value, not an entry: renaming it — or onto it — would
+    // leave `isDummyMemberDn` naming something else, and every empty group
+    // would then refuse to be deleted by `deleteGuard: nonEmpty`.
+    const dummy = this.config.group_dummy_user;
+    if (
+      dummy &&
+      (isDummyMemberDn(dn, dummy) || isDummyMemberDn(newDn, dummy))
+    ) {
+      throw new ConflictError(
+        `${dummy} is the configured placeholder member and cannot be renamed`
+      );
+    }
+
+    const sameName = normalizeDn(dn) === normalizeDn(newDn);
+    const source = await this.entryExists(dn);
+    const target = sameName ? source : await this.entryExists(newDn);
+
+    const rules = this.requirePlugin<ReferenceRewriter>('ldapEnterpriseRules');
+    let references: unknown[] = [];
+
+    if (sameName) {
+      // Re-issuing a rename that already happened. Nothing to rename, and
+      // nothing to rewrite either: the references were rewritten to this very
+      // DN. Answering 200 is what makes a retry safe.
+      if (!source) throw new NotFoundError(`${this.singularName} not found`);
+    } else if (source) {
+      if (target) {
+        throw new ConflictError(
+          `${this.singularName} "${newId}" already exists`
+        );
+      }
+      // Asked while the old DN is still live: afterwards nothing answers for
+      // it, and the entries left pointing at it could only be found by walking
+      // the whole directory.
+      references = (await rules?.findReferences(dn)) || [];
+      // The commit point. Everything above can still refuse; nothing below
+      // can put this back, and a failure here leaves the directory untouched,
+      // so the directory's own status is what the caller gets.
+      await this.renameEntry(dn, newDn, req);
+    } else if (target) {
+      // The old DN is gone and the new one is there: the rename happened and
+      // the rewrite did not finish — a 207, or a crash between the two. Same
+      // request, and it becomes the repair.
+      references = (await rules?.findReferences(dn)) || [];
+    } else {
+      throw new NotFoundError(`${this.singularName} not found`);
+    }
+
+    const report =
+      rules && references.length > 0
+        ? await rules.rewriteReferences(references, dn, newDn, req)
+        : { updated: 0, failed: [] as { attribute: string; count: number }[] };
+
+    const answer = {
+      success: report.failed.length === 0,
+      dn: newDn,
+      referencesUpdated: report.updated,
+    };
+    if (report.failed.length === 0) {
+      res.json(answer);
+      return;
+    }
+    // The rename is a fact; hiding it behind an error would describe a
+    // directory that does not exist.
+    multiStatus(res, { ...answer, referencesFailed: report.failed });
+  }
+
+  /**
+   * Whether an entry exists, asked without narrowing by the caller's own
+   * permissions — as `apiGet` asks it.
+   *
+   * @param dn entry to look for
+   * @returns true when the directory holds it
+   */
+  private async entryExists(dn: string): Promise<boolean> {
+    try {
+      const result = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: ['dn'] },
+        dn
+      )) as SearchResult;
+      return (result?.searchEntries?.length ?? 0) > 0;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      // A missing entry is reported as an error by the directory (code 32).
+      return false;
+    }
   }
 
   /**
@@ -1070,7 +1385,26 @@ export default abstract class LdapFlat extends DmPlugin {
     return res;
   }
 
-  async renameEntry(id: string, newId: string): Promise<boolean> {
+  /**
+   * Change the RDN of an entry.
+   *
+   * The request is not optional in practice: `ldapActions` hands it to the
+   * `ldaprenamerequest` hook, and every authorization plugin skips its check
+   * when there is none (`AuthzBase.shouldSkipAuthorization`). Renaming
+   * without one therefore renames without authorization — silently. It stays
+   * optional in the signature for the callers that genuinely belong to no
+   * request, as the rest of this class does.
+   *
+   * @param id current identifier, or the entry's DN
+   * @param newId new identifier, or the entry's new DN
+   * @param req request this comes from, so the branch check runs
+   * @returns true when the directory accepted the rename
+   */
+  async renameEntry(
+    id: string,
+    newId: string,
+    req?: Request
+  ): Promise<boolean> {
     if (!/,/.test(id)) {
       validateDnValue(id, this.mainAttribute);
     }
@@ -1083,7 +1417,9 @@ export default abstract class LdapFlat extends DmPlugin {
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
     );
-    const res = await this.ldap.rename(dn, newDn);
+    const res = await (req
+      ? this.ldap.forRequest(req).rename(dn, newDn)
+      : this.ldap.rename(dn, newDn));
     void launchHooks(this.registeredHooks[`${this.hookPrefix}renamedone`], [
       dn,
       newDn,

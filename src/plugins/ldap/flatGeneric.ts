@@ -288,6 +288,7 @@ export default class LdapFlatGeneric extends DmPlugin {
           create: `${apiPrefix}/v1/ldap/${instance.pluralName}`,
           update: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id`,
           delete: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id`,
+          rename: `${apiPrefix}/v1/ldap/${instance.pluralName}/:id/rename`,
         },
       };
     });
