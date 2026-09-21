@@ -75,6 +75,16 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   may create there. None of the three holds an attribute name, a domain or a
   nomenclature value: every rule is a schema marker
 
+- `abstract/ldapFlat`: `POST /v1/ldap/{resource}/{id}/rename` changes the
+  identifier of an entry and rewrites what named its DN, waiting for that
+  before it answers. What it rewrites is read from the schemas — every
+  `pointer` whose `branch` admits the entry, every attribute carrying the
+  `members` or `owners` role — so no attribute name is written in the code.
+  It answers `207` when the entry was renamed and a rewrite was not, and
+  re-issuing the same request finishes it. The cascade needs
+  `core/ldap/enterpriseRules`, see
+  [Upgrading](docs/usage/upgrading.md#renaming-an-entry-and-what-the-cascade-reaches)
+
 - `abstract/ldapFlat`: the markers those plugins read. `role` says what an
   attribute _means_, so core code finds it without knowing its name; `hint`
   explains a `test` in words a client can show; `generated` and `readOnly`
@@ -123,12 +133,31 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   a legacy record stored with upper case is no longer found. Calendar releases
   before 1.0.0.1, which ignore the parameter, keep working
 
+- `abstract/ldapFlat`: `generatedFrom.regenerateOnChange` is gone. It said an
+  identifier would be recomputed, and renamed, when the attribute it derives
+  from changed; nothing ever read it. `generated` derives an identifier when
+  an entry is created — the rename endpoint is what changes one afterwards,
+  and the marker's documentation says so rather than implying an entry is
+  immutable
+
 - `plugins/ldap/flatGeneric`: a nomenclature's `entity.valueLabels` reaches a
   client as a top-level `valueLabels` on its `flatResources` entry, beside
   `label` and `singularLabel`, instead of only nested in the schema that
   entry carries. The nested copy stays, so nothing reading it breaks
 
 ### Bug Fixes
+
+- `abstract/ldapFlat`: `renameEntry` never handed the request on to
+  `lib/ldapActions`, and an authorization plugin skips every check when it is
+  given no user — so a rename through it ran with none. No deployment was
+  exposed, the route being new in this release, but the method the route is
+  built on answered `200` to a caller holding no write on the branch. It is
+  bound to the request now, and answers `403`
+
+- `abstract/ldapFlat`: `renameEntry` accepted an identifier the schema
+  refuses on creation, checking only that it was neither empty nor full of
+  control characters, and answered `500` rather than `400` when it was. The
+  new value is held to the same `test` as a created one
 
 - `plugins/ldap/groups`: `GET /ldap/groups/:cn` returned the placeholder
   member `--group-dummy-user` adds to keep a `groupOfNames` valid, which the

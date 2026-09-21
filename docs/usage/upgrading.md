@@ -147,6 +147,57 @@ schema does not name one. Declare yours in a copy of the schema, the way
 "unique": { "sentinel": "YOUR-PLACEHOLDER" }
 ```
 
+### Renaming an entry, and what the cascade reaches
+
+**Who is affected:** anyone calling the new
+`POST /v1/ldap/{resource}/{id}/rename`. Nothing changes for a deployment
+that does not.
+
+The identifier of a flat entry can be changed. The entry's DN changes with
+it, so everything naming that DN has to be rewritten, and the endpoint waits
+for that before it answers.
+
+What it rewrites is read from the schemas, never from a list of attribute
+names: every `pointer` — single or in an array — whose `branch` admits the
+renamed entry, and every attribute carrying the `members` or `owners` role.
+**Load `core/ldap/enterpriseRules`**: without it the entry is renamed and
+nothing else is touched.
+
+What it cannot reach is a DN held in a plain `string` attribute that carries
+no role. Declare it a `pointer`, or give it its role, and it is covered.
+
+A directory running OpenLDAP's `refint` overlay already fixes the attributes
+it is configured for — usually `member`, `owner`, `uniqueMember` and
+`memberOf` — in a task of its own, after the rename has answered. The server
+converges with it rather than fighting it: what the overlay has already
+fixed counts as done. `refint` is not a substitute, though. It never sees a
+deployment's own pointers, `twakeManagerLink` and `twakeLocalAdminLink`
+among them — and losing the second one silently costs an administrator every
+branch they administer.
+
+### A rename answers `207` when it could not finish
+
+The rename of the entry and the rewrite of what points at it are separate
+writes, and a directory has no transaction to hold them together.
+
+If the rename itself fails, nothing else has happened and the directory's own
+refusal is what you get. Once it succeeds the rename is a fact, and an error
+would tell you the opposite — so a rewrite that fails answers `207` with the
+attributes and the counts that could not be written. The referring DNs are
+not in the body, where the caller has no business reading them; they are in
+the log, at `error`, with the attribute and both DNs.
+
+**Re-issue the identical request to finish it.** A rename whose source is
+already gone and whose target is already there runs the rewrite alone. That
+is also what to do if the server dies between the two writes.
+
+### `unique` is not widened on a rename
+
+A schema marking its identifier `unique: { "branches": [...] }` gets the
+RDN's own branch checked on a rename, and nothing more: the wider check runs
+from the add and modify hooks, which a rename does not go through. The
+endpoint's own description says so too.
+
 ### Creating an entry that already exists answers `409`
 
 **Who is affected:** any client that reads a failed creation by its status
