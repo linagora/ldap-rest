@@ -151,6 +151,41 @@ Then name yours in a copy of the schema, as
 "unique": { "sentinel": "YOUR-PLACEHOLDER" }
 ```
 
+### Calendar resource ids, and the branch they are looked for in
+
+**Who is affected:** deployments loading `core/twake/calendar` (the plugin
+`calendarResources` was renamed to).
+
+Three things changed in how an LDAP entry is matched to a Calendar resource.
+A resource whose DN is `cn=…` or `uid=…` directly under the configured base,
+with no escape in its value, keeps the identifier it had and needs nothing.
+
+**`--calendar-resource-base` must be a full DN.** The branch was tested by
+asking whether the DN _contained_ the configured value as text, so a partial
+value like `ou=resources` matched — and matched a sibling branch such as
+`ou=resourcesArchive` with it. It is compared by DN components now, which
+also fixes the other direction: a DN written with spaces after its commas was
+not recognised as a resource at all. Give the option the whole DN; the plugin
+warns at startup when the value is not one under `--ldap-base`.
+
+**The identifier is read from the entry's own RDN.** It used to come from an
+unanchored search for `cn=` or `uid=` anywhere in the DN, so an entry whose
+own RDN was neither borrowed the one of an ancestor; failing that, creation
+fell back to a slug of the entry's name, under which modification and
+deletion then found nothing. An RDN value carrying an escape — `cn=Salle\, 2`
+— was cut at the escape.
+
+So an entry of either of those shapes is now created, patched and deleted in
+Calendar under a different identifier than before. **The resource Calendar
+already holds under the old one is not migrated**: rename it there, or delete
+it and let the next write recreate it. List what is affected before
+upgrading — every resource whose RDN attribute is neither `cn` nor `uid`, and
+every one whose RDN value contains a `\`.
+
+**A modification or a deletion outside the base no longer reaches Calendar.**
+Only creation checked the branch; the other two acted on any entry of the
+entity whose DN yielded an identifier.
+
 ### Renaming an entry, and what the cascade reaches
 
 **Who is affected:** anyone calling the new

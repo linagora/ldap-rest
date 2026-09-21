@@ -82,6 +82,21 @@ below is explained there, with what to do about it.
 
 ### Bug Fixes
 
+- `plugins/twake/calendar`: only the creation hook checked that an entry was
+  in the resource branch — a modification or a deletion reached Calendar for
+  any entry of the entity — and the branch was matched as text, so a partial
+  `--calendar-resource-base` took a sibling branch with it and a DN written
+  with spaces was not recognised at all. The resource identifier came from an
+  unanchored search for `cn=`/`uid=`, so an entry whose own RDN was neither
+  borrowed an ancestor's; it is read from the entry's own RDN now, unescaped,
+  and the three hooks share it. It is percent-encoded in the WebAdmin path,
+  see
+  [Upgrading](docs/usage/upgrading.md#calendar-resource-ids-and-the-branch-they-are-looked-for-in)
+
+- `lib/ldapActions`: a cached entry was handed out with its value arrays
+  shared, so a caller sorting one or appending to it wrote into the cache and
+  every later reader saw it until the TTL ran out. They are copied
+
 - `abstract/ldapFlat`: `renameEntry` never handed the request on, so a rename
   through it ran with no authorization check at all, and accepted identifiers
   the schema refuses on creation. The route is new in this release, so no
