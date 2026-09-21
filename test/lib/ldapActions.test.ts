@@ -257,4 +257,250 @@ describe('ldapActions', function () {
       });
     });
   });
+
+  describe('the base-scope search cache', function () {
+    // --ldap-cache-ttl is read once, when ldapActions is built, so each of
+    // these builds the instance it needs. Two instances of ldapActions are
+    // two caches: writes made through one never drop what the other cached,
+    // which is how "did that read come from the cache?" gets answered
+    // without counting connections — change the entry behind a cache's back
+    // and see whether it still answers the old value.
+    const build = (ttlSeconds: number | undefined): LdapActions => {
+      if (ttlSeconds === undefined) delete process.env.DM_LDAP_CACHE_TTL;
+      else process.env.DM_LDAP_CACHE_TTL = String(ttlSeconds);
+      return new LdapActions(new DM());
+    };
+
+    let BASE: string;
+    let dnA: string;
+    let dnB: string;
+    let branch: string;
+    let renamedBranch: string;
+    let childDn: string;
+    let savedTtl: string | undefined;
+
+    const read = async (
+      ldap: LdapActions,
+      dn: string,
+      attributes: string[] = ['mail', 'uid']
+    ): Promise<SearchResult> =>
+      (await ldap.search(
+        { paged: false, scope: 'base', filter: '(objectClass=*)', attributes },
+        dn
+      )) as SearchResult;
+
+    const mailOf = async (ldap: LdapActions, dn: string): Promise<unknown> =>
+      (await read(ldap, dn)).searchEntries[0]?.mail;
+
+    const person = (uid: string, mail: string) => ({
+      objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+      cn: 'Cache Test User',
+      sn: 'User',
+      uid,
+      mail,
+    });
+
+    const thrownBy = async (fn: () => Promise<unknown>): Promise<unknown> => {
+      try {
+        await fn();
+      } catch (err) {
+        return err;
+      }
+      return undefined;
+    };
+
+    before(function () {
+      savedTtl = process.env.DM_LDAP_CACHE_TTL;
+      BASE = process.env.DM_LDAP_BASE as string;
+      dnA = `uid=cacheuser,${BASE}`;
+      dnB = `uid=cacheuserbis,${BASE}`;
+      branch = `ou=cachebranch,${BASE}`;
+      renamedBranch = `ou=cachebranchbis,${BASE}`;
+      childDn = `uid=cachechild,${branch}`;
+    });
+
+    after(function () {
+      if (savedTtl === undefined) delete process.env.DM_LDAP_CACHE_TTL;
+      else process.env.DM_LDAP_CACHE_TTL = savedTtl;
+    });
+
+    // Cleanup runs through an instance of its own: deleting something the
+    // test cached must not be what makes the next test pass.
+    const wipe = async () => {
+      const cleaner = build(0);
+      for (const dn of [
+        childDn,
+        `uid=cachechild,${renamedBranch}`,
+        dnA,
+        dnB,
+        branch,
+        renamedBranch,
+      ]) {
+        try {
+          await cleaner.delete(dn);
+        } catch {
+          /* not there, fine */
+        }
+      }
+    };
+
+    beforeEach(wipe);
+    afterEach(wipe);
+
+    it('serves a second identical search from the cache', async () => {
+      const cached = build(60);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'before@test.org'));
+
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      // Behind that cache's back: another instance, another cache.
+      await direct.modify(dnA, { replace: { mail: 'after@test.org' } });
+      expect(await mailOf(direct, dnA)).to.include('after@test.org');
+
+      // Cached, so the directory is not consulted and the old value stands.
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+    });
+
+    it('caches nothing with the default TTL', async () => {
+      const dflt = build(undefined);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'before@test.org'));
+
+      expect(await mailOf(dflt, dnA)).to.include('before@test.org');
+      await direct.modify(dnA, { replace: { mail: 'after@test.org' } });
+      expect(await mailOf(dflt, dnA)).to.include('after@test.org');
+    });
+
+    it('keys on the attributes asked for', async () => {
+      const cached = build(60);
+      await cached.add(dnA, person('cacheuser', 'before@test.org'));
+
+      const narrow = await read(cached, dnA, ['mail']);
+      expect(narrow.searchEntries[0]).to.not.have.property('cn');
+
+      // A key that ignored the attribute list would answer this one with
+      // the entry above, which has no cn in it.
+      const wide = await read(cached, dnA, ['mail', 'cn']);
+      expect(wide.searchEntries[0]).to.have.property('cn');
+    });
+
+    it('drops what a modify changed', async () => {
+      const cached = build(60);
+      await cached.add(dnA, person('cacheuser', 'before@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      await cached.modify(dnA, { replace: { mail: 'after@test.org' } });
+      expect(await mailOf(cached, dnA)).to.include('after@test.org');
+    });
+
+    it('drops what a modify changed, whatever case the DN is written in', async () => {
+      const cached = build(60);
+      await cached.add(dnA, person('cacheuser', 'before@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      // The directory reads these two as one entry; a cache that compares
+      // DNs as plain strings does not, and keeps the old mail.
+      await cached.modify(dnA.toUpperCase(), {
+        replace: { mail: 'after@test.org' },
+      });
+      expect(await mailOf(cached, dnA)).to.include('after@test.org');
+    });
+
+    it('drops what a delete removed', async () => {
+      const cached = build(60);
+      await cached.add(dnA, person('cacheuser', 'before@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      await cached.delete(dnA);
+      const err = await thrownBy(() => read(cached, dnA));
+      expect(err, 'a deleted entry must not still be served').to.be.an('error');
+      expect((err as { code?: number }).code).to.equal(32);
+    });
+
+    it('drops what an add re-created', async () => {
+      const cached = build(60);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'before@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      // Removed by something else — another replica, LSC, ldapmodify — and
+      // created again through this instance.
+      await direct.delete(dnA);
+      await cached.add(dnA, person('cacheuser', 'after@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('after@test.org');
+    });
+
+    it('drops the old DN of a rename', async () => {
+      const cached = build(60);
+      await cached.add(dnA, person('cacheuser', 'before@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+
+      await cached.rename(dnA, dnB);
+      const err = await thrownBy(() => read(cached, dnA));
+      expect(err, 'a renamed entry must not answer under its old DN').to.be.an(
+        'error'
+      );
+      expect((err as { code?: number }).code).to.equal(32);
+      expect(await mailOf(cached, dnB)).to.include('before@test.org');
+    });
+
+    it('drops the new DN of a rename', async () => {
+      const cached = build(60);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'moved@test.org'));
+      await direct.add(dnB, person('cacheuserbis', 'previous@test.org'));
+
+      // Cache the entry that holds the target DN today...
+      expect(await mailOf(cached, dnB)).to.include('previous@test.org');
+      // ...take it out of the way behind that cache's back, and put the
+      // other entry in its place.
+      await direct.delete(dnB);
+      await cached.rename(dnA, dnB);
+
+      expect(await mailOf(cached, dnB)).to.include('moved@test.org');
+    });
+
+    it('drops both ends of a move', async () => {
+      const cached = build(60);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'moved@test.org'));
+      await direct.add(dnB, person('cacheuserbis', 'previous@test.org'));
+      expect(await mailOf(cached, dnA)).to.include('moved@test.org');
+      expect(await mailOf(cached, dnB)).to.include('previous@test.org');
+
+      await direct.delete(dnB);
+      await cached.move(dnA, dnB);
+
+      const err = await thrownBy(() => read(cached, dnA));
+      expect(err, 'a moved entry must not answer under its old DN').to.be.an(
+        'error'
+      );
+      expect((err as { code?: number }).code).to.equal(32);
+      expect(await mailOf(cached, dnB)).to.include('moved@test.org');
+    });
+
+    it('drops the cached children of a renamed branch', async () => {
+      const cached = build(60);
+      await cached.add(branch, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: 'cachebranch',
+      });
+      await cached.add(childDn, person('cachechild', 'child@test.org'));
+      expect(await mailOf(cached, childDn)).to.include('child@test.org');
+
+      // One operation at the branch, every DN below it changes.
+      await cached.rename(branch, renamedBranch);
+
+      const err = await thrownBy(() => read(cached, childDn));
+      expect(
+        err,
+        'a child of a renamed branch must not answer under its old DN'
+      ).to.be.an('error');
+      expect((err as { code?: number }).code).to.equal(32);
+      expect(
+        await mailOf(cached, `uid=cachechild,${renamedBranch}`)
+      ).to.include('child@test.org');
+    });
+  });
 });
