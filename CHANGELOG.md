@@ -123,21 +123,35 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   a legacy record stored with upper case is no longer found. Calendar releases
   before 1.0.0.1, which ignore the parameter, keep working
 
+- `plugins/ldap/flatGeneric`: a nomenclature's `entity.valueLabels` reaches a
+  client as a top-level `valueLabels` on its `flatResources` entry, beside
+  `label` and `singularLabel`, instead of only nested in the schema that
+  entry carries. The nested copy stays, so nothing reading it breaks
+
 ### Bug Fixes
 
 - `plugins/ldap/groups`: `GET /ldap/groups/:cn` returned the placeholder
   member `--group-dummy-user` adds to keep a `groupOfNames` valid, which the
   listing already hid — a client showed it as a person. It is hidden on both,
-  and recognised however the directory spells its DN
+  and recognised however the directory spells its DN. That comparison now
+  serves every reader of the placeholder: `plugins/ldap/enterpriseRules`
+  answered `409 … it still has 1 member(s)` to the deletion of a group
+  holding nothing but a differently spelled one, SCIM listed it as a member,
+  and `plugins/twake/james` resolved an address for it
 
 - `plugins/auth/llng` never initialized the LemonLDAP::NG handler: `--llng-ini`
   was parsed and never read, and every request failed with a `500`. The
   handler is now initialized from it when the server starts, and a file or a
-  configuration it cannot use stops the server with the reason
+  configuration it cannot use stops the server with the reason, see
+  [Upgrading](docs/usage/upgrading.md#the-llng-handler-now-needs-a-working-configuration-at-startup)
 
-- `abstract/ldapFlat`: creating an entry that already exists answered `500`
-  when two creations of it raced past the existence checks, which a bulk
-  import holding one person twice does. It answers `409`
+- Creating an entry that already exists answered `500` when two creations of
+  it raced past the existence checks, which a bulk import holding one person
+  twice does. The directory's refusal is recognised once, in
+  `lib/ldapActions`, so every creation route answers `409` alike — the flat
+  routes, `POST /ldap/groups`, the organization routes and the external
+  members `core/ldap/externalUsersInGroups` inserts, see
+  [Upgrading](docs/usage/upgrading.md#creating-an-entry-that-already-exists-answers-409)
 
 - `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix with
   the comma optional, so `uid=x,xou=users,dc=example,dc=com` passed for being
@@ -156,6 +170,19 @@ See [Upgrading](docs/usage/upgrading.md) before deploying this one.
   rejects the names real directories carry — every one with a space, an
   apostrophe or an `&`. Loading such a directory failed on its first
   organization
+
+- `plugins/ldap/groups`: refusing to remove the placeholder member answered
+  `500`. It answers `400`: the client asked for something it may not have,
+  which is not a fault of the server
+
+- `plugins/ldap/groups`: a listing that did not ask for `member` answered
+  `"member": [null]`, the absent value having been wrapped in an array. The
+  field is simply absent now
+
+- `plugins/auth/llng`: two instances of the plugin loaded with different
+  `--llng-ini` shared one configuration in silence — the handler keeps its
+  state in the module, so the last `init()` won and both instances then read
+  it. The second one is refused at startup, naming both files
 
 - `plugins/ldap/departmentSync`: moving or renaming an organization left the
   organization and its whole subtree with the path of their former parent, and

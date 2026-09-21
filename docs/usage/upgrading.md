@@ -30,6 +30,35 @@ after upgrading that the runtime you deploy on carries it:
 node -e "require('lemonldap-ng-handler'); console.log('present')"
 ```
 
+### The LLNG handler now needs a working configuration at startup
+
+**Who is affected:** every deployment configuring `core/auth/llng`.
+
+The handler used to do nothing at startup: `--llng-ini` was read into the
+configuration but never handed to it, so every request failed with a `500`
+regardless of what the file said. It is now initialized once, before the
+server starts serving — which means the file finally matters, and two ways
+it can be wrong now stop the server instead of answering `500`:
+
+- `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`, and a file at
+  that path with no `[node-handler] nodeVhosts` listing this server — the
+  normal state until now, since nothing read it — refuses to start where it
+  used to start and answer `500` to every request instead;
+- an LLNG configuration store (`[configuration] baseConfigUrl` and the rest)
+  unreachable when the server boots crash-loops it under an orchestrator,
+  until the portal or config store it depends on comes up.
+
+List this server before upgrading:
+
+```ini
+[node-handler]
+nodeVhosts = api.example.com
+```
+
+and, if the LLNG configuration store starts after this server does, sequence
+the two or give the container a restart policy that tolerates a few
+failures at boot.
+
 ### The Twake schemas now need `core/ldap/enterpriseRules`
 
 **Who is affected:** every deployment loading `static/schemas/twake/*`.
@@ -117,6 +146,25 @@ schema does not name one. Declare yours in a copy of the schema, the way
 ```json
 "unique": { "sentinel": "YOUR-PLACEHOLDER" }
 ```
+
+### Creating an entry that already exists answers `409`
+
+**Who is affected:** any client that reads a failed creation by its status
+code or by the text of its message — a bulk import recording per-line errors
+most of all.
+
+Two creations of the same entry racing past the existence checks answered
+`500`, the add path having wrapped every LDAP error in a plain `Error`. The
+directory's own `entryAlreadyExists` is now recognised once, in
+`lib/ldapActions`, so every creation route answers `409` alike: the flat
+routes, `POST /ldap/groups`, the organization routes, and the external
+members `core/ldap/externalUsersInGroups` inserts.
+
+The message is `Entry <dn> already exists`. The flat routes used to say
+`<entity> <dn> already exists`, and `core/ldap/bulkImport` used to record
+`LDAP add error: …` in its per-line `errors[]`; both read the same now.
+SCIM still answers `uniqueness`, the numeric code being carried on the
+error it is given.
 
 ### A flat schema may not claim a URL an LDAP plugin serves
 
