@@ -3,6 +3,7 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import { SearchResult } from 'ldapts';
+import { ConflictError } from '../../../src/lib/errors';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
@@ -40,17 +41,31 @@ describe('External users in groups', function () {
     expect(plugin.constructor.name).to.equal('LdapGroups');
   });
 
-  it('should surface a duplicate external member as a 409, not a 500', async () => {
-    // Listing the same external member twice makes both concurrent
-    // creations race for the same entry: the directory refuses the second
-    // one with entryAlreadyExists (68), which must reach the caller as a
-    // ConflictError (409), not the plain Error the catch block used to
-    // rewrap it into (a 500).
+  it('should surface a ConflictError from creating the external member as a 409, not a 500', async () => {
+    // Exercises the catch around `this.ldap.add` in the
+    // ldapgroupvalidatemembers hook: when the member creation itself fails
+    // with an HttpError (as ldapActions.add does for entryAlreadyExists,
+    // code 68 -> ConflictError), that error must reach the caller as-is
+    // (409), not get flattened into the plain Error the catch block used to
+    // rewrap it into (a 500). Driven deterministically by stubbing
+    // `plugin.ldap.add` rather than relying on a real creation race.
+    const realAdd = plugin.ldap.add.bind(plugin.ldap);
+    (plugin.ldap as any).add = async (dn: string, entry: unknown) => {
+      if (dn === user1) {
+        const conflict = new ConflictError(`Entry ${dn} already exists`);
+        (conflict as { code?: number }).code = 68;
+        throw conflict;
+      }
+      return realAdd(dn, entry as any);
+    };
+
     try {
-      await plugin.addGroup('testgroup', [user1, user1]);
-      expect.fail('Should reject duplicate external member creation');
+      await plugin.addGroup('testgroup', [user1]);
+      expect.fail('Should reject external member creation conflict');
     } catch (e) {
       expect(e).to.have.property('statusCode', 409);
+    } finally {
+      (plugin.ldap as any).add = realAdd;
     }
   });
 
