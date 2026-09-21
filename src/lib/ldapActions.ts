@@ -173,6 +173,21 @@ class ldapActions {
   logger: winston.Logger;
   private searchCache: LRUCache<string, SearchResult>;
   private cacheEnabled: boolean;
+  /**
+   * How many writes this instance has made since it was built.
+   *
+   * A read can be overtaken by a write: the write lands and `invalidateCache`
+   * finds nothing to drop, because the read has not stored its answer yet —
+   * and the read then stores what it read *before* the write, an entry
+   * nothing will drop until its TTL runs out. `search()` remembers the count
+   * it started at and stores only if no write happened in between, so a read
+   * a write overtook costs a cache entry, never a stale answer.
+   *
+   * The count is per instance and per write, not per DN: a write to another
+   * branch keeps a concurrent read out of the cache too. That is hit rate
+   * given up, not freshness.
+   */
+  private cacheGeneration = 0;
   public queryLimit: ReturnType<typeof pLimit>;
   private connectionPool: PooledConnection[] = [];
   private poolSize: number;
@@ -514,6 +529,10 @@ class ldapActions {
    */
   invalidateCache(dn: string): void {
     if (!this.cacheEnabled) return;
+    // Every write ends the epoch any read in flight started in, whether or
+    // not this call finds an entry to drop: the read it overtook may not
+    // have stored its own yet. See `cacheGeneration`.
+    this.cacheGeneration++;
     const target = foldDn(dn);
     const descendantSuffix = `,${target}`;
     // Collect before deleting: dropping entries from the LRU while walking
@@ -568,6 +587,11 @@ class ldapActions {
     // key is built from the base and options those hooks settled on.
     const cacheable = this.cacheEnabled && !opts.paged && opts.scope === 'base';
     const cacheKey = cacheable ? this.getCacheKey(base, opts) : '';
+    // The write count this read starts at: a write landing between here and
+    // the store below would leave what comes back describing a state that no
+    // longer holds, and `invalidateCache` would find nothing to drop. See
+    // `cacheGeneration`.
+    const generation = this.cacheGeneration;
     if (cacheable) {
       const cached = this.searchCache.get(cacheKey);
       if (cached) {
@@ -601,8 +625,19 @@ class ldapActions {
       // entry is never cached as missing.
       if (cacheable) {
         const result = res as unknown as SearchResult;
-        this.searchCache.set(cacheKey, cloneSearchResult(result));
-        this.logger.debug(`LDAP search cached: ${digestKey(cacheKey)}`);
+        // A write that landed while this read was in flight makes what came
+        // back describe the directory as it was before that write, and there
+        // is nothing left to drop it: the write's `invalidateCache` ran when
+        // this entry did not exist yet. Storing it now would serve the state
+        // it replaced for a whole TTL, so it is answered, not kept.
+        if (generation === this.cacheGeneration) {
+          this.searchCache.set(cacheKey, cloneSearchResult(result));
+          this.logger.debug(`LDAP search cached: ${digestKey(cacheKey)}`);
+        } else {
+          this.logger.debug(
+            `LDAP search not cached, a write overtook it: ${digestKey(cacheKey)}`
+          );
+        }
         return result;
       }
 

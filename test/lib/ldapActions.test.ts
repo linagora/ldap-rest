@@ -362,6 +362,36 @@ describe('ldapActions', function () {
       expect(await mailOf(cached, dnA)).to.include('before@test.org');
     });
 
+    it('keeps nothing from a read a write overtook', async () => {
+      process.env.DM_LDAP_CACHE_TTL = '60';
+      const dm = new DM();
+      const cached = new LdapActions(dm);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'before@test.org'));
+
+      // The window, made reachable: a write landing after the directory has
+      // answered this read and before the read stores it. `ldapsearchresult`
+      // is the one place between those two moments, and it is a plugin hook
+      // — a write made through this instance runs its own invalidation
+      // before the read below ever reaches its store.
+      let overtaken = false;
+      dm.hooks.ldapsearchresult = [
+        async (result: SearchResult) => {
+          if (!overtaken) {
+            overtaken = true;
+            await cached.modify(dnA, { replace: { mail: 'after@test.org' } });
+          }
+          return result;
+        },
+      ];
+
+      // This read is answered with the directory as it was when the server
+      // replied, which is what has to be returned. What must not happen is
+      // that answer being kept for the rest of the TTL.
+      expect(await mailOf(cached, dnA)).to.include('before@test.org');
+      expect(await mailOf(cached, dnA)).to.include('after@test.org');
+    });
+
     it('caches nothing with the default TTL', async () => {
       const dflt = build(undefined);
       const direct = build(0);
