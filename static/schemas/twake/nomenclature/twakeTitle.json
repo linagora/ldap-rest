@@ -37,6 +37,14 @@
       "Prof": {
         "en": "Prof.",
         "fr": "Pr"
+      },
+      "Hon": {
+        "en": "Hon.",
+        "fr": "Honorable"
+      },
+      "Excellence": {
+        "en": "Excellency",
+        "fr": "Excellence"
       }
     },
     "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"

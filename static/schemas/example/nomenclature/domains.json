@@ -5,7 +5,15 @@
     "objectClass": ["top", "domain", "domainRelatedObject"],
     "singularName": "domain",
     "pluralName": "domains",
-    "base": "ou=domains,ou=nomenclature,{ldap_base}"
+    "base": "ou=domains,ou=nomenclature,{ldap_base}",
+    "label": {
+      "en": "Mail domains",
+      "fr": "Domaines de messagerie"
+    },
+    "singularLabel": {
+      "en": "domain",
+      "fr": "domaine"
+    }
   },
   "strict": true,
   "attributes": {
