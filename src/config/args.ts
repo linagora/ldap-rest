@@ -332,7 +332,10 @@ const configArgs: ConfigTemplate = [
   ['--ldap-url', 'DM_LDAP_URL', ['ldap://localhost'], 'array', '--ldap-urls'],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
-  ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 300, 'number'], // seconds
+  // 0 means "do not cache", and it is the default: the base-scope search
+  // cache stored nothing at all until #166, so no deployment has ever run
+  // with it on. See ldapActions' constructor.
+  ['--ldap-cache-ttl', 'DM_LDAP_CACHE_TTL', 0, 'number'], // seconds, 0 = off
   ['--ldap-pool-size', 'DM_LDAP_POOL_SIZE', 5, 'number'],
   ['--ldap-connection-ttl', 'DM_LDAP_CONNECTION_TTL', 60, 'number'], // seconds
   [

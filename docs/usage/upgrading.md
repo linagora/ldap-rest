@@ -6,6 +6,27 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### The search cache works now, and is off by default
+
+**Who is affected:** deployments that set `--ldap-cache-ttl` (or
+`DM_LDAP_CACHE_TTL`) explicitly. Everyone else keeps exactly the behaviour
+they had.
+
+The base-scope search cache stored nothing since it was written: the branch
+that would have kept a result could not be reached, so every read went to the
+directory whatever the option said. It caches now — which means a deployment
+that had set the option gets a working cache for the first time, where it used
+to get none.
+
+What a write through this service drops is what it changed, its subtree
+included, whatever case the DN is written in. What this service cannot know
+about, it cannot drop: another replica of it, an LSC synchronisation, a
+hand-run `ldapmodify`. A cached read stays as it was until its TTL runs out.
+
+So `--ldap-cache-ttl` now defaults to `0`, which means no caching at all. Set
+it only where this service is the sole writer of the entries it reads, and
+keep the value under the staleness you are willing to serve.
+
 ### `calendarResources` is renamed `calendar`
 
 **Who is affected:** deployments loading `core/twake/calendarResources`, and
