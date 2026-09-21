@@ -222,6 +222,90 @@ describe('LdapGroups Plugin', function () {
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({});
     });
 
+    it('should answer 409 when the same group is created twice', async () => {
+      // The directory refuses the second write. It used to reach the client
+      // as a 500, while the flat routes already answered 409.
+      const create = () =>
+        request
+          .post('/api/v1/ldap/groups')
+          .type('json')
+          .send({
+            cn: 'testgroup',
+            member: [user1],
+          });
+      const first = await create();
+      expect(first.status).to.equal(200);
+
+      const second = await create();
+      expect(second.status).to.equal(409);
+      expect(second.body.error).to.match(/already exists/);
+      expect(second.body.error).to.contain(
+        `cn=testgroup,${DM_LDAP_GROUP_BASE}`
+      );
+    });
+
+    it('should not return a member list the caller did not ask for', async () => {
+      // `member` absent from the answer was wrapped into `[undefined]`, so
+      // the listing read `"member":[null]`.
+      await plugin.addGroup('testgroup', [user1]);
+      const res = await request
+        .get('/api/v1/ldap/groups?match=cn=testgroup&attributes=cn')
+        .set('Accept', 'application/json');
+      expect(res.status).to.equal(200);
+      expect(res.body.testgroup).to.not.have.property('member');
+      expect(
+        await plugin.listGroups({
+          filter: '(cn=testgroup)',
+          attributes: ['cn'],
+        })
+      ).to.deep.equal({
+        testgroup: {
+          dn: `cn=testgroup,${DM_LDAP_GROUP_BASE}`,
+          cn: 'testgroup',
+        },
+      });
+    });
+
+    it('should read back no member at all for a group holding only the placeholder', async () => {
+      await plugin.addGroup('testgroup');
+      // Stored as the directory may hold it, not as the configuration spells
+      // it: it is still the placeholder, so the group is empty.
+      await plugin.ldap.modify(`cn=testgroup,${DM_LDAP_GROUP_BASE}`, {
+        replace: {
+          member: [(server.config.group_dummy_user as string).toUpperCase()],
+        },
+      });
+      const res = await request
+        .get('/api/v1/ldap/groups/testgroup')
+        .set('Accept', 'application/json');
+      expect(res.status).to.equal(200);
+      expect(res.body.member).to.deep.equal([]);
+      expect(
+        (await plugin.listGroups()).testgroup.member as string[]
+      ).to.deep.equal([]);
+    });
+
+    it('should refuse to delete the placeholder however it is spelled', async () => {
+      // Spelled as a client may send it, or as the configuration may hold
+      // it: the DNs are the same, so the refusal must be the same — and it
+      // is a client mistake, which is a 400, not a 500.
+      await plugin.addGroup('testgroup');
+      const spelled = (server.config.group_dummy_user as string)
+        .replace('=', ' = ')
+        .toUpperCase();
+      const res = await request
+        .delete(
+          `/api/v1/ldap/groups/testgroup/members/${encodeURIComponent(spelled)}`
+        )
+        .type('json')
+        .send();
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.match(/dummy member/);
+      expect(
+        (await plugin.searchGroupsByName('testgroup')).testgroup.member
+      ).to.deep.equal([]);
+    });
+
     it('should hide the placeholder member when a group is read', async () => {
       // The placeholder is spelled differently from the configured DN, as a
       // directory may hold it: a text comparison would let it through.

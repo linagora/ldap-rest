@@ -1023,15 +1023,13 @@ export default class LdapGroups extends DmPlugin {
       })) as AsyncGenerator<SearchResult>;
     let entries: LdapList = {};
     for await (const r of _res) {
-      r.searchEntries.map(entry => {
+      for (const entry of r.searchEntries) {
         const s = entry[this.cn] as string;
-        if (s) entries[s] = entry;
-        if (!Array.isArray(entries[s].member))
-          entries[s].member = [entries[s].member as string];
-        entries[s].member = (entries[s].member as string[]).filter(
-          (m: string) => !this.isDummyMember(m)
-        );
-      });
+        if (!s) continue;
+        // `member` is absent when the caller did not ask for it: wrapping
+        // `undefined` in an array made those listings read `"member":[null]`.
+        entries[s] = this.withoutDummyMember(entry);
+      }
     }
 
     entries = await launchHooksChained(
