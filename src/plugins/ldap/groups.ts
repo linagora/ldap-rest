@@ -858,8 +858,10 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
     );
+    // Refusing the placeholder is an answer to the client, not a fault:
+    // a plain Error made it a 500.
     if (this.isDummyMember(member))
-      throw new Error('Cannot delete dummy member from group');
+      throw new BadRequestError('Cannot delete dummy member from group');
     return await this.ldap
       .modify(dn, {
         delete: { member: member },
