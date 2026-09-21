@@ -49,8 +49,10 @@ below is explained there, with what to do about it.
 ### Security
 
 - Bump `csv-parse` to 7.0.2 (GHSA-8cw4-87c7-c6xx): a `__proto__` header would
-  have been copied onto the entry `plugins/ldap/bulkImport` was building,
-  replacing its prototype
+  have been copied onto the entry `plugins/ldap/bulkImport` was building, and
+  replaced its prototype wherever that cell held several values — assigning a
+  string to `__proto__` is a silent no-op, assigning the array a cell holding
+  a `;` becomes is not
 
 ### Features
 
