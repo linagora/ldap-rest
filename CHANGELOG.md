@@ -7,228 +7,130 @@ endpoints an administration console reads, and a script that says what a
 migration will refuse before it does. The console itself is
 [Twake Directory Manager](https://github.com/linagora/twake-directory-manager).
 
-See [Upgrading](docs/usage/upgrading.md) before deploying this one.
+**Read [Upgrading](docs/usage/upgrading.md) before deploying this one.** Every breaking change
+below is explained there, with what to do about it.
 
 ### Breaking Changes
 
-- Node 20 is the floor — the version Debian 13 ships — declared in `engines`
-  and stood behind by a CI that runs the suite on 20, 22, 24 and 26
+- Node 20 is the floor, the version Debian 13 ships —
+  [notes](docs/usage/upgrading.md#node-20-is-the-floor)
 
-- `static/schemas/twake`: the shipped schemas describe an enterprise directory
-  rather than a bare CRUD surface. `uid` is **generated** from the local part
-  of `mail`, `twakeDepartmentPath` and `twakeAccountStatus` are computed,
-  `twakeDeliveryMode` is filled with `cn=normal`, and `twakeDepartmentLink` is
-  a `pointer` whose target must exist. Posting any of them gets a `400` naming
-  the attribute — on the flat routes, on `PUT /ldap/organizations` and on
-  `PUT /ldap/groups`. Each is a schema marker: copy the schema and drop them
-  to keep the old behaviour
+- `static/schemas/twake` describe an enterprise directory rather than a bare
+  CRUD surface: `uid`, `twakeDepartmentPath`, `twakeAccountStatus` and
+  `twakeDeliveryMode` are computed and refused in a request body, and the
+  schemas need `core/ldap/enterpriseRules` loaded —
+  [notes](docs/usage/upgrading.md#the-twake-schemas-now-need-coreldapenterpriserules),
+  [notes](docs/usage/upgrading.md#clients-must-stop-sending-the-computed-attributes)
 
-- `static/schemas/twake/users.json` requires what the interface it replaces
-  required: `employeeNumber`, `displayName` and `givenName`. `cn` stops being
-  required, as it was there — 689 accounts of the reference directory have
-  none. The `displayName` role moves from `cn` to `displayName`, `cn` holding
-  the name surname-first and `displayName` the readable order. `employeeNumber`
-  is unique with no placeholder exempt, see
-  [Upgrading](docs/usage/upgrading.md#employeenumber-is-unique-placeholders-included)
-
-- An attribute both `required` and `generated` needs a plugin that fills it:
-  the Twake schemas without `core/ldap/enterpriseRules` answer `400` rather
-  than writing an entry missing an attribute no client could then supply. A
-  `pointer` default is checked against the directory the same way, one value
-  or a list of them, instead of a dangling DN on every entry
+- `static/schemas/twake/users.json` requires `employeeNumber`, `displayName`
+  and `givenName`, `cn` stops being required, and `employeeNumber` is unique
+  with no placeholder exempt —
+  [notes](docs/usage/upgrading.md#employeenumber-is-unique-placeholders-included)
 
 - An array's `items.test` and `items.branch` are enforced on the flat,
-  organization and group routes, where they never were — `mailAlternateAddress`
-  has carried a pattern since v0.7.0 and accepted anything. An array of
-  pointers has each target looked up, as a single pointer's is. Stored values
-  are untouched: `npm run audit:directory` lists what an update would now
-  refuse
+  organization and group routes, where they never were. Stored values are
+  untouched — [notes](docs/usage/upgrading.md#run-the-audit-before-switching)
 
-- `twakeDepartmentPath` reads from the root down, the entry's own name last;
-  the check demanded the reverse and refused every top-level organization
-  anyway. What a directory of the old convention holds is still accepted as it
-  stands, so an upgrade leaves those organizations writable
+- `twakeDepartmentPath` reads from the root down; what a directory of the old
+  convention holds is still accepted —
+  [notes](docs/usage/upgrading.md#organization-paths-nothing-to-convert)
 
-- A flat schema claiming an `entity.name` or an `entity.pluralName` another
-  schema — or an LDAP plugin — already serves is refused and says who holds
-  it. Both used to load, sharing a hook prefix and a URL, and the loser was
-  advertised by the configuration API while being unreachable in fact
+- A flat schema claiming a name another schema or an LDAP plugin already
+  serves is refused instead of loading unreachable —
+  [notes](docs/usage/upgrading.md#a-flat-schema-may-not-claim-a-url-an-ldap-plugin-serves)
+
+- `--ldap-cache-ttl` defaults to `0`: the search cache is off until asked for
+  — [notes](docs/usage/upgrading.md#the-search-cache-works-now-and-is-off-by-default)
+
+- `core/auth/llng` needs a configuration it can use at startup, and stops the
+  server without one —
+  [notes](docs/usage/upgrading.md#the-llng-handler-now-needs-a-working-configuration-at-startup)
 
 ### Security
 
-- Bump `csv-parse` to 7.0.2 (GHSA-8cw4-87c7-c6xx). The advisory's trigger,
-  `group_columns_by_name`, is not used here, but 7.0.2 hands a `__proto__`
-  header over as an ordinary key, which `plugins/ldap/bulkImport` would have
-  copied onto the entry being built, replacing its prototype. A value under a
-  column whose name is not an LDAP attribute name now fails its line; empty
-  cells are still ignored whatever their column
+- Bump `csv-parse` to 7.0.2 (GHSA-8cw4-87c7-c6xx): a `__proto__` header would
+  have been copied onto the entry `plugins/ldap/bulkImport` was building,
+  replacing its prototype
 
 ### Features
 
-- `plugins/ldap/enterpriseRules`: uniqueness across a shared namespace, mail
-  addresses confined to the domains an organization owns, computed
-  organization paths, byte-size normalisation, referential integrity on delete
-  and a guard on emptying a group. `plugins/ldap/accountLifecycle` adds
-  `POST {entity}/:id/status` and `POST {entity}/:id/password`, a generated
-  password being returned exactly once. `plugins/auth/authzScope` answers
-  `GET /v1/authz/scope`: which branches the caller administers, and what they
-  may create there. None of the three holds an attribute name, a domain or a
-  nomenclature value: every rule is a schema marker
+- `plugins/ldap/enterpriseRules`, `plugins/ldap/accountLifecycle` and
+  `plugins/auth/authzScope`: the rules a directory needs, the status and
+  password endpoints, and the answer to which branches a caller administers.
+  None holds an attribute name, a domain or a nomenclature value — every rule
+  is a schema marker on `abstract/ldapFlat` (`role`, `hint`, `generated`,
+  `readOnly`, `neverReturn`, `generatedFrom`, `searchable`), see
+  [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
 
-- `abstract/ldapFlat`: `POST /v1/ldap/{resource}/{id}/rename` changes the
-  identifier of an entry and rewrites what named its DN, waiting for that
-  before it answers. What it rewrites is read from the schemas — every
-  `pointer` whose `branch` admits the entry, every attribute carrying the
-  `members` or `owners` role — so no attribute name is written in the code.
-  It answers `207` when the entry was renamed and a rewrite was not, and
-  re-issuing the same request finishes it. The cascade needs
-  `core/ldap/enterpriseRules`, see
-  [Upgrading](docs/usage/upgrading.md#renaming-an-entry-and-what-the-cascade-reaches)
+- `POST /v1/ldap/{resource}/{id}/rename` changes an identifier and rewrites
+  what named its DN before it answers, `207` when a rewrite did not land —
+  [notes](docs/usage/upgrading.md#renaming-an-entry-and-what-the-cascade-reaches)
 
-- `abstract/ldapFlat`: the markers those plugins read. `role` says what an
-  attribute _means_, so core code finds it without knowing its name; `hint`
-  explains a `test` in words a client can show; `generated` and `readOnly`
-  refuse a value in a request body; `neverReturn` keeps a writable attribute
-  out of every answer; `generatedFrom` derives an identifier from another
-  attribute. See [flat-generic](docs/usage/plugins/ldap/flat-generic.md)
+- `GET /ldap/{entity}?match=…&attribute=a,b,c` answers on any of several
+  attributes, `searchable` saying which are worth scanning
 
-- `GET /ldap/{entity}?match=…&attribute=…` takes several attribute names
-  separated by commas and answers on any of them, so a search box needs no
-  field picker beside it. Which attributes are worth searching is a new schema
-  marker, `searchable` — what is indexed is the deployment's business.
-  `GET /ldap/groups` answers on the same terms rather than on its RDN
-  attribute alone
-
-- `npm run audit:directory` reads a branch and reports what a schema would
-  refuse, quoting each rule's own `hint`. Tightening a pattern says nothing
-  about the entries already stored. See
+- `npm run audit:directory` reports what a schema would refuse of what is
+  already stored, quoting each rule's own `hint`, see
   [directory-audit](docs/usage/directory-audit.md)
 
 - `static/schemas`: the missing `domains` nomenclature, English and French
-  labels on every Twake nomenclature and on its values — a new
-  `entity.valueLabels`, so a client shows _Shared mailbox_ rather than
-  `teamMailbox` — and a dozen attributes across the Twake
-  schemas, plus `static/schemas/example` — a worked
-  configuration keeping every national format, mail domain and quota default
-  in a schema rather than in the code, with `npm run check:no-client-values`
-  failing the build if one leaks back into `src/`. `--organization-schema` is
-  settable on the command line at last
+  labels on every Twake nomenclature and on its values
+  (`entity.valueLabels`), and `static/schemas/example`, a worked configuration
+  keeping national formats, mail domains and quota defaults out of the code
 
 ### Bug Fixes
 
-- `lib/ldapActions`: the base-scope search cache never stored a result — the
-  condition guarding the store could not be true — so `--ldap-cache-ttl`
-  bought nothing since it was written. It caches now, and every write drops
-  what it changed: `rename` and `move` invalidated nothing at all, `modify`
-  and `delete` missed a DN spelled in another case and never dropped the
-  entries below a container they moved. The option defaults to `0`, no
-  caching, see
-  [Upgrading](docs/usage/upgrading.md#the-search-cache-works-now-and-is-off-by-default)
+- `abstract/ldapFlat`: `renameEntry` never handed the request on, so a rename
+  through it ran with no authorization check at all, and accepted identifiers
+  the schema refuses on creation. The route is new in this release, so no
+  deployment was exposed
+
+- Creating an entry that already exists answered `500` on some routes and
+  `409` on others; it is recognised once, in `lib/ldapActions`, and answers
+  `409` everywhere —
+  [notes](docs/usage/upgrading.md#creating-an-entry-that-already-exists-answers-409)
+
+- `lib/ldapActions`: the base-scope search cache never stored a result, and
+  `rename` and `move` dropped nothing when they changed one —
+  [notes](docs/usage/upgrading.md#the-search-cache-works-now-and-is-off-by-default)
+
+- `plugins/auth/llng` never initialized the LemonLDAP::NG handler, so every
+  request answered `500`, and two instances given different `--llng-ini`
+  silently shared one configuration
+
+- `plugins/ldap/groups`: the placeholder member is hidden when a group is read
+  as well as listed, and recognised by its DN wherever it is read — the delete
+  guard, SCIM and `plugins/twake/james` all compared text. Refusing to remove
+  it answers `400`, and a listing that did not ask for `member` no longer
+  answers `"member": [null]`
+
+- `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix;
+  `searchEntriesByName` interpolated its value into an LDAP filter raw; and a
+  business rule that refused a creation answered `500`
+
+- `plugins/ldap/organizations`: `ou` rejected every name carrying a space, an
+  apostrophe or an `&` — which is most of a real directory
+
+- `plugins/ldap/departmentSync`: moving or renaming an organization left its
+  subtree, and the users and groups linked to it, on the former parent's path
 
 ### Improvements
 
-- `plugins/twake/calendar`: a user email or name change looks the Calendar
-  registered user up with `GET /registeredUsers?email=…` instead of
-  downloading every registered user. Calendar lower-cases the address itself;
-  a legacy record stored with upper case is no longer found. Calendar releases
-  before 1.0.0.1, which ignore the parameter, keep working
+- `plugins/twake/calendar` looks a registered user up by email instead of
+  downloading every one. Releases before 1.0.0.1 ignore the parameter and keep
+  working
 
-- `abstract/ldapFlat`: `generatedFrom.regenerateOnChange` is gone. It said an
-  identifier would be recomputed, and renamed, when the attribute it derives
-  from changed; nothing ever read it. `generated` derives an identifier when
-  an entry is created — the rename endpoint is what changes one afterwards,
-  and the marker's documentation says so rather than implying an entry is
-  immutable
+- `plugins/ldap/flatGeneric`: `entity.valueLabels` reaches a client at the top
+  level of its `flatResources` entry, beside `label` and `singularLabel`
 
-- `plugins/ldap/flatGeneric`: a nomenclature's `entity.valueLabels` reaches a
-  client as a top-level `valueLabels` on its `flatResources` entry, beside
-  `label` and `singularLabel`, instead of only nested in the schema that
-  entry carries. The nested copy stays, so nothing reading it breaks
-
-### Bug Fixes
-
-- `abstract/ldapFlat`: `renameEntry` never handed the request on to
-  `lib/ldapActions`, and an authorization plugin skips every check when it is
-  given no user — so a rename through it ran with none. No deployment was
-  exposed, the route being new in this release, but the method the route is
-  built on answered `200` to a caller holding no write on the branch. It is
-  bound to the request now, and answers `403`
-
-- `abstract/ldapFlat`: `renameEntry` accepted an identifier the schema
-  refuses on creation, checking only that it was neither empty nor full of
-  control characters, and answered `500` rather than `400` when it was. The
-  new value is held to the same `test` as a created one
-
-- `plugins/ldap/groups`: `GET /ldap/groups/:cn` returned the placeholder
-  member `--group-dummy-user` adds to keep a `groupOfNames` valid, which the
-  listing already hid — a client showed it as a person. It is hidden on both,
-  and recognised however the directory spells its DN. That comparison now
-  serves every reader of the placeholder: `plugins/ldap/enterpriseRules`
-  answered `409 … it still has 1 member(s)` to the deletion of a group
-  holding nothing but a differently spelled one, SCIM listed it as a member,
-  and `plugins/twake/james` resolved an address for it
-
-- `plugins/auth/llng` never initialized the LemonLDAP::NG handler: `--llng-ini`
-  was parsed and never read, and every request failed with a `500`. The
-  handler is now initialized from it when the server starts, and a file or a
-  configuration it cannot use stops the server with the reason, see
-  [Upgrading](docs/usage/upgrading.md#the-llng-handler-now-needs-a-working-configuration-at-startup)
-
-- Creating an entry that already exists answered `500` when two creations of
-  it raced past the existence checks, which a bulk import holding one person
-  twice does. The directory's refusal is recognised once, in
-  `lib/ldapActions`, so every creation route answers `409` alike — the flat
-  routes, `POST /ldap/groups`, the organization routes and the external
-  members `core/ldap/externalUsersInGroups` inserts, see
-  [Upgrading](docs/usage/upgrading.md#creating-an-entry-that-already-exists-answers-409)
-
-- `abstract/ldapFlat`: a pointer's `branch` was matched as a text suffix with
-  the comma optional, so `uid=x,xou=users,dc=example,dc=com` passed for being
-  inside `ou=users,dc=example,dc=com`. It is compared RDN by RDN now
-
-- `abstract/ldapFlat`: `searchEntriesByName` interpolated its value into an
-  LDAP filter raw. A name holding `*` became a pattern and matched whichever
-  entry came first; one holding `(` threw from the filter parser after the
-  entry was written, answering `500` on a creation that had succeeded
-
-- `abstract/ldapFlat`: a business rule that refused a creation answered `500`,
-  the add path having wrapped every error in a plain `Error`. A `409` reaches
-  the client as the ordinary outcome it is
-
-- `plugins/ldap/organizations`: `ou` accepted only `[a-zA-Z0-9._-]`, which
-  rejects the names real directories carry — every one with a space, an
-  apostrophe or an `&`. Loading such a directory failed on its first
-  organization
-
-- `plugins/ldap/groups`: refusing to remove the placeholder member answered
-  `500`. It answers `400`: the client asked for something it may not have,
-  which is not a fault of the server
-
-- `plugins/ldap/groups`: a listing that did not ask for `member` answered
-  `"member": [null]`, the absent value having been wrapped in an array. The
-  field is simply absent now
-
-- `plugins/auth/llng`: two instances of the plugin loaded with different
-  `--llng-ini` shared one configuration in silence — the handler keeps its
-  state in the module, so the last `init()` won and both instances then read
-  it. The second one is refused at startup, naming both files
-
-- `plugins/ldap/departmentSync`: moving or renaming an organization left the
-  organization and its whole subtree with the path of their former parent, and
-  rewrote the linked users and groups to those stale paths. The paths of the
-  tree are recomputed first now, then the linked entries copy them. The path
-  and link attributes are read from the schema roles first, as the enterprise
-  rules read them, then from the configuration
-
-- `test/helpers`: a failing LDIF load reported "Already exists" whatever the
-  real cause, every error being retried over the entries a half-finished first
-  attempt had left behind. Only a connection failure is retried now
+- `generatedFrom.regenerateOnChange` is gone — declared, documented, and read
+  nowhere. The rename endpoint is what changes an identifier
 
 ### Dependencies
 
-- `csv-parse` 7 trims ECMAScript whitespace: in bulk imports, cells padded
-  with a non-breaking space are now trimmed, and a BOM before the first header
-  no longer ends up in the column name
+- `csv-parse` 7 trims ECMAScript whitespace: cells padded with a non-breaking
+  space are now trimmed, and a BOM before the first header no longer ends up
+  in the column name
 
 ### Deprecations
 
