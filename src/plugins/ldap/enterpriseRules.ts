@@ -20,6 +20,24 @@
  * and domain rules validate the address that was submitted, never one the
  * server has already rewritten, and an identifier derived from that address
  * cannot influence the check that justified it.
+ *
+ * ## What "a reference" is, and the one case this cannot see
+ *
+ * Two rules — the delete guard and the rename cascade — have to find every
+ * entry naming another one by its DN. They look in two places, both declared
+ * by the schemas: every `pointer` (single, or under `items`) whose `branch`
+ * admits the target, and every attribute carrying the `members` or `owners`
+ * role. The second is not redundant: a group's member list cannot be a
+ * pointer, since pointer validation requires the target to exist and a group
+ * legitimately holds the DN of an external member that has none.
+ *
+ * A deployment whose schema stores a DN in an attribute that is neither of
+ * those — a plain `string` carrying no role — is therefore not covered: its
+ * value is left naming the old DN after a rename, and does not hold a
+ * deletion back. Declare such an attribute as a `pointer`, or give it the
+ * role it plays. No marker is invented here to cover the gap: a marker
+ * meaning "this happens to contain a DN" would be a third way of saying what
+ * `pointer` and the roles already say.
  * @group Plugins
  */
 import type { Request } from 'express';
@@ -30,6 +48,7 @@ import type { Hooks } from '../../hooks';
 import type {
   AttributesList,
   AttributeValue,
+  ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
 import type {
@@ -59,11 +78,101 @@ interface EntityBinding {
   label: string;
 }
 
+/**
+ * One attribute of one entity that may hold the DN of another entry, as the
+ * schemas declare it. See the module header for what counts as a reference.
+ */
+interface ReferringAttribute {
+  /** Entity whose entries may hold the reference */
+  binding: EntityBinding;
+  /** Attribute name, in the schema's own spelling */
+  name: string;
+  /** Its schema definition */
+  attr: SchemaAttribute;
+  /**
+   * The element rules of a DN-valued attribute: the attribute itself when it
+   * is a `pointer`, its `items` block otherwise. Undefined when the attribute
+   * was retained for the role it carries and declares no element rules — the
+   * test is the one `guardReferences` has always applied.
+   */
+  pointer?: { branch?: string[] };
+  /** True when the schema declares a list rather than a single value */
+  multiValued: boolean;
+}
+
+/**
+ * One place a DN is stored: which entry, in which attribute, and what that
+ * attribute currently holds there.
+ */
+export interface DnReference {
+  /** Entry holding the reference */
+  dn: string;
+  /** Attribute it sits in, in the schema's spelling */
+  attribute: string;
+  /**
+   * Every value the attribute holds in that entry, as the directory spells
+   * them. Kept whole rather than reduced to the matching one: a rewrite
+   * deletes the spelling the directory actually stores, not the one the
+   * caller typed, and it has to know whether the new DN is already there.
+   */
+  values: string[];
+  /** True when the schema declares a list rather than a single value */
+  multiValued: boolean;
+}
+
+/** What a reference rewrite did, and what it could not do. */
+export interface ReferenceRewriteReport {
+  /** References rewritten */
+  updated: number;
+  /**
+   * References left naming the old DN, counted per attribute. The referring
+   * DNs are deliberately absent: the caller owns the entry it renamed, not
+   * the entries pointing at it — the same care `checkUnique` and
+   * `guardReferences` take. They are in the log.
+   */
+  failed: { attribute: string; count: number }[];
+}
+
 /** Attribute values, always as a list of strings. */
 function valueList(value: AttributeValue | undefined): string[] {
   if (value === undefined || value === null) return [];
   if (Array.isArray(value)) return value.map(v => String(v));
   return [String(value)];
+}
+
+/**
+ * Read an attribute from an entry the directory returned.
+ *
+ * LDAP attribute names are case-insensitive and may come back with options
+ * (`member;x-origin`), while a schema is written in one spelling. Indexing
+ * the entry verbatim returned nothing whenever the two differed.
+ *
+ * @param entry entry as read from the directory
+ * @param name attribute name, in any case
+ * @returns its values, empty when the entry does not carry it
+ */
+function entryValues(entry: Record<string, unknown>, name: string): string[] {
+  const wanted = name.toLowerCase();
+  for (const [key, value] of Object.entries(entry)) {
+    if (key.split(';')[0].toLowerCase() === wanted)
+      return valueList(value as AttributeValue);
+  }
+  return [];
+}
+
+/**
+ * Canonical form of a DN, or the value itself when it cannot be parsed as
+ * one — an unparsable value is simply not the DN we are looking for.
+ *
+ * @param value value read from the directory
+ * @returns comparable form
+ */
+function asDn(value: string): string {
+  try {
+    return normalizeDn(value);
+  } catch {
+    return value;
+  }
 }
 
 /**
@@ -865,41 +974,352 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @throws ConflictError naming the first referencing entry
    */
   private async guardReferences(dn: string): Promise<void> {
+    for (const candidate of this.referringAttributes(dn)) {
+      // `ignore` (the default) says a reference may be left dangling by a
+      // deletion. It says nothing about a rename, which is why the rewrite
+      // below does not filter on it.
+      if (!candidate.pointer) continue;
+      if (candidate.attr.referentialIntegrity !== 'restrict') continue;
+
+      const referrer = (await this.searchReferrers(candidate, dn))[0];
+      if (referrer) {
+        // Same reasoning as checkUnique: the caller owns the DN being
+        // deleted, not the one pointing at it.
+        this.logger.warn(
+          `Delete of ${dn} refused: still referenced by ${String(referrer.dn)} (${candidate.name})`
+        );
+        throw new ConflictError(
+          `Cannot delete ${dn}: still referenced by another entry (${candidate.name})`
+        );
+      }
+    }
+  }
+
+  /**
+   * Every attribute of every loaded entity that could hold this DN.
+   *
+   * This is the traversal the delete guard and the rename cascade share: it
+   * knows no attribute name, only what the schemas declare — a `pointer`
+   * (single or under `items`) whose `branch` admits the DN's parent, or an
+   * attribute carrying the `members` or `owners` role. The module header says
+   * why both are needed and what neither covers.
+   *
+   * The branch narrowing is what keeps the searches few: only the attributes
+   * that could legally name an entry of this branch are looked into.
+   *
+   * @param dn entry being deleted or renamed
+   * @returns one candidate per (entity, attribute) pair
+   */
+  private referringAttributes(dn: string): ReferringAttribute[] {
     const parent = getParentDn(dn);
+    const out: ReferringAttribute[] = [];
     for (const binding of this.bindings()) {
       for (const [name, attr] of Object.entries(binding.schema.attributes)) {
         const pointer = attr.type === 'pointer' ? attr : attr.items;
-        if (!pointer) continue;
-        if (attr.referentialIntegrity !== 'restrict') continue;
-        // Only search when the deleted entry could be a legal target. The
-        // question is the one `isDnInBranch` answers, and asking it here too
-        // leaves one spelling of the rule in the code rather than four.
-        const branches = pointer.branch || [];
+        const byRole = hasRole(attr, 'members') || hasRole(attr, 'owners');
+        if (!pointer && !byRole) continue;
+        // Only look where the entry could be a legal target. The question is
+        // the one `isDnInBranch` answers, and asking it here too leaves one
+        // spelling of the rule in the code rather than four.
+        const branches = pointer?.branch || [];
         if (branches.length > 0 && !branches.some(b => isDnInBranch(parent, b)))
           continue;
-
-        const result = (await this.server.ldap.search(
-          {
-            paged: false,
-            scope: 'sub',
-            filter: `(${name}=${escapeLdapFilter(dn)})`,
-            attributes: ['dn'],
-          },
-          binding.base
-        )) as SearchResult;
-        const referrer = (result.searchEntries || [])[0];
-        if (referrer) {
-          // Same reasoning as checkUnique: the caller owns the DN being
-          // deleted, not the one pointing at it.
-          this.logger.warn(
-            `Delete of ${dn} refused: still referenced by ${String(referrer.dn)} (${name})`
-          );
-          throw new ConflictError(
-            `Cannot delete ${dn}: still referenced by another entry (${name})`
-          );
-        }
+        out.push({
+          binding,
+          name,
+          attr,
+          pointer,
+          multiValued: attr.type === 'array',
+        });
       }
     }
+    return out;
+  }
+
+  /**
+   * Entries whose attribute holds a given DN.
+   *
+   * Run without a request, like every other lookup here: these rules answer
+   * about the directory as a whole. A rename that only rewrote the references
+   * its caller happens to be able to read would leave the rest silently
+   * wrong; the writes are authorized one by one instead.
+   *
+   * @param candidate entity and attribute to look into
+   * @param dn DN to look for
+   * @returns the matching entries, carrying that attribute
+   */
+  private async searchReferrers(
+    candidate: ReferringAttribute,
+    dn: string
+  ): Promise<Record<string, unknown>[]> {
+    const result = (await this.server.ldap.search(
+      {
+        paged: false,
+        scope: 'sub',
+        filter: `(${candidate.name}=${escapeLdapFilter(dn)})`,
+        attributes: ['dn', candidate.name],
+      },
+      candidate.binding.base
+    )) as SearchResult;
+    return (result.searchEntries || []) as Record<string, unknown>[];
+  }
+
+  /**
+   * Every reference the directory holds to a DN.
+   *
+   * A reference is a stored value, so this answers about a DN whether or not
+   * an entry still carries it — which is what lets the rename ask again
+   * afterwards, and what lets a repair run find what an interrupted one left
+   * behind.
+   *
+   * @param dn DN to look for
+   * @returns one entry per (referring entry, attribute) pair
+   */
+  async findReferences(dn: string): Promise<DnReference[]> {
+    const found: DnReference[] = [];
+    const seen = new Set<string>();
+    await Promise.all(
+      this.referringAttributes(dn).map(candidate =>
+        this.server.ldap.queryLimit(async () => {
+          for (const entry of await this.searchReferrers(candidate, dn)) {
+            const holder = String(entry.dn);
+            // Two entities can share a branch — the shipped groups live
+            // inside the base the organizations declare — so the same entry
+            // can be reached twice for the same attribute. Rewriting it twice
+            // would fail the second time, on a value no longer there.
+            const key = `${asDn(holder)} ${candidate.name.toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            found.push({
+              dn: holder,
+              attribute: candidate.name,
+              values: entryValues(entry, candidate.name),
+              multiValued: candidate.multiValued,
+            });
+          }
+        })
+      )
+    );
+    return found;
+  }
+
+  /**
+   * Identity of a reference, for comparing the two passes below.
+   *
+   * @param reference reference to name
+   * @returns a key equal for the same attribute of the same entry
+   */
+  private static referenceKey(reference: DnReference): string {
+    return `${asDn(reference.dn)} ${reference.attribute.toLowerCase()}`;
+  }
+
+  /**
+   * Point every reference at the new DN.
+   *
+   * Each rewrite is attempted on its own and its failure collected rather
+   * than thrown: the rename itself has already been committed by the time
+   * this runs, so refusing the whole thing would report a directory state
+   * that does not exist. The caller answers 207 with this report.
+   *
+   * The write is a plain modify, never the group plugin's member API: that
+   * one fires member validation, which creates missing external members —
+   * work that has no business running while an existing DN is being respelled.
+   *
+   * **The directory may have done part of the work already.** OpenLDAP's
+   * `refint` overlay rewrites the attributes it is configured for — `member`,
+   * `owner`, `uniqueMember`, `manager`, `memberOf` in the stock configuration
+   * — the moment a `modifyDN` lands, and knows nothing of the rest. Which
+   * attributes, and whether the overlay is there at all, is a property of the
+   * deployment. So the references are looked for a second time, *after* the
+   * rename: what is still stale is what this has to write, and what is no
+   * longer there was written by the directory itself and counts as done.
+   * Re-adding a value the overlay had already added is refused with
+   * `attributeOrValueExists`, which would have been reported as a 207 on a
+   * directory that was in fact perfectly consistent.
+   *
+   * @param references what {@link findReferences} found, before the rename
+   * @param oldDn DN as it was
+   * @param newDn DN as it now is
+   * @param req request the rename came from, so each write is authorized
+   * @returns how many references now name the new DN, and what was left behind
+   */
+  async rewriteReferences(
+    references: DnReference[],
+    oldDn: string,
+    newDn: string,
+    req?: Request
+  ): Promise<ReferenceRewriteReport> {
+    const stale = asDn(oldDn);
+    const target = asDn(newDn);
+    if (stale === target) return { updated: 0, failed: [] };
+
+    // Bound to the request when there is one, so each rewrite is authorized
+    // on the branch it writes in. A caller-less rename — a migration script —
+    // writes with the server's own rights, as everything else here does.
+    const ldap = req
+      ? this.server.ldap.forRequest(req)
+      : {
+          modify: (dn: string, changes: ModifyRequest): Promise<boolean> =>
+            this.server.ldap.modify(dn, changes),
+        };
+
+    // What still names the old DN, and how the directory spells it now.
+    const remaining = new Map<string, DnReference>();
+    for (const reference of await this.findReferences(oldDn))
+      remaining.set(LdapEnterpriseRules.referenceKey(reference), reference);
+
+    // Everything found before the rename and no longer found now was
+    // respelled by the directory while we were not looking.
+    let updated = references.filter(
+      reference => !remaining.has(LdapEnterpriseRules.referenceKey(reference))
+    ).length;
+    const failed = new Map<string, number>();
+
+    await Promise.all(
+      [...remaining.values()].map(reference =>
+        this.server.ldap.queryLimit(async () => {
+          try {
+            await this.applyRewrite(ldap, reference, stale, target, newDn);
+            updated++;
+          } catch (err) {
+            // The operator needs both DNs and the attribute to finish by
+            // hand; the client is told the attribute and a count, no more.
+            this.logger.error(
+              `Rename ${oldDn} -> ${newDn}: could not rewrite ${reference.attribute} of ${reference.dn}: ${String(err)}`
+            );
+            failed.set(
+              reference.attribute,
+              (failed.get(reference.attribute) || 0) + 1
+            );
+          }
+        })
+      )
+    );
+
+    return {
+      updated,
+      failed: [...failed].map(([attribute, count]) => ({ attribute, count })),
+    };
+  }
+
+  /**
+   * Respell one reference, converging when the directory is respelling it at
+   * the same moment.
+   *
+   * `refint` does its fixups in a task of its own, *after* the `modifyDN` has
+   * answered, so a rewrite of one of its attributes is a race nobody can win
+   * by looking first: the overlay may land between the search and the modify.
+   * Both outcomes of that race say the same thing —
+   * `attributeOrValueExists` that the new DN is already in, `noSuchAttribute`
+   * that the old one is already out — so the entry is read again and the
+   * remaining half, if any, is applied. Anything else is a real failure.
+   *
+   * @param ldap directory to write through, bound to the request
+   * @param reference reference to rewrite
+   * @param stale canonical form of the old DN
+   * @param target canonical form of the new DN
+   * @param newDn new DN, as it is to be written
+   * @throws whatever the directory answered, when it is not a race
+   */
+  private async applyRewrite(
+    ldap: { modify(dn: string, changes: ModifyRequest): Promise<boolean> },
+    reference: DnReference,
+    stale: string,
+    target: string,
+    newDn: string
+  ): Promise<void> {
+    const changes = this.rewrite(reference, stale, target, newDn);
+    if (!changes) return;
+    try {
+      await ldap.modify(reference.dn, changes);
+      return;
+    } catch (err) {
+      const code = (err as { code?: number }).code;
+      // 20 attributeOrValueExists, 16 noSuchAttribute
+      if (code !== 20 && code !== 16) throw err;
+      this.logger.debug(
+        `Rewrite of ${reference.attribute} on ${reference.dn} met a concurrent one (code ${code}); reading it back`
+      );
+    }
+
+    const fresh = {
+      ...reference,
+      values: await this.freshValues(reference.dn, reference.attribute),
+    };
+    const retry = this.rewrite(fresh, stale, target, newDn);
+    // Nothing of the old DN is left: the directory finished the job itself.
+    if (!retry) return;
+    await ldap.modify(fresh.dn, retry);
+  }
+
+  /**
+   * Read one attribute of one entry, past the cache.
+   *
+   * The cached copy may predate a write nobody here made — `refint` fixing
+   * its own attributes — and the cache is only invalidated by the writes
+   * this process performs.
+   *
+   * @param dn entry to read
+   * @param name attribute to read
+   * @returns its values, as the directory spells them
+   */
+  private async freshValues(dn: string, name: string): Promise<string[]> {
+    this.server.ldap.invalidateCache(dn);
+    const result = (await this.server.ldap.search(
+      { paged: false, scope: 'base', attributes: [name] },
+      dn
+    )) as SearchResult;
+    const entry = result.searchEntries?.[0];
+    return entry ? entryValues(entry as Record<string, unknown>, name) : [];
+  }
+
+  /**
+   * The modification that respells one reference.
+   *
+   * A list has the stale values deleted and the new one added, so the other
+   * members of a group are left alone — and nothing is added when the new DN
+   * is already there, which is what a repair run finds. A single-valued
+   * attribute is replaced instead: `ldapActions` emits an `add` before a
+   * `delete`, which a single-valued attribute refuses, and the replacement is
+   * built from the values read so that a directory holding more than the
+   * schema says loses none of them.
+   *
+   * @param reference reference to rewrite
+   * @param stale canonical form of the old DN
+   * @param target canonical form of the new DN
+   * @param newDn new DN, as it is to be written
+   * @returns the changes, or undefined when there is nothing to do
+   */
+  private rewrite(
+    reference: DnReference,
+    stale: string,
+    target: string,
+    newDn: string
+  ): ModifyRequest | undefined {
+    const attribute = reference.attribute;
+    // Nothing moved, so nothing to respell. Worth saying rather than
+    // computing: the two branches below both read "the new DN is already
+    // there", and would delete the reference instead of leaving it.
+    if (stale === target) return undefined;
+    const obsolete = reference.values.filter(value => asDn(value) === stale);
+    // The entry matched the search but holds no value equal to the DN: the
+    // directory's matching rule was looser than a DN comparison. Nothing to
+    // rewrite, and nothing to guess.
+    if (obsolete.length === 0) return undefined;
+    const already = reference.values.some(value => asDn(value) === target);
+
+    if (!reference.multiValued) {
+      const kept: string[] = [];
+      for (const value of reference.values) {
+        const replaced = asDn(value) === stale ? newDn : value;
+        if (!kept.some(seen => asDn(seen) === asDn(replaced)))
+          kept.push(replaced);
+      }
+      return { replace: { [attribute]: kept } };
+    }
+    return already
+      ? { delete: { [attribute]: obsolete } }
+      : { delete: { [attribute]: obsolete }, add: { [attribute]: newDn } };
   }
 
   /**
