@@ -1024,7 +1024,15 @@ export default class LdapGroups extends DmPlugin {
     let entries: LdapList = {};
     for await (const r of _res) {
       for (const entry of r.searchEntries) {
-        const s = entry[this.cn] as string;
+        // An entry under the group base holding no main attribute is not a
+        // group but something keeping them — an `ou=` container, typically.
+        // The search asked for that attribute, so the client answers with an
+        // empty array rather than with nothing, and an array is truthy: `!s`
+        // let the container through and keyed the listing on `''`, which a
+        // console shows as a row with no name.
+        const raw = entry[this.cn];
+        if (Array.isArray(raw) && raw.length === 0) continue;
+        const s = raw as string;
         if (!s) continue;
         // `member` is absent when the caller did not ask for it: wrapping
         // `undefined` in an array made those listings read `"member":[null]`.
