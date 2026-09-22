@@ -561,7 +561,7 @@ export default class Calendar extends TwakePlugin {
       // `plugins/twake/james` interpolates addresses raw into a dozen paths
       // of this same WebAdmin: changing one of the two would have them
       // disagree on the wire with nothing but a mock to say which is right.
-      // See the issue tracking both.
+      // See issue #175, which tracks both.
       const url = new URL(`${this.webadminUrl}/users/${mail}`);
       url.searchParams.set('action', 'deleteData');
 
