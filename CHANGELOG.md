@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.8.0 (2026-09-22)
 
 An enterprise directory manager: the rules a real deployment needs, the
 endpoints an administration console reads, and a script that says what a
