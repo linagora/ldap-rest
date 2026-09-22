@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- `plugins/ldap/groups`: a branch under the group base — an `ou=` holding some
+  of the lists — was answered as a group of its own. The listing searches the
+  whole subtree and asks for the main attribute; an entry without one is
+  answered with an empty array, which the guard meant to skip a nameless entry
+  read as a name, so the branch reached the client keyed on `""`. A console
+  listing groups showed a row with no name, and an empty option wherever it
+  let one be picked
+
 ## v0.8.0 (2026-09-22)
 
 An enterprise directory manager: the rules a real deployment needs, the
