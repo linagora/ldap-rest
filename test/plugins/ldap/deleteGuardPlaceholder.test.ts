@@ -43,6 +43,14 @@ describe('Enterprise rules: the placeholder is not a member', function () {
   });
 
   afterEach(async () => {
+    // The guard under test is what stands between this and a clean
+    // directory: the second case deliberately gives the group a real member,
+    // so deleting straight away was refused and left the entry behind, run
+    // after run. Put it back to holding nothing but the placeholder, which
+    // the first case shows is deletable, then delete it.
+    await server.ldap
+      .modify(listDn, { replace: { member: placeholder } })
+      .catch(() => undefined);
     await server.ldap.delete(listDn).catch(() => undefined);
   });
 
