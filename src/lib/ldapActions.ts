@@ -154,13 +154,27 @@ const foldDn = (dn: string): string =>
  *
  * Without this the cache hands the very same object to every caller, and a
  * caller that edits the entry it was given edits what the next one reads.
- * Entries are copied one level deep: adding, replacing or dropping an
- * attribute on a returned entry cannot reach the cached copy. Attribute
- * *values* stay shared — mutating a value array in place would still show
- * through, which no caller does today.
+ *
+ * The entry is copied, and so is every value that is a list: an attribute
+ * comes back as an array whenever it holds — or may hold — several values,
+ * and `entry.member.push(…)` or `entry.objectClass.sort()` on a returned
+ * entry would otherwise be a write into the cache, serving the result to
+ * every later reader until the TTL ran out. No caller does that today; the
+ * copy is what keeps that from being a rule nobody wrote down.
+ *
+ * What stays shared is the bytes of a `Buffer` value, which only a caller
+ * writing into a binary attribute in place could reach, and which copying on
+ * every hit would pay for on every deployment that never does.
  */
 const cloneSearchResult = (result: SearchResult): SearchResult => ({
-  searchEntries: result.searchEntries.map(entry => ({ ...entry })),
+  searchEntries: result.searchEntries.map(entry =>
+    Object.fromEntries(
+      Object.entries(entry).map(([name, value]) => [
+        name,
+        Array.isArray(value) ? [...value] : value,
+      ])
+    )
+  ) as SearchResult['searchEntries'],
   searchReferences: [...result.searchReferences],
 });
 

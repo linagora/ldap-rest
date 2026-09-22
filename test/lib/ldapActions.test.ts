@@ -362,6 +362,30 @@ describe('ldapActions', function () {
       expect(await mailOf(cached, dnA)).to.include('before@test.org');
     });
 
+    it('hands out a copy a caller cannot write back into the cache', async () => {
+      const cached = build(60);
+      const direct = build(0);
+      await direct.add(dnA, person('cacheuser', 'before@test.org'));
+
+      // The first read stores a copy and answers the original, so the entry
+      // to poison is the one a *hit* hands back: its value arrays were the
+      // very arrays the cache holds.
+      await read(cached, dnA, ['objectClass']);
+      const hit = (await read(cached, dnA, ['objectClass']))
+        .searchEntries[0] as unknown as { objectClass: string[] };
+      const before = [...hit.objectClass];
+
+      // `objectClass` comes back as a list, which is what a caller would be
+      // tempted to sort or push into. Doing so used to write into the cache,
+      // and every later reader saw it until the TTL ran out.
+      hit.objectClass.push('poisoned');
+
+      const later = (await read(cached, dnA, ['objectClass']))
+        .searchEntries[0] as unknown as { objectClass: string[] };
+      expect(later.objectClass).to.deep.equal(before);
+      expect(later.objectClass).to.not.include('poisoned');
+    });
+
     it('keeps nothing from a read a write overtook', async () => {
       process.env.DM_LDAP_CACHE_TTL = '60';
       const dm = new DM();

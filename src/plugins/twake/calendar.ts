@@ -5,6 +5,7 @@ import { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { Hooks } from '../../hooks';
+import { isDnInBranch, rdnValue } from '../../lib/utils';
 
 /** A Twake Calendar registered user, as the WebAdmin API returns it */
 interface RegisteredUser {
@@ -64,6 +65,21 @@ export default class Calendar extends TwakePlugin {
     this.resourceDomain =
       (this.config.calendar_resource_domain as string) || '';
 
+    // The resource base is compared to an entry's DN part by part, so it has
+    // to be a full DN: `ou=resources` alone names no branch and would leave
+    // every resource unsynchronised without a word. Say so at startup rather
+    // than let the deployment wonder why nothing reaches Calendar.
+    const ldapBase = this.config.ldap_base;
+    if (
+      this.resourceBase &&
+      ldapBase &&
+      !isDnInBranch(this.resourceBase, ldapBase)
+    ) {
+      this.logger.warn(
+        `Calendar plugin: calendar_resource_base (${this.resourceBase}) is not a DN under ${ldapBase}; no entry will be taken for a resource`
+      );
+    }
+
     // LDAP attributes holding the user's first and last name (for registered users)
     this.firstnameAttr =
       (this.config.calendar_firstname_attribute as string) || 'givenName';
@@ -113,8 +129,18 @@ export default class Calendar extends TwakePlugin {
     ) => {
       const [dn, changes] = args;
 
-      // Check if this is a resource
-      // TODO: fetch objectClass if needed to verify
+      // Same branch guard as the add hook, and the branch alone: a modify
+      // carries the attributes that changed, so an untouched objectClass is
+      // simply not there to compare against calendar_resource_objectclass.
+      // That is enough here — the hook only fires for the calendarResource
+      // entity, whose objectClass its schema fixes, so the branch is what
+      // still tells a resource from an entry of the same entity rooted
+      // elsewhere. Without it, modifying such an entry patched the Calendar
+      // resource carrying the same id.
+      if (!this.isInResourceBranch(dn)) {
+        return;
+      }
+
       const resourceId = this.getResourceId(dn);
       if (!resourceId) {
         return;
@@ -145,7 +171,7 @@ export default class Calendar extends TwakePlugin {
 
       await this.callWebAdminApi(
         'ldapcalendarResourcemodifydone',
-        `${this.webadminUrl}/resources/${resourceId}`,
+        this.resourceUrl(resourceId),
         'PATCH',
         dn,
         JSON.stringify(updateData),
@@ -155,6 +181,18 @@ export default class Calendar extends TwakePlugin {
 
     // Hook when a resource is deleted from LDAP
     ldapcalendarResourcedeletedone: async (dn: string) => {
+      // The entry is already gone when this runs, so there is no objectClass
+      // left to read: the branch is the whole guard, as on the modify path.
+      // Reading the entry before it goes would mean a lookup on the chained
+      // `ldapcalendarResourcedelete` hook plus state carried from there to
+      // here, keyed by DN only — the delete path has no operation number to
+      // key it on, unlike modify — for a filter the entity's fixed
+      // objectClass makes moot. Not worth the machinery; the branch is the
+      // test that discriminates.
+      if (!this.isInResourceBranch(dn)) {
+        return;
+      }
+
       const resourceId = this.getResourceId(dn);
       if (!resourceId) {
         return;
@@ -162,7 +200,7 @@ export default class Calendar extends TwakePlugin {
 
       await this.callWebAdminApi(
         'ldapcalendarResourcedeletedone',
-        `${this.webadminUrl}/resources/${resourceId}`,
+        this.resourceUrl(resourceId),
         'DELETE',
         dn,
         null,
@@ -209,10 +247,7 @@ export default class Calendar extends TwakePlugin {
    */
   private isResource(dn: string, attributes: AttributesList): boolean {
     // Check if DN is under the resources branch
-    if (
-      this.resourceBase &&
-      !dn.toLowerCase().includes(this.resourceBase.toLowerCase())
-    ) {
+    if (!this.isInResourceBranch(dn)) {
       return false;
     }
 
@@ -227,6 +262,31 @@ export default class Calendar extends TwakePlugin {
     }
 
     return true;
+  }
+
+  /**
+   * Whether a DN is the configured resource branch or sits below it.
+   *
+   * Compared RDN by RDN ({@link isDnInBranch}), not as text: a substring test
+   * took `cn=Salle,ou=resourcesArchive,…` for a resource when the branch was
+   * given as `ou=resources`, and missed a DN written `cn=Salle, ou=resources,
+   * …` — the spaces a client puts after its commas are not part of the DN.
+   *
+   * No configured branch means no branch restriction, as before.
+   */
+  private isInResourceBranch(dn: string): boolean {
+    return !this.resourceBase || isDnInBranch(dn, this.resourceBase);
+  }
+
+  /**
+   * URL of one resource in the WebAdmin API.
+   *
+   * The id is a raw RDN value, so it can carry anything a directory accepts:
+   * `cn=Salle A/B` interpolated as such builds `/resources/Salle A/B`, a path
+   * naming another resource or none. Percent-encoding keeps it one segment.
+   */
+  private resourceUrl(resourceId: string): string {
+    return `${this.webadminUrl}/resources/${encodeURIComponent(resourceId)}`;
   }
 
   /**
@@ -260,9 +320,14 @@ export default class Calendar extends TwakePlugin {
     // Extract domain from DN or use configured domain
     const domain = this.resourceDomain || this.extractDomainFromDn(dn);
 
-    // Generate ID from DN (use cn or uid)
-    const id =
-      this.getResourceId(dn) || name.toLowerCase().replace(/\s+/g, '-');
+    // The id is read from the DN, and from the DN only, so that the three
+    // hooks name the same resource: the slug of the name used as a fallback
+    // here created a resource the modify and delete hooks — which have no
+    // such fallback — could never reach again.
+    const id = this.getResourceId(dn);
+    if (!id) {
+      return null;
+    }
 
     return {
       name,
@@ -274,12 +339,22 @@ export default class Calendar extends TwakePlugin {
   }
 
   /**
-   * Extract resource ID from DN
+   * The name a resource is known by in Calendar: the value of the entry's own
+   * RDN, escapes removed.
+   *
+   * Taken from the first RDN, whatever its attribute type, so that an entity
+   * whose mainAttribute is neither `cn` nor `uid` gets an id of its own. The
+   * previous derivation looked for `cn=`/`uid=` anywhere in the DN, so
+   * `o=Room 12,cn=zone,ou=resources,…` answered `zone`, its parent's id — a
+   * modify on that entry then patched another resource. It also cut the value
+   * at the first comma, escaped or not, so `cn=Salle\, 2` answered `Salle\`,
+   * an id two rooms could share.
+   *
+   * A DN with `cn=` or `uid=` as its own first RDN and no escape in its value
+   * — the shape a deployment has — answers exactly what it answered before.
    */
   private getResourceId(dn: string): string | null {
-    // Extract cn or uid from DN
-    const match = dn.match(/(?:cn|uid)=([^,]+)/i);
-    return match ? match[1] : null;
+    return rdnValue(dn) || null;
   }
 
   /**
@@ -481,6 +556,12 @@ export default class Calendar extends TwakePlugin {
     };
 
     try {
+      // Left as it is written, deliberately. `@` is legal in a path segment
+      // (RFC 3986), so encoding it buys nothing for an ordinary address, and
+      // `plugins/twake/james` interpolates addresses raw into a dozen paths
+      // of this same WebAdmin: changing one of the two would have them
+      // disagree on the wire with nothing but a mock to say which is right.
+      // See the issue tracking both.
       const url = new URL(`${this.webadminUrl}/users/${mail}`);
       url.searchParams.set('action', 'deleteData');
 
