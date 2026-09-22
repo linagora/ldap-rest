@@ -123,6 +123,10 @@ describe('Enterprise rules', () => {
     let subOrgDn: string;
     let otherOrgDn: string;
     let previousOrganizationSchema: string | undefined;
+    // What this fixture had to create to give the organization a domain, in
+    // creation order; only these are removed, so a directory that already
+    // holds its nomenclature keeps it.
+    const createdForDomain: string[] = [];
 
     before(function () {
       skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
@@ -176,6 +180,36 @@ describe('Enterprise rules', () => {
         }
       }
 
+      // The domain `orgDn` links to. Without it the link resolves to no name,
+      // which lifts the restriction for the whole subtree — so the two cases
+      // below read a rule that never runs, and the one expecting a refusal
+      // gets the address created instead.
+      for (const [dn, attrs] of [
+        [
+          `ou=nomenclature,${base}`,
+          { objectClass: ['top', 'organizationalUnit'], ou: 'nomenclature' },
+        ],
+        [
+          `ou=domains,ou=nomenclature,${base}`,
+          { objectClass: ['top', 'organizationalUnit'], ou: 'domains' },
+        ],
+        [
+          `dc=example,ou=domains,ou=nomenclature,${base}`,
+          {
+            objectClass: ['top', 'domain', 'domainRelatedObject'],
+            dc: 'example',
+            associatedDomain: 'example.com',
+          },
+        ],
+      ] as [string, Record<string, unknown>][]) {
+        try {
+          await server.ldap.add(dn, attrs as never);
+          createdForDomain.push(dn);
+        } catch (e) {
+          // already there, and not ours to remove
+        }
+      }
+
       const flat = new LdapFlatGeneric(server);
       await server.registerPlugin('ldapFlatGeneric', flat);
       const organizations = new LdapOrganizations(server);
@@ -192,6 +226,8 @@ describe('Enterprise rules', () => {
 
     after(async () => {
       for (const dn of [subOrgDn, orgDn, otherOrgDn])
+        await server.ldap.delete(dn).catch(() => undefined);
+      for (const dn of [...createdForDomain].reverse())
         await server.ldap.delete(dn).catch(() => undefined);
       // The whole suite shares one process: leaving this set would hand the
       // organization schema to every server built afterwards.
