@@ -408,8 +408,9 @@ describe('Twake Calendar Plugin', function () {
   });
 
   describe('deleteUserData', () => {
-    // The address goes out percent-encoded — `user@test.org` — since it is
-    // a value in a path, not a path; the WebAdmin decodes it back
+    // The address goes out as it is written — `@` is legal in a path
+    // segment, so nothing encodes it — which is what the plugin does
+    // deliberately, see the comment on `deleteUserData` (issue #175)
     it('should call POST /users/{mail}?action=deleteData and return taskId', async () => {
       const deleteDataScope = nock(
         process.env.DM_CALENDAR_WEBADMIN_URL || 'http://localhost:8080'
