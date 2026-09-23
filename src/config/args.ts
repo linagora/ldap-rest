@@ -125,6 +125,7 @@ export interface Config {
 
   // auth/llng
   llng_ini?: string;
+  llng_username_header?: string;
 
   // auth/token
   auth_token?: string[];
@@ -140,6 +141,7 @@ export interface Config {
 
   // auth/openidconnect
   oidc_server?: string;
+  oidc_username_claim?: string;
   oidc_client_id?: string;
   oidc_client_secret?: string;
   base_url?: string;
@@ -160,6 +162,7 @@ export interface Config {
    */
   authz_filter_attached_entries?: boolean;
   authz_unresolved_user?: string;
+  authz_identity?: string;
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
@@ -741,6 +744,12 @@ const configArgs: ConfigTemplate = [
 
   // Lemonldap options
   ['--llng-ini', 'DM_LLNG_INI', '/etc/lemonldap-ng/lemonldap-ng.ini'],
+  // A header LemonLDAP::NG exports carrying the caller's login, published as
+  // `req.userName`. Empty means none, and `whatToTrace` — the value the
+  // handler writes to `Lm-Remote-User` — is then both values. Configure it
+  // when `whatToTrace` traces a mail or a display name and rules are to be
+  // written on logins (`--authz-identity req.userName`).
+  ['--llng-username-header', 'DM_LLNG_USERNAME_HEADER', ''],
 
   // Common to every authentication plugin: restrict it to path prefixes
   [
@@ -783,6 +792,11 @@ const configArgs: ConfigTemplate = [
   // across the whole tree. An anonymous request is not this case: it is
   // skipped as before.
   ['--authz-unresolved-user', 'DM_AUTHZ_UNRESOLVED_USER', 'deny'],
+  // Which of the two values an authenticator publishes the authorization
+  // plugins key on: `req.user`, this server's identifier for the caller, or
+  // `req.userName`, the caller under a name a person would use. The default
+  // keeps every existing rule meaning what it meant.
+  ['--authz-identity', 'DM_AUTHZ_IDENTITY', 'req.user'],
 
   // Auth authzPerBranch plugin
   [
@@ -849,6 +863,12 @@ const configArgs: ConfigTemplate = [
 
   // Auth OpenID Connect plugin
   ['--oidc-server', 'DM_OIDC_SERVER', ''],
+  // Which claim names the caller for a human reader. The `sub` is what
+  // authorization rules are keyed on by default, and it is an opaque
+  // provider identifier — `auth0|…`, a UUID — that nobody can write a rule
+  // for without looking it up per administrator. This claim is published as
+  // `req.userName`, which `--authz-identity` can key on instead.
+  ['--oidc-username-claim', 'DM_OIDC_USERNAME_CLAIM', 'sub'],
   ['--oidc-client-id', 'DM_OIDC_CLIENT_ID', ''],
   ['--oidc-client-secret', 'DM_OIDC_CLIENT_SECRET', ''],
   ['--base-url', 'DM_BASE_URL', ''],

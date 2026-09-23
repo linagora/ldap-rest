@@ -11,7 +11,12 @@ import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import { forbidden } from '../../lib/expressFormatedResponses';
-import type { DmRequest } from '../../lib/auth/base';
+import {
+  assertIdentityMode,
+  identityFor,
+  warnUnmatchedRuleKeys,
+  type DmRequest,
+} from '../../lib/auth/base';
 
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,
@@ -61,8 +66,12 @@ export default class AuthzPerRoute extends DmPlugin {
   roles: Role[] = ['authz'] as const;
   private rules: Map<string, AuthzRule[]> = new Map();
 
+  /** Said once: a rule keyed on a value the authenticator did not publish. */
+  private fallbackWarned = false;
+
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
+    assertIdentityMode(this.config, this.constructor.name);
 
     const entries = this.config.authz_per_route ?? [];
     for (const entry of entries) {
@@ -169,12 +178,49 @@ export default class AuthzPerRoute extends DmPlugin {
     return false;
   }
 
+  /**
+   * Say, once every plugin is loaded, when no rule can ever match.
+   *
+   * The rules are keyed on identities, and which values an authenticator
+   * publishes is the whole subject of #187: a rule written for a token name
+   * is inert behind OpenID Connect, where the identity is a `sub`. Inert is
+   * the part worth a line — nothing is refused, so nothing looks wrong.
+   */
+  afterLoad(): void {
+    warnUnmatchedRuleKeys(
+      [...this.rules.keys()],
+      this.server.loadedPlugins,
+      this.name,
+      this.logger
+    );
+  }
+
   api(app: Express): void {
     app.use((req: Request, res: Response, next: NextFunction) => {
-      const user = (req as DmRequest).user;
+      const { value: user, fellBack } = identityFor(
+        req as DmRequest,
+        this.config
+      );
+      if (fellBack && !this.fallbackWarned) {
+        this.fallbackWarned = true;
+        this.logger.warn(
+          `${this.name}: --authz-identity asks for req.userName and the ` +
+            'authenticator published none, so rules are matched against ' +
+            'req.user instead'
+        );
+      }
 
       // No authenticated user yet — let upstream auth plugin handle 401
       if (!user) {
+        // Said, rather than passed in silence: this is right for the
+        // anonymous path the documentation describes, and it is also what a
+        // mistyped prefix, a missing authentication plugin or a route
+        // outside every prefix look like — in which case the whole route
+        // ACL is a no-op and nothing else says so.
+        this.logger.warn(
+          `${this.name}: ${req.method} ${req.path} carries no identity, so ` +
+            'no route rule applies to it'
+        );
         return next();
       }
 

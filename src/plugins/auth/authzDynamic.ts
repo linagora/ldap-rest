@@ -390,7 +390,12 @@ export default class AuthzDynamic extends AuthBase {
    * scoped to their tenant's branches" deserves to hear that on the first
    * line of its log rather than from an incident.
    */
+  protected identitySource(): string {
+    return "req.user and req.userName: the token's tenant";
+  }
+
   afterLoad(): void {
+    super.afterLoad();
     const mine = this.pathPrefixes;
     const covers = (a: string[], b: string[]): boolean =>
       a.length === 0 ||
@@ -576,7 +581,7 @@ export default class AuthzDynamic extends AuthBase {
         // What this plugin needs is its token on the request, so its own
         // ACLs are enforced — which is the whole point of not stepping
         // aside any more.
-        req.user ??= match.tenant;
+        if (!req.user) this.publishIdentity(req, match.tenant);
         (req as AuthzDynamicRequest).authzToken = match;
         // Run `next` (and everything downstream) inside an AsyncLocalStorage
         // frame so authz hooks can read the token even when plugins don't

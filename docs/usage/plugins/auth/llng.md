@@ -31,6 +31,12 @@ The identity header is read whatever case the handler wrote it in, and
 whatever the client sent under that name is dropped before the handler runs:
 only the handler may name the caller.
 
+`req.user` is what `whatToTrace` traces, which is often a mail or a display
+name. `--llng-username-header` names a second header LemonLDAP::NG exports
+carrying the login, published as `req.userName`; with
+`--authz-identity req.userName`, rules are then written on logins. Export it
+from the LLNG configuration as you would any other header.
+
 ## Prerequisites
 
 1. **LemonLDAP::NG Handler**: The `lemonldap-ng-handler` npm package (optional dependency)

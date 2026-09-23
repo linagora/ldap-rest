@@ -12,6 +12,14 @@ import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
 export default class AuthToken extends AuthBase {
+  protected knownIdentities(): string[] {
+    return [...new Set(this.tokenMap.values())];
+  }
+
+  protected identitySource(): string {
+    return 'req.user and req.userName: the name given in --auth-token';
+  }
+
   name = 'authToken';
   roles: Role[] = ['auth'] as const;
   private tokenMap: Map<string, string> = new Map(); // token -> name
@@ -53,7 +61,9 @@ export default class AuthToken extends AuthBase {
       return unauthorized(res);
     }
 
-    req.user = userName;
+    // The name given in `--auth-token`, which is what a rule keyed on this
+    // plugin names: the same value under both keys.
+    this.publishIdentity(req, userName);
     next();
   }
 }

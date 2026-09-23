@@ -281,9 +281,10 @@ see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
 
 #### Common to every authorization plugin
 
-| CLI                       | Env                        | Default | Description                                                                                                                          |
-| ------------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`  | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning |
+| CLI                       | Env                        | Default    | Description                                                                                                                                                                                                                       |
+| ------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`     | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning                                                                                              |
+| `--authz-identity`        | `DM_AUTHZ_IDENTITY`        | `req.user` | Which value rules are keyed on: `req.user`, this server's identifier for the caller, or `req.userName`, the caller under a name a person would use. See [what a rule is keyed on](plugins/auth/README.md#what-a-rule-is-keyed-on) |
 
 Read by the plugins that resolve an identity before judging it —
 `core/auth/authzPerBranch` and `core/auth/authzLinid1`.

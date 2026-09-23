@@ -11,7 +11,7 @@ import type { SearchOptions } from 'ldapts';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
-import type { DmRequest } from '../auth/base';
+import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
 import type {
   AttributesList,
   ModifyRequest,
@@ -52,6 +52,7 @@ export default abstract class AuthzBase extends DmPlugin {
     // `Allow`, `true` or a trailing space would all have meant `deny` in
     // silence — 403s for everyone, with nothing saying the value was not
     // understood.
+    assertIdentityMode(this.config, this.constructor.name);
     const policy = (this.config.authz_unresolved_user as string) ?? 'deny';
     if (
       !(AuthzBase.UNRESOLVED_POLICIES as readonly string[]).includes(policy)
@@ -230,8 +231,20 @@ export default abstract class AuthzBase extends DmPlugin {
    * @returns the resolved user, or null when the policy is to allow it
    * @throws ForbiddenError when the policy is to deny it
    */
+  /** Said once: a rule keyed on a value the authenticator did not publish. */
+  private fallbackWarned = false;
+
   protected async resolveCaller(req: DmRequest): Promise<string | null> {
-    const identity = req.user as string;
+    const { value, fellBack } = identityFor(req, this.config);
+    if (fellBack && !this.fallbackWarned) {
+      this.fallbackWarned = true;
+      this.logger.warn(
+        `${this.name}: --authz-identity asks for req.userName and the ` +
+          'authenticator published none, so permissions are read for ' +
+          'req.user instead. Rules written on logins will not match'
+      );
+    }
+    const identity = value as string;
     const now = Date.now();
     const cached = this.resolutionCache.get(identity);
     let user: string | null;

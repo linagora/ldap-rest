@@ -146,19 +146,41 @@ export default class AuthLLNG extends AuthBase {
   }
 
   /**
+   * A header's value, whatever case it was written in.
+   *
+   * @param req request the handler has just passed on
+   * @param lowercased the header's name, already lower-cased
+   * @returns its value, or undefined when it is not there
+   */
+  private static headerValue(
+    req: DmRequest,
+    lowercased: string
+  ): string | undefined {
+    for (const [key, value] of Object.entries(req.headers))
+      if (key.toLowerCase() === lowercased && typeof value === 'string')
+        return value;
+    return undefined;
+  }
+
+  /**
    * The identity the handler vouched for, whatever case it wrote it in.
    *
    * @param req request the handler has just passed on
    * @returns the identity, or undefined when the handler named nobody
    */
   private static vouchedIdentity(req: DmRequest): string | undefined {
-    for (const [key, value] of Object.entries(req.headers))
-      if (
-        key.toLowerCase() === AuthLLNG.USER_HEADER &&
-        typeof value === 'string'
-      )
-        return value;
-    return undefined;
+    return AuthLLNG.headerValue(req, AuthLLNG.USER_HEADER);
+  }
+
+  protected identitySource(): string {
+    const header = (this.config.llng_username_header as string) || '';
+    return (
+      "req.user: LemonLDAP::NG's whatToTrace, via Lm-Remote-User; " +
+      (header
+        ? `req.userName: the ${header} header LLNG exports`
+        : 'req.userName: the same value, until --llng-username-header names ' +
+          'an exported header')
+    );
   }
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
@@ -186,7 +208,14 @@ export default class AuthLLNG extends AuthBase {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      req.user = user;
+      // A second header, when the deployment exports one: `whatToTrace` is
+      // often a mail or a display name, and a rule written on logins needs
+      // the login. Absent, both values are what the handler traced.
+      const header = (this.config.llng_username_header as string) || '';
+      const named = header
+        ? AuthLLNG.headerValue(req, header.toLowerCase())
+        : undefined;
+      this.publishIdentity(req, user, named);
       next();
     });
   }
