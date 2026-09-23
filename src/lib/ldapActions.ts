@@ -601,6 +601,37 @@ class ldapActions {
     };
   }
 
+  /**
+   * Hand a search result to `ldapsearchfilter`, which may drop entries the
+   * caller is not allowed to see.
+   *
+   * Applied on every return path of `search`, and deliberately after the
+   * cache: `ldapsearchresult` fires before caching and knows no request, so
+   * what it removed for one caller would be served to the next. A paginated
+   * search is filtered chunk by chunk, as it is consumed.
+   */
+  private filterForCaller(
+    value: SearchResult | AsyncGenerator<SearchResult>,
+    req?: Request
+  ): SearchResult | AsyncGenerator<SearchResult> | Promise<SearchResult> {
+    if (!this.parent.hooks.ldapsearchfilter) return value;
+    const hook = this.parent.hooks.ldapsearchfilter;
+    const one = async (chunk: SearchResult): Promise<SearchResult> => {
+      const [filtered] = await launchHooksChained(hook, [chunk, req]);
+      return filtered;
+    };
+    if (
+      typeof (value as AsyncGenerator<SearchResult>)[Symbol.asyncIterator] ===
+      'function'
+    ) {
+      const source = value as AsyncGenerator<SearchResult>;
+      return (async function* (): AsyncGenerator<SearchResult> {
+        for await (const chunk of source) yield await one(chunk);
+      })();
+    }
+    return one(value as SearchResult);
+  }
+
   async search(
     options: SearchOptions,
     base: string = this.base,
@@ -634,7 +665,7 @@ class ldapActions {
       const cached = this.searchCache.get(cacheKey);
       if (cached) {
         this.logger.debug(`LDAP search cache hit: ${digestKey(cacheKey)}`);
-        return cloneSearchResult(cached);
+        return this.filterForCaller(cloneSearchResult(cached), req);
       }
     }
 
@@ -676,18 +707,18 @@ class ldapActions {
             `LDAP search not cached, a write overtook it: ${digestKey(cacheKey)}`
           );
         }
-        return result;
+        return this.filterForCaller(result, req);
       }
 
       // For paginated searches, return a wrapped generator that releases connection when done
       if (opts.paged) {
-        return this.wrapPaginatedSearch(
-          res as AsyncGenerator<SearchResult>,
-          pooled
-        );
+        return this.filterForCaller(
+          this.wrapPaginatedSearch(res as AsyncGenerator<SearchResult>, pooled),
+          req
+        ) as AsyncGenerator<SearchResult>;
       }
 
-      return res;
+      return this.filterForCaller(res as unknown as SearchResult, req);
     } finally {
       // For non-paginated searches, release connection immediately
       if (!opts.paged) {

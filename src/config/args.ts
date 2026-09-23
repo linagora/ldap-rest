@@ -57,6 +57,15 @@ export interface Config {
 
   // LDAP groups plugin
   ldap_group_base?: string;
+
+  /**
+   * Judge an attached entry by the organization it hangs off rather than by
+   * the branch it is stored in, and filter listings accordingly. Off by
+   * default: where a branch is a tenant rather than a department, opening a
+   * listing across branches is opening a door between customers.
+   */
+  authz_filter_attached_entries?: boolean;
+
   ldap_groups_main_attribute?: string;
   group_class?: string[];
   group_classes?: string[];
@@ -422,6 +431,13 @@ const configArgs: ConfigTemplate = [
   ],
 
   // LDAP groups plugin
+
+  [
+    '--authz-filter-attached-entries',
+    'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
+    false,
+    'boolean',
+  ],
 
   ['--ldap-group-base', 'DM_LDAP_GROUP_BASE', ''],
   ['--ldap-groups-main-attribute', 'DM_LDAP_GROUPS_MAIN_ATTRIBUTE', 'cn'],

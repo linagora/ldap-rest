@@ -15,6 +15,7 @@ import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
+  AttributeValue,
 } from '../ldapActions';
 import { getParentDn } from '../utils';
 
@@ -35,6 +36,50 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   extractBranchDn(dn: string): string {
     return getParentDn(dn);
+  }
+
+  /**
+   * The branch a write is judged against.
+   *
+   * An account is stored in the same `ou=users` as everyone else, so its
+   * parent says nothing about who may touch it: what governs it is the
+   * organization it is attached to. `submitted` is the link the request
+   * carries, for an entry being created or moved; otherwise the stored one
+   * is read. An entry attached nowhere falls back to its parent, which is
+   * what an organization or a nomenclature value wants.
+   */
+  protected async effectiveBranch(
+    dn: string,
+    submitted?: AttributeValue
+  ): Promise<string> {
+    const linkAttr = this.config.ldap_organization_link_attribute;
+    if (!linkAttr || !this.config.authz_filter_attached_entries)
+      return this.extractBranchDn(dn);
+
+    const first = (v: AttributeValue | undefined): string | undefined => {
+      if (v === undefined || v === null) return undefined;
+      const one = Array.isArray(v) ? v[0] : v;
+      const str = String(one);
+      return str.length > 0 ? str : undefined;
+    };
+
+    const given = first(submitted);
+    if (given) return given;
+
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: [linkAttr] },
+        dn
+      )) as SearchResult;
+      const stored = first(
+        res.searchEntries?.[0]?.[linkAttr] as AttributeValue
+      );
+      if (stored) return stored;
+    } catch {
+      // Unreadable or absent: fall back to the parent, which is what an
+      // entry with no organization of its own is judged on anyway.
+    }
+    return this.extractBranchDn(dn);
   }
 
   /**
@@ -150,7 +195,7 @@ export default abstract class AuthzBase extends DmPlugin {
         }
       } else {
         // For other modifications, check write permission on the entry's current branch
-        const branchToCheck = this.extractBranchDn(dn);
+        const branchToCheck = await this.effectiveBranch(dn);
         const permissions = await this.getUserPermissions(user, branchToCheck);
 
         if (!permissions.write) {
@@ -225,9 +270,26 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      const permissions = await this.getUserPermissions(user, base);
+      // Opted in, an administrator reads the directory whole — the
+      // organization tree, the groups, the nomenclatures — and what is held
+      // to a branch is the accounts, recognised one entry at a time by
+      // `ldapsearchfilter` below. Refusing the search here would take the
+      // tree and the reference data with it.
+      //
+      // Off, which is the default, the branch decides as before. Where a
+      // branch is a tenant rather than a department, letting a listing cross
+      // it is letting a customer read another.
+      if (this.config.authz_filter_attached_entries) {
+        const branches = await this.getAuthorizedBranches(user);
+        if (branches.length === 0) {
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} administers no branch`
+          );
+        }
+        return [base, opts, req];
+      }
 
-      // Check read permission
+      const permissions = await this.getUserPermissions(user, base);
       if (!permissions.read) {
         throw new Error(
           `[authz-forbidden] User ${req!.user} does not have read permission for branch ${base}`
@@ -235,6 +297,48 @@ export default abstract class AuthzBase extends DmPlugin {
       }
 
       return [base, opts, req];
+    },
+
+    /**
+     * Drop the accounts attached outside the branches this caller manages.
+     *
+     * Runs after the cache and carries the request, so what one caller may
+     * not see never reaches another. An entry with no organization link —
+     * an organization, a group, a nomenclature value — is left alone: those
+     * are the reference data every administrator reads.
+     */
+    ldapsearchfilter: async ([result, req]: [
+      SearchResult,
+      DmRequest?,
+    ]): Promise<[SearchResult, DmRequest?]> => {
+      if (!this.config.authz_filter_attached_entries) return [result, req];
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      if (!linkAttr || this.shouldSkipAuthorization(req)) return [result, req];
+      if (!result?.searchEntries?.length) return [result, req];
+
+      const user = await this.resolveUser(req!.user!);
+      if (!user) return [result, req];
+      const branches = await this.getAuthorizedBranches(user);
+      if (branches.length === 0) return [result, req];
+
+      const within = (dn: string): boolean => {
+        const target = dn.toLowerCase();
+        return branches.some(b => {
+          const branch = b.toLowerCase();
+          return target === branch || target.endsWith(`,${branch}`);
+        });
+      };
+
+      result.searchEntries = result.searchEntries.filter(entry => {
+        const link = entry[linkAttr];
+        if (link === undefined || link === null) return true;
+        const values = (Array.isArray(link) ? link : [link]).map(String);
+        if (values.length === 0) return true;
+        // Attached somewhere: it is visible only from there.
+        return values.some(within);
+      });
+
+      return [result, req];
     },
 
     getOrganisationTop: async ([req, defaultTop]: [
@@ -349,7 +453,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // Check delete permission on the branch of every target entry.
       const targets = Array.isArray(dn) ? dn : [dn];
       for (const target of targets) {
-        const branchToCheck = this.extractBranchDn(target);
+        const branchToCheck = await this.effectiveBranch(target);
         const permissions = await this.getUserPermissions(user, branchToCheck);
         if (!permissions.delete) {
           throw new Error(
