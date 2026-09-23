@@ -70,7 +70,18 @@ export default class AuthzPerRoute extends DmPlugin {
   private fallbackWarned = false;
   /** Routes already reported as reached with no identity. */
   private unidentifiedRoutes = new Set<string>();
-  /** How many of them to remember; past it, every one is reported again. */
+  /** How many such lines have been written at `warn`. */
+  private unidentifiedWarnings = 0;
+  /**
+   * How many of those lines to write, and how many routes to remember.
+   *
+   * The bound that matters is on the *log*, not on the set: `req.path` is a
+   * concrete path, identifiers included, so a client decides how many
+   * distinct ones exist. Bounding only the set leaves every path it never
+   * had room for unseen for ever, and each request for one writes the line
+   * again — the bound holds the memory and loses the thing it was there to
+   * protect.
+   */
   private static readonly UNIDENTIFIED_MAX = 1000;
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
@@ -225,18 +236,19 @@ export default class AuthzPerRoute extends DmPlugin {
         // no-op, so the first time each route is reached that way is worth
         // a line.
         const route = `${req.method} ${req.path}`;
-        if (!this.unidentifiedRoutes.has(route)) {
-          if (this.unidentifiedRoutes.size < AuthzPerRoute.UNIDENTIFIED_MAX)
-            this.unidentifiedRoutes.add(route);
-          this.logger.warn(
-            `${this.name}: ${route} carries no identity, so no route rule ` +
-              'applies to it'
-          );
+        const line =
+          `${this.name}: ${route} carries no identity, so no route rule ` +
+          'applies to it';
+        const seen = this.unidentifiedRoutes.has(route);
+        if (
+          !seen &&
+          this.unidentifiedWarnings < AuthzPerRoute.UNIDENTIFIED_MAX
+        ) {
+          this.unidentifiedWarnings++;
+          this.unidentifiedRoutes.add(route);
+          this.logger.warn(line);
         } else {
-          this.logger.debug(
-            `${this.name}: ${route} carries no identity, so no route rule ` +
-              'applies to it'
-          );
+          this.logger.debug(line);
         }
         return next();
       }
