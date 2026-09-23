@@ -171,12 +171,16 @@ export default abstract class AuthBase extends DmPlugin {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.authMethod(req, res, async (): Promise<void> => {
       try {
-        if (this.hooks?.onAuth) {
-          [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
-            req,
-            res,
-          ]);
-        }
+        // Unconditionally, as `beforeAuth` above. It used to run only when
+        // the authenticating plugin declared a hook of its own named
+        // `onAuth` — a flag no plugin in this repository sets, so the
+        // documented extension point never fired for anyone: the auth
+        // README's worked example, the OIDC page's, and `rateLimit`'s own
+        // description of how it tracks failed attempts.
+        [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
+          req,
+          res,
+        ]);
         next();
       } catch (err) {
         serverError(res, err as Error);

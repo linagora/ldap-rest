@@ -1,5 +1,16 @@
 import type { Express, RequestHandler, Response } from 'express';
-import { auth, requiresAuth, ConfigParams } from 'express-openid-connect';
+import oidc from 'express-openid-connect';
+import type { ConfigParams } from 'express-openid-connect';
+
+// Taken off the default export, not imported by name. The package is
+// CommonJS, and Node detects the named exports an ESM file may import by
+// reading `module.exports` statically — `auth` is a plain property there and
+// is seen, `requiresAuth` arrives through a spread and is not. A named
+// import of it type-checks (the `.d.ts` declares it) and links under a test
+// runner's lenient interop, then fails at startup on the only path a
+// deployment uses: `Named export 'requiresAuth' not found`. `core/auth/llng`
+// is built the same way, for the same reason.
+const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
@@ -172,7 +183,8 @@ export default class OpenIDConnect extends AuthBase {
    * The dispatcher is mounted before any plugin can register a route, runs
    * only the plugin whose claim is most specific, and hands `authMethod`
    * the `beforeAuth`/`afterAuth` hooks — the three layers, in a place where
-   * order is not a configuration accident.
+   * order is not a configuration accident. (`afterAuth` used to be gated on
+   * a flag nothing sets, so this plugin's own copy of it never ran either.)
    *
    * @param app the express application
    */

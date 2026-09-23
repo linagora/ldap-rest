@@ -39,6 +39,11 @@
 
 ### Bug Fixes
 
+- `lib/auth/base`: the `afterAuth` hooks ran only when the authenticating
+  plugin declared an `onAuth` hook of its own, which no plugin does — so a
+  documented extension point fired for nobody. They run like `beforeAuth`
+  now, on every authenticated request
+
 - `core/ldap/organizations`: a node holding more children than the directory
   will list in one answer made `/subnodes` return `200 []` — every failure
   was read as "no children", so a console drew an empty tree and only
