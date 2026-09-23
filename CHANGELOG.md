@@ -12,6 +12,14 @@
   `crowdsec` key their protection on. The list matches on the module now,
   and every instance of a priority module is loaded in the first pass
 
+- `core/auth/openidconnect`: the plugin mounted its own middleware instead of
+  registering with the authentication dispatcher, so `auth_path_prefix` was
+  accepted and ignored, a named instance could mount after the plugins
+  reading what it publishes — `core/auth/authzPerRoute` judging every rule
+  before `req.user` existed, and passing what it cannot identify — and a
+  second authentication composed as an AND. It is an `AuthBase` now —
+  [notes](docs/usage/upgrading.md#openid-connect-honours-auth_path_prefix)
+
 - `core/auth/authzDynamic`: the plugin stepped aside as soon as another
   authenticator had identified the request, so its token ACLs were applied to
   nothing — with `core/auth/token` loaded beside it, a static token reached
@@ -30,6 +38,11 @@
   [notes](docs/usage/upgrading.md#an-identity-that-does-not-resolve-is-refused)
 
 ### Bug Fixes
+
+- `lib/auth/base`: the `afterAuth` hooks ran only when the authenticating
+  plugin declared an `onAuth` hook of its own, which no plugin does — so a
+  documented extension point fired for nobody. They run like `beforeAuth`
+  now, on every authenticated request
 
 - `core/ldap/organizations`: a node holding more children than the directory
   will list in one answer made `/subnodes` return `200 []` — every failure

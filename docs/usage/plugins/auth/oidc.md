@@ -35,6 +35,39 @@ Install the optional dependency:
 npm install express-openid-connect
 ```
 
+## Scope
+
+Like every other authentication plugin, this one registers with the server's
+authentication dispatcher, so `auth_path_prefix` says which paths it guards:
+
+```bash
+--plugin 'core/auth/openidconnect:oidc:{"auth_path_prefix":"/api/admin"}'
+```
+
+Until 0.8.3 the option was accepted and ignored — the plugin mounted its own
+middleware and guarded the whole server — and the layers it mounted kept
+their registration order, so a route plugin loading before it was served
+without a session and an authorization plugin loading after it judged rules
+before `req.user` existed. See
+[the note](../../upgrading.md#openid-connect-honours-auth_path_prefix).
+
+Its own routes come with it: `/login`, `/logout`, `/callback` and
+`/backchannel-logout` are claimed whatever the scope, so the provider can
+always reach the callback and post a logout token, and a catch-all
+authentication never answers them with a 401.
+
+Two instances are supported — `auth()` builds a fresh router per instance —
+but `--base-url` and the callback path are global, so both share one
+redirect URI. Scope by prefix, not by provider, unless you also front them
+with different base URLs.
+
+## What an unauthenticated request receives
+
+The library's own answer: a browser is redirected to the provider, an API
+client (`Accept: application/json`) receives 401. Every other authentication
+plugin in this repository answers JSON 401 throughout — the difference is
+kept because it is what makes a login work at all.
+
 ## How It Works
 
 1. Uses `express-openid-connect` for OAuth2/OIDC flow

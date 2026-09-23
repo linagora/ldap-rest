@@ -6,7 +6,9 @@
  * to protect against brute-force attacks. It should be loaded BEFORE auth plugins.
  *
  * Uses an Express middleware to check rate limits before processing, and
- * an afterAuth hook to track failed authentication attempts.
+ * a middleware per request. It describes an `afterAuth` hook tracking failed
+ * authentication attempts, which it has never registered — the counting is
+ * per request, whatever the request turns out to be.
  *
  * @author Xavier Guimard <xguimard@linagora.com>
  */

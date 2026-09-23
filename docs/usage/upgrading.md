@@ -6,6 +6,37 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### OpenID Connect honours `auth_path_prefix`
+
+**Who is affected:** anyone running `core/auth/openidconnect`, and in
+particular anyone who gave it an `auth_path_prefix`.
+
+The plugin did not go through the authentication dispatcher: it mounted its
+own middleware in `api()`, which kept its registration order, and it never
+read `auth_path_prefix`. Three consequences, all of them now gone:
+
+- **Scoping did nothing.** An instance scoped to `/api/admin` guarded the
+  whole server. It now guards `/api/admin` — and **the paths it used to
+  guard by accident are no longer guarded by it**. Check that another
+  authentication plugin covers them, or drop the prefix to keep guarding
+  everything. The startup line naming unguarded routes works again and is
+  the fastest way to tell.
+- **Authorization could run before the identity.** With
+  `core/auth/authzPerRoute` loaded, a named OIDC instance landed in the
+  parallel batch and mounted after it, so every rule was judged with no
+  `req.user` — and an unidentified request is passed, not refused. Rules
+  that read as enforced were inert.
+- **Two authentications composed as an AND.** A valid `Authorization:
+Bearer` answered by a catch-all token plugin was then redirected to the
+  provider anyway. Only the plugin whose claim is most specific runs now.
+
+`/login`, `/logout`, `/callback` and `/backchannel-logout` are claimed by
+the plugin whatever its scope, so a catch-all authentication no longer
+answers the provider's redirect with a 401.
+
+Unauthenticated requests are unchanged: a browser is redirected, an API
+client receives 401.
+
 ### `authzDynamic` no longer steps aside for another authenticator
 
 **Who is affected:** anyone loading `core/auth/authzDynamic` beside another
