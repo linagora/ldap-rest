@@ -163,5 +163,7 @@ npm install express-openid-connect
 
 ## See Also
 
+- [Back-Channel Logout](back-channel-logout.md) — honouring a logout the
+  provider performed elsewhere
 - [OpenID Connect Specification](https://openid.net/connect/)
 - [express-openid-connect](https://github.com/auth0/express-openid-connect)

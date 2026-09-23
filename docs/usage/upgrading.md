@@ -6,6 +6,26 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Back-Channel Logout keeps its marks in `core/storage`
+
+`core/bcl/ldap` and `core/bcl/file` are gone, and with them
+`--bcl-ldap-base`, `--bcl-ldap-object-class`, `--bcl-file-directory` and
+`--bcl-sweep-interval`. One plugin, `core/bcl`, keeps what a logout killed in
+`core/storage`, so a deployment chooses where records live once and every
+consumer of that store follows. Sweeping is now `--storage-sweep-interval`;
+`--bcl-retention` stays, because how long a mark is kept is Back-Channel
+Logout's policy rather than the store's. See
+[Storage](plugins/utilities/storage.md) and
+[Back-Channel Logout](plugins/auth/back-channel-logout.md).
+
+**Marks written before this are not read.** The key is namespaced now, and
+the LDAP branch is the store's rather than the plugin's. Back-Channel Logout
+shipped in no release — 0.8.2 predates it — so this can only affect an
+instance running a build from `master`. If yours is one, everything logged out
+within the retention window stops counting once you upgrade, and the old
+`ou=BclTombstones` branch, or the old `--bcl-file-directory`, is left behind
+for you to remove.
+
 ### Judging an account by what it is attached to
 
 `--authz-filter-attached-entries` changes what a branch grant means, so it is

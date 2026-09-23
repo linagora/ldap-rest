@@ -92,6 +92,10 @@
       "types": "./dist/src/plugins/auth/trustedProxy.d.ts",
       "import": "./dist/plugins/auth/trustedProxy.js"
     },
+    "./plugin-bcl": {
+      "types": "./dist/src/plugins/bcl.d.ts",
+      "import": "./dist/plugins/bcl.js"
+    },
     "./plugin-configapi": {
       "types": "./dist/src/plugins/configApi.d.ts",
       "import": "./dist/plugins/configApi.js"
@@ -211,6 +215,18 @@
     "./plugin-static": {
       "types": "./dist/src/plugins/static.d.ts",
       "import": "./dist/plugins/static.js"
+    },
+    "./plugin-storage": {
+      "types": "./dist/src/plugins/storage.d.ts",
+      "import": "./dist/plugins/storage.js"
+    },
+    "./plugin-storage-file": {
+      "types": "./dist/src/plugins/storage/file.d.ts",
+      "import": "./dist/plugins/storage/file.js"
+    },
+    "./plugin-storage-ldap": {
+      "types": "./dist/src/plugins/storage/ldap.d.ts",
+      "import": "./dist/plugins/storage/ldap.js"
     },
     "./plugin-twake-appaccountsapi": {
       "types": "./dist/src/plugins/twake/appAccountsApi.d.ts",

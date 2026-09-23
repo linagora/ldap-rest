@@ -76,6 +76,16 @@ dependencies = {
 - **Consumes Hooks**: None
 - **Notes**: LinID 1.x authorization integration
 
+#### `bcl` (core/bcl)
+
+- **Dependencies**: `core/storage` — **required**: a logout check with
+  nowhere to record what died would leave every session outliving the logout
+  that closed it, so the plugin refuses to start
+- **Provides Hooks**: None
+- **Consumes Hooks**: `oidclogouttoken`, `oidclogin`, `oidcsessionvalid`
+- **Notes**: Back-Channel Logout. Records only the sessions a provider
+  declared dead; needs `core/auth/openidconnect` to raise those hooks
+
 ### LDAP Core Plugins
 
 #### `onLdapChange` (core/ldap/onChange)
@@ -237,6 +247,15 @@ dependencies = {
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: HTTP request logging
+
+#### `storage` (core/storage)
+
+- **Dependencies**: None (the `ldap` backend uses the server's connection)
+- **Provides Hooks**: None
+- **Consumes Hooks**: None
+- **Notes**: Keyed storage with a deadline. Only one instance may be loaded —
+  a second one is refused rather than leaving registration order to decide
+  which answers
 
 #### `configApi` (core/configApi)
 
@@ -531,24 +550,26 @@ graph TB
 - `static` - Static files
 - `weblogs` - Logging
 - `configApi` - Configuration API
+- `storage` - Keyed storage. Written anywhere in the configuration, but
+  loaded before the others: its consumers have to find it registered, so it
+  is in the priority list
 
 ## Plugin Priority System
 
-LDAP-Rest uses a priority system defined in `src/plugins/priority.json`:
+LDAP-Rest uses a priority system defined in
+[`src/plugins/priority.json`](../../src/plugins/priority.json), which is the
+list itself — copying it here is how this section came to name two plugins
+the file does not and to omit four it does.
 
-```json
-[
-  "core/auth/crowdsec",
-  "core/auth/rateLimit",
-  "core/auth/token",
-  "core/auth/llng",
-  "core/auth/openidconnect",
-  "core/auth/authzPerBranch",
-  "core/auth/authzLinid1"
-]
-```
+Plugins in that list are loaded one at a time, in its order, before every
+other plugin is loaded in parallel. Two reasons put a plugin there: a
+security plugin whose middleware must sit ahead of the routes it guards, and
+a plugin others depend on, which has to be registered before the batch its
+consumers land in — `core/storage` is there for the second reason.
 
-Plugins in this list load before others, ensuring security plugins run first.
+The list matches by exact string, so a named instance
+(`core/auth/token:authAdmins:{…}`) is not in it and lands in the parallel
+batch.
 
 ## Hook Execution Order
 

@@ -5,27 +5,17 @@
 ### Features
 
 - `core/storage`: keyed storage for whoever needs to keep something with a
-  deadline — a key, a value, an instant past which the value stops being
-  returned. One backend, named by `--storage-backend`: `storage/ldap` keeps
-  one entry per record under a branch of its own, `storage/file` one file per
-  record. Expiry is answered on read whatever the sweeper has done, and the
-  deadline comes in with the record: how long something lives is the policy
-  of whoever wrote it, not of the place it is kept
+  deadline, in an LDAP branch or in a directory of files —
+  [notes](docs/usage/plugins/utilities/storage.md)
 
-- Back-Channel Logout: `core/auth/openidconnect` accepts a logout token and
-  asks, on every request, whether the session it holds is still alive. Where
-  the answer is kept is a plugin — `core/bcl/ldap` writes one entry per killed
-  session under a branch of its own, `core/bcl/file` one file per killed
-  session. Nothing stores a session: only what is dead is recorded, so the
-  session stays in its cookie. A mark stops counting once the session it kills
-  would have ended anyway, enforced on read as well as by the sweeper
+- Back-Channel Logout: a logout performed at the provider ends the session
+  here, on the next request. `core/bcl` records only what died, so a session
+  stays in its cookie and the storage stays small —
+  [notes](docs/usage/plugins/auth/back-channel-logout.md)
 
 - `--authz-filter-attached-entries`: an account is judged by the organization
   it hangs off rather than by the `ou=users` every account shares, so a local
   administrator lists and writes their own and no one else's. Off by default —
-  where a branch is a tenant rather than a department, opening a listing
-  across branches opens a door between customers — and honoured by
-  `authzPerBranch` and `authzLinid1` only, not by `authzDynamic`, see
   [notes](docs/usage/upgrading.md#judging-an-account-by-what-it-is-attached-to)
 
 ## v0.8.2 (2026-09-23)

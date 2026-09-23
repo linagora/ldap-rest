@@ -1,4 +1,5 @@
 [
+  "core/storage",
   "core/auth/trustedProxy",
   "core/weblogs",
   "core/auth/crowdsec",
