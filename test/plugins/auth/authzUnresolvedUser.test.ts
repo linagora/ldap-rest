@@ -153,6 +153,41 @@ describe('An authenticated identity the model cannot resolve', function () {
     expect(server.loadedPlugins['authzLinid1']).to.equal(authz);
   });
 
+  it('should refuse a policy it does not understand, at startup', async () => {
+    // `Allow`, `true` or a trailing space all used to mean `deny` in
+    // silence: 403 for everyone, and nothing saying the value was not the
+    // one the operator wrote.
+    const server = new DM();
+    await server.ready;
+    server.config.authz_unresolved_user = 'Allow';
+    expect(() => new AuthzLinid1(server)).to.throw(
+      /unknown --authz-unresolved-user "Allow"\. Known: deny, allow/
+    );
+  });
+
+  it('should stop resolving to a DN the administrator has left', async () => {
+    // A positive answer goes stale too: `authzLinid1` resolves an identity
+    // to a DN, so an administrator whose entry is renamed keeps resolving to
+    // the former one — where no organization names them — and every
+    // operation of theirs is refused until the TTL runs out. A rename drops
+    // what was resolved.
+    const { server, authz, request } = await build();
+    let lookups = 0;
+    const realResolve = authz.resolveUser.bind(authz);
+    authz.resolveUser = async (uid: string) => {
+      lookups++;
+      return realResolve(uid);
+    };
+    await request.get('/api/v1/ldap/users').set('X-Test-User', STRANGER);
+    expect(lookups).to.equal(1);
+    const renamed = server.hooks.ldaprenamedone as
+      | ((args: [string, string]) => void)[]
+      | undefined;
+    for (const hook of renamed ?? []) hook(['uid=a,dc=x', 'uid=b,dc=x']);
+    await request.get('/api/v1/ldap/users').set('X-Test-User', STRANGER);
+    expect(lookups, 'the rename dropped what was resolved').to.equal(2);
+  });
+
   it('should still skip a request that carries no identity at all', async () => {
     // Anonymous is not unresolvable: nothing authenticated, nothing to
     // resolve, and the route's own authentication answers that.

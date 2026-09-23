@@ -80,8 +80,17 @@ made this pairing an open door rather than a misconfiguration; see
 [the note](../../upgrading.md#an-identity-that-does-not-resolve-is-refused)
 and `--authz-unresolved-user` for the transition.
 
-Both answers are cached for the plugin's TTL, negatives included, so a
-mismatch does not turn every request into a directory search.
+Both answers are cached for the plugin's TTL (5 minutes), negatives
+included, so a mismatch does not turn every request into a directory search.
+The TTL cuts both ways: an identity added to the directory after being
+refused waits it out, and an administrator whose **own entry is renamed or
+moved** keeps resolving to the former DN — where no organization names them,
+so their own operations are refused. A rename or a delete performed through
+this server drops what was resolved; a change made directly in the directory
+waits out the TTL.
+
+`GET /api/v1/authz/scope` resolves the identity outside that cache, so
+during such a window it can describe a scope the hooks no longer grant.
 
 ## Permission Resolution
 

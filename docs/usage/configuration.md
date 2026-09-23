@@ -285,6 +285,13 @@ see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
 | ------------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`  | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning |
 
+Read by the plugins that resolve an identity before judging it —
+`core/auth/authzPerBranch` and `core/auth/authzLinid1`.
+`core/auth/authzPerRoute` matches the identity as it stands and
+`core/auth/authzDynamic` judges a token, so neither resolves anything and
+neither reads this option. A value other than `deny` or `allow` is refused
+at startup.
+
 An **anonymous** request is not this case: it carries no identity, and every
 authorization plugin skips it as before. This is about a caller the
 authenticator admitted whose identity the authorization model cannot place —

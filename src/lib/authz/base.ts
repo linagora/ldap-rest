@@ -9,6 +9,7 @@
 import type { SearchOptions } from 'ldapts';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
+import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../auth/base';
 import type {
@@ -37,6 +38,30 @@ export default abstract class AuthzBase extends DmPlugin {
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
+
+  /** What `--authz-unresolved-user` accepts. */
+  private static readonly UNRESOLVED_POLICIES = ['deny', 'allow'] as const;
+
+  /**
+   * @param server DM object
+   */
+  constructor(server: DM) {
+    super(server);
+    // Refused here rather than read leniently at request time: the option
+    // decides whether an identity the model cannot place is refused, and
+    // `Allow`, `true` or a trailing space would all have meant `deny` in
+    // silence — 403s for everyone, with nothing saying the value was not
+    // understood.
+    const policy = (this.config.authz_unresolved_user as string) ?? 'deny';
+    if (
+      !(AuthzBase.UNRESOLVED_POLICIES as readonly string[]).includes(policy)
+    ) {
+      throw new Error(
+        `${this.constructor.name}: unknown --authz-unresolved-user ` +
+          `"${policy}". Known: ${AuthzBase.UNRESOLVED_POLICIES.join(', ')}.`
+      );
+    }
+  }
 
   /**
    * Whether a search asked for this attribute.
@@ -152,8 +177,10 @@ export default abstract class AuthzBase extends DmPlugin {
     string,
     { user: string | null; at: number }
   >();
-  /** Identities to remember at once, so the map cannot grow without end. */
+  /** How many identities to remember at once. A cap, not a threshold. */
   private static readonly RESOLUTION_CACHE_MAX = 10000;
+  /** Said once, when the cap is reached: a log line per request helps nobody. */
+  private resolutionCacheFullWarned = false;
 
   /**
    * Resolve the caller, or say what an identity that does not resolve means.
@@ -182,8 +209,22 @@ export default abstract class AuthzBase extends DmPlugin {
    *
    * Both answers are cached for `cacheTTL`, negatives included: a mismatch
    * would otherwise turn every request into a directory search, so a
-   * configuration mistake would also become a load problem. An identity that
-   * appears in the directory after being refused waits out the TTL.
+   * configuration mistake would also become a load problem. The TTL cuts
+   * both ways, and neither way is free:
+   *
+   *  - an identity that appears in the directory after being refused waits
+   *    out the TTL before it is looked up again;
+   *  - a *positive* answer can go stale. `authzLinid1` resolves an identity
+   *    to a DN, so an administrator whose own entry is renamed or moved is
+   *    still resolved to the former DN, where no organization names them:
+   *    every operation is refused until the TTL runs out. A rename or a
+   *    delete therefore drops what was resolved, which closes the window
+   *    for the case that produces it; a change made directly in the
+   *    directory still waits.
+   *
+   * `authzScope` resolves the identity itself (`authzScope.ts`), outside
+   * this cache, so during such a window it can describe a scope the hooks
+   * no longer grant.
    *
    * @param req the request being authorized, which carries an identity
    * @returns the resolved user, or null when the policy is to allow it
@@ -201,7 +242,20 @@ export default abstract class AuthzBase extends DmPlugin {
       if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
         for (const [key, entry] of this.resolutionCache)
           if (now - entry.at >= this.cacheTTL) this.resolutionCache.delete(key);
-      this.resolutionCache.set(identity, { user, at: now });
+      // Under the bound after the prune, or not at all: storing anyway would
+      // make the constant a threshold rather than a cap, and the case that
+      // reaches it — an identity provider where every user is a new key — is
+      // exactly the one this fix is about.
+      if (this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX)
+        this.resolutionCache.set(identity, { user, at: now });
+      else if (!this.resolutionCacheFullWarned) {
+        this.resolutionCacheFullWarned = true;
+        this.logger.warn(
+          `${this.name}: more than ${AuthzBase.RESOLUTION_CACHE_MAX} ` +
+            'identities resolved within one cache window, so resolutions ' +
+            'are no longer cached and each request costs a lookup'
+        );
+      }
     }
     if (user) return user;
     if (this.config.authz_unresolved_user === 'allow') {
@@ -228,6 +282,21 @@ export default abstract class AuthzBase extends DmPlugin {
    * Common hooks for all authorization plugins
    */
   hooks = {
+    /**
+     * A rename moves the entry an identity resolves to, so what was
+     * resolved is dropped.
+     *
+     * `authzLinid1` keys its permissions on the administrator's DN: renamed
+     * or moved, they resolve to a DN no organization names any more, and
+     * every operation of theirs is refused until the TTL runs out. The
+     * whole map goes rather than one key, since what is cached is
+     * identity → DN and the hook carries DNs: a handful of lookups is
+     * cheaper than working out which identity moved.
+     */
+    ldaprenamedone: (): void => {
+      this.resolutionCache.clear();
+    },
+
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
       string,
       ModifyRequest,
