@@ -4,6 +4,14 @@
 
 ### Security
 
+- `bin`: the plugin priority list was matched against the whole `--plugin`
+  string, so a named instance — `core/auth/trustedProxy:tp2:{…}`, the only
+  form that can carry a per-instance option — lost its rank and landed in
+  the parallel batch, where it could register after the routes it guards. A
+  forged `X-Forwarded-For` then reached them, which is what `rateLimit` and
+  `crowdsec` key their protection on. The list matches on the module now,
+  and every instance of a priority module is loaded in the first pass
+
 - `core/auth/authzDynamic`: the plugin stepped aside as soon as another
   authenticator had identified the request, so its token ACLs were applied to
   nothing — with `core/auth/token` loaded beside it, a static token reached

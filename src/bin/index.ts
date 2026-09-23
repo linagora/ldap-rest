@@ -117,12 +117,38 @@ export class DM {
         p => !p.includes('configApi')
       );
 
-      // Load priority plugins first sequentially to ensure proper middleware order
+      // Load priority plugins first sequentially to ensure proper middleware
+      // order.
+      //
+      // Matched on the module, not on the whole `--plugin` string. An entry
+      // carrying a name and overrides — `module:name:{json}`, the only form
+      // that can hold a per-instance option — is never equal to the bare
+      // module name, so every named instance used to leave this pass for the
+      // parallel batch, where the order is import completion. A named
+      // `core/auth/trustedProxy` then registered after the routes it was
+      // meant to guard, and a forged `X-Forwarded-For` reached them — which
+      // is what `rateLimit` and `crowdsec` key on.
+      //
+      // Every instance of a priority module is loaded here, in configuration
+      // order: two instances of one module are a deliberate configuration
+      // (each guarding its own prefix), and splitting them across the two
+      // passes would put one of them after the routes.
+      // Captured: inside the closure below, the compiler no longer follows
+      // that the constructor has already built it.
+      const logger = this.logger;
       const priorityPromise = (async () => {
         for (const p of pluginPriority) {
-          if (regularPlugins.includes(p)) {
-            regularPlugins = regularPlugins.filter(pl => pl !== p);
-            await this.loadPlugin(p);
+          const target = this.resolveModule(DM.moduleOf(p));
+          const matching = regularPlugins.filter(
+            entry => this.resolveModule(DM.moduleOf(entry)) === target
+          );
+          if (matching.length === 0) continue;
+          regularPlugins = regularPlugins.filter(
+            entry => !matching.includes(entry)
+          );
+          for (const entry of matching) {
+            logger.debug(`Loading ${entry} in the priority pass`);
+            await this.loadPlugin(entry);
           }
         }
       })();
@@ -131,9 +157,12 @@ export class DM {
       // Load remaining plugins in parallel after priority plugins
       promises.push(
         priorityPromise.then(async () => {
-          const regularPromises = regularPlugins.map(pluginName =>
-            this.loadPlugin(pluginName)
-          );
+          const regularPromises = regularPlugins.map(pluginName => {
+            // Which pass loaded what is otherwise invisible, and a plugin
+            // that lost its rank is invisible with it.
+            logger.debug(`Loading ${pluginName} in the parallel batch`);
+            return this.loadPlugin(pluginName);
+          });
           await Promise.all(regularPromises);
         })
       );
@@ -499,6 +528,46 @@ export class DM {
     this.logger.debug('Server stopped');
   }
 
+  /**
+   * The module part of a `--plugin` entry.
+   *
+   * An entry is `module[:name[:{overrides}]]`, and the module is what
+   * decides where it loads from — and, since the priority list names
+   * modules, which pass loads it. One rule, used by the loader and by that
+   * list, rather than two that can drift.
+   *
+   * @param entry a `--plugin` value
+   * @returns the module it names
+   */
+  private static moduleOf(entry: string): string {
+    const colon = entry.indexOf(':');
+    return colon === -1 ? entry : entry.substring(0, colon);
+  }
+
+  /**
+   * Where a module name resolves, as `import()` would resolve it.
+   *
+   * `core/x` is this build's `plugins/x.js`, and a relative path is relative
+   * to this file — so the two spellings of one plugin compare equal, which
+   * is what lets the priority list recognise a plugin configured by path.
+   *
+   * @param module module part of a `--plugin` entry
+   * @returns an absolute path for what can be resolved, the name itself
+   *          otherwise (a package, resolved by node)
+   */
+  private resolveModule(module: string): string {
+    if (module.startsWith('core/'))
+      return module
+        .replace(
+          'core/',
+          join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins') + '/'
+        )
+        .replace(/$/, '.js');
+    if (module.startsWith('.'))
+      return fileURLToPath(new URL(module, import.meta.url));
+    return module;
+  }
+
   loadPlugin(pluginName: string): Promise<boolean> {
     let name: string | undefined;
     let overrides: Config | undefined;
@@ -537,14 +606,14 @@ export class DM {
       name = undefined;
     }
     this.logger.debug(`Loading plugin ${pluginName}`);
-    if (pluginName.startsWith('core/')) {
-      pluginName = pluginName
-        .replace(
-          'core/',
-          join(dirname(fileURLToPath(import.meta.url)), '..', 'plugins') + '/'
-        )
-        .replace(/$/, '.js');
-    }
+    // `core/x` is rewritten; anything else is handed to `import()` as
+    // written. `resolveModule` would answer the same file for a relative
+    // path, but as an absolute one — and a resolver that maps `.js` to a
+    // `.ts` beside it (tsx, under the test runner) does that for a
+    // specifier, not for a path. Comparing modules is its job; importing
+    // them is not.
+    if (pluginName.startsWith('core/'))
+      pluginName = this.resolveModule(pluginName);
     return new Promise<boolean>((resolve, reject) => {
       import(pluginName)
         .then(async pluginModule => {

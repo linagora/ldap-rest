@@ -567,9 +567,13 @@ security plugin whose middleware must sit ahead of the routes it guards, and
 a plugin others depend on, which has to be registered before the batch its
 consumers land in — `core/storage` is there for the second reason.
 
-The list matches by exact string, so a named instance
-(`core/auth/token:authAdmins:{…}`) is not in it and lands in the parallel
-batch.
+The list matches on the **module**, so a named instance
+(`core/auth/token:authAdmins:{…}`) keeps its rank, and every instance of a
+priority module is loaded in that first pass, in configuration order. It
+used to be matched on the whole `--plugin` string, which sent exactly the
+configurations that carry per-instance options into the parallel batch —
+`core/auth/trustedProxy` named that way registered after the routes it
+guards.
 
 ## Hook Execution Order
 

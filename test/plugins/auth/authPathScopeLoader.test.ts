@@ -7,11 +7,18 @@ import { DM } from '../../../src/bin';
  * The same scoping, exercised through the real plugin loader rather than
  * through `registerPlugin` calls written in the right order by hand.
  *
- * This is the path the authentication bypass lived on: `loadPlugin` matches
- * the priority list by exact string, so a named instance — the only form that
- * can carry a scope — never gets the sequential early load and lands in the
- * parallel batch, where an API plugin can register its routes first. The API
- * is deliberately declared before the plugin that guards it.
+ * This is the path the authentication bypass lived on: a named instance —
+ * the only form that can carry a scope — landed in the parallel batch, where
+ * an API plugin can register its routes first. The API is deliberately
+ * declared before the plugin that guards it.
+ *
+ * The priority list matches on the module now, so a named instance of a
+ * priority module keeps its rank (GHSA-98fh-j3x2-c347). It does not make
+ * this suite moot: the plugins here are loaded by path, which only resolves
+ * to the same module as `core/auth/token` in a built tree, and a plugin
+ * outside the list is in the batch whatever its name. What makes
+ * authentication safe in every one of those cases is the dispatcher, which
+ * is what this suite drives.
  */
 describe('Authentication path scope through the plugin loader', () => {
   let dm: DM;
