@@ -61,6 +61,9 @@ describe('Back-Channel Logout, over the shared store', function () {
     storage = new Storage(server);
     await server.registerPlugin('storage', storage);
     bcl = new Bcl(server);
+    // What `registerPlugin` does, and in its order: the dependency loop
+    // first, then `api()`, then the hooks.
+    bcl.api();
   });
 
   after(() => {
@@ -78,7 +81,58 @@ describe('Back-Channel Logout, over the shared store', function () {
     // outliving the logout that closed it, and nothing saying so.
     const bare = new DM();
     await bare.ready;
-    expect(() => new Bcl(bare)).to.throw(/needs core\/storage/);
+    expect(() => new Bcl(bare).api()).to.throw(/needs core\/storage/);
+  });
+
+  it('should find the store although it was built before it', async () => {
+    // The refusal above must answer for the configuration, not for the order
+    // of two `--plugin` arguments: a plugin is constructed before
+    // `registerPlugin` reads its `dependencies` and loads what they name, so
+    // `core/bcl` listed first is built with nothing loaded yet. Resolving in
+    // the constructor refused that configuration; resolving in `api()`,
+    // which runs after the dependency loop, does not.
+    const other = new DM();
+    await other.ready;
+    const early = new Bcl(other);
+
+    // One storage instance at a time is the plugin's own rule, so the
+    // suite's hands the guard over for the length of this test. Its store
+    // keeps working — `release` clears the guard, not the object.
+    Storage.release(storage);
+    const late = new Storage(other);
+    try {
+      await other.registerPlugin('storage', late);
+      expect(() => early.api()).to.not.throw();
+      await (
+        early.hooks.oidclogouttoken as (c: OidcSessionClaims) => Promise<void>
+      )({ iss: ISS, sid: 'S7' });
+      const [, valid] = await (
+        early.hooks.oidcsessionvalid as (
+          a: [OidcSessionClaims, boolean]
+        ) => Promise<[OidcSessionClaims, boolean]>
+      )([{ iss: ISS, sid: 'S7' }, true]);
+      expect(
+        valid,
+        'a plugin built first still records what a token kills'
+      ).to.equal(false);
+    } finally {
+      late.store.stopSweeping();
+      Storage.release(late);
+    }
+  });
+
+  it('should say so rather than answer for a store it never took', async () => {
+    // Reading `undefined` as "nothing is recorded" is the fail-open this
+    // plugin exists to prevent, so a hook running before `api()` says what
+    // is missing.
+    const unregistered = new Bcl(server);
+    let raised: Error | undefined;
+    await (
+      unregistered.hooks.oidclogouttoken as (
+        c: OidcSessionClaims
+      ) => Promise<void>
+    )({ iss: ISS, sid: 'S8' }).catch((err: Error) => (raised = err));
+    expect(raised?.message).to.match(/before api\(\)/);
   });
 
   it('should kill the session a token names', async () => {
@@ -122,6 +176,7 @@ describe('Back-Channel Logout, over the shared store', function () {
     // plugin reads.
     server.config.bcl_retention = -1;
     const shortLived = new Bcl(server);
+    shortLived.api();
     server.config.bcl_retention = 3600;
     await (
       shortLived.hooks.oidclogouttoken as (

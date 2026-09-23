@@ -58,6 +58,10 @@ every session outliving the logout that closed it, and nothing would say so.
 For a feature that can be skipped, a warning is the right answer; for this
 one, a refusal to start is the honest failure.
 
+The refusal answers for the configuration, not for the order it is written
+in: `core/bcl` declares `core/storage` as a dependency, so listing it first
+loads the store anyway.
+
 ## What a Login Forgets
 
 A mark on the `sub` kills every session of that person. Left in place it
