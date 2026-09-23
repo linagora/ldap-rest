@@ -77,12 +77,9 @@ export interface Config {
   storage_ldap_object_class?: string;
   storage_file_directory?: string;
 
-  // Back-Channel Logout
+  // Back-Channel Logout. Where the marks live is core/storage's business;
+  // what stays here is how long one is kept.
   bcl_retention?: number;
-  bcl_sweep_interval?: number;
-  bcl_ldap_base?: string;
-  bcl_ldap_object_class?: string;
-  bcl_file_directory?: string;
 
   // LDAP Organizations plugin
   ldap_top_organization?: string;
@@ -451,11 +448,6 @@ const configArgs: ConfigTemplate = [
     '',
   ],
 
-  // Back-Channel Logout
-  //
-  // How long a tombstone is kept. It has to outlive the session it kills, or
-  // a cookie older than the mark would be honoured again; the default matches
-  // express-openid-connect's own 7-day session.
   // Keyed storage
   //
   // Which sub-plugin keeps the records: `ldap` or `file`. Empty means none is
@@ -478,19 +470,13 @@ const configArgs: ConfigTemplate = [
   // else should be writing there.
   ['--storage-file-directory', 'DM_STORAGE_FILE_DIRECTORY', ''],
 
+  // Back-Channel Logout
+  //
+  // How long a tombstone is kept. It has to outlive the session it kills, or
+  // a cookie older than the mark would be honoured again; the default matches
+  // express-openid-connect's own 7-day session. Where the marks live, and how
+  // often expired ones are reclaimed, is core/storage's business.
   ['--bcl-retention', 'DM_BCL_RETENTION', 604800, 'number'],
-  // Reads enforce expiry anyway, so a long interval costs storage rather
-  // than correctness — with one exception: `bcl/file` will not sweep a
-  // temporary file younger than this, so an interval shorter than a write
-  // takes would make it take one in flight.
-  ['--bcl-sweep-interval', 'DM_BCL_SWEEP_INTERVAL', 600, 'number'],
-  // The branch `bcl/ldap` writes to. It holds nothing but tombstones, so it
-  // belongs outside the branches the directory serves.
-  ['--bcl-ldap-base', 'DM_BCL_LDAP_BASE', ''],
-  ['--bcl-ldap-object-class', 'DM_BCL_LDAP_OBJECT_CLASS', 'applicationProcess'],
-  // Where `bcl/file` keeps its tombstones. One file per killed session, so
-  // the directory is its own: nothing else should be writing there.
-  ['--bcl-file-directory', 'DM_BCL_FILE_DIRECTORY', ''],
 
   // LDAP groups plugin
 

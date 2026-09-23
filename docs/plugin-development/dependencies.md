@@ -76,6 +76,16 @@ dependencies = {
 - **Consumes Hooks**: None
 - **Notes**: LinID 1.x authorization integration
 
+#### `bcl` (core/bcl)
+
+- **Dependencies**: `core/storage` — **required**: a logout check with
+  nowhere to record what died would leave every session outliving the logout
+  that closed it, so the plugin refuses to start
+- **Provides Hooks**: None
+- **Consumes Hooks**: `oidclogouttoken`, `oidclogin`, `oidcsessionvalid`
+- **Notes**: Back-Channel Logout. Records only the sessions a provider
+  declared dead; needs `core/auth/openidconnect` to raise those hooks
+
 ### LDAP Core Plugins
 
 #### `onLdapChange` (core/ldap/onChange)
@@ -237,6 +247,15 @@ dependencies = {
 - **Provides Hooks**: None
 - **Consumes Hooks**: None
 - **Notes**: HTTP request logging
+
+#### `storage` (core/storage)
+
+- **Dependencies**: None (the `ldap` backend uses the server's connection)
+- **Provides Hooks**: None
+- **Consumes Hooks**: None
+- **Notes**: Keyed storage with a deadline. Only one instance may be loaded —
+  a second one is refused rather than leaving registration order to decide
+  which answers
 
 #### `configApi` (core/configApi)
 

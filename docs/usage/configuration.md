@@ -25,6 +25,7 @@ All LDAP-Rest configuration options.
     - [core/auth/hmac](#coreauthhmac)
     - [core/auth/llng](#coreauthllng)
     - [core/auth/openidconnect](#coreauthopenidconnect)
+    - [core/bcl](#corebcl)
   - [Authorization Plugins](#authorization-plugins)
     - [core/auth/authzPerBranch](#coreauthauthzperbranch)
     - [core/auth/authzPerRoute](#coreauthauthzperroute)
@@ -41,6 +42,7 @@ All LDAP-Rest configuration options.
   - [Utility Plugins](#utility-plugins)
     - [core/static](#corestatic)
     - [core/weblogs](#coreweblogs)
+    - [core/storage](#corestorage)
     - [core/configApi](#coreconfigapi)
 - [Configuration File](#configuration-file)
 - [LDAP Failover](#ldap-failover)
@@ -264,6 +266,16 @@ Empty means the plugin guards every path. Scoping several instances to different
 | `--oidc-client-secret` | `DM_OIDC_CLIENT_SECRET` |         | OIDC Client Secret       |
 | `--base-url`           | `DM_BASE_URL`           |         | Public URL for callbacks |
 
+#### `core/bcl`
+
+Back-Channel Logout: a logout performed at the provider ends the session here
+on the next request. Needs `core/storage`, and refuses to start without it —
+see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
+
+| CLI               | Env                | Default  | Description                 |
+| ----------------- | ------------------ | -------- | --------------------------- |
+| `--bcl-retention` | `DM_BCL_RETENTION` | `604800` | Seconds a tombstone is kept |
+
 ### Authorization Plugins
 
 #### `core/auth/authzPerBranch`
@@ -384,6 +396,19 @@ Automatically creates/updates/deletes applicative account entries when users are
 #### `core/weblogs`
 
 Web access logging plugin. No configuration options - just add the plugin to enable access logs.
+
+#### `core/storage`
+
+Keyed storage with a deadline, for the plugins that need to keep something —
+see [Storage](plugins/utilities/storage.md).
+
+| CLI                           | Env                            | Default              | Description                            |
+| ----------------------------- | ------------------------------ | -------------------- | -------------------------------------- |
+| `--storage-backend`           | `DM_STORAGE_BACKEND`           |                      | `ldap` or `file`; required             |
+| `--storage-sweep-interval`    | `DM_STORAGE_SWEEP_INTERVAL`    | `600`                | Seconds between two expiry passes      |
+| `--storage-ldap-base`         | `DM_STORAGE_LDAP_BASE`         |                      | Branch the `ldap` backend writes to    |
+| `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes  |
+| `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    |                      | Directory the `file` backend writes to |
 
 #### `core/configApi`
 
