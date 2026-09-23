@@ -4,6 +4,14 @@
 
 ### Features
 
+- `core/storage`: keyed storage for whoever needs to keep something with a
+  deadline — a key, a value, an instant past which the value stops being
+  returned. One backend, named by `--storage-backend`: `storage/ldap` keeps
+  one entry per record under a branch of its own, `storage/file` one file per
+  record. Expiry is answered on read whatever the sweeper has done, and the
+  deadline comes in with the record: how long something lives is the policy
+  of whoever wrote it, not of the place it is kept
+
 - Back-Channel Logout: `core/auth/openidconnect` accepts a logout token and
   asks, on every request, whether the session it holds is still alive. Where
   the answer is kept is a plugin — `core/bcl/ldap` writes one entry per killed

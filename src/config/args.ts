@@ -66,6 +66,17 @@ export interface Config {
   group_dummy_user?: string;
   group_schema?: string;
 
+  /**
+   * Keyed storage, shared by whoever needs to keep something with a
+   * deadline. `storage_backend` names the sub-plugin that keeps it; the rest
+   * configures that one.
+   */
+  storage_backend?: string;
+  storage_sweep_interval?: number;
+  storage_ldap_base?: string;
+  storage_ldap_object_class?: string;
+  storage_file_directory?: string;
+
   // Back-Channel Logout
   bcl_retention?: number;
   bcl_sweep_interval?: number;
@@ -445,6 +456,28 @@ const configArgs: ConfigTemplate = [
   // How long a tombstone is kept. It has to outlive the session it kills, or
   // a cookie older than the mark would be honoured again; the default matches
   // express-openid-connect's own 7-day session.
+  // Keyed storage
+  //
+  // Which sub-plugin keeps the records: `ldap` or `file`. Empty means none is
+  // loaded, and a consumer asking for one says so.
+  ['--storage-backend', 'DM_STORAGE_BACKEND', ''],
+  // Reads enforce expiry whatever the sweeper has done, so a long interval
+  // costs storage rather than correctness — with one exception: `file` will
+  // not sweep a temporary younger than this, so an interval shorter than a
+  // write takes would make it take one in flight.
+  ['--storage-sweep-interval', 'DM_STORAGE_SWEEP_INTERVAL', 600, 'number'],
+  // The branch `storage/ldap` writes to. It holds records and nothing else,
+  // so it belongs outside the branches the directory serves.
+  ['--storage-ldap-base', 'DM_STORAGE_LDAP_BASE', ''],
+  [
+    '--storage-ldap-object-class',
+    'DM_STORAGE_LDAP_OBJECT_CLASS',
+    'applicationProcess',
+  ],
+  // The directory `storage/file` writes to, one file per record, so nothing
+  // else should be writing there.
+  ['--storage-file-directory', 'DM_STORAGE_FILE_DIRECTORY', ''],
+
   ['--bcl-retention', 'DM_BCL_RETENTION', 604800, 'number'],
   // Reads enforce expiry anyway, so a long interval costs storage rather
   // than correctness — with one exception: `bcl/file` will not sweep a
