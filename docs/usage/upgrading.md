@@ -6,6 +6,26 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### `/subnodes/search` caps what it returns
+
+**Who is affected:** a client reading the whole answer of
+`/api/v1/ldap/organizations/<dn>/subnodes/search` and expecting every match.
+
+It returned every attached entry it found, which is the one shape a directory
+with a size limit cannot answer: past that limit the server refuses the
+search rather than shortening it. It now caps them at
+`--ldap-organization-max-subnodes` (default 50) and ends the list with the
+`moreIndicator` row `/subnodes` already used, so the two endpoints answer the
+same shape.
+
+A client that treats every row as an entry will show that row as one. Drop
+whatever carries `_isMoreIndicator` — see
+[the endpoint's notes](plugins/ldap/organizations.md#get-organization-subnodes).
+
+The same row can now also appear among the **child organizations**, which
+were never capped and still are not: it says the directory refused to list
+them all, and it carries no `_totalCount`, nothing having counted them.
+
 ### Back-Channel Logout keeps its marks in `core/storage`
 
 `core/bcl/ldap` and `core/bcl/file` are gone, and with them

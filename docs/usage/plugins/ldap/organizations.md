@@ -174,6 +174,43 @@ curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu
 ]
 ```
 
+**When the answer is partial**
+
+Two things bound what comes back, and both are announced in the list rather
+than left for the client to guess:
+
+- The attached entries are capped at `--ldap-organization-max-subnodes`
+  (default 50). Child organizations are not capped.
+- The directory has a size limit of its own, and a branch holding more
+  entries than it will list in one answer makes it refuse rather than
+  truncate. The endpoint then asks again for a bounded number and returns
+  what it gets, writing a `warn` line naming the node.
+
+Either way the list ends with a row that is not an entry:
+
+```json
+{
+  "dn": "more-ou=IT,dc=example,dc=com",
+  "cn": ["... 412 more elements"],
+  "objectClass": ["moreIndicator"],
+  "_isMoreIndicator": "true",
+  "_totalCount": "462",
+  "_displayedCount": "50"
+}
+```
+
+Its DN answers nothing — `more-<the organization's DN>` for the attached
+entries, `more-organizations-<the organization's DN>` for the child
+organizations — and a client should drop any row carrying
+`_isMoreIndicator` before treating the rest as entries. `_totalCount` is
+present only when the directory listed everything and the cap did the
+trimming; when the directory itself refused, nothing knows the total.
+
+A refusal is not emptiness: a node whose children cannot be listed answers
+its first fifty and says there are more, and any other directory failure is
+raised rather than returned as `[]`. Raise the size limit for the account
+ldap-rest binds as (`olcLimits`, or `olcSizeLimit`) to see a whole branch.
+
 ### Create Organization
 
 ```http

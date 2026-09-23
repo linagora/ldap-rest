@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Bug Fixes
+
+- `core/ldap/organizations`: a node holding more children than the directory
+  will list in one answer made `/subnodes` return `200 []` — every failure
+  was read as "no children", so a console drew an empty tree and only
+  `debug` said otherwise. A refusal is now answered with what the directory
+  will give and a row saying there is more, `noSuchObject` alone means
+  empty, and anything else is raised
+  ([#179](https://github.com/linagora/ldap-rest/issues/179),
+  [notes](docs/usage/plugins/ldap/organizations.md#get-organization-subnodes))
+
+### Security
+
+- `core/ldap/organizations`: `/subnodes/search` searched the directory
+  without the request, and every authorization plugin skips its check when
+  there is none — the gap `abstract/ldapFlat` closed in 0.8.2, still open on
+  this route
+
 ### Features
 
 - `core/storage`: keyed storage for whoever needs to keep something with a

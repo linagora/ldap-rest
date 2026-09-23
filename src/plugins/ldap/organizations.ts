@@ -36,6 +36,7 @@ import {
   NotFoundError,
   ConflictError,
 } from '../../lib/errors';
+import { extractLdapCode } from '../../lib/ldapCodes';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
@@ -344,7 +345,9 @@ export default class LdapOrganizations extends DmPlugin {
         if (!query)
           throw new BadRequestError('query parameter "q" is required');
         await tryMethodData(res, async () =>
-          this.hideNeverReturn(await this.searchOrganisationSubnodes(dn, query))
+          this.hideNeverReturn(
+            await this.searchOrganisationSubnodes(dn, query, req)
+          )
         );
       })
     );
@@ -905,25 +908,14 @@ export default class LdapOrganizations extends DmPlugin {
 
     // 1. Get direct sub-OUs (children organizational units)
     if (!objectClassFilter || objectClassFilter === 'organizationalUnit') {
-      try {
-        const subOUs = (await this.server.ldap.search(
-          {
-            paged: false,
-            scope: 'one',
-            filter: '(objectClass=organizationalUnit)',
-          },
+      result.push(
+        ...(await this.childOrganizations(
           dn,
+          '(objectClass=organizationalUnit)',
+          MAX_LINKED_ENTITIES,
           req
-        )) as SearchResult;
-        this.server.logger.debug(
-          `Found ${subOUs.searchEntries.length} sub-OUs for ${dn}`
-        );
-        result.push(...subOUs.searchEntries);
-      } catch (err) {
-        // Ignore errors (e.g., if no children exist)
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        this.server.logger.debug(`No sub-OUs found for ${dn}: ${err}`);
-      }
+        ))
+      );
     }
 
     // 2. Get linked entities (users and groups) - limited to MAX_LINKED_ENTITIES
@@ -945,42 +937,198 @@ export default class LdapOrganizations extends DmPlugin {
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
-    const subs = await this.server.ldap.search(
-      {
-        paged: true,
+    result.push(
+      ...(await this.linkedEntities(
+        baseDn,
         filter,
-      },
-      baseDn,
-      req
-    );
-    let linkedCount = 0;
-    let totalCount = 0;
-    for await (const sub of subs as AsyncGenerator<SearchResult>) {
-      totalCount += sub.searchEntries.length;
-      const remaining = MAX_LINKED_ENTITIES - linkedCount;
-      if (remaining > 0) {
-        const entriesToAdd = sub.searchEntries.slice(0, remaining);
-        result.push(...entriesToAdd);
-        linkedCount += entriesToAdd.length;
-      }
-    }
-    this.server.logger.debug(
-      `Found ${totalCount} linked entities for ${dn}, returning ${linkedCount}`
+        MAX_LINKED_ENTITIES,
+        dn,
+        req
+      ))
     );
 
-    // Add a special indicator entry if there are more elements
-    if (totalCount > MAX_LINKED_ENTITIES) {
-      result.push({
+    return result;
+  }
+
+  /**
+   * The child organizations of a node, and what to do when the directory
+   * will not list them all.
+   *
+   * Every failure used to be read as "no children" (#179): the node's own
+   * children were searched without a limit, and a directory answering
+   * `sizeLimitExceeded` rather than a long list left the endpoint returning
+   * `200 []` with nothing above `debug` to say so. An empty tree is what a
+   * console then draws for a branch holding a thousand organizations.
+   *
+   * Three outcomes, and only one of them is emptiness:
+   *
+   *  - `noSuchObject` (32): nothing is there. An empty answer is the truth.
+   *  - `sizeLimitExceeded` (4): the answer was longer than the server's
+   *    limit. Measured against OpenLDAP 2.5, the paged control does not lift
+   *    it — `size.prtotal` bounds the whole search, so a paged walk ends on
+   *    the same refusal. What does change the answer is asking for a bounded
+   *    number: ldapts raises the refusal only when the request carried no
+   *    `sizeLimit` of its own, so a second, bounded search comes back with
+   *    entries where the first came back with an error. The answer then says
+   *    it is partial, through the `moreIndicator` row the attached entries
+   *    already use.
+   *  - anything else is a failure, and answering `[]` to a failure is how a
+   *    broken directory comes to look exactly like an empty one.
+   *
+   * The first search is paged for the directories where paging *is* what
+   * lifts the limit: Active Directory answers an unpaged search with at most
+   * `MaxPageSize` entries and expects the control for the rest.
+   *
+   * @param dn organization whose children are wanted
+   * @param filter what those children have to match
+   * @param cap how many to keep when the directory will not list them all
+   * @param req incoming request, forwarded to the authorization hooks
+   * @returns the children, followed by a `moreIndicator` row when the
+   *          directory refused to list them all
+   */
+  private async childOrganizations(
+    dn: string,
+    filter: string,
+    cap: number,
+    req?: Request
+  ): Promise<AttributesList[]> {
+    try {
+      const pages = (await this.server.ldap.search(
+        { paged: true, scope: 'one', filter },
+        dn,
+        req
+      )) as AsyncGenerator<SearchResult>;
+      const children: AttributesList[] = [];
+      // A paged search fails from the walk, not from the call above: the
+      // generator reaches the directory on its first iteration. One try
+      // covers both.
+      for await (const page of pages) children.push(...page.searchEntries);
+      this.server.logger.debug(`Found ${children.length} sub-OUs for ${dn}`);
+      return children;
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) {
+        this.server.logger.debug(`No sub-OUs for ${dn}: the node holds none`);
+        return [];
+      }
+      if (code !== 4) throw err;
+    }
+
+    // Refused for being too long. Ask again for a bounded number, which the
+    // directory answers instead of refusing.
+    const bounded = (await this.server.ldap.search(
+      { paged: false, scope: 'one', filter, sizeLimit: cap + 1 },
+      dn,
+      req
+    )) as SearchResult;
+    const shown = bounded.searchEntries.slice(0, cap);
+    // `warn`, not `debug`: the answer is incomplete, and the only fix is on
+    // the directory. Nothing else in the response says so to an operator
+    // reading logs.
+    this.server.logger.warn(
+      `Organization ${dn} holds more child organizations than the directory ` +
+        `will list in one answer, so ${shown.length} are returned and the ` +
+        'rest are hidden. Raise the size limit for the account ldap-rest ' +
+        'binds as (olcLimits, or olcSizeLimit) to list them all.'
+    );
+    return [
+      ...shown,
+      {
+        // Distinct from the row the attached entries add: one answer can
+        // carry both, and two rows sharing a DN is not a list.
+        dn: `more-organizations-${dn}`,
+        cn: ['... more organizations than the directory will list'],
+        objectClass: ['moreIndicator'],
+        _isMoreIndicator: 'true',
+        _displayedCount: shown.length.toString(),
+      },
+    ];
+  }
+
+  /**
+   * The entries attached to an organization without being one.
+   *
+   * Capped at `cap`, with a `moreIndicator` row counting what was left out —
+   * the behaviour this endpoint already had, plus the refusal the children
+   * search just learned to survive: a directory that will not walk the whole
+   * link filter is told about rather than turned into an empty list.
+   *
+   * @param baseDn branch the attached entries live in
+   * @param filter what links them to the organization
+   * @param cap how many to return
+   * @param dn organization they are attached to, for the indicator's DN
+   * @param req incoming request, forwarded to the authorization hooks
+   * @returns the entries, followed by a `moreIndicator` row when some were
+   *          left out
+   */
+  private async linkedEntities(
+    baseDn: string,
+    filter: string,
+    cap: number,
+    dn: string,
+    req?: Request
+  ): Promise<AttributesList[]> {
+    const kept: AttributesList[] = [];
+    let totalCount = 0;
+    try {
+      const subs = (await this.server.ldap.search(
+        { paged: true, filter },
+        baseDn,
+        req
+      )) as AsyncGenerator<SearchResult>;
+      for await (const sub of subs) {
+        totalCount += sub.searchEntries.length;
+        const remaining = cap - kept.length;
+        if (remaining > 0) kept.push(...sub.searchEntries.slice(0, remaining));
+      }
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) {
+        // The branch itself is not there: nothing is attached to anything.
+        this.server.logger.debug(`No linked entities for ${dn}: no ${baseDn}`);
+        return [];
+      }
+      if (code !== 4) throw err;
+      const bounded = (await this.server.ldap.search(
+        { paged: false, filter, sizeLimit: cap + 1 },
+        baseDn,
+        req
+      )) as SearchResult;
+      this.server.logger.warn(
+        `More entries are attached to ${dn} than the directory will list in ` +
+          'one answer. Raise the size limit for the account ldap-rest binds ' +
+          'as (olcLimits, or olcSizeLimit) to count them all.'
+      );
+      return [
+        ...bounded.searchEntries.slice(0, cap),
+        {
+          dn: `more-${dn}`,
+          cn: ['... more elements than the directory will list'],
+          objectClass: ['moreIndicator'],
+          _isMoreIndicator: 'true',
+          _displayedCount: Math.min(
+            bounded.searchEntries.length,
+            cap
+          ).toString(),
+        },
+      ];
+    }
+
+    this.server.logger.debug(
+      `Found ${totalCount} linked entities for ${dn}, returning ${kept.length}`
+    );
+    if (totalCount <= cap) return kept;
+    return [
+      ...kept,
+      {
         dn: `more-${dn}`,
-        cn: [`... ${totalCount - MAX_LINKED_ENTITIES} more elements`],
+        cn: [`... ${totalCount - cap} more elements`],
         objectClass: ['moreIndicator'],
         _isMoreIndicator: 'true',
         _totalCount: totalCount.toString(),
-        _displayedCount: MAX_LINKED_ENTITIES.toString(),
-      });
-    }
-
-    return result;
+        _displayedCount: cap.toString(),
+      },
+    ];
   }
 
   async addOrganization(
@@ -1207,34 +1355,40 @@ export default class LdapOrganizations extends DmPlugin {
     return await this.server.ldap.delete(dn);
   }
 
+  /**
+   * The same two searches as `getOrganisationSubnodes`, narrowed by a query.
+   *
+   * Both go through the helpers that classify a failure rather than reading
+   * every one of them as emptiness (#179), and both now carry the request:
+   * they ran without one, and an authorization plugin skips its check when
+   * there is none — the same gap the flat routes had until 0.8.2. The
+   * attached entries are capped like the other endpoint's, since an answer
+   * the directory refuses to finish is what this is about.
+   *
+   * @param dn organization to search under
+   * @param query what to look for in a name, a description or an identity
+   * @param req incoming request, forwarded to the authorization hooks
+   * @returns matching organizations then matching attached entries
+   */
   async searchOrganisationSubnodes(
     dn: string,
-    query: string
+    query: string,
+    req?: Request
   ): Promise<AttributesList[]> {
     const result: AttributesList[] = [];
+    const cap = this.config.ldap_organization_max_subnodes || 50;
 
     // Search for sub-OUs matching the query
     // Escape query to prevent LDAP injection
     const escapedQuery = escapeLdapFilter(query);
-    try {
-      const subOUs = (await this.server.ldap.search(
-        {
-          paged: false,
-          scope: 'one',
-          filter: `(&(objectClass=organizationalUnit)(|(ou=*${escapedQuery}*)(description=*${escapedQuery}*)))`,
-        },
-        dn
-      )) as SearchResult;
-      this.server.logger.debug(
-        `Found ${subOUs.searchEntries.length} sub-OUs matching "${query}" for ${dn}`
-      );
-      result.push(...subOUs.searchEntries);
-    } catch (err) {
-      this.server.logger.debug(
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `No sub-OUs found matching "${query}" for ${dn}: ${err}`
-      );
-    }
+    result.push(
+      ...(await this.childOrganizations(
+        dn,
+        `(&(objectClass=organizationalUnit)(|(ou=*${escapedQuery}*)(description=*${escapedQuery}*)))`,
+        cap,
+        req
+      ))
+    );
 
     // Search for linked entities (users and groups) matching the query
     const topOrg = this.config.ldap_top_organization as string;
@@ -1245,23 +1399,7 @@ export default class LdapOrganizations extends DmPlugin {
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
-
-    const subs = await this.server.ldap.search(
-      {
-        paged: true,
-        filter,
-      },
-      baseDn
-    );
-
-    let linkedCount = 0;
-    for await (const sub of subs as AsyncGenerator<SearchResult>) {
-      linkedCount += sub.searchEntries.length;
-      result.push(...sub.searchEntries);
-    }
-    this.server.logger.debug(
-      `Found ${linkedCount} linked entities matching "${query}" for ${dn}`
-    );
+    result.push(...(await this.linkedEntities(baseDn, filter, cap, dn, req)));
 
     return result;
   }
