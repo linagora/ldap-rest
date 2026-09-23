@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `abstract/ldapFlat`: reading, listing, modifying and deleting a flat entity
+  ran with no authorization check. The request never reached the directory
+  call, and every plugin skips its check without one, so any authenticated
+  caller reached every account whatever branch they were granted.
+  `renameEntry` was fixed for this in 0.8.0, the four others were left
+
 ## v0.8.1 (2026-09-22)
 
 ### Bug Fixes
