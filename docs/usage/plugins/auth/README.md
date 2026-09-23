@@ -27,8 +27,10 @@ of what a caller is called. Every one of them publishes the caller twice:
 | `core/auth/authzDynamic`  | the token's tenant                  | the same                                 |
 
 `req.user` is this server's identifier for the caller; `req.userName` is the
-caller under a name a person would use. `--authz-identity` says which one
-the authorization plugins and the SCIM base map key on:
+caller under a name a person would use. `--authz-identity` says which one is
+keyed on by `core/auth/authzPerBranch`, `core/auth/authzLinid1`,
+`core/auth/authzPerRoute` and the SCIM base map — every plugin that names a
+caller in its configuration:
 
 ```bash
 --authz-identity req.user        # the default: every existing rule is unchanged
