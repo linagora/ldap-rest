@@ -24,6 +24,16 @@ import { getParentDn } from '../utils';
  * Provides common utility methods and interface for LDAP-based authorization
  */
 export default abstract class AuthzBase extends DmPlugin {
+  /**
+   * Searches whose projection we widened to carry the organization link.
+   *
+   * The filter cannot ask `opts` whether the caller wanted the attribute: by
+   * then `opts` is the widened one and would answer yes about an attribute
+   * we added ourselves. Holding the objects we touched keeps the question
+   * answerable, and a WeakSet lets them be collected with the request.
+   */
+  private static widenedForLink = new WeakSet<object>();
+
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
 
@@ -34,6 +44,28 @@ export default abstract class AuthzBase extends DmPlugin {
    *
    * Handles escaped commas in DN values (e.g., "cn=Smith\, John")
    */
+  /**
+   * Whether a search asked for this attribute.
+   *
+   * No projection at all means every attribute, and so do the `*` and `+`
+   * forms. A narrow list means what it says — and is exactly the case the
+   * filter cannot judge without help, since an entry that came back without
+   * its organization link looks attached to nothing.
+   */
+  protected static wantsAttribute(
+    opts: SearchOptions | undefined,
+    attr: string
+  ): boolean {
+    const asked = opts?.attributes;
+    if (asked === undefined) return true;
+    const list = (Array.isArray(asked) ? asked : [asked]).map(a =>
+      String(a).toLowerCase()
+    );
+    if (list.length === 0) return true;
+    if (list.includes('*') || list.includes('+')) return true;
+    return list.includes(attr.toLowerCase());
+  }
+
   extractBranchDn(dn: string): string {
     return getParentDn(dn);
   }
@@ -43,15 +75,16 @@ export default abstract class AuthzBase extends DmPlugin {
    *
    * An account is stored in the same `ou=users` as everyone else, so its
    * parent says nothing about who may touch it: what governs it is the
-   * organization it is attached to. `submitted` is the link the request
-   * carries, for an entry being created or moved; otherwise the stored one
-   * is read. An entry attached nowhere falls back to its parent, which is
-   * what an organization or a nomenclature value wants.
+   * organization it is attached to, which is read from the stored entry. An
+   * entry attached nowhere falls back to its parent, which is what an
+   * organization or a nomenclature value wants.
+   *
+   * Creation is not routed through here on purpose: `ldapaddrequest` reads
+   * the link off the entry being written and is not behind the flag, so
+   * unifying the two would judge an add on `ou=users` whenever the flag is
+   * off — a relaxation in the default configuration.
    */
-  protected async effectiveBranch(
-    dn: string,
-    submitted?: AttributeValue
-  ): Promise<string> {
+  protected async effectiveBranch(dn: string): Promise<string> {
     const linkAttr = this.config.ldap_organization_link_attribute;
     if (!linkAttr || !this.config.authz_filter_attached_entries)
       return this.extractBranchDn(dn);
@@ -62,9 +95,6 @@ export default abstract class AuthzBase extends DmPlugin {
       const str = String(one);
       return str.length > 0 ? str : undefined;
     };
-
-    const given = first(submitted);
-    if (given) return given;
 
     try {
       const res = (await this.server.ldap.search(
@@ -286,6 +316,22 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} administers no branch`
           );
         }
+        // Granting the broad read also means supplying the means to enforce
+        // it. A caller asking only for the fields it displays — the normal
+        // client shape, and what SCIM does — would otherwise get entries
+        // carrying no organization link, which `ldapsearchfilter` cannot tell
+        // from entries attached to nothing: the filter would pass everything.
+        // The attribute is added here and removed again there for callers
+        // that did not ask for it.
+        const linkAttr = this.config.ldap_organization_link_attribute;
+        if (linkAttr && !AuthzBase.wantsAttribute(opts, linkAttr)) {
+          const asked = opts.attributes;
+          const list = Array.isArray(asked)
+            ? asked.map(String)
+            : [String(asked)];
+          opts = { ...opts, attributes: [...list, linkAttr] };
+          AuthzBase.widenedForLink.add(opts);
+        }
         return [base, opts, req];
       }
 
@@ -307,19 +353,25 @@ export default abstract class AuthzBase extends DmPlugin {
      * an organization, a group, a nomenclature value — is left alone: those
      * are the reference data every administrator reads.
      */
-    ldapsearchfilter: async ([result, req]: [
+    ldapsearchfilter: async ([result, req, opts]: [
       SearchResult,
       DmRequest?,
-    ]): Promise<[SearchResult, DmRequest?]> => {
-      if (!this.config.authz_filter_attached_entries) return [result, req];
+      SearchOptions?,
+    ]): Promise<[SearchResult, DmRequest?, SearchOptions?]> => {
+      const pass: [SearchResult, DmRequest?, SearchOptions?] = [
+        result,
+        req,
+        opts,
+      ];
+      if (!this.config.authz_filter_attached_entries) return pass;
       const linkAttr = this.config.ldap_organization_link_attribute;
-      if (!linkAttr || this.shouldSkipAuthorization(req)) return [result, req];
-      if (!result?.searchEntries?.length) return [result, req];
+      if (!linkAttr || this.shouldSkipAuthorization(req)) return pass;
+      if (!result?.searchEntries?.length) return pass;
 
       const user = await this.resolveUser(req!.user!);
-      if (!user) return [result, req];
+      if (!user) return pass;
       const branches = await this.getAuthorizedBranches(user);
-      if (branches.length === 0) return [result, req];
+      if (branches.length === 0) return pass;
 
       const within = (dn: string): boolean => {
         const target = dn.toLowerCase();
@@ -334,11 +386,24 @@ export default abstract class AuthzBase extends DmPlugin {
         if (link === undefined || link === null) return true;
         const values = (Array.isArray(link) ? link : [link]).map(String);
         if (values.length === 0) return true;
-        // Attached somewhere: it is visible only from there.
-        return values.some(within);
+        if (values.some(within)) return true;
+        // Attached outside every branch this caller holds. A link that
+        // matches nothing configured lands here too: hidden rather than
+        // shown, since a wrong link would otherwise be a way to be seen by
+        // everyone — but said out loud, so support can find the entry.
+        this.logger.debug(
+          `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, attached to ${values[0]}`
+        );
+        return false;
       });
 
-      return [result, req];
+      // The link was added to the projection so the judgement above could be
+      // made; a caller that did not ask for it must not receive it.
+      if (opts && AuthzBase.widenedForLink.has(opts)) {
+        for (const entry of result.searchEntries) delete entry[linkAttr];
+      }
+
+      return [result, req, opts];
     },
 
     getOrganisationTop: async ([req, defaultTop]: [

@@ -612,12 +612,13 @@ class ldapActions {
    */
   private filterForCaller(
     value: SearchResult | AsyncGenerator<SearchResult>,
-    req?: Request
+    req?: Request,
+    opts?: SearchOptions
   ): SearchResult | AsyncGenerator<SearchResult> | Promise<SearchResult> {
     if (!this.parent.hooks.ldapsearchfilter) return value;
     const hook = this.parent.hooks.ldapsearchfilter;
     const one = async (chunk: SearchResult): Promise<SearchResult> => {
-      const [filtered] = await launchHooksChained(hook, [chunk, req]);
+      const [filtered] = await launchHooksChained(hook, [chunk, req, opts]);
       return filtered;
     };
     if (
@@ -665,7 +666,7 @@ class ldapActions {
       const cached = this.searchCache.get(cacheKey);
       if (cached) {
         this.logger.debug(`LDAP search cache hit: ${digestKey(cacheKey)}`);
-        return this.filterForCaller(cloneSearchResult(cached), req);
+        return this.filterForCaller(cloneSearchResult(cached), req, opts);
       }
     }
 
@@ -707,18 +708,19 @@ class ldapActions {
             `LDAP search not cached, a write overtook it: ${digestKey(cacheKey)}`
           );
         }
-        return this.filterForCaller(result, req);
+        return this.filterForCaller(result, req, opts);
       }
 
       // For paginated searches, return a wrapped generator that releases connection when done
       if (opts.paged) {
         return this.filterForCaller(
           this.wrapPaginatedSearch(res as AsyncGenerator<SearchResult>, pooled),
-          req
+          req,
+          opts
         ) as AsyncGenerator<SearchResult>;
       }
 
-      return this.filterForCaller(res as unknown as SearchResult, req);
+      return this.filterForCaller(res as unknown as SearchResult, req, opts);
     } finally {
       // For non-paginated searches, release connection immediately
       if (!opts.paged) {

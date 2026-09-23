@@ -22,7 +22,10 @@ import supertest from 'supertest';
 import type { Response } from 'express';
 
 import { DM } from '../../../src/bin';
-import type { AttributesList } from '../../../src/lib/ldapActions';
+import type {
+  AttributesList,
+  SearchResult,
+} from '../../../src/lib/ldapActions';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
@@ -57,6 +60,7 @@ describe('Authorization by attachment', function () {
   let previousConfig: string | undefined;
   let previousTtl: string | undefined;
   let previousFilter: string | undefined;
+  let previousCacheTtl: string | undefined;
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -71,6 +75,10 @@ describe('Authorization by attachment', function () {
 
     // The whole point of this file, and off by default: see
     // `authz_filter_attached_entries`.
+    // The cache holds base-scope, unpaginated reads only, and is off by
+    // default. Without it the case below cannot fail for the reason it names.
+    previousCacheTtl = process.env.DM_LDAP_CACHE_TTL;
+    process.env.DM_LDAP_CACHE_TTL = '60';
     previousFilter = process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES;
     process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES = 'true';
     previousConfig = process.env.DM_AUTHZ_PER_BRANCH_CONFIG;
@@ -157,6 +165,8 @@ describe('Authorization by attachment', function () {
     if (previousFilter === undefined)
       delete process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES;
     else process.env.DM_AUTHZ_FILTER_ATTACHED_ENTRIES = previousFilter;
+    if (previousCacheTtl === undefined) delete process.env.DM_LDAP_CACHE_TTL;
+    else process.env.DM_LDAP_CACHE_TTL = previousCacheTtl;
   });
 
   const list = async (who: string): Promise<Record<string, unknown>> => {
@@ -185,15 +195,99 @@ describe('Authorization by attachment', function () {
     }
   });
 
-  it('should not serve one administrator the list filtered for another', async () => {
-    // Back to back, on the same branch: the second answer may not come from
-    // what the first one was allowed to see.
+  it('should not serve one administrator what another was allowed to see', async () => {
+    // The listing is paginated and never cached, so it cannot exercise this.
+    // A single-entry read is base-scope and unpaginated, which is exactly
+    // what the cache holds: A reads an entry of their branch, B asks for the
+    // same DN, and the answer must be B's own — not A's, served from the
+    // cache. A reads it again afterwards, to show the cache was not emptied
+    // on B's behalf either.
+    const read = async (who: string): Promise<number> =>
+      (
+        await request
+          .get(`/api/v1/ldap/users/${IN_A}`)
+          .set('X-Test-User', who)
+          .set('Accept', 'application/json')
+      ).status;
+
+    expect(await read(ADMIN_A), 'A reads their own').to.equal(200);
+    expect(
+      await read(ADMIN_B),
+      'B must not get it from the cache'
+    ).to.not.equal(200);
+    expect(await read(ADMIN_A), 'A still reads their own').to.equal(200);
+  });
+
+  it('should show each administrator their own accounts in a listing', async () => {
     const a = Object.keys(await list(ADMIN_A));
     const b = Object.keys(await list(ADMIN_B));
     expect(a).to.include(IN_A);
     expect(a).not.to.include(IN_B);
     expect(b).to.include(IN_B);
     expect(b).not.to.include(IN_A);
+  });
+
+  it('should still filter when the caller asks for a narrow projection', async () => {
+    // "Ask only for the fields you display" is the normal client shape, and
+    // what SCIM does. An entry that came back without its organization link
+    // is indistinguishable from one attached to nothing, so the filter would
+    // pass everything: the feature would be off exactly where it is wanted.
+    const res = await request
+      .get('/api/v1/ldap/users?attributes=uid,cn,mail')
+      .set('X-Test-User', ADMIN_A)
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    const seen = res.body as Record<string, Record<string, unknown>>;
+    expect(Object.keys(seen)).to.include(IN_A);
+    expect(Object.keys(seen)).not.to.include(IN_B);
+  });
+
+  it('should not hand back the link attribute nobody asked for', async () => {
+    const res = await request
+      .get('/api/v1/ldap/users?attributes=uid,cn,mail')
+      .set('X-Test-User', ADMIN_A)
+      .set('Accept', 'application/json');
+    const seen = res.body as Record<string, Record<string, unknown>>;
+    expect(seen[IN_A]).to.not.have.property('twakeDepartmentLink');
+  });
+
+  it('should refuse to read one account attached to another branch', async () => {
+    const res = await request
+      .get(`/api/v1/ldap/users/${IN_B}`)
+      .set('X-Test-User', ADMIN_A)
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.not.equal(200);
+  });
+
+  it('should refuse a deletion of an account attached to another branch', async () => {
+    const res = await request
+      .delete(`/api/v1/ldap/users/${IN_B}`)
+      .set('X-Test-User', ADMIN_A)
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(403);
+    // The refusal has to be the entry still being there, not just the code.
+    const still = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['dn'] },
+      `uid=${IN_B},${userBranch}`
+    )) as SearchResult;
+    expect(still.searchEntries.length).to.equal(1);
+  });
+
+  it('should filter a search that asks for the DN alone', async () => {
+    // What SCIM does. The entry comes back carrying no attribute at all, so
+    // nothing on it says where it is attached: the link has to be added to
+    // the projection or the filter has nothing to judge.
+    const seen = (await server.ldap.search(
+      {
+        paged: false,
+        scope: 'sub',
+        filter: `(uid=${IN_B})`,
+        attributes: ['dn'],
+      },
+      userBranch,
+      { user: ADMIN_A } as unknown as Parameters<typeof server.ldap.search>[2]
+    )) as SearchResult;
+    expect(seen.searchEntries.length).to.equal(0);
   });
 
   it('should refuse a write on an account attached to another branch', async () => {

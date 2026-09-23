@@ -46,7 +46,7 @@ export interface Hooks {
    * so a subscriber may drop entries per caller without the answer outliving
    * them. On a paginated search it is called once per chunk.
    */
-  ldapsearchfilter?: ChainedHook<[SearchResult, Request?]>;
+  ldapsearchfilter?: ChainedHook<[SearchResult, Request?, SearchOptions?]>;
   // add
   ldapaddrequest?: ChainedHook<[string, AttributesList, Request?]>;
   ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
