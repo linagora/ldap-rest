@@ -196,6 +196,46 @@ describe('Organization subnodes, when the directory will not answer in full', fu
     expect(String(indicator?._totalCount)).to.equal('60');
   });
 
+  it('should raise when the branch the attached entries live in is absent', async () => {
+    // `noSuchObject` is emptiness for a node's children and a configuration
+    // error here: the base is the parent of `ldap_top_organization`, not
+    // anything the caller named. An empty answer would leave an operator
+    // with a working-looking endpoint and no attached entry anywhere.
+    stub(call =>
+      call.options.scope === 'one'
+        ? pageOf([])
+        : refusingPages(ldapError(32, 'No such object'))
+    );
+    let raised: Error | undefined;
+    await plugin
+      .getOrganisationSubnodes(orgDn)
+      .catch((err: Error) => (raised = err));
+    expect(raised?.message).to.match(/No such object/);
+  });
+
+  it('should say a node is crowded once, not once per listing', async () => {
+    // A console expanding a tree lists the same node on every refresh. The
+    // answer stays partial until the directory is reconfigured, so repeating
+    // the warning buries the log without adding anything.
+    const warned: string[] = [];
+    const realWarn = server.logger.warn.bind(server.logger);
+    server.logger.warn = ((message: string) => {
+      warned.push(String(message));
+      return server.logger;
+    }) as unknown as typeof server.logger.warn;
+    try {
+      refusingChildren(500);
+      const crowded = `ou=seen-once,${orgDn}`;
+      await plugin.getOrganisationSubnodes(crowded);
+      await plugin.getOrganisationSubnodes(crowded);
+      await plugin.getOrganisationSubnodes(`ou=another,${orgDn}`);
+      expect(warned.filter(m => m.includes('seen-once')).length).to.equal(1);
+      expect(warned.filter(m => m.includes('another')).length).to.equal(1);
+    } finally {
+      server.logger.warn = realWarn;
+    }
+  });
+
   it('should carry the request into the searches a subnode search makes', async () => {
     // Without it every authorization plugin skips its check — the gap the
     // flat routes had until 0.8.2, still open on this route.

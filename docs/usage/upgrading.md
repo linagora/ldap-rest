@@ -26,6 +26,26 @@ The same row can now also appear among the **child organizations**, which
 were never capped and still are not: it says the directory refused to list
 them all, and it carries no `_totalCount`, nothing having counted them.
 
+### `/subnodes/search` is authorized, and lists the children by page
+
+**Who is affected:** anyone whose callers reach that route with a token that
+does not hold the whole directory, and anyone running against Active
+Directory.
+
+Neither of its searches carried the request, and an authorization plugin
+skips its check when there is none — the same gap the flat routes had until
+0.8.2. A caller now sees what its branch grants it, where it used to see
+everything the directory held; a caller outside its branch is refused. This
+is a fix, but it changes what an existing client receives.
+
+The child organizations of both routes are also searched by page now. On
+OpenLDAP that changes nothing — the server's size limit bounds a paged
+search as it does an unpaged one. On **Active Directory** it does: an
+unpaged search answered at most `MaxPageSize` entries (1000 by default) and
+said nothing about the rest, so a node with more children than that now
+returns all of them, and a client holding the answer in memory receives a
+larger one than before.
+
 ### Back-Channel Logout keeps its marks in `core/storage`
 
 `core/bcl/ldap` and `core/bcl/file` are gone, and with them

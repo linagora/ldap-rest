@@ -255,13 +255,21 @@ export default class LdapOrganizations extends DmPlugin {
      * @openapi
      * summary: List subnodes of an organization
      * description: |
-     *   Returns up to `ldap_organization_max_subnodes` (default 50) entries
-     *   that are either direct child organizational units **or** entries (users,
-     *   groups) whose organization-link attribute points to `:dn`.
+     *   Returns the direct child organizational units of `:dn`, followed by
+     *   up to `ldap_organization_max_subnodes` (default 50) entries (users,
+     *   groups) whose organization-link attribute points to it.
      *
-     *   When the result is truncated a special sentinel entry with
-     *   `objectClass: [moreIndicator]` is appended that carries `_totalCount`
-     *   and `_displayedCount` fields.
+     *   Two things bound the answer, and each appends a sentinel entry with
+     *   `objectClass: [moreIndicator]` and `_isMoreIndicator: "true"`, which
+     *   a client must drop before treating the rest as entries:
+     *
+     *   - the cap on the attached entries, whose sentinel is at
+     *     `more-<dn>` and carries `_totalCount` and `_displayedCount`;
+     *   - a directory refusing to list a branch in one answer, whose
+     *     sentinel is at `more-organizations-<dn>` and carries
+     *     `_displayedCount` alone — nothing counted the rest.
+     *
+     *   Child organizations are not capped.
      * parameters:
      *   - in: query
      *     name: objectClass
@@ -309,7 +317,13 @@ export default class LdapOrganizations extends DmPlugin {
      * description: |
      *   Full-text search across child OUs and linked entries (users, groups)
      *   of `:dn`. The `q` parameter is matched against `ou`, `description`,
-     *   `uid`, `cn`, `sn`, `givenName`, and `mail`. Results are not paginated.
+     *   `uid`, `cn`, `sn`, `givenName`, and `mail`.
+     *
+     *   Matching attached entries are capped at
+     *   `ldap_organization_max_subnodes` (default 50), and the same sentinel
+     *   entries as `/subnodes` say when the answer is partial: a client must
+     *   drop whatever carries `_isMoreIndicator` before treating the rest as
+     *   entries.
      * parameters:
      *   - in: query
      *     name: q
@@ -950,6 +964,36 @@ export default class LdapOrganizations extends DmPlugin {
     return result;
   }
 
+  /** Nodes already warned about, so a crowded tree says it once per node. */
+  private sizeLimitWarned = new Set<string>();
+  /** How many of them to remember. */
+  private static readonly SIZE_LIMIT_WARNED_MAX = 500;
+
+  /**
+   * Say once per node what only the directory can fix.
+   *
+   * A console expanding a tree lists the same crowded node on every refresh,
+   * and a warning per listing buries the rest of the log while saying
+   * nothing new: the answer stays partial until someone raises the size
+   * limit. The first listing carries the message, the others go to `debug`.
+   *
+   * The set is bounded, so a directory with thousands of crowded nodes
+   * cannot grow it without end. Past the bound the message is written every
+   * time — the loud side of the trade rather than the silent one.
+   *
+   * @param key node the message is about
+   * @param message what to say
+   */
+  private warnSizeLimit(key: string, message: string): void {
+    if (this.sizeLimitWarned.has(key)) {
+      this.server.logger.debug(message);
+      return;
+    }
+    if (this.sizeLimitWarned.size < LdapOrganizations.SIZE_LIMIT_WARNED_MAX)
+      this.sizeLimitWarned.add(key);
+    this.server.logger.warn(message);
+  }
+
   /**
    * The child organizations of a node, and what to do when the directory
    * will not list them all.
@@ -1024,8 +1068,9 @@ export default class LdapOrganizations extends DmPlugin {
     const shown = bounded.searchEntries.slice(0, cap);
     // `warn`, not `debug`: the answer is incomplete, and the only fix is on
     // the directory. Nothing else in the response says so to an operator
-    // reading logs.
-    this.server.logger.warn(
+    // reading logs — but once per node, not once per listing.
+    this.warnSizeLimit(
+      `children:${dn}`,
       `Organization ${dn} holds more child organizations than the directory ` +
         `will list in one answer, so ${shown.length} are returned and the ` +
         'rest are hidden. Raise the size limit for the account ldap-rest ' +
@@ -1083,18 +1128,19 @@ export default class LdapOrganizations extends DmPlugin {
       }
     } catch (err) {
       const code = extractLdapCode(err);
-      if (code === 32) {
-        // The branch itself is not there: nothing is attached to anything.
-        this.server.logger.debug(`No linked entities for ${dn}: no ${baseDn}`);
-        return [];
-      }
+      // `noSuchObject` is not answered with an empty list here, where it is
+      // for the children. The base is not the caller's node but the branch
+      // the deployment configured — the parent of `ldap_top_organization` —
+      // and its absence is a configuration nobody can act on from an empty
+      // answer. It keeps raising, as before this change.
       if (code !== 4) throw err;
       const bounded = (await this.server.ldap.search(
         { paged: false, filter, sizeLimit: cap + 1 },
         baseDn,
         req
       )) as SearchResult;
-      this.server.logger.warn(
+      this.warnSizeLimit(
+        `linked:${dn}`,
         `More entries are attached to ${dn} than the directory will list in ` +
           'one answer. Raise the size limit for the account ldap-rest binds ' +
           'as (olcLimits, or olcSizeLimit) to count them all.'
