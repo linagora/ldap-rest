@@ -117,6 +117,18 @@ describe('Back-Channel Logout, tombstones in LDAP', function () {
     );
   });
 
+  it('should take the same token twice without raising', async () => {
+    // Providers redeliver. The second write finds the entry already there,
+    // which is the ordinary case and must take the update path — the
+    // "already exists" it is recognised by is a message from the driver, so
+    // this is the test that says the wording still matches.
+    await plugin.store.record({ iss: ISS, sid: 'sid-twice' });
+    await plugin.store.record({ iss: ISS, sid: 'sid-twice' });
+    expect(
+      await plugin.store.isRevoked({ iss: ISS, sid: 'sid-twice' })
+    ).to.equal(true);
+  });
+
   it('should forget what would kill a session just established', async () => {
     // A logout token names a `sid` and a `sub`. The mark on the `sub` kills
     // every session of that person, so left in place it kills the ones
