@@ -9,6 +9,7 @@
 import type { SearchOptions } from 'ldapts';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
+import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../auth/base';
 import type {
@@ -17,6 +18,7 @@ import type {
   SearchResult,
   AttributeValue,
 } from '../ldapActions';
+import { ForbiddenError } from '../errors';
 import { getParentDn, isDnInBranch } from '../utils';
 
 /**
@@ -36,6 +38,30 @@ export default abstract class AuthzBase extends DmPlugin {
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
+
+  /** What `--authz-unresolved-user` accepts. */
+  private static readonly UNRESOLVED_POLICIES = ['deny', 'allow'] as const;
+
+  /**
+   * @param server DM object
+   */
+  constructor(server: DM) {
+    super(server);
+    // Refused here rather than read leniently at request time: the option
+    // decides whether an identity the model cannot place is refused, and
+    // `Allow`, `true` or a trailing space would all have meant `deny` in
+    // silence — 403s for everyone, with nothing saying the value was not
+    // understood.
+    const policy = (this.config.authz_unresolved_user as string) ?? 'deny';
+    if (
+      !(AuthzBase.UNRESOLVED_POLICIES as readonly string[]).includes(policy)
+    ) {
+      throw new Error(
+        `${this.constructor.name}: unknown --authz-unresolved-user ` +
+          `"${policy}". Known: ${AuthzBase.UNRESOLVED_POLICIES.join(', ')}.`
+      );
+    }
+  }
 
   /**
    * Whether a search asked for this attribute.
@@ -146,10 +172,131 @@ export default abstract class AuthzBase extends DmPlugin {
     return !req?.user;
   }
 
+  /** What `resolveUser` answered for an identity, and when. */
+  private resolutionCache = new Map<
+    string,
+    { user: string | null; at: number }
+  >();
+  /** How many identities to remember at once. A cap, not a threshold. */
+  private static readonly RESOLUTION_CACHE_MAX = 10000;
+  /** Said once, when the cap is reached: a log line per request helps nobody. */
+  private resolutionCacheFullWarned = false;
+
+  /**
+   * Resolve the caller, or say what an identity that does not resolve means.
+   *
+   * `shouldSkipAuthorization` covers the request that carries no identity at
+   * all — anonymous, and skipped by design. This covers the other case: a
+   * request that *was* authenticated, whose identity this plugin's model
+   * cannot place.
+   *
+   * That used to return the operation untouched behind a `warn`, which made
+   * a configuration mismatch an open door rather than a refusal.
+   * `authzLinid1` resolves `req.user` by searching
+   * `(<ldap_user_main_attribute>=<identity>)`, so an authenticator
+   * publishing anything else — `core/auth/openidconnect` publishes the OIDC
+   * `sub`, `core/auth/llng` whatever `whatToTrace` traces — resolved to
+   * nothing on every request, and read, write and delete went through
+   * across the whole tree, with a line a `notice` production log does not
+   * show. (`authzPerBranch` fails the other way: the identity is its own key,
+   * so a mismatch yields all-false permissions and a refusal.)
+   *
+   * An authenticated identity that does not resolve is a failure of the
+   * configuration, not an absence of one, so it is refused.
+   * `--authz-unresolved-user allow` restores the old behaviour for a
+   * deployment that turns out to rely on it — a security fix should not
+   * rewrite every configuration by itself.
+   *
+   * Both answers are cached for `cacheTTL`, negatives included: a mismatch
+   * would otherwise turn every request into a directory search, so a
+   * configuration mistake would also become a load problem. The TTL cuts
+   * both ways, and neither way is free:
+   *
+   *  - an identity that appears in the directory after being refused waits
+   *    out the TTL before it is looked up again;
+   *  - a *positive* answer can go stale. `authzLinid1` resolves an identity
+   *    to a DN, so an administrator whose own entry is renamed or moved is
+   *    still resolved to the former DN, where no organization names them:
+   *    every operation is refused until the TTL runs out. A rename or a
+   *    delete therefore drops what was resolved, which closes the window
+   *    for the case that produces it; a change made directly in the
+   *    directory still waits.
+   *
+   * `authzScope` resolves the identity itself (`authzScope.ts`), outside
+   * this cache, so during such a window it can describe a scope the hooks
+   * no longer grant.
+   *
+   * @param req the request being authorized, which carries an identity
+   * @returns the resolved user, or null when the policy is to allow it
+   * @throws ForbiddenError when the policy is to deny it
+   */
+  protected async resolveCaller(req: DmRequest): Promise<string | null> {
+    const identity = req.user as string;
+    const now = Date.now();
+    const cached = this.resolutionCache.get(identity);
+    let user: string | null;
+    if (cached && now - cached.at < this.cacheTTL) {
+      user = cached.user;
+    } else {
+      user = await this.resolveUser(identity);
+      if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
+        for (const [key, entry] of this.resolutionCache)
+          if (now - entry.at >= this.cacheTTL) this.resolutionCache.delete(key);
+      // Under the bound after the prune, or not at all: storing anyway would
+      // make the constant a threshold rather than a cap, and the case that
+      // reaches it — an identity provider where every user is a new key — is
+      // exactly the one this fix is about.
+      if (this.resolutionCache.size < AuthzBase.RESOLUTION_CACHE_MAX)
+        this.resolutionCache.set(identity, { user, at: now });
+      else if (!this.resolutionCacheFullWarned) {
+        this.resolutionCacheFullWarned = true;
+        this.logger.warn(
+          `${this.name}: more than ${AuthzBase.RESOLUTION_CACHE_MAX} ` +
+            'identities resolved within one cache window, so resolutions ' +
+            'are no longer cached and each request costs a lookup'
+        );
+      }
+    }
+    if (user) return user;
+    if (this.config.authz_unresolved_user === 'allow') {
+      this.logger.warn(
+        `User ${identity} could not be resolved by ${this.name}; ` +
+          'allowed by --authz-unresolved-user allow'
+      );
+      return null;
+    }
+    // The marker is what the error middleware turns into a 403 whose body
+    // says nothing about the model — see `setupErrorMiddleware`.
+    throw new ForbiddenError(
+      `[authz-forbidden] User ${identity} could not be resolved by ` +
+        `${this.name}, so no permission can be read for them`
+    );
+  }
+
+  /** Forget what was resolved, for a test that changes the directory. */
+  protected clearResolutionCache(): void {
+    this.resolutionCache.clear();
+  }
+
   /**
    * Common hooks for all authorization plugins
    */
   hooks = {
+    /**
+     * A rename moves the entry an identity resolves to, so what was
+     * resolved is dropped.
+     *
+     * `authzLinid1` keys its permissions on the administrator's DN: renamed
+     * or moved, they resolve to a DN no organization names any more, and
+     * every operation of theirs is refused until the TTL runs out. The
+     * whole map goes rather than one key, since what is cached is
+     * identity → DN and the hook carries DNs: a handful of lookups is
+     * cheaper than working out which identity moved.
+     */
+    ldaprenamedone: (): void => {
+      this.resolutionCache.clear();
+    },
+
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
       string,
       ModifyRequest,
@@ -160,9 +307,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, changes, opNumber, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, changes, opNumber, req];
       }
 
@@ -248,9 +394,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, entry, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, entry, req];
       }
 
@@ -290,9 +435,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [base, opts, req];
       }
 
@@ -369,7 +513,7 @@ export default abstract class AuthzBase extends DmPlugin {
       if (!linkAttr || this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) return pass;
       const branches = await this.getAuthorizedBranches(user);
       if (branches.length === 0) return pass;
@@ -416,7 +560,7 @@ export default abstract class AuthzBase extends DmPlugin {
         return [req, defaultTop];
       }
 
-      const user = await this.resolveUser((req as DmRequest).user!);
+      const user = await this.resolveCaller(req as DmRequest);
       if (!user) {
         return [req, defaultTop];
       }
@@ -466,9 +610,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [oldDn, newDn, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [oldDn, newDn, req];
       }
 
@@ -510,9 +653,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, req];
       }
 

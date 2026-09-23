@@ -60,6 +60,38 @@ No configuration file needed - permissions are read from LDAP. Simply load the p
 
 The plugin caches permissions for 5 minutes by default. This is hardcoded but can be modified in the source if needed.
 
+### The identity has to be a `uid`
+
+The plugin resolves `req.user` by searching
+`(<ldap_user_main_attribute>=<identity>)` under `--ldap-base`, so it only
+works behind an authenticator that publishes what the directory calls a user:
+
+| Authenticator             | `req.user`                       | Resolves here                          |
+| ------------------------- | -------------------------------- | -------------------------------------- |
+| `core/auth/token`         | the name given in `--auth-token` | only if that name is a `uid`           |
+| `core/auth/totp`          | the name given in `--auth-totp`  | only if that name is a `uid`           |
+| `core/auth/hmac`          | the service name                 | usually not                            |
+| `core/auth/llng`          | LLNG's `whatToTrace`             | when it traces the `uid`               |
+| `core/auth/openidconnect` | the OIDC `sub`                   | **no** — an opaque provider identifier |
+
+An identity that does not resolve is **refused** (403), and the refusal is
+logged with the plugin's name. Until 0.8.3 it was let through instead, which
+made this pairing an open door rather than a misconfiguration; see
+[the note](../../upgrading.md#an-identity-that-does-not-resolve-is-refused)
+and `--authz-unresolved-user` for the transition.
+
+Both answers are cached for the plugin's TTL (5 minutes), negatives
+included, so a mismatch does not turn every request into a directory search.
+The TTL cuts both ways: an identity added to the directory after being
+refused waits it out, and an administrator whose **own entry is renamed or
+moved** keeps resolving to the former DN — where no organization names them,
+so their own operations are refused. A rename or a delete performed through
+this server drops what was resolved; a change made directly in the directory
+waits out the TTL.
+
+`GET /api/v1/authz/scope` resolves the identity outside that cache, so
+during such a window it can describe a scope the hooks no longer grant.
+
 ## Permission Resolution
 
 For each LDAP operation, the plugin:

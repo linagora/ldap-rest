@@ -147,6 +147,7 @@ ENV NODE_ENV=production \
  DM_AUTH_HMAC= \
  DM_AUTH_HMAC_WINDOW="120000" \
  DM_AUTHZ_PER_ROUTES= \
+ DM_AUTHZ_UNRESOLVED_USER="deny" \
  DM_AUTHZ_FILTER_ATTACHED_ENTRIES=false \
  DM_AUTHZ_PER_BRANCH_CONFIG="{\"default\":{\"read\":true,\"write\":false,\"delete\":false}}" \
  DM_AUTHZ_PER_BRANCH_CACHE_TTL="60" \

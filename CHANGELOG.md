@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Security
+
+- `lib/authz/base`: every authorization hook let the operation through when
+  it could not resolve the caller, so `core/auth/authzLinid1` behind an
+  authenticator publishing anything but a `uid` — an OIDC `sub`, an LLNG
+  `whatToTrace` — skipped every check on every request, across the whole
+  tree. An authenticated identity that does not resolve is refused now, and
+  `--authz-unresolved-user allow` restores the old behaviour for a
+  deployment that relies on it —
+  [notes](docs/usage/upgrading.md#an-identity-that-does-not-resolve-is-refused)
+
 ### Bug Fixes
 
 - `core/ldap/organizations`: a node holding more children than the directory
