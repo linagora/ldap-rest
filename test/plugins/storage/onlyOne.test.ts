@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { DM } from '../../../src/bin';
+import priority from '../../../src/plugins/priority.json';
 import Storage from '../../../src/plugins/storage';
 
 describe('Keyed storage, one instance', function () {
@@ -67,5 +68,26 @@ describe('Keyed storage, one instance', function () {
     expect(() => new Storage(other)).to.throw(/unknown backend/);
     process.env.DM_STORAGE_BACKEND = 'file';
     first = new Storage(server);
+  });
+});
+
+/**
+ * The refusal above is a guarantee for a configuration listing storage once,
+ * and a trap for the plugin that declares it as a dependency.
+ *
+ * `DM` loads its priority plugins one at a time and the rest in parallel, and
+ * `registerPlugin` resolves a declared dependency by loading it when nothing
+ * is registered under that name yet. So a consumer reaching registration
+ * before the storage the operator also listed loads a second one, and the
+ * refusal fires on a configuration that named the store exactly once — with
+ * a message about two instances, which is not what happened.
+ *
+ * Naming `core/storage` in the priority list is what keeps that from
+ * happening: it is then registered before the parallel batch any consumer
+ * lands in, and the dependency loop finds it rather than loading it again.
+ */
+describe('Keyed storage, loaded before its consumers', () => {
+  it('should be named in the priority list', () => {
+    expect(priority).to.include('core/storage');
   });
 });

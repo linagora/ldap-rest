@@ -59,8 +59,10 @@ For a feature that can be skipped, a warning is the right answer; for this
 one, a refusal to start is the honest failure.
 
 The refusal answers for the configuration, not for the order it is written
-in: `core/bcl` declares `core/storage` as a dependency, so listing it first
-loads the store anyway.
+in. `core/bcl` declares `core/storage` as a dependency, so a configuration
+naming only `core/bcl` loads the store anyway; and `core/storage` is in the
+priority list, so one that names both gets a single instance whichever comes
+first.
 
 ## What a Login Forgets
 

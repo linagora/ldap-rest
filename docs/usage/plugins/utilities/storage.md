@@ -34,6 +34,11 @@ which is invisible in a configuration.
 | `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes                     |
 | `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    | _(none)_             | Directory the `file` backend writes to                    |
 
+`core/storage` is in the priority list, so it is registered before the
+plugins that consume it whatever order they are written in. A consumer that
+declares it as a dependency — `core/bcl` does — also loads it on its own when
+the configuration does not name it.
+
 ## Backends
 
 ### `ldap`
