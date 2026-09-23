@@ -6,6 +6,44 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### An identity that does not resolve is refused
+
+**Who is affected:** anyone running an authorization plugin that resolves
+identities against the directory — `core/auth/authzLinid1` — behind an
+authenticator that publishes something other than the directory's
+`ldap_user_main_attribute`.
+
+Every authorization hook skipped its check when `resolveUser` answered
+null: a `warn`, then the read, the write or the delete went ahead. With
+`authzLinid1`, whose `resolveUser` searches
+`(<ldap_user_main_attribute>=<identity>)`, an authenticator publishing
+anything else resolved to nothing on every request — `core/auth/openidconnect`
+publishes the OIDC `sub`, `core/auth/llng` whatever `whatToTrace` traces — so
+anyone the identity provider admitted read, wrote and deleted across the
+whole tree, behind a line a `notice` production log does not show.
+
+An authenticated identity that does not resolve is now refused, with the same
+403 as any other refusal. **Check your logs before upgrading**: a deployment
+in this state looks healthy, and the requests that were passing will start
+answering 403.
+
+```
+grep 'could not be resolved' <your log>
+```
+
+If that matches, the caller's identity and the plugin's model disagree, and
+the upgrade turns an open door into a refusal — which may be a service
+outage where the door was being used. `--authz-unresolved-user allow`
+restores the old behaviour while you fix the pairing; it keeps the warning,
+and it keeps the door open.
+
+An **anonymous** request is unchanged: no identity at all is still skipped,
+and the route's own authentication is what answers it.
+
+Both answers are cached now, negatives included, for the plugin's own cache
+TTL. An identity added to the directory after being refused waits out that
+TTL.
+
 ### `/subnodes/search` caps what it returns
 
 **Who is affected:** a client reading the whole answer of

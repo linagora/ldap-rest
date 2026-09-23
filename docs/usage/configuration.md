@@ -27,6 +27,7 @@ All LDAP-Rest configuration options.
     - [core/auth/openidconnect](#coreauthopenidconnect)
     - [core/bcl](#corebcl)
   - [Authorization Plugins](#authorization-plugins)
+    - [Common to every authorization plugin](#common-to-every-authorization-plugin)
     - [core/auth/authzPerBranch](#coreauthauthzperbranch)
     - [core/auth/authzPerRoute](#coreauthauthzperroute)
     - [core/auth/authzLinid1](#coreauthauthzlinid1)
@@ -277,6 +278,20 @@ see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
 | `--bcl-retention` | `DM_BCL_RETENTION` | `604800` | Seconds a tombstone is kept |
 
 ### Authorization Plugins
+
+#### Common to every authorization plugin
+
+| CLI                       | Env                        | Default | Description                                                                                                                          |
+| ------------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`  | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning |
+
+An **anonymous** request is not this case: it carries no identity, and every
+authorization plugin skips it as before. This is about a caller the
+authenticator admitted whose identity the authorization model cannot place —
+`authzLinid1` looking up a `uid` that does not exist, typically because the
+authenticator publishes something else. `allow` is the behaviour every plugin
+had before 0.8.3, and it is an open door where `authzLinid1` is loaded: see
+[the note](upgrading.md#an-identity-that-does-not-resolve-is-refused).
 
 #### `core/auth/authzPerBranch`
 

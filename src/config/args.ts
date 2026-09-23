@@ -159,6 +159,7 @@ export interface Config {
    * hooks, so it never sees the filter and this option does nothing there.
    */
   authz_filter_attached_entries?: boolean;
+  authz_unresolved_user?: string;
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
@@ -769,6 +770,18 @@ const configArgs: ConfigTemplate = [
     'array',
     '--authz-per-routes',
   ],
+
+  // Common to every authorization plugin
+  //
+  // What an *authenticated* caller whose identity the plugin cannot resolve
+  // means. `deny` refuses the operation; `allow` lets it through with a
+  // warning, which is what every plugin did until it turned out to be an
+  // open door: `authzLinid1` resolves `req.user` as a `uid` in the
+  // directory, so an authenticator publishing something else — an OIDC
+  // `sub`, an LLNG `whatToTrace` tracing a mail — made every check skip,
+  // across the whole tree. An anonymous request is not this case: it is
+  // skipped as before.
+  ['--authz-unresolved-user', 'DM_AUTHZ_UNRESOLVED_USER', 'deny'],
 
   // Auth authzPerBranch plugin
   [

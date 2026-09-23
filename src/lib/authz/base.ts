@@ -17,6 +17,7 @@ import type {
   SearchResult,
   AttributeValue,
 } from '../ldapActions';
+import { ForbiddenError } from '../errors';
 import { getParentDn, isDnInBranch } from '../utils';
 
 /**
@@ -146,6 +147,83 @@ export default abstract class AuthzBase extends DmPlugin {
     return !req?.user;
   }
 
+  /** What `resolveUser` answered for an identity, and when. */
+  private resolutionCache = new Map<
+    string,
+    { user: string | null; at: number }
+  >();
+  /** Identities to remember at once, so the map cannot grow without end. */
+  private static readonly RESOLUTION_CACHE_MAX = 10000;
+
+  /**
+   * Resolve the caller, or say what an identity that does not resolve means.
+   *
+   * `shouldSkipAuthorization` covers the request that carries no identity at
+   * all — anonymous, and skipped by design. This covers the other case: a
+   * request that *was* authenticated, whose identity this plugin's model
+   * cannot place.
+   *
+   * That used to return the operation untouched behind a `warn`, which made
+   * a configuration mismatch an open door rather than a refusal.
+   * `authzLinid1` resolves `req.user` by searching
+   * `(<ldap_user_main_attribute>=<identity>)`, so an authenticator
+   * publishing anything else — `core/auth/openidconnect` publishes the OIDC
+   * `sub`, `core/auth/llng` whatever `whatToTrace` traces — resolved to
+   * nothing on every request, and read, write and delete went through
+   * across the whole tree, with a line a `notice` production log does not
+   * show. (`authzPerBranch` fails the other way: the identity is its own key,
+   * so a mismatch yields all-false permissions and a refusal.)
+   *
+   * An authenticated identity that does not resolve is a failure of the
+   * configuration, not an absence of one, so it is refused.
+   * `--authz-unresolved-user allow` restores the old behaviour for a
+   * deployment that turns out to rely on it — a security fix should not
+   * rewrite every configuration by itself.
+   *
+   * Both answers are cached for `cacheTTL`, negatives included: a mismatch
+   * would otherwise turn every request into a directory search, so a
+   * configuration mistake would also become a load problem. An identity that
+   * appears in the directory after being refused waits out the TTL.
+   *
+   * @param req the request being authorized, which carries an identity
+   * @returns the resolved user, or null when the policy is to allow it
+   * @throws ForbiddenError when the policy is to deny it
+   */
+  protected async resolveCaller(req: DmRequest): Promise<string | null> {
+    const identity = req.user as string;
+    const now = Date.now();
+    const cached = this.resolutionCache.get(identity);
+    let user: string | null;
+    if (cached && now - cached.at < this.cacheTTL) {
+      user = cached.user;
+    } else {
+      user = await this.resolveUser(identity);
+      if (this.resolutionCache.size >= AuthzBase.RESOLUTION_CACHE_MAX)
+        for (const [key, entry] of this.resolutionCache)
+          if (now - entry.at >= this.cacheTTL) this.resolutionCache.delete(key);
+      this.resolutionCache.set(identity, { user, at: now });
+    }
+    if (user) return user;
+    if (this.config.authz_unresolved_user === 'allow') {
+      this.logger.warn(
+        `User ${identity} could not be resolved by ${this.name}; ` +
+          'allowed by --authz-unresolved-user allow'
+      );
+      return null;
+    }
+    // The marker is what the error middleware turns into a 403 whose body
+    // says nothing about the model — see `setupErrorMiddleware`.
+    throw new ForbiddenError(
+      `[authz-forbidden] User ${identity} could not be resolved by ` +
+        `${this.name}, so no permission can be read for them`
+    );
+  }
+
+  /** Forget what was resolved, for a test that changes the directory. */
+  protected clearResolutionCache(): void {
+    this.resolutionCache.clear();
+  }
+
   /**
    * Common hooks for all authorization plugins
    */
@@ -160,9 +238,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, changes, opNumber, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, changes, opNumber, req];
       }
 
@@ -248,9 +325,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, entry, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, entry, req];
       }
 
@@ -290,9 +366,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [base, opts, req];
       }
 
@@ -369,7 +444,7 @@ export default abstract class AuthzBase extends DmPlugin {
       if (!linkAttr || this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) return pass;
       const branches = await this.getAuthorizedBranches(user);
       if (branches.length === 0) return pass;
@@ -416,7 +491,7 @@ export default abstract class AuthzBase extends DmPlugin {
         return [req, defaultTop];
       }
 
-      const user = await this.resolveUser((req as DmRequest).user!);
+      const user = await this.resolveCaller(req as DmRequest);
       if (!user) {
         return [req, defaultTop];
       }
@@ -466,9 +541,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [oldDn, newDn, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [oldDn, newDn, req];
       }
 
@@ -510,9 +584,8 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, req];
       }
 
-      const user = await this.resolveUser(req!.user!);
+      const user = await this.resolveCaller(req!);
       if (!user) {
-        this.logger.warn(`User ${req!.user} could not be resolved`);
         return [dn, req];
       }
 
