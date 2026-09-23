@@ -550,24 +550,26 @@ graph TB
 - `static` - Static files
 - `weblogs` - Logging
 - `configApi` - Configuration API
+- `storage` - Keyed storage. Written anywhere in the configuration, but
+  loaded before the others: its consumers have to find it registered, so it
+  is in the priority list
 
 ## Plugin Priority System
 
-LDAP-Rest uses a priority system defined in `src/plugins/priority.json`:
+LDAP-Rest uses a priority system defined in
+[`src/plugins/priority.json`](../../src/plugins/priority.json), which is the
+list itself — copying it here is how this section came to name two plugins
+the file does not and to omit four it does.
 
-```json
-[
-  "core/auth/crowdsec",
-  "core/auth/rateLimit",
-  "core/auth/token",
-  "core/auth/llng",
-  "core/auth/openidconnect",
-  "core/auth/authzPerBranch",
-  "core/auth/authzLinid1"
-]
-```
+Plugins in that list are loaded one at a time, in its order, before every
+other plugin is loaded in parallel. Two reasons put a plugin there: a
+security plugin whose middleware must sit ahead of the routes it guards, and
+a plugin others depend on, which has to be registered before the batch its
+consumers land in — `core/storage` is there for the second reason.
 
-Plugins in this list load before others, ensuring security plugins run first.
+The list matches by exact string, so a named instance
+(`core/auth/token:authAdmins:{…}`) is not in it and lands in the parallel
+batch.
 
 ## Hook Execution Order
 

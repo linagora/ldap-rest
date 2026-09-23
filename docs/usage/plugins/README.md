@@ -90,4 +90,4 @@ See [the complete dependencies matrix](../../plugin-development/dependencies.md)
 
 ## Load Order
 
-Authentication plugins are loaded first to secure API endpoints. The order is defined in `src/plugins/priority.json`.
+Authentication plugins are loaded first, so their middleware sits ahead of the routes it guards. The list also carries the plugins other plugins depend on, which have to be registered before the batch their consumers land in — `core/storage` is one. The order is defined in `src/plugins/priority.json`.
