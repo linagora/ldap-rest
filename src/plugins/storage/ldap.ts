@@ -43,7 +43,7 @@ export default class LdapStore extends Store {
 
   /** `<deadline> <key>\n<value>`, the deadline first as in the file store. */
   private static encode(key: string, record: StoredRecord): string {
-    return `${record.deadline} ${key}\n${record.value}`;
+    return `${record.deadline} ${LdapStore.readable(key)}\n${record.value}`;
   }
 
   private static decode(value: unknown): StoredRecord | null {

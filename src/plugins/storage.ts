@@ -13,6 +13,13 @@
  * is unwell. Registration order is invisible in a configuration, which is a
  * poor place to keep a behaviour.
  *
+ * A consumer reaches it with `requirePlugin('storage')` and works through
+ * `store`; it should not index `loadedPlugins` itself. And one that makes a
+ * security decision must not read "no storage" as "nothing to check":
+ * `requirePlugin` answers null and warns once, which is right for an optional
+ * feature and wrong for, say, a logout check — such a consumer refuses to
+ * load instead.
+ *
  * What a consumer must not expect of this layer: it does not decide how long
  * anything lives. A deadline comes in with the record, because retention is
  * the policy of whoever wrote it — the moment a backend decides for itself,
@@ -27,12 +34,32 @@ import type Store from '../lib/storage/store';
 import FileStore from './storage/file';
 import LdapStore from './storage/ldap';
 
+/**
+ * The one instance, if there is one.
+ *
+ * "One plugin, one backend" is the reason a consumer may treat the store as
+ * the place a record is: two of them put the same record in two places, and
+ * make registration order — invisible in a configuration — decide what
+ * happens when one is unwell. `--storage-backend` is a single value, but
+ * nothing stops a second instance arriving under another name, so the
+ * guarantee is held here rather than stated in a comment.
+ */
+let onlyInstance: Storage | undefined;
+
 export default class Storage extends DmPlugin {
   name = 'storage';
   store: Store;
 
   constructor(server: DM) {
     super(server);
+    if (onlyInstance) {
+      throw new Error(
+        `storage: an instance is already loaded, keeping its records in ` +
+          `${onlyInstance.store.name}. A second one would put the same ` +
+          'record in two places and leave registration order to decide ' +
+          'which answers. Load one, and let its consumers share it.'
+      );
+    }
     const backend = (server.config.storage_backend as string) || '';
 
     switch (backend) {
@@ -76,9 +103,21 @@ export default class Storage extends DmPlugin {
         );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    onlyInstance = this;
     this.logger.info(`storage: records kept by ${this.store.name}`);
     this.store.startSweeping(
       (server.config.storage_sweep_interval as number) || 0
     );
+  }
+
+  /**
+   * Release the single-instance hold.
+   *
+   * For a test building several servers in one process; a running one has no
+   * reason to call it.
+   */
+  static release(instance: Storage): void {
+    if (onlyInstance === instance) onlyInstance = undefined;
   }
 }

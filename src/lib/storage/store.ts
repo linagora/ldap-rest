@@ -54,9 +54,24 @@ export default abstract class Store {
   /** Drop every expired record. Returns how many went. */
   abstract sweep(): Promise<number>;
 
-  /** `namespace:key`, so two consumers cannot collide. */
+  /**
+   * The key a backend actually sees, namespaced so two consumers cannot
+   * collide.
+   *
+   * Joined on NUL, not on a colon: `('bcl', 'x:y')` and `('bcl:x', 'y')`
+   * would otherwise be the same string, and one record would answer for
+   * both. A consumer picks its namespace in code, so a colon in one is
+   * unlikely — but for a store about to hold session state, holding by
+   * construction beats holding by convention. `lib/ldapActions` moved its own
+   * cache keys to NUL for the same reason.
+   */
   protected static scoped(namespace: string, key: string): string {
-    return `${namespace}:${key}`;
+    return `${namespace}\u0000${key}`;
+  }
+
+  /** The same pair, for a human reading a record. Never used to look one up. */
+  protected static readable(scoped: string): string {
+    return scoped.replace('\u0000', ':');
   }
 
   /**

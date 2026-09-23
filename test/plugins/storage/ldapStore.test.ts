@@ -85,8 +85,20 @@ describe('Keyed storage, in the directory', function () {
 
   it('should reclaim what expired and leave the rest', async () => {
     await store.set('bcl', 'swept', 'gone', Date.now() - 1000);
-    expect(await store.sweep()).to.be.greaterThan(0);
-    expect(await store.get('bcl', 'swept')).to.equal(null);
+    // `get` answers null for an expired record whether or not it was
+    // reclaimed, so the assertion is on the branch: one fewer entry.
+    const count = async (): Promise<number> =>
+      (
+        (await server.ldap.search(
+          { paged: false, scope: 'one', attributes: ['dn'] },
+          branch
+        )) as SearchResult
+      ).searchEntries.length;
+    const before = await count();
+    await store.sweep();
+    expect(await count(), 'the expired record was reclaimed').to.equal(
+      before - 1
+    );
     expect(await store.get('bcl', 'k1')).to.equal('hello');
   });
 });

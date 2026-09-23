@@ -58,7 +58,7 @@ export default class FileStore extends Store {
 
   /** `<deadline> <key>\n<value>` — the deadline first, so a short read still has it. */
   private static encode(key: string, record: StoredRecord): string {
-    return `${record.deadline} ${key}\n${record.value}\n`;
+    return `${record.deadline} ${FileStore.readable(key)}\n${record.value}\n`;
   }
 
   private static decode(text: string): StoredRecord | null {

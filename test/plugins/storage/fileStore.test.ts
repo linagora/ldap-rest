@@ -91,10 +91,28 @@ describe('Keyed storage, in files', function () {
     const past = new Date(Date.now() - 3600_000);
     await fs.utimes(abandoned, past, past);
 
-    expect(await store.sweep()).to.be.greaterThan(0);
+    // `get` answers null for an expired record whether or not it was
+    // reclaimed, and the abandoned temporary alone would satisfy a count
+    // greater than zero. So the assertion is on the storage: one fewer file,
+    // and the live ones still there.
+    const before = (await fs.readdir(dir)).filter(n => !n.endsWith('.tmp'));
+    await store.sweep();
+    const after = (await fs.readdir(dir)).filter(n => !n.endsWith('.tmp'));
+    expect(after.length, 'the expired record was reclaimed').to.equal(
+      before.length - 1
+    );
     expect(await fs.readdir(dir)).to.not.include('abandoned.tmp');
-    // The live ones stayed.
     expect(await store.get('bcl', 'k1')).to.equal('hello');
+  });
+
+  it('should not let a colon in a namespace reach another consumer', async () => {
+    // Joined on a colon, ('bcl', 'x:y') and ('bcl:x', 'y') would be the same
+    // string and one record would answer for both — which is the promise
+    // "two consumers cannot collide" quietly failing.
+    await store.set('bcl', 'x:y', 'written by (bcl, x:y)', inAnHour());
+    await store.set('bcl:x', 'y', 'written by (bcl:x, y)', inAnHour());
+    expect(await store.get('bcl', 'x:y')).to.equal('written by (bcl, x:y)');
+    expect(await store.get('bcl:x', 'y')).to.equal('written by (bcl:x, y)');
   });
 
   it('should keep a value that has a newline in it', async () => {
