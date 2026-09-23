@@ -6,6 +6,46 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### `/subnodes/search` caps what it returns
+
+**Who is affected:** a client reading the whole answer of
+`/api/v1/ldap/organizations/<dn>/subnodes/search` and expecting every match.
+
+It returned every attached entry it found, which is the one shape a directory
+with a size limit cannot answer: past that limit the server refuses the
+search rather than shortening it. It now caps them at
+`--ldap-organization-max-subnodes` (default 50) and ends the list with the
+`moreIndicator` row `/subnodes` already used, so the two endpoints answer the
+same shape.
+
+A client that treats every row as an entry will show that row as one. Drop
+whatever carries `_isMoreIndicator` — see
+[the endpoint's notes](plugins/ldap/organizations.md#get-organization-subnodes).
+
+The same row can now also appear among the **child organizations**, which
+were never capped and still are not: it says the directory refused to list
+them all, and it carries no `_totalCount`, nothing having counted them.
+
+### `/subnodes/search` is authorized, and lists the children by page
+
+**Who is affected:** anyone whose callers reach that route with a token that
+does not hold the whole directory, and anyone running against Active
+Directory.
+
+Neither of its searches carried the request, and an authorization plugin
+skips its check when there is none — the same gap the flat routes had until
+0.8.2. A caller now sees what its branch grants it, where it used to see
+everything the directory held; a caller outside its branch is refused. This
+is a fix, but it changes what an existing client receives.
+
+The child organizations of both routes are also searched by page now. On
+OpenLDAP that changes nothing — the server's size limit bounds a paged
+search as it does an unpaged one. On **Active Directory** it does: an
+unpaged search answered at most `MaxPageSize` entries (1000 by default) and
+said nothing about the rest, so a node with more children than that now
+returns all of them, and a client holding the answer in memory receives a
+larger one than before.
+
 ### Back-Channel Logout keeps its marks in `core/storage`
 
 `core/bcl/ldap` and `core/bcl/file` are gone, and with them
