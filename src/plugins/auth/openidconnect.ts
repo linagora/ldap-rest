@@ -1,16 +1,27 @@
-import type { Express, Response } from 'express';
-import { auth, ConfigParams } from 'express-openid-connect';
+import type { Express, RequestHandler, Response } from 'express';
+import { auth, requiresAuth, ConfigParams } from 'express-openid-connect';
 
-import { DmRequest } from '../../lib/auth/base';
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import AuthBase, { DmRequest } from '../../lib/auth/base';
+import { type Role } from '../../abstract/plugin';
 import { launchHooks, launchHooksChained } from '../../lib/utils';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
-export default class OpenIDConnect extends DmPlugin {
+/**
+ * The routes `express-openid-connect` serves itself.
+ *
+ * They belong to this plugin whatever it is scoped to: a provider has to be
+ * able to reach the callback and to POST a logout token, and a catch-all
+ * authentication answering `/callback` with a 401 breaks every login.
+ */
+const OWN_ROUTES = ['/login', '/logout', '/callback', '/backchannel-logout'];
+
+export default class OpenIDConnect extends AuthBase {
   name = 'openidconnect';
   roles: Role[] = ['auth'] as const;
+  /** The library's router, built once: `auth()` returns a fresh one per call. */
+  private router?: RequestHandler;
 
   constructor(server: DM) {
     super(server);
@@ -34,7 +45,13 @@ export default class OpenIDConnect extends DmPlugin {
    */
   buildConfig(): ConfigParams {
     const config: ConfigParams = {
-      authRequired: true,
+      // The router reads the session and stops there. Whether a request
+      // needs one is asked after it, by `requiresAuth()` in `authMethod`:
+      // with `authRequired` here, a request reaching this plugin before the
+      // router has installed `req.oidc` fails with "req.oidc is not found",
+      // and the decision would be taken inside a layer the dispatcher
+      // cannot order.
+      authRequired: false,
       issuerBaseURL: this.config.oidc_server,
       clientID: this.config.oidc_client_id,
       secret: this.config.oidc_client_secret as string,
@@ -121,48 +138,79 @@ export default class OpenIDConnect extends DmPlugin {
     return config;
   }
 
+  /**
+   * Paths this authentication claims.
+   *
+   * Its own routes come with it. Scoped to `/api/admin`, the plugin would
+   * otherwise leave `/callback` to whatever else guards the server — a
+   * catch-all token plugin answering the provider's redirect with a 401 —
+   * so the four are claimed too, which also keeps them out of every other
+   * plugin's catch-all.
+   *
+   * Unscoped, the plugin already guards everything and the list stays empty.
+   *
+   * @returns the prefixes the dispatcher routes here
+   */
+  get pathPrefixes(): string[] {
+    const configured = super.pathPrefixes;
+    if (configured.length === 0) return configured;
+    return [...configured, ...OWN_ROUTES];
+  }
+
+  /**
+   * Register with the dispatcher, like every other authentication plugin.
+   *
+   * This plugin used to mount three layers of its own — the `beforeAuth`
+   * hooks, the library's router, then the identity — which kept their
+   * registration order. An instance carrying a name, the only form that can
+   * hold `auth_path_prefix`, landed in the parallel batch and mounted after
+   * the plugins that were supposed to read what it publishes: with
+   * `core/auth/authzPerRoute` loaded, every rule was judged before
+   * `req.user` existed, and `authzPerRoute` passes a request it cannot
+   * identify. The rules read as enforced and were inert.
+   *
+   * The dispatcher is mounted before any plugin can register a route, runs
+   * only the plugin whose claim is most specific, and hands `authMethod`
+   * the `beforeAuth`/`afterAuth` hooks — the three layers, in a place where
+   * order is not a configuration accident.
+   *
+   * @param app the express application
+   */
   api(app: Express): void {
-    const config = this.buildConfig();
-    app.use(async (req, res, next) => {
-      try {
-        [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [
-          req,
-          res,
-        ]);
-        next();
-      } catch (err) {
-        return serverError(res, err as Error);
-      }
-    });
-    app.use(auth(config));
-    app.use(async (req, res, next) => {
-      try {
-        if (this.hooks?.onAuth) {
-          [req, res] = await launchHooksChained(this.server.hooks.afterAuth, [
-            req,
-            res,
-          ]);
-        }
+    this.router = auth(this.buildConfig());
+    super.api(app);
+  }
+
+  /**
+   * Read the session, then require one.
+   *
+   * `requiresAuth()` runs *after* the router, so `req.oidc` exists when the
+   * decision is taken. It redirects a browser to the provider and answers
+   * 401 to an API client, which is the library's default and what makes a
+   * login work at all; the other authentication plugins answer JSON 401
+   * throughout, and that difference is documented rather than smoothed over.
+   *
+   * The plugin's own routes never reach the second step: the router answers
+   * them itself.
+   *
+   * @param req incoming request
+   * @param res response, ended by the library when it refuses or redirects
+   * @param next called once the request carries an identity
+   */
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    if (!this.router)
+      return serverError(
+        res,
+        new Error(`${this.name}: api() has not built the router`)
+      );
+    this.router(req, res, (err?: unknown) => {
+      if (err) return serverError(res, err as Error);
+      requiresAuth()(req, res, () => {
         // @ts-expect-error request is augmented by express-openid-connect
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         req.user = req.oidc.user.sub;
         next();
-      } catch (err) {
-        serverError(res, err as Error);
-      }
+      });
     });
-  }
-
-  authMethod(req: DmRequest, res: Response, next: () => void): void {
-    auth({
-      issuerBaseURL: process.env.ISSUER_BASE_URL,
-      clientID: process.env.CLIENT_ID,
-      clientSecret: process.env.CLIENT_SECRET,
-      baseURL: process.env.BASE_URL,
-      authorizationParams: {
-        response_type: 'code',
-        scope: 'openid email profile',
-      },
-    })(req, res, next);
   }
 }

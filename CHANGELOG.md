@@ -12,6 +12,14 @@
   `crowdsec` key their protection on. The list matches on the module now,
   and every instance of a priority module is loaded in the first pass
 
+- `core/auth/openidconnect`: the plugin mounted its own middleware instead of
+  registering with the authentication dispatcher, so `auth_path_prefix` was
+  accepted and ignored, a named instance could mount after the plugins
+  reading what it publishes — `core/auth/authzPerRoute` judging every rule
+  before `req.user` existed, and passing what it cannot identify — and a
+  second authentication composed as an AND. It is an `AuthBase` now —
+  [notes](docs/usage/upgrading.md#openid-connect-honours-auth_path_prefix)
+
 - `core/auth/authzDynamic`: the plugin stepped aside as soon as another
   authenticator had identified the request, so its token ACLs were applied to
   nothing — with `core/auth/token` loaded beside it, a static token reached
