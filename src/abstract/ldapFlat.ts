@@ -628,7 +628,7 @@ export default abstract class LdapFlat extends DmPlugin {
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
         }
-        const list = await this.listEntries(args);
+        const list = await this.listEntries({ ...args, req });
         res.json(this.projectList(list));
       })
     );
@@ -987,7 +987,8 @@ export default abstract class LdapFlat extends DmPlugin {
       const dn = this.resolveDn(id);
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
-        dn
+        dn,
+        req
       )) as SearchResult;
       if (result.searchEntries.length === 0) {
         throw new NotFoundError(`${this.singularName} not found`);
@@ -1033,7 +1034,7 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
-    await tryMethod(res, this.deleteEntry.bind(this), id);
+    await tryMethod(res, this.deleteEntry.bind(this), id, req);
   }
 
   async apiModify(req: Request, res: Response): Promise<void> {
@@ -1041,7 +1042,7 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!body) return;
     this.rejectForbiddenInput(modifiedAttributeNames(body));
     const id = decodeURIComponent(req.params.id as string);
-    await tryMethod(res, this.modifyEntry.bind(this), id, body);
+    await tryMethod(res, this.modifyEntry.bind(this), id, body, req);
   }
 
   async apiMove(req: Request, res: Response): Promise<void> {
@@ -1341,7 +1342,11 @@ export default abstract class LdapFlat extends DmPlugin {
     return res;
   }
 
-  async modifyEntry(id: string, changes: ModifyRequest): Promise<boolean> {
+  async modifyEntry(
+    id: string,
+    changes: ModifyRequest,
+    req?: Request
+  ): Promise<boolean> {
     let dn = this.resolveDn(id);
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
@@ -1376,7 +1381,7 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     await this.validateChanges(dn, changes);
-    const res = await this.ldap.modify(dn, changes);
+    const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}modifydone`], [
       dn,
       changes,
@@ -1427,13 +1432,13 @@ export default abstract class LdapFlat extends DmPlugin {
     return res;
   }
 
-  async deleteEntry(id: string): Promise<boolean> {
+  async deleteEntry(id: string, req?: Request): Promise<boolean> {
     let dn = this.resolveDn(id);
     dn = await launchHooksChained(
       this.registeredHooks[`${this.hookPrefix}delete`],
       dn
     );
-    const res = await this.ldap.delete(dn);
+    const res = await this.ldap.delete(dn, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}deletedone`], dn);
     return res;
   }
@@ -1568,9 +1573,11 @@ export default abstract class LdapFlat extends DmPlugin {
   async listEntries({
     filter,
     attributes,
+    req,
   }: {
     filter?: string;
     attributes?: string[];
+    req?: Request;
   }): Promise<LdapList> {
     filter = filter || '(objectClass=*)';
     const args: {
@@ -1582,7 +1589,7 @@ export default abstract class LdapFlat extends DmPlugin {
       filter,
     };
     if (attributes && attributes.length > 0) args.attributes = attributes;
-    const ldapRes = await this.ldap.search(args, this.base);
+    const ldapRes = await this.ldap.search(args, this.base, req);
     const res: LdapList = {};
     for await (const tmp of ldapRes as AsyncGenerator<SearchResult>) {
       tmp.searchEntries.forEach(e => {
