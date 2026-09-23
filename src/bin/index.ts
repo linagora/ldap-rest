@@ -151,6 +151,7 @@ export class DM {
           .then(() => {
             this.setupErrorMiddleware();
             this.warnUnauthenticatedRoutes();
+            this.afterLoad();
             resolve();
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
@@ -277,9 +278,23 @@ export class DM {
       selected = this.authenticators.filter(p => p.pathPrefixes.length === 0);
     if (selected.length === 0) return next();
 
+    // A verdict a plugin could not reach on its own, once every
+    // authenticator has run.
+    //
+    // This is the only point that is after the whole chain and before any
+    // route: a plugin mounting its own middleware for it would land wherever
+    // its registration fell among the others, and a route plugin registered
+    // first would answer before the refusal — registration order deciding an
+    // authorization answer, in the direction that fails open.
+    const finish = (index: number): void => {
+      if (index >= selected.length) return next();
+      const plugin = selected[index];
+      if (!plugin.afterChain) return finish(index + 1);
+      plugin.afterChain(req, res, () => finish(index + 1));
+    };
     // Every selected plugin must let the request through
     const run = (index: number): void => {
-      if (index >= selected.length) return next();
+      if (index >= selected.length) return finish(0);
       void selected[index].authenticate(req, res, () => run(index + 1));
     };
     run(0);
@@ -297,6 +312,26 @@ export class DM {
    */
   claimedAuthPrefixes(except?: string): string[] {
     return claimedPrefixes(this.loadedPlugins, except);
+  }
+
+  /**
+   * Let every loaded plugin look at the configuration as a whole.
+   *
+   * Constructors and `api()` run while the rest is still loading, so a
+   * plugin cannot see there what it is loaded *beside*. A failure here is
+   * reported and does not stop the server: it is a plugin's opinion about a
+   * configuration, not a condition for serving it.
+   */
+  afterLoad(): void {
+    for (const plugin of Object.values(this.loadedPlugins)) {
+      try {
+        plugin.afterLoad?.();
+      } catch (err) {
+        this.logger.error(
+          `Plugin ${plugin.name}: afterLoad failed: ${String(err)}`
+        );
+      }
+    }
   }
 
   /**

@@ -44,6 +44,44 @@ node lib/bin/index.js \
 | `--authz-dynamic-config-attribute` | `DM_AUTHZ_DYNAMIC_CONFIG_ATTRIBUTE` | `description`  | Attribute holding the JSON ACL document                               |
 | `--authz-dynamic-tenant-attribute` | `DM_AUTHZ_DYNAMIC_TENANT_ATTRIBUTE` | `cn`           | Attribute from which `req.user` is read                               |
 | `--authz-dynamic-reload-endpoint`  | `DM_AUTHZ_DYNAMIC_RELOAD_ENDPOINT`  | `false`        | Register `POST /api/v1/authz-dynamic/reload` for manual cache refresh |
+| `--authz-dynamic-bypass`           | `DM_AUTHZ_DYNAMIC_BYPASS`           | _(empty)_      | Who may reach the directory without one of these tokens (see below)   |
+
+### Loading this plugin beside another authenticator
+
+The dispatcher runs every authentication plugin claiming a request's path,
+so a request can arrive here already identified by another one. Until 0.8.3
+this plugin stepped aside whenever that happened, and the token ACLs were
+then applied to nothing: with `core/auth/token` loaded beside it, a static
+token reached the whole directory as an unscoped administrator — or was
+refused for lacking a dynamic token, depending on which plugin had been
+registered first.
+
+The ACLs now apply to whatever token the request carries, whoever else
+identified it, and anything allowed past them without a token is named:
+
+| `--authz-dynamic-bypass` | Effect                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| _(empty, the default)_   | Nobody. A request must carry one of these tokens                                                    |
+| `any-authenticated`      | Anything another plugin authenticated — the behaviour before 0.8.3                                  |
+| `trusted-proxy`          | A request from a trusted proxy **that named a caller** (`req.trustedProxy` and `req.proxyAuthUser`) |
+| any other value          | The identity another authenticator publishes in `req.user`, e.g. a name from `--auth-token`         |
+
+Values combine: `--authz-dynamic-bypass trusted-proxy --authz-dynamic-bypass ops-admin`.
+
+`trusted-proxy` requires the proxy to have named someone. `trustedProxy`
+marks the _address_ it trusts and fills `proxyAuthUser` only when the
+request carried the authentication header it expects, so accepting the mark
+alone would hand the whole directory to every host of the `--trusted-proxy`
+range — `10.0.0.0/8` being all of it.
+
+A bypassed request carries **no** token, so no ACL is enforced on it — that
+is what a bypass is. Each one is logged at `info` with the reason that let it
+through, and a configuration loading this plugin beside another
+authenticator says so once at startup.
+
+The answer no longer depends on registration order: when the bypass names an
+identity another plugin has not published yet, the verdict waits until every
+authenticator has run.
 
 ## Token entry shape
 
@@ -148,6 +186,10 @@ ACL, the client is cryptographically constrained to its own SCIM subtree.
   deploy cleartext secrets in production.
 - **Timing**: comparisons run through `crypto.timingSafeEqual` or a buffer
   wrapper, preventing timing oracles on the secret.
+- **Composition**: loading another authenticator on the same paths means a
+  request can arrive already identified. It is still checked against the
+  token it carries; what may pass without one is `--authz-dynamic-bypass`,
+  and nothing else.
 - **Scope escape**: the authz hooks check every LDAP operation's DN against
   the token's ACL. The active token is carried via `AsyncLocalStorage`, so it
   applies even to plugins that do not thread `req` down to `ldapActions`.

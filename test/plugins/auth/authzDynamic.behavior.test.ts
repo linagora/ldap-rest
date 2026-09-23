@@ -214,13 +214,9 @@ describe('authzDynamic behavioural regressions', function () {
     });
   });
 
-  describe('composable auth (req.user already set)', () => {
-    it('short-circuits authMethod when req.user is already set by another middleware', async () => {
-      // Simulate a prior auth middleware that set req.user. We add it to the
-      // stack AFTER the SCIM auth, but since Express runs in order and the
-      // authzDynamic middleware is in place already, we piggyback via a hook:
-      // set req.user in beforeAuth.
-      const key = 'preexisting-user';
+  describe('another authenticator identified the caller (GHSA-rxq9-qj94-27gg)', () => {
+    /** A prior middleware that identifies the caller, as the dispatcher would */
+    const identifyAs = (key: string): (() => void) => {
       server.hooks.beforeAuth = server.hooks.beforeAuth || [];
       (server.hooks.beforeAuth as Array<unknown>).push(
         (args: [{ user?: string }, unknown]) => {
@@ -228,19 +224,97 @@ describe('authzDynamic behavioural regressions', function () {
           return args;
         }
       );
+      return () => {
+        (server.hooks.beforeAuth as Array<unknown>).pop();
+      };
+    };
 
-      // Call a route with NO Authorization header — would normally 401.
-      // With the short-circuit, it should proceed past authMethod; but the
-      // authzDynamic hooks still gate on the active token from
-      // AsyncLocalStorage. Since the short-circuit runs `next()` without
-      // entering the `authzContext.run` frame, no token is active, and the
-      // authz hooks pass through (they no-op when no token).
-      // We expect the request to reach the route handler (no 401).
-      const res = await supertest(server.app).get('/api/v1/ldap/groups');
-      expect(res.status).to.not.equal(401);
+    it('should not let a request past the ACLs just because someone else named it', async () => {
+      // The plugin used to step aside as soon as `req.user` was set, so with
+      // `core/auth/token` loaded beside it the token plugin ran first and
+      // every LDAP operation of that request was checked against no ACL —
+      // a branch-unrestricted administrator, decided by registration order.
+      const done = identifyAs('preexisting-user');
+      try {
+        const res = await supertest(server.app).get('/api/v1/ldap/groups');
+        expect(res.status, JSON.stringify(res.body)).to.equal(401);
+      } finally {
+        done();
+      }
+      expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
+    });
 
-      // Clean up the hook
-      (server.hooks.beforeAuth as Array<unknown>).pop();
+    it('should let it through when the deployment names the identity', async () => {
+      const done = identifyAs('preexisting-user');
+      server.config.authz_dynamic_bypass = ['preexisting-user'];
+      try {
+        const res = await supertest(server.app).get('/api/v1/ldap/groups');
+        expect(res.status).to.not.equal(401);
+      } finally {
+        server.config.authz_dynamic_bypass = [];
+        done();
+      }
+      // A bypass carries no token, so no frame is entered and the hooks
+      // enforce nothing — which is what the deployment asked for.
+      expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
+    });
+
+    it('should let it through under the old blanket behaviour, when asked for', async () => {
+      const done = identifyAs('someone-else');
+      server.config.authz_dynamic_bypass = ['any-authenticated'];
+      try {
+        const res = await supertest(server.app).get('/api/v1/ldap/groups');
+        expect(res.status).to.not.equal(401);
+      } finally {
+        server.config.authz_dynamic_bypass = [];
+        done();
+      }
+    });
+
+    it('should not let a named identity through on another name', async () => {
+      const done = identifyAs('someone-else');
+      server.config.authz_dynamic_bypass = ['preexisting-user'];
+      try {
+        const res = await supertest(server.app).get('/api/v1/ldap/groups');
+        expect(res.status).to.equal(401);
+      } finally {
+        server.config.authz_dynamic_bypass = [];
+        done();
+      }
+    });
+
+    it('should refuse a write the token may not make, although someone else named the caller', async () => {
+      // The advisory's case, end to end: token A may read `ou=groups` and
+      // not write it. Identified by another authenticator, the request used
+      // to skip the ACLs entirely and the write went to the directory.
+      const done = identifyAs('preexisting-user');
+      try {
+        const res = await supertest(server.app)
+          .post('/api/v1/ldap/groups')
+          .set('Authorization', `Bearer ${tokenJsonTenant}`)
+          .set('Content-Type', 'application/json')
+          .send({ cn: 'group-the-token-may-not-create' });
+        expect(res.status, JSON.stringify(res.body)).to.equal(403);
+        expect(res.body.error).to.match(/permission/i);
+      } finally {
+        done();
+      }
+    });
+
+    it('should enforce the token ACLs of a request someone else already named', async () => {
+      // The other half of the fix: a token presented by an already
+      // identified caller is resolved and its ACLs applied, where the plugin
+      // used to ignore it. The tenant does not overwrite the identity the
+      // first authenticator published.
+      const done = identifyAs('preexisting-user');
+      try {
+        const res = await supertest(server.app)
+          .get('/api/v1/ldap/groups')
+          .set('Authorization', `Bearer ${tokenJsonTenant}`);
+        expect(res.status, JSON.stringify(res.body)).to.not.equal(401);
+      } finally {
+        done();
+      }
       expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
     });
   });

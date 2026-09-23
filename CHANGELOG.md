@@ -4,6 +4,14 @@
 
 ### Security
 
+- `core/auth/authzDynamic`: the plugin stepped aside as soon as another
+  authenticator had identified the request, so its token ACLs were applied to
+  nothing — with `core/auth/token` loaded beside it, a static token reached
+  the whole directory unscoped, or was refused, depending on registration
+  order. The ACLs apply to whatever token a request carries now, and what may
+  pass without one is named by `--authz-dynamic-bypass` —
+  [notes](docs/usage/upgrading.md#authzdynamic-no-longer-steps-aside-for-another-authenticator)
+
 - `lib/authz/base`: every authorization hook let the operation through when
   it could not resolve the caller, so `core/auth/authzLinid1` behind an
   authenticator publishing anything but a `uid` — an OIDC `sub`, an LLNG

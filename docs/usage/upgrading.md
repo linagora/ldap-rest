@@ -6,6 +6,42 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### `authzDynamic` no longer steps aside for another authenticator
+
+**Who is affected:** anyone loading `core/auth/authzDynamic` beside another
+authentication plugin on the same paths — `core/auth/token`,
+`core/auth/openidconnect`, `core/auth/llng`.
+
+The plugin returned early as soon as a request already carried a `req.user`,
+so the token ACLs were applied to nothing. With `core/auth/token` registered
+first, its static tokens reached the whole directory as unscoped
+administrators; registered the other way round, the same configuration
+demanded both credentials. Which one a deployment got was plugin import
+order.
+
+The ACLs now apply to the token a request carries, whoever else identified
+it, and a request carrying none is refused. **A deployment relying on the
+old behaviour will start answering 401** — its callers authenticate with the
+other plugin and have no dynamic token.
+
+`--authz-dynamic-bypass` names what may pass without a token:
+
+```
+--authz-dynamic-bypass any-authenticated   # what the plugin did before 0.8.3
+--authz-dynamic-bypass ops-admin           # one identity, as another plugin publishes it
+--authz-dynamic-bypass trusted-proxy       # what core/auth/trustedProxy vouched for
+```
+
+`any-authenticated` restores the previous behaviour in one line. The
+difference is that it is now written down, logged per request with the
+reason, and announced at startup when this plugin shares its paths with
+another authenticator.
+
+`trusted-proxy` is the composition the old code's comment described and
+never performed: `core/auth/trustedProxy` sets `req.trustedProxy` and
+`req.proxyAuthUser`, never `req.user`, so that pair never took the early
+return — while every authenticator that does set it, did.
+
 ### An identity that does not resolve is refused
 
 **Who is affected:** anyone running an authorization plugin that resolves

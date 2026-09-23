@@ -31,7 +31,10 @@ import type { SearchOptions } from 'ldapts';
 
 import { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
-import AuthBase, { type DmRequest } from '../../lib/auth/base';
+import AuthBase, {
+  type DmRequest,
+  prefixCoversPath,
+} from '../../lib/auth/base';
 import { ForbiddenError } from '../../lib/errors';
 import type {
   AttributesList,
@@ -68,6 +71,12 @@ export interface TokenEntry {
 /** Extends DmRequest with the resolved token entry for downstream hooks. */
 export interface AuthzDynamicRequest extends DmRequest {
   authzToken?: TokenEntry;
+}
+
+/** A request whose verdict waits for the end of the authentication chain. */
+interface PendingRequest extends AuthzDynamicRequest {
+  authzDynamicPending?: boolean;
+  authzDynamicPendingReason?: string;
 }
 
 /**
@@ -323,13 +332,193 @@ export default class AuthzDynamic extends AuthBase {
     return this.loading;
   }
 
+  /**
+   * Whether this request is allowed past the token ACLs without a token.
+   *
+   * The plugin used to step aside as soon as anything else had set
+   * `req.user`, which is not a decision anyone wrote down: with
+   * `core/auth/token` and this plugin both unscoped, the dispatcher runs the
+   * token plugin first, it sets `req.user`, and every LDAP operation of that
+   * request was then checked against no ACL at all — a branch-unrestricted
+   * administrator. Registered the other way round, the same configuration
+   * demanded both credentials. An ordering accident decided which.
+   *
+   * The comment that justified it named `trustedProxy + authzDynamic`, a
+   * composition that never worked: `trustedProxy` sets `req.trustedProxy`
+   * and `req.proxyAuthUser`, never `req.user`, so that pair never took this
+   * path — while every authenticator that does set it, did.
+   *
+   * So the bypass is named now. `--authz-dynamic-bypass` lists the
+   * identities that may skip the ACLs, plus `trusted-proxy` for the
+   * composition the comment meant and `any-authenticated` for the old
+   * behaviour, which a deployment relying on it can ask for in one line.
+   *
+   * @param req request being authenticated
+   * @returns what allowed it past, or undefined when nothing does
+   */
+  private bypassReason(req: DmRequest): string | undefined {
+    const allowed = (this.config.authz_dynamic_bypass as string[]) || [];
+    if (allowed.length === 0) return undefined;
+    // `trustedProxy` marks the *address* it trusts, and fills
+    // `proxyAuthUser` only when the proxy named someone. Accepting the mark
+    // alone would hand the whole directory to every host of a
+    // `--trusted-proxy` range — `10.0.0.0/8` being all of it — with no token
+    // and no ACL. The vouch has to name a caller.
+    const proxied = req as DmRequest & {
+      trustedProxy?: boolean;
+      proxyAuthUser?: string;
+    };
+    if (
+      allowed.includes('trusted-proxy') &&
+      proxied.trustedProxy === true &&
+      proxied.proxyAuthUser
+    )
+      return `trusted-proxy vouching for ${proxied.proxyAuthUser}`;
+    if (!req.user) return undefined;
+    if (allowed.includes('any-authenticated')) return 'any-authenticated';
+    if (allowed.includes(req.user)) return `identity ${req.user}`;
+    return undefined;
+  }
+
+  /**
+   * Say, once and at startup, when a configuration is ambiguous.
+   *
+   * The dispatcher runs every authenticator claiming the winning prefix, so
+   * this plugin sharing one with another means each request carries two
+   * verdicts — and, before the bypass was named, which of them decided the
+   * ACLs depended on registration order. A deployment reading as "tokens are
+   * scoped to their tenant's branches" deserves to hear that on the first
+   * line of its log rather than from an incident.
+   */
+  afterLoad(): void {
+    const mine = this.pathPrefixes;
+    const covers = (a: string[], b: string[]): boolean =>
+      a.length === 0 ||
+      b.length === 0 ||
+      a.some(x =>
+        b.some(y => x === y || prefixCoversPath(x, y) || prefixCoversPath(y, x))
+      );
+    const sharing = Object.values(this.server.loadedPlugins)
+      .filter(
+        plugin =>
+          plugin !== this &&
+          plugin.roles?.includes('auth') &&
+          covers(mine, (plugin as AuthBase).pathPrefixes || [])
+      )
+      .map(plugin => plugin.name);
+    if (sharing.length === 0) return;
+    const bypass = (this.config.authz_dynamic_bypass as string[]) || [];
+    this.logger.warn(
+      `authzDynamic: ${sharing.join(', ')} authenticate the same paths as ` +
+        'this plugin, so a request can arrive already identified. It is ' +
+        (bypass.length === 0
+          ? 'checked against the ACLs of the token it carries, and refused ' +
+            'without one — set --authz-dynamic-bypass to let an identity ' +
+            'through without a token.'
+          : `let through without a token when it matches ${bypass.join(', ')} ` +
+            '(--authz-dynamic-bypass), and checked against its token ACLs ' +
+            'otherwise.')
+    );
+  }
+
+  /**
+   * The verdict `authMethod` could not reach on its own.
+   *
+   * A bypass is written in terms of the identity another authenticator
+   * publishes, and the dispatcher runs them in registration order: asked
+   * first, this plugin sees no identity yet and would refuse the very
+   * request the bypass is for — order deciding the answer again, which is
+   * the shape of the bug this fixes. So `authMethod` defers, and the
+   * dispatcher calls this once every authenticator has run and before any
+   * route: `req.user` is final here, and nothing has answered yet.
+   *
+   * A middleware of our own would not do. `api()` runs during registration,
+   * and this plugin is not in `priority.json` — nor could it be, since a
+   * named instance is matched by exact string and falls back into the
+   * parallel batch — so the middleware would land wherever this plugin fell
+   * among the others, and a route plugin registered first would answer
+   * before the refusal.
+   *
+   * @param req request whose verdict was deferred
+   * @param res response, ended when the request is refused
+   * @param next continuation, called when it is allowed
+   */
+  afterChain(req: DmRequest, res: Response, next: () => void): void {
+    const pending = req as PendingRequest;
+    if (!pending.authzDynamicPending) return next();
+    pending.authzDynamicPending = false;
+    const bypass = this.bypassReason(pending);
+    if (bypass) {
+      this.logger.info(
+        `authzDynamic: request allowed past the token ACLs (${bypass})`
+      );
+      return next();
+    }
+    // The reason the deferral was taken rather than a generic sentence: the
+    // same request logs the same line whether or not a bypass is configured.
+    this.logger.warn(
+      pending.authzDynamicPendingReason ||
+        'authzDynamic: no token on a request no bypass covers'
+    );
+    unauthorized(res);
+  }
+
+  /**
+   * Refuse a request carrying no token of ours — unless a bypass may cover
+   * it, in which case the verdict waits for the rest of the chain.
+   *
+   * A bypass names the identity another authenticator publishes, and the
+   * dispatcher runs them in registration order: asked first, this plugin
+   * sees no identity yet, and refusing there would make the answer depend on
+   * that order again. So the request is marked and the middleware mounted in
+   * `api()` decides, after every authenticator has run.
+   *
+   * @param req request with no usable token
+   * @param res response, ended when the request is refused
+   * @param next continuation, called when the verdict is deferred
+   * @param warning what to log when it is refused outright
+   */
+  private refuseOrDefer(
+    req: DmRequest,
+    res: Response,
+    next: () => void,
+    warning: string
+  ): void {
+    const bypass = this.bypassReason(req);
+    if (bypass) {
+      this.logger.info(
+        `authzDynamic: request allowed past the token ACLs (${bypass})`
+      );
+      next();
+      return;
+    }
+    if (
+      !req.user &&
+      ((this.config.authz_dynamic_bypass as string[]) || []).length > 0
+    ) {
+      // Including a bearer nobody here knows: that is what another
+      // authenticator's own credential looks like from in here, and it is
+      // the case the deferral exists for. The refusal is only postponed —
+      // and it keeps the sentence it would have been refused with.
+      const pending = req as PendingRequest;
+      pending.authzDynamicPending = true;
+      pending.authzDynamicPendingReason = warning;
+      next();
+      return;
+    }
+    this.logger.warn(warning);
+    unauthorized(res);
+  }
+
   authMethod(req: DmRequest, res: Response, next: () => void): void {
-    // If an earlier auth plugin already identified the caller, treat that as
-    // authoritative: we only enrich the request with a token/ACL if we can
-    // find a matching entry, but we do not refuse a request that already
-    // carries a `req.user` set by another middleware. This keeps the plugin
-    // composable (e.g. trustedProxy + authzDynamic for admin bypass).
-    if (req.user) {
+    const bypass = this.bypassReason(req);
+    if (bypass) {
+      // No token, so no frame: the hooks find nothing and enforce nothing,
+      // which is the point. Said out loud, since it is the one path where
+      // this plugin lets an operation through unchecked.
+      this.logger.info(
+        `authzDynamic: request allowed past the token ACLs (${bypass})`
+      );
       next();
       return;
     }
@@ -337,15 +526,22 @@ export default class AuthzDynamic extends AuthBase {
       .then(() => {
         const header = req.headers['authorization'];
         if (!header || !/^Bearer\s+/.test(header)) {
-          this.logger.warn(
+          this.refuseOrDefer(
+            req,
+            res,
+            next,
             'authzDynamic: missing or invalid Authorization header'
           );
-          unauthorized(res);
           return;
         }
         const token = header.slice(header.indexOf(' ') + 1).trim();
         if (!token) {
-          unauthorized(res);
+          this.refuseOrDefer(
+            req,
+            res,
+            next,
+            'authzDynamic: empty bearer token'
+          );
           return;
         }
 
@@ -362,12 +558,25 @@ export default class AuthzDynamic extends AuthBase {
         if (!match) {
           const masked =
             token.length > 8 ? `${token.substring(0, 8)}...` : '***';
-          this.logger.warn(`authzDynamic: unauthorized token ${masked}`);
-          unauthorized(res);
+          // A bearer this plugin does not know may well be another
+          // authenticator's credential — `core/auth/token`'s static token,
+          // typically — so the bypass gets its say before the refusal.
+          this.refuseOrDefer(
+            req,
+            res,
+            next,
+            `authzDynamic: unauthorized token ${masked}`
+          );
           return;
         }
 
-        req.user = match.tenant;
+        // An identity another authenticator published is left in place:
+        // the dispatcher ran it first, and the authorization plugins keyed
+        // on `req.user` have already been configured for what it publishes.
+        // What this plugin needs is its token on the request, so its own
+        // ACLs are enforced — which is the whole point of not stepping
+        // aside any more.
+        req.user ??= match.tenant;
         (req as AuthzDynamicRequest).authzToken = match;
         // Run `next` (and everything downstream) inside an AsyncLocalStorage
         // frame so authz hooks can read the token even when plugins don't

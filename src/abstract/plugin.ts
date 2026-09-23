@@ -79,6 +79,18 @@ export default abstract class DmPlugin {
   /* Function to provide configuration for config API */
   getConfigApiData?(): Record<string, unknown> | undefined;
 
+  /**
+   * Called once every plugin is loaded, before the first request.
+   *
+   * A constructor and `api()` run while the others are still loading, so
+   * neither can see what a configuration amounts to as a whole — which
+   * authenticators are loaded beside this one, whether two plugins claim the
+   * same thing. This is where a plugin says, once, that a combination is
+   * ambiguous: the check that catches a mispairing before a request does
+   * rather than after.
+   */
+  afterLoad?(): void;
+
   /* Uniq name of this plugin */
   abstract name: string;
 
