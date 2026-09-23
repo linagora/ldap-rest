@@ -23,6 +23,7 @@ import AuthHmac from '../../../src/plugins/auth/hmac';
 import OpenIDConnect from '../../../src/plugins/auth/openidconnect';
 import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 import type { DmRequest } from '../../../src/lib/auth/base';
+import { BaseResolver } from '../../../src/plugins/scim/baseResolver';
 
 /** Reports what the authenticators left on the request */
 class Probe extends DmPlugin {
@@ -190,6 +191,19 @@ describe('The two names of a caller', function () {
       const request = await build('req.user', 'auth0|17:GET:/api/who');
       const res = await request.get('/api/who');
       expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    });
+
+    it('should refuse it in the SCIM base resolver too', async () => {
+      // A deployment running SCIM without an authorization plugin gets no
+      // other validator, and the base a request is served from is keyed on
+      // the same value a rule is.
+      process.env.DM_AUTHZ_IDENTITY = 'req.userNames';
+      const server = new DM();
+      await server.ready;
+      expect(() => new BaseResolver(server.config)).to.throw(
+        /unknown --authz-identity "req.userNames"/
+      );
+      delete process.env.DM_AUTHZ_IDENTITY;
     });
 
     it('should refuse an --authz-identity nobody wrote', async () => {

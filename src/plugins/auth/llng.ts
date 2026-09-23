@@ -140,9 +140,10 @@ export default class AuthLLNG extends AuthBase {
    *
    * @param req incoming request, whose headers are pruned in place
    */
-  private static dropForgedIdentity(req: DmRequest): void {
+  private static dropForgedIdentity(req: DmRequest, header?: string): void {
+    const name = header ?? AuthLLNG.USER_HEADER;
     for (const key of Object.keys(req.headers))
-      if (key.toLowerCase() === AuthLLNG.USER_HEADER) delete req.headers[key];
+      if (key.toLowerCase() === name) delete req.headers[key];
   }
 
   /**
@@ -190,7 +191,20 @@ export default class AuthLLNG extends AuthBase {
     if (!this.handler) {
       throw new Error(`${this.name}: lemonldap-ng-handler is not loaded`);
     }
+    // Both names the client could supply, before the handler runs. The
+    // second one matters as much as the first: `--llng-username-header`
+    // names what `req.userName` is read from, an authorization rule can be
+    // keyed on it (`--authz-identity req.userName`) and the SCIM base map
+    // reads the same value — so a client sending `x-login: root` would take
+    // over the identity a rule names. The handler writes the header under
+    // the spelling LLNG's configuration gives it, and a lower-cased key
+    // from the wire is a *different* key sitting earlier in the object,
+    // which is the one a case-insensitive read finds first.
+    const usernameHeader = (
+      (this.config.llng_username_header as string) || ''
+    ).toLowerCase();
     AuthLLNG.dropForgedIdentity(req);
+    if (usernameHeader) AuthLLNG.dropForgedIdentity(req, usernameHeader);
     this.handler.run(req, res, () => {
       const user = AuthLLNG.vouchedIdentity(req);
       if (!user) {
@@ -211,9 +225,8 @@ export default class AuthLLNG extends AuthBase {
       // A second header, when the deployment exports one: `whatToTrace` is
       // often a mail or a display name, and a rule written on logins needs
       // the login. Absent, both values are what the handler traced.
-      const header = (this.config.llng_username_header as string) || '';
-      const named = header
-        ? AuthLLNG.headerValue(req, header.toLowerCase())
+      const named = usernameHeader
+        ? AuthLLNG.headerValue(req, usernameHeader)
         : undefined;
       this.publishIdentity(req, user, named);
       next();

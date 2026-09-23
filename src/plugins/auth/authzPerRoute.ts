@@ -68,6 +68,10 @@ export default class AuthzPerRoute extends DmPlugin {
 
   /** Said once: a rule keyed on a value the authenticator did not publish. */
   private fallbackWarned = false;
+  /** Routes already reported as reached with no identity. */
+  private unidentifiedRoutes = new Set<string>();
+  /** How many of them to remember; past it, every one is reported again. */
+  private static readonly UNIDENTIFIED_MAX = 1000;
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
@@ -212,15 +216,28 @@ export default class AuthzPerRoute extends DmPlugin {
 
       // No authenticated user yet — let upstream auth plugin handle 401
       if (!user) {
-        // Said, rather than passed in silence: this is right for the
-        // anonymous path the documentation describes, and it is also what a
-        // mistyped prefix, a missing authentication plugin or a route
-        // outside every prefix look like — in which case the whole route
-        // ACL is a no-op and nothing else says so.
-        this.logger.warn(
-          `${this.name}: ${req.method} ${req.path} carries no identity, so ` +
-            'no route rule applies to it'
-        );
+        // Said once per route, not once per request. This is right for the
+        // anonymous paths the documentation describes — and for a login
+        // route, and for a health check, which is most of the traffic that
+        // reaches here without an identity; a line per request would be the
+        // log rather than a signal. It is also what a mistyped prefix or a
+        // missing authentication plugin look like, where every rule is a
+        // no-op, so the first time each route is reached that way is worth
+        // a line.
+        const route = `${req.method} ${req.path}`;
+        if (!this.unidentifiedRoutes.has(route)) {
+          if (this.unidentifiedRoutes.size < AuthzPerRoute.UNIDENTIFIED_MAX)
+            this.unidentifiedRoutes.add(route);
+          this.logger.warn(
+            `${this.name}: ${route} carries no identity, so no route rule ` +
+              'applies to it'
+          );
+        } else {
+          this.logger.debug(
+            `${this.name}: ${route} carries no identity, so no route rule ` +
+              'applies to it'
+          );
+        }
         return next();
       }
 

@@ -24,7 +24,11 @@
 import fs from 'fs';
 
 import type { Config } from '../../config/args';
-import { identityFor, type DmRequest } from '../../lib/auth/base';
+import {
+  assertIdentityMode,
+  identityFor,
+  type DmRequest,
+} from '../../lib/auth/base';
 import { escapeDnValue, isChildOf } from '../../lib/utils';
 
 export interface BaseMapEntry {
@@ -46,6 +50,12 @@ export class BaseResolver {
   private readonly config: Config;
 
   constructor(config: Config) {
+    // This resolver keys a base on the same value the authorization plugins
+    // key a rule on, so it refuses an unknown `--authz-identity` as they
+    // do: a deployment running SCIM without an authorization plugin would
+    // otherwise get no refusal at all, and the value would silently mean
+    // `req.user`.
+    assertIdentityMode(config, 'scim base resolver');
     this.config = config;
     const fallback = config.ldap_base || '';
     this.defaultUserBase = (config.scim_user_base as string) || fallback;
