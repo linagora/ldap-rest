@@ -73,6 +73,12 @@ export interface AuthzDynamicRequest extends DmRequest {
   authzToken?: TokenEntry;
 }
 
+/** A request whose verdict waits for the end of the authentication chain. */
+interface PendingRequest extends AuthzDynamicRequest {
+  authzDynamicPending?: boolean;
+  authzDynamicPendingReason?: string;
+}
+
 /**
  * Per-request async context holding the authenticated token.
  *
@@ -149,37 +155,6 @@ export default class AuthzDynamic extends AuthBase {
   api(app: Express): void {
     // Register the AuthBase middleware (runs authMethod per request).
     super.api(app);
-
-    // The verdict `authMethod` could not reach on its own.
-    //
-    // A bypass is written in terms of the identity another authenticator
-    // publishes, and the dispatcher runs the authenticators in registration
-    // order: asked first, this plugin sees no identity yet and would refuse
-    // the very request the bypass is for — order deciding the answer again,
-    // which is the shape of the bug this fixes. So when a bypass is
-    // configured and no token is presented, `authMethod` defers, and this
-    // middleware answers once every authenticator has run: the dispatcher
-    // calls `next()` only after the whole chain succeeded, so `req.user` is
-    // final here.
-    app.use((req, res, next) => {
-      const pending = req as AuthzDynamicRequest & {
-        authzDynamicPending?: boolean;
-      };
-      if (!pending.authzDynamicPending) return next();
-      pending.authzDynamicPending = false;
-      const bypass = this.bypassReason(pending);
-      if (bypass) {
-        this.logger.info(
-          `authzDynamic: request allowed past the token ACLs (${bypass})`
-        );
-        return next();
-      }
-      this.logger.warn(
-        'authzDynamic: no token on a request no bypass covers' +
-          (pending.user ? `, identified as ${pending.user}` : '')
-      );
-      unauthorized(res);
-    });
 
     // The `serverError()` helper and DM's core error middleware both check
     // for the `[authz-forbidden]` marker (added to ForbiddenError messages
@@ -384,11 +359,21 @@ export default class AuthzDynamic extends AuthBase {
   private bypassReason(req: DmRequest): string | undefined {
     const allowed = (this.config.authz_dynamic_bypass as string[]) || [];
     if (allowed.length === 0) return undefined;
+    // `trustedProxy` marks the *address* it trusts, and fills
+    // `proxyAuthUser` only when the proxy named someone. Accepting the mark
+    // alone would hand the whole directory to every host of a
+    // `--trusted-proxy` range — `10.0.0.0/8` being all of it — with no token
+    // and no ACL. The vouch has to name a caller.
+    const proxied = req as DmRequest & {
+      trustedProxy?: boolean;
+      proxyAuthUser?: string;
+    };
     if (
       allowed.includes('trusted-proxy') &&
-      (req as DmRequest & { trustedProxy?: boolean }).trustedProxy === true
+      proxied.trustedProxy === true &&
+      proxied.proxyAuthUser
     )
-      return 'trusted-proxy';
+      return `trusted-proxy vouching for ${proxied.proxyAuthUser}`;
     if (!req.user) return undefined;
     if (allowed.includes('any-authenticated')) return 'any-authenticated';
     if (allowed.includes(req.user)) return `identity ${req.user}`;
@@ -437,6 +422,48 @@ export default class AuthzDynamic extends AuthBase {
   }
 
   /**
+   * The verdict `authMethod` could not reach on its own.
+   *
+   * A bypass is written in terms of the identity another authenticator
+   * publishes, and the dispatcher runs them in registration order: asked
+   * first, this plugin sees no identity yet and would refuse the very
+   * request the bypass is for — order deciding the answer again, which is
+   * the shape of the bug this fixes. So `authMethod` defers, and the
+   * dispatcher calls this once every authenticator has run and before any
+   * route: `req.user` is final here, and nothing has answered yet.
+   *
+   * A middleware of our own would not do. `api()` runs during registration,
+   * and this plugin is not in `priority.json` — nor could it be, since a
+   * named instance is matched by exact string and falls back into the
+   * parallel batch — so the middleware would land wherever this plugin fell
+   * among the others, and a route plugin registered first would answer
+   * before the refusal.
+   *
+   * @param req request whose verdict was deferred
+   * @param res response, ended when the request is refused
+   * @param next continuation, called when it is allowed
+   */
+  afterChain(req: DmRequest, res: Response, next: () => void): void {
+    const pending = req as PendingRequest;
+    if (!pending.authzDynamicPending) return next();
+    pending.authzDynamicPending = false;
+    const bypass = this.bypassReason(pending);
+    if (bypass) {
+      this.logger.info(
+        `authzDynamic: request allowed past the token ACLs (${bypass})`
+      );
+      return next();
+    }
+    // The reason the deferral was taken rather than a generic sentence: the
+    // same request logs the same line whether or not a bypass is configured.
+    this.logger.warn(
+      pending.authzDynamicPendingReason ||
+        'authzDynamic: no token on a request no bypass covers'
+    );
+    unauthorized(res);
+  }
+
+  /**
    * Refuse a request carrying no token of ours — unless a bypass may cover
    * it, in which case the verdict waits for the rest of the chain.
    *
@@ -469,9 +496,13 @@ export default class AuthzDynamic extends AuthBase {
       !req.user &&
       ((this.config.authz_dynamic_bypass as string[]) || []).length > 0
     ) {
-      (
-        req as AuthzDynamicRequest & { authzDynamicPending?: boolean }
-      ).authzDynamicPending = true;
+      // Including a bearer nobody here knows: that is what another
+      // authenticator's own credential looks like from in here, and it is
+      // the case the deferral exists for. The refusal is only postponed —
+      // and it keeps the sentence it would have been refused with.
+      const pending = req as PendingRequest;
+      pending.authzDynamicPending = true;
+      pending.authzDynamicPendingReason = warning;
       next();
       return;
     }

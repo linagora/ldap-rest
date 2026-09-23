@@ -59,14 +59,20 @@ registered first.
 The ACLs now apply to whatever token the request carries, whoever else
 identified it, and anything allowed past them without a token is named:
 
-| `--authz-dynamic-bypass` | Effect                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------- |
-| _(empty, the default)_   | Nobody. A request must carry one of these tokens                                            |
-| `any-authenticated`      | Anything another plugin authenticated — the behaviour before 0.8.3                          |
-| `trusted-proxy`          | A request `core/auth/trustedProxy` vouched for (`req.trustedProxy`)                         |
-| any other value          | The identity another authenticator publishes in `req.user`, e.g. a name from `--auth-token` |
+| `--authz-dynamic-bypass` | Effect                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| _(empty, the default)_   | Nobody. A request must carry one of these tokens                                                    |
+| `any-authenticated`      | Anything another plugin authenticated — the behaviour before 0.8.3                                  |
+| `trusted-proxy`          | A request from a trusted proxy **that named a caller** (`req.trustedProxy` and `req.proxyAuthUser`) |
+| any other value          | The identity another authenticator publishes in `req.user`, e.g. a name from `--auth-token`         |
 
 Values combine: `--authz-dynamic-bypass trusted-proxy --authz-dynamic-bypass ops-admin`.
+
+`trusted-proxy` requires the proxy to have named someone. `trustedProxy`
+marks the _address_ it trusts and fills `proxyAuthUser` only when the
+request carried the authentication header it expects, so accepting the mark
+alone would hand the whole directory to every host of the `--trusted-proxy`
+range — `10.0.0.0/8` being all of it.
 
 A bypassed request carries **no** token, so no ACL is enforced on it — that
 is what a bypass is. Each one is logged at `info` with the reason that let it

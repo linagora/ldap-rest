@@ -185,6 +185,32 @@ export default abstract class AuthBase extends DmPlugin {
   }
 
   /**
+   * A verdict this plugin could not reach while the chain was still running.
+   *
+   * The dispatcher calls it, on every selected plugin that implements it,
+   * once each of them has authenticated and before any route sees the
+   * request — the only moment where `req.user` is final and nothing has
+   * answered yet. A plugin needing it must not mount a middleware of its
+   * own: `api()` runs during registration, so such a middleware lands
+   * wherever that plugin fell among the others, and a route plugin
+   * registered first answers before it.
+   *
+   * `onAuth`/`afterAuth` are not that moment either: they run inside this
+   * plugin's own `authenticate`, while the authenticators after it have yet
+   * to run.
+   *
+   * Implement it only to answer a question that depends on what the *other*
+   * authenticators did — `core/auth/authzDynamic` uses it to apply a bypass
+   * written in terms of an identity another plugin publishes. Calling
+   * `next()` passes the request on; ending the response refuses it.
+   *
+   * @param req the authenticated request
+   * @param res response, ended by the plugin when it refuses
+   * @param next continuation, called when the plugin has nothing to say
+   */
+  afterChain?(req: DmRequest, res: Response, next: () => void): void;
+
+  /**
    * Register with the server's authentication dispatcher instead of mounting
    * a middleware.
    *

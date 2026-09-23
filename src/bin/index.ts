@@ -278,9 +278,23 @@ export class DM {
       selected = this.authenticators.filter(p => p.pathPrefixes.length === 0);
     if (selected.length === 0) return next();
 
+    // A verdict a plugin could not reach on its own, once every
+    // authenticator has run.
+    //
+    // This is the only point that is after the whole chain and before any
+    // route: a plugin mounting its own middleware for it would land wherever
+    // its registration fell among the others, and a route plugin registered
+    // first would answer before the refusal — registration order deciding an
+    // authorization answer, in the direction that fails open.
+    const finish = (index: number): void => {
+      if (index >= selected.length) return next();
+      const plugin = selected[index];
+      if (!plugin.afterChain) return finish(index + 1);
+      plugin.afterChain(req, res, () => finish(index + 1));
+    };
     // Every selected plugin must let the request through
     const run = (index: number): void => {
-      if (index >= selected.length) return next();
+      if (index >= selected.length) return finish(0);
       void selected[index].authenticate(req, res, () => run(index + 1));
     };
     run(0);
@@ -301,20 +315,6 @@ export class DM {
   }
 
   /**
-   * List the routes no authentication plugin guards, once every plugin is
-   * loaded.
-   *
-   * Scoping authentication to a path prefix is what lets one server host
-   * populations that authenticate differently, but it also means a route
-   * registered outside every prefix is served to anyone. That gap is silent
-   * — the server starts, the API answers — so it is named at startup.
-   *
-   * Nothing is reported when no authentication is configured at all (the
-   * server is open on purpose) or when one plugin guards every path.
-   *
-   * @returns the unguarded route paths, for tests and callers
-   */
-  /**
    * Let every loaded plugin look at the configuration as a whole.
    *
    * Constructors and `api()` run while the rest is still loading, so a
@@ -334,6 +334,20 @@ export class DM {
     }
   }
 
+  /**
+   * List the routes no authentication plugin guards, once every plugin is
+   * loaded.
+   *
+   * Scoping authentication to a path prefix is what lets one server host
+   * populations that authenticate differently, but it also means a route
+   * registered outside every prefix is served to anyone. That gap is silent
+   * — the server starts, the API answers — so it is named at startup.
+   *
+   * Nothing is reported when no authentication is configured at all (the
+   * server is open on purpose) or when one plugin guards every path.
+   *
+   * @returns the unguarded route paths, for tests and callers
+   */
   warnUnauthenticatedRoutes(): string[] {
     const authPlugins = Object.values(this.loadedPlugins).filter(p =>
       p.roles?.includes('auth')
