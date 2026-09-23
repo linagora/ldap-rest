@@ -588,6 +588,29 @@ class ldapActions {
     LDAP search
    */
   /**
+   * The directory as the server itself, with no request behind it.
+   *
+   * Every authorization plugin skips its check when a call carries no
+   * request, so an unbound call is a bypass — a deliberate one where the
+   * work belongs to nobody in particular: a startup task, a cron job, a
+   * uniqueness check, a referential-integrity check. Those must see the
+   * whole directory to be correct: a caller who cannot *read* `uid=jdoe`
+   * must still not be handed it as a free identifier, and a reference to an
+   * organization they cannot read is still a valid reference.
+   *
+   * The methods are the same objects as this instance's own — writes
+   * included, since a scheduled task writes: the examples above are reads
+   * because that is where the ambiguity lives, not because a write cannot
+   * belong to nobody. What this adds is a name: `ldap.system.search(…)` says
+   * the omission was meant, where `ldap.search(…)` says nothing and looks
+   * exactly like the mistake it takes one review to miss. A plugin serving a
+   * request should reach for {@link forRequest} instead.
+   */
+  get system(): this {
+    return this;
+  }
+
+  /**
    * Bind every directory operation to one request, so the authorization
    * hooks always see it. See {@link RequestBoundLdap}.
    */

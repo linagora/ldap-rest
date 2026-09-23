@@ -475,7 +475,18 @@ The `this.server.ldap` object provides access to all LDAP operations:
 > `forRequest()` returns a `RequestBoundLdap`, whose methods have no request
 > parameter at all — the omission stops being expressible. Use the unbound
 > methods only for work that genuinely belongs to no request, such as startup
-> or scheduled tasks, where passing nothing is the deliberate answer.
+> or scheduled tasks, where passing nothing is the deliberate answer — and
+> say so by reaching for them through `ldap.system`:
+>
+> ```typescript
+> await this.server.ldap.system.search({ scope: 'base' }, dn);
+> ```
+>
+> It is the same object, and that is the point: `ldap.system.search(…)` reads
+> as a decision where `ldap.search(…)` reads as a forgotten argument. Some
+> reads are the server's by nature — a uniqueness check has to see a whole
+> branch, and a reference to an entry the caller cannot read is still a valid
+> reference — and those are the ones it names.
 
 #### Search
 

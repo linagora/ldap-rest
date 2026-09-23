@@ -34,7 +34,9 @@ describe('Plugin Override', () => {
     const plugin = dm.loadedPlugins.myHello;
     expect(plugin, 'overridden plugin').to.not.equal(undefined);
     expect(plugin.server).to.be.instanceOf(DM);
-    expect(plugin.server.claimedAuthPrefixes()).to.deep.equal([]);
+    // Any method of the server's own will do: what is under test is that
+    // the prototype survived the override, not what the method answers.
+    expect(plugin.server.warnUnauthenticatedRoutes()).to.be.an('array');
     expect(plugin.server.registerPlugin).to.be.a('function');
   });
 
