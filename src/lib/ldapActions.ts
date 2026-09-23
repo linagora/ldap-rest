@@ -619,7 +619,8 @@ class ldapActions {
     const hook = this.parent.hooks.ldapsearchfilter;
     const one = async (chunk: SearchResult): Promise<SearchResult> => {
       const [filtered] = await launchHooksChained(hook, [chunk, req, opts]);
-      return filtered;
+      // A subscriber that returns nothing must not turn the answer into one.
+      return filtered ?? chunk;
     };
     if (
       typeof (value as AsyncGenerator<SearchResult>)[Symbol.asyncIterator] ===

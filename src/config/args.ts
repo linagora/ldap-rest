@@ -130,17 +130,21 @@ export interface Config {
   base_url?: string;
 
   // auth/authzPerRoute
+
+  authz_per_route?: string[];
+
+  // auth/authzPerBranch
   /**
    * Judge an attached entry by the organization it hangs off rather than by
    * the branch it is stored in, and filter listings accordingly. Off by
    * default: where a branch is a tenant rather than a department, opening a
    * listing across branches is opening a door between customers.
+   *
+   * Honoured by the plugins built on `AuthzBase` — `authzPerBranch` and
+   * `authzLinid1`. `authzDynamic` extends `AuthBase` and registers its own
+   * hooks, so it never sees the filter and this option does nothing there.
    */
   authz_filter_attached_entries?: boolean;
-
-  authz_per_route?: string[];
-
-  // auth/authzPerBranch
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
@@ -724,6 +728,12 @@ const configArgs: ConfigTemplate = [
 
   // Auth authzPerBranch plugin
   [
+    '--authz-filter-attached-entries',
+    'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
+    false,
+    'boolean',
+  ],
+  [
     '--authz-per-branch-config',
     'DM_AUTHZ_PER_BRANCH_CONFIG',
     { default: { read: true, write: false, delete: false } } as AuthConfig,
@@ -737,12 +747,6 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Auth authzDynamic plugin
-  [
-    '--authz-filter-attached-entries',
-    'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
-    false,
-    'boolean',
-  ],
 
   ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
   ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],

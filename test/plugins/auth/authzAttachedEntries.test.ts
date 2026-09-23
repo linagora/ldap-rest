@@ -290,6 +290,24 @@ describe('Authorization by attachment', function () {
     expect(seen.searchEntries.length).to.equal(0);
   });
 
+  it('should filter a search asking for the operational attributes', async () => {
+    // `+` is not `*`: it asks for the operational attributes, and the
+    // organization link is a user attribute. A search for `+` alone comes
+    // back without it, so treating `+` as "everything" left the entry
+    // looking attached to nothing — visible, with its DN and its metadata.
+    const seen = (await server.ldap.search(
+      {
+        paged: false,
+        scope: 'sub',
+        filter: `(uid=${IN_B})`,
+        attributes: ['+'],
+      },
+      userBranch,
+      { user: ADMIN_A } as unknown as Parameters<typeof server.ldap.search>[2]
+    )) as SearchResult;
+    expect(seen.searchEntries.length).to.equal(0);
+  });
+
   it('should refuse a write on an account attached to another branch', async () => {
     const res = await request
       .put(`/api/v1/ldap/users/${IN_B}`)

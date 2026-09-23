@@ -38,19 +38,13 @@ export default abstract class AuthzBase extends DmPlugin {
   cacheTTL!: number;
 
   /**
-   * Extract the branch DN to check permissions against
-   * For a DN like "uid=user,ou=users,ou=org,dc=example,dc=com"
-   * we need to check permissions on the parent branch
-   *
-   * Handles escaped commas in DN values (e.g., "cn=Smith\, John")
-   */
-  /**
    * Whether a search asked for this attribute.
    *
-   * No projection at all means every attribute, and so do the `*` and `+`
-   * forms. A narrow list means what it says — and is exactly the case the
-   * filter cannot judge without help, since an entry that came back without
-   * its organization link looks attached to nothing.
+   * No projection at all means every user attribute, and so does `*`. `+`
+   * does not: it asks for the operational attributes, and the organization
+   * link is a user attribute — a search for `+` alone comes back without it,
+   * which is the very case the filter cannot judge, since an entry that
+   * arrived without its link looks attached to nothing.
    */
   protected static wantsAttribute(
     opts: SearchOptions | undefined,
@@ -62,10 +56,17 @@ export default abstract class AuthzBase extends DmPlugin {
       String(a).toLowerCase()
     );
     if (list.length === 0) return true;
-    if (list.includes('*') || list.includes('+')) return true;
+    if (list.includes('*')) return true;
     return list.includes(attr.toLowerCase());
   }
 
+  /**
+   * Extract the branch DN to check permissions against
+   * For a DN like "uid=user,ou=users,ou=org,dc=example,dc=com"
+   * we need to check permissions on the parent branch
+   *
+   * Handles escaped commas in DN values (e.g., "cn=Smith\, John")
+   */
   extractBranchDn(dn: string): string {
     return getParentDn(dn);
   }

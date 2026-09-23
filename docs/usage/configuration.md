@@ -268,10 +268,11 @@ Empty means the plugin guards every path. Scoping several instances to different
 
 #### `core/auth/authzPerBranch`
 
-| CLI                            | Env                             | Default                                          | Description                 |
-| ------------------------------ | ------------------------------- | ------------------------------------------------ | --------------------------- |
-| `--authz-per-branch-config`    | `DM_AUTHZ_PER_BRANCH_CONFIG`    | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON) |
-| `--authz-per-branch-cache-ttl` | `DM_AUTHZ_PER_BRANCH_CACHE_TTL` | `60`                                             | Cache TTL (seconds)         |
+| CLI                               | Env                                | Default                                          | Description                                                                                                                                                                   |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-per-branch-config`       | `DM_AUTHZ_PER_BRANCH_CONFIG`       | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON)                                                                                                                                                   |
+| `--authz-per-branch-cache-ttl`    | `DM_AUTHZ_PER_BRANCH_CACHE_TTL`    | `60`                                             | Cache TTL (seconds)                                                                                                                                                           |
+| `--authz-filter-attached-entries` | `DM_AUTHZ_FILTER_ATTACHED_ENTRIES` | `false`                                          | Judge an attached entry by the organization it hangs off, and filter listings accordingly. Honoured by `authzPerBranch` and `authzLinid1`; does nothing under `authzDynamic`. |
 
 #### `core/auth/authzPerRoute`
 

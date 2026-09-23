@@ -4,6 +4,32 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Judging an account by what it is attached to
+
+`--authz-filter-attached-entries` changes what a branch grant means, so it is
+off by default and nothing moves until you set it.
+
+Every account of a directory lives in the same `ou=users`, so a branch check
+on its parent says the same thing about all of them: either every
+administrator reaches every account, or none does. With the option on, an
+account is judged by the organization its `twakeDepartmentLink` names —
+listings drop the accounts attached elsewhere, and a write is refused on an
+account outside the branch you hold. Entries attached to nothing, which is
+what an organization or a nomenclature value is, stay readable by every
+administrator.
+
+**Turn it on only where a branch is a department.** Where a branch is a
+tenant, the option also stops refusing a read on the branch it targets — the
+organization tree and the reference data become readable across branches, and
+what keeps one customer out of another's data is then the per-entry filter
+alone.
+
+It is honoured by `core/auth/authzPerBranch` and `core/auth/authzLinid1`.
+`core/auth/authzDynamic` registers its own hooks and never sees the filter:
+setting the option there does nothing at all.
+
 ## To 0.8.0
 
 ### Node 20 is the floor

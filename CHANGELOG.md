@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `--authz-filter-attached-entries`: an account is judged by the organization
+  it hangs off rather than by the `ou=users` every account shares, so a local
+  administrator lists and writes their own and no one else's. Off by default —
+  where a branch is a tenant rather than a department, opening a listing
+  across branches opens a door between customers — and honoured by
+  `authzPerBranch` and `authzLinid1` only, not by `authzDynamic`, see
+  [notes](docs/usage/upgrading.md#judging-an-account-by-what-it-is-attached-to)
+
 ## v0.8.2 (2026-09-23)
 
 ### Security
