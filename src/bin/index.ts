@@ -151,6 +151,7 @@ export class DM {
           .then(() => {
             this.setupErrorMiddleware();
             this.warnUnauthenticatedRoutes();
+            this.afterLoad();
             resolve();
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
@@ -313,6 +314,26 @@ export class DM {
    *
    * @returns the unguarded route paths, for tests and callers
    */
+  /**
+   * Let every loaded plugin look at the configuration as a whole.
+   *
+   * Constructors and `api()` run while the rest is still loading, so a
+   * plugin cannot see there what it is loaded *beside*. A failure here is
+   * reported and does not stop the server: it is a plugin's opinion about a
+   * configuration, not a condition for serving it.
+   */
+  afterLoad(): void {
+    for (const plugin of Object.values(this.loadedPlugins)) {
+      try {
+        plugin.afterLoad?.();
+      } catch (err) {
+        this.logger.error(
+          `Plugin ${plugin.name}: afterLoad failed: ${String(err)}`
+        );
+      }
+    }
+  }
+
   warnUnauthenticatedRoutes(): string[] {
     const authPlugins = Object.values(this.loadedPlugins).filter(p =>
       p.roles?.includes('auth')

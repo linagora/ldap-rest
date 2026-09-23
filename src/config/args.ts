@@ -170,6 +170,7 @@ export interface Config {
   authz_dynamic_config_attribute?: string;
   authz_dynamic_tenant_attribute?: string;
   authz_dynamic_reload_endpoint?: boolean;
+  authz_dynamic_bypass?: string[];
 
   // auth/authzLinid1
   authz_local_admin_attribute?: string;
@@ -804,6 +805,17 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Auth authzDynamic plugin
+  //
+  // Who may reach the directory through this plugin without presenting one
+  // of its tokens. Empty — the default — means nobody: a request is checked
+  // against the ACLs of the token it carries, whatever else authenticated
+  // it. Values are identities as another authenticator publishes them in
+  // `req.user`, plus two words:
+  //
+  //  - `any-authenticated`: anything another plugin authenticated, which is
+  //    what the plugin did until 0.8.3, by accident rather than by decision;
+  //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
+  ['--authz-dynamic-bypass', 'DM_AUTHZ_DYNAMIC_BYPASS', [], 'array'],
   ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
   ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],
   [
