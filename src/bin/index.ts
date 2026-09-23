@@ -136,7 +136,7 @@ export class DM {
       // Captured: inside the closure below, the compiler no longer follows
       // that the constructor has already built it.
       const logger = this.logger;
-      const priorityPromise = (async () => {
+      const priorityPromise = (async (): Promise<void> => {
         for (const p of pluginPriority) {
           const target = this.resolveModule(DM.moduleOf(p));
           const matching = regularPlugins.filter(
@@ -437,7 +437,7 @@ export class DM {
       req: Request,
       res: Response,
       _next: NextFunction
-    ) => {
+    ): void => {
       let statusCode =
         'statusCode' in err ? (err as { statusCode: number }).statusCode : 500;
 
@@ -460,9 +460,10 @@ export class DM {
         this.logger.warn(
           `Client error ${statusCode} in request ${req.method} ${req.path}: ${clientMessage}`
         );
-        if (!res.headersSent) {
-          return res.status(statusCode).json({ error: clientMessage });
-        }
+        // `res.json` answers the response object; the middleware answers
+        // nothing, which is what lets the signature say so.
+        if (!res.headersSent)
+          res.status(statusCode).json({ error: clientMessage });
         return;
       }
 
