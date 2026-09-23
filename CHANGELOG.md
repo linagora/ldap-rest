@@ -4,6 +4,15 @@
 
 ### Security
 
+- `core/auth/llng`: a request the handler passed on without naming anyone —
+  what a LemonLDAP::NG `skip` rule produces — published `req.user =
+undefined`, which every authorization plugin reads as anonymous and skips,
+  so a rule meaning "no authentication here" meant "authenticated, and
+  scoped by nobody". Such a request is refused now; the identity header is
+  read whatever case the handler wrote it in, and whatever a client sent
+  under that name is dropped before the handler runs
+  ([#190](https://github.com/linagora/ldap-rest/issues/190))
+
 - `bin`: the plugin priority list was matched against the whole `--plugin`
   string, so a named instance — `core/auth/trustedProxy:tp2:{…}`, the only
   form that can carry a per-instance option — lost its rank and landed in
@@ -43,6 +52,15 @@
   plugin declared an `onAuth` hook of its own, which no plugin does — so a
   documented extension point fired for nobody. They run like `beforeAuth`
   now, on every authenticated request
+
+- `lib/ldapActions`: `ldap.system` names the directory as the server itself,
+  for the reads that are nobody's request — a uniqueness check, a
+  referential-integrity check. The methods are the same ones; what it adds is
+  that an unbound call reads as a decision rather than as a forgotten
+  argument. `DM.claimedAuthPrefixes` and `claimedPrefixes`, which nothing
+  called and whose documentation described a mechanism the dispatcher does
+  not implement, are gone
+  ([#190](https://github.com/linagora/ldap-rest/issues/190))
 
 - `core/ldap/organizations`: a node holding more children than the directory
   will list in one answer made `/subnodes` return `200 []` — every failure

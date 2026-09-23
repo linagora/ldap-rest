@@ -117,6 +117,50 @@ export default class AuthLLNG extends AuthBase {
     return import('lemonldap-ng-handler');
   }
 
+  /**
+   * The header the handler writes the identity to.
+   *
+   * `lemonldap-ng-handler` 3.x assigns it with that exact spelling —
+   * `req.headers["Lm-Remote-User"] = session[this.tsv.whatToTrace]` in its
+   * `sendHeaders` — while Node lower-cases every header that arrives on the
+   * wire. The two never collide, which is what keeps a client from
+   * supplying its own identity, and nothing in either project promises that
+   * spelling: `dropForgedIdentity` below removes what a client sent, so the
+   * plugin can then read whatever case the handler used.
+   */
+  private static readonly USER_HEADER = 'lm-remote-user';
+
+  /**
+   * Remove any identity header the request arrived with.
+   *
+   * Only the handler may name the caller. A client sending
+   * `Lm-Remote-User: admin` reaches this plugin as `lm-remote-user`, and the
+   * read below is case-insensitive, so without this it would be read as an
+   * identity the handler never vouched for.
+   *
+   * @param req incoming request, whose headers are pruned in place
+   */
+  private static dropForgedIdentity(req: DmRequest): void {
+    for (const key of Object.keys(req.headers))
+      if (key.toLowerCase() === AuthLLNG.USER_HEADER) delete req.headers[key];
+  }
+
+  /**
+   * The identity the handler vouched for, whatever case it wrote it in.
+   *
+   * @param req request the handler has just passed on
+   * @returns the identity, or undefined when the handler named nobody
+   */
+  private static vouchedIdentity(req: DmRequest): string | undefined {
+    for (const [key, value] of Object.entries(req.headers))
+      if (
+        key.toLowerCase() === AuthLLNG.USER_HEADER &&
+        typeof value === 'string'
+      )
+        return value;
+    return undefined;
+  }
+
   authMethod(req: DmRequest, res: Response, next: () => void): void {
     // api() runs before any request reaches here and would already have
     // thrown if the dependency were missing, so this only guards against
@@ -124,8 +168,25 @@ export default class AuthLLNG extends AuthBase {
     if (!this.handler) {
       throw new Error(`${this.name}: lemonldap-ng-handler is not loaded`);
     }
+    AuthLLNG.dropForgedIdentity(req);
     this.handler.run(req, res, () => {
-      req.user = req.headers['Lm-Remote-User'] as string;
+      const user = AuthLLNG.vouchedIdentity(req);
+      if (!user) {
+        // The handler let the request through without naming anyone. Its
+        // `skip` rules do exactly that — `run()` returns `next()` at once,
+        // no session read, no header written — and publishing `undefined`
+        // made every authorization plugin treat the request as anonymous
+        // and skip its check, which reads as "authenticated but unscoped"
+        // and is not.
+        this.logger.warn(
+          `${this.name}: the handler passed a request on without naming a ` +
+            'user, which a `skip` rule does. Refusing rather than serving ' +
+            'it with no identity'
+        );
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      req.user = user;
       next();
     });
   }

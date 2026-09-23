@@ -37,6 +37,20 @@ answers the provider's redirect with a 401.
 Unauthenticated requests are unchanged: a browser is redirected, an API
 client receives 401.
 
+### `core/auth/llng` refuses a request the handler named nobody for
+
+**Who is affected:** anyone whose LemonLDAP::NG configuration has a `skip`
+rule on a path this plugin guards.
+
+`skip` makes the handler return immediately — no session read, no
+`Lm-Remote-User` header — and the plugin published `req.user = undefined`.
+Every authorization plugin skips its check when a request carries no
+identity, so the rule meant "authenticated, and scoped by nobody" rather
+than "no authentication on this path". Such a request now answers 401.
+
+Serve those paths from a virtual host this plugin does not guard, or scope
+the plugin with `auth_path_prefix` so they fall outside it.
+
 ### `authzDynamic` no longer steps aside for another authenticator
 
 **Who is affected:** anyone loading `core/auth/authzDynamic` beside another

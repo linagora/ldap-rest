@@ -15,6 +15,22 @@ Integration with [LemonLDAP::NG](https://lemonldap-ng.org/) (LLNG) Web SSO solut
 DM_LLNG_INI="/etc/lemonldap-ng/lemonldap-ng.ini"
 ```
 
+## Rules that name nobody
+
+The plugin serves a request only when the handler named a user. A LemonLDAP::NG
+location rule set to `skip` makes the handler return at once — no session
+read, no `Lm-Remote-User` written — and such a request is refused with 401
+rather than served with no identity: every authorization plugin skips its
+check when a request carries no identity, so "no authentication on this path"
+would have become "authenticated, and scoped by nobody".
+
+Serve such a path from a virtual host this plugin does not guard, or scope
+the plugin with `auth_path_prefix` so the path falls outside it.
+
+The identity header is read whatever case the handler wrote it in, and
+whatever the client sent under that name is dropped before the handler runs:
+only the handler may name the caller.
+
 ## Prerequisites
 
 1. **LemonLDAP::NG Handler**: The `lemonldap-ng-handler` npm package (optional dependency)

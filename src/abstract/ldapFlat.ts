@@ -495,12 +495,19 @@ export default abstract class LdapFlat extends DmPlugin {
   /**
    * Tell whether an entry already uses this RDN value in the branch.
    *
+   * Asked as the server, not as the caller. A uniqueness check has to see
+   * the whole branch to answer at all: a caller who cannot read
+   * `uid=jdoe` must not be handed `jdoe` as a free identifier, which is
+   * what a request-bound read would answer. What it can leak is bounded by
+   * the same reasoning — whether a name is taken, through the identifier
+   * the server then generates.
+   *
    * @param value candidate RDN value
    * @returns true when the DN is taken
    */
   protected async rdnExists(value: string): Promise<boolean> {
     try {
-      const res = (await this.ldap.search(
+      const res = (await this.ldap.system.search(
         { paged: false, scope: 'base' },
         `${this.mainAttribute}=${escapeDnValue(value)},${this.base}`
       )) as SearchResult;
@@ -1203,7 +1210,10 @@ export default abstract class LdapFlat extends DmPlugin {
    */
   private async entryExists(dn: string): Promise<boolean> {
     try {
-      const result = (await this.ldap.search(
+      // As the server: the question is whether the directory holds it, and
+      // the caller's right to read it is settled by the authorization hooks
+      // on the rename itself.
+      const result = (await this.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['dn'] },
         dn
       )) as SearchResult;
@@ -1760,9 +1770,14 @@ export default abstract class LdapFlat extends DmPlugin {
         }
       }
 
-      // Verify that the DN exists in LDAP
+      // Verify that the DN exists in LDAP.
+      //
+      // As the server: a reference to an entry the caller cannot read is
+      // still a valid reference, and refusing it would make a schema rule
+      // mean "points at something you may read" — which is not what
+      // referential integrity is.
       try {
-        const result = (await this.ldap.search(
+        const result = (await this.ldap.system.search(
           { paged: false, scope: 'base' },
           dnValue
         )) as SearchResult;
@@ -1794,7 +1809,8 @@ export default abstract class LdapFlat extends DmPlugin {
     // pointer's is.
     if (attr.type !== 'pointer')
       await checkDnValues(field, attr, value, async dn => {
-        const result = (await this.ldap.search(
+        // As the server, for the reason the single pointer above gives.
+        const result = (await this.ldap.system.search(
           { paged: false, scope: 'base', attributes: ['dn'] },
           dn
         )) as SearchResult;

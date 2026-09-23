@@ -43,32 +43,6 @@ export function prefixCoversPath(prefix: string, path: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
 }
 
-/**
- * Path prefixes claimed by scoped authentication plugins.
- *
- * Takes the registry as an argument rather than reaching for the server, so
- * `DM` and `AuthBase` share one definition of what "claimed" means. The
- * registry is a live reference: it keeps filling as the remaining plugins
- * register, which is why the catch-all consults it per request.
- *
- * @param loadedPlugins the server's plugin registry
- * @param except name of the plugin asking, excluded from the result
- * @returns the prefixes other authentication plugins guard
- */
-export function claimedPrefixes(
-  loadedPlugins: Record<string, DmPlugin>,
-  except?: string
-): string[] {
-  const claimed: string[] = [];
-  for (const plugin of Object.values(loadedPlugins)) {
-    if (plugin.name === except || !plugin.roles?.includes('auth')) continue;
-    const prefixes = (plugin as DmPlugin & { pathPrefixes?: string[] })
-      .pathPrefixes;
-    if (prefixes?.length) claimed.push(...prefixes);
-  }
-  return claimed;
-}
-
 export default abstract class AuthBase extends DmPlugin {
   abstract authMethod(req: DmRequest, res: Response, next: () => void): void;
 
