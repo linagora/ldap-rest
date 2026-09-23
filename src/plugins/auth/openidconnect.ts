@@ -3,9 +3,10 @@ import { auth, ConfigParams } from 'express-openid-connect';
 
 import { DmRequest } from '../../lib/auth/base';
 import DmPlugin, { type Role } from '../../abstract/plugin';
-import { launchHooksChained } from '../../lib/utils';
+import { launchHooks, launchHooksChained } from '../../lib/utils';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
+import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
 export default class OpenIDConnect extends DmPlugin {
   name = 'openidconnect';
@@ -34,6 +35,40 @@ export default class OpenIDConnect extends DmPlugin {
       authorizationParams: {
         response_type: 'code',
         scope: 'openid profile email',
+      },
+      // Back-Channel Logout, handed to whoever subscribed. This plugin knows
+      // how to receive a logout token and how to ask whether the session in
+      // front of it is still alive; where that answer is kept is a plugin of
+      // its own. Both hooks are supplied rather than a store, which is what
+      // lets the session stay in the cookie: only what is dead is recorded.
+      backchannelLogout: {
+        onLogoutToken: async (decoded: object): Promise<void> => {
+          if (!this.server.hooks.oidclogouttoken) {
+            // The route exists as soon as this plugin does, so without a
+            // subscriber the provider is told the logout succeeded and
+            // nothing acts on it. Say so rather than drop it in silence.
+            this.logger.warn(
+              'openidconnect: a logout token arrived but no Back-Channel ' +
+                'Logout plugin is loaded, so nothing records it'
+            );
+            return;
+          }
+          await launchHooks(
+            this.server.hooks.oidclogouttoken,
+            decoded as OidcLogoutToken
+          );
+        },
+        isLoggedOut: async (req: DmRequest): Promise<boolean> => {
+          if (!this.server.hooks.oidcsessionvalid) return false;
+          const claims = (
+            req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
+          ).oidc.idTokenClaims;
+          const [, valid] = await launchHooksChained(
+            this.server.hooks.oidcsessionvalid,
+            [claims, true]
+          );
+          return !valid;
+        },
       },
     };
     app.use(async (req, res, next) => {

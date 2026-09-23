@@ -4,6 +4,14 @@
 
 ### Features
 
+- Back-Channel Logout: `core/auth/openidconnect` accepts a logout token and
+  asks, on every request, whether the session it holds is still alive. Where
+  the answer is kept is a plugin — `core/bcl/ldap` writes one entry per killed
+  session under a branch of its own, `core/bcl/file` one file per killed
+  session. Nothing stores a session: only what is dead is recorded, so the
+  session stays in its cookie. A mark stops counting once the session it kills
+  would have ended anyway, enforced on read as well as by the sweeper
+
 - `--authz-filter-attached-entries`: an account is judged by the organization
   it hangs off rather than by the `ou=users` every account shares, so a local
   administrator lists and writes their own and no one else's. Off by default —
