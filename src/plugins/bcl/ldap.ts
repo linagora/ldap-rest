@@ -68,7 +68,8 @@ class LdapBclStore extends BclStore {
       // "No such entry" is the common case and not an error: nobody logged
       // out. Anything else means the store could not be consulted, which is
       // enforcement stopping — said out loud rather than read as "alive".
-      if (!/no ?such ?object|0x20/i.test(String(err)))
+      // 32 is noSuchObject, carried onto the wrapped error the same way.
+      if ((err as { code?: number })?.code !== 32)
         this.logger.warn(
           `${this.name}: cannot read a tombstone, enforcement is blind: ${String(err)}`
         );
@@ -91,7 +92,11 @@ class LdapBclStore extends BclStore {
       // wins, and a failure to write it is a failure to record — raised, so
       // the provider is told 400 and retries, rather than told 204 about a
       // logout nothing kept.
-      const already = /already ?exists/i.test(String(err));
+      // Read the code, not the sentence: `ldapActions` carries the LDAP
+      // result code onto the error it wraps, and a reword of its message is
+      // the one change a test cannot warn about from a distance. 68 is
+      // entryAlreadyExists.
+      const already = (err as { code?: number })?.code === 68;
       if (!already) {
         this.logger.warn(`${this.name}: cannot record ${dn}: ${String(err)}`);
         throw err;

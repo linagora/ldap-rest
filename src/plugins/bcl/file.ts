@@ -84,8 +84,19 @@ class FileBclStore extends BclStore {
     // take a live tombstone for an expired one, which is the wrong way to be
     // wrong: write elsewhere, then rename, which is atomic on one filesystem.
     const tmp = `${target}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, `${deadline} ${key}\n`, { mode: 0o600 });
-    await fs.rename(tmp, target);
+    try {
+      await fs.writeFile(tmp, `${deadline} ${key}\n`, { mode: 0o600 });
+      await fs.rename(tmp, target);
+    } catch (err) {
+      // The failure is raised — the provider is told 400 and retries rather
+      // than told the logout was kept — but a lost tombstone deserves a line
+      // of its own, not just the status the provider sees.
+      this.logger.warn(
+        `${this.name}: cannot record a tombstone, the logout is not kept: ${String(err)}`
+      );
+      await fs.unlink(tmp).catch(() => undefined);
+      throw err;
+    }
   }
 
   protected async remove(key: string): Promise<void> {

@@ -58,6 +58,35 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
       ).to.be.a('function');
   });
 
+  it('should let a store that could not record reach the provider', async () => {
+    // `launchHooks` reports and swallows, by contract. Routing the token
+    // through it would leave the provider told 204 about a logout nothing
+    // kept — the fail-open this feature exists to close. The failure has to
+    // come back out of `onLogoutToken` so the library answers 400 and the
+    // provider retries.
+    const boom = new Error('the store is read-only');
+    (server.hooks as Record<string, unknown>).oidclogouttoken = [
+      (): never => {
+        throw boom;
+      },
+    ];
+    const config = plugin.buildConfig();
+    const onLogoutToken = (
+      config.backchannelLogout as {
+        onLogoutToken: (t: object) => Promise<void>;
+      }
+    ).onLogoutToken;
+
+    let raised: unknown;
+    await onLogoutToken({ iss: 'https://sso.example.com', sid: 'S1' }).catch(
+      (e: unknown) => {
+        raised = e;
+      }
+    );
+    expect(raised, 'the failure must not be swallowed').to.equal(boom);
+    delete (server.hooks as Record<string, unknown>).oidclogouttoken;
+  });
+
   it('should configure no store, since sessions stay in the cookie', () => {
     const config = plugin.buildConfig();
     const bcl = config.backchannelLogout as Record<string, unknown>;

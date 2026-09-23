@@ -61,10 +61,18 @@ export default class OpenIDConnect extends DmPlugin {
             );
             return;
           }
-          await launchHooks(
-            this.server.hooks.oidclogouttoken,
-            decoded as OidcLogoutToken
-          );
+          // Deliberately not `launchHooks`: its contract is to report and
+          // swallow, so a store that could not write would leave the
+          // provider told 204 about a logout nothing kept. Here the failure
+          // has to reach the library, which answers 400 and lets the
+          // provider retry — so the subscribers are walked in this plugin's
+          // own terms.
+          const subscribers = this.server.hooks.oidclogouttoken as unknown as ((
+            token: OidcLogoutToken
+          ) => Promise<void> | void)[];
+          for (const subscriber of subscribers ?? []) {
+            if (subscriber) await subscriber(decoded as OidcLogoutToken);
+          }
         },
         // Supplying this is not optional. Left out, the library runs its own,
         // which reaches for `backchannelLogout.store` or `session.store` and
