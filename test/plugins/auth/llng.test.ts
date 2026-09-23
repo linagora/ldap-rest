@@ -166,6 +166,64 @@ describe('LemonLDAP::NG auth plugin', () => {
       expect(req.user).to.equal(undefined);
     });
 
+    it('lets the handler win over an identity the client forged', async () => {
+      // The attack as it would be tried: a forged header *and* a session
+      // naming someone. Each half is covered above; only together do they
+      // say which value wins, which is the whole point of dropping the
+      // forged one before the handler runs.
+      const dm = new DM();
+      await dm.ready;
+      const { handler } = fakeHandler();
+      const plugin = new (withHandler(handler))(dm);
+      await plugin.api({} as Express);
+
+      for (const spelling of ['Lm-Remote-User', 'lm-remote-user']) {
+        const req = {
+          headers: { [spelling]: 'admin' },
+        } as unknown as DmRequest;
+        let passed = false;
+        plugin.authMethod(req, {} as Response, () => {
+          passed = true;
+        });
+        expect(passed, `served with ${spelling}`).to.equal(true);
+        expect(req.user, `identity with ${spelling}`).to.equal('dwho');
+      }
+    });
+
+    it('hands the handler a request with no identity on it', async () => {
+      // Where the order is observable: by the time the handler runs, the
+      // forged header is gone. A handler that trusted what it found there —
+      // or a future version of this plugin that read it before the run —
+      // would see the client's value instead of its own session's.
+      const dm = new DM();
+      await dm.ready;
+      let seen: unknown = 'not run';
+      const spy = {
+        init: async (): Promise<unknown> => ({}),
+        run: (
+          req: { headers: Record<string, string> },
+          _res: unknown,
+          next: () => void
+        ): void => {
+          seen =
+            Object.entries(req.headers).find(
+              ([key]) => key.toLowerCase() === 'lm-remote-user'
+            )?.[1] ?? null;
+          req.headers['Lm-Remote-User'] = 'dwho';
+          next();
+        },
+      };
+      const plugin = new (withHandler(spy))(dm);
+      await plugin.api({} as Express);
+
+      const req = {
+        headers: { 'lm-remote-user': 'admin' },
+      } as unknown as DmRequest;
+      plugin.authMethod(req, {} as Response, () => undefined);
+      expect(seen, 'what the handler saw').to.equal(null);
+      expect(req.user).to.equal('dwho');
+    });
+
     it('reads the identity whatever case the handler wrote it in', async () => {
       const dm = new DM();
       await dm.ready;

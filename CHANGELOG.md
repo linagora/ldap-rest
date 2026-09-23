@@ -11,7 +11,8 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   scoped by nobody". Such a request is refused now; the identity header is
   read whatever case the handler wrote it in, and whatever a client sent
   under that name is dropped before the handler runs
-  ([#190](https://github.com/linagora/ldap-rest/issues/190))
+  ([#190](https://github.com/linagora/ldap-rest/issues/190),
+  [notes](docs/usage/upgrading.md#coreauthllng-refuses-a-request-the-handler-named-nobody-for))
 
 - `bin`: the plugin priority list was matched against the whole `--plugin`
   string, so a named instance — `core/auth/trustedProxy:tp2:{…}`, the only

@@ -598,11 +598,13 @@ class ldapActions {
    * must still not be handed it as a free identifier, and a reference to an
    * organization they cannot read is still a valid reference.
    *
-   * The methods are the same objects as this instance's own. What this adds
-   * is a name: `ldap.system.search(…)` says the omission was meant, where
-   * `ldap.search(…)` says nothing and looks exactly like the mistake it
-   * takes one review to miss. A plugin serving a request should reach for
-   * {@link forRequest} instead.
+   * The methods are the same objects as this instance's own — writes
+   * included, since a scheduled task writes: the examples above are reads
+   * because that is where the ambiguity lives, not because a write cannot
+   * belong to nobody. What this adds is a name: `ldap.system.search(…)` says
+   * the omission was meant, where `ldap.search(…)` says nothing and looks
+   * exactly like the mistake it takes one review to miss. A plugin serving a
+   * request should reach for {@link forRequest} instead.
    */
   get system(): this {
     return this;
