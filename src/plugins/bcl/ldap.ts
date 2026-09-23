@@ -25,6 +25,10 @@ import type { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
 
+/** What to put in a log line about an unknown thrown value. */
+const errorText = (err: unknown): string =>
+  err instanceof Error ? err.message : JSON.stringify(err);
+
 class LdapBclStore extends BclStore {
   name = 'bcl/ldap';
   private server: DM;
@@ -106,7 +110,18 @@ class LdapBclStore extends BclStore {
   }
 
   protected async remove(key: string): Promise<void> {
-    await this.server.ldap.delete(this.dn(key)).catch(() => undefined);
+    // 32 is noSuchObject, the ordinary outcome. Anything else leaves a mark
+    // standing, and `forget` depends on this: a `sub` mark that cannot be
+    // removed keeps killing every session that person establishes until it
+    // expires.
+    await this.server.ldap
+      .delete(this.dn(key))
+      .catch((err: { code?: number }) => {
+        if (err?.code !== 32)
+          this.logger.warn(
+            `${this.name}: cannot drop a tombstone, it keeps counting: ${errorText(err)}`
+          );
+      });
   }
 
   async sweep(): Promise<number> {

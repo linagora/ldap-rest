@@ -70,9 +70,22 @@ export default class OpenIDConnect extends DmPlugin {
           const subscribers = this.server.hooks.oidclogouttoken as unknown as ((
             token: OidcLogoutToken
           ) => Promise<void> | void)[];
+          // Every backend gets the token, and the first failure is still
+          // raised. Stopping at it would cost the healthy stores their
+          // record — a session the provider considers closed would keep
+          // working against the one that would have killed it, which is the
+          // fail-open arriving through the store that works.
+          let firstError: Error | undefined;
           for (const subscriber of subscribers ?? []) {
-            if (subscriber) await subscriber(decoded as OidcLogoutToken);
+            if (!subscriber) continue;
+            try {
+              await subscriber(decoded as OidcLogoutToken);
+            } catch (err) {
+              firstError ??=
+                err instanceof Error ? err : new Error(String(err));
+            }
           }
+          if (firstError) throw firstError;
         },
         // Supplying this is not optional. Left out, the library runs its own,
         // which reaches for `backchannelLogout.store` or `session.store` and

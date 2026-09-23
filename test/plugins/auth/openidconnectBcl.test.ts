@@ -87,6 +87,38 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
     delete (server.hooks as Record<string, unknown>).oidclogouttoken;
   });
 
+  it('should give every backend the token even when one fails', async () => {
+    // Two stores may be loaded at once, and nothing orders them. Stopping at
+    // the first failure would leave the healthy one with no record: the
+    // provider would retry into the same wall, and the session it considers
+    // closed would keep working against the store that would have killed it.
+    const boom = new Error('the first store is read-only');
+    let secondSaw = false;
+    (server.hooks as Record<string, unknown>).oidclogouttoken = [
+      (): never => {
+        throw boom;
+      },
+      (): void => {
+        secondSaw = true;
+      },
+    ];
+    const onLogoutToken = (
+      plugin.buildConfig().backchannelLogout as {
+        onLogoutToken: (t: object) => Promise<void>;
+      }
+    ).onLogoutToken;
+
+    let raised: unknown;
+    await onLogoutToken({ iss: 'https://sso.example.com', sid: 'S1' }).catch(
+      (e: unknown) => {
+        raised = e;
+      }
+    );
+    expect(secondSaw, 'the healthy store must still record').to.equal(true);
+    expect(raised, 'and the provider must still be told').to.equal(boom);
+    delete (server.hooks as Record<string, unknown>).oidclogouttoken;
+  });
+
   it('should configure no store, since sessions stay in the cookie', () => {
     const config = plugin.buildConfig();
     const bcl = config.backchannelLogout as Record<string, unknown>;

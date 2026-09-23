@@ -29,6 +29,10 @@ import BclStore from '../../lib/bcl/store';
 import type { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
+/** What to put in a log line about an unknown thrown value. */
+const errorText = (err: unknown): string =>
+  err instanceof Error ? err.message : JSON.stringify(err);
+
 class FileBclStore extends BclStore {
   name = 'bcl/file';
   private dir: string;
@@ -100,7 +104,16 @@ class FileBclStore extends BclStore {
   }
 
   protected async remove(key: string): Promise<void> {
-    await fs.unlink(this.path(key)).catch(() => undefined);
+    // Not there is the ordinary outcome. Anything else leaves a mark
+    // standing, and `forget` depends on this: a `sub` mark that cannot be
+    // removed keeps killing every session that person establishes until it
+    // expires.
+    await fs.unlink(this.path(key)).catch((err: { code?: string }) => {
+      if (err?.code !== 'ENOENT')
+        this.logger.warn(
+          `${this.name}: cannot drop a tombstone, it keeps counting: ${errorText(err)}`
+        );
+    });
   }
 
   async sweep(): Promise<number> {
