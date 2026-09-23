@@ -11,6 +11,7 @@ import type { SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
+import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
 
 interface CachedGroups {
   groups: string[];
@@ -40,6 +41,25 @@ export default class AuthzPerBranch extends AuthzBase {
    */
   resolveUser(uid: string): Promise<string | null> {
     return Promise.resolve(uid);
+  }
+
+  /**
+   * Say, once every plugin is loaded, when no configured user can ever be
+   * the caller.
+   *
+   * A `authz_per_branch_config.users` key is an identity, and which values
+   * an authenticator publishes differs per plugin: keys written for token
+   * names are inert behind OpenID Connect, where the identity is a `sub`.
+   * The permissions then fall back to `default`, which reads as a
+   * configuration that is working.
+   */
+  afterLoad(): void {
+    warnUnmatchedRuleKeys(
+      Object.keys(this.authConfig?.users ?? {}),
+      this.server.loadedPlugins,
+      this.name,
+      this.logger
+    );
   }
 
   /**

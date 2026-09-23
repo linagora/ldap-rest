@@ -47,6 +47,20 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   deployment that relies on it —
   [notes](docs/usage/upgrading.md#an-identity-that-does-not-resolve-is-refused)
 
+### Features
+
+- Authorization rules can be keyed on a login rather than on whatever
+  identifier an authenticator happens to publish: every one of them now
+  publishes `req.userName` beside `req.user` — the OIDC claim named by
+  `--oidc-username-claim`, the LLNG header named by `--llng-username-header`,
+  the configured name elsewhere — and `--authz-identity` says which of the
+  two `authzPerBranch`, `authzLinid1`, `authzPerRoute` and the SCIM base map
+  read. The default is `req.user`, so nothing moves until it is set. At
+  startup each authenticator says what it publishes, and an authorization
+  plugin whose identities none of them can produce says that too
+  ([#187](https://github.com/linagora/ldap-rest/issues/187),
+  [notes](docs/usage/plugins/auth/README.md#what-a-rule-is-keyed-on))
+
 ### Bug Fixes
 
 - `lib/auth/base`: the `afterAuth` hooks ran only when the authenticating

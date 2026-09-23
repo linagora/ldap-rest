@@ -12,6 +12,47 @@ LDAP-Rest provides multiple authentication plugins to secure API access. These p
 | [LemonLDAP::NG](llng.md)  | `core/auth/llng`          | Integration with LemonLDAP::NG SSO               |
 | [OpenID Connect](oidc.md) | `core/auth/openidconnect` | OAuth 2.0 / OpenID Connect authentication        |
 
+## What a rule is keyed on
+
+Authorization rules name a caller, and each authenticator has its own idea
+of what a caller is called. Every one of them publishes the caller twice:
+
+| Authenticator             | `req.user`                          | `req.userName`                           |
+| ------------------------- | ----------------------------------- | ---------------------------------------- |
+| `core/auth/token`         | the name given in `--auth-token`    | the same                                 |
+| `core/auth/totp`          | the name given in `--auth-totp`     | the same                                 |
+| `core/auth/hmac`          | the service name from `--auth-hmac` | the same                                 |
+| `core/auth/llng`          | LLNG's `whatToTrace`                | `--llng-username-header`, or the same    |
+| `core/auth/openidconnect` | the OIDC `sub`                      | `--oidc-username-claim` (default: `sub`) |
+| `core/auth/authzDynamic`  | the token's tenant                  | the same                                 |
+
+`req.user` is this server's identifier for the caller; `req.userName` is the
+caller under a name a person would use. `--authz-identity` says which one is
+keyed on by `core/auth/authzPerBranch`, `core/auth/authzLinid1`,
+`core/auth/authzPerRoute` and the SCIM base map — every plugin that names a
+caller in its configuration:
+
+```bash
+--authz-identity req.user        # the default: every existing rule is unchanged
+--authz-identity req.userName    # rules written on logins
+```
+
+The second is what makes a rule portable. Under OpenID Connect the `sub` is
+opaque — `auth0|…`, a UUID — so rules keyed on it have to be looked up per
+administrator and rewritten when the provider changes; keyed on
+`preferred_username` they read as the logins they are.
+
+A value other than these two is refused at startup. When the option asks for
+`req.userName` and the authenticator published none, permissions are read for
+`req.user` and a warning says so once — a rule that silently stops matching
+is worse than one that refuses.
+
+At startup each authenticator logs what it will publish, and each
+authorization plugin whose configured identities none of them can produce
+says so: token, TOTP and HMAC names are in the configuration, and an
+identity provider's claims are not, in which case the line says it cannot be
+checked before a login rather than staying silent.
+
 ## Authorization Plugins
 
 | Method                                          | Plugin                     | Description                  |

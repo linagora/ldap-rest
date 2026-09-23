@@ -24,7 +24,11 @@
 import fs from 'fs';
 
 import type { Config } from '../../config/args';
-import type { DmRequest } from '../../lib/auth/base';
+import {
+  assertIdentityMode,
+  identityFor,
+  type DmRequest,
+} from '../../lib/auth/base';
 import { escapeDnValue, isChildOf } from '../../lib/utils';
 
 export interface BaseMapEntry {
@@ -42,8 +46,17 @@ export class BaseResolver {
   private readonly userBaseHeader: string;
   private readonly groupBaseHeader: string;
   private readonly headerRoot: string;
+  /** Kept so a base is keyed on whatever `--authz-identity` names. */
+  private readonly config: Config;
 
   constructor(config: Config) {
+    // This resolver keys a base on the same value the authorization plugins
+    // key a rule on, so it refuses an unknown `--authz-identity` as they
+    // do: a deployment running SCIM without an authorization plugin would
+    // otherwise get no refusal at all, and the value would silently mean
+    // `req.user`.
+    assertIdentityMode(config, 'scim base resolver');
+    this.config = config;
     const fallback = config.ldap_base || '';
     this.defaultUserBase = (config.scim_user_base as string) || fallback;
     this.defaultGroupBase = (config.scim_group_base as string) || fallback;
@@ -103,8 +116,13 @@ export class BaseResolver {
     kind: 'user' | 'group',
     req?: DmRequest | { user?: string }
   ): string {
+    // Keyed on what `--authz-identity` names, as the authorization plugins
+    // are: a `scim_base_map` written on logins has to match the same value a
+    // branch rule does, or one of the two silently describes another person.
     const user =
-      req && typeof req === 'object' && 'user' in req ? req.user : undefined;
+      req && typeof req === 'object'
+        ? identityFor(req as DmRequest, this.config).value
+        : undefined;
 
     // 1. Explicit map entry (identity pinning wins over a request header)
     if (this.map && user && this.map[user]) {

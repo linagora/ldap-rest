@@ -11,7 +11,12 @@ import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import { forbidden } from '../../lib/expressFormatedResponses';
-import type { DmRequest } from '../../lib/auth/base';
+import {
+  assertIdentityMode,
+  identityFor,
+  warnUnmatchedRuleKeys,
+  type DmRequest,
+} from '../../lib/auth/base';
 
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,
@@ -61,8 +66,27 @@ export default class AuthzPerRoute extends DmPlugin {
   roles: Role[] = ['authz'] as const;
   private rules: Map<string, AuthzRule[]> = new Map();
 
+  /** Said once: a rule keyed on a value the authenticator did not publish. */
+  private fallbackWarned = false;
+  /** Routes already reported as reached with no identity. */
+  private unidentifiedRoutes = new Set<string>();
+  /** How many such lines have been written at `warn`. */
+  private unidentifiedWarnings = 0;
+  /**
+   * How many of those lines to write, and how many routes to remember.
+   *
+   * The bound that matters is on the *log*, not on the set: `req.path` is a
+   * concrete path, identifiers included, so a client decides how many
+   * distinct ones exist. Bounding only the set leaves every path it never
+   * had room for unseen for ever, and each request for one writes the line
+   * again — the bound holds the memory and loses the thing it was there to
+   * protect.
+   */
+  private static readonly UNIDENTIFIED_MAX = 1000;
+
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
+    assertIdentityMode(this.config, this.constructor.name);
 
     const entries = this.config.authz_per_route ?? [];
     for (const entry of entries) {
@@ -169,12 +193,63 @@ export default class AuthzPerRoute extends DmPlugin {
     return false;
   }
 
+  /**
+   * Say, once every plugin is loaded, when no rule can ever match.
+   *
+   * The rules are keyed on identities, and which values an authenticator
+   * publishes is the whole subject of #187: a rule written for a token name
+   * is inert behind OpenID Connect, where the identity is a `sub`. Inert is
+   * the part worth a line — nothing is refused, so nothing looks wrong.
+   */
+  afterLoad(): void {
+    warnUnmatchedRuleKeys(
+      [...this.rules.keys()],
+      this.server.loadedPlugins,
+      this.name,
+      this.logger
+    );
+  }
+
   api(app: Express): void {
     app.use((req: Request, res: Response, next: NextFunction) => {
-      const user = (req as DmRequest).user;
+      const { value: user, fellBack } = identityFor(
+        req as DmRequest,
+        this.config
+      );
+      if (fellBack && !this.fallbackWarned) {
+        this.fallbackWarned = true;
+        this.logger.warn(
+          `${this.name}: --authz-identity asks for req.userName and the ` +
+            'authenticator published none, so rules are matched against ' +
+            'req.user instead'
+        );
+      }
 
       // No authenticated user yet — let upstream auth plugin handle 401
       if (!user) {
+        // Said once per route, not once per request. This is right for the
+        // anonymous paths the documentation describes — and for a login
+        // route, and for a health check, which is most of the traffic that
+        // reaches here without an identity; a line per request would be the
+        // log rather than a signal. It is also what a mistyped prefix or a
+        // missing authentication plugin look like, where every rule is a
+        // no-op, so the first time each route is reached that way is worth
+        // a line.
+        const route = `${req.method} ${req.path}`;
+        const line =
+          `${this.name}: ${route} carries no identity, so no route rule ` +
+          'applies to it';
+        const seen = this.unidentifiedRoutes.has(route);
+        if (
+          !seen &&
+          this.unidentifiedWarnings < AuthzPerRoute.UNIDENTIFIED_MAX
+        ) {
+          this.unidentifiedWarnings++;
+          this.unidentifiedRoutes.add(route);
+          this.logger.warn(line);
+        } else {
+          this.logger.debug(line);
+        }
         return next();
       }
 

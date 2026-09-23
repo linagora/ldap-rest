@@ -1,12 +1,22 @@
 import type { Express, Request, Response } from 'express';
 
-export type DmRequest = Request & { user?: string };
-
-// eslint-disable-next-line import/order
 import DmPlugin from '../../abstract/plugin';
-
+import type { Config } from '../../config/args';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { launchHooksChained } from '../../lib/utils';
+
+/**
+ * A request as the authentication plugins leave it.
+ *
+ * `user` is what an authorization rule is keyed on, and every authenticator
+ * fills it with something different — a token's name, an OIDC `sub`, a
+ * tenant. `userName` is the same caller under the name a person would use
+ * for them, so a rule can be written once and survive a change of
+ * authenticator; `--authz-identity` says which of the two the authorization
+ * plugins read, and the default stays `user`, which changes nothing for an
+ * existing deployment.
+ */
+export type DmRequest = Request & { user?: string; userName?: string };
 
 /**
  * Drop the trailing slashes of a path prefix.
@@ -41,6 +51,122 @@ function stripTrailingSlashes(path: string): string {
  */
 export function prefixCoversPath(prefix: string, path: string): boolean {
   return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/** What `--authz-identity` accepts. */
+const IDENTITY_MODES = ['req.user', 'req.userName'] as const;
+
+/**
+ * Refuse a `--authz-identity` nobody wrote.
+ *
+ * Called by every plugin that keys on an identity, at construction. A value
+ * that is neither would otherwise mean `req.user` in silence, which is the
+ * wrong half of a security option to guess at.
+ *
+ * @param config the server configuration
+ * @param who the plugin asking, for the message
+ * @throws Error when the value is not one of the two
+ */
+export function assertIdentityMode(config: Config, who: string): void {
+  const mode = (config.authz_identity as string) ?? 'req.user';
+  if (!(IDENTITY_MODES as readonly string[]).includes(mode))
+    throw new Error(
+      `${who}: unknown --authz-identity "${mode}". Known: ` +
+        `${IDENTITY_MODES.join(', ')}.`
+    );
+}
+
+/**
+ * The value an authorization rule is keyed on.
+ *
+ * `req.user` is this server's identifier for the caller and differs per
+ * authenticator — a token's name, an OIDC `sub`, a tenant — so a rule
+ * written for one is inert under another. `req.userName` is the same caller
+ * under a name a person would use, which is what makes a rule portable.
+ *
+ * When `req.userName` is asked for and missing, the answer falls back to
+ * `req.user` rather than to nothing: an authenticated caller read as
+ * anonymous would be *skipped* by the branch plugins, which is the one
+ * outcome a misconfiguration must not produce. The caller is told so it can
+ * say it once.
+ *
+ * @param req the request, or undefined
+ * @param config the server configuration
+ * @returns the identity to key on, and whether it is not the configured one
+ */
+export function identityFor(
+  req: DmRequest | undefined,
+  config: Config
+): { value?: string; fellBack: boolean } {
+  if (!req) return { fellBack: false };
+  if ((config.authz_identity as string) !== 'req.userName')
+    return { value: req.user, fellBack: false };
+  if (req.userName) return { value: req.userName, fellBack: false };
+  return { value: req.user, fellBack: Boolean(req.user) };
+}
+
+/**
+ * What the loaded authenticators can name, and which of them cannot say.
+ *
+ * A rule is keyed on an identity, and a rule whose key no authenticator can
+ * produce matches nothing — it is not refused, it is *inert*, and that reads
+ * as a permission problem months later. Token, TOTP and HMAC names are in
+ * the configuration, so this is answerable at startup for them; an identity
+ * provider's claims are not, and saying "cannot verify" is the honest
+ * answer rather than silence.
+ *
+ * @param loadedPlugins the server's plugin registry
+ * @returns the identities that can be named, and the plugins that cannot say
+ */
+export function identityCoverage(loadedPlugins: Record<string, DmPlugin>): {
+  known: Set<string>;
+  unverifiable: string[];
+} {
+  const known = new Set<string>();
+  const unverifiable: string[] = [];
+  for (const plugin of Object.values(loadedPlugins)) {
+    if (!plugin.roles?.includes('auth')) continue;
+    const names = (
+      plugin as DmPlugin & { knownIdentities?: () => string[] | undefined }
+    ).knownIdentities?.();
+    if (!names) unverifiable.push(plugin.name);
+    else for (const name of names) known.add(name);
+  }
+  return { known, unverifiable };
+}
+
+/**
+ * Say, once at startup, when configured rules name nobody.
+ *
+ * @param keys the identities the rules are written for
+ * @param loadedPlugins the server's plugin registry
+ * @param who the plugin asking
+ * @param logger where to say it
+ */
+export function warnUnmatchedRuleKeys(
+  keys: string[],
+  loadedPlugins: Record<string, DmPlugin>,
+  who: string,
+  logger: {
+    warn: (message: string) => unknown;
+    info: (message: string) => unknown;
+  }
+): void {
+  if (keys.length === 0) return;
+  const { known, unverifiable } = identityCoverage(loadedPlugins);
+  const matched = keys.filter(key => known.has(key));
+  if (matched.length > 0) return;
+  if (known.size === 0 && unverifiable.length === 0) return;
+  const cannotSay = unverifiable.length
+    ? ` ${unverifiable.join(', ')} cannot be checked before a login, so this ` +
+      'may be right'
+    : '';
+  logger.warn(
+    `${who}: none of its configured identities (${keys.join(', ')}) is one ` +
+      `the loaded authenticators can publish${
+        known.size ? ` (${[...known].join(', ')})` : ''
+      }.${cannotSay || ' Every rule is inert.'}`
+  );
 }
 
 export default abstract class AuthBase extends DmPlugin {
@@ -160,6 +286,67 @@ export default abstract class AuthBase extends DmPlugin {
         serverError(res, err as Error);
       }
     });
+  }
+
+  /**
+   * Publish the caller, under both names.
+   *
+   * Every authenticator calls this rather than assigning `req.user` itself,
+   * so that the second value cannot be forgotten by one of them — which is
+   * how a rule keyed on it would silently stop matching for that
+   * population.
+   *
+   * @param req request being authenticated
+   * @param user what authorization rules are keyed on, this plugin's own
+   *             identifier for the caller
+   * @param userName the caller under a name a person would use, when the
+   *                 plugin has one; the identifier otherwise
+   */
+  protected publishIdentity(
+    req: DmRequest,
+    user: string,
+    userName?: string
+  ): void {
+    req.user = user;
+    req.userName = userName || user;
+  }
+
+  /**
+   * The identities this plugin can publish, when they are known before any
+   * request arrives.
+   *
+   * A configuration lists token, TOTP and HMAC names, so those plugins can
+   * answer; an identity provider's claims are only known once someone logs
+   * in, so those answer undefined and the check says so rather than
+   * guessing.
+   *
+   * @returns the identities, or undefined when they cannot be known
+   */
+  protected knownIdentities(): string[] | undefined {
+    return undefined;
+  }
+
+  /**
+   * Where the values this plugin publishes come from, for the startup line.
+   *
+   * Said once at startup because the mismatch it guards against — a rule
+   * written for one authenticator, inert under another — is invisible
+   * until a request arrives, and then reads as a permission problem.
+   *
+   * @returns a sentence naming both sources
+   */
+  protected identitySource(): string {
+    return 'req.user and req.userName: the name this plugin knows the caller by';
+  }
+
+  /**
+   * Say what this plugin will publish, once every plugin is loaded.
+   *
+   * A subclass overriding `afterLoad` for its own checks should call this
+   * one too.
+   */
+  afterLoad(): void {
+    this.logger.info(`${this.name}: ${this.identitySource()}`);
   }
 
   /**

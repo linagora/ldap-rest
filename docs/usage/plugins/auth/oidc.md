@@ -61,6 +61,23 @@ but `--base-url` and the callback path are global, so both share one
 redirect URI. Scope by prefix, not by provider, unless you also front them
 with different base URLs.
 
+## The identity it publishes
+
+`req.user` is the OIDC `sub` — an opaque provider identifier, `auth0|…` or a
+UUID — which is what authorization rules are keyed on by default, and what
+nobody can write a rule for without looking it up per administrator.
+
+`--oidc-username-claim` names the claim published as `req.userName`:
+
+```bash
+--oidc-username-claim preferred_username
+```
+
+Ask the provider for the scope that carries it (`profile`, or `email` for
+`email`), then key the authorization plugins on it with
+`--authz-identity req.userName`. A session missing the configured claim falls
+back to the `sub`, with a warning naming the claim.
+
 ## What an unauthenticated request receives
 
 The library's own answer: a browser is redirected to the provider, an API

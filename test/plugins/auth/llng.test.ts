@@ -224,6 +224,64 @@ describe('LemonLDAP::NG auth plugin', () => {
       expect(req.user).to.equal('dwho');
     });
 
+    it('lets the handler win on the second name too', async () => {
+      // `--llng-username-header` is read into `req.userName`, which a rule
+      // can be keyed on (`--authz-identity req.userName`) and which the
+      // SCIM base map reads. A client sending it under the spelling the
+      // wire produces — a different key from the one LLNG's configuration
+      // gives the handler, and an earlier one — took over the identity a
+      // rule names, with no misconfiguration needed.
+      const dm = new DM();
+      await dm.ready;
+      dm.config.llng_username_header = 'X-Login';
+      const exporting = {
+        init: async (): Promise<unknown> => ({}),
+        run: (
+          req: { headers: Record<string, string> },
+          _res: unknown,
+          next: () => void
+        ): void => {
+          req.headers['Lm-Remote-User'] = 'dwho@example.com';
+          // The spelling LLNG's own configuration gives it.
+          req.headers['X-Login'] = 'dwho';
+          next();
+        },
+      };
+      const plugin = new (withHandler(exporting))(dm);
+      await plugin.api({} as Express);
+
+      const req = {
+        headers: { 'x-login': 'root' },
+      } as unknown as DmRequest;
+      plugin.authMethod(req, {} as Response, () => undefined);
+      expect(req.user).to.equal('dwho@example.com');
+      expect(
+        req.userName,
+        'the handler names the caller, not the client'
+      ).to.equal('dwho');
+      delete dm.config.llng_username_header;
+    });
+
+    it('falls back to what was traced when nothing exported the second name', async () => {
+      // The other half: LLNG exports nothing under that name, and a client
+      // supplies it. `req.userName` is then what `whatToTrace` traced, not
+      // what the client asked for.
+      const dm = new DM();
+      await dm.ready;
+      dm.config.llng_username_header = 'X-Login';
+      const { handler } = fakeHandler();
+      const plugin = new (withHandler(handler))(dm);
+      await plugin.api({} as Express);
+
+      const req = {
+        headers: { 'x-login': 'root' },
+      } as unknown as DmRequest;
+      plugin.authMethod(req, {} as Response, () => undefined);
+      expect(req.user).to.equal('dwho');
+      expect(req.userName).to.equal('dwho');
+      delete dm.config.llng_username_header;
+    });
+
     it('reads the identity whatever case the handler wrote it in', async () => {
       const dm = new DM();
       await dm.ready;

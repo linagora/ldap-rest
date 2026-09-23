@@ -149,6 +149,17 @@ export default class OpenIDConnect extends AuthBase {
     return config;
   }
 
+  protected identitySource(): string {
+    const claim = (this.config.oidc_username_claim as string) || 'sub';
+    return (
+      'req.user: the OIDC sub, an opaque provider identifier; req.userName: ' +
+      `the "${claim}" claim` +
+      (claim === 'sub'
+        ? ' — the same value, until --oidc-username-claim names another'
+        : '')
+    );
+  }
+
   /**
    * Paths this authentication claims.
    *
@@ -218,9 +229,26 @@ export default class OpenIDConnect extends AuthBase {
     this.router(req, res, (err?: unknown) => {
       if (err) return serverError(res, err as Error);
       requiresAuth()(req, res, () => {
-        // @ts-expect-error request is augmented by express-openid-connect
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        req.user = req.oidc.user.sub;
+        const claims = (
+          req as unknown as { oidc: { user: Record<string, unknown> } }
+        ).oidc.user;
+        const claim = (this.config.oidc_username_claim as string) || 'sub';
+        const named = claims[claim];
+        if (claim !== 'sub' && typeof named !== 'string')
+          // Once per session rather than per request would need somewhere to
+          // remember it; a provider that does not send the claim sends it for
+          // nobody, so the line repeats until the configuration is fixed.
+          this.logger.warn(
+            `${this.name}: no "${claim}" claim on this session, so ` +
+              'req.userName falls back to the sub. Check ' +
+              '--oidc-username-claim against the scopes the provider is ' +
+              'asked for'
+          );
+        this.publishIdentity(
+          req,
+          String(claims.sub),
+          typeof named === 'string' ? named : String(claims.sub)
+        );
         next();
       });
     });

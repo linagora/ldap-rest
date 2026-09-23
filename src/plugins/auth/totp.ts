@@ -20,6 +20,14 @@ interface TotpUser {
 }
 
 export default class AuthTotp extends AuthBase {
+  protected knownIdentities(): string[] {
+    return this.totpUsers.map(user => user.name);
+  }
+
+  protected identitySource(): string {
+    return 'req.user and req.userName: the name given in --auth-totp';
+  }
+
   name = 'authTotp';
   roles: Role[] = ['auth'] as const;
   private totpUsers: TotpUser[] = [];
@@ -91,7 +99,7 @@ export default class AuthTotp extends AuthBase {
         this.logger.debug(
           `TOTP authentication successful for user: ${user.name}`
         );
-        req.user = user.name;
+        this.publishIdentity(req, user.name);
         return next();
       }
     }

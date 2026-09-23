@@ -254,18 +254,20 @@ Empty means the plugin guards every path. Scoping several instances to different
 
 #### `core/auth/llng`
 
-| CLI          | Env           | Default                              | Description               |
-| ------------ | ------------- | ------------------------------------ | ------------------------- |
-| `--llng-ini` | `DM_LLNG_INI` | `/etc/lemonldap-ng/lemonldap-ng.ini` | LemonLDAP::NG config path |
+| CLI                      | Env                       | Default                              | Description                                                                                        |
+| ------------------------ | ------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `--llng-ini`             | `DM_LLNG_INI`             | `/etc/lemonldap-ng/lemonldap-ng.ini` | LemonLDAP::NG config path                                                                          |
+| `--llng-username-header` | `DM_LLNG_USERNAME_HEADER` |                                      | Header LLNG exports with the login, published as `req.userName` (see [llng](plugins/auth/llng.md)) |
 
 #### `core/auth/openidconnect`
 
-| CLI                    | Env                     | Default | Description              |
-| ---------------------- | ----------------------- | ------- | ------------------------ |
-| `--oidc-server`        | `DM_OIDC_SERVER`        |         | OIDC server URL          |
-| `--oidc-client-id`     | `DM_OIDC_CLIENT_ID`     |         | OIDC Client ID           |
-| `--oidc-client-secret` | `DM_OIDC_CLIENT_SECRET` |         | OIDC Client Secret       |
-| `--base-url`           | `DM_BASE_URL`           |         | Public URL for callbacks |
+| CLI                     | Env                      | Default | Description                                                                             |
+| ----------------------- | ------------------------ | ------- | --------------------------------------------------------------------------------------- |
+| `--oidc-server`         | `DM_OIDC_SERVER`         |         | OIDC server URL                                                                         |
+| `--oidc-client-id`      | `DM_OIDC_CLIENT_ID`      |         | OIDC Client ID                                                                          |
+| `--oidc-client-secret`  | `DM_OIDC_CLIENT_SECRET`  |         | OIDC Client Secret                                                                      |
+| `--oidc-username-claim` | `DM_OIDC_USERNAME_CLAIM` | `sub`   | Claim naming the caller, published as `req.userName` (see [OIDC](plugins/auth/oidc.md)) |
+| `--base-url`            | `DM_BASE_URL`            |         | Public URL for callbacks                                                                |
 
 #### `core/bcl`
 
@@ -281,16 +283,16 @@ see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
 
 #### Common to every authorization plugin
 
-| CLI                       | Env                        | Default | Description                                                                                                                          |
-| ------------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`  | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning |
+| CLI                       | Env                        | Default    | Description                                                                                                                                                                                                                       |
+| ------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`     | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning                                                                                              |
+| `--authz-identity`        | `DM_AUTHZ_IDENTITY`        | `req.user` | Which value rules are keyed on: `req.user`, this server's identifier for the caller, or `req.userName`, the caller under a name a person would use. See [what a rule is keyed on](plugins/auth/README.md#what-a-rule-is-keyed-on) |
 
-Read by the plugins that resolve an identity before judging it —
-`core/auth/authzPerBranch` and `core/auth/authzLinid1`.
+`--authz-unresolved-user` is read by the plugins that resolve an identity
+before judging it — `core/auth/authzPerBranch` and `core/auth/authzLinid1`.
 `core/auth/authzPerRoute` matches the identity as it stands and
 `core/auth/authzDynamic` judges a token, so neither resolves anything and
-neither reads this option. A value other than `deny` or `allow` is refused
-at startup.
+neither reads it. A value other than `deny` or `allow` is refused at startup.
 
 An **anonymous** request is not this case: it carries no identity, and every
 authorization plugin skips it as before. This is about a caller the
@@ -299,6 +301,12 @@ authenticator admitted whose identity the authorization model cannot place —
 authenticator publishes something else. `allow` is the behaviour every plugin
 had before 0.8.3, and it is an open door where `authzLinid1` is loaded: see
 [the note](upgrading.md#an-identity-that-does-not-resolve-is-refused).
+
+`--authz-identity` is a different question, and the paragraph above is not
+about it: `core/auth/authzPerRoute` and the SCIM base map read it as well,
+since a route rule and the base a SCIM operation is served from are keyed on
+whichever of the two names it selects. A value other than `req.user` or
+`req.userName` is refused at startup.
 
 #### `core/auth/authzPerBranch`
 

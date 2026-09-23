@@ -31,6 +31,14 @@ interface HmacService {
 }
 
 export default class AuthHmac extends AuthBase {
+  protected knownIdentities(): string[] {
+    return [...this.services.values()].map(service => service.name);
+  }
+
+  protected identitySource(): string {
+    return 'req.user and req.userName: the service name given in --auth-hmac';
+  }
+
   name = 'authHmac';
   roles: Role[] = ['auth'] as const;
   private services: Map<string, HmacService> = new Map();
@@ -160,7 +168,7 @@ export default class AuthHmac extends AuthBase {
     this.logger.debug(
       `HMAC authentication successful for service: ${serviceId} (${service.name})`
     );
-    req.user = service.name;
+    this.publishIdentity(req, service.name);
     next();
   }
 
