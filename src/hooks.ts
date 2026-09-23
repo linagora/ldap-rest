@@ -16,6 +16,19 @@ import * as utils from './lib/utils';
 export type MaybePromise<T> = Promise<T> | T;
 export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
 
+/**
+ * What identifies an OpenID Connect session on both sides of a Back-Channel
+ * Logout: the issuer, plus whichever of `sid` and `sub` the provider sends.
+ * At least one of the two is present — the specification requires it, and
+ * `express-openid-connect` refuses the token otherwise.
+ */
+export interface OidcSessionClaims {
+  iss: string;
+  sid?: string;
+  sub?: string;
+}
+export type OidcLogoutToken = OidcSessionClaims;
+
 export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export type OtherHook = Function;
@@ -71,6 +84,38 @@ export interface Hooks {
 
   /** Demo plugin */
   hello?: () => string;
+
+  /**
+   * OpenID Connect session validity
+   *
+   * `core/auth/openidconnect` knows how to receive a logout token and how to
+   * ask whether the session in front of it is still alive; it knows nothing
+   * about where that answer is kept. A Back-Channel Logout plugin subscribes
+   * to these two and supplies it.
+   *
+   * `oidcsessionvalid` carries the claims and the verdict so far: a
+   * subscriber that has nothing to say passes the pair along unchanged, and
+   * one that knows the session is dead answers `false`. Chained, so a refusal
+   * already given is never turned back into an acceptance.
+   */
+  oidcsessionvalid?: ChainedHook<[OidcSessionClaims, boolean]>;
+
+  /** A logout token arrived and verified; subscribers record what it kills. */
+  oidclogouttoken?: VoidHook<[OidcLogoutToken]>;
+
+  /**
+   * A session was just established; subscribers forget what would kill it.
+   *
+   * A logout token names a `sid`, a `sub`, or both, and a mark on the `sub`
+   * kills every session of that person — including the ones created
+   * afterwards, which is not what logging out means. Clearing it here is what
+   * keeps an old logout from reaching a session younger than itself.
+   *
+   * It has a consequence worth knowing: clearing the `sub` mark also revives
+   * sessions killed by a "log out everywhere" token that carried no `sid`.
+   * The library's own default hook behaves the same way.
+   */
+  oidclogin?: VoidHook<[OidcSessionClaims]>;
 
   /** LdapGroups plugin */
   ldapgroupvalidatemembers?: ChainedHook<[string, string[]]>;
