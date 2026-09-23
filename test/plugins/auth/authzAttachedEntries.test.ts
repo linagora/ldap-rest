@@ -12,9 +12,9 @@
  * being judged on their parent, and stay visible to any administrator: they
  * are the reference data every console reads.
  *
- * The last case is the one this change could plausibly break. Filtering runs
- * after the search cache, so what one caller may not see must never reach the
- * next from the cache. Two administrators listing the same branch in a row is
+ * The case the change could plausibly break is the one about the cache:
+ * filtering runs after it, so what one caller may not see must never reach
+ * the next from there. Two administrators reading the same entry in a row is
  * exactly the shape that would expose it.
  */
 import { expect } from 'chai';
@@ -54,6 +54,7 @@ describe('Authorization by attachment', function () {
   let orgB: string;
   const ADMIN_A = 'attach.admin.a';
   const ADMIN_B = 'attach.admin.b';
+  const ADMIN_C = 'attach.admin.c';
   const IN_A = 'attach.user.a';
   const IN_B = 'attach.user.b';
   const LOOSE = 'attach.user.loose';
@@ -88,6 +89,15 @@ describe('Authorization by attachment', function () {
       users: {
         [ADMIN_A]: { [orgA]: { read: true, write: true, delete: true } },
         [ADMIN_B]: { [orgB]: { read: true, write: true, delete: true } },
+        // A grant written the way a hand-written one often is, with a space
+        // after each comma: the branch is the same one, spelled differently.
+        [ADMIN_C]: {
+          [`ou=AttachOrgA, ${base}`]: {
+            read: true,
+            write: false,
+            delete: false,
+          },
+        },
       },
       groups: {},
     });
@@ -249,6 +259,16 @@ describe('Authorization by attachment', function () {
       .set('Accept', 'application/json');
     const seen = res.body as Record<string, Record<string, unknown>>;
     expect(seen[IN_A]).to.not.have.property('twakeDepartmentLink');
+  });
+
+  it('should match a branch spelled with spaces after its commas', async () => {
+    // The grant above is orgA written `ou=AttachOrgA, <base>`. Compared as
+    // text it is not the `ou=AttachOrgA,<base>` the directory answers with,
+    // so the administrator holding that branch would be shown none of their
+    // accounts — the failure `isDnInBranch` exists to prevent.
+    const seen = await list(ADMIN_C);
+    expect(Object.keys(seen)).to.include(IN_A);
+    expect(Object.keys(seen)).not.to.include(IN_B);
   });
 
   it('should refuse to read one account attached to another branch', async () => {

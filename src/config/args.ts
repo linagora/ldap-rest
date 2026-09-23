@@ -57,7 +57,6 @@ export interface Config {
 
   // LDAP groups plugin
   ldap_group_base?: string;
-
   ldap_groups_main_attribute?: string;
   group_class?: string[];
   group_classes?: string[];
@@ -130,7 +129,6 @@ export interface Config {
   base_url?: string;
 
   // auth/authzPerRoute
-
   authz_per_route?: string[];
 
   // auth/authzPerBranch
@@ -747,7 +745,6 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Auth authzDynamic plugin
-
   ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
   ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],
   [

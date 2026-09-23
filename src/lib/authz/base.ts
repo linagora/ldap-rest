@@ -17,7 +17,7 @@ import type {
   SearchResult,
   AttributeValue,
 } from '../ldapActions';
-import { getParentDn } from '../utils';
+import { getParentDn, isDnInBranch } from '../utils';
 
 /**
  * Abstract base class for authorization plugins
@@ -374,13 +374,13 @@ export default abstract class AuthzBase extends DmPlugin {
       const branches = await this.getAuthorizedBranches(user);
       if (branches.length === 0) return pass;
 
-      const within = (dn: string): boolean => {
-        const target = dn.toLowerCase();
-        return branches.some(b => {
-          const branch = b.toLowerCase();
-          return target === branch || target.endsWith(`,${branch}`);
-        });
-      };
+      // RDN by RDN, as everywhere else a DN is compared to a branch
+      // (`isDnInBranch`): a text suffix ignores the spaces a hand-written
+      // grant may carry after its commas, and reads an escaped separator as
+      // one that was not escaped. Either way the verdict is wrong — the
+      // account of the administrator holding the branch would be hidden.
+      const within = (dn: string): boolean =>
+        branches.some(branch => isDnInBranch(dn, branch));
 
       result.searchEntries = result.searchEntries.filter(entry => {
         const link = entry[linkAttr];
