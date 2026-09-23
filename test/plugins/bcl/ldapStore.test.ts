@@ -107,12 +107,30 @@ describe('Back-Channel Logout, tombstones in LDAP', function () {
     await stale.store.record({ iss: ISS, sid: 'sid-swept' });
     const gone = await stale.store.sweep();
     expect(gone).to.be.greaterThan(0);
-    const res = (await server.ldap.search(
-      { paged: false, scope: 'one', attributes: ['dn'] },
-      branch
-    )) as SearchResult;
-    // What is left is the marks that have not expired.
-    for (const e of res.searchEntries || [])
-      expect(String(e.dn)).to.not.equal('');
+    // The stale one is gone …
+    expect(
+      await stale.store.isRevoked({ iss: ISS, sid: 'sid-swept' })
+    ).to.equal(false);
+    // … and the live ones were not taken with it.
+    expect(await plugin.store.isRevoked({ iss: ISS, sid: 'sid-one' })).to.equal(
+      true
+    );
+  });
+
+  it('should forget what would kill a session just established', async () => {
+    // A logout token names a `sid` and a `sub`. The mark on the `sub` kills
+    // every session of that person, so left in place it kills the ones
+    // created afterwards — for the whole retention, which is a week.
+    await plugin.store.record({ iss: ISS, sid: 'S1', sub: 'bob' });
+    expect(
+      await plugin.store.isRevoked({ iss: ISS, sid: 'S2', sub: 'bob' }),
+      'a new session must be dead before login clears the mark'
+    ).to.equal(true);
+
+    await plugin.store.forget({ iss: ISS, sid: 'S2', sub: 'bob' });
+    expect(
+      await plugin.store.isRevoked({ iss: ISS, sid: 'S2', sub: 'bob' }),
+      'and alive after it'
+    ).to.equal(false);
   });
 });

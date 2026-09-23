@@ -103,6 +103,20 @@ export interface Hooks {
   /** A logout token arrived and verified; subscribers record what it kills. */
   oidclogouttoken?: VoidHook<[OidcLogoutToken]>;
 
+  /**
+   * A session was just established; subscribers forget what would kill it.
+   *
+   * A logout token names a `sid`, a `sub`, or both, and a mark on the `sub`
+   * kills every session of that person — including the ones created
+   * afterwards, which is not what logging out means. Clearing it here is what
+   * keeps an old logout from reaching a session younger than itself.
+   *
+   * It has a consequence worth knowing: clearing the `sub` mark also revives
+   * sessions killed by a "log out everywhere" token that carried no `sid`.
+   * The library's own default hook behaves the same way.
+   */
+  oidclogin?: VoidHook<[OidcSessionClaims]>;
+
   /** LdapGroups plugin */
   ldapgroupvalidatemembers?: ChainedHook<[string, string[]]>;
   ldapgroupadd?: ChainedHook<[string, AttributesList]>;

@@ -32,10 +32,20 @@ import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 class FileBclStore extends BclStore {
   name = 'bcl/file';
   private dir: string;
+  /** How long a temporary file must sit before it counts as abandoned. */
+  private abandonedAfter: number;
 
-  constructor(logger: DM['logger'], dir: string, retention: number) {
+  constructor(
+    logger: DM['logger'],
+    dir: string,
+    retention: number,
+    abandonedAfterSeconds: number
+  ) {
     super(logger, retention);
     this.dir = dir;
+    // A write in flight is a matter of milliseconds; a sweep interval is the
+    // safest yardstick available, and never less than a minute.
+    this.abandonedAfter = Math.max(abandonedAfterSeconds, 60) * 1000;
   }
 
   /** The directory is created on demand, readable by this user alone. */
@@ -55,8 +65,14 @@ class FileBclStore extends BclStore {
   protected async read(key: string): Promise<number | null> {
     try {
       return FileBclStore.decode(await fs.readFile(this.path(key), 'utf8'));
-    } catch {
+    } catch (err) {
       // Absent is the common case and not an error: nobody logged out.
+      // Anything else means the store could not be consulted, which is
+      // enforcement stopping — said out loud rather than read as "alive".
+      if ((err as { code?: string })?.code !== 'ENOENT')
+        this.logger.warn(
+          `${this.name}: cannot read a tombstone, enforcement is blind: ${String(err)}`
+        );
       return null;
     }
   }
@@ -88,10 +104,18 @@ class FileBclStore extends BclStore {
     for (const name of names) {
       const file = join(this.dir, name);
       if (name.endsWith('.tmp')) {
-        // A write interrupted between the temporary file and the rename.
-        // Nothing will ever claim it.
-        await fs.unlink(file).catch(() => undefined);
-        gone++;
+        // A write between its temporary file and its rename, possibly in
+        // another process sharing the directory. Taking it now would make
+        // that rename fail and lose the tombstone it was writing, so only
+        // the ones old enough to be nobody's are swept.
+        const age = await fs
+          .stat(file)
+          .then(st => now - st.mtimeMs)
+          .catch(() => 0);
+        if (age > this.abandonedAfter) {
+          await fs.unlink(file).catch(() => undefined);
+          gone++;
+        }
         continue;
       }
       let deadline: number | null = null;
@@ -127,7 +151,8 @@ export default class BclFile extends DmPlugin {
     this.store = new FileBclStore(
       server.logger,
       dir,
-      (server.config.bcl_retention as number) || 604800
+      (server.config.bcl_retention as number) || 604800,
+      (server.config.bcl_sweep_interval as number) || 600
     );
     this.store.startSweeping((server.config.bcl_sweep_interval as number) || 0);
   }
@@ -135,6 +160,10 @@ export default class BclFile extends DmPlugin {
   hooks = {
     oidclogouttoken: async (token: OidcLogoutToken): Promise<void> => {
       await this.store.record(token);
+    },
+
+    oidclogin: async (claims: OidcSessionClaims): Promise<void> => {
+      await this.store.forget(claims);
     },
 
     oidcsessionvalid: async ([claims, valid]: [

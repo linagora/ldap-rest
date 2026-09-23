@@ -69,6 +69,18 @@ export default abstract class BclStore {
     await Promise.all(keys.map(k => this.write(k, deadline)));
   }
 
+  /**
+   * Forget what would kill a session that has just been established.
+   *
+   * The `sub` mark is the one that matters: it kills every session of that
+   * person, so left in place it would kill the ones created after it, for as
+   * long as it is kept. The `sid` mark of the new session goes too — a
+   * provider reusing a session identifier is unusual but not forbidden.
+   */
+  async forget(claims: OidcSessionClaims): Promise<void> {
+    await Promise.all(BclStore.keys(claims).map(k => this.remove(k)));
+  }
+
   /** Whether a session has been logged out behind its holder's back. */
   async isRevoked(claims: OidcSessionClaims): Promise<boolean> {
     const keys = BclStore.keys(claims);

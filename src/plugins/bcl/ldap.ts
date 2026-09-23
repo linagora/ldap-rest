@@ -64,8 +64,14 @@ class LdapBclStore extends BclStore {
       const entry = res.searchEntries?.[0];
       if (!entry) return null;
       return LdapBclStore.decode(entry.description);
-    } catch {
-      // Absent is the common case and not an error: nobody logged out.
+    } catch (err) {
+      // "No such entry" is the common case and not an error: nobody logged
+      // out. Anything else means the store could not be consulted, which is
+      // enforcement stopping — said out loud rather than read as "alive".
+      if (!/no ?such ?object|0x20/i.test(String(err)))
+        this.logger.warn(
+          `${this.name}: cannot read a tombstone, enforcement is blind: ${String(err)}`
+        );
       return null;
     }
   }
@@ -79,14 +85,18 @@ class LdapBclStore extends BclStore {
         cn: dn.slice(3, dn.indexOf(',')),
         description,
       });
-    } catch {
-      // Already there: a second logout token for the same session, or the
-      // same one delivered twice. The later deadline wins.
-      await this.server.ldap
-        .modify(dn, { replace: { description } })
-        .catch(err => {
-          this.logger.warn(`${this.name}: cannot record ${dn}: ${String(err)}`);
-        });
+    } catch (err) {
+      // Already there is the ordinary case: a second logout token for the
+      // same session, or the same one delivered twice. The later deadline
+      // wins, and a failure to write it is a failure to record — raised, so
+      // the provider is told 400 and retries, rather than told 204 about a
+      // logout nothing kept.
+      const already = /already ?exists/i.test(String(err));
+      if (!already) {
+        this.logger.warn(`${this.name}: cannot record ${dn}: ${String(err)}`);
+        throw err;
+      }
+      await this.server.ldap.modify(dn, { replace: { description } });
     }
   }
 
@@ -143,6 +153,10 @@ export default class BclLdap extends DmPlugin {
   hooks = {
     oidclogouttoken: async (token: OidcLogoutToken): Promise<void> => {
       await this.store.record(token);
+    },
+
+    oidclogin: async (claims: OidcSessionClaims): Promise<void> => {
+      await this.store.forget(claims);
     },
 
     oidcsessionvalid: async ([claims, valid]: [

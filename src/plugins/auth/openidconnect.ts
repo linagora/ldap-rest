@@ -24,7 +24,15 @@ export default class OpenIDConnect extends DmPlugin {
     }
   }
 
-  api(app: Express): void {
+  /**
+   * What is handed to `express-openid-connect`.
+   *
+   * Built apart from `api` so it can be looked at: leaving `onLogin` out of
+   * `backchannelLogout` made the library run its own, which reaches for a
+   * store nothing configured here and threw on every callback — a 500 on
+   * every login, with the session cookie already set.
+   */
+  buildConfig(): ConfigParams {
     const config: ConfigParams = {
       authRequired: true,
       issuerBaseURL: this.config.oidc_server,
@@ -58,6 +66,24 @@ export default class OpenIDConnect extends DmPlugin {
             decoded as OidcLogoutToken
           );
         },
+        // Supplying this is not optional. Left out, the library runs its own,
+        // which reaches for `backchannelLogout.store` or `session.store` and
+        // calls `destroy` on it — both are undefined here, so every callback
+        // threw and every login answered 500, with the session cookie already
+        // set: authenticated, and stuck on an error page.
+        //
+        // What it has to do is forget what would kill the session just
+        // established. A mark on the `sub` kills every session of that
+        // person, so left in place it would kill the ones created after it.
+        onLogin: async (req: DmRequest): Promise<void> => {
+          if (!this.server.hooks.oidclogin) return;
+          const claims = (
+            req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
+          ).oidc?.idTokenClaims;
+          if (!claims) return;
+          await launchHooks(this.server.hooks.oidclogin, claims);
+        },
+
         isLoggedOut: async (req: DmRequest): Promise<boolean> => {
           if (!this.server.hooks.oidcsessionvalid) return false;
           const claims = (
@@ -71,6 +97,11 @@ export default class OpenIDConnect extends DmPlugin {
         },
       },
     };
+    return config;
+  }
+
+  api(app: Express): void {
+    const config = this.buildConfig();
     app.use(async (req, res, next) => {
       try {
         [req, res] = await launchHooksChained(this.server.hooks.beforeAuth, [

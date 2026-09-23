@@ -91,10 +91,36 @@ describe('Back-Channel Logout, tombstones in files', function () {
     ).to.equal(false);
   });
 
+  it('should leave a temporary file a write may still be holding', async () => {
+    const inflight = join(dir, 'inflight.tmp');
+    await fs.writeFile(inflight, '0 busy\n');
+    await store.sweep();
+    expect(await fs.readdir(dir)).to.include('inflight.tmp');
+    await fs.unlink(inflight);
+  });
+
+  it('should forget what would kill a session just established', async () => {
+    await store.record({ iss: ISS, sid: 'S1', sub: 'bob' });
+    expect(
+      await store.isRevoked({ iss: ISS, sid: 'S2', sub: 'bob' }),
+      'a new session must be dead before login clears the mark'
+    ).to.equal(true);
+    await store.forget({ iss: ISS, sid: 'S2', sub: 'bob' });
+    expect(
+      await store.isRevoked({ iss: ISS, sid: 'S2', sub: 'bob' }),
+      'and alive after it'
+    ).to.equal(false);
+  });
+
   it('should reclaim what has expired, and what an interrupted write left', async () => {
     const stale = makeStore(logger, -1);
     await stale.record({ iss: ISS, sid: 'sid-swept' });
-    await fs.writeFile(join(dir, 'abandoned.tmp'), '0 nobody\n');
+    // Old enough to be nobody's: a fresh one may be a write in flight, and
+    // taking it would make its rename fail and lose the tombstone.
+    const abandoned = join(dir, 'abandoned.tmp');
+    await fs.writeFile(abandoned, '0 nobody\n');
+    const past = new Date(Date.now() - 3600_000);
+    await fs.utimes(abandoned, past, past);
     const gone = await stale.sweep();
     expect(gone).to.be.greaterThan(0);
     const left = await fs.readdir(dir);
