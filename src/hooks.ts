@@ -15,6 +15,7 @@ import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;
 export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
+
 export type VoidHook<T extends unknown[]> = (...args: T) => MaybePromise<void>;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export type OtherHook = Function;
@@ -35,6 +36,20 @@ export interface Hooks {
   ldapsearchopts?: ChainedHook<SearchOptions>;
   ldapsearchrequest?: ChainedHook<[string, SearchOptions, Request?]>;
   ldapsearchresult?: ChainedHook<SearchResult>;
+  /**
+   * What a given caller is allowed to see of a search that already ran.
+   *
+   * Distinct from `ldapsearchresult`, and deliberately so: that one fires
+   * before the result is cached and is handed no request, so anything it
+   * removed for one caller would be served from the cache to the next. This
+   * one runs after the cache, on every return path, and carries the request —
+   * so a subscriber may drop entries per caller without the answer outliving
+   * them. On a paginated search it is called once per chunk, and a chunk may
+   * come back with every entry dropped and none left, a page whose entries
+   * all belong elsewhere: the search goes on, so a consumer that reads an
+   * empty chunk as the end of the results would stop early.
+   */
+  ldapsearchfilter?: ChainedHook<[SearchResult, Request?, SearchOptions?]>;
   // add
   ldapaddrequest?: ChainedHook<[string, AttributesList, Request?]>;
   ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
