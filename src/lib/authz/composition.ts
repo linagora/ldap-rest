@@ -304,6 +304,27 @@ export function assertAuthzComposition(server: DM, candidate?: DmPlugin): void {
       );
   }
 
+  // The server-wide option, when no loaded plugin reads it: with only
+  // `authzDynamic` loaded it scopes nothing, and a typo in it — which a
+  // plugin reading it would refuse — reads as a working scope. Said once,
+  // over the whole configuration: a plugin arriving later may read it.
+  const global = candidate ? undefined : authzFor(server.config, '--authz-for');
+  if (
+    global &&
+    !Object.values(server.loadedPlugins).some(
+      plugin =>
+        plugin.roles?.includes('authz') &&
+        !plugin.roles.includes('auth') &&
+        plugin.config.authz_for === server.config.authz_for
+    )
+  )
+    server.logger.warn(
+      `--authz-for names ${global.join(', ')}, and no loaded plugin reads ` +
+        'it: it scopes nothing. authzDynamic judges the requests it ' +
+        'authenticates itself; the option is for authzPerBranch, ' +
+        'authzLinid1 and authzPerRoute'
+    );
+
   const judges = ldapJudges(server);
   for (const judge of judges)
     if (concerns(judge.plugin))

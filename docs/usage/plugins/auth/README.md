@@ -113,7 +113,9 @@ aside — `authzDynamic` letting a request through on
   hook and is never part of it: route plus branch, and route plus token, are
   deliberate ANDs on identities each side can name.
 - An `authz_for` naming no loaded authentication plugin is refused: the
-  plugin would judge nobody, which reads as a working configuration.
+  plugin would judge nobody, which reads as a working configuration. A
+  server-wide `--authz-for` that no loaded plugin reads — only
+  `authzDynamic` there — is said: it scopes nothing.
 - Two plugins whose populations only meet through two authenticators on the
   same path prefix — a request presenting both credentials is judged by
   both — are said, not refused: asking for two credentials is a decision

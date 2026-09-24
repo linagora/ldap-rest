@@ -400,6 +400,32 @@ describe('Authorization plugins loaded together', function () {
         );
     });
 
+    it('should say a server-wide --authz-for that no loaded plugin reads', async () => {
+      // With only authzDynamic loaded the option scopes nothing, and a typo
+      // in it — refused where a plugin reads it — reads as a working scope.
+      process.env.DM_AUTHZ_FOR = 'oidcc';
+      let server: DM;
+      try {
+        server = new DM();
+      } finally {
+        delete process.env.DM_AUTHZ_FOR;
+      }
+      await server.ready;
+      const warned: string[] = [];
+      server.logger.warn = ((message: string) => {
+        warned.push(String(message));
+        return server.logger;
+      }) as unknown as typeof server.logger.warn;
+      await server.registerPlugin('authzDynamic', new AuthzDynamic(server));
+      assertAuthzComposition(server);
+      expect(
+        warned.some(m =>
+          m.startsWith('--authz-for names oidcc, and no loaded plugin reads it')
+        ),
+        warned.join('\n')
+      ).to.equal(true);
+    });
+
     it('should say an authz_for of its own is ignored on a plugin that authenticates', async () => {
       const server = new DM();
       await server.ready;
