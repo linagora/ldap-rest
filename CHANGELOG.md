@@ -95,8 +95,12 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   `Hook ldapadddone failed: TypeError: Cannot read properties of undefined`,
   an `Unhandled promise rejection` for the call sites that `void` the
   promise, and a refused login for an `oidclogin` hook. The logger is
-  resolved when a hook fails now, and the four `lib/ldapActions` call sites
-  that had grown a `.catch` around the accident are back to a plain `void`
+  resolved when a hook fails now, a thrown value that is not an `Error` is
+  reported rather than dropped, and the four `lib/ldapActions` call sites
+  that had grown a `.catch` around the accident are back to a plain `void`.
+  An `oidclogin` subscriber that cannot clear its marks still refuses the
+  login — that one is meant, and said where it happens rather than inherited
+  from the accident
   ([#182](https://github.com/linagora/ldap-rest/issues/182))
 
 ### Security

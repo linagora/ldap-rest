@@ -119,6 +119,70 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
     delete (server.hooks as Record<string, unknown>).oidclogouttoken;
   });
 
+  it('should refuse the login when a subscriber could not clear its marks', async () => {
+    // `bcl` deletes the mark a logout token set on the `sub`, and
+    // `oidcsessionvalid` reads that mark without comparing any timestamp: a
+    // failure swallowed here returns a login that works to a caller whose
+    // next request is already refused. Behind a provider that logs back in
+    // on its own, that is a loop of logins and logouts with a single
+    // `Hook error` line to explain it.
+    const boom = new Error('the store is read-only');
+    (server.hooks as Record<string, unknown>).oidclogin = [
+      (): never => {
+        throw boom;
+      },
+    ];
+    const config = plugin.buildConfig();
+    const onLogin = (
+      config.backchannelLogout as {
+        onLogin: (req: object) => Promise<void>;
+      }
+    ).onLogin;
+
+    let raised: unknown;
+    await onLogin({
+      oidc: { idTokenClaims: { iss: 'https://sso.example.com', sub: 'alice' } },
+    }).catch((e: unknown) => {
+      raised = e;
+    });
+    expect(raised, 'the failure must not be swallowed').to.equal(boom);
+    delete (server.hooks as Record<string, unknown>).oidclogin;
+  });
+
+  it('should give every subscriber the login even when one fails', async () => {
+    // Same reason as for a logout token: stopping at the first failure would
+    // leave the marks of the other plugins in place, so the session just
+    // established would be refused by the store that never got to run.
+    const boom = new Error('the first store is read-only');
+    let secondSaw = false;
+    (server.hooks as Record<string, unknown>).oidclogin = [
+      (): never => {
+        throw boom;
+      },
+      (): void => {
+        secondSaw = true;
+      },
+    ];
+    const config = plugin.buildConfig();
+    const onLogin = (
+      config.backchannelLogout as {
+        onLogin: (req: object) => Promise<void>;
+      }
+    ).onLogin;
+
+    let raised: unknown;
+    await onLogin({
+      oidc: { idTokenClaims: { iss: 'https://sso.example.com', sub: 'alice' } },
+    }).catch((e: unknown) => {
+      raised = e;
+    });
+    expect(secondSaw, 'the healthy store must still clear its marks').to.equal(
+      true
+    );
+    expect(raised, 'and the login must still be refused').to.equal(boom);
+    delete (server.hooks as Record<string, unknown>).oidclogin;
+  });
+
   it('should configure no store, since sessions stay in the cookie', () => {
     const config = plugin.buildConfig();
     const bcl = config.backchannelLogout as Record<string, unknown>;

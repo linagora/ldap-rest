@@ -14,7 +14,7 @@ const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
-import { launchHooks, launchHooksChained } from '../../lib/utils';
+import { launchHooksChained } from '../../lib/utils';
 import { serverError } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
@@ -27,6 +27,45 @@ import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
  * authentication answering `/callback` with a 401 breaks every login.
  */
 const OWN_ROUTES = ['/login', '/logout', '/callback', '/backchannel-logout'];
+
+/**
+ * A hook list as `DM` holds it: whichever plugins registered under that name.
+ *
+ * The `Hooks` interface declares each of these as a single function, and
+ * `registerPlugin` pushes every one of them onto an array — which is the
+ * shape the call sites read.
+ */
+type Subscribers<T> = ((arg: T) => Promise<void> | void)[] | undefined;
+
+/**
+ * Hand a payload to every subscriber, and raise the first failure once they
+ * have all run.
+ *
+ * Not `launchHooks`: its contract is to report and swallow, and both callers
+ * here need the failure to travel — to the library, which answers a logout
+ * token with a 400 and lets the provider retry, or out of the login
+ * callback, which refuses a session whose marks could not be cleared.
+ *
+ * Every subscriber runs even when one fails. Stopping at the first would
+ * cost the others their turn: a session the provider considers closed would
+ * keep working against the store that would have killed it, and a login
+ * would keep the marks of the plugins that never got to run.
+ */
+const walkSubscribers = async <T>(
+  subscribers: Subscribers<T>,
+  payload: T
+): Promise<void> => {
+  let firstError: Error | undefined;
+  for (const subscriber of subscribers ?? []) {
+    if (!subscriber) continue;
+    try {
+      await subscriber(payload);
+    } catch (err) {
+      firstError ??= err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  if (firstError) throw firstError;
+};
 
 export default class OpenIDConnect extends AuthBase {
   name = 'openidconnect';
@@ -89,31 +128,14 @@ export default class OpenIDConnect extends AuthBase {
             );
             return;
           }
-          // Deliberately not `launchHooks`: its contract is to report and
-          // swallow, so a store that could not write would leave the
-          // provider told 204 about a logout nothing kept. Here the failure
-          // has to reach the library, which answers 400 and lets the
-          // provider retry — so the subscribers are walked in this plugin's
-          // own terms.
-          const subscribers = this.server.hooks.oidclogouttoken as unknown as ((
-            token: OidcLogoutToken
-          ) => Promise<void> | void)[];
-          // Every backend gets the token, and the first failure is still
-          // raised. Stopping at it would cost the healthy stores their
-          // record — a session the provider considers closed would keep
-          // working against the one that would have killed it, which is the
-          // fail-open arriving through the store that works.
-          let firstError: Error | undefined;
-          for (const subscriber of subscribers ?? []) {
-            if (!subscriber) continue;
-            try {
-              await subscriber(decoded as OidcLogoutToken);
-            } catch (err) {
-              firstError ??=
-                err instanceof Error ? err : new Error(String(err));
-            }
-          }
-          if (firstError) throw firstError;
+          // The failure has to reach the library, which answers 400 and lets
+          // the provider retry, where `launchHooks` would leave it told 204
+          // about a logout nothing kept.
+          await walkSubscribers(
+            this.server.hooks
+              .oidclogouttoken as unknown as Subscribers<OidcLogoutToken>,
+            decoded as OidcLogoutToken
+          );
         },
         // Supplying this is not optional. Left out, the library runs its own,
         // which reaches for `backchannelLogout.store` or `session.store` and
@@ -130,7 +152,19 @@ export default class OpenIDConnect extends AuthBase {
             req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
           ).oidc?.idTokenClaims;
           if (!claims) return;
-          await launchHooks(this.server.hooks.oidclogin, claims);
+          // Not `launchHooks` either, and not for the provider's benefit:
+          // what these subscribers do is clear what would refuse the session
+          // just established. `bcl` deletes the mark its logout token set on
+          // the `sub`, and a mark left in place kills every session of that
+          // person — `oidcsessionvalid` reads it without comparing any
+          // timestamp. Swallowing the failure would hand the caller a login
+          // that works and a next request already refused, which behind a
+          // provider that logs back in on its own is a loop of the two.
+          await walkSubscribers(
+            this.server.hooks
+              .oidclogin as unknown as Subscribers<OidcSessionClaims>,
+            claims
+          );
         },
 
         isLoggedOut: async (req: DmRequest): Promise<boolean> => {
