@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.9.0 (2026-09-24)
 
 Authorization that says what it judges: rules keyed on a login rather than on
 whatever an authenticator publishes, plugins scoped to the authenticators
