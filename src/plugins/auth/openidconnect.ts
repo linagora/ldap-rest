@@ -160,11 +160,30 @@ export default class OpenIDConnect extends AuthBase {
           // timestamp. Swallowing the failure would hand the caller a login
           // that works and a next request already refused, which behind a
           // provider that logs back in on its own is a loop of the two.
-          await walkSubscribers(
-            this.server.hooks
-              .oidclogin as unknown as Subscribers<OidcSessionClaims>,
-            claims
-          );
+          try {
+            await walkSubscribers(
+              this.server.hooks
+                .oidclogin as unknown as Subscribers<OidcSessionClaims>,
+              claims
+            );
+          } catch (err) {
+            // The session is already in `req.appSession` by the time this
+            // runs — the library's `callback()` fills it before calling the
+            // hook — and its `appSession` middleware writes whatever is
+            // there into the cookie on the way out, the response to a
+            // rethrown error included. A refusal that left it in place would
+            // answer the caller with an error *and* a working session; on
+            // the silent path, which redirects instead of failing, it would
+            // send a live session and no error at all. Emptying it is what
+            // makes the refusal hold on its own, rather than by the mark the
+            // subscriber failed to clear.
+            const session = (
+              req as unknown as { appSession?: Record<string, unknown> }
+            ).appSession;
+            if (session)
+              for (const key of Object.keys(session)) delete session[key];
+            throw err;
+          }
         },
 
         isLoggedOut: async (req: DmRequest): Promise<boolean> => {

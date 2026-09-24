@@ -139,13 +139,45 @@ describe('OpenID Connect, the Back-Channel Logout configuration', function () {
       }
     ).onLogin;
 
+    // The library has already filled `req.appSession` when the hook runs,
+    // and its `appSession` middleware writes whatever is there into the
+    // cookie — the response to this error included.
+    const session: Record<string, unknown> = { sid: 'S1', sub: 'alice' };
     let raised: unknown;
     await onLogin({
       oidc: { idTokenClaims: { iss: 'https://sso.example.com', sub: 'alice' } },
+      appSession: session,
     }).catch((e: unknown) => {
       raised = e;
     });
     expect(raised, 'the failure must not be swallowed').to.equal(boom);
+    expect(
+      Object.keys(session),
+      'and the refusal must leave nothing for the cookie'
+    ).to.deep.equal([]);
+    delete (server.hooks as Record<string, unknown>).oidclogin;
+  });
+
+  it('should leave the session in place when every subscriber succeeds', async () => {
+    (server.hooks as Record<string, unknown>).oidclogin = [
+      (): void => undefined,
+    ];
+    const config = plugin.buildConfig();
+    const onLogin = (
+      config.backchannelLogout as {
+        onLogin: (req: object) => Promise<void>;
+      }
+    ).onLogin;
+
+    const session: Record<string, unknown> = { sid: 'S1', sub: 'alice' };
+    await onLogin({
+      oidc: { idTokenClaims: { iss: 'https://sso.example.com', sub: 'alice' } },
+      appSession: session,
+    });
+    expect(
+      Object.keys(session),
+      'a login that worked keeps its session'
+    ).to.deep.equal(['sid', 'sub']);
     delete (server.hooks as Record<string, unknown>).oidclogin;
   });
 
