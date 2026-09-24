@@ -49,6 +49,9 @@ describe('Authorization scope endpoint', () => {
     await server.ready;
     if (opts.flatSchemas) server.config.ldap_flat_schema = opts.flatSchemas;
     if (opts.scopeSource) server.config.authz_scope_source = opts.scopeSource;
+    // Two branch models judging one caller: refused as it is registered
+    // unless the AND is declared, as it would be at startup.
+    if (opts.perBranch && withAuthz) server.config.authz_combine = true;
     const warned = opts.warned;
     if (warned)
       server.logger.warn = ((message: string) => {
@@ -76,8 +79,9 @@ describe('Authorization scope endpoint', () => {
     if (withAuthz)
       await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
     const scope = new AuthzScope(server);
+    // Checked as it is registered, source included: the server is past its
+    // startup, and a plugin arriving now is judged on arrival.
     await server.registerPlugin('authzScope', scope);
-    scope.assertComposition();
     scope.afterLoad();
     server.setupErrorMiddleware();
     delete process.env.DM_AUTHZ_PER_ROUTES;
@@ -414,5 +418,26 @@ describe('Authorization scope endpoint', () => {
       .get('/api/v1/authz/scope')
       .set('Accept', 'application/json');
     expect(res.status).to.equal(401);
+  });
+
+  it('should refuse an anonymous caller when what authorizes cannot describe a scope', async () => {
+    // Every authorization plugin skips a request without an identity, so
+    // nothing judged them and the answer was `unrestricted: true` with
+    // `create` everywhere — more than an identified caller of the same
+    // server is told (`described: false`, no entity).
+    const request = await serve(undefined, false, { perRoute: true });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(401);
+  });
+
+  it('should call an anonymous caller unrestricted when nothing authorizes', async () => {
+    const request = await serve(undefined, false);
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status).to.equal(200);
+    expect(res.body).to.include({ unrestricted: true, user: null });
   });
 });

@@ -58,7 +58,9 @@ checked before a login rather than staying silent.
 Every plugin that judges LDAP operations — `core/auth/authzPerBranch`,
 `core/auth/authzLinid1`, `core/auth/authzDynamic` — registers the same hooks,
 and all of them run: loaded together, they compose as an **AND**, and the
-first refusal wins. That is sound when it is meant. When it is not, it is a
+first refusal wins. The per-caller read filter (`ldapsearchfilter`) is one of
+those hooks: two plugins there compose as an intersection, which is the same
+AND. That is sound when it is meant. When it is not, it is a
 refusal nobody can explain: `authzPerBranch` beside `authzDynamic` judges a
 machine token by a branch configuration written for administrators, finds
 no entry for the tenant, and refuses a write the token's own ACLs grant.
@@ -85,7 +87,9 @@ through OpenID Connect to the branch configuration: no request is judged by
 both. Unset, `authz_for` means every authenticated request — what every
 plugin did before the option existed. It is read by `authzPerBranch`,
 `authzLinid1` and `authzPerRoute`; `authzDynamic` judges the requests
-carrying its own tokens, and no others, whatever the option says.
+carrying its own tokens, and no others, whatever the option says — an
+`authz_for` of its own there is said at startup rather than ignored in
+silence.
 
 Two cases stay apart:
 
@@ -114,6 +118,13 @@ aside — `authzDynamic` letting a request through on
   same path prefix — a request presenting both credentials is judged by
   both — are said, not refused: asking for two credentials is a decision
   already.
+
+A host that assembles the server itself — `registerPlugin` after `ready`,
+rather than `--plugin` — gets the same checks, as each plugin arrives: the
+refusal comes out of `registerPlugin`, before any of the plugin's routes or
+hooks exist. An arriving plugin is judged against what is already there, so
+the authentication plugins an `authz_for` or `--authz-scope-source` names
+are registered before the plugin naming them.
 
 ### What the log says
 

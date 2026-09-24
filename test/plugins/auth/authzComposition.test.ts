@@ -13,14 +13,20 @@
  * log line naming the plugin that refused.
  */
 import type { Express, Response } from 'express';
+import type winston from 'winston';
 import { expect } from 'chai';
 import supertest from 'supertest';
 
 import DmPlugin, { type Role } from '../../../src/abstract/plugin';
+import type { Hooks } from '../../../src/hooks';
 import { DM, type Config } from '../../../src/bin';
-import type { DmRequest } from '../../../src/lib/auth/base';
+import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import { assertAuthzComposition } from '../../../src/lib/authz/composition';
 import { asyncHandler, launchHooksChained } from '../../../src/lib/utils';
+import {
+  getLogger,
+  setLogger,
+} from '../../../src/lib/expressFormatedResponses';
 import AuthToken from '../../../src/plugins/auth/token';
 import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
@@ -63,6 +69,30 @@ class Writer extends DmPlugin {
       );
   }
 }
+
+/**
+ * An authenticator that exists for `authz_for` to name, on a path nothing
+ * requests: the dispatcher never selects it, so what a test puts in
+ * `req.authenticators` stays what the hooks read.
+ */
+class Idle extends AuthBase {
+  name = 'idle';
+  roles: Role[] = ['auth'] as const;
+  authMethod(_req: DmRequest, _res: Response, next: () => void): void {
+    next();
+  }
+}
+
+const present = async (server: DM, ...names: string[]): Promise<void> => {
+  for (const name of names)
+    await server.registerPlugin(
+      name,
+      new Idle(
+        server.withConfig({ ...server.config, auth_path_prefix: ['/idle'] })
+      ),
+      name
+    );
+};
 
 describe('Authorization plugins loaded together', function () {
   let baseDn: string;
@@ -181,38 +211,39 @@ describe('Authorization plugins loaded together', function () {
       return server.logger;
     }) as unknown as typeof server.logger.info;
 
-    if (opts.token)
-      await server.registerPlugin(
-        'authToken',
-        new AuthToken(
-          opts.token === 'everywhere'
-            ? server
-            : server.withConfig({
-                ...server.config,
-                auth_path_prefix: [opts.token],
-              })
-        )
-      );
-    if (opts.dynamic) {
-      const dynamic = new AuthzDynamic(server);
-      await server.registerPlugin('authzDynamic', dynamic);
-      await dynamic.reload();
-    }
-    if (opts.perBranch)
-      await server.registerPlugin(
-        'authzPerBranch',
-        new AuthzPerBranch(
-          server.withConfig({ ...server.config, ...opts.perBranch })
-        )
-      );
-    await server.registerPlugin('writer', new Writer(server, () => targetDn));
-    server.setupErrorMiddleware();
+    // Past `ready`, so each plugin is judged as it is registered: a refusal
+    // comes out of `registerPlugin`, and the plugin refused is not there.
     let startup: Error | undefined;
     try {
-      assertAuthzComposition(server);
+      if (opts.token)
+        await server.registerPlugin(
+          'authToken',
+          new AuthToken(
+            opts.token === 'everywhere'
+              ? server
+              : server.withConfig({
+                  ...server.config,
+                  auth_path_prefix: [opts.token],
+                })
+          )
+        );
+      if (opts.dynamic) {
+        const dynamic = new AuthzDynamic(server);
+        await server.registerPlugin('authzDynamic', dynamic);
+        await dynamic.reload();
+      }
+      if (opts.perBranch)
+        await server.registerPlugin(
+          'authzPerBranch',
+          new AuthzPerBranch(
+            server.withConfig({ ...server.config, ...opts.perBranch })
+          )
+        );
     } catch (err) {
       startup = err as Error;
     }
+    await server.registerPlugin('writer', new Writer(server, () => targetDn));
+    server.setupErrorMiddleware();
     return { server, request: supertest(server.app), warned, info, startup };
   };
 
@@ -249,6 +280,32 @@ describe('Authorization plugins loaded together', function () {
       ).to.equal(true);
       // The name goes to the log, never to the client.
       expect(JSON.stringify(res.body)).to.not.match(/authzPerBranch/);
+    });
+
+    it('should say a refusal from a hook no plugin registered', async () => {
+      // Pushed straight onto the list, as a suite does through
+      // `registeredHooks`: there is no owner on record, and the refusal
+      // must still reach the log rather than vanish into a bare 403.
+      const warned: string[] = [];
+      const installed = getLogger();
+      setLogger({
+        warn: (message: string) => warned.push(String(message)),
+      } as unknown as winston.Logger);
+      try {
+        await launchHooksChained(
+          [
+            function pushedByHand(): never {
+              throw new Error('[authz-forbidden] not yours');
+            },
+          ],
+          []
+        ).catch(() => undefined);
+      } finally {
+        setLogger(installed);
+      }
+      expect(warned).to.deep.equal([
+        'a hook no plugin registered (pushedByHand) refused: [authz-forbidden] not yours',
+      ]);
     });
 
     it('should refuse a token write on the default branch configuration, with no other plugin at all', async () => {
@@ -288,12 +345,79 @@ describe('Authorization plugins loaded together', function () {
       const server = new DM();
       await server.ready;
       await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
-      await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
-      expect(() => assertAuthzComposition(server)).to.throw(
-        /authzPerBranch and authzLinid1/
-      );
-      server.config.authz_combine = true;
       expect(() => assertAuthzComposition(server)).to.not.throw();
+      let refused: Error | undefined;
+      await server
+        .registerPlugin('authzLinid1', new AuthzLinid1(server))
+        .catch((err: Error) => {
+          refused = err;
+        });
+      expect(refused, 'refused').to.be.instanceOf(Error);
+      expect(refused!.message).to.match(/authzPerBranch and authzLinid1/);
+      server.config.authz_combine = true;
+      expect(
+        await server.registerPlugin('authzLinid1', new AuthzLinid1(server))
+      ).to.equal(true);
+    });
+
+    it('should refuse on a server assembled by hand, and leave nothing of the refused plugin', async () => {
+      // The configuration's plugins are checked once loaded; an embedding
+      // host registers its own after `ready`, and was never checked.
+      const server = new DM();
+      await server.ready;
+      await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
+      const hooksBefore = (server.hooks.ldapmodifyrequest ?? []).length;
+      const linid = new AuthzLinid1(server);
+      await server
+        .registerPlugin('authzLinid1', linid)
+        .then(() => expect.fail('registered'))
+        .catch((err: Error) =>
+          expect(err.message).to.match(/authzPerBranch and authzLinid1/)
+        );
+      expect(server.loadedPlugins).to.not.have.property('authzLinid1');
+      expect((server.hooks.ldapmodifyrequest ?? []).length).to.equal(
+        hooksBefore
+      );
+    });
+
+    it('should refuse two plugins judging reads only through ldapsearchfilter', async () => {
+      // The per-caller read filter composes as an intersection: the same AND.
+      class Filter extends DmPlugin {
+        name = 'filter';
+        roles: Role[] = ['authz'] as const;
+        hooks: Hooks = {
+          ldapsearchfilter: args => args,
+        };
+      }
+      const server = new DM();
+      await server.ready;
+      await server.registerPlugin('filterA', new Filter(server), 'filterA');
+      await server
+        .registerPlugin('filterB', new Filter(server), 'filterB')
+        .then(() => expect.fail('registered'))
+        .catch((err: Error) =>
+          expect(err.message).to.match(/filterA and filterB/)
+        );
+    });
+
+    it('should say an authz_for of its own is ignored on a plugin that authenticates', async () => {
+      const server = new DM();
+      await server.ready;
+      const warned: string[] = [];
+      server.logger.warn = ((message: string) => {
+        warned.push(String(message));
+        return server.logger;
+      }) as unknown as typeof server.logger.warn;
+      await server.registerPlugin(
+        'authzDynamic',
+        new AuthzDynamic(
+          server.withConfig({ ...server.config, authz_for: ['oidcc'] })
+        )
+      );
+      expect(
+        warned.some(m => m.includes('authzDynamic: authz_for is ignored')),
+        warned.join('\n')
+      ).to.equal(true);
     });
 
     it('should accept them once each serves its own authenticators', async () => {
@@ -376,6 +500,7 @@ describe('Authorization plugins loaded together', function () {
     it('should skip another population and judge its own, at the hook', async () => {
       const server = new DM();
       await server.ready;
+      await present(server, 'a', 'b', 'c');
       await server.registerPlugin(
         'authzPerBranch',
         new AuthzPerBranch(
@@ -420,6 +545,7 @@ describe('Authorization plugins loaded together', function () {
         (req as DmRequest).authenticators = vouched;
         next();
       });
+      await present(server, 'a', 'c');
       await server.registerPlugin(
         'authzPerRoute',
         new AuthzPerRoute(
@@ -481,6 +607,32 @@ describe('Authorization plugins loaded together', function () {
         'authOther',
         'authzPerBranch',
       ]);
+    });
+  });
+
+  describe('what authzDynamic says it shares', () => {
+    const sharing = (warned: string[]): boolean =>
+      warned.some(m => m.includes('authenticate the same paths'));
+
+    it('should not say an unscoped authenticator shares paths with a scoped one', async () => {
+      // The dispatcher runs the longest matching prefix: `/api/other` is the
+      // token's alone, and the rest is authzDynamic's alone. The composition
+      // check reads it that way; this line used to say the opposite.
+      const { server, warned } = await build({
+        dynamic: true,
+        token: '/api/other',
+      });
+      server.afterLoad();
+      expect(sharing(warned), warned.join('\n')).to.equal(false);
+    });
+
+    it('should say it when both run on every path', async () => {
+      const { server, warned } = await build({
+        dynamic: true,
+        token: 'everywhere',
+      });
+      server.afterLoad();
+      expect(sharing(warned), warned.join('\n')).to.equal(true);
     });
   });
 

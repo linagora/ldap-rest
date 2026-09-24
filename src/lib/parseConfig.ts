@@ -149,6 +149,22 @@ export class ConfigParser {
           const nextArg = argv[i + 1];
           (tmp as string[]).push(nextArg);
           args.set(arg, tmp);
+          // One value per occurrence, and a second word after it used to be
+          // skipped in silence: `--authz-for oidc authToken` read as
+          // `["oidc"]`, a population smaller than the command line says —
+          // and for an authorization scope, requests of `authToken` nobody
+          // judges. The environment variable and the plural form split on
+          // spaces; the singular does not, so it refuses.
+          const stray = argv[i + 2];
+          if (stray !== undefined && !stray.startsWith('-'))
+            throw new Error(
+              `Error in command line: ${arg} takes one value, got ` +
+                `"${nextArg}" followed by "${stray}". Repeat ${arg} for each ` +
+                'value' +
+                (configEntry[4]
+                  ? `, or give them all to ${configEntry[4]}`
+                  : '')
+            );
         } else {
           const nextArg = argv[i + 1];
           args.set(arg, nextArg);

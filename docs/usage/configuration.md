@@ -29,6 +29,7 @@ All LDAP-Rest configuration options.
   - [Authorization Plugins](#authorization-plugins)
     - [Common to every authorization plugin](#common-to-every-authorization-plugin)
     - [core/auth/authzPerBranch](#coreauthauthzperbranch)
+    - [core/auth/authzScope](#coreauthauthzscope)
     - [core/auth/authzPerRoute](#coreauthauthzperroute)
     - [core/auth/authzLinid1](#coreauthauthzlinid1)
   - [Security Plugins](#security-plugins)
@@ -308,6 +309,12 @@ had before 0.8.3, and it is an open door where `authzLinid1` is loaded: see
 without them, two plugins judging the LDAP operations of the same requests
 are refused at startup — see [several authorization
 plugins](plugins/auth/README.md#several-authorization-plugins).
+
+`--authz-for` takes one name per occurrence: repeat it
+(`--authz-for oidc --authz-for authToken`), or give the environment variable
+a list (`DM_AUTHZ_FOR="oidc authToken"`). A second word after the value —
+`--authz-for oidc authToken` — is refused rather than dropped, as it is after
+every option taking a list.
 
 `--authz-identity` is a different question, and the paragraphs above are not
 about it: `core/auth/authzPerRoute` and the SCIM base map read it as well,

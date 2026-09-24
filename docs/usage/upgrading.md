@@ -34,6 +34,12 @@ now refuses to start, naming both plugins. Two ways out:
 `authzPerRoute` is not concerned: it registers no LDAP hook, and route plus
 branch stays a combination that starts as before.
 
+**Hosts assembling the server themselves** — `registerPlugin` after `ready`
+rather than `--plugin` — get the same refusal, out of the `registerPlugin`
+call that brings the second plugin. A plugin arriving is judged against what
+is already there: register the authentication plugins an `authz_for` names,
+and the plugins `--authz-scope-source` names, before the plugin naming them.
+
 A lone `authzPerBranch` is not refused, but mind its default: unset,
 `--authz-per-branch-config` grants read everywhere and write nowhere to
 **every** authenticated identity, whatever authenticated it. The startup
@@ -47,7 +53,21 @@ several can. And when the only plugins judging the caller cannot describe a
 scope — `authzPerRoute`, `authzDynamic` — it answers `described: false` with
 no entity instead of `unrestricted: true` with `create: true` everywhere. A
 client that enumerates the entities it may create offers nothing there
-rather than everything.
+rather than everything. An anonymous caller is answered `401` as soon as any
+authorization plugin is loaded, where it used to be told `unrestricted`.
+
+### A second word after an option taking a list is refused
+
+**Who is affected:** anyone whose command line puts two values after one
+`--plugin`, `--authz-for`, `--mail-domain` or other list option.
+
+`--authz-for oidc authToken` read as `["oidc"]`: the second word was dropped
+in silence, and for `authz_for` that is a population smaller than the
+command line says — requests of `authToken` that nothing judges. The server
+now refuses to start on it, naming the option. Repeat the option for each
+value (`--authz-for oidc --authz-for authToken`), or use the plural form
+where there is one (`--plugins "a b"`), or the environment variable, which
+splits on spaces and commas.
 
 ### OpenID Connect honours `auth_path_prefix`
 

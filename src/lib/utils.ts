@@ -106,13 +106,15 @@ export const recordHookOwner = (
 };
 
 /**
- * The plugin a hook function belongs to, when it was registered by one.
+ * The plugin a hook function belongs to, and the hook it is registered
+ * under, when `registerPlugin` registered it.
  *
  * @param fn a hook function
- * @returns its plugin's instance name, or undefined
+ * @returns its plugin's instance name and hook name, or undefined
  */
-export const hookOwner = (fn: Function): string | undefined =>
-  hookOwners.get(fn)?.plugin;
+export const hookOwner = (
+  fn: Function
+): { plugin: string; hook: string } | undefined => hookOwners.get(fn);
 
 /**
  * Whether an error is an authorization refusal.
@@ -146,11 +148,19 @@ export const launchHooksChained = async <T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         args = await hook(args);
       } catch (err) {
-        const owner = hookOwners.get(hook);
-        if (owner && isRefusal(err))
+        // A hook pushed onto the list directly — through
+        // `registeredHooks`, or replaced by a wrapper — has no owner on
+        // record. Its refusal is still said, with what can be said of it.
+        if (isRefusal(err)) {
+          const owner = hookOwner(hook);
           getLogger()?.warn(
-            `${owner.plugin} refused ${owner.hook}: ${(err as Error).message}`
+            `${
+              owner
+                ? `${owner.plugin} refused ${owner.hook}`
+                : `a hook no plugin registered (${hook.name || 'anonymous'}) refused`
+            }: ${(err as Error).message}`
           );
+        }
         throw err;
       }
     }

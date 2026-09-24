@@ -282,8 +282,16 @@ export default class AuthzScope extends DmPlugin {
    * @param res Express response
    */
   private async scope(req: DmRequest, res: Response): Promise<void> {
+    // An anonymous caller is refused as soon as anything authorizes: every
+    // plugin skips a request without an identity, so nothing would judge
+    // them here and the answer would be `unrestricted` — the one an
+    // identified caller of the same server does not get. Only a server with
+    // no authorization at all is unrestricted, and it is for anyone.
     const describers = this.describers();
-    if (describers.length > 0 && !req.user)
+    const authorizes = Object.values(this.server.loadedPlugins).some(plugin =>
+      plugin.roles?.includes('authz')
+    );
+    if (authorizes && !req.user)
       throw new UnauthorizedError('No authenticated user');
 
     // Every authorization plugin whose verdict applies to this caller, and

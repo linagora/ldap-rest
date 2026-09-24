@@ -21,13 +21,18 @@ import type { DM } from '../../bin';
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../auth/base';
 
-/** The hooks an operation is authorized in, and refused from. */
-export const LDAP_REQUEST_HOOKS = [
+/**
+ * The hooks an LDAP operation is judged in: refused from, or — for
+ * `ldapsearchfilter` — narrowed to what the caller may see. Two plugins on
+ * the last one compose as an intersection, which is the same AND.
+ */
+export const LDAP_JUDGING_HOOKS = [
   'ldapsearchrequest',
   'ldapaddrequest',
   'ldapmodifyrequest',
   'ldapdeleterequest',
   'ldaprenamerequest',
+  'ldapsearchfilter',
 ] as const;
 
 /** Every authenticated request, whatever authenticated it. */
@@ -43,6 +48,15 @@ interface Authenticator {
 }
 
 /**
+ * `authz_for` as parsed, per configuration object.
+ *
+ * `servesRequest` reads it on every LDAP hook of every judge; parsing once
+ * also means the only call that can throw is the plugin's constructor,
+ * which names the plugin — not a request, naming the option.
+ */
+const parsedAuthzFor = new WeakMap<object, string[] | undefined>();
+
+/**
  * The authentication plugins an authorization plugin judges the requests of.
  *
  * @param config the plugin's configuration
@@ -51,6 +65,13 @@ interface Authenticator {
  * @throws Error when the option is not a list of names
  */
 export function authzFor(config: Config, who: string): string[] | undefined {
+  if (parsedAuthzFor.has(config)) return parsedAuthzFor.get(config);
+  const names = parseAuthzFor(config, who);
+  parsedAuthzFor.set(config, names);
+  return names;
+}
+
+function parseAuthzFor(config: Config, who: string): string[] | undefined {
   const raw = config.authz_for as unknown;
   if (raw === undefined || raw === null || raw === '') return undefined;
   const list = Array.isArray(raw) ? (raw as unknown[]) : [raw];
@@ -97,13 +118,15 @@ export function servesRequest(
  *
  * The dispatcher runs the plugins claiming the longest matching prefix, all
  * of them, so two plugins run together exactly when they claim the same
- * prefix — or when neither claims any, on the paths nobody else does.
+ * prefix — or when neither claims any, on the paths nobody else does. A
+ * prefix nested in another's is not shared: the longer one wins on its
+ * paths, and the shorter one alone runs on the rest.
  *
  * @param a an authenticator
  * @param b another one
  * @returns true when a request can carry both stamps
  */
-function runTogether(a: Authenticator, b: Authenticator): boolean {
+export function runTogether(a: Authenticator, b: Authenticator): boolean {
   if (a.pathPrefixes.length === 0 && b.pathPrefixes.length === 0) return true;
   return a.pathPrefixes.some(prefix => b.pathPrefixes.includes(prefix));
 }
@@ -130,7 +153,7 @@ export function ldapJudges(server: DM): Judge[] {
   const judges: Judge[] = [];
   for (const plugin of Object.values(server.loadedPlugins)) {
     if (!plugin.roles?.includes('authz')) continue;
-    const hooks = LDAP_REQUEST_HOOKS.filter(hook =>
+    const hooks = LDAP_JUDGING_HOOKS.filter(hook =>
       Boolean((plugin.hooks as Record<string, unknown> | undefined)?.[hook])
     );
     if (hooks.length === 0) continue;
@@ -192,10 +215,25 @@ export function describePopulation(
 }
 
 /**
- * Refuse, at startup, the compositions nobody decided, and say the others.
+ * Whether a plugin authenticates, as far as the dispatcher is concerned.
+ *
+ * @param plugin a plugin
+ * @returns true when it claims paths to authenticate
+ */
+function isAuthenticator(plugin: DmPlugin): plugin is DmPlugin & Authenticator {
+  return (
+    Boolean(plugin.roles?.includes('auth')) &&
+    Array.isArray((plugin as Partial<Authenticator>).pathPrefixes)
+  );
+}
+
+/**
+ * Refuse the compositions nobody decided, and say the others.
  *
  * - an `authz_for` naming no loaded authentication plugin is refused: the
  *   plugin would judge nobody, which reads as a working configuration;
+ * - an `authz_for` of its own on a plugin that authenticates is said: it
+ *   judges the requests it vouched for, and the option is inert there;
  * - two plugins judging the LDAP operations of the same authenticator's
  *   requests are refused unless `--authz-combine` makes the AND deliberate;
  * - two judging authenticators that run on the same prefix — a request
@@ -208,16 +246,49 @@ export function describePopulation(
  * of the AND this refuses: route plus branch is a documented combination,
  * and each side judges identities it can name.
  *
- * @param server the server, once every plugin is loaded
+ * Run once every plugin of the configuration is loaded, over all of them;
+ * and for a plugin registered after that — a server assembled by hand —
+ * over what that one plugin adds, before it is registered. What it adds is
+ * judged against what is already there, so an authorization plugin naming
+ * authenticators is registered after them.
+ *
+ * @param server the server
+ * @param candidate a plugin about to be registered, present in
+ *        `server.loadedPlugins`; only what concerns it is checked
  * @throws Error naming the plugins when the composition is ambiguous
  */
-export function assertAuthzComposition(server: DM): void {
-  const authenticators = server.authenticators;
+export function assertAuthzComposition(server: DM, candidate?: DmPlugin): void {
+  const authenticators: Authenticator[] = [...server.authenticators];
+  if (
+    candidate &&
+    isAuthenticator(candidate) &&
+    !authenticators.some(plugin => plugin.name === candidate.name)
+  )
+    authenticators.push(candidate);
   const names = authenticators.map(plugin => plugin.name);
+  const concerns = (plugin: DmPlugin): boolean =>
+    !candidate || plugin === candidate;
+  const plugins = Object.values(server.loadedPlugins).filter(concerns);
 
-  for (const plugin of Object.values(server.loadedPlugins)) {
-    if (!plugin.roles?.includes('authz') || plugin.roles.includes('auth'))
+  for (const plugin of plugins) {
+    if (!plugin.roles?.includes('authz')) continue;
+    if (plugin.roles.includes('auth')) {
+      // Inert by design, and silent is how a typo in it would read as
+      // working. A value inherited from the server-wide option is not this
+      // plugin's: it was written for the others.
+      const own = plugin.config.authz_for as unknown;
+      const shared = server.config.authz_for as unknown;
+      if (
+        own !== undefined &&
+        JSON.stringify(own) !== JSON.stringify(shared) &&
+        JSON.stringify(own) !== '[]'
+      )
+        server.logger.warn(
+          `${plugin.name}: authz_for is ignored here. This plugin judges ` +
+            'the requests it authenticates itself, and no others'
+        );
       continue;
+    }
     const scope = authzFor(plugin.config, plugin.name);
     const unknown = (scope ?? []).filter(name => !names.includes(name));
     if (unknown.length > 0)
@@ -225,16 +296,21 @@ export function assertAuthzComposition(server: DM): void {
         `${plugin.name}: authz_for names ${unknown.join(', ')}, which ` +
           `${unknown.length > 1 ? 'are not loaded authentication plugins' : 'is not a loaded authentication plugin'}` +
           ` (loaded: ${names.join(', ') || 'none'}). It would judge no ` +
-          'request of theirs.'
+          'request of theirs.' +
+          (candidate
+            ? ' Register the authentication plugins before the ' +
+              'authorization plugins that name them.'
+            : '')
       );
   }
 
   const judges = ldapJudges(server);
   for (const judge of judges)
-    server.logger.info(
-      `${judge.plugin.name} judges ${judge.hooks.join(', ')} for ` +
-        describePopulation(judge.population, authenticators)
-    );
+    if (concerns(judge.plugin))
+      server.logger.info(
+        `${judge.plugin.name} judges ${judge.hooks.join(', ')} for ` +
+          describePopulation(judge.population, authenticators)
+      );
 
   const combine = Boolean(server.config.authz_combine);
   const conflicts: string[] = [];
@@ -242,6 +318,7 @@ export function assertAuthzComposition(server: DM): void {
     for (let j = i + 1; j < judges.length; j++) {
       const a = judges[i];
       const b = judges[j];
+      if (!concerns(a.plugin) && !concerns(b.plugin)) continue;
       const shared = overlap(a.population, b.population, authenticators);
       if (!shared) continue;
       const pair = `${a.plugin.name} and ${b.plugin.name}`;
@@ -269,6 +346,5 @@ export function assertAuthzComposition(server: DM): void {
         'by both, or set --authz-combine to make the AND deliberate.'
     );
 
-  for (const plugin of Object.values(server.loadedPlugins))
-    plugin.assertComposition?.();
+  for (const plugin of plugins) plugin.assertComposition?.();
 }

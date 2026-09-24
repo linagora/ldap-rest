@@ -139,9 +139,16 @@ everything, and the answer says so:
 
 ## Errors
 
-| Status | When                                                          |
-| ------ | ------------------------------------------------------------- |
-| `401`  | No authenticated user, or a user the directory cannot resolve |
+| Status | When                                                                                        |
+| ------ | ------------------------------------------------------------------------------------------- |
+| `401`  | No authenticated user while any authorization plugin is loaded, or a user it cannot resolve |
+
+An anonymous caller is refused as soon as anything authorizes: every
+authorization plugin skips a request without an identity, so nothing would
+judge them and the answer would be `unrestricted: true` — more than an
+identified caller of the same server is told. A server loading no
+authorization plugin at all answers `unrestricted` to anyone, anonymous
+included, which is what it does.
 
 ## See also
 

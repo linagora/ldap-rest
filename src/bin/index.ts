@@ -96,6 +96,12 @@ export class DM {
     dispatcherMounted: false,
   };
   private _errorMiddlewareSetup: boolean = false;
+  /**
+   * Whether the plugins of the configuration are loaded and their
+   * composition checked. A plugin registered after that — a server
+   * assembled by hand — is checked on its own as it arrives.
+   */
+  private _composed: boolean = false;
   private _errorMiddleware?: express.ErrorRequestHandler;
 
   constructor() {
@@ -187,12 +193,14 @@ export class DM {
             // judging the same requests is a configuration nobody decided,
             // and the server does not start on it.
             assertAuthzComposition(this);
+            this._composed = true;
             this.afterLoad();
             resolve();
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
         this.setupErrorMiddleware();
+        this._composed = true;
         resolve();
       }
     });
@@ -646,6 +654,28 @@ export class DM {
     });
   }
 
+  /**
+   * Refuse a plugin whose arrival makes the authorization composition
+   * ambiguous, before any of it is registered.
+   *
+   * The configuration's plugins are checked together once loaded; a plugin
+   * registered afterwards — the way an embedding host assembles a server —
+   * would otherwise never be, and two branch models registered by hand would
+   * compose as the AND the startup check exists to refuse. Checked before
+   * its routes and hooks exist, so a refused plugin leaves nothing behind.
+   *
+   * @param obj the plugin about to be registered
+   * @throws Error when the composition would be refused at startup
+   */
+  private admitToComposition(obj: DmPlugin): void {
+    this.loadedPlugins[obj.name] = obj;
+    try {
+      assertAuthzComposition(this, obj);
+    } finally {
+      delete this.loadedPlugins[obj.name];
+    }
+  }
+
   async registerPlugin(
     pluginName: string,
     obj: DmPlugin,
@@ -677,6 +707,7 @@ export class DM {
         }
       }
     }
+    if (this._composed) this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
