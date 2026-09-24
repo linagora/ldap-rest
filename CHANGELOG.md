@@ -86,6 +86,23 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   ([#179](https://github.com/linagora/ldap-rest/issues/179),
   [notes](docs/usage/plugins/ldap/organizations.md#get-organization-subnodes))
 
+- `lib/utils`: `launchHooks` reports a hook that fails and ignores it — the
+  contract the OpenID Connect plugin cites where it declines to use it — but
+  it had captured its logger when the module was evaluated, before the `DM`
+  constructor calls `setLogger`, so the report threw
+  `Cannot read properties of undefined` instead. A failing hook reached its
+  caller as an error about the logging of the error: a log line saying
+  `Hook ldapadddone failed: TypeError: Cannot read properties of undefined`,
+  an `Unhandled promise rejection` for the call sites that `void` the
+  promise, and a refused login for an `oidclogin` hook. The logger is
+  resolved when a hook fails now, a thrown value that is not an `Error` is
+  reported rather than dropped, and the four `lib/ldapActions` call sites
+  that had grown a `.catch` around the accident are back to a plain `void`.
+  An `oidclogin` subscriber that cannot clear its marks still refuses the
+  login, and leaves no session for the cookie to carry — that refusal is
+  meant, and said where it happens rather than inherited from the accident
+  ([#182](https://github.com/linagora/ldap-rest/issues/182))
+
 ### Security
 
 - `core/ldap/organizations`: `/subnodes/search` searched the directory

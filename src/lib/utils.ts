@@ -12,8 +12,6 @@ import type { Config } from '../bin';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
 
-const logger = getLogger();
-
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
 // Using dynamic user-generated patterns would cause unbounded memory growth.
@@ -49,6 +47,25 @@ export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * What to write about a value a hook threw that is not an `Error`.
+ *
+ * The shape the rest of the codebase uses — the store's failed sweeps, for
+ * one — with the guard: `JSON.stringify` refuses a circular value, and
+ * throwing from inside the catch that exists to swallow is how #182's
+ * failure would come back wearing a different message.
+ *
+ * @param e - the value the hook threw
+ * @returns something to print
+ */
+const describeThrown = (e: unknown): string => {
+  try {
+    return JSON.stringify(e) ?? String(e);
+  } catch {
+    return String(e);
+  }
+};
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored.
 //
 // Calling convention: VARIADIC. The trailing args are spread into each hook:
@@ -73,7 +90,24 @@ export const launchHooks = async (
         try {
           await hook(...args);
         } catch (e: unknown) {
-          logger.error('Hook error', e);
+          // Resolved at call time, not captured when this module was
+          // evaluated: `setLogger` runs in the `DM` constructor, and this
+          // module is loaded before it through `ldapActions`, so a captured
+          // logger is `undefined` here — the report would throw
+          // `Cannot read properties of undefined` instead of naming the
+          // hook's error, and the catch would propagate what it exists to
+          // swallow.
+          //
+          // The Error goes as the second argument, which is where winston
+          // keeps its stack; a thrown value of any other kind is dropped
+          // there — measured with the repository's own logger, `throw 'x'`
+          // printed `{"level":"error","message":"Hook error"}` and nothing
+          // else — so it goes into the message instead.
+          if (e instanceof Error) {
+            getLogger()?.error('Hook error', e);
+          } else {
+            getLogger()?.error(`Hook error: ${describeThrown(e)}`);
+          }
         }
       }
     }
