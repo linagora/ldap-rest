@@ -12,8 +12,6 @@ import type { Config } from '../bin';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
 
-const logger = getLogger();
-
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
 // Using dynamic user-generated patterns would cause unbounded memory growth.
@@ -73,7 +71,14 @@ export const launchHooks = async (
         try {
           await hook(...args);
         } catch (e: unknown) {
-          logger.error('Hook error', e);
+          // Resolved at call time, not captured when this module was
+          // evaluated: `setLogger` runs in the `DM` constructor, and this
+          // module is loaded before it through `ldapActions`, so a captured
+          // logger is `undefined` here — the report would throw
+          // `Cannot read properties of undefined` instead of naming the
+          // hook's error, and the catch would propagate what it exists to
+          // swallow.
+          getLogger()?.error('Hook error', e);
         }
       }
     }

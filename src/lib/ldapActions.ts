@@ -837,11 +837,7 @@ class ldapActions {
       // ldapmodify — and re-created through this call, where the cache would
       // otherwise keep answering the entry that used to carry this DN.
       this.invalidateCache(dn);
-      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]).catch(
-        err => {
-          this.logger.error(`Hook ldapadddone failed: ${String(err)}`);
-        }
-      );
+      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
       return true;
     } catch (error) {
       throw ldapAddError(dn, error);
@@ -937,13 +933,7 @@ class ldapActions {
         await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
-        void launchHooks(this.parent.hooks.ldapmodifydone, [
-          dn,
-          changes,
-          op,
-        ]).catch(err => {
-          this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
-        });
+        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
         return true;
       } catch (error) {
         this.logger.warn(
@@ -979,11 +969,7 @@ class ldapActions {
       } else {
         this.logger.debug(`Modify on ${dn} had nothing to apply`);
       }
-      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]).catch(
-        err => {
-          this.logger.error(`Hook ldapmodifydone failed: ${String(err)}`);
-        }
-      );
+      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]);
       return false;
     }
   }
@@ -1014,11 +1000,7 @@ class ldapActions {
       // subtree too: renaming a container moves every DN under it.
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
-      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]).catch(
-        err => {
-          this.logger.error(`Hook ldaprenamedone failed: ${String(err)}`);
-        }
-      );
+      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
       return true;
     } catch (error) {
       throw ldapError(`LDAP rename error`, error);
@@ -1100,9 +1082,7 @@ class ldapActions {
         } catch (error) {
           throw ldapError(`LDAP delete error`, error);
         }
-        void launchHooks(this.parent.hooks.ldapdeletedone, entry).catch(err => {
-          this.logger.error(`Hook ldapdeletedone failed: ${String(err)}`);
-        });
+        void launchHooks(this.parent.hooks.ldapdeletedone, entry);
       }
       return true;
     } finally {
