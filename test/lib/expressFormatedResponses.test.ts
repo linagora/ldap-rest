@@ -14,7 +14,7 @@ import {
  * line, not the response.
  */
 describe('serverError', () => {
-  let installed: winston.Logger;
+  let installed: winston.Logger | undefined;
 
   /** A response that records what was sent. */
   const fakeResponse = (): {
@@ -43,7 +43,7 @@ describe('serverError', () => {
   });
 
   beforeEach(() => {
-    setLogger(undefined as unknown as winston.Logger);
+    setLogger(undefined);
   });
 
   afterEach(() => {

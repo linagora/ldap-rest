@@ -5,13 +5,28 @@
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
-let _logger: winston.Logger;
+/**
+ * The server's logger, once the `DM` constructor has installed it.
+ *
+ * Undefined until then, and said so in the type: this module is loaded
+ * before any `DM` exists, and a caller reading it as always there throws
+ * from inside the error path it was reporting on (#182, #199). The compiler
+ * now holds every reader to a guard.
+ */
+let _logger: winston.Logger | undefined;
 
-export const setLogger = (logger: winston.Logger): void => {
+/**
+ * Install the logger, or remove it: a test restores the state it found,
+ * which before any `DM` is none.
+ *
+ * @param logger the logger, or undefined for none
+ */
+export const setLogger = (logger: winston.Logger | undefined): void => {
   _logger = logger;
 };
 
-export const getLogger = (): winston.Logger => _logger;
+/** @returns the installed logger, or undefined before any `DM` exists */
+export const getLogger = (): winston.Logger | undefined => _logger;
 
 // Utility that generates standard responses depending on the success of the method
 export const tryMethod = async (

@@ -66,6 +66,19 @@ const describeThrown = (e: unknown): string => {
   }
 };
 
+/**
+ * Where a failing hook comes from, for the report.
+ *
+ * @param hook the hook function
+ * @returns ` in <plugin> (<hook>)` when `registerPlugin` recorded it, the
+ *          function's own name otherwise, or nothing for an anonymous one
+ */
+const hookLabel = (hook: Function): string => {
+  const owner = hookOwner(hook);
+  if (owner) return ` in ${owner.plugin} (${owner.hook})`;
+  return hook.name ? ` in ${hook.name}` : '';
+};
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored.
 //
 // Calling convention: VARIADIC. The trailing args are spread into each hook:
@@ -103,10 +116,16 @@ export const launchHooks = async (
           // there — measured with the repository's own logger, `throw 'x'`
           // printed `{"level":"error","message":"Hook error"}` and nothing
           // else — so it goes into the message instead.
+          //
+          // The line names the hook and its plugin when `registerPlugin`
+          // recorded them: the `.catch` blocks #182 removed from
+          // `ldapActions` each named their hook, and a bare `Hook error`
+          // left the reader to guess among every plugin subscribed.
+          const where = hookLabel(hook);
           if (e instanceof Error) {
-            getLogger()?.error('Hook error', e);
+            getLogger()?.error(`Hook error${where}`, e);
           } else {
-            getLogger()?.error(`Hook error: ${describeThrown(e)}`);
+            getLogger()?.error(`Hook error${where}: ${describeThrown(e)}`);
           }
         }
       }

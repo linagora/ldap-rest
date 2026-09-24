@@ -137,8 +137,15 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   so reached before any `setLogger` it threw from inside the error path
   (`Cannot read properties of undefined`), and the 4xx or 5xx it owed was
   never sent. It reads the logger as `_rejectResponse` already did: a missing
-  one costs the log line, not the response
+  one costs the log line, not the response. `getLogger()` now says in its
+  type that there may be none, so the compiler holds every reader to a guard
   ([#199](https://github.com/linagora/ldap-rest/issues/199))
+
+- `lib/utils`: a hook that fails under `launchHooks` is reported with the
+  plugin and hook it belongs to — `Hook error in james (ldapadddone)` —
+  where the line said `Hook error` and nothing else since the call sites'
+  own `.catch` blocks were removed
+  ([#182](https://github.com/linagora/ldap-rest/issues/182))
 
 ### Security
 
