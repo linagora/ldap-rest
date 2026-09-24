@@ -139,7 +139,9 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   never sent. It reads the logger as `_rejectResponse` already did: a missing
   one costs the log line, not the response. `getLogger()` now says in its
   type that there may be none, so the compiler holds every reader to a guard
-  ([#199](https://github.com/linagora/ldap-rest/issues/199))
+  — a plugin calling it without one stops compiling
+  ([#199](https://github.com/linagora/ldap-rest/issues/199),
+  [notes](docs/usage/upgrading.md#getlogger-may-return-undefined-and-its-type-says-so))
 
 - `lib/utils`: a hook that fails under `launchHooks` is reported with the
   plugin and hook it belongs to — `Hook error in james (ldapadddone)` —
