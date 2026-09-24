@@ -15,20 +15,60 @@ whichever authorization plugin is in force.
 --plugin core/auth/authzScope
 ```
 
-It has no options. It answers through whichever loaded plugin carries the
-`authz` role _and_ can say who may do what where — one implementing
-`resolveUser`, `getAuthorizedBranches` and `getUserPermissions`. Both
+It answers through a loaded plugin that carries the `authz` role _and_ can
+say who may do what where — one implementing `resolveUser`,
+`getAuthorizedBranches` and `getUserPermissions`. Both
 [authz-linid1](authz-linid1.md) and [authz-per-branch](authz-per-branch.md)
 do, and this endpoint works with either without knowing which.
 
-The role alone is not enough. [authz-per-route](authz-per-route.md) gates URLs
-and [authz-dynamic](authz-dynamic.md) reads a token: both carry the `authz`
-role and implement none of those three methods, so this endpoint passes them
-over — loading one beside a branch-level plugin changes the answer not at all.
-A server whose only authorization plugin is one of those has nothing to
-describe a scope with, and the answer is the unrestricted one shown below: a
-client built on it shows every button, and a refusal, when it comes, comes from
-the route or the token rather than from the scope.
+| CLI                    | Env                     | Default | Description                                                   |
+| ---------------------- | ----------------------- | ------- | ------------------------------------------------------------- |
+| `--authz-scope-source` | `DM_AUTHZ_SCOPE_SOURCE` |         | The plugin, by instance name, that describes a caller's scope |
+
+### Which plugin answers
+
+The caller is resolved under the name the hooks key on — `req.user`, or
+`req.userName` with `--authz-identity req.userName` — so the scope described
+is the one enforced.
+
+Only a plugin that judges the caller answers for them: one scoped with
+`authz_for` to other authentication plugins is not this caller's model, and
+is passed over (see [several authorization
+plugins](README.md#several-authorization-plugins)).
+
+When more than one judges the caller — two branch-level plugins combined with
+`--authz-combine` — the hooks apply both and this endpoint can describe only
+one. `--authz-scope-source` names it. Without it, the first loaded answers,
+and for plugins outside the priority list that is import order, which nobody
+chose: the server says so at startup, and the answer lists every plugin
+judging the caller under `sources`, the one it comes from under `source`. A
+name that is not a loaded plugin able to describe a scope is refused at
+startup.
+
+### When nothing can describe the scope
+
+[authz-per-route](authz-per-route.md) gates URLs and
+[authz-dynamic](authz-dynamic.md) reads a token: both carry the `authz` role,
+neither resolves a user or a branch. When they judge the caller and no
+branch-level plugin does, no model can say what the caller may do, and the
+answer says that rather than guessing:
+
+```json
+{
+  "user": "alice",
+  "unrestricted": false,
+  "described": false,
+  "source": null,
+  "sources": ["authzPerRoute"],
+  "branches": [],
+  "entities": []
+}
+```
+
+This endpoint used to answer `unrestricted: true` with `create: true` on
+every entity there — an authorization judgement handed to a client that acts
+on it, while the route or the token refused. A client that reads an entity
+missing from `entities` as not creatable offers nothing.
 
 ## Endpoint
 
@@ -40,6 +80,9 @@ GET /api/v1/authz/scope
 {
   "user": "uid=alice,ou=users,dc=example,dc=com",
   "unrestricted": false,
+  "described": true,
+  "source": "authzLinid1",
+  "sources": ["authzLinid1"],
   "branches": [
     {
       "dn": "ou=Sales,ou=organization,dc=example,dc=com",
@@ -77,13 +120,16 @@ is where a new organization goes when the client names no parent. A local admini
 `create: false` for organizations, and creates sub-organizations under their own
 node by naming it as `parentDn`.
 
-With no authorization plugin loaded the server grants everything, and the
-answer says so:
+With no authorization plugin judging the caller the server grants
+everything, and the answer says so:
 
 ```json
 {
   "user": "alice",
   "unrestricted": true,
+  "described": true,
+  "source": null,
+  "sources": [],
   "branches": [],
   "entities": [
     { "name": "users", "base": "ou=users,dc=example,dc=com", "create": true }

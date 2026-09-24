@@ -37,6 +37,9 @@ describe('Authorization scope endpoint', () => {
       perBranch?: string;
       organizations?: boolean;
       flatSchemas?: string[];
+      scopeSource?: string;
+      warned?: string[];
+      userName?: string;
     } = {}
   ): Promise<ReturnType<typeof supertest>> => {
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
@@ -45,8 +48,16 @@ describe('Authorization scope endpoint', () => {
     const server = new DM();
     await server.ready;
     if (opts.flatSchemas) server.config.ldap_flat_schema = opts.flatSchemas;
+    if (opts.scopeSource) server.config.authz_scope_source = opts.scopeSource;
+    const warned = opts.warned;
+    if (warned)
+      server.logger.warn = ((message: string) => {
+        warned.push(String(message));
+        return server.logger;
+      }) as unknown as typeof server.logger.warn;
     server.app.use((req, _res, next) => {
       if (user) (req as DmRequest).user = user;
+      if (opts.userName) (req as DmRequest).userName = opts.userName;
       next();
     });
     await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
@@ -64,7 +75,10 @@ describe('Authorization scope endpoint', () => {
       await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
     if (withAuthz)
       await server.registerPlugin('authzLinid1', new AuthzLinid1(server));
-    await server.registerPlugin('authzScope', new AuthzScope(server));
+    const scope = new AuthzScope(server);
+    await server.registerPlugin('authzScope', scope);
+    scope.assertComposition();
+    scope.afterLoad();
     server.setupErrorMiddleware();
     delete process.env.DM_AUTHZ_PER_ROUTES;
     delete process.env.DM_AUTHZ_PER_BRANCH_CONFIG;
@@ -165,6 +179,103 @@ describe('Authorization scope endpoint', () => {
     expect((res.body.branches as { dn: string }[]).map(b => b.dn)).to.include(
       `ou=Test Org 1,ou=organization,${base}`
     );
+    // Both judge the caller; one of them can describe a scope.
+    expect(res.body.source).to.equal('authzLinid1');
+    expect(res.body.sources).to.deep.equal(['authzPerRoute', 'authzLinid1']);
+  });
+
+  it('should not call a server unrestricted when what restricts it cannot describe a scope', async () => {
+    // `authzPerRoute` alone judges the caller and resolves no branch. The
+    // answer used to be `unrestricted: true` with `create: true` on every
+    // entity — an authorization judgement handed to a client that acts on
+    // it, while the route rules refuse.
+    const request = await serve('alice.admin', false, { perRoute: true });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(res.body).to.include({
+      unrestricted: false,
+      described: false,
+      source: null,
+    });
+    expect(res.body.sources).to.deep.equal(['authzPerRoute']);
+    expect(res.body.entities).to.deep.equal([]);
+    expect(res.body.branches).to.deep.equal([]);
+  });
+
+  describe('with two plugins able to describe a scope', () => {
+    const orgDn = (): string => `ou=Test Org 1,ou=organization,${base}`;
+    const perBranch = (): string =>
+      JSON.stringify({
+        default: { read: false, write: false, delete: false },
+        users: {
+          'alice.admin': {
+            [orgDn()]: { read: true, write: false, delete: false },
+          },
+        },
+      });
+
+    it('should answer with the first loaded, list both, and say so at startup', async () => {
+      const warned: string[] = [];
+      const request = await serve('alice.admin', true, {
+        perBranch: perBranch(),
+        warned,
+      });
+      const res = await request
+        .get('/api/v1/authz/scope')
+        .set('Accept', 'application/json');
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body.source).to.equal('authzPerBranch');
+      expect(res.body.sources).to.deep.equal(['authzPerBranch', 'authzLinid1']);
+      expect(
+        warned.some(
+          m =>
+            m.includes('authzPerBranch and authzLinid1') &&
+            m.includes('--authz-scope-source')
+        ),
+        warned.join('\n')
+      ).to.equal(true);
+    });
+
+    for (const source of ['authzPerBranch', 'authzLinid1']) {
+      it(`should answer with ${source} when --authz-scope-source names it`, async () => {
+        const warned: string[] = [];
+        const request = await serve('alice.admin', true, {
+          perBranch: perBranch(),
+          scopeSource: source,
+          warned,
+        });
+        const res = await request
+          .get('/api/v1/authz/scope')
+          .set('Accept', 'application/json');
+        expect(res.status, JSON.stringify(res.body)).to.equal(200);
+        expect(res.body.source).to.equal(source);
+        // Each model names the caller its own way: a configuration key for
+        // one, a directory entry for the other.
+        expect(res.body.user).to.equal(
+          source === 'authzLinid1'
+            ? `uid=alice.admin,ou=users,${base}`
+            : 'alice.admin'
+        );
+        expect(warned.some(m => m.includes('--authz-scope-source'))).to.equal(
+          false
+        );
+      });
+    }
+
+    it('should refuse to start on a source that is not loaded', async () => {
+      let refused: Error | undefined;
+      try {
+        await serve('alice.admin', true, { scopeSource: 'authzPerBrnach' });
+      } catch (err) {
+        refused = err as Error;
+      }
+      expect(refused, 'refused').to.be.instanceOf(Error);
+      expect(refused!.message).to.match(
+        /--authz-scope-source names authzPerBrnach.*loaded: authzLinid1/
+      );
+    });
   });
 
   it('should not offer create to an administrator who cannot write', async () => {
@@ -274,6 +385,27 @@ describe('Authorization scope endpoint', () => {
       'create',
       true
     );
+  });
+
+  it('should describe the name the hooks key on', async () => {
+    // Under `--authz-identity req.userName` the hooks resolve the login; a
+    // scope resolved from `req.user` — an opaque `sub` here — described
+    // nobody, or somebody else.
+    const previous = process.env.DM_AUTHZ_IDENTITY;
+    process.env.DM_AUTHZ_IDENTITY = 'req.userName';
+    try {
+      const request = await serve('opaque-sub-1234', true, {
+        userName: 'alice.admin',
+      });
+      const res = await request
+        .get('/api/v1/authz/scope')
+        .set('Accept', 'application/json');
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body.user).to.equal(`uid=alice.admin,ou=users,${base}`);
+    } finally {
+      if (previous === undefined) delete process.env.DM_AUTHZ_IDENTITY;
+      else process.env.DM_AUTHZ_IDENTITY = previous;
+    }
   });
 
   it('should refuse an anonymous caller', async () => {

@@ -15,7 +15,13 @@
 import type { Express, Response } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
-import type { DmRequest } from '../../lib/auth/base';
+import { identityFor, type DmRequest } from '../../lib/auth/base';
+import {
+  authzFor,
+  EVERYONE,
+  overlap,
+  servesRequest,
+} from '../../lib/authz/composition';
 import type { BranchPermissions } from '../../config/args';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { asyncHandler } from '../../lib/utils';
@@ -23,8 +29,7 @@ import { UnauthorizedError } from '../../lib/errors';
 import { roleAttribute, type Schema } from '../../config/schema';
 
 /** The part of an authorization plugin this endpoint needs. */
-interface AuthzLike {
-  roles?: Role[];
+interface AuthzLike extends DmPlugin {
   resolveUser(uid: string): Promise<string | null>;
   getAuthorizedBranches(user: string): Promise<string[]>;
   getUserPermissions(user: string, branch: string): Promise<BranchPermissions>;
@@ -68,8 +73,17 @@ export default class AuthzScope extends DmPlugin {
      *   A client uses it to show the scope explicitly and to hide actions that
      *   would be refused.
      *
-     *   With no authorization plugin loaded the server grants everything, and
-     *   the answer says so through `unrestricted: true`.
+     *   With no authorization plugin judging the caller the server grants
+     *   everything, and the answer says so through `unrestricted: true`.
+     *   When plugins judge the caller and none of them can describe a scope
+     *   (`authzPerRoute`, `authzDynamic`), the answer is `described: false`
+     *   with nothing in it: no model can say what will be granted, and a
+     *   client should not offer what it cannot know.
+     *
+     *   `sources` names the authorization plugins judging the caller, and
+     *   `source` the one this scope comes from — the first loaded, or the one
+     *   `--authz-scope-source` names — so a client can tell a scope from one
+     *   model among several from the server's whole answer.
      * tags:
      *   - Authorization
      * responses:
@@ -80,6 +94,9 @@ export default class AuthzScope extends DmPlugin {
      *         example:
      *           user: uid=alice,ou=users,dc=example,dc=com
      *           unrestricted: false
+     *           described: true
+     *           source: authzLinid1
+     *           sources: [authzLinid1]
      *           branches:
      *             - dn: ou=Sales,ou=organization,dc=example,dc=com
      *               read: true
@@ -104,28 +121,100 @@ export default class AuthzScope extends DmPlugin {
   }
 
   /**
-   * The authorization plugin in force, if any.
+   * Whether a plugin can say who may do what where.
    *
-   * @returns the plugin, or undefined when the server is unrestricted
+   * The `authz` role says a plugin restricts something, not that it can
+   * answer that: `authzPerRoute` gates URLs and `authzDynamic` reads a token,
+   * and neither resolves a user or a branch. Both carry the role, and
+   * `authzPerRoute` sits in priority.json, so it is registered before any
+   * branch-level plugin — picking by role alone made this endpoint answer 500
+   * to every caller on any server combining the two. The capability is what
+   * is asked for.
+   *
+   * @param plugin a loaded plugin
+   * @returns true when it resolves users and reads branch permissions
    */
-  private authz(): AuthzLike | undefined {
-    // The `authz` role says a plugin restricts something, not that it can
-    // answer *who may do what where*: `authzPerRoute` gates URLs and
-    // `authzDynamic` reads a token, and neither resolves a user or a branch.
-    // Both carry the role, and `authzPerRoute` sits in priority.json, so it is
-    // registered before any branch-level plugin — picking by role alone made
-    // this endpoint answer 500 to every caller on any server combining the
-    // two. Ask for the capability instead, and fall through to the
-    // unrestricted answer when nothing provides it.
-    return Object.values(this.server.loadedPlugins).find(plugin => {
-      if (!plugin.roles?.includes('authz')) return false;
-      const candidate = plugin as unknown as Partial<AuthzLike>;
-      return (
-        typeof candidate.resolveUser === 'function' &&
-        typeof candidate.getAuthorizedBranches === 'function' &&
-        typeof candidate.getUserPermissions === 'function'
+  private static canDescribe(plugin: DmPlugin): plugin is AuthzLike {
+    if (!plugin.roles?.includes('authz')) return false;
+    const candidate = plugin as unknown as Partial<AuthzLike>;
+    return (
+      typeof candidate.resolveUser === 'function' &&
+      typeof candidate.getAuthorizedBranches === 'function' &&
+      typeof candidate.getUserPermissions === 'function'
+    );
+  }
+
+  /** @returns the loaded plugins able to describe a scope, in load order */
+  private describers(): AuthzLike[] {
+    return Object.values(this.server.loadedPlugins).filter(plugin =>
+      AuthzScope.canDescribe(plugin)
+    );
+  }
+
+  /**
+   * Whether a plugin judges this request.
+   *
+   * One that authenticates too — `authzDynamic` — judges the requests it
+   * vouched for, which carry its token; the others, the requests of the
+   * authenticators `--authz-for` gives them, and only when they carry an
+   * identity: an anonymous request passes every one of them.
+   *
+   * @param plugin an authorization plugin
+   * @param req the request
+   * @returns true when the plugin's verdict applies to it
+   */
+  private static judges(plugin: DmPlugin, req: DmRequest): boolean {
+    if (plugin.roles?.includes('auth'))
+      return Boolean(req.authenticators?.includes(plugin.name));
+    return Boolean(req.user) && servesRequest(req, plugin.config);
+  }
+
+  /**
+   * Refuse a `--authz-scope-source` naming nothing that can describe a scope.
+   *
+   * Read leniently, a typo would fall back to the first plugin loaded, which
+   * is the choice the option exists to take away from load order.
+   */
+  assertComposition(): void {
+    const named = this.config.authz_scope_source;
+    if (!named) return;
+    const describers = this.describers().map(plugin => plugin.name);
+    if (!describers.includes(named))
+      throw new Error(
+        `${this.name}: --authz-scope-source names ${named}, which is not a ` +
+          'loaded plugin able to describe a scope' +
+          (describers.length > 0 ? ` (loaded: ${describers.join(', ')})` : '')
       );
-    }) as AuthzLike | undefined;
+  }
+
+  /**
+   * Say, at startup, when the scope depends on which plugin loaded first.
+   *
+   * Two plugins able to describe a scope, both judging one caller, is two
+   * models of what that caller may do; the hooks apply both, and this
+   * endpoint can only describe one. Without `--authz-scope-source` it is
+   * the first loaded — import-completion order for plugins outside
+   * priority.json, which is not a decision anyone took.
+   */
+  afterLoad(): void {
+    if (this.config.authz_scope_source) return;
+    const describers = this.describers();
+    const authenticators = this.server.authenticators;
+    const population = (plugin: AuthzLike): string[] | typeof EVERYONE =>
+      authzFor(plugin.config, plugin.name) ?? EVERYONE;
+    for (let i = 0; i < describers.length; i++)
+      for (let j = i + 1; j < describers.length; j++) {
+        const a = describers[i];
+        const b = describers[j];
+        if (!overlap(population(a), population(b), authenticators)) continue;
+        this.logger.warn(
+          `${this.name}: ${a.name} and ${b.name} can both describe the scope ` +
+            `of one caller, and ${a.name} answers because it loaded first. ` +
+            'Set --authz-scope-source to choose; the answer lists both under ' +
+            '`sources`'
+        );
+        return;
+      }
   }
 
   /**
@@ -193,24 +282,64 @@ export default class AuthzScope extends DmPlugin {
    * @param res Express response
    */
   private async scope(req: DmRequest, res: Response): Promise<void> {
-    const authz = this.authz();
+    const describers = this.describers();
+    if (describers.length > 0 && !req.user)
+      throw new UnauthorizedError('No authenticated user');
+
+    // Every authorization plugin whose verdict applies to this caller, and
+    // the one describing them: the named source when it judges them, the
+    // first loaded otherwise. A describer that does not judge this caller
+    // (`--authz-for`) is not their model, whatever it would answer.
+    const sources = Object.values(this.server.loadedPlugins).filter(
+      plugin =>
+        plugin.roles?.includes('authz') && AuthzScope.judges(plugin, req)
+    );
+    const judging = describers.filter(plugin => sources.includes(plugin));
+    const named = this.config.authz_scope_source;
+    const authz = judging.find(plugin => plugin.name === named) ?? judging[0];
+    const sourceNames = sources.map(plugin => plugin.name);
+
     if (!authz) {
+      if (sources.length === 0) {
+        res.json({
+          user: req.user ?? null,
+          unrestricted: true,
+          described: true,
+          source: null,
+          sources: [],
+          branches: [],
+          entities: this.entities().map(({ name, base }) => ({
+            name,
+            base,
+            create: true,
+          })),
+        });
+        return;
+      }
+      // Something restricts this caller and nothing can say what. Answering
+      // `unrestricted` with `create: true` everywhere — what this endpoint
+      // did — hands a client an authorization judgement it then acts on,
+      // and the refusal comes from the route or the token instead. Nothing
+      // is offered rather than everything: a client enumerating entities
+      // reads a missing one as not creatable.
       res.json({
         user: req.user ?? null,
-        unrestricted: true,
+        unrestricted: false,
+        described: false,
+        source: null,
+        sources: sourceNames,
         branches: [],
-        entities: this.entities().map(({ name, base }) => ({
-          name,
-          base,
-          create: true,
-        })),
+        entities: [],
       });
       return;
     }
 
-    if (!req.user) throw new UnauthorizedError('No authenticated user');
-    const user = await authz.resolveUser(req.user);
-    if (!user) throw new UnauthorizedError(`Unknown user ${req.user}`);
+    // The name the hooks key on, not `req.user` as such: under
+    // `--authz-identity req.userName` the hooks judge the login, and a scope
+    // read for the other name describes somebody else.
+    const identity = identityFor(req, authz.config).value as string;
+    const user = await authz.resolveUser(identity);
+    if (!user) throw new UnauthorizedError(`Unknown user ${identity}`);
 
     const branchDns = await authz.getAuthorizedBranches(user);
     const branches = [];
@@ -263,6 +392,9 @@ export default class AuthzScope extends DmPlugin {
     res.json({
       user,
       unrestricted: false,
+      described: true,
+      source: authz.name,
+      sources: sourceNames,
       branches,
       entities,
     });
