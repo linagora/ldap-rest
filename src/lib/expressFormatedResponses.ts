@@ -108,7 +108,13 @@ export const tooManyRequests = (
 
 // 50x responses
 
-// We don't want to publish the real error in server responses
+// We don't want to publish the real error in server responses.
+//
+// The logger is read guarded, as `_rejectResponse` reads it: `setLogger`
+// runs in the `DM` constructor, and anything reaching here without one —
+// a library, a test — would otherwise throw `Cannot read properties of
+// undefined` from inside the error path, and the response it owes would
+// never be sent.
 export const serverError = (res: Response, err: unknown): void => {
   const message = err instanceof Error ? err.message : String(err);
   let statusCode =
@@ -130,18 +136,18 @@ export const serverError = (res: Response, err: unknown): void => {
       statusCode === 403 && /\[authz-forbidden\]/.test(message)
         ? 'Token does not have permission on this branch'
         : message;
-    _logger.warn(`Client error ${statusCode}: ${clientMessage}`);
+    _logger?.warn(`Client error ${statusCode}: ${clientMessage}`);
     res.status(statusCode).json({ error: clientMessage });
     return;
   }
 
   // Server error (5xx) - log as error and hide details
   if (err instanceof Error) {
-    _logger.error(err.message, err);
+    _logger?.error(err.message, err);
   } else if (typeof err === 'string') {
-    _logger.error(err);
+    _logger?.error(err);
   } else {
-    _logger.error('Server error', err);
+    _logger?.error('Server error', err);
   }
   res.status(statusCode).json({ error: 'check logs' });
 };

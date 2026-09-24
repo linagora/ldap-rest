@@ -133,6 +133,13 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   meant, and said where it happens rather than inherited from the accident
   ([#182](https://github.com/linagora/ldap-rest/issues/182))
 
+- `lib/expressFormatedResponses`: `serverError` read its logger unguarded,
+  so reached before any `setLogger` it threw from inside the error path
+  (`Cannot read properties of undefined`), and the 4xx or 5xx it owed was
+  never sent. It reads the logger as `_rejectResponse` already did: a missing
+  one costs the log line, not the response
+  ([#199](https://github.com/linagora/ldap-rest/issues/199))
+
 ### Security
 
 - `lib/authz/base`: moving an entry to another organization checks read
