@@ -6,6 +6,69 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Two authorization plugins judging the same requests no longer start
+
+**Who is affected:** anyone loading two of `core/auth/authzPerBranch`,
+`core/auth/authzLinid1` and `core/auth/authzDynamic` together — including
+`authzPerBranch` beside `authzDynamic`, where the branch plugin judged the
+tokens too.
+
+Every plugin judging LDAP operations registers the same hooks, and all of
+them run: the first refusal wins. Loaded together, they composed as an AND
+nobody had decided, and the 403 did not say whose refusal it was. The server
+now refuses to start, naming both plugins. Two ways out:
+
+- **Scope each plugin to its own callers** with `authz_for`, the instance
+  names of the authentication plugins whose requests it judges — so that no
+  request is judged by both:
+
+  ```bash
+  --plugin core/auth/authzDynamic
+  --plugin 'core/auth/openidconnect:oidc:{"auth_path_prefix":"/api/admin"}'
+  --plugin 'core/auth/authzPerBranch:authzPerBranch:{"authz_for":["oidc"]}'
+  ```
+
+- **Keep the AND**, if it was meant, with `--authz-combine`. Behaviour is
+  then what it was, and the startup log says the two compose.
+
+`authzPerRoute` is not concerned: it registers no LDAP hook, and route plus
+branch stays a combination that starts as before.
+
+**Hosts assembling the server themselves** — `registerPlugin` after `ready`
+rather than `--plugin` — get the same refusal, out of the `registerPlugin`
+call that brings the second plugin. A plugin arriving is judged against what
+is already there: register the authentication plugins an `authz_for` names,
+and the plugins `--authz-scope-source` names, before the plugin naming them.
+
+A lone `authzPerBranch` is not refused, but mind its default: unset,
+`--authz-per-branch-config` grants read everywhere and write nowhere to
+**every** authenticated identity, whatever authenticated it. The startup
+line `authzPerBranch judges … for every authenticated request (…)` names the
+authenticators it judges; one it was not written for needs an `authz_for`.
+
+`GET /v1/authz/scope` changes in two ways. It answers with a plugin that
+judges the caller, lists every plugin judging them under `sources`, and says
+which one answered under `source` — `--authz-scope-source` chooses when
+several can. And when the only plugins judging the caller cannot describe a
+scope — `authzPerRoute`, `authzDynamic` — it answers `described: false` with
+no entity instead of `unrestricted: true` with `create: true` everywhere. A
+client that enumerates the entities it may create offers nothing there
+rather than everything. An anonymous caller is answered `401` as soon as any
+authorization plugin is loaded, where it used to be told `unrestricted`.
+
+### A second word after an option taking a list is refused
+
+**Who is affected:** anyone whose command line puts two values after one
+`--plugin`, `--authz-for`, `--mail-domain` or other list option.
+
+`--authz-for oidc authToken` read as `["oidc"]`: the second word was dropped
+in silence, and for `authz_for` that is a population smaller than the
+command line says — requests of `authToken` that nothing judges. The server
+now refuses to start on it, naming the option. Repeat the option for each
+value (`--authz-for oidc --authz-for authToken`), or use the plural form
+where there is one (`--plugins "a b"`), or the environment variable, which
+splits on spaces and commas.
+
 ### OpenID Connect honours `auth_path_prefix`
 
 **Who is affected:** anyone running `core/auth/openidconnect`, and in

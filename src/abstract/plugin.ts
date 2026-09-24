@@ -91,6 +91,16 @@ export default abstract class DmPlugin {
    */
   afterLoad?(): void;
 
+  /**
+   * Called once every plugin is loaded, before `afterLoad`: refuse a
+   * configuration this plugin cannot serve.
+   *
+   * `afterLoad` is an opinion, logged and served anyway. Throwing here stops
+   * the server from starting — for a setting that would otherwise make the
+   * plugin answer on behalf of something that is not there.
+   */
+  assertComposition?(): void;
+
   /* Uniq name of this plugin */
   abstract name: string;
 

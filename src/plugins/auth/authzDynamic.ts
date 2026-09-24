@@ -31,10 +31,8 @@ import type { SearchOptions } from 'ldapts';
 
 import { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
-import AuthBase, {
-  type DmRequest,
-  prefixCoversPath,
-} from '../../lib/auth/base';
+import AuthBase, { type DmRequest } from '../../lib/auth/base';
+import { runTogether } from '../../lib/authz/composition';
 import { ForbiddenError } from '../../lib/errors';
 import type {
   AttributesList,
@@ -396,19 +394,19 @@ export default class AuthzDynamic extends AuthBase {
 
   afterLoad(): void {
     super.afterLoad();
-    const mine = this.pathPrefixes;
-    const covers = (a: string[], b: string[]): boolean =>
-      a.length === 0 ||
-      b.length === 0 ||
-      a.some(x =>
-        b.some(y => x === y || prefixCoversPath(x, y) || prefixCoversPath(y, x))
-      );
+    // The dispatcher's rule, not a looser one: it runs the plugins claiming
+    // the longest matching prefix, so an unscoped plugin and a scoped one
+    // never see the same request, nor do `/api` and `/api/admin`. Reading
+    // either as sharing said here what the composition check contradicts.
     const sharing = Object.values(this.server.loadedPlugins)
       .filter(
         plugin =>
           plugin !== this &&
           plugin.roles?.includes('auth') &&
-          covers(mine, (plugin as AuthBase).pathPrefixes || [])
+          runTogether(this, {
+            name: plugin.name,
+            pathPrefixes: (plugin as AuthBase).pathPrefixes || [],
+          })
       )
       .map(plugin => plugin.name);
     if (sharing.length === 0) return;
@@ -494,7 +492,7 @@ export default class AuthzDynamic extends AuthBase {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
       );
-      next();
+      this.passThrough(req, next);
       return;
     }
     if (
@@ -508,7 +506,7 @@ export default class AuthzDynamic extends AuthBase {
       const pending = req as PendingRequest;
       pending.authzDynamicPending = true;
       pending.authzDynamicPendingReason = warning;
-      next();
+      this.passThrough(req, next);
       return;
     }
     this.logger.warn(warning);
@@ -524,7 +522,7 @@ export default class AuthzDynamic extends AuthBase {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
       );
-      next();
+      this.passThrough(req, next);
       return;
     }
     void this.ensureFresh()

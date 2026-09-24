@@ -278,6 +278,41 @@ describe('AuthzPerBranch', function () {
       }
     });
 
+    it('should refuse to move an entry out of an organization the caller cannot read', async function () {
+      // The source check used to throw inside the `try` whose `catch` was
+      // meant for a failed search, so its own refusal was caught and the
+      // parent branch — readable here — judged instead: the entry moved.
+      this.timeout(5000);
+      const previousLink = server.config.ldap_organization_link_attribute;
+      const linkAttr = previousLink || 'twakeDepartmentLink';
+      server.config.ldap_organization_link_attribute = linkAttr;
+      const entryDn = `uid=moved,${getUserBranch()}`;
+      const secretOrg = `ou=secret,${process.env.DM_LDAP_BASE}`;
+      const search = server.ldap.search;
+      server.ldap.search = (async (_opts: unknown, base: string) =>
+        base === entryDn
+          ? { searchEntries: [{ dn: entryDn, [linkAttr]: secretOrg }] }
+          : { searchEntries: [] }) as unknown as typeof search;
+      try {
+        let refused: Error | undefined;
+        await plugin.hooks!.ldapmodifyrequest!([
+          entryDn,
+          { replace: { [linkAttr]: getUserBranch() } },
+          0,
+          { user: 'testuser1' } as DmRequest,
+        ]).catch((err: Error) => {
+          refused = err;
+        });
+        expect(refused, 'refused').to.be.instanceOf(Error);
+        expect(refused!.message).to.include(
+          `read permission for source branch ${secretOrg}`
+        );
+      } finally {
+        server.ldap.search = search;
+        server.config.ldap_organization_link_attribute = previousLink;
+      }
+    });
+
     it('should pass through when no user in request', async function () {
       this.timeout(5000);
       const mockReq = {} as any;

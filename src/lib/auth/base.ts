@@ -16,7 +16,21 @@ import { launchHooksChained } from '../../lib/utils';
  * plugins read, and the default stays `user`, which changes nothing for an
  * existing deployment.
  */
-export type DmRequest = Request & { user?: string; userName?: string };
+export type DmRequest = Request & {
+  user?: string;
+  userName?: string;
+  /**
+   * The authentication plugins that vouched for this request, by instance
+   * name, in the order the dispatcher ran them.
+   *
+   * Written by the dispatcher alone, once a plugin has let the request
+   * through, so an authorization plugin can tell *whose* request it is
+   * looking at: a machine token and an administrator's session carry
+   * identities from different models, and a rule written for one of them
+   * is not a judgement about the other (`--authz-for`).
+   */
+  authenticators?: string[];
+};
 
 /**
  * Drop the trailing slashes of a path prefix.
@@ -347,6 +361,37 @@ export default abstract class AuthBase extends DmPlugin {
    */
   afterLoad(): void {
     this.logger.info(`${this.name}: ${this.identitySource()}`);
+  }
+
+  /** Requests this plugin let through without authenticating them. */
+  private readonly passedThrough = new WeakSet<object>();
+
+  /**
+   * Let a request through without vouching for it.
+   *
+   * The dispatcher records every plugin that calls `next()` as having
+   * authenticated the request, and an authorization plugin scoped with
+   * `--authz-for` judges by that record. A plugin that steps aside — a
+   * bypass naming what *another* plugin authenticated, a verdict deferred to
+   * the end of the chain — has not, and must not appear there: a plugin
+   * scoped to it would judge requests whose identity it never produced.
+   *
+   * @param req the request passed on
+   * @param next continuation
+   */
+  protected passThrough(req: Request, next: () => void): void {
+    this.passedThrough.add(req);
+    next();
+  }
+
+  /**
+   * Whether this plugin authenticated the request it just let through.
+   *
+   * @param req a request this plugin called `next()` for
+   * @returns false when it only stepped aside
+   */
+  vouchedFor(req: Request): boolean {
+    return !this.passedThrough.has(req);
   }
 
   /**

@@ -21,6 +21,8 @@ import type {
 import { ForbiddenError } from '../errors';
 import { getParentDn, isDnInBranch } from '../utils';
 
+import { authzFor, servesRequest } from './composition';
+
 /**
  * Abstract base class for authorization plugins
  * Provides common utility methods and interface for LDAP-based authorization
@@ -53,6 +55,9 @@ export default abstract class AuthzBase extends DmPlugin {
     // silence — 403s for everyone, with nothing saying the value was not
     // understood.
     assertIdentityMode(this.config, this.constructor.name);
+    // Its shape here, its names once the authenticators are loaded
+    // (`assertAuthzComposition`).
+    authzFor(this.config, this.constructor.name);
     const policy = (this.config.authz_unresolved_user as string) ?? 'deny';
     if (
       !(AuthzBase.UNRESOLVED_POLICIES as readonly string[]).includes(policy)
@@ -166,11 +171,19 @@ export default abstract class AuthzBase extends DmPlugin {
   abstract getAuthorizedBranches(user: string): Promise<string[]>;
 
   /**
-   * Check if authorization should be skipped for this request
-   * Can be overridden by subclasses for custom logic
+   * Whether this request is none of this plugin's business.
+   *
+   * Two cases, and only two: a request with no identity (anonymous, skipped
+   * by design), and one that authentication plugins outside `--authz-for`
+   * vouched for — another population, judged by another model. An identity
+   * of *this* population that does not resolve is not skipped here: that is
+   * a configuration error, and `resolveCaller` refuses it. Inferring "not
+   * mine" from "cannot place it" is exactly the confusion this keeps apart.
+   *
+   * Subclasses overriding it must call this one.
    */
   protected shouldSkipAuthorization(req?: DmRequest): boolean {
-    return !req?.user;
+    return !req?.user || !servesRequest(req, this.config);
   }
 
   /** What `resolveUser` answered for an identity, and when. */
@@ -332,43 +345,37 @@ export default abstract class AuthzBase extends DmPlugin {
         // 1. Read permission on the source (current location)
         // 2. Write permission on the destination (new location)
 
-        // First, check read permission on source
-        // Get the current entry to find its current organization link
+        // First, check read permission on source: the organization the
+        // entry is linked to, or its parent branch when that cannot be read.
+        //
+        // Only the search is inside the `try`. The refusal used to be too, so
+        // its own `catch` — meant for a search that failed — swallowed it and
+        // judged the parent branch instead: a caller who could read the
+        // entry's parent but not the organization it was linked to could
+        // move it out, and nothing was logged.
+        let sourceBranch = this.extractBranchDn(dn);
         try {
           const currentEntry = (await this.server.ldap.search(
             { paged: false, scope: 'base', attributes: [linkAttr] },
             dn
           )) as SearchResult;
-
-          if (currentEntry.searchEntries.length > 0) {
-            const currentLink = currentEntry.searchEntries[0][linkAttr];
-            const sourceBranch = Array.isArray(currentLink)
-              ? String(currentLink[0])
-              : String(currentLink);
-
-            const sourcePermissions = await this.getUserPermissions(
-              user,
-              sourceBranch
-            );
-            if (!sourcePermissions.read) {
-              throw new Error(
-                `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
-              );
-            }
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (err) {
-          // If we can't read the current entry, check permissions on the entry's parent branch
-          const sourceBranch = this.extractBranchDn(dn);
-          const sourcePermissions = await this.getUserPermissions(
-            user,
-            sourceBranch
+          const currentLink = currentEntry.searchEntries[0]?.[linkAttr];
+          const linked = Array.isArray(currentLink)
+            ? currentLink[0]
+            : currentLink;
+          if (linked !== undefined && linked !== null && String(linked) !== '')
+            sourceBranch = String(linked);
+        } catch {
+          // The entry could not be read: its parent branch stands in.
+        }
+        const sourcePermissions = await this.getUserPermissions(
+          user,
+          sourceBranch
+        );
+        if (!sourcePermissions.read) {
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
           );
-          if (!sourcePermissions.read) {
-            throw new Error(
-              `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
-            );
-          }
         }
 
         // Then check write permission on destination

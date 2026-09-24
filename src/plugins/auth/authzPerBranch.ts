@@ -66,7 +66,7 @@ export default class AuthzPerBranch extends AuthzBase {
    * Override to add authConfig check
    */
   protected shouldSkipAuthorization(req?: DmRequest): boolean {
-    return !req?.user || !this.authConfig;
+    return super.shouldSkipAuthorization(req) || !this.authConfig;
   }
 
   // Note: hooks are inherited from AuthzBase

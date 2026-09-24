@@ -408,6 +408,14 @@ Cache hit/miss logging:
 - **Open by default**: Set `read: true` for general access
 - Choose based on your security posture
 
+`--authz-per-branch-config` is never empty: unset, it is
+`{"default":{"read":true,"write":false,"delete":false}}`, and it applies to
+**every** authenticated identity, whatever authenticated it. Loaded beside a
+token plugin, `authzDynamic` or an identity provider whose callers no rule
+names, this plugin lets them read and refuses every write. Give it an
+`authz_for` naming the authentication plugins it was written for — see
+[several authorization plugins](README.md#several-authorization-plugins).
+
 ### Group-Based Security
 
 - Group DNs must be fully qualified

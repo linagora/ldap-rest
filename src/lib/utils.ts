@@ -114,8 +114,59 @@ export const launchHooks = async (
   }
 };
 
+/**
+ * Which plugin registered a hook function, and under which hook name.
+ *
+ * Beside the hook arrays rather than inside them: `launchHooks`,
+ * `launchHooksChained` and `AuthBase.authenticate` all take those arrays as
+ * plain lists of functions, and a registry keyed on the function leaves them
+ * as they are.
+ */
+const hookOwners = new WeakMap<Function, { plugin: string; hook: string }>();
+
+/**
+ * Record the plugin a hook function belongs to.
+ *
+ * @param fn the registered function
+ * @param plugin the plugin's instance name
+ * @param hook the hook it is registered under
+ */
+export const recordHookOwner = (
+  fn: Function,
+  plugin: string,
+  hook: string
+): void => {
+  hookOwners.set(fn, { plugin, hook });
+};
+
+/**
+ * The plugin a hook function belongs to, and the hook it is registered
+ * under, when `registerPlugin` registered it.
+ *
+ * @param fn a hook function
+ * @returns its plugin's instance name and hook name, or undefined
+ */
+export const hookOwner = (
+  fn: Function
+): { plugin: string; hook: string } | undefined => hookOwners.get(fn);
+
+/**
+ * Whether an error is an authorization refusal.
+ *
+ * The marker as well as the status: plugins wrap a hook's error into a plain
+ * `Error` on the way up, which keeps the message and drops the status.
+ */
+const isRefusal = (err: unknown): boolean =>
+  (err as { statusCode?: number })?.statusCode === 403 ||
+  /\[authz-forbidden\]/.test(String((err as Error)?.message ?? ''));
+
 // launchHooksChained threads a single value through each hook, collecting the
 // returned (possibly modified) value. Any error stops the chain.
+//
+// A refusal is logged with the plugin that made it. Every authorization
+// plugin registers the same LDAP hooks and the first refusal wins, so the
+// 403 alone does not say which of them decided — and it must not: the body
+// stays what the error middleware makes of it, and the name goes to the log.
 //
 // Calling convention: SINGLE PACKED ARG. If a chained hook needs several
 // inputs, pack them in a tuple — that is what `ChainedHook<[A, B]>` declares.
@@ -126,8 +177,26 @@ export const launchHooksChained = async <T>(
 ): Promise<T> => {
   if (hooks) {
     for (const hook of hooks) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      if (hook) args = await hook(args);
+      if (!hook) continue;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        args = await hook(args);
+      } catch (err) {
+        // A hook pushed onto the list directly — through
+        // `registeredHooks`, or replaced by a wrapper — has no owner on
+        // record. Its refusal is still said, with what can be said of it.
+        if (isRefusal(err)) {
+          const owner = hookOwner(hook);
+          getLogger()?.warn(
+            `${
+              owner
+                ? `${owner.plugin} refused ${owner.hook}`
+                : `a hook no plugin registered (${hook.name || 'anonymous'}) refused`
+            }: ${(err as Error).message}`
+          );
+        }
+        throw err;
+      }
     }
   }
   return args;

@@ -91,6 +91,35 @@ describe('ConfigParser', () => {
     expect(result.plugin).to.deep.equal(['a', 'b', 'x', 'y']);
   });
 
+  it('should refuse a second value after an array option', () => {
+    // `--authz-for oidc authToken` used to read as `["oidc"]`: a scope
+    // smaller than the command line, and requests nobody judges.
+    const parser = new ConfigParser(configArgs);
+    expect(() =>
+      parser.parse(['node', 'script.js', '--authz-for', 'oidc', 'authToken'])
+    ).to.throw(
+      /--authz-for takes one value, got "oidc" followed by "authToken"/
+    );
+    expect(() =>
+      parser.parse(['node', 'script.js', '--plugin', 'a', 'b'])
+    ).to.throw(/or give them all to --plugins/);
+  });
+
+  it('should read an array option repeated, or followed by another option', () => {
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse([
+      'node',
+      'script.js',
+      '--authz-for',
+      'oidc',
+      '--authz-for',
+      'authToken',
+      '--authz-combine',
+    ]);
+    expect(result.authz_for).to.deep.equal(['oidc', 'authToken']);
+    expect(result.authz_combine).to.equal(true);
+  });
+
   it('should parse command line argument with plural suffix for arrays', () => {
     const argv = ['node', 'script.js', '--plugins', 'm, n  o'];
     const parser = new ConfigParser(configArgs);

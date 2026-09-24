@@ -29,7 +29,9 @@ import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
-import AuthBase, { prefixCoversPath } from '../lib/auth/base';
+import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
+import { assertAuthzComposition } from '../lib/authz/composition';
+import { recordHookOwner } from '../lib/utils';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -94,6 +96,12 @@ export class DM {
     dispatcherMounted: false,
   };
   private _errorMiddlewareSetup: boolean = false;
+  /**
+   * Whether the plugins of the configuration are loaded and their
+   * composition checked. A plugin registered after that — a server
+   * assembled by hand — is checked on its own as it arrives.
+   */
+  private _composed: boolean = false;
   private _errorMiddleware?: express.ErrorRequestHandler;
 
   constructor() {
@@ -180,12 +188,19 @@ export class DM {
           .then(() => {
             this.setupErrorMiddleware();
             this.warnUnauthenticatedRoutes();
+            // Before `afterLoad`, and outside it: a plugin's opinion there is
+            // logged and served anyway, while two authorization models
+            // judging the same requests is a configuration nobody decided,
+            // and the server does not start on it.
+            assertAuthzComposition(this);
+            this._composed = true;
             this.afterLoad();
             resolve();
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
         this.setupErrorMiddleware();
+        this._composed = true;
         resolve();
       }
     });
@@ -321,10 +336,22 @@ export class DM {
       if (!plugin.afterChain) return finish(index + 1);
       plugin.afterChain(req, res, () => finish(index + 1));
     };
-    // Every selected plugin must let the request through
+    // Every selected plugin must let the request through, and the ones that
+    // vouched for it are recorded as they do: an authorization plugin scoped
+    // with `--authz-for` reads that list to tell whose request it is. The
+    // continuation only runs on success, so recording there costs nothing and
+    // cannot record a plugin that refused. The list is set here rather than
+    // grown from whatever the request carried in: only this dispatcher writes
+    // it.
+    const vouched: string[] = [];
+    (req as DmRequest).authenticators = vouched;
     const run = (index: number): void => {
       if (index >= selected.length) return finish(0);
-      void selected[index].authenticate(req, res, () => run(index + 1));
+      const plugin = selected[index];
+      void plugin.authenticate(req, res, () => {
+        if (plugin.vouchedFor(req)) vouched.push(plugin.name);
+        run(index + 1);
+      });
     };
     run(0);
   }
@@ -627,6 +654,28 @@ export class DM {
     });
   }
 
+  /**
+   * Refuse a plugin whose arrival makes the authorization composition
+   * ambiguous, before any of it is registered.
+   *
+   * The configuration's plugins are checked together once loaded; a plugin
+   * registered afterwards — the way an embedding host assembles a server —
+   * would otherwise never be, and two branch models registered by hand would
+   * compose as the AND the startup check exists to refuse. Checked before
+   * its routes and hooks exist, so a refused plugin leaves nothing behind.
+   *
+   * @param obj the plugin about to be registered
+   * @throws Error when the composition would be refused at startup
+   */
+  private admitToComposition(obj: DmPlugin): void {
+    this.loadedPlugins[obj.name] = obj;
+    try {
+      assertAuthzComposition(this, obj);
+    } finally {
+      delete this.loadedPlugins[obj.name];
+    }
+  }
+
   async registerPlugin(
     pluginName: string,
     obj: DmPlugin,
@@ -658,6 +707,7 @@ export class DM {
         }
       }
     }
+    if (this._composed) this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);
@@ -680,6 +730,7 @@ export class DM {
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore: object is defined
           this.hooks[hookName as keyof Hooks].push(hook);
+          recordHookOwner(hook, obj.name, hookName);
         } else {
           throw new Error(`Plugin ${obj.name}: hook ${hookName} is invalid`);
         }

@@ -61,7 +61,37 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   ([#187](https://github.com/linagora/ldap-rest/issues/187),
   [notes](docs/usage/plugins/auth/README.md#what-a-rule-is-keyed-on))
 
+- `authz_for` scopes an authorization plugin to the authentication plugins
+  whose requests it judges — the dispatcher now records who vouched for a
+  request in `req.authenticators` — so a branch model written for
+  administrators and a token's own ACLs can serve one server without judging
+  each other's callers. `--authz-scope-source` names the plugin
+  `authzScope` describes a caller with, and its answer lists every plugin
+  judging them under `sources`
+  ([#189](https://github.com/linagora/ldap-rest/issues/189),
+  [notes](docs/usage/plugins/auth/README.md#several-authorization-plugins))
+
 ### Bug Fixes
+
+- Two authorization plugins loaded together composed as an AND that nobody
+  had decided: every plugin judging LDAP operations registers the same hooks
+  and the first refusal wins, so `authzPerBranch` beside `authzDynamic`
+  refused a token's write by a branch configuration that never named the
+  tenant, and nothing said which plugin refused. The server refuses to start
+  on two plugins judging the same requests unless `--authz-combine` says so,
+  logs what each plugin judges at startup, and names the refusing plugin in
+  the log when a hook refuses. The same checks run as each plugin is
+  registered on a server assembled by hand, and cover the per-caller read
+  filter. `authzScope` no longer answers `unrestricted: true` when what
+  restricts the caller cannot describe a scope, nor to an anonymous caller
+  once anything authorizes, and resolves the name `--authz-identity`
+  selects, as the hooks do, rather than `req.user`
+  ([#189](https://github.com/linagora/ldap-rest/issues/189),
+  [notes](docs/usage/upgrading.md#two-authorization-plugins-judging-the-same-requests-no-longer-start))
+
+- `lib/parseConfig`: a second word after an option taking a list —
+  `--authz-for oidc authToken` — was dropped in silence, and is refused now
+  ([notes](docs/usage/upgrading.md#a-second-word-after-an-option-taking-a-list-is-refused))
 
 - `lib/auth/base`: the `afterAuth` hooks ran only when the authenticating
   plugin declared an `onAuth` hook of its own, which no plugin does — so a
@@ -104,6 +134,15 @@ undefined`, which every authorization plugin reads as anonymous and skips,
   ([#182](https://github.com/linagora/ldap-rest/issues/182))
 
 ### Security
+
+- `lib/authz/base`: moving an entry to another organization checks read
+  permission on the organization it leaves, and that refusal was thrown
+  inside the `try` meant for reading the entry — so its own `catch` swallowed
+  it and judged the entry's parent branch instead. A caller who could read
+  the parent but not the organization could move the entry out of it, and
+  nothing was logged. An entry the search does not return is judged by its
+  parent branch too, where it used to be judged by nothing, and one with no
+  link by its parent rather than by a branch named `undefined`
 
 - `core/ldap/organizations`: `/subnodes/search` searched the directory
   without the request, and every authorization plugin skips its check when

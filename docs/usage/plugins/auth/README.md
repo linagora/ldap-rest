@@ -53,6 +53,94 @@ says so: token, TOTP and HMAC names are in the configuration, and an
 identity provider's claims are not, in which case the line says it cannot be
 checked before a login rather than staying silent.
 
+## Several authorization plugins
+
+Every plugin that judges LDAP operations — `core/auth/authzPerBranch`,
+`core/auth/authzLinid1`, `core/auth/authzDynamic` — registers the same hooks,
+and all of them run: loaded together, they compose as an **AND**, and the
+first refusal wins. The per-caller read filter (`ldapsearchfilter`) is one of
+those hooks: two plugins there compose as an intersection, which is the same
+AND. That is sound when it is meant. When it is not, it is a
+refusal nobody can explain: `authzPerBranch` beside `authzDynamic` judges a
+machine token by a branch configuration written for administrators, finds
+no entry for the tenant, and refuses a write the token's own ACLs grant.
+
+The AND needs no second plugin to bite. `--authz-per-branch-config` has a
+default — read everywhere, write nowhere — so a lone `authzPerBranch` judges
+**every** authenticated identity, whatever authenticated it: a token that no
+rule names reads, and every write it attempts is refused.
+
+### Whose requests a plugin judges
+
+The dispatcher records which authentication plugins vouched for a request,
+by instance name, in `req.authenticators`. An authorization plugin given
+`authz_for` judges the requests of those plugins and skips the others:
+
+```bash
+--plugin core/auth/authzDynamic
+--plugin 'core/auth/openidconnect:oidc:{"auth_path_prefix":"/api/admin"}'
+--plugin 'core/auth/authzPerBranch:authzPerBranch:{"authz_for":["oidc"]}'
+```
+
+Here the tokens are held to their own ACLs, and the administrators signed in
+through OpenID Connect to the branch configuration: no request is judged by
+both. Unset, `authz_for` means every authenticated request — what every
+plugin did before the option existed. It is read by `authzPerBranch`,
+`authzLinid1` and `authzPerRoute`; `authzDynamic` judges the requests
+carrying its own tokens, and no others, whatever the option says — an
+`authz_for` of its own there is said at startup rather than ignored in
+silence.
+
+Two cases stay apart:
+
+- a request **another** population's authenticator vouched for is skipped —
+  it is not this model's business;
+- a request of **this** population whose identity does not resolve is
+  refused — a configuration error, not an absence of one
+  (`--authz-unresolved-user`).
+
+A request carrying an identity that no authenticator vouched for is judged:
+"not mine" is never inferred from an absence. A plugin that only stepped
+aside — `authzDynamic` letting a request through on
+`--authz-dynamic-bypass` — did not vouch for it and is not recorded.
+
+### What is refused at startup
+
+- Two plugins judging LDAP operations for the same authenticator's requests
+  — two branch-level plugins with no `authz_for`, or a branch-level plugin
+  judging `authzDynamic`'s tokens — are refused, with both names, unless
+  `--authz-combine` says the AND is meant. `authzPerRoute` registers no LDAP
+  hook and is never part of it: route plus branch, and route plus token, are
+  deliberate ANDs on identities each side can name.
+- An `authz_for` naming no loaded authentication plugin is refused: the
+  plugin would judge nobody, which reads as a working configuration. A
+  server-wide `--authz-for` that no loaded plugin reads — only
+  `authzDynamic` there — is said: it scopes nothing.
+- Two plugins whose populations only meet through two authenticators on the
+  same path prefix — a request presenting both credentials is judged by
+  both — are said, not refused: asking for two credentials is a decision
+  already.
+
+A host that assembles the server itself — `registerPlugin` after `ready`,
+rather than `--plugin` — gets the same checks, as each plugin arrives: the
+refusal comes out of `registerPlugin`, before any of the plugin's routes or
+hooks exist. An arriving plugin is judged against what is already there, so
+the authentication plugins an `authz_for` or `--authz-scope-source` names
+are registered before the plugin naming them.
+
+### What the log says
+
+At startup, one line per plugin names the hooks it takes part in and whose
+requests it judges — `every authenticated request (authToken, oidc)` when
+`authz_for` is unset, so a model judging an authenticator nobody wrote it
+for is visible before a request arrives. When a hook refuses, the log line
+names the plugin that refused; the 403 body does not, as it never discloses
+the model.
+
+With two plugins combined on purpose, `--authz-filter-attached-entries` only
+broadens a listing while both honour it — both do, being built on the same
+base class, but nothing obliges a third implementation to.
+
 ## Authorization Plugins
 
 | Method                                          | Plugin                     | Description                  |

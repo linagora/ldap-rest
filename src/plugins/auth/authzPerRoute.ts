@@ -17,6 +17,7 @@ import {
   warnUnmatchedRuleKeys,
   type DmRequest,
 } from '../../lib/auth/base';
+import { authzFor, servesRequest } from '../../lib/authz/composition';
 
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,
@@ -87,6 +88,7 @@ export default class AuthzPerRoute extends DmPlugin {
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
     assertIdentityMode(this.config, this.constructor.name);
+    authzFor(this.config, this.constructor.name);
 
     const entries = this.config.authz_per_route ?? [];
     for (const entry of entries) {
@@ -250,6 +252,18 @@ export default class AuthzPerRoute extends DmPlugin {
         } else {
           this.logger.debug(line);
         }
+        return next();
+      }
+
+      // Vouched for by authentication plugins this one does not serve
+      // (`--authz-for`): another population, whose rules are not here. A
+      // refusal would be a judgement on identities nobody wrote a rule for.
+      if (!servesRequest(req as DmRequest, this.config)) {
+        this.logger.debug(
+          `${this.name}: ${req.method} ${req.path} authenticated by ` +
+            `${((req as DmRequest).authenticators ?? []).join(', ')}, ` +
+            'which this plugin does not serve'
+        );
         return next();
       }
 
