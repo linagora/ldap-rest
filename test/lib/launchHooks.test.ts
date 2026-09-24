@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import type winston from 'winston';
 
-import { launchHooks } from '../../src/lib/utils';
+import { launchHooks, recordHookOwner } from '../../src/lib/utils';
 import { getLogger, setLogger } from '../../src/lib/expressFormatedResponses';
 
 /**
@@ -14,7 +14,7 @@ import { getLogger, setLogger } from '../../src/lib/expressFormatedResponses';
  * hook fails, not when the module was evaluated.
  */
 describe('launchHooks', () => {
-  let installed: winston.Logger;
+  let installed: winston.Logger | undefined;
   let reported: unknown[][] = [];
   const fakeLogger = {
     error: (...args: unknown[]) => {
@@ -69,6 +69,33 @@ describe('launchHooks', () => {
     expect(ran).to.deep.equal(['second']);
   });
 
+  it('names the hook and its plugin when registerPlugin recorded them', async () => {
+    setLogger(fakeLogger);
+    const boom = new Error('boom');
+    const hook = (): never => {
+      throw boom;
+    };
+    recordHookOwner(hook, 'james', 'ldapadddone');
+
+    await launchHooks([hook]);
+
+    expect(reported).to.have.lengthOf(1);
+    expect(reported[0][0]).to.equal('Hook error in james (ldapadddone)');
+    expect(reported[0][1]).to.equal(boom);
+  });
+
+  it("names a hook no plugin recorded by the function's own name", async () => {
+    setLogger(fakeLogger);
+
+    await launchHooks([
+      function pushedByHand(): never {
+        throw 'refused';
+      },
+    ]);
+
+    expect(reported[0][0]).to.equal('Hook error in pushedByHand: "refused"');
+  });
+
   it('reports a thrown value that is not an Error', async () => {
     // winston keeps a second argument only when it is an object, so a hook
     // throwing a string used to report `Hook error` and nothing more.
@@ -104,7 +131,7 @@ describe('launchHooks', () => {
   it('does not throw when no logger has been installed yet', async () => {
     // The app's order: this module is evaluated (through `ldapActions`)
     // before the `DM` constructor hands its logger to `setLogger`.
-    setLogger(undefined as unknown as winston.Logger);
+    setLogger(undefined);
 
     await launchHooks([
       () => {

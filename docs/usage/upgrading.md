@@ -69,6 +69,27 @@ value (`--authz-for oidc --authz-for authToken`), or use the plural form
 where there is one (`--plugins "a b"`), or the environment variable, which
 splits on spaces and commas.
 
+### `getLogger()` may return `undefined`, and its type says so
+
+**Who is affected:** anyone building a plugin or a host in TypeScript
+against the package's `expressformatedresponses` export and calling
+`getLogger()`.
+
+The logger is installed by the `DM` constructor, and before that there is
+none. The type used to say `winston.Logger`, so a reader without a guard
+compiled and threw `Cannot read properties of undefined` at runtime — from
+inside an error path, which is how #182 and #199 happened. It now says
+`winston.Logger | undefined`, and such a reader stops compiling:
+
+```ts
+getLogger().info('…'); // no longer compiles
+getLogger()?.info('…'); // logs when there is a logger
+```
+
+A plugin holds `this.logger`, which is always set; `getLogger()` is for a
+helper with no server in hand. `setLogger` accepts `undefined` as well, so a
+test restoring the state it found no longer needs a cast.
+
 ### OpenID Connect honours `auth_path_prefix`
 
 **Who is affected:** anyone running `core/auth/openidconnect`, and in

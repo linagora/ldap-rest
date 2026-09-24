@@ -5,13 +5,28 @@
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
-let _logger: winston.Logger;
+/**
+ * The server's logger, once the `DM` constructor has installed it.
+ *
+ * Undefined until then, and said so in the type: this module is loaded
+ * before any `DM` exists, and a caller reading it as always there throws
+ * from inside the error path it was reporting on (#182, #199). The compiler
+ * now holds every reader to a guard.
+ */
+let _logger: winston.Logger | undefined;
 
-export const setLogger = (logger: winston.Logger): void => {
+/**
+ * Install the logger, or remove it: a test restores the state it found,
+ * which before any `DM` is none.
+ *
+ * @param logger the logger, or undefined for none
+ */
+export const setLogger = (logger: winston.Logger | undefined): void => {
   _logger = logger;
 };
 
-export const getLogger = (): winston.Logger => _logger;
+/** @returns the installed logger, or undefined before any `DM` exists */
+export const getLogger = (): winston.Logger | undefined => _logger;
 
 // Utility that generates standard responses depending on the success of the method
 export const tryMethod = async (
@@ -108,7 +123,13 @@ export const tooManyRequests = (
 
 // 50x responses
 
-// We don't want to publish the real error in server responses
+// We don't want to publish the real error in server responses.
+//
+// The logger is read guarded, as `_rejectResponse` reads it: `setLogger`
+// runs in the `DM` constructor, and anything reaching here without one —
+// a library, a test — would otherwise throw `Cannot read properties of
+// undefined` from inside the error path, and the response it owes would
+// never be sent.
 export const serverError = (res: Response, err: unknown): void => {
   const message = err instanceof Error ? err.message : String(err);
   let statusCode =
@@ -130,18 +151,18 @@ export const serverError = (res: Response, err: unknown): void => {
       statusCode === 403 && /\[authz-forbidden\]/.test(message)
         ? 'Token does not have permission on this branch'
         : message;
-    _logger.warn(`Client error ${statusCode}: ${clientMessage}`);
+    _logger?.warn(`Client error ${statusCode}: ${clientMessage}`);
     res.status(statusCode).json({ error: clientMessage });
     return;
   }
 
   // Server error (5xx) - log as error and hide details
   if (err instanceof Error) {
-    _logger.error(err.message, err);
+    _logger?.error(err.message, err);
   } else if (typeof err === 'string') {
-    _logger.error(err);
+    _logger?.error(err);
   } else {
-    _logger.error('Server error', err);
+    _logger?.error('Server error', err);
   }
   res.status(statusCode).json({ error: 'check logs' });
 };
