@@ -287,6 +287,8 @@ see [Back-Channel Logout](plugins/auth/back-channel-logout.md).
 | ------------------------- | -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--authz-unresolved-user` | `DM_AUTHZ_UNRESOLVED_USER` | `deny`     | What an authenticated identity the plugin cannot resolve means: `deny` refuses the operation, `allow` lets it through with a warning                                                                                              |
 | `--authz-identity`        | `DM_AUTHZ_IDENTITY`        | `req.user` | Which value rules are keyed on: `req.user`, this server's identifier for the caller, or `req.userName`, the caller under a name a person would use. See [what a rule is keyed on](plugins/auth/README.md#what-a-rule-is-keyed-on) |
+| `--authz-for`             | `DM_AUTHZ_FOR`             |            | The authentication plugins, by instance name, whose requests the plugin judges; unset, every authenticated request. Meant for a plugin's own overrides: `{"authz_for":["oidc"]}`                                                  |
+| `--authz-combine`         | `DM_AUTHZ_COMBINE`         | `false`    | Let two plugins judging the LDAP operations of the same requests start together, as an AND                                                                                                                                        |
 
 `--authz-unresolved-user` is read by the plugins that resolve an identity
 before judging it — `core/auth/authzPerBranch` and `core/auth/authzLinid1`.
@@ -302,7 +304,12 @@ authenticator publishes something else. `allow` is the behaviour every plugin
 had before 0.8.3, and it is an open door where `authzLinid1` is loaded: see
 [the note](upgrading.md#an-identity-that-does-not-resolve-is-refused).
 
-`--authz-identity` is a different question, and the paragraph above is not
+`--authz-for` and `--authz-combine` say how plugins loaded together compose:
+without them, two plugins judging the LDAP operations of the same requests
+are refused at startup — see [several authorization
+plugins](plugins/auth/README.md#several-authorization-plugins).
+
+`--authz-identity` is a different question, and the paragraphs above are not
 about it: `core/auth/authzPerRoute` and the SCIM base map read it as well,
 since a route rule and the base a SCIM operation is served from are keyed on
 whichever of the two names it selects. A value other than `req.user` or
@@ -315,6 +322,12 @@ whichever of the two names it selects. A value other than `req.user` or
 | `--authz-per-branch-config`       | `DM_AUTHZ_PER_BRANCH_CONFIG`       | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON)                                                                                                                                                   |
 | `--authz-per-branch-cache-ttl`    | `DM_AUTHZ_PER_BRANCH_CACHE_TTL`    | `60`                                             | Cache TTL (seconds)                                                                                                                                                           |
 | `--authz-filter-attached-entries` | `DM_AUTHZ_FILTER_ATTACHED_ENTRIES` | `false`                                          | Judge an attached entry by the organization it hangs off, and filter listings accordingly. Honoured by `authzPerBranch` and `authzLinid1`; does nothing under `authzDynamic`. |
+
+#### `core/auth/authzScope`
+
+| CLI                    | Env                     | Default | Description                                                                                                                                                    |
+| ---------------------- | ----------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-scope-source` | `DM_AUTHZ_SCOPE_SOURCE` |         | The plugin, by instance name, that describes a caller's scope when several judge them; unset, the first loaded. See [authz-scope](plugins/auth/authz-scope.md) |
 
 #### `core/auth/authzPerRoute`
 

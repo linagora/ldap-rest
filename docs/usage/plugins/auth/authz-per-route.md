@@ -107,6 +107,12 @@ one-level:GET:/api/v1/ldap/users/*
 | User authenticated but has no rules configured        | 403 Forbidden                                          |
 | User has at least one matching rule                   | 200 / pass through                                     |
 | User has rules but none match the current method+path | 403 Forbidden                                          |
+| Authenticated by a plugin outside `authz_for`         | Pass through — another population, judged elsewhere    |
+
+`authz_for` lists the authentication plugins, by instance name, whose
+requests the rules are for; unset, they apply to every authenticated
+request. See [several authorization
+plugins](README.md#several-authorization-plugins).
 
 ## Full Example
 

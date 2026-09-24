@@ -21,6 +21,8 @@ import type {
 import { ForbiddenError } from '../errors';
 import { getParentDn, isDnInBranch } from '../utils';
 
+import { authzFor, servesRequest } from './composition';
+
 /**
  * Abstract base class for authorization plugins
  * Provides common utility methods and interface for LDAP-based authorization
@@ -53,6 +55,9 @@ export default abstract class AuthzBase extends DmPlugin {
     // silence — 403s for everyone, with nothing saying the value was not
     // understood.
     assertIdentityMode(this.config, this.constructor.name);
+    // Its shape here, its names once the authenticators are loaded
+    // (`assertAuthzComposition`).
+    authzFor(this.config, this.constructor.name);
     const policy = (this.config.authz_unresolved_user as string) ?? 'deny';
     if (
       !(AuthzBase.UNRESOLVED_POLICIES as readonly string[]).includes(policy)
@@ -166,11 +171,19 @@ export default abstract class AuthzBase extends DmPlugin {
   abstract getAuthorizedBranches(user: string): Promise<string[]>;
 
   /**
-   * Check if authorization should be skipped for this request
-   * Can be overridden by subclasses for custom logic
+   * Whether this request is none of this plugin's business.
+   *
+   * Two cases, and only two: a request with no identity (anonymous, skipped
+   * by design), and one that authentication plugins outside `--authz-for`
+   * vouched for — another population, judged by another model. An identity
+   * of *this* population that does not resolve is not skipped here: that is
+   * a configuration error, and `resolveCaller` refuses it. Inferring "not
+   * mine" from "cannot place it" is exactly the confusion this keeps apart.
+   *
+   * Subclasses overriding it must call this one.
    */
   protected shouldSkipAuthorization(req?: DmRequest): boolean {
-    return !req?.user;
+    return !req?.user || !servesRequest(req, this.config);
   }
 
   /** What `resolveUser` answered for an identity, and when. */

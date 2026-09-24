@@ -163,6 +163,15 @@ export interface Config {
   authz_filter_attached_entries?: boolean;
   authz_unresolved_user?: string;
   authz_identity?: string;
+  /**
+   * The authentication plugins, by instance name, whose requests an
+   * authorization plugin judges. Empty means every one of them.
+   */
+  authz_for?: string[];
+  /** Let two LDAP judges whose populations overlap compose as an AND. */
+  authz_combine?: boolean;
+  /** The branch-level plugin `authzScope` answers with, by instance name. */
+  authz_scope_source?: string;
   authz_per_branch_config?: AuthConfig;
   authz_per_branch_cache_ttl?: number;
 
@@ -797,6 +806,21 @@ const configArgs: ConfigTemplate = [
   // `req.userName`, the caller under a name a person would use. The default
   // keeps every existing rule meaning what it meant.
   ['--authz-identity', 'DM_AUTHZ_IDENTITY', 'req.user'],
+  // Whose requests an authorization plugin judges: the instance names of the
+  // authentication plugins that vouched for them. Empty — the default —
+  // means every authenticated request, whatever authenticated it, which is
+  // what every plugin did before the option existed. Meant for a plugin's
+  // own overrides (`{"authz_for":["oidc"]}`), so a branch model written for
+  // administrators does not judge a machine token it cannot name.
+  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array'],
+  // Two plugins judging the LDAP operations of the same requests compose as
+  // an AND: the first refusal wins. The server refuses to start on that
+  // unless this says the AND is meant.
+  ['--authz-combine', 'DM_AUTHZ_COMBINE', false, 'boolean'],
+  // The branch-level plugin `authzScope` describes a caller with, when more
+  // than one of them judges that caller. Empty: the first one loaded, and
+  // the answer lists the others under `sources`.
+  ['--authz-scope-source', 'DM_AUTHZ_SCOPE_SOURCE', ''],
 
   // Auth authzPerBranch plugin
   [

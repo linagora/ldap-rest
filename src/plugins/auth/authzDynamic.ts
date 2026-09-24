@@ -494,7 +494,7 @@ export default class AuthzDynamic extends AuthBase {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
       );
-      next();
+      this.passThrough(req, next);
       return;
     }
     if (
@@ -508,7 +508,7 @@ export default class AuthzDynamic extends AuthBase {
       const pending = req as PendingRequest;
       pending.authzDynamicPending = true;
       pending.authzDynamicPendingReason = warning;
-      next();
+      this.passThrough(req, next);
       return;
     }
     this.logger.warn(warning);
@@ -524,7 +524,7 @@ export default class AuthzDynamic extends AuthBase {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
       );
-      next();
+      this.passThrough(req, next);
       return;
     }
     void this.ensureFresh()
