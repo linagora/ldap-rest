@@ -49,7 +49,7 @@ node lib/bin/index.js \
 ### Loading this plugin beside another authenticator
 
 The dispatcher runs every authentication plugin claiming a request's path,
-so a request can arrive here already identified by another one. Until 0.8.3
+so a request can arrive here already identified by another one. Until 0.9.0
 this plugin stepped aside whenever that happened, and the token ACLs were
 then applied to nothing: with `core/auth/token` loaded beside it, a static
 token reached the whole directory as an unscoped administrator — or was
@@ -62,7 +62,7 @@ identified it, and anything allowed past them without a token is named:
 | `--authz-dynamic-bypass` | Effect                                                                                              |
 | ------------------------ | --------------------------------------------------------------------------------------------------- |
 | _(empty, the default)_   | Nobody. A request must carry one of these tokens                                                    |
-| `any-authenticated`      | Anything another plugin authenticated — the behaviour before 0.8.3                                  |
+| `any-authenticated`      | Anything another plugin authenticated — the behaviour before 0.9.0                                  |
 | `trusted-proxy`          | A request from a trusted proxy **that named a caller** (`req.trustedProxy` and `req.proxyAuthUser`) |
 | any other value          | The identity another authenticator publishes in `req.user`, e.g. a name from `--auth-token`         |
 

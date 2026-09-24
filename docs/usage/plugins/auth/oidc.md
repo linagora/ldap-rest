@@ -44,7 +44,7 @@ authentication dispatcher, so `auth_path_prefix` says which paths it guards:
 --plugin 'core/auth/openidconnect:oidc:{"auth_path_prefix":"/api/admin"}'
 ```
 
-Until 0.8.3 the option was accepted and ignored — the plugin mounted its own
+Until 0.9.0 the option was accepted and ignored — the plugin mounted its own
 middleware and guarded the whole server — and the layers it mounted kept
 their registration order, so a route plugin loading before it was served
 without a session and an authorization plugin loading after it judged rules

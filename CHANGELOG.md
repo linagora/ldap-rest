@@ -2,184 +2,134 @@
 
 ## Unreleased
 
-### Security
+Authorization that says what it judges: rules keyed on a login rather than on
+whatever an authenticator publishes, plugins scoped to the authenticators
+whose requests they judge, and a server that refuses to start on a
+combination nobody decided. Several paths where a request went unchecked are
+closed, and closing them changes what some deployments answer.
 
-- `core/auth/llng`: a request the handler passed on without naming anyone —
-  what a LemonLDAP::NG `skip` rule produces — published `req.user =
-undefined`, which every authorization plugin reads as anonymous and skips,
-  so a rule meaning "no authentication here" meant "authenticated, and
-  scoped by nobody". Such a request is refused now; the identity header is
-  read whatever case the handler wrote it in, and whatever a client sent
-  under that name is dropped before the handler runs
-  ([#190](https://github.com/linagora/ldap-rest/issues/190),
-  [notes](docs/usage/upgrading.md#coreauthllng-refuses-a-request-the-handler-named-nobody-for))
+**Read [Upgrading](docs/usage/upgrading.md) before deploying this one.** Every
+change below that needs a decision links to its notes there.
 
-- `bin`: the plugin priority list was matched against the whole `--plugin`
-  string, so a named instance — `core/auth/trustedProxy:tp2:{…}`, the only
-  form that can carry a per-instance option — lost its rank and landed in
-  the parallel batch, where it could register after the routes it guards. A
-  forged `X-Forwarded-For` then reached them, which is what `rateLimit` and
-  `crowdsec` key their protection on. The list matches on the module now,
-  and every instance of a priority module is loaded in the first pass
+### Breaking Changes
 
-- `core/auth/openidconnect`: the plugin mounted its own middleware instead of
-  registering with the authentication dispatcher, so `auth_path_prefix` was
-  accepted and ignored, a named instance could mount after the plugins
-  reading what it publishes — `core/auth/authzPerRoute` judging every rule
-  before `req.user` existed, and passing what it cannot identify — and a
-  second authentication composed as an AND. It is an `AuthBase` now —
-  [notes](docs/usage/upgrading.md#openid-connect-honours-auth_path_prefix)
-
-- `core/auth/authzDynamic`: the plugin stepped aside as soon as another
-  authenticator had identified the request, so its token ACLs were applied to
-  nothing — with `core/auth/token` loaded beside it, a static token reached
-  the whole directory unscoped, or was refused, depending on registration
-  order. The ACLs apply to whatever token a request carries now, and what may
-  pass without one is named by `--authz-dynamic-bypass` —
-  [notes](docs/usage/upgrading.md#authzdynamic-no-longer-steps-aside-for-another-authenticator)
-
-- `lib/authz/base`: every authorization hook let the operation through when
-  it could not resolve the caller, so `core/auth/authzLinid1` behind an
-  authenticator publishing anything but a `uid` — an OIDC `sub`, an LLNG
-  `whatToTrace` — skipped every check on every request, across the whole
-  tree. An authenticated identity that does not resolve is refused now, and
-  `--authz-unresolved-user allow` restores the old behaviour for a
-  deployment that relies on it —
-  [notes](docs/usage/upgrading.md#an-identity-that-does-not-resolve-is-refused)
-
-### Features
-
-- Authorization rules can be keyed on a login rather than on whatever
-  identifier an authenticator happens to publish: every one of them now
-  publishes `req.userName` beside `req.user` — the OIDC claim named by
-  `--oidc-username-claim`, the LLNG header named by `--llng-username-header`,
-  the configured name elsewhere — and `--authz-identity` says which of the
-  two `authzPerBranch`, `authzLinid1`, `authzPerRoute` and the SCIM base map
-  read. The default is `req.user`, so nothing moves until it is set. At
-  startup each authenticator says what it publishes, and an authorization
-  plugin whose identities none of them can produce says that too
-  ([#187](https://github.com/linagora/ldap-rest/issues/187),
-  [notes](docs/usage/plugins/auth/README.md#what-a-rule-is-keyed-on))
-
-- `authz_for` scopes an authorization plugin to the authentication plugins
-  whose requests it judges — the dispatcher now records who vouched for a
-  request in `req.authenticators` — so a branch model written for
-  administrators and a token's own ACLs can serve one server without judging
-  each other's callers. `--authz-scope-source` names the plugin
-  `authzScope` describes a caller with, and its answer lists every plugin
-  judging them under `sources`
-  ([#189](https://github.com/linagora/ldap-rest/issues/189),
-  [notes](docs/usage/plugins/auth/README.md#several-authorization-plugins))
-
-### Bug Fixes
-
-- Two authorization plugins loaded together composed as an AND that nobody
-  had decided: every plugin judging LDAP operations registers the same hooks
-  and the first refusal wins, so `authzPerBranch` beside `authzDynamic`
-  refused a token's write by a branch configuration that never named the
-  tenant, and nothing said which plugin refused. The server refuses to start
-  on two plugins judging the same requests unless `--authz-combine` says so,
-  logs what each plugin judges at startup, and names the refusing plugin in
-  the log when a hook refuses. The same checks run as each plugin is
-  registered on a server assembled by hand, and cover the per-caller read
-  filter. `authzScope` no longer answers `unrestricted: true` when what
-  restricts the caller cannot describe a scope, nor to an anonymous caller
-  once anything authorizes, and resolves the name `--authz-identity`
-  selects, as the hooks do, rather than `req.user`
+- Two authorization plugins judging the same requests stop the server, unless
+  `authz_for` separates them or `--authz-combine` keeps the AND they composed
+  as. `GET /v1/authz/scope` answers `described: false` where nothing can
+  describe the caller's scope, rather than `unrestricted: true`
   ([#189](https://github.com/linagora/ldap-rest/issues/189),
   [notes](docs/usage/upgrading.md#two-authorization-plugins-judging-the-same-requests-no-longer-start))
 
-- `lib/parseConfig`: a second word after an option taking a list —
-  `--authz-for oidc authToken` — was dropped in silence, and is refused now
-  ([notes](docs/usage/upgrading.md#a-second-word-after-an-option-taking-a-list-is-refused))
+- A second word after an option taking a list — `--authz-for oidc authToken`
+  — is refused rather than dropped in silence —
+  [notes](docs/usage/upgrading.md#a-second-word-after-an-option-taking-a-list-is-refused)
 
-- `lib/auth/base`: the `afterAuth` hooks ran only when the authenticating
-  plugin declared an `onAuth` hook of its own, which no plugin does — so a
-  documented extension point fired for nobody. They run like `beforeAuth`
-  now, on every authenticated request
-
-- `lib/ldapActions`: `ldap.system` names the directory as the server itself,
-  for the reads that are nobody's request — a uniqueness check, a
-  referential-integrity check. The methods are the same ones; what it adds is
-  that an unbound call reads as a decision rather than as a forgotten
-  argument. `DM.claimedAuthPrefixes` and `claimedPrefixes`, which nothing
-  called and whose documentation described a mechanism the dispatcher does
-  not implement, are gone
-  ([#190](https://github.com/linagora/ldap-rest/issues/190))
-
-- `core/ldap/organizations`: a node holding more children than the directory
-  will list in one answer made `/subnodes` return `200 []` — every failure
-  was read as "no children", so a console drew an empty tree and only
-  `debug` said otherwise. A refusal is now answered with what the directory
-  will give and a row saying there is more, `noSuchObject` alone means
-  empty, and anything else is raised
-  ([#179](https://github.com/linagora/ldap-rest/issues/179),
-  [notes](docs/usage/plugins/ldap/organizations.md#get-organization-subnodes))
-
-- `lib/utils`: `launchHooks` reports a hook that fails and ignores it — the
-  contract the OpenID Connect plugin cites where it declines to use it — but
-  it had captured its logger when the module was evaluated, before the `DM`
-  constructor calls `setLogger`, so the report threw
-  `Cannot read properties of undefined` instead. A failing hook reached its
-  caller as an error about the logging of the error: a log line saying
-  `Hook ldapadddone failed: TypeError: Cannot read properties of undefined`,
-  an `Unhandled promise rejection` for the call sites that `void` the
-  promise, and a refused login for an `oidclogin` hook. The logger is
-  resolved when a hook fails now, a thrown value that is not an `Error` is
-  reported rather than dropped, and the four `lib/ldapActions` call sites
-  that had grown a `.catch` around the accident are back to a plain `void`.
-  An `oidclogin` subscriber that cannot clear its marks still refuses the
-  login, and leaves no session for the cookie to carry — that refusal is
-  meant, and said where it happens rather than inherited from the accident
-  ([#182](https://github.com/linagora/ldap-rest/issues/182))
-
-- `lib/expressFormatedResponses`: `serverError` read its logger unguarded,
-  so reached before any `setLogger` it threw from inside the error path
-  (`Cannot read properties of undefined`), and the 4xx or 5xx it owed was
-  never sent. It reads the logger as `_rejectResponse` already did: a missing
-  one costs the log line, not the response. `getLogger()` now says in its
-  type that there may be none, so the compiler holds every reader to a guard
-  — a plugin calling it without one stops compiling
+- `getLogger()` is typed `winston.Logger | undefined`: a plugin reading it
+  without a guard stops compiling
   ([#199](https://github.com/linagora/ldap-rest/issues/199),
   [notes](docs/usage/upgrading.md#getlogger-may-return-undefined-and-its-type-says-so))
 
-- `lib/utils`: a hook that fails under `launchHooks` is reported with the
-  plugin and hook it belongs to — `Hook error in james (ldapadddone)` —
-  where the line said `Hook error` and nothing else since the call sites'
-  own `.catch` blocks were removed
-  ([#182](https://github.com/linagora/ldap-rest/issues/182))
+- `/subnodes/search` caps its matches at `--ldap-organization-max-subnodes`
+  and ends the list with the `moreIndicator` row `/subnodes` already used —
+  [notes](docs/usage/upgrading.md#subnodessearch-caps-what-it-returns)
+
+- `DM.claimedAuthPrefixes` and `claimedPrefixes` are gone: nothing called
+  them, and they described a mechanism the dispatcher does not implement
 
 ### Security
 
-- `lib/authz/base`: moving an entry to another organization checks read
-  permission on the organization it leaves, and that refusal was thrown
-  inside the `try` meant for reading the entry — so its own `catch` swallowed
-  it and judged the entry's parent branch instead. A caller who could read
-  the parent but not the organization could move the entry out of it, and
-  nothing was logged. An entry the search does not return is judged by its
-  parent branch too, where it used to be judged by nothing, and one with no
-  link by its parent rather than by a branch named `undefined`
+- `lib/authz/base`: an authenticated identity that did not resolve skipped
+  every check, so `authzLinid1` behind OpenID Connect or LLNG checked nothing
+  across the whole tree. It is refused now, and `--authz-unresolved-user
+allow` restores the old behaviour —
+  [notes](docs/usage/upgrading.md#an-identity-that-does-not-resolve-is-refused)
 
-- `core/ldap/organizations`: `/subnodes/search` searched the directory
-  without the request, and every authorization plugin skips its check when
-  there is none — the gap `abstract/ldapFlat` closed in 0.8.2, still open on
-  this route
+- `core/auth/authzDynamic`: the token ACLs stepped aside for any request
+  another authenticator had identified, so a `core/auth/token` static token
+  reached the whole directory unscoped. They apply to every token now, and
+  `--authz-dynamic-bypass` names what may pass without one —
+  [notes](docs/usage/upgrading.md#authzdynamic-no-longer-steps-aside-for-another-authenticator)
+
+- `core/auth/openidconnect`: `auth_path_prefix` was ignored, a named instance
+  could mount after `authzPerRoute` and leave its rules inert, and a second
+  authentication composed as an AND. It registers with the authentication
+  dispatcher now —
+  [notes](docs/usage/upgrading.md#openid-connect-honours-auth_path_prefix)
+
+- `core/auth/llng`: a request a `skip` rule let through was published as
+  authenticated by nobody, which every authorization plugin skips. It answers
+  401 now, and an identity header sent by the client is dropped
+  ([#190](https://github.com/linagora/ldap-rest/issues/190),
+  [notes](docs/usage/upgrading.md#coreauthllng-refuses-a-request-the-handler-named-nobody-for))
+
+- `core/ldap/organizations`: `/subnodes/search` searched without the request,
+  so no authorization plugin checked it — the gap `abstract/ldapFlat` closed
+  in 0.8.2 —
+  [notes](docs/usage/upgrading.md#subnodessearch-is-authorized-and-lists-the-children-by-page)
+
+- `lib/authz/base`: moving an entry out of an organization the caller could
+  not read went through, the refusal being swallowed by its own `catch`
+
+- `bin`: a named instance of a priority plugin —
+  `core/auth/trustedProxy:tp2:{…}` — lost its rank and could register after
+  the routes it guards, letting a forged `X-Forwarded-For` reach what
+  `rateLimit` and `crowdsec` key on
 
 ### Features
 
-- `core/storage`: keyed storage for whoever needs to keep something with a
-  deadline, in an LDAP branch or in a directory of files —
-  [notes](docs/usage/plugins/utilities/storage.md)
+- `--authz-identity`: authorization rules can be keyed on a login. Every
+  authenticator publishes `req.userName` beside `req.user` —
+  `--oidc-username-claim`, `--llng-username-header` — and says at startup
+  what it publishes
+  ([#187](https://github.com/linagora/ldap-rest/issues/187),
+  [notes](docs/usage/plugins/auth/README.md#what-a-rule-is-keyed-on))
 
-- Back-Channel Logout: a logout performed at the provider ends the session
-  here, on the next request. `core/bcl` records only what died, so a session
-  stays in its cookie and the storage stays small —
-  [notes](docs/usage/plugins/auth/back-channel-logout.md)
+- `authz_for` scopes an authorization plugin to the authenticators whose
+  requests it judges, recorded in `req.authenticators`;
+  `--authz-scope-source` chooses which one `authzScope` answers with
+  ([#189](https://github.com/linagora/ldap-rest/issues/189),
+  [notes](docs/usage/plugins/auth/README.md#several-authorization-plugins))
 
-- `--authz-filter-attached-entries`: an account is judged by the organization
-  it hangs off rather than by the `ou=users` every account shares, so a local
-  administrator lists and writes their own and no one else's. Off by default —
+- `core/storage`: keyed storage with a deadline, in an LDAP branch or in a
+  directory of files — [notes](docs/usage/plugins/utilities/storage.md)
+
+- Back-Channel Logout: `core/bcl` ends the session here when the provider
+  ends it — [notes](docs/usage/plugins/auth/back-channel-logout.md)
+
+- `--authz-filter-attached-entries`: an account is judged by the
+  organization it is attached to rather than by the `ou=users` every account
+  shares. Off by default —
   [notes](docs/usage/upgrading.md#judging-an-account-by-what-it-is-attached-to)
+
+- `lib/ldapActions`: `ldap.system` for the reads that are nobody's request —
+  a uniqueness or referential-integrity check
+  ([#190](https://github.com/linagora/ldap-rest/issues/190))
+
+### Bug Fixes
+
+- A refused LDAP operation names the authorization plugin that refused it in
+  the log, and each plugin says at startup what it judges
+  ([#189](https://github.com/linagora/ldap-rest/issues/189))
+
+- `lib/auth/base`: the `afterAuth` hooks never ran. They run on every
+  authenticated request now
+
+- `core/ldap/organizations`: a node with more children than the directory
+  lists in one answer returned `200 []` from `/subnodes`. It returns what the
+  directory gives and a row saying there is more, and its children are
+  searched by page
+  ([#179](https://github.com/linagora/ldap-rest/issues/179),
+  [notes](docs/usage/plugins/ldap/organizations.md#get-organization-subnodes))
+
+- `lib/utils`: a hook failing under `launchHooks` threw from its own error
+  report, the logger having been captured before `setLogger` — an unhandled
+  rejection, or a refused OpenID Connect login. It is reported now, with the
+  plugin and hook it belongs to
+  ([#182](https://github.com/linagora/ldap-rest/issues/182))
+
+- `lib/expressFormatedResponses`: `serverError` reached before `setLogger`
+  threw instead of sending its response
+  ([#199](https://github.com/linagora/ldap-rest/issues/199))
 
 ## v0.8.2 (2026-09-23)
 

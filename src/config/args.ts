@@ -851,7 +851,7 @@ const configArgs: ConfigTemplate = [
   // `req.user`, plus two words:
   //
   //  - `any-authenticated`: anything another plugin authenticated, which is
-  //    what the plugin did until 0.8.3, by accident rather than by decision;
+  //    what the plugin did until 0.9.0, by accident rather than by decision;
   //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
   ['--authz-dynamic-bypass', 'DM_AUTHZ_DYNAMIC_BYPASS', [], 'array'],
   ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],

@@ -156,7 +156,7 @@ other plugin and have no dynamic token.
 `--authz-dynamic-bypass` names what may pass without a token:
 
 ```
---authz-dynamic-bypass any-authenticated   # what the plugin did before 0.8.3
+--authz-dynamic-bypass any-authenticated   # what the plugin did before 0.9.0
 --authz-dynamic-bypass ops-admin           # one identity, as another plugin publishes it
 --authz-dynamic-bypass trusted-proxy       # what core/auth/trustedProxy vouched for
 ```

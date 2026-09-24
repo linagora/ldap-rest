@@ -75,7 +75,7 @@ works behind an authenticator that publishes what the directory calls a user:
 | `core/auth/openidconnect` | the OIDC `sub`                   | **no** — an opaque provider identifier |
 
 An identity that does not resolve is **refused** (403), and the refusal is
-logged with the plugin's name. Until 0.8.3 it was let through instead, which
+logged with the plugin's name. Until 0.9.0 it was let through instead, which
 made this pairing an open door rather than a misconfiguration; see
 [the note](../../upgrading.md#an-identity-that-does-not-resolve-is-refused)
 and `--authz-unresolved-user` for the transition.
