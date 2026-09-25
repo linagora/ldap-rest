@@ -260,6 +260,18 @@
       "types": "./dist/src/plugins/twake/james.d.ts",
       "import": "./dist/plugins/twake/james.js"
     },
+    "./plugin-twake-lifecycleattributes": {
+      "types": "./dist/src/plugins/twake/lifecycleAttributes.d.ts",
+      "import": "./dist/plugins/twake/lifecycleAttributes.js"
+    },
+    "./plugin-twake-lifecycleevents": {
+      "types": "./dist/src/plugins/twake/lifecycleEvents.d.ts",
+      "import": "./dist/plugins/twake/lifecycleEvents.js"
+    },
+    "./plugin-twake-tombstone": {
+      "types": "./dist/src/plugins/twake/tombstone.d.ts",
+      "import": "./dist/plugins/twake/tombstone.js"
+    },
     "./plugin-weblogs": {
       "types": "./dist/src/plugins/weblogs.d.ts",
       "import": "./dist/plugins/weblogs.js"
