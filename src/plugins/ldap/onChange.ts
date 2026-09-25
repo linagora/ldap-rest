@@ -157,9 +157,18 @@ class OnLdapChange extends DmPlugin {
   };
 
   async read(dn: string): Promise<Entry | undefined> {
+    const followed = new Set(
+      Object.values(this.server.loadedPlugins).flatMap(
+        p => p.followedOperationalAttributes || []
+      )
+    );
     try {
       const res = (await this.server.ldap.search(
-        { paged: false, scope: 'base' },
+        {
+          paged: false,
+          scope: 'base',
+          ...(followed.size ? { attributes: ['*', ...followed] } : {}),
+        },
         dn
       )) as SearchResult;
       const entry = res.searchEntries[0];

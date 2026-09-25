@@ -73,6 +73,13 @@ export default abstract class DmPlugin {
   /* Plugin roles for categorization */
   roles?: Role[] | undefined;
 
+  /**
+   * Operational attributes this plugin follows through `onLdapEntryChange`,
+   * e.g. `pwdAccountLockedTime`. A search returns none unless asked by name,
+   * so `core/ldap/onChange` requests these beside `*`.
+   */
+  followedOperationalAttributes?: string[];
+
   /* Function to register API */
   api?(app: Express): MaybePromise<void>;
 

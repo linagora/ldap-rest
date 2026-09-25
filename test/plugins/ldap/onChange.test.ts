@@ -10,6 +10,7 @@ import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 import type { ChangeContext } from '../../../src/lib/changeContext';
 import type { Request } from 'express';
+import type DmPlugin from '../../../src/abstract/plugin';
 
 type EntryChange = [string, Entry | null, Entry | null, ChangeContext];
 
@@ -247,6 +248,33 @@ describe('onChange', () => {
       expect(add).to.include({ actor: 'Jane', source: 'rest' });
       expect(add.requestId).to.be.a('string');
       expect(modify.requestId).to.equal(add.requestId);
+    });
+
+    describe('operational attributes', () => {
+      const lock = { replace: { pwdAccountLockedTime: '000001010000Z' } };
+
+      it('are not read while no plugin follows them', async () => {
+        const dn = await addUser('ochlock1');
+        await dm.ldap.modify(dn, lock);
+        await settle('ochlock1');
+        expect(entryChanges.filter(([d]) => d === dn)).to.eql([]);
+      });
+
+      it('are read on both sides once a plugin follows them', async () => {
+        dm.loadedPlugins.follower = {
+          followedOperationalAttributes: ['pwdAccountLockedTime'],
+        } as unknown as DmPlugin;
+        try {
+          const dn = await addUser('ochlock2');
+          await dm.ldap.modify(dn, lock);
+          await waitFor(() => entryChanges.some(([d]) => d === dn));
+          const [, before, after] = entryChanges.find(([d]) => d === dn)!;
+          expect(before).to.not.have.property('pwdAccountLockedTime');
+          expect(after).to.include({ pwdAccountLockedTime: '000001010000Z' });
+        } finally {
+          delete dm.loadedPlugins.follower;
+        }
+      });
     });
   });
 });
