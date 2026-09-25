@@ -12,10 +12,12 @@ export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 export interface LifecycleAttributes {
   role: string;
   lock: string;
+  lockValue: string;
   deleted: string;
   deletedValue: string;
   deletedAt: string;
   deletedAtFormat: DeletedAtFormat;
+  reason: string;
 }
 
 export function lifecycleAttributes(config: Config): LifecycleAttributes {
@@ -31,10 +33,15 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
       config.twake_lifecycle_lock_attribute ||
       config.scim_user_lock_attribute ||
       'pwdAccountLockedTime',
+    lockValue:
+      config.twake_lifecycle_lock_value ||
+      config.scim_user_lock_value ||
+      '000001010000Z',
     deleted: config.twake_lifecycle_deleted_attribute || '',
     deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',
     deletedAt: config.twake_lifecycle_deleted_at_attribute || '',
     deletedAtFormat: format,
+    reason: config.twake_lifecycle_reason_attribute || '',
   };
 }
 
@@ -76,6 +83,13 @@ export function isTombstone(
   attrs: LifecycleAttributes
 ): boolean {
   return holdsDeleted(valueOf(entry, attrs.deleted), attrs);
+}
+
+export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
+  const iso = date.toISOString();
+  return format === 'iso8601'
+    ? iso
+    : iso.replace(/[-:T]/g, '').replace(/\.\d+Z$/, 'Z');
 }
 
 /** A deletion date as the directory holds it, or undefined if unreadable. */
