@@ -591,6 +591,29 @@ describe('ClouderyProvision plugin', () => {
       });
     });
 
+    it('deletes the instance and publishes nothing when the routing key is empty', async () => {
+      dm.config.cozy_user_deleted_routing_key = '';
+      plugin = new ClouderyProvision(dm);
+      const dn = `uid=john.doe,${USER_BASE}`;
+      ldap.entries[dn] = {
+        twakeWorkspaceUrl: 'johndoe.example.com',
+        mail: 'john.doe@example.com',
+      };
+
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoe.example.com')
+        .reply(200, { items: [{ _id: 'uuid-1' }] })
+        .delete('/api/v1/instances/uuid-1')
+        .query(q => q.user_request === 'true')
+        .reply(200, { workflow: 'wf-del' });
+
+      await remove('john.doe', makeReq('org1'));
+
+      expect(scope.isDone(), 'search + delete').to.equal(true);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
     it('does not publish when the Cloudery instance is not found', async () => {
       const dn = `uid=john.doe,${USER_BASE}`;
       ldap.entries[dn] = {

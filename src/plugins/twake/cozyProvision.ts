@@ -68,9 +68,10 @@ export default class CozyProvision extends DmPlugin {
     this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
     this.userCreatedRoutingKey =
       (this.config.cozy_user_created_routing_key as string) || 'user.created';
+    // Empty turns the deletion event off, for a deployment that publishes it
+    // elsewhere.
     this.userDeletedRoutingKey =
-      (this.config.cozy_user_deleted_routing_key as string) ||
-      'domain.user.deleted';
+      this.config.cozy_user_deleted_routing_key ?? 'domain.user.deleted';
     this.cozyAdminAuthHeader = `Basic ${Buffer.from(
       `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
     ).toString('base64')}`;
@@ -369,6 +370,7 @@ export default class CozyProvision extends DmPlugin {
    * instances can drop the deleted user's contact card.
    */
   private async publishUserDeleted(id: string): Promise<void> {
+    if (!this.userDeletedRoutingKey) return;
     const rabbitmq = this.rabbitmq();
     if (!rabbitmq) return;
     if (!this.cozyOrgDomain) {

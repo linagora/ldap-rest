@@ -156,8 +156,10 @@ export default class ClouderyProvision extends DmPlugin {
     this.b2bExchange = (cfg.cozy_b2b_exchange as string) || 'b2b';
     this.userCreatedRoutingKey =
       (cfg.cozy_user_created_routing_key as string) || 'user.created';
+    // Empty turns the deletion event off, for a deployment that publishes it
+    // elsewhere.
     this.userDeletedRoutingKey =
-      (cfg.cozy_user_deleted_routing_key as string) || 'domain.user.deleted';
+      cfg.cozy_user_deleted_routing_key ?? 'domain.user.deleted';
     this.pollIntervalMs =
       Number(cfg.cloudery_workflow_poll_interval_ms) || 2000;
     this.maxPollAttempts = Number(cfg.cloudery_workflow_max_attempts) || 60;
@@ -960,6 +962,7 @@ export default class ClouderyProvision extends DmPlugin {
     fqdn: string,
     domain: string
   ): Promise<void> {
+    if (!this.userDeletedRoutingKey) return;
     const rabbitmq = this.requirePlugin<RabbitMq>('rabbitmq');
     this.logger.info({
       plugin: this.name,
