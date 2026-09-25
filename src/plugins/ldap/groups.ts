@@ -28,6 +28,7 @@ import {
   tryMethod,
   wantJson,
 } from '../../lib/expressFormatedResponses';
+import { extractLdapCode } from '../../lib/ldapCodes';
 import {
   asyncHandler,
   escapeDnValue,
@@ -167,24 +168,21 @@ export default class LdapGroups extends DmPlugin {
   }
 
   /**
-   * Catch all deletion to remove deleted users from groups
+   * Remove deleted entries from groups once the delete has landed: a delete
+   * refused, failed or turned into something else by another plugin leaves
+   * the memberships alone.
    */
   hooks: Hooks = {
-    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
-      let _dn = dn;
-      if (!Array.isArray(_dn)) {
-        _dn = [_dn];
-      }
+    ldapdeletedone: async (dn: string | string[]) => {
+      const dns = Array.isArray(dn) ? dn : [dn];
       this.logger.debug(
-        `User deletion detected, removing from groups: ${_dn.join(', ')}`
+        `User deletion detected, removing from groups: ${dns.join(', ')}`
       );
-      // Remove user from groups before actual deletion
       await Promise.all(
-        _dn.map(dnEntry => this.deleteMemberFromAll(dnEntry))
+        dns.map(entry => this.deleteMemberFromAll(entry))
       ).catch(err => {
         this.logger.error('Failed to process user deletion in groups:', err);
       });
-      return [dn, req] as [string | string[], Request?];
     },
   };
 
@@ -892,12 +890,27 @@ export default class LdapGroups extends DmPlugin {
           .modify(entry.dn, {
             delete: { member: memberDn },
           })
-          .catch(err =>
+          .catch(err => {
+            // The last member of a groupOfNames: the placeholder takes its
+            // place, as it does in a group created empty.
+            if (extractLdapCode(err) === 65 && this.config.group_dummy_user)
+              return this.ldap.modify(entry.dn, {
+                add: { member: this.config.group_dummy_user },
+                delete: { member: memberDn },
+              });
+            throw err;
+          })
+          .catch(err => {
+            // A directory running the refint overlay removes the member on
+            // its own, after the delete has answered; a group deleted in the
+            // meantime has no member left to remove either.
+            const code = extractLdapCode(err);
+            if (code === 16 || code === 32) return;
             this.logger.error(
               `Failed to remove ${memberDn} from group ${entry.dn}:`,
               err
-            )
-          )
+            );
+          })
       )
     );
   }

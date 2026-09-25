@@ -10,6 +10,16 @@
   attributes, exchanges, routing keys and payloads are configuration
   ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
 
+### Bug Fixes
+
+- `core/ldap/groups`: an entry left its groups as soon as its delete was
+  asked for, so a delete that an authorization plugin refused, that failed,
+  or that another plugin kept (`core/ldap/trash`) still cost the entry its
+  memberships. It leaves them once the delete has landed: the cleanup runs
+  just after `delete()` answers, and a cleanup that fails is logged. A group
+  losing its last member keeps the `--group-dummy-user` placeholder instead
+  of the deleted DN
+
 ## v0.9.0 (2026-09-24)
 
 Authorization that says what it judges: rules keyed on a login rather than on
