@@ -1,8 +1,8 @@
 /**
  * @module core/onLdapChange
- * Check for ldap modify events and generate hooks:
- *  - onLdapChange
- *  - onLdapMailChange
+ * Publish the state of an entry before and after each write
+ * (onLdapEntryChange), and the hooks derived from it: onLdapChange,
+ * onLdapMailChange…
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import { Entry } from 'ldapts';
@@ -18,6 +18,51 @@ export type ChangesToNotify = Record<
   string,
   [AttributeValue | null, AttributeValue | null]
 >;
+
+const normalize = (value: AttributeValue | undefined): string[] =>
+  (value === undefined ? [] : Array.isArray(value) ? value : [value])
+    .map(v => (Buffer.isBuffer(v) ? v.toString('base64') : String(v)))
+    .sort();
+
+/**
+ * The attributes whose values differ between two states of an entry. Values
+ * are compared as sets, so a single value and a one-element array are equal,
+ * and so are two orderings of the same values.
+ */
+export function diffEntries(
+  before: Entry | null,
+  after: Entry | null
+): ChangesToNotify {
+  // Attribute names are case-insensitive in LDAP
+  const index = (entry: Entry | null): Map<string, string> =>
+    new Map(
+      Object.keys(entry || {})
+        .filter(k => k !== 'dn')
+        .map(k => [k.toLowerCase(), k])
+    );
+  const b = index(before);
+  const a = index(after);
+  const res: ChangesToNotify = {};
+  for (const name of new Set([...b.keys(), ...a.keys()])) {
+    const bKey = b.get(name);
+    const aKey = a.get(name);
+    const bVal = bKey ? before![bKey] : undefined;
+    const aVal = aKey ? after![aKey] : undefined;
+    const bNorm = normalize(bVal);
+    const aNorm = normalize(aVal);
+    if (
+      bNorm.length === aNorm.length &&
+      bNorm.every((v, i) => v === aNorm[i])
+    ) {
+      continue;
+    }
+    res[(aKey || bKey)!] = [
+      bNorm.length ? bVal! : null,
+      aNorm.length ? aVal! : null,
+    ];
+  }
+  return res;
+}
 
 const events: {
   [configParam: keyof Config]: keyof Hooks;
@@ -35,138 +80,107 @@ class OnLdapChange extends DmPlugin {
   roles: Role[] = ['consistency'] as const;
 
   stack: Record<number, Entry> = {};
-  // Store entries before deletion to trigger notify with proper changes
   pendingDeletions: Map<string, Entry> = new Map();
+  pendingRenames: Map<string, Entry> = new Map();
 
   hooks: Hooks = {
-    /**
-     * When a user is added, trigger notify with all new attributes
-     */
-    ldapadddone: (
-      args: [string, import('../../lib/ldapActions').AttributesList]
-    ) => {
-      const [dn, attributes] = args;
-
-      // Build ChangesToNotify with ALL attributes from the new entry
-      const res: ChangesToNotify = {};
-      for (const [key, value] of Object.entries(attributes)) {
-        res[key] = [null, value];
-      }
-
-      // Trigger notify which will call appropriate hooks based on configured attributes
-      this.notify(dn, res);
+    ldapadddone: async ([dn, attributes]) => {
+      const after = (await this.read(dn)) || { dn, ...attributes };
+      this.publish(dn, null, after);
     },
 
     // The request travels with the tuple: `launchHooksChained` feeds each
     // hook's return value to the next, so dropping it here would blind every
     // authorization plugin registered after this one.
     ldapmodifyrequest: async ([dn, attributes, op, req]) => {
-      const tmp = (await this.server.ldap.search(
-        { paged: false },
-        dn
-      )) as SearchResult;
-      if (tmp.searchEntries.length == 1) {
-        this.stack[op] = tmp.searchEntries[0];
+      const entry = await this.read(dn);
+      if (entry) {
+        this.stack[op] = entry;
       } else {
-        this.logger.warn(
-          `Could not find unique entry ${dn} before modification, got ${tmp.searchEntries.length} entries`
-        );
+        this.logger.warn(`Could not read ${dn} before modification`);
       }
       return [dn, attributes, op, req];
     },
 
-    ldapmodifydone: ([dn, changes, op]) => {
-      const prev = this.stack[op];
-      if (!prev) {
-        delete this.stack[op];
+    ldapmodifydone: async ([dn, changes, op]) => {
+      const before = this.stack[op];
+      delete this.stack[op];
+      if (!before) {
         this.logger.warn(
           `Received a ldapmodifydone for an unknown operation (${op})`
         );
         return;
       }
-      const res: ChangesToNotify = {};
-      if (changes.add) {
-        for (const [key, value] of Object.entries(changes.add)) {
-          res[key] = [null, value];
-        }
+      if (Object.keys(changes).length === 0) return;
+      const after = await this.read(dn);
+      if (!after) {
+        this.logger.warn(`Could not read ${dn} after modification`);
+        return;
       }
-      if (changes.delete) {
-        if (Array.isArray(changes.delete)) {
-          for (const attr of changes.delete) {
-            res[attr] = [prev[attr], null];
-          }
-        } else {
-          for (const [key, value] of Object.entries(changes.delete)) {
-            res[key] = [value, null];
-          }
-        }
-      }
-      if (changes.replace) {
-        for (const [key, value] of Object.entries(changes.replace)) {
-          res[key] = [prev[key], value];
-        }
-      }
-      this.notify(dn, res);
-      // The snapshot has served its purpose. Without this the map grows by
-      // one entry per modify, for the lifetime of the process — only the
-      // unknown-operation branch above ever cleared it.
-      delete this.stack[op];
+      this.publish(dn, before, after);
     },
 
-    /**
-     * Before deletion, capture entry to trigger notify with proper changes
-     */
-    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
-      const dns = Array.isArray(dn) ? dn : [dn];
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      const entry = await this.read(dn);
+      if (entry) this.pendingRenames.set(dn, entry);
+      return [dn, newDn, req];
+    },
 
-      for (const userDn of dns) {
-        try {
-          const result = await this.server.ldap.search(
-            {
-              scope: 'base',
-              paged: false,
-            },
-            userDn
-          );
-          const entry = (result as SearchResult).searchEntries?.[0];
-          if (entry) {
-            this.pendingDeletions.set(userDn, entry);
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (e) {
-          // Entry might not exist, ignore
-        }
+    ldaprenamedone: async ([dn, newDn]) => {
+      const before = this.pendingRenames.get(dn);
+      this.pendingRenames.delete(dn);
+      const after = await this.read(newDn);
+      if (!before || !after) {
+        this.logger.warn(`Could not read both sides of ${dn} -> ${newDn}`);
+        return;
+      }
+      this.publish(newDn, before, after);
+    },
+
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
+      for (const target of Array.isArray(dn) ? dn : [dn]) {
+        const entry = await this.read(target);
+        if (entry) this.pendingDeletions.set(target, entry);
       }
       return [dn, req] as [string | string[], Request?];
     },
 
-    /**
-     * After deletion, trigger notify with all attributes set to null
-     */
     ldapdeletedone: (dn: string | string[]) => {
-      const dns = Array.isArray(dn) ? dn : [dn];
-
-      for (const userDn of dns) {
-        const entry = this.pendingDeletions.get(userDn);
-        if (entry) {
-          this.pendingDeletions.delete(userDn);
-
-          // Build ChangesToNotify with ALL attributes from the deleted entry
-          const res: ChangesToNotify = {};
-          for (const [key, value] of Object.entries(entry)) {
-            // Skip the dn attribute
-            if (key === 'dn') continue;
-            res[key] = [value, null];
-          }
-
-          // Trigger notify which will call appropriate hooks based on configured attributes
-          this.notify(userDn, res);
-        }
+      for (const target of Array.isArray(dn) ? dn : [dn]) {
+        const before = this.pendingDeletions.get(target);
+        if (!before) continue;
+        this.pendingDeletions.delete(target);
+        this.publish(target, before, null);
       }
     },
   };
 
-  notify(dn: string, changes: ChangesToNotify): void {
+  async read(dn: string): Promise<Entry | undefined> {
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+      return res.searchEntries[0];
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  publish(dn: string, before: Entry | null, after: Entry | null): void {
+    const changes = diffEntries(before, after);
+    if (Object.keys(changes).length === 0 && before?.dn === after?.dn) return;
+    void launchHooks(this.server.hooks.onLdapEntryChange, dn, before, after);
+    this.notify(dn, changes, before, after);
+  }
+
+  notify(
+    dn: string,
+    changes: ChangesToNotify,
+    before: Entry | null,
+    after: Entry | null
+  ): void {
     void launchHooks(this.server.hooks.onLdapChange, dn, changes);
     for (const [configParam, hookName] of Object.entries(events)) {
       if (
@@ -179,11 +193,12 @@ class OnLdapChange extends DmPlugin {
           hookName === 'onLdapForwardChange' ||
           hookName === 'onLdapAliasChange'
         ) {
-          void this.notifyAttributeChangeWithMail(
+          this.notifyAttributeChangeWithMail(
             this.config[configParam] as string,
             hookName,
             dn,
-            changes
+            changes,
+            after
           );
         } else if (hookName === 'onLdapMailChange') {
           // Only mail change uses the simple notification
@@ -210,11 +225,9 @@ class OnLdapChange extends DmPlugin {
         }
       }
     }
-    // Trigger onLdapDisplayNameChange if cn, givenName or sn changed
-    if (changes.cn || changes.givenName || changes.sn) {
-      // Reconstruct old and new display names from changed attributes
-      const oldDisplayName = this.reconstructDisplayName(changes, 0);
-      const newDisplayName = this.reconstructDisplayName(changes, 1);
+    const oldDisplayName = this.reconstructDisplayName(before);
+    const newDisplayName = this.reconstructDisplayName(after);
+    if (oldDisplayName !== newDisplayName) {
       void launchHooks(
         this.server.hooks.onLdapDisplayNameChange,
         dn,
@@ -244,12 +257,13 @@ class OnLdapChange extends DmPlugin {
     }
   }
 
-  async notifyAttributeChangeWithMail(
+  notifyAttributeChangeWithMail(
     attribute: string,
     hookName: keyof Hooks,
     dn: string,
-    changes: ChangesToNotify
-  ): Promise<void> {
+    changes: ChangesToNotify,
+    after: Entry | null
+  ): void {
     const [oldValue, newValue] = changes[attribute] || [];
     if (oldValue === undefined && newValue === undefined) return;
 
@@ -263,28 +277,16 @@ class OnLdapChange extends DmPlugin {
       mail = Array.isArray(mailChange[1])
         ? String(mailChange[1][0])
         : String(mailChange[1]);
+    } else if (after?.[mailAttr]) {
+      const mailValue = after[mailAttr];
+      mail = Array.isArray(mailValue)
+        ? String(mailValue[0])
+        : String(mailValue);
     } else {
-      // Mail not changing, fetch from LDAP
-      try {
-        const result = (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes: [mailAttr] },
-          dn
-        )) as SearchResult;
-        if (result.searchEntries.length === 1) {
-          const mailValue = result.searchEntries[0][mailAttr];
-          mail = Array.isArray(mailValue)
-            ? String(mailValue[0])
-            : String(mailValue);
-        } else {
-          this.logger.warn(
-            `Could not find mail for ${dn}, skipping ${hookName} notification`
-          );
-          return;
-        }
-      } catch (err) {
-        this.logger.error(`Error fetching mail for ${dn}:`, err);
-        return;
-      }
+      this.logger.warn(
+        `Could not find mail for ${dn}, skipping ${hookName} notification`
+      );
+      return;
     }
 
     // Handle different hook types
@@ -331,17 +333,12 @@ class OnLdapChange extends DmPlugin {
 
   /**
    * Reconstruct display name from cn, givenName, and sn attributes
-   * @param changes - The changes object
-   * @param index - 0 for old value, 1 for new value
+   * @param entry - The entry, before or after the change
    * @returns The reconstructed display name or null
    */
-  reconstructDisplayName(
-    changes: ChangesToNotify,
-    index: 0 | 1
-  ): string | null {
+  reconstructDisplayName(entry: Entry | null): string | null {
     const getValue = (attr: string): string | null => {
-      if (!changes[attr]) return null;
-      const value = changes[attr][index];
+      const value = entry?.[attr];
       if (!value) return null;
       if (Array.isArray(value))
         return value.length > 0 ? String(value[0]) : null;

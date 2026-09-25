@@ -2,7 +2,7 @@
  * Types for hooks
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import type { SearchOptions, SearchResult } from 'ldapts';
+import type { Entry, SearchOptions, SearchResult } from 'ldapts';
 import type { Request, Response } from 'express';
 
 import type {
@@ -137,7 +137,19 @@ export interface Hooks {
   // this hook is for low-level ldap listGroups method
   _ldapgrouplist?: ChainedHook<AsyncGenerator<SearchResult>>;
 
-  /** "onLdapChange" */
+  /**
+   * "onLdapChange"
+   *
+   * `onLdapEntryChange` gives the entry as the directory held it before and
+   * after an add, a modify, a rename or a delete; the other hooks are derived
+   * from it. `before` is null on an add, `after` on a delete, and on a rename
+   * their `dn` differ. A write that changed nothing fires none of them.
+   */
+  onLdapEntryChange?: (
+    dn: string,
+    before: Entry | null,
+    after: Entry | null
+  ) => MaybePromise<void>;
   onLdapChange?: (dn: string, changes: ChangesToNotify) => MaybePromise<void>;
   onLdapMailChange?: (
     dn: string,

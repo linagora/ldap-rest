@@ -4,6 +4,19 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### `onLdapChange` gives full values
+
+**Who is affected:** plugins listening to `onLdapChange` that read the values
+of an `add`, or of a `delete` naming values, as the values added or removed.
+
+Each attribute now maps to all its values before and after the write. Adding
+`c` to `member: [a, b]` gave `[null, [c]]` and gives `[[a, b], [a, b, c]]`.
+Compute what was added or removed as the difference of the two sides, as the
+plugins shipped with LDAP-Rest do. A `replace` with the current value no
+longer fires the hook.
+
 ## To 0.9.0
 
 ### Two authorization plugins judging the same requests no longer start
