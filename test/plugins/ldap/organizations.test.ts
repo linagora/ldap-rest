@@ -246,6 +246,37 @@ describe('LDAP Organizations Plugin', function () {
       await plugin.isEmptyOrganization(testOrgDn);
       // If we get here without exception, the organization is correctly identified as empty
     });
+
+    // A DN is a filter value like any other: `*` made the search a substring
+    // match, which a DN attribute never satisfies, and `(` broke the filter.
+    for (const name of ['a*b', 'R&D (Paris)']) {
+      it(`sees the entries linked to ${name}`, async () => {
+        const linkAttr = server.config
+          .ldap_organization_link_attribute as string;
+        const org = `ou=${name},${DM_LDAP_TOP_ORGANIZATION}`;
+        const user = `uid=esclinked,${process.env.DM_LDAP_BASE}`;
+        await plugin.server.ldap.add(org, {
+          objectClass: ['organizationalUnit', 'top'],
+          ou: name,
+        });
+        try {
+          await plugin.server.ldap.add(user, {
+            objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+            uid: 'esclinked',
+            cn: 'Linked',
+            sn: 'Linked',
+            [linkAttr]: org,
+          });
+          let error: unknown;
+          await plugin.isEmptyOrganization(org).catch(e => (error = e));
+          expect(error).to.be.instanceOf(Error);
+          expect((error as Error).message).to.match(/is not empty/);
+        } finally {
+          await plugin.server.ldap.delete(user).catch(() => undefined);
+          await plugin.server.ldap.delete(org).catch(() => undefined);
+        }
+      });
+    }
   });
 
   describe('hooks', () => {

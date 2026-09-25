@@ -95,6 +95,16 @@ describe('AuthzLinid1 Plugin', () => {
       const dn = await authz.getUserDn('nonexistent');
       expect(dn).to.be.null;
     });
+
+    it('does not resolve a uid holding a wildcard to someone else', async () => {
+      await dm.ldap.add(getTestUserDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      });
+      expect(await authz.getUserDn('testad*')).to.be.null;
+    });
   });
 
   describe('getUserPermissions', () => {

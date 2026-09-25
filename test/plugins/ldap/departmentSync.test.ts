@@ -151,6 +151,43 @@ describe('LDAP Department Sync Plugin', function () {
       expect(userPath).to.equal('SyncTestOrgMoved');
     });
 
+    it('updates the resources linked to an organization whose DN holds parentheses', async () => {
+      const linkAttr =
+        DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE || 'twakeDepartmentLink';
+      const pathAttr =
+        DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE || 'twakeDepartmentPath';
+      const org = `ou=R&D (Paris),${DM_LDAP_TOP_ORGANIZATION}`;
+      const moved = `ou=R&D (Lyon),${DM_LDAP_TOP_ORGANIZATION}`;
+      await server.ldap.add(org, {
+        objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+        ou: 'R&D (Paris)',
+        [pathAttr]: 'R&D (Paris)',
+      });
+      try {
+        await server.ldap.add(testUserDn, {
+          objectClass: ['twakeAccount', 'twakeWhitePages', 'top'],
+          uid: 'synctestuser',
+          cn: 'Sync Test User',
+          sn: 'User',
+          mail: 'synctestuser@example.org',
+          [linkAttr]: org,
+          [pathAttr]: 'R&D (Paris)',
+        });
+        await server.ldap.rename(org, moved);
+        await plugin.hooks.ldaprenamedone?.([org, moved]);
+        const user = (
+          (await server.ldap.search(
+            { paged: false, scope: 'base', attributes: [linkAttr] },
+            testUserDn
+          )) as SearchResult
+        ).searchEntries[0];
+        expect(String(user[linkAttr])).to.equal(moved);
+      } finally {
+        await server.ldap.delete(org).catch(() => undefined);
+        await server.ldap.delete(moved).catch(() => undefined);
+      }
+    });
+
     it('should update resources linked to sub-organizations when parent is renamed', async () => {
       const linkAttr =
         DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE || 'twakeDepartmentLink';

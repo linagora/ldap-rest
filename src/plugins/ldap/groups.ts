@@ -1059,7 +1059,10 @@ export default class LdapGroups extends DmPlugin {
     partial = false,
     attributes: string[] = [this.cn, 'member']
   ): Promise<LdapList> {
-    const filter = partial ? `(${this.cn}=*${cn}*)` : `(${this.cn}=${cn})`;
+    const value = escapeLdapFilter(cn);
+    const filter = partial
+      ? `(${this.cn}=*${value}*)`
+      : `(${this.cn}=${value})`;
     return await this.listGroups({ filter, attributes });
   }
 

@@ -846,7 +846,7 @@ export default class LdapOrganizations extends DmPlugin {
   async isEmptyOrganization(dn: string): Promise<void> {
     const res = await this.server.ldap.search({
       paged: false,
-      filter: `(${this.config.ldap_organization_link_attribute}=${dn})`,
+      filter: `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(dn)})`,
     });
     if ((res as SearchResult).searchEntries.length > 0)
       throw new ConflictError(`Organization ${dn} is not empty`);
