@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/twake/lifecycleEvents`: publishes an account's lifecycle (created,
+  role changed, disabled, enabled, deleted) to RabbitMQ from the directory
+  write, so every API writing the entry announces the same events. Entries,
+  attributes, exchanges, routing keys and payloads are configuration
+  ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
+
 ## v0.9.0 (2026-09-24)
 
 Authorization that says what it judges: rules keyed on a login rather than on

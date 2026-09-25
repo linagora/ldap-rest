@@ -266,6 +266,13 @@ export interface Config {
   cloudery_default_locale?: string;
   cloudery_workflow_poll_interval_ms?: number;
   cloudery_workflow_max_attempts?: number;
+  twake_lifecycle_role_attribute?: string;
+  twake_lifecycle_lock_attribute?: string;
+  twake_lifecycle_deleted_attribute?: string;
+  twake_lifecycle_deleted_value?: string;
+  twake_lifecycle_deleted_at_attribute?: string;
+  twake_lifecycle_deleted_at_format?: string;
+  twake_lifecycle_rules?: string;
   rabbitmq_url?: string;
 
   // Applicative Accounts plugin
@@ -711,6 +718,33 @@ const configArgs: ConfigTemplate = [
     60,
     'number',
   ],
+
+  // Account lifecycle attributes, shared by the twake lifecycle plugins
+  ['--twake-lifecycle-role-attribute', 'DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE', ''],
+  ['--twake-lifecycle-lock-attribute', 'DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE', ''],
+  [
+    '--twake-lifecycle-deleted-attribute',
+    'DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE',
+    '',
+  ],
+  [
+    '--twake-lifecycle-deleted-value',
+    'DM_TWAKE_LIFECYCLE_DELETED_VALUE',
+    'TRUE',
+  ],
+  [
+    '--twake-lifecycle-deleted-at-attribute',
+    'DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE',
+    '',
+  ],
+  [
+    '--twake-lifecycle-deleted-at-format',
+    'DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT',
+    'iso8601',
+  ],
+  // twake/lifecycleEvents plugin
+  ['--twake-lifecycle-rules', 'DM_TWAKE_LIFECYCLE_RULES', ''],
+
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
 
   // Applicative Accounts plugin
