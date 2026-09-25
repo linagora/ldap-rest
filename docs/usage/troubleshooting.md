@@ -89,15 +89,7 @@ DM_LOG_LEVEL=debug ldap-rest
 
 ## Testing
 
-Run the test suite:
-
-```bash
-# All tests
-source ~/.test-env && npm run test:dev
-
-# Single file
-source ~/.test-env && npm run test:one test/path/to/file.test.ts
-```
+See [Tests and checks](../../CONTRIBUTING.md#tests-and-checks).
 
 ## Support
 

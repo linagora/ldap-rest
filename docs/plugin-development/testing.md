@@ -76,23 +76,7 @@ Loading initial LDIF from .../base-structure.ldif...
 
 ### Running Tests
 
-**Using embedded LDAP (no setup required):**
-
-```bash
-npm test
-npm run test:one test/plugins/ldap/flatGeneric.test.ts
-```
-
-**Using external LDAP:**
-
-```bash
-export DM_LDAP_URL=ldap://localhost:389
-export DM_LDAP_DN=cn=admin,dc=example,dc=com
-export DM_LDAP_PWD=secret
-export DM_LDAP_BASE=dc=example,dc=com
-
-npm test
-```
+See [Tests and checks](../../CONTRIBUTING.md#tests-and-checks).
 
 ### In CI/CD
 

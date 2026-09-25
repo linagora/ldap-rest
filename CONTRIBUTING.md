@@ -15,8 +15,7 @@ npm install
 npm run build:dev
 ```
 
-To run the server with every plugin loaded, point it to a directory first,
-with a `~/.test-env` file such as:
+To run the server with every plugin loaded, point it to a directory first:
 
 ```bash
 export DM_LDAP_URL="ldap://localhost:389"
@@ -24,10 +23,7 @@ export DM_LDAP_DN="cn=admin,dc=example,dc=com"
 export DM_LDAP_PWD="admin"
 export DM_LDAP_BASE="dc=example,dc=com"
 export DM_LDAP_TOP_ORGANIZATION="ou=organization,dc=example,dc=com"
-```
-
-```bash
-source ~/.test-env && npm run start:dev
+npm run start:dev
 ```
 
 ## Where to read next
@@ -40,7 +36,7 @@ source ~/.test-env && npm run start:dev
 - [Client development](./docs/client-development/README.md): REST API,
   browser libraries, schemas
 
-## Checks
+## Tests and checks
 
 ```bash
 npm run test:dev                  # build, then the whole suite
@@ -50,7 +46,8 @@ npm run fix                       # ESLint and Prettier fixes
 ```
 
 Without `DM_LDAP_*` variables, the tests run against an embedded LDAP server
-in Docker; `source ~/.test-env` first to use yours.
+in Docker; set them as above to use yours. How the embedded server works:
+[testing](./docs/plugin-development/testing.md).
 
 ### Coverage
 

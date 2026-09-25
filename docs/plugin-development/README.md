@@ -1283,24 +1283,7 @@ describe('NotificationPlugin', function () {
 
 ### Running Tests
 
-```bash
-# Set up test environment
-cat > ~/.test-env <<EOF
-export DM_LDAP_URL="ldap://localhost:389"
-export DM_LDAP_DN="cn=admin,dc=example,dc=com"
-export DM_LDAP_PWD="admin"
-export DM_LDAP_BASE="dc=example,dc=com"
-EOF
-
-# Run all tests
-source ~/.test-env && npm test
-
-# Run specific test file
-source ~/.test-env && npm run test:one test/plugins/notification/webhook.test.ts
-
-# Run tests in watch mode
-source ~/.test-env && npm run test:dev
-```
+See [Tests and checks](../../CONTRIBUTING.md#tests-and-checks).
 
 ### Test Best Practices
 
