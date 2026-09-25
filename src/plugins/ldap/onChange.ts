@@ -161,7 +161,15 @@ class OnLdapChange extends DmPlugin {
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;
-      return res.searchEntries[0];
+      const entry = res.searchEntries[0];
+      if (!entry) return undefined;
+      // ldapts lists every attribute requested, `*` included, with an empty
+      // array for those the entry does not hold
+      return Object.fromEntries(
+        Object.entries(entry).filter(
+          ([, v]) => !Array.isArray(v) || v.length > 0
+        )
+      ) as Entry;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
       return undefined;

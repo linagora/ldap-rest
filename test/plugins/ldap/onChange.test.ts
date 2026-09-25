@@ -158,6 +158,7 @@ describe('onChange', () => {
       const [, before, after] = entryChanges[0];
       expect(before).to.include({ sn: 'Doe', mail: 'm@example.com' });
       expect(after).to.include({ sn: 'Smith', mail: 'm@example.com' });
+      expect(after).to.not.have.property('*');
       await waitFor(() => ldapChanges.length > 0);
       expect(ldapChanges[0][1]).to.eql({ sn: ['Doe', 'Smith'] });
     });
