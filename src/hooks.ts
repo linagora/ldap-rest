@@ -11,6 +11,7 @@ import type {
   AttributeValue,
 } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/ldap/onChange';
+import type { ChangeContext } from './lib/changeContext';
 import * as utils from './lib/utils';
 
 export type MaybePromise<T> = Promise<T> | T;
@@ -65,18 +66,30 @@ export interface Hooks {
   ldapsearchfilter?: ChainedHook<[SearchResult, Request?, SearchOptions?]>;
   // add
   ldapaddrequest?: ChainedHook<[string, AttributesList, Request?]>;
-  ldapadddone?: (args: [string, AttributesList]) => MaybePromise<void>;
+  // The "done" hooks get, after their arguments, who made the write and
+  // through which door: empty for a write no request is behind
+  ldapadddone?: (
+    args: [string, AttributesList],
+    context?: ChangeContext
+  ) => MaybePromise<void>;
   // modify
   ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request?]>;
   ldapmodifydone?: (
-    args: [string, ModifyRequest, number]
+    args: [string, ModifyRequest, number],
+    context?: ChangeContext
   ) => MaybePromise<void>;
   // delete
   ldapdeleterequest?: ChainedHook<[string | string[], Request?]>;
-  ldapdeletedone?: (dn: string | string[]) => MaybePromise<void>;
+  ldapdeletedone?: (
+    dn: string | string[],
+    context?: ChangeContext
+  ) => MaybePromise<void>;
   // rename
   ldaprenamerequest?: ChainedHook<[string, string, Request?]>;
-  ldaprenamedone?: (args: [string, string]) => MaybePromise<void>;
+  ldaprenamedone?: (
+    args: [string, string],
+    context?: ChangeContext
+  ) => MaybePromise<void>;
 
   /**
    * Plugins
@@ -148,7 +161,8 @@ export interface Hooks {
   onLdapEntryChange?: (
     dn: string,
     before: Entry | null,
-    after: Entry | null
+    after: Entry | null,
+    context: ChangeContext
   ) => MaybePromise<void>;
   onLdapChange?: (dn: string, changes: ChangesToNotify) => MaybePromise<void>;
   onLdapMailChange?: (

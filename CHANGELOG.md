@@ -27,6 +27,10 @@
   entry before and after each add, modify, rename and delete
   ([#206](https://github.com/linagora/ldap-rest/issues/206))
 
+- The `ldap*done` hooks and `onLdapEntryChange` receive who made the write
+  and through which door: `actor`, `requestId`, `source` (`rest` or `scim`)
+  ([#207](https://github.com/linagora/ldap-rest/issues/207))
+
 ### Bug Fixes
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`

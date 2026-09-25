@@ -13,6 +13,7 @@ import type { Hooks } from '../../hooks';
 import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
 import { launchHooks } from '../../lib/utils';
 import type { Config } from '../../bin';
+import type { ChangeContext } from '../../lib/changeContext';
 
 export type ChangesToNotify = Record<
   string,
@@ -84,9 +85,9 @@ class OnLdapChange extends DmPlugin {
   pendingRenames: Map<string, Entry> = new Map();
 
   hooks: Hooks = {
-    ldapadddone: async ([dn, attributes]) => {
+    ldapadddone: async ([dn, attributes], context) => {
       const after = (await this.read(dn)) || { dn, ...attributes };
-      this.publish(dn, null, after);
+      this.publish(dn, null, after, context);
     },
 
     // The request travels with the tuple: `launchHooksChained` feeds each
@@ -102,7 +103,7 @@ class OnLdapChange extends DmPlugin {
       return [dn, attributes, op, req];
     },
 
-    ldapmodifydone: async ([dn, changes, op]) => {
+    ldapmodifydone: async ([dn, changes, op], context) => {
       const before = this.stack[op];
       delete this.stack[op];
       if (!before) {
@@ -117,7 +118,7 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read ${dn} after modification`);
         return;
       }
-      this.publish(dn, before, after);
+      this.publish(dn, before, after, context);
     },
 
     ldaprenamerequest: async ([dn, newDn, req]) => {
@@ -126,7 +127,7 @@ class OnLdapChange extends DmPlugin {
       return [dn, newDn, req];
     },
 
-    ldaprenamedone: async ([dn, newDn]) => {
+    ldaprenamedone: async ([dn, newDn], context) => {
       const before = this.pendingRenames.get(dn);
       this.pendingRenames.delete(dn);
       const after = await this.read(newDn);
@@ -134,7 +135,7 @@ class OnLdapChange extends DmPlugin {
         this.logger.warn(`Could not read both sides of ${dn} -> ${newDn}`);
         return;
       }
-      this.publish(newDn, before, after);
+      this.publish(newDn, before, after, context);
     },
 
     ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
@@ -145,12 +146,12 @@ class OnLdapChange extends DmPlugin {
       return [dn, req] as [string | string[], Request?];
     },
 
-    ldapdeletedone: (dn: string | string[]) => {
+    ldapdeletedone: (dn: string | string[], context?: ChangeContext) => {
       for (const target of Array.isArray(dn) ? dn : [dn]) {
         const before = this.pendingDeletions.get(target);
         if (!before) continue;
         this.pendingDeletions.delete(target);
-        this.publish(target, before, null);
+        this.publish(target, before, null, context);
       }
     },
   };
@@ -176,10 +177,21 @@ class OnLdapChange extends DmPlugin {
     }
   }
 
-  publish(dn: string, before: Entry | null, after: Entry | null): void {
+  publish(
+    dn: string,
+    before: Entry | null,
+    after: Entry | null,
+    context: ChangeContext = {}
+  ): void {
     const changes = diffEntries(before, after);
     if (Object.keys(changes).length === 0 && before?.dn === after?.dn) return;
-    void launchHooks(this.server.hooks.onLdapEntryChange, dn, before, after);
+    void launchHooks(
+      this.server.hooks.onLdapEntryChange,
+      dn,
+      before,
+      after,
+      context
+    );
     this.notify(dn, changes, before, after);
   }
 

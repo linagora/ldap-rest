@@ -20,5 +20,5 @@ Typescript definitions into [hooks.ts](./src/hooks.ts)
 ## [onChange](../usage/plugins/ldap/on-change.md) hooks
 
 - **onLdapEntryChange**: called after any write, with the entry before and
-  after it
+  after it, and who made it
 - **onLdapChange**, **onLdapMailChange**…: derived from it

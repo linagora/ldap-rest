@@ -8,8 +8,10 @@ import OnLdapChange, {
 } from '../../../src/plugins/ldap/onChange';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
+import type { ChangeContext } from '../../../src/lib/changeContext';
+import type { Request } from 'express';
 
-type EntryChange = [string, Entry | null, Entry | null];
+type EntryChange = [string, Entry | null, Entry | null, ChangeContext];
 
 describe('onChange', () => {
   describe('diffEntries', () => {
@@ -113,8 +115,13 @@ describe('onChange', () => {
       await dm.ready;
       await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
       dm.hooks.onLdapEntryChange = [
-        (dn: string, before: Entry | null, after: Entry | null) => {
-          entryChanges.push([dn, before, after]);
+        (
+          dn: string,
+          before: Entry | null,
+          after: Entry | null,
+          context: ChangeContext
+        ) => {
+          entryChanges.push([dn, before, after, context]);
         },
       ];
       dm.hooks.onLdapChange = [
@@ -214,6 +221,32 @@ describe('onChange', () => {
       expect(got).to.equal(dn);
       expect(before).to.include({ dn, uid: 'ochdel' });
       expect(after).to.be.null;
+    });
+
+    it('gives an empty context to a write no request is behind', async () => {
+      await addUser('ochsys');
+      await dm.ldap.modify(user('ochsys'), { replace: { sn: 'Other' } });
+      await waitFor(() => entryChanges.length > 0);
+      expect(entryChanges[0][3]).to.eql({});
+    });
+
+    it('names the caller, and one id for every write of a request', async () => {
+      const req = { user: 'token1', userName: 'Jane' } as unknown as Request;
+      const dn = user('ochctx');
+      created.push(dn);
+      const ldap = dm.ldap.forRequest(req);
+      await ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'ochctx',
+        cn: 'Ctx',
+        sn: 'Doe',
+      });
+      await ldap.modify(dn, { replace: { sn: 'Other' } });
+      await waitFor(() => entryChanges.length >= 2);
+      const [add, modify] = entryChanges.map(c => c[3]);
+      expect(add).to.include({ actor: 'Jane', source: 'rest' });
+      expect(add.requestId).to.be.a('string');
+      expect(modify.requestId).to.equal(add.requestId);
     });
   });
 });

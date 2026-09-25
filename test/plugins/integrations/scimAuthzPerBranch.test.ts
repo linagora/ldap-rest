@@ -24,6 +24,8 @@ import { DM } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import type { Hooks } from '../../../src/hooks';
+import type { ChangeContext } from '../../../src/lib/changeContext';
+import { waitFor } from '../../helpers/waitFor';
 
 /** Minimal auth plugin: identifies the caller from the `x-scim-user` header. */
 class HeaderAuthPlugin extends AuthBase {
@@ -181,6 +183,29 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
         userName,
         name: { familyName: 'Doe' },
       });
+
+  it('a SCIM write says who made it, and through which door', async () => {
+    const seen: [string, ChangeContext][] = [];
+    const listener = (
+      dn: string,
+      _before: unknown,
+      _after: unknown,
+      context: ChangeContext
+    ) => {
+      seen.push([dn, context]);
+    };
+    server.hooks.onLdapEntryChange = [listener];
+    try {
+      await createUser('writer', 'alice').expect(201);
+      const dn = `uid=alice,${peopleBase}`;
+      await waitFor(() => seen.some(([d]) => d === dn));
+      const [, context] = seen.find(([d]) => d === dn)!;
+      expect(context).to.include({ actor: 'writer', source: 'scim' });
+      expect(context.requestId).to.be.a('string');
+    } finally {
+      server.hooks.onLdapEntryChange = [];
+    }
+  });
 
   describe('read enforcement', () => {
     // SCIM reads used to call ldap.search() without the request, exactly as
