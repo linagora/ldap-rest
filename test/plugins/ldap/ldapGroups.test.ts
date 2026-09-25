@@ -167,6 +167,25 @@ describe('LdapGroups Plugin', function () {
       });
     });
 
+    it('should remove a member whose DN holds filter characters from all groups', async () => {
+      const odd = `uid=odd(1)*,${process.env.DM_LDAP_BASE}`;
+      await plugin.ldap.add(odd, {
+        objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+        cn: 'Odd User',
+        sn: 'User',
+        uid: 'odd(1)*',
+      });
+      try {
+        await plugin.addGroup('testgroup', [odd, user1]);
+        await plugin.deleteMemberFromAll(odd);
+        expect(
+          (await plugin.searchGroupsByName('testgroup')).testgroup.member
+        ).to.deep.equal([user1]);
+      } finally {
+        await plugin.ldap.delete(odd).catch(() => undefined);
+      }
+    });
+
     it('should rename group', async () => {
       await plugin.addGroup('testgroup', [user1]);
       expect(await plugin.searchGroupsByName('testgroup')).to.deep.equal({

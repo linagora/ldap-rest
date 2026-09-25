@@ -876,7 +876,7 @@ export default class LdapGroups extends DmPlugin {
     const res = (await this.ldap
       .search(
         {
-          filter: `member=${memberDn}`,
+          filter: `member=${escapeLdapFilter(memberDn)}`,
           paged: false,
           attributes: [this.cn],
         },

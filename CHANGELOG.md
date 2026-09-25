@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- `core/ldap/groups`: removing a deleted entry from every group put its DN
+  into the search filter unescaped, so a DN holding `(`, `)` or `*` failed
+  the search or matched other members, and the entry stayed in its groups
+
 ## v0.9.0 (2026-09-24)
 
 Authorization that says what it judges: rules keyed on a login rather than on
