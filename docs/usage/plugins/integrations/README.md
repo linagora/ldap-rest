@@ -16,6 +16,7 @@ Plugins for connecting LDAP-Rest to external systems.
 | [calendar](calendar.md)                 | Calendar resources and users sync        |
 | [app-accounts](app-accounts.md)         | Applicative accounts API (devices, apps) |
 | [lifecycle-events](lifecycle-events.md) | Account lifecycle events to RabbitMQ     |
+| [tombstone](tombstone.md)               | Deleted accounts kept as tombstones      |
 
 ## Prerequisites
 

@@ -450,6 +450,24 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 
 **Requires:** `core/ldap/onChange`, `core/rabbitmq`
 
+#### `core/twake/tombstone`
+
+Reads the `--twake-lifecycle-*` attributes above, and:
+
+| CLI                                  | Env                                   | Default             | Description                               |
+| ------------------------------------ | ------------------------------------- | ------------------- | ----------------------------------------- |
+| `--twake-lifecycle-lock-value`       | `DM_TWAKE_LIFECYCLE_LOCK_VALUE`       | `000001010000Z`     | Lock value written on a tombstone         |
+| `--twake-lifecycle-reason-attribute` | `DM_TWAKE_LIFECYCLE_REASON_ATTRIBUTE` |                     | Deletion reason attribute                 |
+| `--twake-tombstone-dn`               | `DM_TWAKE_TOMBSTONE_DN`               | `[]`                | DN patterns of entries kept as tombstones |
+| `--twake-tombstone-default-reason`   | `DM_TWAKE_TOMBSTONE_DEFAULT_REASON`   | `deleted`           | Reason when none is given                 |
+| `--twake-tombstone-reason-header`    | `DM_TWAKE_TOMBSTONE_REASON_HEADER`    | `x-deletion-reason` | Request header carrying the reason        |
+| `--twake-tombstone-reasons`          | `DM_TWAKE_TOMBSTONE_REASONS`          | `[]`                | Accepted reasons (empty: any)             |
+| `--twake-tombstone-clear-attributes` | `DM_TWAKE_TOMBSTONE_CLEAR_ATTRIBUTES` | `[]`                | Attributes removed from a tombstone       |
+| `--twake-tombstone-erase-min-age`    | `DM_TWAKE_TOMBSTONE_ERASE_MIN_AGE`    | `2592000`           | Seconds before a tombstone may be erased  |
+| `--twake-tombstone-group-bases`      | `DM_TWAKE_TOMBSTONE_GROUP_BASES`      | `--ldap-group-base` | Where memberships are removed at erase    |
+
+See [tombstone](plugins/integrations/tombstone.md).
+
 ### Utility Plugins
 
 #### `core/static`

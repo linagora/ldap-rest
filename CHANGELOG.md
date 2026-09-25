@@ -10,6 +10,13 @@
   attributes, exchanges, routing keys and payloads are configuration
   ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
 
+- `core/twake/tombstone`: the delete of a matching account writes a
+  tombstone (deleted flag, date, reason, lock) instead, and a second delete
+  announces it again. SCIM treats a tombstone as gone, and a SCIM create with
+  its identity replaces it. `POST /api/v1/twake/tombstones/erase` removes a
+  tombstone and its group memberships once the deletion is old enough, or
+  when forced ([docs](docs/usage/plugins/integrations/tombstone.md))
+
 ### Bug Fixes
 
 - `core/ldap/groups`: an entry left its groups as soon as its delete was
