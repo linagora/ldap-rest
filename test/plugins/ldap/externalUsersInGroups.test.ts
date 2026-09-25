@@ -4,6 +4,7 @@ import { DM } from '../../../src/bin';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import { SearchResult } from 'ldapts';
 import { ConflictError } from '../../../src/lib/errors';
+import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
@@ -150,7 +151,14 @@ describe('External users in groups', function () {
       // Delete user - the hook should automatically remove it from groups
       await plugin.ldap.delete(externalUser);
 
-      // Verify user was removed from group by the hook
+      // Verify user was removed from group by the hook, which runs once the
+      // delete has landed
+      await waitFor(
+        async () =>
+          (await plugin.searchGroupsByName('testgroup2')).testgroup2.member
+            .length === 0,
+        { what: 'the deleted member to leave the group' }
+      );
       expect(await plugin.searchGroupsByName('testgroup2')).to.deep.equal({
         testgroup2: {
           dn: `cn=testgroup2,${DM_LDAP_GROUP_BASE}`,
