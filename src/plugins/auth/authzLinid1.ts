@@ -10,6 +10,7 @@ import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import AuthzBase from '../../lib/authz/base';
+import { escapeLdapFilter } from '../../lib/utils';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
@@ -47,7 +48,7 @@ export default class AuthzLinid1 extends AuthzBase {
    */
   async getUserDn(uid: string): Promise<string | null> {
     try {
-      const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${uid})`;
+      const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
       const result = (await this.server.ldap.search(
         {
           paged: false,
@@ -118,7 +119,7 @@ export default class AuthzLinid1 extends AuthzBase {
       // Search for all organizations where this user is in local admin attribute
       const adminAttr =
         this.config.authz_local_admin_attribute || 'twakeLocalAdminLink';
-      const filter = `(${adminAttr}=${userDn})`;
+      const filter = `(${adminAttr}=${escapeLdapFilter(userDn)})`;
       const orgBase =
         this.config.ldap_top_organization || this.config.ldap_base || '';
 

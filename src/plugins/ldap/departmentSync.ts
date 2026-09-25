@@ -15,6 +15,7 @@ import type { Hooks } from '../../hooks';
 import { roleAttribute, type Schema } from '../../config/schema';
 import {
   getParentDn,
+  escapeLdapFilter,
   isDnInBranch,
   normalizeDn,
   parseDn,
@@ -258,7 +259,7 @@ export default class LdapDepartmentSync extends DmPlugin {
     baseDn: string,
     attrs: LinkedAttributes
   ): Promise<void> {
-    const filter = `(${attrs.link}=${oldDn})`;
+    const filter = `(${attrs.link}=${escapeLdapFilter(oldDn)})`;
     this.logger.debug(
       `Searching for resources directly linked to ${oldDn}: ${filter}`
     );

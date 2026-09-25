@@ -362,6 +362,41 @@ describe('App Accounts Consistency Plugin', function () {
       }
     });
 
+    it("leaves another user's applicative account when the deleted mail holds a wildcard", async () => {
+      await dm.ldap.add(testUserDN, {
+        objectClass: 'inetOrgPerson',
+        uid: `testuser-${timestamp}`,
+        cn: 'Test User',
+        sn: 'User',
+        mail: `testuser-${timestamp}@example.com`,
+      });
+      await waitForEntry(dm, testApplicativeDN);
+
+      const wildDN = `uid=testwild-${timestamp},${userBase}`;
+      const wildApplicativeDN = `uid=testuser-*@example.com,${applicativeBase}`;
+      try {
+        await dm.ldap.add(wildDN, {
+          objectClass: 'inetOrgPerson',
+          uid: `testwild-${timestamp}`,
+          cn: 'Wild',
+          sn: 'Wild',
+          mail: 'testuser-*@example.com',
+        });
+        await waitForEntry(dm, wildApplicativeDN);
+        await dm.ldap.delete(wildDN);
+        await waitForNoEntry(dm, wildApplicativeDN);
+
+        const result = await dm.ldap.search(
+          { scope: 'base', paged: false },
+          testApplicativeDN
+        );
+        expect((result as any).searchEntries).to.have.lengthOf(1);
+      } finally {
+        await dm.ldap.delete(wildDN).catch(() => undefined);
+        await dm.ldap.delete(wildApplicativeDN).catch(() => undefined);
+      }
+    });
+
     it('should delete multiple applicative accounts when user is deleted', async function () {
       this.timeout(10000);
 

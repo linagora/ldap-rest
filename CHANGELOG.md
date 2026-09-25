@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Security
+
+- `core/auth/authzLinid1`: an identity holding `*` resolved to the first user
+  the pattern matched, and was judged with that user's permissions
+
+- `core/twake/appAccountsConsistency`: deleting a user whose mail holds `*`
+  deleted every applicative account the pattern matched
+
 ### Features
 
 - `core/twake/cozyProvision`, `core/twake/clouderyProvision`: an empty
@@ -11,9 +19,16 @@
 
 ### Bug Fixes
 
-- `core/ldap/groups`: removing a deleted entry from every group put its DN
-  into the search filter unescaped, so a DN holding `(`, `)` or `*` failed
-  the search or matched other members, and the entry stayed in its groups
+- Values written into a search filter unescaped: a DN holding `(` or `)`
+  failed the search, and one holding `*` matched nothing, a DN attribute
+  having no substring match
+  - `core/ldap/groups`: a deleted entry stayed in its groups
+  - `core/ldap/organizations`: an organization looked empty, and was deleted
+    with entries still linked to it
+  - `core/ldap/departmentSync`: a renamed organization left the links to it
+    behind
+  - `core/auth/authzLinid1`: an administrator got no permission from the
+    organizations naming them
 
 ## v0.9.0 (2026-09-24)
 

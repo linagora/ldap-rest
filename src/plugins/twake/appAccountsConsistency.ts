@@ -34,7 +34,7 @@ import type {
   SearchResult,
 } from '../../lib/ldapActions';
 import { Hooks } from '../../hooks';
-import { escapeDnValue, isDnInBranch } from '../../lib/utils';
+import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 /**
  * Whether an error is the directory saying "that entry is not there".
@@ -333,7 +333,7 @@ export default class AppAccountsConsistency extends DmPlugin {
   private async deleteApplicativeAccount(mail: string): Promise<void> {
     try {
       // Search for applicative accounts by mail attribute
-      const filter = `(${this.mailAttr}=${mail})`;
+      const filter = `(${this.mailAttr}=${escapeLdapFilter(mail)})`;
 
       const result = await this.server.ldap.search(
         {
@@ -390,7 +390,7 @@ export default class AppAccountsConsistency extends DmPlugin {
   ): Promise<void> {
     try {
       // Search for the old applicative account
-      const filter = `(${this.mailAttr}=${oldMail})`;
+      const filter = `(${this.mailAttr}=${escapeLdapFilter(oldMail)})`;
       const result = await this.server.ldap.search(
         {
           filter,
