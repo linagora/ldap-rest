@@ -16,3 +16,9 @@ Typescript definitions into [hooks.ts](./src/hooks.ts)
 - **ldapmodifyrequest**: called before any ldapmodify
 - **ldapdeleterequest**: called before any ldapdelete
 - **ldaprenamerequest**: called before any ldap rename/modifyDN operation
+
+## [onChange](../usage/plugins/ldap/on-change.md) hooks
+
+- **onLdapEntryChange**: called after any write, with the entry before and
+  after it
+- **onLdapChange**, **onLdapMailChange**…: derived from it

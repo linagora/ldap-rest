@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `onLdapChange` gives the full values on each side of a change, not the
+  values the request named —
+  [notes](docs/usage/upgrading.md#onldapchange-gives-full-values)
+
 ### Security
 
 - `core/auth/authzLinid1`: an identity holding `*` resolved to the first user
@@ -16,6 +22,10 @@
   `--cozy-user-deleted-routing-key` stops them publishing the deletion event,
   for a deployment where another plugin publishes it. The instance is still
   deleted
+
+- `core/ldap/onChange` publishes `onLdapEntryChange(dn, before, after)`: the
+  entry before and after each add, modify, rename and delete
+  ([#206](https://github.com/linagora/ldap-rest/issues/206))
 
 ### Bug Fixes
 
@@ -37,6 +47,11 @@
   just after `delete()` answers, and a cleanup that fails is logged. A group
   losing its last member keeps the `--group-dummy-user` placeholder instead
   of the deleted DN
+
+- `core/ldap/onChange`: a write that leaves every value as it was fires no
+  hook, a rename fires them, and a modify of an entry that has children is no
+  longer missed. `onLdapDisplayNameChange` builds both names from the whole
+  entry, and fires only when the name changed
 
 ## v0.9.0 (2026-09-24)
 
