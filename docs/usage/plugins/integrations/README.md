@@ -11,10 +11,11 @@ Plugins for connecting LDAP-Rest to external systems.
 
 ## Twake
 
-| Plugin                          | Description                              |
-| ------------------------------- | ---------------------------------------- |
-| [calendar](calendar.md)         | Calendar resources and users sync        |
-| [app-accounts](app-accounts.md) | Applicative accounts API (devices, apps) |
+| Plugin                                  | Description                              |
+| --------------------------------------- | ---------------------------------------- |
+| [calendar](calendar.md)                 | Calendar resources and users sync        |
+| [app-accounts](app-accounts.md)         | Applicative accounts API (devices, apps) |
+| [lifecycle-events](lifecycle-events.md) | Account lifecycle events to RabbitMQ     |
 
 ## Prerequisites
 
@@ -39,4 +40,8 @@ core/twake/james
 
 core/twake/calendar
   └─ requires: core/ldap/onChange
+
+core/twake/lifecycleEvents
+  ├─ requires: core/ldap/onChange
+  └─ requires: core/rabbitmq
 ```
