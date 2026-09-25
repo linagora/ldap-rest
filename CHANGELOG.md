@@ -31,6 +31,11 @@
   and through which door: `actor`, `requestId`, `source` (`rest` or `scim`)
   ([#207](https://github.com/linagora/ldap-rest/issues/207))
 
+- A plugin declares the operational attributes it follows, such as
+  `pwdAccountLockedTime`, in `followedOperationalAttributes`, and
+  `onLdapEntryChange` gives them on both sides
+  ([#208](https://github.com/linagora/ldap-rest/issues/208))
+
 ### Bug Fixes
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`

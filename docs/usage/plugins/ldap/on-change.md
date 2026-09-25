@@ -54,6 +54,18 @@ member was [a, b], the request added c:
 { member: [['a', 'b'], ['a', 'b', 'c']] }
 ```
 
+## Operational attributes
+
+A search returns no operational attribute unless asked by name, so neither
+side holds `pwdAccountLockedTime` or its kind by default, and a write changing
+only such an attribute fires no hook. A plugin that follows some declares them:
+
+```typescript
+followedOperationalAttributes = ['pwdAccountLockedTime'];
+```
+
+The entry is then read with `*` and every attribute a loaded plugin declares.
+
 ## What counts as a change
 
 Values are compared as sets: a single value and a one-element array are equal,
