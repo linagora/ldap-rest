@@ -4,6 +4,8 @@ import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import { SearchResult } from 'ldapts';
 
+import { waitFor } from '../../helpers/waitFor';
+
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
 
@@ -538,6 +540,84 @@ describe('LdapGroups Plugin', function () {
       )) as SearchResult;
       expect(group.searchEntries[0].twakeDepartmentLink).to.equal(org2Dn);
       expect(group.searchEntries[0].twakeDepartmentPath).to.equal('Test Org 2');
+    });
+  });
+
+  describe('deleted members', () => {
+    let dm: DM;
+    const leaver = `uid=groups-leaver,${process.env.DM_LDAP_BASE}`;
+    const members = async (): Promise<string[]> =>
+      (await plugin.searchGroupsByName('testgroup')).testgroup
+        .member as string[];
+
+    before(async () => {
+      dm = new DM();
+      await dm.ready;
+      await dm.registerPlugin('core/ldap/groups', new LdapGroups(dm));
+    });
+
+    beforeEach(async () => {
+      await dm.ldap.add(leaver, {
+        objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+        cn: 'Leaver',
+        sn: 'Leaver',
+        uid: 'groups-leaver',
+      });
+      await plugin.addGroup('testgroup', [leaver, user1]);
+    });
+
+    afterEach(async () => {
+      await dm.ldap.delete(leaver).catch(() => undefined);
+    });
+
+    it('leaves the groups once the delete has landed', async () => {
+      await dm.ldap.delete(leaver);
+      await waitFor(async () => (await members()).length === 1, {
+        what: 'the leaver to leave its groups',
+      });
+      expect(await members()).to.deep.equal([user1]);
+    });
+
+    it('leaves the placeholder in a group it was the last member of', async () => {
+      const solo = `cn=groups-solo,${DM_LDAP_GROUP_BASE}`;
+      // Written straight to the directory, so without the placeholder a
+      // group created through the plugin would hold.
+      await dm.ldap.add(solo, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'groups-solo',
+        member: leaver,
+      });
+      try {
+        await dm.ldap.delete(leaver);
+        const solos = async (): Promise<unknown> =>
+          (
+            (await dm.ldap.search(
+              { paged: false, scope: 'base', attributes: ['member'] },
+              solo
+            )) as SearchResult
+          ).searchEntries[0].member;
+        await waitFor(
+          async () => (await solos()) === dm.config.group_dummy_user,
+          { what: 'the placeholder to replace the last member' }
+        );
+      } finally {
+        await dm.ldap.delete(solo).catch(() => undefined);
+      }
+    });
+
+    it('stays in its groups when another plugin keeps the entry', async () => {
+      const keep = async ([dn, req]: [string[], unknown]) => [
+        dn.filter(d => d !== leaver),
+        req,
+      ];
+      const hooks = (dm.hooks.ldapdeleterequest ||= []);
+      hooks.push(keep);
+      try {
+        await dm.ldap.delete(leaver);
+      } finally {
+        hooks.splice(hooks.indexOf(keep), 1);
+      }
+      expect(await members()).to.deep.equal([leaver, user1]);
     });
   });
 });
