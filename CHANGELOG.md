@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Features
+
+- `core/twake/cozyProvision`, `core/twake/clouderyProvision`: an empty
+  `--cozy-user-deleted-routing-key` stops them publishing the deletion event,
+  for a deployment where another plugin publishes it. The instance is still
+  deleted
+
 ### Bug Fixes
 
 - `core/ldap/groups`: removing a deleted entry from every group put its DN

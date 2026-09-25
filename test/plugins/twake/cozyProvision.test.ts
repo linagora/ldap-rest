@@ -381,6 +381,22 @@ describe('CozyProvision plugin', () => {
       expect(rabbit.calls[0].routingKey).to.equal('domain.user.deleted');
     });
 
+    it('deletes the instance and publishes nothing when the routing key is empty', async () => {
+      dm.config.cozy_user_deleted_routing_key = '';
+      plugin = new CozyProvision(dm);
+      const scope = nock(COZY_URL)
+        .delete('/instances/eve.twake.local')
+        .reply(204);
+
+      const hook = plugin.hooks?.scimuserdeletedone as (
+        id: string
+      ) => Promise<void>;
+      await hook('eve');
+
+      expect(scope.isDone()).to.equal(true);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
     it('does not publish when the destroy errors', async () => {
       const scope = nock(COZY_URL)
         .delete('/instances/broken.twake.local')
