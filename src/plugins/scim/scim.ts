@@ -16,6 +16,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
+import { setChangeSource } from '../../lib/changeContext';
 
 import { BaseResolver } from './baseResolver';
 import { ScimUsers } from './users';
@@ -597,6 +598,11 @@ export default class Scim extends DmPlugin {
     // building the answer: on a write route the check would otherwise sit
     // after the directory had already been changed, and the caller would read
     // a 400 for a request that had in fact landed.
+    app.use(prefix, (req, _res, next) => {
+      setChangeSource(req, 'scim');
+      next();
+    });
+
     app.use(
       prefix,
       scimAsyncHandler((req, _res, next) => {

@@ -15,6 +15,7 @@ import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
 import { escapeDnValue, launchHooks, launchHooksChained } from './utils';
+import { changeContext } from './changeContext';
 import { ConflictError } from './errors';
 
 // Typescript interface
@@ -837,7 +838,11 @@ class ldapActions {
       // ldapmodify — and re-created through this call, where the cache would
       // otherwise keep answering the entry that used to carry this DN.
       this.invalidateCache(dn);
-      void launchHooks(this.parent.hooks.ldapadddone, [dn, entry]);
+      void launchHooks(
+        this.parent.hooks.ldapadddone,
+        [dn, entry],
+        changeContext(req)
+      );
       return true;
     } catch (error) {
       throw ldapAddError(dn, error);
@@ -933,7 +938,11 @@ class ldapActions {
         await pooled.client.modify(dn, ldapChanges);
         // Invalidate cache for this DN
         this.invalidateCache(dn);
-        void launchHooks(this.parent.hooks.ldapmodifydone, [dn, changes, op]);
+        void launchHooks(
+          this.parent.hooks.ldapmodifydone,
+          [dn, changes, op],
+          changeContext(req)
+        );
         return true;
       } catch (error) {
         this.logger.warn(
@@ -969,7 +978,11 @@ class ldapActions {
       } else {
         this.logger.debug(`Modify on ${dn} had nothing to apply`);
       }
-      void launchHooks(this.parent.hooks.ldapmodifydone, [dn, {}, op]);
+      void launchHooks(
+        this.parent.hooks.ldapmodifydone,
+        [dn, {}, op],
+        changeContext(req)
+      );
       return false;
     }
   }
@@ -1000,7 +1013,11 @@ class ldapActions {
       // subtree too: renaming a container moves every DN under it.
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
-      void launchHooks(this.parent.hooks.ldaprenamedone, [dn, newRdn]);
+      void launchHooks(
+        this.parent.hooks.ldaprenamedone,
+        [dn, newRdn],
+        changeContext(req)
+      );
       return true;
     } catch (error) {
       throw ldapError(`LDAP rename error`, error);
@@ -1082,7 +1099,11 @@ class ldapActions {
         } catch (error) {
           throw ldapError(`LDAP delete error`, error);
         }
-        void launchHooks(this.parent.hooks.ldapdeletedone, entry);
+        void launchHooks(
+          this.parent.hooks.ldapdeletedone,
+          entry,
+          changeContext(req)
+        );
       }
       return true;
     } finally {

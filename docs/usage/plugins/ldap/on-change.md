@@ -13,8 +13,9 @@ LDAP-Rest, and hooks for the attributes other plugins follow.
 
 ## Hooks
 
-`onLdapEntryChange(dn, before, after)` fires after every add, modify, rename
-and delete, with the entry as the directory held it on each side:
+`onLdapEntryChange(dn, before, after, context)` fires after every add,
+modify, rename and delete, with the entry as the directory held it on each
+side:
 
 | Operation | `before`                 | `after`                  |
 | --------- | ------------------------ | ------------------------ |
@@ -23,7 +24,15 @@ and delete, with the entry as the directory held it on each side:
 | rename    | the entry, at its old DN | the entry, at its new DN |
 | delete    | the entry before         | `null`                   |
 
-`dn` is the entry's DN after the write, its old one on a delete.
+`dn` is the entry's DN after the write, its old one on a delete. `context`
+says who made the write, and through which door:
+
+- `actor`: the caller's `userName`, or its `user` when it has none;
+- `requestId`: generated, the same for every write of one request;
+- `source`: `scim` for the SCIM API, `rest` otherwise.
+
+A write no request is behind, such as a scheduled task's, gets `{}`. The LDAP
+`ldap*done` hooks receive the same context after their arguments.
 
 The other hooks are derived from it:
 
