@@ -31,6 +31,28 @@ caller who is a member of a configured group now also gets what its rule
 grants. **Check the `groups` rules before upgrading**: a permission they
 grant that callers were not getting is about to apply.
 
+### An identity naming several entries is refused
+
+**Who is affected:** a directory where the same `uid` appears twice — one
+without a `unique` overlay, or one where a homonym was left in the trash
+while the uid was reused.
+
+An identity that names several entries cannot be resolved to a DN without
+picking one, and the pick differs between replicas — so `authzLinid1` now
+refuses every request of such a caller with a `403`. `authzPerBranch` keeps
+the uid's `users` rules, which are keyed on the uid itself, and withholds the
+`groups` rules, which belong to one entry or the other. Both log a warning
+naming the identity and the number of entries it matched.
+
+**Check your directory before upgrading:**
+
+```bash
+ldapsearch -x -b "<base>" "(uid=<uid>)" dn
+```
+
+must answer one entry. Where it answers two, remove the duplicate — the
+trash included — or restore the uniqueness the `unique` overlay enforces.
+
 ### `onLdapChange` gives full values
 
 **Who is affected:** plugins listening to `onLdapChange` that read the values

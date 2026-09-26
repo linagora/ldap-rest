@@ -88,6 +88,20 @@
   longer missed. `onLdapDisplayNameChange` builds both names from the whole
   entry, and fires only when the name changed
 
+- `core/ldap/groups`, `core/ldap/organizations` and
+  `core/twake/appAccountsApi`: the writes they make now carry the
+  who/which-door context the release announces, which they dropped
+
+- `lib/ldapActions.move`, the path `core/ldap/trash` takes: a moved entry now
+  tells the plugins it moved, as a rename does. The group cache and the
+  resolution cache kept their answer, so a caller kept its grants until the
+  TTL ran out
+
+- `lib/authz/base`: a delete now drops what was resolved, which the base's
+  own comment already described. An administrator deleted through the API
+  kept their session's rights until the TTL ran out — the identity still
+  resolved to the former DN, where the organization still named them
+
 ## v0.9.0 (2026-09-24)
 
 Authorization that says what it judges: rules keyed on a login rather than on
