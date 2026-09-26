@@ -8,7 +8,7 @@
  */
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
-import type { SearchResult } from '../../lib/ldapActions';
+import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
@@ -56,12 +56,17 @@ export default class AuthzPerBranch extends AuthzBase {
       this.logger.info('Authorization config loaded');
     }
 
-    // Group memberships are cached per uid, and any write can change one: a
+    // Group memberships are cached per uid, and a write can change one: a
     // `member` added or removed, a user deleted, renamed or given another
-    // uid, or a second entry carrying the same uid. Every write drops the
+    // uid, or a second entry carrying the same uid. Such a write drops the
     // whole map, as the base does on a rename: a few lookups are cheaper
     // than working out which uid a change affects, and without it a caller
     // removed from a group kept its grants until the TTL ran out.
+    //
+    // A modify is the one write that says what it touched, and the most
+    // frequent one: it only drops the map when it touches the member
+    // attribute or the one users are found by. Adds are not filtered — an
+    // added user always carries that attribute, and may duplicate a uid.
     // Registered from the constructor because the server reads `hooks` once
     // the plugin is built; the base's own rename hook keeps running.
     const inherited = this.hooks;
@@ -69,13 +74,37 @@ export default class AuthzPerBranch extends AuthzBase {
     this.hooks = {
       ...inherited,
       ldapadddone: forget,
-      ldapmodifydone: forget,
+      ldapmodifydone: ([, changes]): void => {
+        if (this.touchesMembership(changes)) forget();
+      },
       ldapdeletedone: forget,
       ldaprenamedone: (): void => {
         inherited.ldaprenamedone();
         forget();
       },
     };
+  }
+
+  /**
+   * Whether a modify can change which groups a uid belongs to: it touches
+   * the member attribute, or the attribute a uid is resolved by.
+   */
+  private touchesMembership(changes: ModifyRequest): boolean {
+    const watched = [
+      (this.config.ldap_group_member_attribute as string) || 'member',
+      this.config.ldap_user_main_attribute || 'uid',
+    ].map(a => a.toLowerCase());
+    const touched = [
+      ...Object.keys(changes.add ?? {}),
+      ...Object.keys(changes.replace ?? {}),
+      ...(Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete ?? {})),
+    ];
+    // `member;range=…` and the like name the same attribute.
+    return touched.some(attr =>
+      watched.includes(attr.split(';')[0].toLowerCase())
+    );
   }
 
   /** Drop every cached and pending group lookup. */

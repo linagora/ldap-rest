@@ -46,8 +46,8 @@
   [notes](docs/usage/upgrading.md#group-rules-now-apply)). Group DNs in the
   configuration are now compared as DNs (case and spaces ignored); a uid
   naming several entries gets no group rule rather than the first entry's;
-  the group cache is emptied by every write made through ldap-rest, and a
-  failed lookup is no longer cached
+  the group cache is emptied by a write made through ldap-rest that can
+  change a membership, and a failed lookup is no longer cached
 
 - `core/auth/authzLinid1`: a uid naming several entries resolved to
   whichever one the server listed first, and a failed lookup read as "no such

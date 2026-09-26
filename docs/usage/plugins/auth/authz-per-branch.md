@@ -394,9 +394,11 @@ Group memberships are cached to reduce LDAP queries:
 - **Configurable**: `--authz-per-branch-cache-ttl`
 - **Per-user cache**: Each user's groups cached separately
 - **Automatic expiry**: Cache entries expire after TTL
-- **Dropped on writes**: any add, modify, delete or rename made through
-  ldap-rest empties the cache, so removing a member takes effect on the next
-  request. A change made directly in the directory still waits for the TTL
+- **Dropped on writes**: any add, delete or rename made through ldap-rest
+  empties the cache, and so does a modify touching the group member attribute
+  or `--ldap-user-main-attribute`: removing a member takes effect on the next
+  request. A modify touching anything else keeps the cache. A change made
+  directly in the directory still waits for the TTL
 
 Cache hit/miss logging:
 

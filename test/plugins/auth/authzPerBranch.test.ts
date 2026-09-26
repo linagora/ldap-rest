@@ -462,6 +462,24 @@ describe('AuthzPerBranch', function () {
       expect(await plugin.getUserGroups('grpuser')).to.not.include(groupA());
     });
 
+    it('keeps the cache across a modify that touches no membership', async function () {
+      this.timeout(5000);
+      await plugin.getUserGroups('grpuser');
+      await server.ldap.modify(userDn(), { replace: { sn: 'Renamed' } });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(plugin.groupCache.has('grpuser')).to.be.true;
+    });
+
+    it('forgets the cache when a modify touches the attribute users are found by', async function () {
+      this.timeout(5000);
+      await plugin.getUserGroups('grpuser');
+      // A second value: the first one is the RDN and cannot be replaced.
+      const attr = plugin.config.ldap_user_main_attribute || 'uid';
+      await server.ldap.modify(userDn(), { add: { [attr]: 'grpuser2' } });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+    });
+
     it('shares one lookup between concurrent misses', async function () {
       this.timeout(5000);
       let calls = 0;
