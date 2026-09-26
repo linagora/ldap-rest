@@ -560,6 +560,7 @@ describe('ldapActions', function () {
 
   describe('the LDAP base', function () {
     const settings = [
+      'NODE_ENV',
       'DM_LDAP_URL',
       'DM_LDAP_DN',
       'DM_LDAP_PWD',

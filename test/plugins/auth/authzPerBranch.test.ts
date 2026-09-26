@@ -531,13 +531,16 @@ describe('AuthzPerBranch', function () {
 
     it('sees a membership change in each attribute form the hook can be handed', () => {
       // The modify-done hook filters on these forms to decide whether to
-      // empty the cache. Two of them — a `delete` given as an attribute
-      // list and an option range — cannot be written against a live
-      // directory, so the predicate is read directly.
+      // empty the cache. `delete` comes as a list of attribute names or as
+      // attribute/value pairs, and an attribute may carry an option
+      // (`member;binary`) naming the same attribute: the predicate is read
+      // directly, rather than writing each form against a live directory.
       const touches = (changes: ModifyRequest): boolean =>
         plugin['touchesMembership'](changes);
       expect(touches({ delete: ['member'] })).to.be.true;
-      expect(touches({ replace: { 'member;range=0-1': 'x' } })).to.be.true;
+      expect(touches({ delete: { member: 'uid=x,dc=example,dc=com' } })).to.be
+        .true;
+      expect(touches({ replace: { 'member;binary': 'x' } })).to.be.true;
       const main = plugin.config.ldap_user_main_attribute || 'uid';
       expect(touches({ add: { [main]: 'x' } })).to.be.true;
       expect(touches({ replace: { sn: 'X' } })).to.be.false;
