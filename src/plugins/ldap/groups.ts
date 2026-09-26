@@ -1024,9 +1024,10 @@ export default class LdapGroups extends DmPlugin {
 
   /**
    * List groups from LDAP
-   * @param param0 {filter, attributes}:
+   * @param param0 {filter, attributes, req}:
    * - filter: LDAP filter (default '(objectClass=*)')
    * - attributes: attributes to fetch (default ['cn','member'])
+   * - req: incoming request, forwarded to the authorization hooks
    * @returns LdapList (Record<string, AttributesList>)
    */
   async listGroups({
@@ -1082,18 +1083,20 @@ export default class LdapGroups extends DmPlugin {
    * @param cn main attribute value (partial or full)
    * @param partial boolean, true for partial search (default false)
    * @param attributes array of attributes to return
+   * @param req incoming request, forwarded to the authorization hooks
    * @returns LdapList (means Record<string, AttributesList> where key is the --ldap-user-main-attribute value [default: cn])
    */
   async searchGroupsByName(
     cn: string,
     partial = false,
-    attributes: string[] = [this.cn, 'member']
+    attributes: string[] = [this.cn, 'member'],
+    req?: Request
   ): Promise<LdapList> {
     const value = escapeLdapFilter(cn);
     const filter = partial
       ? `(${this.cn}=*${value}*)`
       : `(${this.cn}=${value})`;
-    return await this.listGroups({ filter, attributes });
+    return await this.listGroups({ filter, attributes, req });
   }
 
   protected fixDn(dn: string): string | false {

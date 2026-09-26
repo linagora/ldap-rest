@@ -33,10 +33,17 @@ could list or change an account.
   own branches: an organization is reference data. `organizations/top` still
   answers their own branches, so a console starts there. Writes to the tree
   are judged as before.
-- **A caller named in no `twakeLocalAdminLink` is refused every read.**
+- **A caller named in no `twakeLocalAdminLink` is refused every read** but the
+  top organization's own entry.
 - An account stored under the organization tree without a
   `twakeDepartmentLink` becomes readable by every administrator. **Where
-  accounts sit under the tree, give them their link before upgrading.**
+  accounts sit under the tree, give them their link before upgrading.** This
+  lists the accounts that have none, under `twakeDepartmentLink: missing`:
+
+  ```bash
+  npm run audit:directory -- --schema static/schemas/twake/users.json \
+    --base ou=users,<base> --filter '(!(twakeDepartmentLink=*))'
+  ```
 
 ## To 0.10.0
 

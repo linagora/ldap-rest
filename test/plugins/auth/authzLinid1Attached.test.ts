@@ -189,6 +189,13 @@ describe('AuthzLinid1 by attachment', function () {
       expect(res.status).to.equal(200);
     });
 
+    it('does not read an account attached to another branch', async () => {
+      const res = await request
+        .get(`/api/v1/ldap/users/${IN_B}`)
+        .set(as(ADMIN_A));
+      expect(res.status).to.equal(404);
+    });
+
     it('refuses to change an account attached to another branch', async () => {
       const res = await request
         .put(`/api/v1/ldap/users/${IN_B}`)

@@ -8,7 +8,8 @@
   `twakeDepartmentLink` names, as `--authz-filter-attached-entries` does,
   whatever the option says: every administrator may read the organization
   tree, though `organizations/top` still starts at their own branches, and a
-  caller administering no branch is refused every read —
+  caller administering no branch is refused every read but the top
+  organization's —
   [notes](docs/usage/upgrading.md#authzlinid1-judges-accounts-and-groups-by-their-organization)
   ([#216](https://github.com/linagora/ldap-rest/issues/216))
 

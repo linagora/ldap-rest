@@ -63,7 +63,8 @@ belongs to nobody's branch, and no administrator could list or change one.
   administrator: the organization tree is reference data. Writes to them are
   judged on their parent. The tree a console draws still starts at the
   caller's own branches: see [getOrganisationTop Hook](#getorganisationtop-hook).
-- A caller named in no `twakeLocalAdminLink` is refused every read (`403`).
+- A caller named in no `twakeLocalAdminLink` is refused every read (`403`)
+  but the top organization's own entry, which `organizations/top` answers.
 
 ## Configuration
 
