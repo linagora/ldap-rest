@@ -148,10 +148,8 @@ export default abstract class AuthzBase extends DmPlugin {
   /**
    * The DN of the entry an identity names, or null when none does.
    *
-   * Searched under `server.ldap.base`, the base every other search uses: it
-   * is `--ldap-base` when set and derived from `--ldap-dn` otherwise, where
-   * `config.ldap_base` would be empty and the search would start from the
-   * root DSE, which OpenLDAP answers with nothing.
+   * Searched under `server.ldap.base`, the base every other search uses:
+   * `--ldap-base`, which the server refuses to start without.
    *
    * More than one entry is a refusal, not a pick: which one comes first is
    * the server's business, and differs between replicas. A failed search
