@@ -68,7 +68,8 @@ export default class AuthzPerBranch extends AuthzBase {
     // attribute or the one users are found by. Adds are not filtered — an
     // added user always carries that attribute, and may duplicate a uid.
     // Registered from the constructor because the server reads `hooks` once
-    // the plugin is built; the base's own rename hook keeps running.
+    // the plugin is built; the base's own rename and delete hooks keep
+    // running.
     const inherited = this.hooks;
     const forget = (): void => this.forgetGroups();
     this.hooks = {
@@ -77,7 +78,10 @@ export default class AuthzPerBranch extends AuthzBase {
       ldapmodifydone: ([, changes]): void => {
         if (this.touchesMembership(changes)) forget();
       },
-      ldapdeletedone: forget,
+      ldapdeletedone: (): void => {
+        inherited.ldapdeletedone();
+        forget();
+      },
       ldaprenamedone: (): void => {
         inherited.ldaprenamedone();
         forget();

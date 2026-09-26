@@ -547,6 +547,48 @@ describe('AuthzPerBranch', function () {
     });
   });
 
+  describe('Resolution cache', () => {
+    const target = () => `uid=authzresolved,${getUserBranch()}`;
+    // The base keeps what `resolveCaller` resolved and owns the field; it is
+    // private, which is what the cast says rather than a missing accessor.
+    const cache = (): Map<string, unknown> =>
+      (plugin as unknown as { resolutionCache: Map<string, unknown> })
+        .resolutionCache;
+
+    afterEach(async () => {
+      try {
+        await server.ldap.delete(target());
+      } catch (err) {
+        // Ignore
+      }
+    });
+
+    it('drops what was resolved when a delete removes the entry', async function () {
+      this.timeout(5000);
+      await server.ldap.add(target(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'authzresolved',
+        sn: 'User',
+        cn: 'Resolved User',
+      });
+      // A resolution the base cached, as `resolveCaller` leaves one: an
+      // identity → DN entry an administrator's rights are read from.
+      cache().set('resolved@example.com', {
+        user: `uid=resolved,${getUserBranch()}`,
+        at: Date.now(),
+      });
+      expect(cache().size).to.equal(1);
+
+      await server.ldap.delete(target());
+      // The done hooks are launched without being awaited.
+      await new Promise(resolve => setImmediate(resolve));
+
+      // `forget` alone empties the group cache, so this reaching zero says
+      // authzPerBranch's delete hook ran the base's own hook too.
+      expect(cache().size).to.equal(0);
+    });
+  });
+
   describe('Hook integration', () => {
     it('should register ldapsearchrequest hook', () => {
       expect(plugin.hooks).to.not.be.undefined;
