@@ -165,6 +165,14 @@ export interface Config {
    * nothing there.
    */
   authz_filter_attached_entries?: boolean;
+  /**
+   * The organization an administrator hands entries over through, when
+   * entries are judged by their attachment: anyone administering a branch
+   * sees what is attached there and may claim it, and puts an entry there
+   * with write on the organization it leaves. An entry attached to no
+   * organization is in transit too, with or without this option.
+   */
+  authz_transit_branch?: string;
   authz_unresolved_user?: string;
   authz_identity?: string;
   /**
@@ -836,6 +844,7 @@ const configArgs: ConfigTemplate = [
     false,
     'boolean',
   ],
+  ['--authz-transit-branch', 'DM_AUTHZ_TRANSIT_BRANCH', ''],
   [
     '--authz-per-branch-config',
     'DM_AUTHZ_PER_BRANCH_CONFIG',

@@ -16,10 +16,15 @@ import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-  AttributeValue,
 } from '../ldapActions';
 import { AmbiguousIdentityError, ForbiddenError } from '../errors';
-import { escapeLdapFilter, getParentDn, isDnInBranch } from '../utils';
+import {
+  escapeLdapFilter,
+  getParentDn,
+  isDnInBranch,
+  normalizeDn,
+  organizationLink,
+} from '../utils';
 
 import { authzFor, servesRequest } from './composition';
 
@@ -67,6 +72,14 @@ export default abstract class AuthzBase extends DmPlugin {
           `"${policy}". Known: ${AuthzBase.UNRESOLVED_POLICIES.join(', ')}.`
       );
     }
+    // Said rather than refused: several authorization plugins share one
+    // configuration, and only some of them judge by attachment.
+    if (this.config.authz_transit_branch && !this.filtersAttachedEntries())
+      this.logger.warn(
+        `${this.constructor.name}: --authz-transit-branch is ignored, ` +
+          'entries are not judged by their attachment here ' +
+          '(--authz-filter-attached-entries)'
+      );
   }
 
   /**
@@ -131,27 +144,56 @@ export default abstract class AuthzBase extends DmPlugin {
     if (!linkAttr || !this.filtersAttachedEntries())
       return this.extractBranchDn(dn);
 
-    const first = (v: AttributeValue | undefined): string | undefined => {
-      if (v === undefined || v === null) return undefined;
-      const one = Array.isArray(v) ? v[0] : v;
-      const str = String(one);
-      return str.length > 0 ? str : undefined;
-    };
-
     try {
       const res = (await this.server.ldap.search(
         { paged: false, scope: 'base', attributes: [linkAttr] },
         dn
       )) as SearchResult;
-      const stored = first(
-        res.searchEntries?.[0]?.[linkAttr] as AttributeValue
-      );
+      const stored = organizationLink(res.searchEntries?.[0]?.[linkAttr]);
       if (stored) return stored;
     } catch {
       // Unreadable or absent: fall back to the parent, which is what an
       // entry with no organization of its own is judged on anyway.
     }
     return this.extractBranchDn(dn);
+  }
+
+  /**
+   * The organization entries are handed over through between
+   * administrators: `--authz-transit-branch`. It only means something when
+   * entries are judged by their attachment, and is `undefined` otherwise.
+   */
+  transitBranch(): string | undefined {
+    if (!this.filtersAttachedEntries()) return undefined;
+    const dn = String(this.config.authz_transit_branch ?? '').trim();
+    return dn.length > 0 ? dn : undefined;
+  }
+
+  /**
+   * Whether an organization link leaves its entry in transit: attached to
+   * the transit branch, or to nothing at all. An account created by another
+   * tool than this one often carries no link, and every administrator can
+   * see it; in transit, one of them can also claim it.
+   *
+   * @param link the link the entry carries, `undefined` for none
+   * @param key the transit branch as {@link transitKey} gives it
+   */
+  protected inTransit(
+    link: string | undefined,
+    key: string | undefined = this.transitKey()
+  ): boolean {
+    if (link === undefined) return true;
+    return key !== undefined && normalizeDn(link) === key;
+  }
+
+  /**
+   * The transit branch in the form DNs are compared in. A listing asks once
+   * and hands it to {@link inTransit} for every entry, rather than parsing
+   * the same constant DN a few thousand times.
+   */
+  private transitKey(): string | undefined {
+    const transit = this.transitBranch();
+    return transit === undefined ? undefined : normalizeDn(transit);
   }
 
   /**
@@ -400,9 +442,14 @@ export default abstract class AuthzBase extends DmPlugin {
         // For move operations, we need to check:
         // 1. Read permission on the source (current location)
         // 2. Write permission on the destination (new location)
+        //
+        // Judging by attachment, the transit branch changes both ends: an
+        // entry in transit is claimed with write on the destination alone,
+        // and one is put in transit with write on the organization it
+        // leaves — an administrator lets go only of what they manage.
 
-        // First, check read permission on source: the organization the
-        // entry is linked to, or its parent branch when that cannot be read.
+        // The source: the organization the entry is linked to, or its parent
+        // branch when that cannot be read.
         //
         // Only the search is inside the `try`. The refusal used to be too, so
         // its own `catch` — meant for a search that failed — swallowed it and
@@ -410,41 +457,67 @@ export default abstract class AuthzBase extends DmPlugin {
         // entry's parent but not the organization it was linked to could
         // move it out, and nothing was logged.
         let sourceBranch = this.extractBranchDn(dn);
+        // Whether the stored entry was read: one that could not be is not
+        // the same as one attached to nothing, and is not in transit.
+        let read = false;
+        let storedLink: string | undefined;
         try {
           const currentEntry = (await this.server.ldap.search(
             { paged: false, scope: 'base', attributes: [linkAttr] },
             dn
           )) as SearchResult;
-          const currentLink = currentEntry.searchEntries[0]?.[linkAttr];
-          const linked = Array.isArray(currentLink)
-            ? currentLink[0]
-            : currentLink;
-          if (linked !== undefined && linked !== null && String(linked) !== '')
-            sourceBranch = String(linked);
+          const entry = currentEntry.searchEntries[0];
+          if (entry) {
+            read = true;
+            storedLink = organizationLink(entry[linkAttr]);
+            if (storedLink) sourceBranch = storedLink;
+          }
         } catch {
           // The entry could not be read: its parent branch stands in.
         }
-        const sourcePermissions = await this.getUserPermissions(
-          user,
-          sourceBranch
-        );
-        if (!sourcePermissions.read) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
-          );
-        }
 
-        // Then check write permission on destination
         const newLink = changes.replace[linkAttr];
         const destBranch = Array.isArray(newLink)
           ? String(newLink[0])
           : String(newLink);
 
-        const destPermissions = await this.getUserPermissions(user, destBranch);
-        if (!destPermissions.write) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+        const byAttachment = this.filtersAttachedEntries();
+        const fromTransit = byAttachment && read && this.inTransit(storedLink);
+        const toTransit = byAttachment && this.inTransit(destBranch);
+
+        if (!fromTransit) {
+          const needed = toTransit ? 'write' : 'read';
+          const sourcePermissions = await this.getUserPermissions(
+            user,
+            sourceBranch
           );
+          if (!sourcePermissions[needed]) {
+            throw new Error(
+              `[authz-forbidden] User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
+            );
+          }
+        }
+
+        if (!toTransit) {
+          const destPermissions = await this.getUserPermissions(
+            user,
+            destBranch
+          );
+          if (!destPermissions.write) {
+            throw new Error(
+              `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
+            );
+          }
+        } else if (fromTransit) {
+          // From transit to transit asks nothing of either end, but it is
+          // still an administrator's gesture: every administrator sees the
+          // entries in transit, and nobody else does.
+          const branches = await this.getAuthorizedBranches(user);
+          if (branches.length === 0) {
+            throw new Error(
+              `[authz-forbidden] User ${req!.user} administers no branch`
+            );
+          }
         }
       } else {
         // For other modifications, check write permission on the entry's current branch
@@ -573,6 +646,9 @@ export default abstract class AuthzBase extends DmPlugin {
      * not see never reaches another. An entry with no organization link —
      * an organization, a group, a nomenclature value — is left alone: those
      * are the reference data every administrator reads.
+     *
+     * So is an entry attached to the transit branch: it is waiting for an
+     * administrator to claim it.
      */
     ldapsearchfilter: async ([result, req, opts]: [
       SearchResult,
@@ -601,6 +677,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // account of the administrator holding the branch would be hidden.
       const within = (dn: string): boolean =>
         branches.some(branch => isDnInBranch(dn, branch));
+      const transitKey = this.transitKey();
 
       result.searchEntries = result.searchEntries.filter(entry => {
         const link = entry[linkAttr];
@@ -608,6 +685,9 @@ export default abstract class AuthzBase extends DmPlugin {
         const values = (Array.isArray(link) ? link : [link]).map(String);
         if (values.length === 0) return true;
         if (values.some(within)) return true;
+        // In transit: every administrator sees it, so that one can claim it.
+        if (values.some(value => this.inTransit(value, transitKey)))
+          return true;
         // Attached outside every branch this caller holds. A link that
         // matches nothing configured lands here too: hidden rather than
         // shown, since a wrong link would otherwise be a way to be seen by

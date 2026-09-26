@@ -66,6 +66,36 @@ belongs to nobody's branch, and no administrator could list or change one.
 - A caller named in no `twakeLocalAdminLink` is refused every read (`403`)
   but the top organization's own entry, which `organizations/top` answers.
 
+### Transit: handing an entry over
+
+An administrator can only move an entry between organizations they write, and
+an account created by another tool often carries no `twakeDepartmentLink` at
+all. The transit branch covers both cases: `--authz-transit-branch` names an
+organization through which entries change hands.
+
+```bash
+--authz-transit-branch "ou=Transit,ou=organization,dc=example,dc=com"
+```
+
+An entry is **in transit** when it is attached to that organization, or to
+none (with or without the option).
+
+- Every administrator sees the entries in transit.
+- **Claiming** one (`POST /api/v1/ldap/users/:id/move` towards an
+  organization) asks for write on that organization only.
+- **Putting** one in transit asks for write on the organization it leaves,
+  and nothing on the transit branch: an administrator only lets go of what
+  they manage. Handing an account over to an organization one does not manage
+  is two steps: put it in transit, then its new administrator claims it.
+- Any other change to an entry in transit (attributes, password, status,
+  deletion) is judged as before, so the entry is claimed first.
+
+`GET /api/v1/authz/scope` returns the transit branch as `transit` (`null`
+when there is none), so that a client can offer these moves. A group attached
+to the transit branch follows the same rules through
+`POST /api/v1/ldap/groups/:cn/move`; that endpoint does not move a group
+attached to no organization.
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:
@@ -440,7 +470,10 @@ User exists in `ou=users,dc=example,dc=com` but local admin cannot manage them.
    twakeDepartmentLink: ou=HR,ou=organization,dc=example,dc=com
    ```
 
-2. Or move user to organization branch:
+2. Or let the local admin claim it: an account with no `twakeDepartmentLink`
+   is in transit, see [Transit](#transit-handing-an-entry-over).
+
+3. Or move user to organization branch:
    ```
    From: uid=user,ou=users,dc=example,dc=com
    To:   uid=user,ou=users,ou=HR,ou=organization,dc=example,dc=com
