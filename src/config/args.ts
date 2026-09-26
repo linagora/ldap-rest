@@ -130,6 +130,9 @@ export interface Config {
   // auth/token
   auth_token?: string[];
 
+  // auth/fake
+  auth_fake_user?: string;
+
   // auth/totp
   auth_totp?: string[];
   auth_totp_window?: number;
@@ -771,6 +774,9 @@ const configArgs: ConfigTemplate = [
 
   // Auth token plugin
   ['--auth-token', 'DM_AUTH_TOKENS', [], 'array', '--auth-tokens'],
+
+  // Auth fake plugin
+  ['--auth-fake-user', 'DM_AUTH_FAKE_USER', ''],
 
   // Auth TOTP plugin
   ['--auth-totp', 'DM_AUTH_TOTP', [], 'array', '--auth-totps'],
