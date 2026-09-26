@@ -7,11 +7,13 @@
  * @group Plugins
  */
 import type { DM } from '../../bin';
+import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
-import { escapeLdapFilter } from '../../lib/utils';
+import { AmbiguousIdentityError } from '../../lib/errors';
+import { escapeLdapFilter, normalizeDn } from '../../lib/utils';
 import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
 
 interface CachedGroups {
@@ -19,10 +21,28 @@ interface CachedGroups {
   timestamp: number;
 }
 
+type GroupRules = NonNullable<AuthConfig['groups']>[string];
+
 export default class AuthzPerBranch extends AuthzBase {
   name = 'authzPerBranch';
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
+  /** Lookups under way, so concurrent misses for one uid share a search. */
+  private pendingGroups = new Map<string, Promise<string[]>>();
+  /**
+   * Bumped by every invalidation. A lookup that started before a write may
+   * have read the directory before it: it still answers its own callers,
+   * but does not put what it read back into the cache.
+   */
+  private groupGeneration = 0;
+  /** `authConfig.groups` keyed by normalized DN, and the object it was built from. */
+  private groupRulesIndex?: {
+    source: AuthConfig['groups'];
+    rules: Map<string, GroupRules>;
+  };
+
+  declare hooks: AuthzBase['hooks'] &
+    Pick<Hooks, 'ldapadddone' | 'ldapmodifydone' | 'ldapdeletedone'>;
 
   constructor(server: DM) {
     super(server);
@@ -35,6 +55,34 @@ export default class AuthzPerBranch extends AuthzBase {
     if (this.authConfig) {
       this.logger.info('Authorization config loaded');
     }
+
+    // Group memberships are cached per uid, and any write can change one: a
+    // `member` added or removed, a user deleted, renamed or given another
+    // uid, or a second entry carrying the same uid. Every write drops the
+    // whole map, as the base does on a rename: a few lookups are cheaper
+    // than working out which uid a change affects, and without it a caller
+    // removed from a group kept its grants until the TTL ran out.
+    // Registered from the constructor because the server reads `hooks` once
+    // the plugin is built; the base's own rename hook keeps running.
+    const inherited = this.hooks;
+    const forget = (): void => this.forgetGroups();
+    this.hooks = {
+      ...inherited,
+      ldapadddone: forget,
+      ldapmodifydone: forget,
+      ldapdeletedone: forget,
+      ldaprenamedone: (): void => {
+        inherited.ldaprenamedone();
+        forget();
+      },
+    };
+  }
+
+  /** Drop every cached and pending group lookup. */
+  forgetGroups(): void {
+    this.groupGeneration++;
+    this.groupCache.clear();
+    this.pendingGroups.clear();
   }
 
   /**
@@ -104,11 +152,9 @@ export default class AuthzPerBranch extends AuthzBase {
     // Check group-based permissions
     const userGroups = await this.getUserGroups(uid);
     for (const groupDn of userGroups) {
-      if (this.authConfig.groups?.[groupDn]) {
-        const groupPerms = this.findBranchPermissions(
-          this.authConfig.groups[groupDn],
-          branch
-        );
+      const rules = this.groupRules(groupDn);
+      if (rules) {
+        const groupPerms = this.findBranchPermissions(rules, branch);
         if (groupPerms) {
           permissions = this.mergePermissions(permissions, groupPerms);
         }
@@ -152,10 +198,9 @@ export default class AuthzPerBranch extends AuthzBase {
     // Check group-based permissions
     const userGroups = await this.getUserGroups(uid);
     for (const groupDn of userGroups) {
-      if (this.authConfig.groups?.[groupDn]) {
-        for (const [branch, perms] of Object.entries(
-          this.authConfig.groups[groupDn]
-        )) {
+      const rules = this.groupRules(groupDn);
+      if (rules) {
+        for (const [branch, perms] of Object.entries(rules)) {
           if (perms[permissionType] && !branches.includes(branch)) {
             branches.push(branch);
           }
@@ -234,35 +279,52 @@ export default class AuthzPerBranch extends AuthzBase {
   }
 
   /**
-   * Resolve a uid to its DN under the configured base
+   * The rules configured for a group, compared as DNs.
+   *
+   * The directory answers with its own spelling of a group's DN, and the
+   * configuration carries whatever an administrator typed: a textual lookup
+   * missed `cn=Admins,ou=Groups,…` against `cn=admins, ou=groups,…` and
+   * dropped the rule without a word. The index is rebuilt whenever
+   * `authConfig.groups` is replaced.
    */
-  private async getUserDn(uid: string): Promise<string | null> {
-    try {
-      const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
-      const result = (await this.server.ldap.search(
-        {
-          paged: false,
-          filter,
-          attributes: ['dn'],
-          scope: 'sub',
-        },
-        this.config.ldap_base || ''
-      )) as SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        const dn = result.searchEntries[0].dn;
-        return typeof dn === 'string' ? dn : String(dn);
+  private groupRules(groupDn: string): GroupRules | undefined {
+    const source = this.authConfig?.groups;
+    if (!source) return undefined;
+    if (this.groupRulesIndex?.source !== source) {
+      const rules = new Map<string, GroupRules>();
+      for (const [dn, perms] of Object.entries(source)) {
+        let key: string;
+        try {
+          key = normalizeDn(dn);
+        } catch {
+          this.logger.warn(
+            `${this.name}: group "${dn}" is not a valid DN, compared as text`
+          );
+          key = dn.toLowerCase();
+        }
+        if (rules.has(key))
+          this.logger.warn(
+            `${this.name}: several groups entries name ${key}; only the last one applies`
+          );
+        rules.set(key, perms);
       }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to get DN for user ${uid}: ${err}`);
+      this.groupRulesIndex = { source, rules };
     }
-
-    return null;
+    let key: string;
+    try {
+      key = normalizeDn(groupDn);
+    } catch {
+      key = groupDn.toLowerCase();
+    }
+    return this.groupRulesIndex.rules.get(key);
   }
 
   /**
    * Get user's group memberships with caching
+   *
+   * Concurrent misses for one uid share a single lookup. What the lookup
+   * found is cached, including "no group"; a failed search is not, so an
+   * outage does not outlive itself by a TTL.
    */
   async getUserGroups(uid: string): Promise<string[]> {
     const now = Date.now();
@@ -273,43 +335,59 @@ export default class AuthzPerBranch extends AuthzBase {
       return cached.groups;
     }
 
-    // Resolve groups from LDAP
-    const groups: string[] = [];
+    const inFlight = this.pendingGroups.get(uid);
+    if (inFlight) return inFlight;
+
+    const generation = this.groupGeneration;
+    const lookup = this.lookupGroups(uid)
+      .then(groups => {
+        if (generation === this.groupGeneration)
+          this.groupCache.set(uid, { groups, timestamp: Date.now() });
+        return groups;
+      })
+      .finally(() => {
+        if (this.pendingGroups.get(uid) === lookup)
+          this.pendingGroups.delete(uid);
+      });
+    this.pendingGroups.set(uid, lookup);
+    return lookup;
+  }
+
+  /** Read a uid's group memberships from the directory. */
+  private async lookupGroups(uid: string): Promise<string[]> {
+    // The member attribute holds DNs, whose matching rule has no substring
+    // form: the uid has to be resolved to its DN before the search.
+    let userDn: string | null;
     try {
-      // The member attribute holds DNs, whose matching rule has no substring
-      // form: the uid has to be resolved to its DN before the search.
-      const userDn = await this.getUserDn(uid);
-      if (userDn) {
-        const memberAttr = this.config.ldap_group_member_attribute || 'member';
-        const filter = `(${memberAttr as string}=${escapeLdapFilter(userDn)})`;
-
-        const searchResult = (await this.server.ldap.search(
-          {
-            paged: false,
-            filter,
-            attributes: ['dn'],
-          },
-          this.server.ldap.base
-        )) as SearchResult;
-
-        if (searchResult.searchEntries) {
-          for (const entry of searchResult.searchEntries) {
-            if (entry.dn) {
-              groups.push(
-                typeof entry.dn === 'string' ? entry.dn : String(entry.dn)
-              );
-            }
-          }
-        }
-      }
+      userDn = await this.findUserDn(uid);
     } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to resolve groups for user ${uid}: ${err}`);
+      if (!(err instanceof AmbiguousIdentityError)) throw err;
+      // The `users` rules are keyed on the uid itself and stay usable; only
+      // the groups, which belong to one entry or the other, are withheld.
+      this.logger.warn(
+        `${this.name}: ${uid} names ${err.count} directory entries, so no group rule applies to them`
+      );
+      return [];
     }
+    if (!userDn) return [];
 
-    // Update cache
-    this.groupCache.set(uid, { groups, timestamp: now });
+    const memberAttr = this.config.ldap_group_member_attribute || 'member';
+    const filter = `(${memberAttr as string}=${escapeLdapFilter(userDn)})`;
+    const searchResult = (await this.server.ldap.search(
+      {
+        paged: false,
+        filter,
+        attributes: ['dn'],
+      },
+      this.server.ldap.base
+    )) as SearchResult;
 
+    const groups: string[] = [];
+    for (const entry of searchResult.searchEntries ?? []) {
+      if (entry.dn) {
+        groups.push(typeof entry.dn === 'string' ? entry.dn : String(entry.dn));
+      }
+    }
     return groups;
   }
 }

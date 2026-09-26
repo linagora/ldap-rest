@@ -18,8 +18,8 @@ import type {
   SearchResult,
   AttributeValue,
 } from '../ldapActions';
-import { ForbiddenError } from '../errors';
-import { getParentDn, isDnInBranch } from '../utils';
+import { AmbiguousIdentityError, ForbiddenError } from '../errors';
+import { escapeLdapFilter, getParentDn, isDnInBranch } from '../utils';
 
 import { authzFor, servesRequest } from './composition';
 
@@ -143,6 +143,40 @@ export default abstract class AuthzBase extends DmPlugin {
       // entry with no organization of its own is judged on anyway.
     }
     return this.extractBranchDn(dn);
+  }
+
+  /**
+   * The DN of the entry an identity names, or null when none does.
+   *
+   * Searched under `server.ldap.base`, the base every other search uses: it
+   * is `--ldap-base` when set and derived from `--ldap-dn` otherwise, where
+   * `config.ldap_base` would be empty and the search would start from the
+   * root DSE, which OpenLDAP answers with nothing.
+   *
+   * More than one entry is a refusal, not a pick: which one comes first is
+   * the server's business, and differs between replicas. A failed search
+   * propagates rather than reading as "no such user", so a caller that
+   * caches the answer does not cache an outage as a fact.
+   *
+   * @throws AmbiguousIdentityError when several entries carry the identity
+   */
+  protected async findUserDn(uid: string): Promise<string | null> {
+    const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
+    const result = (await this.server.ldap.search(
+      {
+        paged: false,
+        filter,
+        attributes: ['dn'],
+        scope: 'sub',
+      },
+      this.server.ldap.base
+    )) as SearchResult;
+    const entries = result.searchEntries ?? [];
+    if (entries.length > 1)
+      throw new AmbiguousIdentityError(uid, entries.length);
+    if (entries.length === 0) return null;
+    const dn = entries[0].dn;
+    return typeof dn === 'string' ? dn : String(dn);
   }
 
   /**

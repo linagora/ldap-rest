@@ -321,6 +321,196 @@ describe('AuthzPerBranch', function () {
     });
   });
 
+  describe('Group rules', () => {
+    const base = () => process.env.DM_LDAP_BASE as string;
+    const alpha = () => `ou=alpha,${base()}`;
+    const beta = () => `ou=beta,${base()}`;
+    const groupA = () => `cn=authzpba,ou=groups,${base()}`;
+    const groupB = () => `cn=authzpbb,ou=groups,${base()}`;
+    const userDn = () => `uid=grpuser,${getUserBranch()}`;
+    // Same uid, another entry: what a directory without the unique overlay
+    // lets through.
+    const homonymDn = () => `uid=grpuser,${base()}`;
+    // groupOfNames needs a member left once the user is removed.
+    const filler = () => `uid=filler,${getUserBranch()}`;
+    const none = { read: false, write: false, delete: false };
+
+    let savedConfig: typeof plugin.authConfig;
+
+    beforeEach(async function () {
+      this.timeout(5000);
+      savedConfig = plugin.authConfig;
+      plugin.authConfig = {
+        default: none,
+        users: {
+          grpuser: { [alpha()]: { read: true, write: false, delete: false } },
+        },
+        groups: {
+          [groupA()]: {
+            [alpha()]: { read: true, write: true, delete: false },
+            [beta()]: { read: true, write: false, delete: false },
+          },
+          // Spelled otherwise than the directory answers: case, and a space
+          // after each comma.
+          [`CN=AuthzPbB, OU=Groups, ${base().toUpperCase().replace(/,/g, ', ')}`]:
+            { [beta()]: { read: false, write: false, delete: true } },
+        },
+      };
+      await server.ldap.add(userDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'grpuser',
+        sn: 'User',
+        cn: 'Group User',
+      });
+      await server.ldap.add(groupA(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzpba',
+        member: [userDn(), filler()],
+      });
+      await server.ldap.add(groupB(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzpbb',
+        member: [userDn(), filler()],
+      });
+    });
+
+    afterEach(async function () {
+      this.timeout(5000);
+      plugin.authConfig = savedConfig;
+      for (const dn of [groupA(), groupB(), userDn(), homonymDn()]) {
+        try {
+          await server.ldap.delete(dn);
+        } catch (err) {
+          // Ignore
+        }
+      }
+      delete (plugin as unknown as Record<string, unknown>).findUserDn;
+      plugin.forgetGroups();
+    });
+
+    /** Replace the DN lookup on this instance only. */
+    const stubFindUserDn = (
+      fn: (
+        original: (uid: string) => Promise<string | null>,
+        uid: string
+      ) => Promise<string | null>
+    ): void => {
+      const original = plugin['findUserDn'].bind(plugin);
+      (plugin as unknown as Record<string, unknown>).findUserDn = (
+        uid: string
+      ) => fn(original, uid);
+    };
+
+    it('lists a branch granted by a group only, and a shared one once', async function () {
+      this.timeout(5000);
+      const read = await plugin.getAuthorizedBranchesForPermission(
+        'grpuser',
+        'read'
+      );
+      expect(read).to.have.members([alpha(), beta()]);
+      expect(read.filter(b => b === alpha())).to.have.lengthOf(1);
+      expect(
+        await plugin.getAuthorizedBranchesForPermission('grpuser', 'write')
+      ).to.deep.equal([alpha()]);
+    });
+
+    it('merges the rules of two groups', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserPermissions('grpuser', beta())).to.deep.equal({
+        read: true,
+        write: false,
+        delete: true,
+      });
+    });
+
+    it('merges a user rule and a group rule on one branch', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserPermissions('grpuser', alpha())).to.deep.equal(
+        { read: true, write: true, delete: false }
+      );
+    });
+
+    it('matches a group configured with another spelling of its DN', async function () {
+      this.timeout(5000);
+      expect(
+        await plugin.getAuthorizedBranchesForPermission('grpuser', 'delete')
+      ).to.deep.equal([beta()]);
+    });
+
+    it('grants no group to a uid naming two entries, and keeps its user rule', async function () {
+      this.timeout(5000);
+      await server.ldap.add(homonymDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'grpuser',
+        sn: 'Homonym',
+        cn: 'Group User Homonym',
+      });
+      // A member too, so that picking either entry would find a group.
+      await server.ldap.modify(groupA(), { add: { member: homonymDn() } });
+      expect(await plugin.getUserGroups('grpuser')).to.deep.equal([]);
+      expect(await plugin.getUserPermissions('grpuser', alpha())).to.deep.equal(
+        { read: true, write: false, delete: false }
+      );
+    });
+
+    it('forgets a membership as soon as it is removed, not after the TTL', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('grpuser')).to.include(groupA());
+      await server.ldap.modify(groupA(), { delete: { member: userDn() } });
+      // The done hooks are launched without being awaited.
+      await new Promise(resolve => setImmediate(resolve));
+      expect(await plugin.getUserGroups('grpuser')).to.not.include(groupA());
+    });
+
+    it('shares one lookup between concurrent misses', async function () {
+      this.timeout(5000);
+      let calls = 0;
+      stubFindUserDn((original, uid) => {
+        calls++;
+        return original(uid);
+      });
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => plugin.getUserGroups('grpuser'))
+      );
+      expect(calls).to.equal(1);
+      for (const groups of results) expect(groups).to.include(groupA());
+    });
+
+    it('does not cache a failed lookup', async function () {
+      this.timeout(5000);
+      let failed = false;
+      stubFindUserDn((original, uid) => {
+        if (failed) return original(uid);
+        failed = true;
+        return Promise.reject(new Error('directory unavailable'));
+      });
+      let caught: unknown;
+      try {
+        await plugin.getUserGroups('grpuser');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).to.be.instanceOf(Error);
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+      expect(await plugin.getUserGroups('grpuser')).to.include(groupA());
+    });
+
+    it('does not cache what a lookup overtaken by a write read', async function () {
+      this.timeout(5000);
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => (release = resolve));
+      stubFindUserDn(async (original, uid) => {
+        await gate;
+        return original(uid);
+      });
+      const lookup = plugin.getUserGroups('grpuser');
+      plugin.forgetGroups();
+      release();
+      expect(await lookup).to.include(groupA());
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+    });
+  });
+
   describe('Hook integration', () => {
     it('should register ldapsearchrequest hook', () => {
       expect(plugin.hooks).to.not.be.undefined;

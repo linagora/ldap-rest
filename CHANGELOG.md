@@ -43,7 +43,19 @@
   looked up with a substring match on an attribute holding DNs, which has no
   substring form, so no group was ever found and the rules were inert
   ([#212](https://github.com/linagora/ldap-rest/issues/212),
-  [notes](docs/usage/upgrading.md#group-rules-now-apply))
+  [notes](docs/usage/upgrading.md#group-rules-now-apply)). Group DNs in the
+  configuration are now compared as DNs (case and spaces ignored); a uid
+  naming several entries gets no group rule rather than the first entry's;
+  the group cache is emptied by every write made through ldap-rest, and a
+  failed lookup is no longer cached
+
+- `core/auth/authzLinid1`: a uid naming several entries resolved to
+  whichever one the server listed first, and a failed lookup read as "no such
+  user" — which `--authz-unresolved-user allow` lets through unchecked, and
+  which was cached. An ambiguous uid is now refused (403) whatever the
+  policy, a failed lookup fails the request without being cached, and the
+  lookup searches the LDAP base derived from `--ldap-dn` when `--ldap-base`
+  is not set, instead of the root DSE
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`
   failed the search, and one holding `*` matched nothing, a DN attribute

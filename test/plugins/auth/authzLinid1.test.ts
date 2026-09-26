@@ -7,6 +7,7 @@ import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
 import supertest from 'supertest';
 import { skipIfMissingEnvVars } from '../../helpers/env';
+import { AmbiguousIdentityError } from '../../../src/lib/errors';
 
 // Simple auth plugin for testing that sets user from X-Test-User header
 class TestAuthPlugin extends AuthBase {
@@ -104,6 +105,30 @@ describe('AuthzLinid1 Plugin', () => {
         cn: 'Test Admin',
       });
       expect(await authz.getUserDn('testad*')).to.be.null;
+    });
+
+    it('refuses a uid that names two entries rather than picking one', async () => {
+      const homonymDn = `uid=testadmin,ou=users,${process.env.DM_LDAP_BASE}`;
+      const entry = {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'testadmin',
+        sn: 'Admin',
+        cn: 'Test Admin',
+      };
+      await dm.ldap.add(getTestUserDn(), entry);
+      await dm.ldap.add(homonymDn, entry);
+      try {
+        let caught: unknown;
+        try {
+          await authz.getUserDn('testadmin');
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught).to.be.instanceOf(AmbiguousIdentityError);
+        expect((caught as AmbiguousIdentityError).statusCode).to.equal(403);
+      } finally {
+        await dm.ldap.delete(homonymDn).catch(() => undefined);
+      }
     });
   });
 

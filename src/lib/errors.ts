@@ -40,6 +40,29 @@ export class ForbiddenError extends HttpError {
   }
 }
 
+/**
+ * An identity that names more than one directory entry.
+ *
+ * A `uid` (or whatever `--ldap-user-main-attribute` names) is only unique if
+ * the directory enforces it, which OpenLDAP does not by default. Taking the
+ * first entry would hand the caller whichever one the server happens to list
+ * first — and with it that entry's groups or organizations. It is a refusal
+ * rather than a `null`: a `null` resolution is what
+ * `--authz-unresolved-user allow` lets through unchecked.
+ */
+export class AmbiguousIdentityError extends ForbiddenError {
+  constructor(
+    public identity: string,
+    public count: number
+  ) {
+    super(
+      `[authz-forbidden] ${identity} names ${count} directory entries, ` +
+        'so no single one can be taken for the caller'
+    );
+    this.name = 'AmbiguousIdentityError';
+  }
+}
+
 export class NotFoundError extends HttpError {
   constructor(message = 'Not found') {
     super(message, 404);
