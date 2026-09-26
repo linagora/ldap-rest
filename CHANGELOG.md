@@ -1,37 +1,31 @@
 # Changelog
 
-## Unreleased
+## v0.11.0 (2026-09-26)
 
 ### Breaking Changes
 
-- `core/auth/authzLinid1` judges accounts and groups by the organization their
-  `twakeDepartmentLink` names, as `--authz-filter-attached-entries` does,
-  whatever the option says: every administrator may read the organization
-  tree, though `organizations/top` still starts at their own branches, and a
-  caller administering no branch is refused every read but the top
-  organization's —
+- `core/auth/authzLinid1` judges accounts and groups by the organization they
+  are attached to, whatever `--authz-filter-attached-entries` says — every
+  administrator reads the organization tree, and a caller administering no
+  branch is refused —
   [notes](docs/usage/upgrading.md#authzlinid1-judges-accounts-and-groups-by-their-organization)
   ([#216](https://github.com/linagora/ldap-rest/issues/216))
 
 ### Security
 
-- `core/ldap/groups`: listing the groups and reading one bypassed the
-  authorization plugins, so any authenticated caller read every group and its
-  members —
-  [notes](docs/usage/upgrading.md#group-reads-are-judged)
+- `core/ldap/groups`: any authenticated caller could list every group and its
+  members — [notes](docs/usage/upgrading.md#group-reads-are-judged)
   ([#216](https://github.com/linagora/ldap-rest/issues/216))
 
 ### Features
 
-- `core/auth/fake` serves every request as the identity given by
-  `--auth-fake-user`, to see an interface as a given administrator during
-  development. Refused with `NODE_ENV=production` —
-  [doc](docs/usage/plugins/auth/fake.md)
+- `core/auth/fake`: a fixed identity for development, refused with
+  `NODE_ENV=production` — [doc](docs/usage/plugins/auth/fake.md)
 
 ### Bug Fixes
 
-- `core/ldap/organizations`: modifying an entry whose `objectClass` holds a
-  single value failed with a 500 (`objectClass.map is not a function`)
+- `core/ldap/organizations`: an entry with a single `objectClass` could not be
+  modified (500)
 
 ## v0.10.0 (2026-09-26)
 
