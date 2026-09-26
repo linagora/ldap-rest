@@ -11,6 +11,7 @@ import type { SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
 import AuthzBase from '../../lib/authz/base';
+import { escapeLdapFilter } from '../../lib/utils';
 import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
 
 interface CachedGroups {
@@ -233,6 +234,34 @@ export default class AuthzPerBranch extends AuthzBase {
   }
 
   /**
+   * Resolve a uid to its DN under the configured base
+   */
+  private async getUserDn(uid: string): Promise<string | null> {
+    try {
+      const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
+      const result = (await this.server.ldap.search(
+        {
+          paged: false,
+          filter,
+          attributes: ['dn'],
+          scope: 'sub',
+        },
+        this.config.ldap_base || ''
+      )) as SearchResult;
+
+      if (result.searchEntries && result.searchEntries.length > 0) {
+        const dn = result.searchEntries[0].dn;
+        return typeof dn === 'string' ? dn : String(dn);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.error(`Failed to get DN for user ${uid}: ${err}`);
+    }
+
+    return null;
+  }
+
+  /**
    * Get user's group memberships with caching
    */
   async getUserGroups(uid: string): Promise<string[]> {
@@ -247,26 +276,29 @@ export default class AuthzPerBranch extends AuthzBase {
     // Resolve groups from LDAP
     const groups: string[] = [];
     try {
-      // Search for groups where user is a member, using wildcard pattern
-      // This works regardless of where the user DN is located
-      const memberAttr = this.config.ldap_group_member_attribute || 'member';
-      const filter = `(${memberAttr as string}=${this.config.ldap_user_main_attribute}=${uid},*)`;
+      // The member attribute holds DNs, whose matching rule has no substring
+      // form: the uid has to be resolved to its DN before the search.
+      const userDn = await this.getUserDn(uid);
+      if (userDn) {
+        const memberAttr = this.config.ldap_group_member_attribute || 'member';
+        const filter = `(${memberAttr as string}=${escapeLdapFilter(userDn)})`;
 
-      const searchResult = (await this.server.ldap.search(
-        {
-          paged: false,
-          filter,
-          attributes: ['dn'],
-        },
-        this.server.ldap.base
-      )) as SearchResult;
+        const searchResult = (await this.server.ldap.search(
+          {
+            paged: false,
+            filter,
+            attributes: ['dn'],
+          },
+          this.server.ldap.base
+        )) as SearchResult;
 
-      if (searchResult.searchEntries) {
-        for (const entry of searchResult.searchEntries) {
-          if (entry.dn) {
-            groups.push(
-              typeof entry.dn === 'string' ? entry.dn : String(entry.dn)
-            );
+        if (searchResult.searchEntries) {
+          for (const entry of searchResult.searchEntries) {
+            if (entry.dn) {
+              groups.push(
+                typeof entry.dn === 'string' ? entry.dn : String(entry.dn)
+              );
+            }
           }
         }
       }

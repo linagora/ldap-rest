@@ -38,6 +38,13 @@
 
 ### Bug Fixes
 
+- `core/auth/authzPerBranch`: the `groups` rules of
+  `--authz-per-branch-config` granted nothing — a caller's groups were
+  looked up with a substring match on an attribute holding DNs, which has no
+  substring form, so no group was ever found and the rules were inert
+  ([#212](https://github.com/linagora/ldap-rest/issues/212),
+  [notes](docs/usage/upgrading.md#group-rules-now-apply))
+
 - Values written into a search filter unescaped: a DN holding `(` or `)`
   failed the search, and one holding `*` matched nothing, a DN attribute
   having no substring match

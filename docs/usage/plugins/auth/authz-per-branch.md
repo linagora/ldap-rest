@@ -174,8 +174,9 @@ Modifies the organization tree API:
 
 Groups are resolved dynamically:
 
-1. Searches for all groups where user is a member
-2. Uses wildcard DN pattern: `(member=uid={user},*)`
+1. Resolves the caller to its DN, searching
+   `(<ldap_user_main_attribute>=<uid>)` under `--ldap-base`
+2. Searches for all groups where that DN is a member
 3. Caches results for configured TTL (default: 60 seconds)
 4. Cache prevents repeated LDAP queries for same user
 
@@ -542,10 +543,11 @@ User should inherit group permissions but doesn't.
 
 **Solutions:**
 
-1. Verify user is member of group:
+1. Verify the user's DN is a member of the group:
 
    ```bash
-   ldapsearch -x -b "ou=groups,dc=example,dc=com" "(member=uid=jdoe,*)"
+   ldapsearch -x -b "dc=example,dc=com" \
+     "(member=uid=jdoe,ou=users,dc=example,dc=com)"
    ```
 
 2. Check group DN in config matches LDAP exactly

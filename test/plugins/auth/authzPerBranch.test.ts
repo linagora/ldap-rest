@@ -43,6 +43,10 @@ class TestAuthPlugin extends AuthBase {
 
 // Use getters to ensure env vars are evaluated after setup
 const getUserBranch = () => `ou=users,${process.env.DM_LDAP_BASE}`;
+const getGroupDn = () =>
+  `cn=authzperbranch,ou=groups,${process.env.DM_LDAP_BASE}`;
+const getGroupMemberDn = () => `uid=groupmember,${getUserBranch()}`;
+const getNonMemberDn = () => `uid=nonmember,${getUserBranch()}`;
 
 describe('AuthzPerBranch', function () {
   before(function () {
@@ -78,7 +82,15 @@ describe('AuthzPerBranch', function () {
           },
         },
       },
-      groups: {},
+      groups: {
+        [getGroupDn()]: {
+          [getUserBranch()]: {
+            read: true,
+            write: true,
+            delete: false,
+          },
+        },
+      },
     };
 
     // Set environment variables BEFORE creating DM
@@ -234,6 +246,78 @@ describe('AuthzPerBranch', function () {
 
       // Restore original TTL
       plugin.cacheTTL = originalTTL;
+    });
+  });
+
+  describe('Group permissions', () => {
+    beforeEach(async function () {
+      this.timeout(5000);
+      await server.ldap.add(getGroupMemberDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'groupmember',
+        sn: 'Member',
+        cn: 'Group Member',
+      });
+      await server.ldap.add(getNonMemberDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'nonmember',
+        sn: 'Member',
+        cn: 'Non Member',
+      });
+      await server.ldap.add(getGroupDn(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzperbranch',
+        member: [getGroupMemberDn()],
+      });
+    });
+
+    afterEach(async function () {
+      this.timeout(5000);
+      try {
+        await server.ldap.delete(getGroupDn());
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await server.ldap.delete(getGroupMemberDn());
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await server.ldap.delete(getNonMemberDn());
+      } catch (err) {
+        // Ignore
+      }
+    });
+
+    it('finds the groups a caller belongs to', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('groupmember')).to.include(
+        getGroupDn()
+      );
+    });
+
+    it('applies the permissions of a group the caller belongs to', async function () {
+      this.timeout(5000);
+      const permissions = await plugin.getUserPermissions(
+        'groupmember',
+        getUserBranch()
+      );
+      expect(permissions).to.deep.equal({
+        read: true,
+        write: true,
+        delete: false,
+      });
+    });
+
+    it('finds no group for a user who is not a member', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('nonmember')).to.deep.equal([]);
+    });
+
+    it('finds no group for a uid that does not resolve', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('nobody')).to.deep.equal([]);
     });
   });
 

@@ -6,6 +6,18 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Group rules now apply
+
+**Who is affected:** a deployment whose `--authz-per-branch-config` declares
+a `groups` section.
+
+That section was inert: a caller's groups were looked up with a substring
+match on an attribute holding DNs, which has no substring form, so no group
+was ever found and permissions came from `users` and `default` alone. A
+caller who is a member of a configured group now also gets what its rule
+grants. **Check the `groups` rules before upgrading**: a permission they
+grant that callers were not getting is about to apply.
+
 ### `onLdapChange` gives full values
 
 **Who is affected:** plugins listening to `onLdapChange` that read the values
