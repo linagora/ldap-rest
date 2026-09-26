@@ -11,25 +11,19 @@ decision or a configuration change appear here; see the
 **Who is affected:** a deployment that starts `ldap-rest` without
 `--ldap-base` (or `DM_LDAP_BASE`).
 
-The base was guessed from `--ldap-dn`, taking the second RDN of the bind DN:
-`dc=example` for `cn=admin,dc=example,dc=com`, which is not an entry, so
-every subtree search failed with `NoSuchObject`. A guess that did land on an
-entry was worse: the searches returned nothing, without an error. The server
-now refuses to start, names the option, and `--help` marks it required. Set
-`--ldap-base` to the DN under which the entries are searched — the same value
-the `ldapsearch` calls behind the deployment use.
+The server refuses to start without it. It used to take the second RDN of
+`--ldap-dn` — `dc=example` for `cn=admin,dc=example,dc=com` — so subtree
+searches failed or found nothing. Set `--ldap-base` to the DN under which
+the entries are searched.
 
 ### Group rules now apply
 
 **Who is affected:** a deployment whose `--authz-per-branch-config` declares
 a `groups` section.
 
-That section was inert: a caller's groups were looked up with a substring
-match on an attribute holding DNs, which has no substring form, so no group
-was ever found and permissions came from `users` and `default` alone. A
-caller who is a member of a configured group now also gets what its rule
-grants. **Check the `groups` rules before upgrading**: a permission they
-grant that callers were not getting is about to apply.
+That section granted nothing: permissions came from `users` and `default`
+alone. A member of a configured group now also gets what its rule grants.
+**Check the `groups` rules before upgrading.**
 
 ### An identity naming several entries is refused
 
@@ -37,12 +31,10 @@ grant that callers were not getting is about to apply.
 without a `unique` overlay, or one where a homonym was left in the trash
 while the uid was reused.
 
-An identity that names several entries cannot be resolved to a DN without
-picking one, and the pick differs between replicas — so `authzLinid1` now
-refuses every request of such a caller with a `403`. `authzPerBranch` keeps
-the uid's `users` rules, which are keyed on the uid itself, and withholds the
-`groups` rules, which belong to one entry or the other. Both log a warning
-naming the identity and the number of entries it matched.
+`authzLinid1` refuses every request of such a caller with a `403`.
+`authzPerBranch` keeps the uid's `users` rules and withholds the `groups`
+rules. Both log a warning naming the identity and the number of entries it
+matched.
 
 **Check your directory before upgrading:**
 

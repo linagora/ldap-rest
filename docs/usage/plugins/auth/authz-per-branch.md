@@ -181,17 +181,13 @@ Groups are resolved dynamically:
    the spaces around `,` and `=` do not matter, so
    `CN=Editors, OU=Groups,dc=example,dc=com` names the same group as
    `cn=editors,ou=groups,dc=example,dc=com`
-4. Caches results for configured TTL (default: 60 seconds); concurrent
+4. Caches results (see [Group Caching](#group-caching)); concurrent
    requests for the same user share one lookup
 
-A uid that names **more than one** entry — the same `uid` in two branches,
-which a directory without the `unique` overlay accepts — gets **no group
-rule**: which entry is the caller cannot be told, and picking the first one
-the server lists would hand over another entry's groups. A warning is
-logged; the uid's own `users` rule still applies.
-
-A lookup that fails (500 — the directory's error is not an authorization
-verdict) is not cached: the request fails, and the next one searches again.
+A uid that names **more than one** entry gets **no group rule**, since its
+groups cannot be told apart from its homonym's; a warning is logged, and the
+uid's own `users` rule still applies. A lookup that fails answers `500` and
+is not cached.
 
 ## Sub-branch Inheritance
 
@@ -393,11 +389,10 @@ Group memberships are cached to reduce LDAP queries:
 - **Configurable**: `--authz-per-branch-cache-ttl`
 - **Per-user cache**: Each user's groups cached separately
 - **Automatic expiry**: Cache entries expire after TTL
-- **Dropped on writes**: any add, delete or rename made through ldap-rest
-  empties the cache, and so does a modify touching the group member attribute
-  or `--ldap-user-main-attribute`: removing a member takes effect on the next
-  request. A modify touching anything else keeps the cache. A change made
-  directly in the directory still waits for the TTL
+- **Dropped on writes**: any add, delete, rename or move made through
+  ldap-rest empties the cache, and so does a modify touching the group member
+  attribute or `--ldap-user-main-attribute`. A change made directly in the
+  directory waits for the TTL
 
 Cache hit/miss logging:
 
@@ -439,9 +434,6 @@ names, this plugin lets them read and refuses every write. Give it an
 
 - Group DNs must be fully qualified
 - Group resolution uses LDAP search - ensure proper indexing
-- A membership removed directly in the directory (not through ldap-rest)
-  keeps granting until the cache TTL runs out
-- A uid shared by several entries gets no group rule
 
 ### Authentication Required
 
@@ -552,8 +544,8 @@ Changed permissions don't take effect immediately.
 
 **Solutions:**
 
-1. Group memberships changed through ldap-rest apply at once; one changed
-   directly in the directory waits for the group cache TTL
+1. A membership changed directly in the directory waits for the
+   [group cache](#group-caching) TTL
 2. Restart server to clear all caches
 3. Reduce `--authz-per-branch-cache-ttl` for testing
 
@@ -574,8 +566,7 @@ User should inherit group permissions but doesn't.
 2. Check the group DN in config names the group: it is compared as a DN
    (case and spaces are ignored), but every RDN must be there
 
-3. Check the uid names a single entry — a uid found in two places gets no
-   group rule, and a warning says so:
+3. Check the uid names a single entry:
 
    ```bash
    ldapsearch -x -b "dc=example,dc=com" "(uid=jdoe)" dn
