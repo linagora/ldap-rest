@@ -3,11 +3,30 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import { SearchResult } from 'ldapts';
+import type { Response } from 'express';
 
+import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
+import type { Role } from '../../../src/abstract/plugin';
+import type { ChangeContext } from '../../../src/lib/changeContext';
 import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
 process.env.DM_GROUP_SCHEMA = '';
+
+/** Authentication reduced to a header, so the test is about the change context */
+class TestAuthPlugin extends AuthBase {
+  name = 'testAuth';
+  roles: Role[] = ['auth'] as const;
+
+  authMethod(req: DmRequest, res: Response, next: () => void): void {
+    const user = req.headers['x-test-user'];
+    if (typeof user === 'string' && user) {
+      req.user = user;
+      return next();
+    }
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+}
 
 describe('LdapGroups Plugin', function () {
   let server: DM;
@@ -618,6 +637,53 @@ describe('LdapGroups Plugin', function () {
         hooks.splice(hooks.indexOf(keep), 1);
       }
       expect(await members()).to.deep.equal([leaver, user1]);
+    });
+  });
+
+  describe('change context', () => {
+    let dm: DM;
+    let request: ReturnType<typeof supertest>;
+    const groupDn = `cn=ctxgroup,${DM_LDAP_GROUP_BASE}`;
+    const actor = 'rest-writer';
+
+    before(async () => {
+      dm = new DM();
+      await dm.ready;
+      // Auth first, so the dispatcher it mounts precedes the group routes.
+      await dm.registerPlugin('testAuth', new TestAuthPlugin(dm));
+      await dm.registerPlugin('core/ldap/groups', new LdapGroups(dm));
+      request = supertest(dm.app);
+    });
+
+    after(async () => {
+      await dm.ldap.delete(groupDn).catch(() => undefined);
+    });
+
+    it('a group write through REST says who made it, and through which door', async () => {
+      // What a plugin watching the directory reads: the second argument of
+      // every `ldap*done` hook. The REST route used to call the write
+      // without the request it held, and the context came out empty.
+      const seen: ChangeContext[] = [];
+      const listener = (_args: unknown, context?: ChangeContext): void => {
+        seen.push(context ?? {});
+      };
+      (dm.hooks.ldapadddone ||= []).push(listener);
+      try {
+        await request
+          .post('/api/v1/ldap/groups')
+          .set('x-test-user', actor)
+          .type('json')
+          .send({ cn: 'ctxgroup', member: [user1] })
+          .expect(200);
+        await waitFor(() => seen.length > 0, {
+          what: 'the add-done hook to carry a context',
+        });
+        expect(seen[0]).to.include({ actor, source: 'rest' });
+        expect(seen[0].requestId).to.be.a('string');
+      } finally {
+        const hooks = dm.hooks.ldapadddone as Function[];
+        hooks.splice(hooks.indexOf(listener), 1);
+      }
     });
   });
 });

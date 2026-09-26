@@ -130,9 +130,18 @@ class OnLdapChange extends DmPlugin {
     ldaprenamedone: async ([dn, newDn], context) => {
       const before = this.pendingRenames.get(dn);
       this.pendingRenames.delete(dn);
+      if (!before) {
+        // A move reaches this hook too (`ldapActions.move` is a modifyDN), and
+        // it launches no `ldaprenamerequest` — that is an authorization hook,
+        // and the write that drove the move was already judged. So there is no
+        // snapshot: an entry moved to the trash, not a fault. It is the
+        // ordinary path here, and warning would add a line per trashed entry.
+        this.logger.debug(`${dn}: no snapshot: a move made outside a request`);
+        return;
+      }
       const after = await this.read(newDn);
-      if (!before || !after) {
-        this.logger.warn(`Could not read both sides of ${dn} -> ${newDn}`);
+      if (!after) {
+        this.logger.warn(`Could not read ${newDn} after the rename of ${dn}`);
         return;
       }
       this.publish(newDn, before, after, context);

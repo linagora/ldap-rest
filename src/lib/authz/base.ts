@@ -355,6 +355,21 @@ export default abstract class AuthzBase extends DmPlugin {
       this.resolutionCache.clear();
     },
 
+    /**
+     * A delete removes the entry an identity resolves to, exactly as a
+     * rename moves it, so what was resolved is dropped the same way.
+     *
+     * An administrator deleted through the API is, for `authzLinid1`, still
+     * resolved to the former DN where the organization still names them:
+     * their session keeps its rights until the TTL runs out. Like the rename
+     * hook, the whole map goes rather than one key — the hook carries the
+     * deleted DN, and the cache keys identities, so a handful of lookups is
+     * cheaper than working out which identity the DN held.
+     */
+    ldapdeletedone: (): void => {
+      this.resolutionCache.clear();
+    },
+
     ldapmodifyrequest: async ([dn, changes, opNumber, req]: [
       string,
       ModifyRequest,

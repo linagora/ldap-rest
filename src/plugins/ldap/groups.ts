@@ -555,7 +555,7 @@ export default class LdapGroups extends DmPlugin {
         if (typeof body.newCn !== 'string') {
           throw new BadRequestError('newCn must be a string');
         }
-        await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn);
+        await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn, req);
       })
     );
   }
@@ -643,14 +643,21 @@ export default class LdapGroups extends DmPlugin {
           !(this.schema?.attributes[key]?.fixed === true)
       )
     ) as AttributesList;
-    await tryMethod(res, this.addGroup.bind(this), cn, members, additional);
+    await tryMethod(
+      res,
+      this.addGroup.bind(this),
+      cn,
+      members,
+      additional,
+      req
+    );
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
     if (!cn) throw new BadRequestError('cn is required');
-    await tryMethod(res, this.deleteGroup.bind(this), cn);
+    await tryMethod(res, this.deleteGroup.bind(this), cn, req);
   }
 
   async apiModify(req: Request, res: Response): Promise<void> {
@@ -670,7 +677,7 @@ export default class LdapGroups extends DmPlugin {
         ([key, _value]) => !(this.schema?.attributes[key]?.fixed === true)
       )
     ) as postModify;
-    await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody);
+    await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody, req);
   }
 
   /**
@@ -680,7 +687,8 @@ export default class LdapGroups extends DmPlugin {
   async addGroup(
     cn: string,
     members: string[] = [],
-    additional: AttributesList = {}
+    additional: AttributesList = {},
+    req?: Request
   ): Promise<boolean> {
     let dn: string;
     if (new RegExp(`^${this.cn}=`).test(cn)) {
@@ -736,7 +744,7 @@ export default class LdapGroups extends DmPlugin {
     ]);
     let res;
     try {
-      res = await this.ldap.add(dn, entry);
+      res = await this.ldap.add(dn, entry, req);
     } catch (err) {
       // A rule that refused the write chose its own status: wrapping it in a
       // plain Error turned a 409 into a 500. The schema now carries `unique`
@@ -755,7 +763,8 @@ export default class LdapGroups extends DmPlugin {
       add?: AttributesList;
       replace?: AttributesList;
       delete?: string[] | AttributesList;
-    }
+    },
+    req?: Request
   ): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     const op = this.opNumber();
@@ -791,7 +800,7 @@ export default class LdapGroups extends DmPlugin {
     }
 
     await this.validateChanges(dn, changes);
-    const res = await this.ldap.modify(dn, changes);
+    const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
       dn,
       changes,
@@ -800,7 +809,11 @@ export default class LdapGroups extends DmPlugin {
     return res;
   }
 
-  async renameGroup(cn: string, newCn: string): Promise<boolean> {
+  async renameGroup(
+    cn: string,
+    newCn: string,
+    req?: Request
+  ): Promise<boolean> {
     if (!/,/.test(cn)) {
       validateDnValue(cn, this.cn);
     }
@@ -815,15 +828,15 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgrouprename,
       [dn, newDn]
     );
-    const res = await this.ldap.rename(dn, newDn);
+    const res = await this.ldap.rename(dn, newDn, req);
     void launchHooks(this.registeredHooks.ldapgrouprenamedone, [dn, newDn]);
     return res;
   }
 
-  async deleteGroup(cn: string): Promise<boolean> {
+  async deleteGroup(cn: string, req?: Request): Promise<boolean> {
     let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
-    const res = await this.ldap.delete(dn);
+    const res = await this.ldap.delete(dn, req);
     void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
     return res;
   }

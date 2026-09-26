@@ -4,12 +4,19 @@
 
 ### Breaking Changes
 
-- A server started without `--ldap-base` (or `DM_LDAP_BASE`) now refuses to
-  start. It used to guess the base from `--ldap-dn`, taking the second RDN of
-  the bind DN — `dc=example` for `cn=admin,dc=example,dc=com`, which is not an
-  entry, so every subtree search answered `NoSuchObject`. A guessed base that
-  happened to exist was worse: the searches returned nothing without an error
-  ([notes](docs/usage/upgrading.md#ldap-base-is-now-required))
+- `--ldap-base` (`DM_LDAP_BASE`) is required: the server no longer guesses it
+  from `--ldap-dn` —
+  [notes](docs/usage/upgrading.md#ldap-base-is-now-required)
+
+- `core/auth/authzPerBranch`: the `groups` rules of
+  `--authz-per-branch-config` granted nothing, and now apply
+  ([#212](https://github.com/linagora/ldap-rest/issues/212),
+  [notes](docs/usage/upgrading.md#group-rules-now-apply))
+
+- A `uid` naming several entries is refused by `core/auth/authzLinid1`, and
+  gets no `groups` rule from `core/auth/authzPerBranch`, instead of being
+  resolved to whichever entry the server listed first —
+  [notes](docs/usage/upgrading.md#an-identity-naming-several-entries-is-refused)
 
 - `onLdapChange` gives the full values on each side of a change, not the
   values the request named —
@@ -30,43 +37,31 @@
   for a deployment where another plugin publishes it. The instance is still
   deleted
 
-- `core/ldap/onChange` publishes `onLdapEntryChange(dn, before, after)`: the
-  entry before and after each add, modify, rename and delete
-  ([#206](https://github.com/linagora/ldap-rest/issues/206))
+- `core/ldap/onChange` publishes `onLdapEntryChange`: the entry before and
+  after each add, modify, rename and delete
+  ([#206](https://github.com/linagora/ldap-rest/issues/206),
+  [doc](docs/usage/plugins/ldap/on-change.md))
 
 - The `ldap*done` hooks and `onLdapEntryChange` receive who made the write
-  and through which door: `actor`, `requestId`, `source` (`rest` or `scim`)
+  and through which door (REST or SCIM)
   ([#207](https://github.com/linagora/ldap-rest/issues/207))
 
 - A plugin declares the operational attributes it follows, such as
-  `pwdAccountLockedTime`, in `followedOperationalAttributes`, and
-  `onLdapEntryChange` gives them on both sides
+  `pwdAccountLockedTime`, and `onLdapEntryChange` gives them on both sides
   ([#208](https://github.com/linagora/ldap-rest/issues/208))
 
 ### Bug Fixes
 
-- `core/auth/authzPerBranch`: the `groups` rules of
-  `--authz-per-branch-config` granted nothing — a caller's groups were
-  looked up with a substring match on an attribute holding DNs, which has no
-  substring form, so no group was ever found and the rules were inert
-  ([#212](https://github.com/linagora/ldap-rest/issues/212),
-  [notes](docs/usage/upgrading.md#group-rules-now-apply)). Group DNs in the
-  configuration are now compared as DNs (case and spaces ignored); a uid
-  naming several entries gets no group rule rather than the first entry's;
-  the group cache is emptied by a write made through ldap-rest that can
-  change a membership, and a failed lookup is no longer cached
+- Authorization plugins: a caller renamed, moved to the trash or deleted
+  through ldap-rest no longer keeps the rights of its former DN until the
+  cache TTL runs out (5 minutes for `core/auth/authzLinid1`)
 
-- `core/auth/authzLinid1`: a uid naming several entries resolved to
-  whichever one the server listed first, and a failed lookup read as "no such
-  user" — which `--authz-unresolved-user allow` lets through unchecked, and
-  which was cached. An ambiguous uid is now refused (403) whatever the
-  policy, a failed lookup fails the request without being cached, and the
-  lookup searches the configured base (`--ldap-base`) instead of the empty
-  one it used to pass, which made every search fail
+- `core/auth/authzLinid1`: a failed directory lookup read as an unknown user,
+  which `--authz-unresolved-user allow` let through, and was cached. It fails
+  the request now, and the next one searches again
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`
-  failed the search, and one holding `*` matched nothing, a DN attribute
-  having no substring match
+  failed the search, and one holding `*` matched nothing
   - `core/ldap/groups`: a deleted entry stayed in its groups
   - `core/ldap/organizations`: an organization looked empty, and was deleted
     with entries still linked to it
@@ -75,18 +70,18 @@
   - `core/auth/authzLinid1`: an administrator got no permission from the
     organizations naming them
 
-- `core/ldap/groups`: an entry left its groups as soon as its delete was
-  asked for, so a delete that an authorization plugin refused, that failed,
-  or that another plugin kept (`core/ldap/trash`) still cost the entry its
-  memberships. It leaves them once the delete has landed: the cleanup runs
-  just after `delete()` answers, and a cleanup that fails is logged. A group
+- `core/ldap/groups`: an entry left its groups when its delete was asked for,
+  even when the delete was refused, failed, or was turned into a move by
+  `core/ldap/trash`. It leaves them once the delete has landed. A group
   losing its last member keeps the `--group-dummy-user` placeholder instead
   of the deleted DN
 
 - `core/ldap/onChange`: a write that leaves every value as it was fires no
   hook, a rename fires them, and a modify of an entry that has children is no
-  longer missed. `onLdapDisplayNameChange` builds both names from the whole
-  entry, and fires only when the name changed
+  longer missed. `onLdapDisplayNameChange` fires only when the name changed
+
+- `core/ldap/trash`: moving an entry to the trash fires the `ldaprenamedone`
+  hooks, as a rename does
 
 ## v0.9.0 (2026-09-24)
 

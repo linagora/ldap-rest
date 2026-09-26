@@ -551,14 +551,14 @@ export default class LdapOrganizations extends DmPlugin {
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
     assertClientMaySet(this.schema, modifiedAttributeNames(body));
-    await tryMethod(res, this.modifyOrganization.bind(this), dn, body);
+    await tryMethod(res, this.modifyOrganization.bind(this), dn, body, req);
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
-    await tryMethod(res, this.deleteOrganization.bind(this), dn);
+    await tryMethod(res, this.deleteOrganization.bind(this), dn, req);
   }
 
   async apiMove(req: Request, res: Response): Promise<void> {
@@ -1190,12 +1190,13 @@ export default class LdapOrganizations extends DmPlugin {
 
   async modifyOrganization(
     dn: string,
-    changes: ModifyRequest
+    changes: ModifyRequest,
+    req?: Request
   ): Promise<boolean> {
     // Validate with schema if available
     await this.validateChanges(dn, changes);
     // Hooks will validate any changes to organization link and path
-    return await this.server.ldap.modify(dn, changes);
+    return await this.server.ldap.modify(dn, changes, req);
   }
 
   async validateNewOrganization(
@@ -1396,9 +1397,9 @@ export default class LdapOrganizations extends DmPlugin {
     return { newDn };
   }
 
-  async deleteOrganization(dn: string): Promise<boolean> {
+  async deleteOrganization(dn: string, req?: Request): Promise<boolean> {
     // Hook will check that organization is empty before deletion
-    return await this.server.ldap.delete(dn);
+    return await this.server.ldap.delete(dn, req);
   }
 
   /**
