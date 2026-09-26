@@ -35,6 +35,17 @@ export default class AuthzLinid1 extends AuthzBase {
   }
 
   /**
+   * Always: the branches this plugin grants are organizations, and what an
+   * administrator manages in them is the accounts and groups whose
+   * organization link names them, wherever they are stored. Judged by their
+   * parent instead, a flat `ou=users` is nobody's branch, and every
+   * administrator is refused every account.
+   */
+  protected filtersAttachedEntries(): boolean {
+    return true;
+  }
+
+  /**
    * Resolve user - for authzLinid1, convert uid to userDn via LDAP
    */
   async resolveUser(uid: string): Promise<string | null> {

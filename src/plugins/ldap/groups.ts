@@ -281,7 +281,7 @@ export default class LdapGroups extends DmPlugin {
         }
         if (req.query.attributes && typeof req.query.attributes === 'string')
           args.attributes = req.query.attributes.split(',');
-        const list = await this.listGroups(args);
+        const list = await this.listGroups({ ...args, req });
         return ok(res, this.hideNeverReturn(list));
       })
     );
@@ -603,7 +603,8 @@ export default class LdapGroups extends DmPlugin {
         : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
       const result = (await this.ldap.search(
         { paged: false, scope: 'base' },
-        dn
+        dn,
+        req
       )) as SearchResult;
       if (result.searchEntries.length === 0) {
         throw new NotFoundError('Group not found');
@@ -1031,9 +1032,11 @@ export default class LdapGroups extends DmPlugin {
   async listGroups({
     filter,
     attributes,
+    req,
   }: {
     filter?: string;
     attributes?: string[];
+    req?: Request;
   } = {}): Promise<LdapList> {
     const _res: AsyncGenerator<SearchResult> = (await this.ldap
       .search(
@@ -1042,7 +1045,8 @@ export default class LdapGroups extends DmPlugin {
           attributes: attributes || [this.cn, 'member'],
           paged: true,
         },
-        this.base as string
+        this.base as string,
+        req
       )
       .catch(err => {
         throw new Error(`Failed to list groups from ${this.base}: ${err}`);

@@ -48,6 +48,23 @@ twakeDepartmentLink: ou=HR,ou=organization,dc=example,dc=com
 
 The HR admin (listed in `ou=HR`'s `twakeLocalAdminLink`) can manage John even though he's in `ou=users` because his `twakeDepartmentLink` points to the HR organization.
 
+### What an administrator reads
+
+`authzLinid1` always judges an attached entry this way, as
+`--authz-filter-attached-entries` does for `authzPerBranch`, whatever that
+option says: judged by its parent instead, an account in a flat `ou=users`
+belongs to nobody's branch, and no administrator could list or change one.
+
+- Listings of accounts and groups drop the entries attached to an
+  organization outside the caller's branches. A single read of one answers
+  `404`.
+- Entries attached to nothing — the organizations, the nomenclature values, a
+  group or an account with no `twakeDepartmentLink` — are readable by every
+  administrator: the organization tree is reference data. Writes to them are
+  judged on their parent. The tree a console draws still starts at the
+  caller's own branches: see [getOrganisationTop Hook](#getorganisationtop-hook).
+- A caller named in no `twakeLocalAdminLink` is refused every read (`403`).
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:
@@ -179,8 +196,9 @@ Intercepts all LDAP search operations:
 2. Resolves user's DN from username
 3. Allows base scope searches on top organization (for navigation)
 4. Allows searches for `twakeLocalAdminLink` (for permission refresh)
-5. Verifies user has read permission for search base
-6. Throws error if access denied
+5. Refuses a caller who administers no branch; lets the others search, and
+   drops from the answer the entries attached outside their branches
+   (`ldapsearchfilter`)
 
 **Special allowances:**
 
@@ -460,31 +478,6 @@ User jdoe not found in LDAP
 2. Check `ldap_user_main_attribute` configuration (default: `uid`)
 
 3. Verify authentication plugin sets `req.user` correctly
-
-### Problem: Cannot Search Top Organization
-
-**Symptoms:**
-
-```json
-{
-  "error": "User admin does not have read permission for branch ou=organization,dc=example,dc=com"
-}
-```
-
-**Solutions:**
-
-This is expected behavior - users can only see organizations they manage. To grant access to top organization:
-
-```bash
-ldapsearch -x -b "ou=organization,dc=example,dc=com" -s base "(objectClass=*)"
-# Modify to add user:
-ldapmodify <<EOF
-dn: ou=organization,dc=example,dc=com
-changetype: modify
-add: twakeLocalAdminLink
-twakeLocalAdminLink: uid=admin,ou=users,dc=example,dc=com
-EOF
-```
 
 ## Integration Examples
 

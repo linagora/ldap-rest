@@ -104,6 +104,15 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * Whether an entry attached to an organization is judged by that
+   * organization rather than by the branch it is stored in:
+   * `--authz-filter-attached-entries`, off by default.
+   */
+  protected filtersAttachedEntries(): boolean {
+    return Boolean(this.config.authz_filter_attached_entries);
+  }
+
+  /**
    * The branch a write is judged against.
    *
    * An account is stored in the same `ou=users` as everyone else, so its
@@ -119,7 +128,7 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   protected async effectiveBranch(dn: string): Promise<string> {
     const linkAttr = this.config.ldap_organization_link_attribute;
-    if (!linkAttr || !this.config.authz_filter_attached_entries)
+    if (!linkAttr || !this.filtersAttachedEntries())
       return this.extractBranchDn(dn);
 
     const first = (v: AttributeValue | undefined): string | undefined => {
@@ -512,16 +521,16 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      // Opted in, an administrator reads the directory whole — the
+      // Filtering, an administrator reads the directory whole — the
       // organization tree, the groups, the nomenclatures — and what is held
       // to a branch is the accounts, recognised one entry at a time by
       // `ldapsearchfilter` below. Refusing the search here would take the
       // tree and the reference data with it.
       //
-      // Off, which is the default, the branch decides as before. Where a
-      // branch is a tenant rather than a department, letting a listing cross
-      // it is letting a customer read another.
-      if (this.config.authz_filter_attached_entries) {
+      // Otherwise the branch decides. Where a branch is a tenant rather than
+      // a department, letting a listing cross it is letting a customer read
+      // another.
+      if (this.filtersAttachedEntries()) {
         const branches = await this.getAuthorizedBranches(user);
         if (branches.length === 0) {
           throw new Error(
@@ -575,7 +584,7 @@ export default abstract class AuthzBase extends DmPlugin {
         req,
         opts,
       ];
-      if (!this.config.authz_filter_attached_entries) return pass;
+      if (!this.filtersAttachedEntries()) return pass;
       const linkAttr = this.config.ldap_organization_link_attribute;
       if (!linkAttr || this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
