@@ -6,6 +6,19 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### LDAP base is now required
+
+**Who is affected:** a deployment that starts `ldap-rest` without
+`--ldap-base` (or `DM_LDAP_BASE`).
+
+The base was guessed from `--ldap-dn`, taking the second RDN of the bind DN:
+`dc=example` for `cn=admin,dc=example,dc=com`, which is not an entry, so
+every subtree search failed with `NoSuchObject`. A guess that did land on an
+entry was worse: the searches returned nothing, without an error. The server
+now refuses to start, names the option, and `--help` marks it required. Set
+`--ldap-base` to the DN under which the entries are searched — the same value
+the `ldapsearch` calls behind the deployment use.
+
 ### Group rules now apply
 
 **Who is affected:** a deployment whose `--authz-per-branch-config` declares

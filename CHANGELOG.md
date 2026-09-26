@@ -4,6 +4,13 @@
 
 ### Breaking Changes
 
+- A server started without `--ldap-base` (or `DM_LDAP_BASE`) now refuses to
+  start. It used to guess the base from `--ldap-dn`, taking the second RDN of
+  the bind DN — `dc=example` for `cn=admin,dc=example,dc=com`, which is not an
+  entry, so every subtree search answered `NoSuchObject`. A guessed base that
+  happened to exist was worse: the searches returned nothing without an error
+  ([notes](docs/usage/upgrading.md#ldap-base-is-now-required))
+
 - `onLdapChange` gives the full values on each side of a change, not the
   values the request named —
   [notes](docs/usage/upgrading.md#onldapchange-gives-full-values)
@@ -54,8 +61,8 @@
   user" — which `--authz-unresolved-user allow` lets through unchecked, and
   which was cached. An ambiguous uid is now refused (403) whatever the
   policy, a failed lookup fails the request without being cached, and the
-  lookup searches the LDAP base derived from `--ldap-dn` when `--ldap-base`
-  is not set, instead of the root DSE
+  lookup searches the configured base (`--ldap-base`) instead of the empty
+  one it used to pass, which made every search fail
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`
   failed the search, and one holding `*` matched nothing, a DN attribute

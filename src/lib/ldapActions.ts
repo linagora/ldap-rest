@@ -307,12 +307,18 @@ class ldapActions {
     if (!server.config.ldap_pwd) {
       throw new Error('LDAP password is not defined');
     }
+    // The base is the default search base (`search(options, base =
+    // this.base)`) and the suffix `setDn()` builds DNs from, so a guessed one
+    // reads and writes in the wrong place. The guess was
+    // `ldap_dn.split(',', 2)[1]`, the second RDN of the bind DN only:
+    // `cn=admin,dc=example,dc=com` gave `dc=example`, which is not an entry,
+    // so every subtree search under it answered `NoSuchObject` (32).
     if (!server.config.ldap_base) {
-      this.base = server.config.ldap_dn.split(',', 2)[1];
-      this.logger.warn(`LDAP base is not defined, using "${this.base}"`);
-    } else {
-      this.base = server.config.ldap_base;
+      throw new Error(
+        'LDAP base is not defined, please set --ldap-base (or DM_LDAP_BASE)'
+      );
     }
+    this.base = server.config.ldap_base;
     this.ldapUrls = server.config.ldap_url;
     this.logger.info(
       `LDAP failover configured with ${this.ldapUrls.length} URL(s): ${this.ldapUrls.join(', ')}`
