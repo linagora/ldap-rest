@@ -5,6 +5,7 @@ import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
+import type { ModifyRequest } from '../../../src/lib/ldapActions';
 import supertest from 'supertest';
 import {
   skipIfMissingEnvVars,
@@ -526,6 +527,20 @@ describe('AuthzPerBranch', function () {
       release();
       expect(await lookup).to.include(groupA());
       expect(plugin.groupCache.has('grpuser')).to.be.false;
+    });
+
+    it('sees a membership change in each attribute form the hook can be handed', () => {
+      // The modify-done hook filters on these forms to decide whether to
+      // empty the cache. Two of them — a `delete` given as an attribute
+      // list and an option range — cannot be written against a live
+      // directory, so the predicate is read directly.
+      const touches = (changes: ModifyRequest): boolean =>
+        plugin['touchesMembership'](changes);
+      expect(touches({ delete: ['member'] })).to.be.true;
+      expect(touches({ replace: { 'member;range=0-1': 'x' } })).to.be.true;
+      const main = plugin.config.ldap_user_main_attribute || 'uid';
+      expect(touches({ add: { [main]: 'x' } })).to.be.true;
+      expect(touches({ replace: { sn: 'X' } })).to.be.false;
     });
   });
 
