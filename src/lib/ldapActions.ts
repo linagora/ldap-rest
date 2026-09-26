@@ -1044,8 +1044,9 @@ class ldapActions {
    * @param dn - Current DN (e.g., "uid=user1,ou=users,dc=example,dc=com")
    * @param newDn - Full new DN (e.g., "uid=user1,ou=trash,dc=example,dc=com")
    *                ldapts will extract newRDN="uid=user1" and newSuperior="ou=trash,dc=example,dc=com"
+   * @param req - Request behind the move, when there is one
    */
-  async move(dn: string, newDn: string): Promise<boolean> {
+  async move(dn: string, newDn: string, req?: Request): Promise<boolean> {
     dn = this.setDn(dn);
     newDn = this.setDn(newDn);
     const pooled = await this.acquireConnection();
@@ -1063,6 +1064,18 @@ class ldapActions {
       // Invalidate both ends — see rename() above for why both matter.
       this.invalidateCache(dn);
       this.invalidateCache(newDn);
+      // A move is a modifyDN, so it is a rename: the plugins that watch a
+      // rename watch a move, and the two caches that outlive the search cache
+      // (the authz group cache, the identity → DN resolution cache) are
+      // dropped by the same hook. `ldaprenamerequest` is deliberately not
+      // launched: it is an authorization hook, and this write has already
+      // been judged by the `ldap*request` hook of whatever drove it —
+      // re-running it here would judge the same write twice.
+      void launchHooks(
+        this.parent.hooks.ldaprenamedone,
+        [dn, newDn],
+        changeContext(req)
+      );
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
     } catch (error) {

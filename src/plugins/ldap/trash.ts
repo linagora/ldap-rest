@@ -232,7 +232,7 @@ class TrashPlugin extends DmPlugin {
             `Moving ${currentDn} to ${trashDn} using LDAP move (atomic)`
           );
 
-          await this.server.ldap.move(currentDn, trashDn);
+          await this.server.ldap.move(currentDn, trashDn, req);
 
           this.logger.info(`Entry ${currentDn} moved to trash at ${trashDn}`);
 

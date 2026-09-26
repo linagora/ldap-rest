@@ -1,9 +1,11 @@
 import LdapActions from '../../src/lib/ldapActions';
 import { expect } from 'chai';
 import { Client, SearchResult } from 'ldapts';
+import type { Request } from 'express';
 import { parseConfig } from '../../src/lib/parseConfig';
 import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
+import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 let ldapActions: LdapActions;
@@ -254,6 +256,62 @@ describe('ldapActions', function () {
         expect((result as SearchResult).searchEntries[0].uid).to.equal(
           'newtestuser'
         );
+      });
+    });
+
+    describe('move', () => {
+      let moved: [string, string, ChangeContext | undefined][];
+
+      // The enclosing suite's instance is built on a DM of its own; this one
+      // listens to the rename-done hook of a DM of its own, so the assertion
+      // reads what the move itself launched and nothing else.
+      beforeEach(() => {
+        moved = [];
+        const dm = new DM();
+        dm.hooks.ldaprenamedone = [
+          ([dn, newDn]: [string, string], context?: ChangeContext): void => {
+            moved.push([dn, newDn, context]);
+          },
+        ];
+        ldapActions = new LdapActions(dm);
+      });
+
+      afterEach(async () => {
+        for (const dn of [testDN, newDN]) {
+          try {
+            await ldapActions.delete(dn);
+          } catch (err) {
+            // Ignore errors if the entry does not exist
+          }
+        }
+      });
+
+      const person = () => ({
+        objectClass: ['inetOrgPerson', 'organizationalPerson', 'person', 'top'],
+        cn: 'Test User',
+        sn: 'User',
+        uid: 'testuser',
+      });
+
+      it('tells the plugins the entry moved, as a rename does', async () => {
+        await ldapActions.add(testDN, person());
+        expect(await ldapActions.move(testDN, newDN)).to.be.true;
+
+        expect(moved).to.have.lengthOf(1);
+        expect(moved[0][0]).to.equal(testDN);
+        expect(moved[0][1]).to.equal(newDN);
+        // No request behind this one: a move driven by a request carries its
+        // context, and none is invented here.
+        expect(moved[0][2]).to.deep.equal({});
+      });
+
+      it('says who moved it, and through which door, when a request drove it', async () => {
+        await ldapActions.add(testDN, person());
+        const req = { user: 'rest-mover' } as unknown as Request;
+        expect(await ldapActions.move(testDN, newDN, req)).to.be.true;
+
+        expect(moved[0][2]).to.include({ actor: 'rest-mover', source: 'rest' });
+        expect(moved[0][2]?.requestId).to.be.a('string');
       });
     });
   });
