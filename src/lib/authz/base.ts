@@ -16,7 +16,6 @@ import type {
   AttributesList,
   ModifyRequest,
   SearchResult,
-  AttributeValue,
 } from '../ldapActions';
 import { AmbiguousIdentityError, ForbiddenError } from '../errors';
 import {
@@ -24,6 +23,7 @@ import {
   getParentDn,
   isDnInBranch,
   normalizeDn,
+  organizationLink,
 } from '../utils';
 
 import { authzFor, servesRequest } from './composition';
@@ -144,26 +144,12 @@ export default abstract class AuthzBase extends DmPlugin {
     if (!linkAttr || !this.filtersAttachedEntries())
       return this.extractBranchDn(dn);
 
-    const first = (v: AttributeValue | undefined): string | undefined => {
-      if (v === undefined || v === null) return undefined;
-      const one = Array.isArray(v) ? v[0] : v;
-      // ldapts answers an attribute that was asked for and is absent with
-      // an empty array: its first value is `undefined`, which read as the
-      // branch "undefined" — and nobody, a global administrator included,
-      // could write an entry attached to no organization.
-      if (one === undefined || one === null) return undefined;
-      const str = String(one);
-      return str.length > 0 ? str : undefined;
-    };
-
     try {
       const res = (await this.server.ldap.search(
         { paged: false, scope: 'base', attributes: [linkAttr] },
         dn
       )) as SearchResult;
-      const stored = first(
-        res.searchEntries?.[0]?.[linkAttr] as AttributeValue
-      );
+      const stored = organizationLink(res.searchEntries?.[0]?.[linkAttr]);
       if (stored) return stored;
     } catch {
       // Unreadable or absent: fall back to the parent, which is what an
@@ -190,11 +176,24 @@ export default abstract class AuthzBase extends DmPlugin {
    * see it; in transit, one of them can also claim it.
    *
    * @param link the link the entry carries, `undefined` for none
+   * @param key the transit branch as {@link transitKey} gives it
    */
-  protected inTransit(link: string | undefined): boolean {
+  protected inTransit(
+    link: string | undefined,
+    key: string | undefined = this.transitKey()
+  ): boolean {
     if (link === undefined) return true;
+    return key !== undefined && normalizeDn(link) === key;
+  }
+
+  /**
+   * The transit branch in the form DNs are compared in. A listing asks once
+   * and hands it to {@link inTransit} for every entry, rather than parsing
+   * the same constant DN a few thousand times.
+   */
+  private transitKey(): string | undefined {
     const transit = this.transitBranch();
-    return transit !== undefined && normalizeDn(link) === normalizeDn(transit);
+    return transit === undefined ? undefined : normalizeDn(transit);
   }
 
   /**
@@ -458,9 +457,10 @@ export default abstract class AuthzBase extends DmPlugin {
         // entry's parent but not the organization it was linked to could
         // move it out, and nothing was logged.
         let sourceBranch = this.extractBranchDn(dn);
-        // The link as stored; unset when the entry could not be read, which
-        // is not the same as an entry attached to nothing.
-        let stored: { link: string | undefined } | undefined;
+        // Whether the stored entry was read: one that could not be is not
+        // the same as one attached to nothing, and is not in transit.
+        let read = false;
+        let storedLink: string | undefined;
         try {
           const currentEntry = (await this.server.ldap.search(
             { paged: false, scope: 'base', attributes: [linkAttr] },
@@ -468,16 +468,9 @@ export default abstract class AuthzBase extends DmPlugin {
           )) as SearchResult;
           const entry = currentEntry.searchEntries[0];
           if (entry) {
-            const currentLink = entry[linkAttr];
-            const linked = Array.isArray(currentLink)
-              ? currentLink[0]
-              : currentLink;
-            const link =
-              linked !== undefined && linked !== null && String(linked) !== ''
-                ? String(linked)
-                : undefined;
-            stored = { link };
-            if (link) sourceBranch = link;
+            read = true;
+            storedLink = organizationLink(entry[linkAttr]);
+            if (storedLink) sourceBranch = storedLink;
           }
         } catch {
           // The entry could not be read: its parent branch stands in.
@@ -489,8 +482,7 @@ export default abstract class AuthzBase extends DmPlugin {
           : String(newLink);
 
         const byAttachment = this.filtersAttachedEntries();
-        const fromTransit =
-          byAttachment && stored !== undefined && this.inTransit(stored.link);
+        const fromTransit = byAttachment && read && this.inTransit(storedLink);
         const toTransit = byAttachment && this.inTransit(destBranch);
 
         if (!fromTransit) {
@@ -685,6 +677,7 @@ export default abstract class AuthzBase extends DmPlugin {
       // account of the administrator holding the branch would be hidden.
       const within = (dn: string): boolean =>
         branches.some(branch => isDnInBranch(dn, branch));
+      const transitKey = this.transitKey();
 
       result.searchEntries = result.searchEntries.filter(entry => {
         const link = entry[linkAttr];
@@ -693,7 +686,8 @@ export default abstract class AuthzBase extends DmPlugin {
         if (values.length === 0) return true;
         if (values.some(within)) return true;
         // In transit: every administrator sees it, so that one can claim it.
-        if (values.some(value => this.inTransit(value))) return true;
+        if (values.some(value => this.inTransit(value, transitKey)))
+          return true;
         // Attached outside every branch this caller holds. A link that
         // matches nothing configured lands here too: hidden rather than
         // shown, since a wrong link would otherwise be a way to be seen by

@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import type { Config } from '../bin';
 
+import type { AttributeValue } from './ldapActions';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
 
@@ -679,6 +680,29 @@ export function isDummyMemberDn(
     // An unparsable DN is simply not the placeholder.
     return false;
   }
+}
+
+/**
+ * The organization an entry is attached to, read off its link attribute
+ * (`--ldap-organization-link-attribute`), or `undefined` when it is attached
+ * to none.
+ *
+ * "None" arrives in three forms: the attribute missing, an empty array —
+ * how ldapts answers an attribute that was asked for and is absent — and an
+ * empty value. The empty array read as the branch "undefined" in one copy of
+ * this logic, and nobody could write such an entry. Every reader of the link
+ * asks here, so the copies cannot drift apart again.
+ *
+ * @param value - The link attribute as a search returned it
+ * @returns its first value, or `undefined` when there is none
+ */
+export function organizationLink(
+  value: AttributeValue | undefined
+): string | undefined {
+  const one = Array.isArray(value) ? value[0] : value;
+  if (one === undefined || one === null) return undefined;
+  const link = String(one);
+  return link.length > 0 ? link : undefined;
 }
 
 /**

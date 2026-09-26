@@ -36,6 +36,7 @@ import {
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  organizationLink,
   substringSearchFilter,
   transformSchemas,
   validateDnValue,
@@ -958,7 +959,7 @@ export default class LdapGroups extends DmPlugin {
     }
 
     const group = currentGroup.searchEntries[0];
-    const currentDeptLink = group[linkAttr] as string | undefined;
+    const currentDeptLink = organizationLink(group[linkAttr]);
 
     // Check if group has department link attribute
     if (!currentDeptLink) {
