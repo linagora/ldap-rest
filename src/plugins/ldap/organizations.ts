@@ -859,9 +859,10 @@ export default class LdapOrganizations extends DmPlugin {
    */
   isOu(entry: AttributesList): boolean {
     if (!entry.objectClass) return false;
-    const entryClasses = (entry.objectClass as string[]).map(c =>
-      c.toLowerCase()
-    );
+    // A single value is read back as a string, not a one-element array.
+    const entryClasses = ([] as unknown[])
+      .concat(entry.objectClass)
+      .map(c => String(c).toLowerCase());
     return (this.config.ldap_organization_class as string[])
       .filter(c => c.toLowerCase() !== 'top')
       .some(c => entryClasses.includes(c.toLowerCase()));
