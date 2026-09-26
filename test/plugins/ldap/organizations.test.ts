@@ -91,6 +91,13 @@ describe('LDAP Organizations Plugin', function () {
       expect(plugin.isOu(entry)).to.be.false;
     });
 
+    it('should read an objectClass holding a single value', () => {
+      expect(plugin.isOu({ objectClass: 'inetOrgPerson', uid: 'test1' })).to.be
+        .false;
+      expect(plugin.isOu({ objectClass: 'organizationalUnit', ou: 'org' })).to
+        .be.true;
+    });
+
     it('should ignore "top" objectClass', () => {
       const entry = {
         objectClass: ['top'],

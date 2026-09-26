@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- `core/ldap/organizations`: modifying an entry whose `objectClass` holds a
+  single value failed with a 500 (`objectClass.map is not a function`)
+
 ## v0.10.0 (2026-09-26)
 
 ### Breaking Changes
