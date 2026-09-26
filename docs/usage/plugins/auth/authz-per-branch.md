@@ -175,8 +175,7 @@ Modifies the organization tree API:
 Groups are resolved dynamically:
 
 1. Resolves the caller to its DN, searching
-   `(<ldap_user_main_attribute>=<uid>)` under the LDAP base (`--ldap-base`,
-   or the one derived from `--ldap-dn` when it is not set)
+   `(<ldap_user_main_attribute>=<uid>)` under the LDAP base (`--ldap-base`)
 2. Searches for all groups where that DN is a member
 3. Matches each group found against the `groups` keys **as DNs**: case and
    the spaces around `,` and `=` do not matter, so
@@ -191,8 +190,8 @@ rule**: which entry is the caller cannot be told, and picking the first one
 the server lists would hand over another entry's groups. A warning is
 logged; the uid's own `users` rule still applies.
 
-A lookup that fails (directory unreachable) is not cached: the request
-fails, and the next one searches again.
+A lookup that fails (500 — the directory's error is not an authorization
+verdict) is not cached: the request fails, and the next one searches again.
 
 ## Sub-branch Inheritance
 
