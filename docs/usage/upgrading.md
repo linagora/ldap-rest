@@ -4,7 +4,7 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## To 0.10.0
 
 ### LDAP base is now required
 
