@@ -519,7 +519,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       // Create applicative account
       const applicativeDn = `uid=${escapeDnValue(newUid)},${this.applicativeAccountBase}`;
-      await this.server.ldap.add(applicativeDn, newAttrs);
+      await this.server.ldap.add(applicativeDn, newAttrs, req);
 
       this.logger.info(
         `${this.name}: Created applicative account ${applicativeDn} for user ${principal}`
@@ -529,10 +529,14 @@ export default class AppAccountsApi extends DmPlugin {
       // The principal account stores all app account passwords for single-point authentication
       const principalDn = `uid=${escapeDnValue(mailStr)},${this.applicativeAccountBase}`;
       try {
-        await this.server.ldap.modify(principalDn, {
-          // SECURITY NOTE: Cleartext password is intentional - ppolicy hashes before storage
-          add: { userPassword: newPassword },
-        });
+        await this.server.ldap.modify(
+          principalDn,
+          {
+            // SECURITY NOTE: Cleartext password is intentional - ppolicy hashes before storage
+            add: { userPassword: newPassword },
+          },
+          req
+        );
       } catch (error) {
         // Services authenticate against the principal account, so a password
         // that is missing there authenticates nowhere. Returning it anyway
@@ -543,7 +547,7 @@ export default class AppAccountsApi extends DmPlugin {
           error
         );
         try {
-          await this.server.ldap.delete(applicativeDn);
+          await this.server.ldap.delete(applicativeDn, req);
         } catch (rollbackError) {
           this.logger.error(
             `${this.name}: Failed to roll back applicative account ${applicativeDn}:`,
@@ -691,9 +695,13 @@ export default class AppAccountsApi extends DmPlugin {
         const passwordToDelete = Array.isArray(userPassword)
           ? userPassword[0]
           : userPassword;
-        await this.server.ldap.modify(principalDn, {
-          delete: { userPassword: passwordToDelete },
-        });
+        await this.server.ldap.modify(
+          principalDn,
+          {
+            delete: { userPassword: passwordToDelete },
+          },
+          req
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         // A value already absent means an earlier attempt did revoke it and
@@ -725,7 +733,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       // Delete the applicative account
       const applicativeDn = accountEntry.dn;
-      await this.server.ldap.delete(applicativeDn);
+      await this.server.ldap.delete(applicativeDn, req);
 
       this.logger.info(
         `${this.name}: Deleted applicative account ${applicativeDn}`

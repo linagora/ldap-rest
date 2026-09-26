@@ -1512,7 +1512,7 @@ export default abstract class LdapFlat extends DmPlugin {
     };
 
     // Execute the modification (will trigger onLdapChange hook)
-    await this.modifyEntry(id, changes);
+    await this.modifyEntry(id, changes, req);
 
     return {
       departmentPath,
