@@ -553,7 +553,11 @@ describe('AuthzLinid1 Plugin', () => {
     });
 
     describe('READ - Search outside authorized scope', () => {
-      it('should not allow search in unauthorized branch', async () => {
+      // Organizations carry no organization link: they are the reference
+      // data every administrator reads, and the tree a console draws. What
+      // another branch holds back is its accounts and groups
+      // (authzLinid1Attached.test.ts), and every write to it.
+      it('reads another organization, which is reference data', async () => {
         // Create admin user
         const adminEntry = {
           objectClass: ['top', 'inetOrgPerson'],
@@ -580,7 +584,6 @@ describe('AuthzLinid1 Plugin', () => {
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
-        // Try to get unauthorized org via API - should fail
         const res = await request
           .get(
             `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`
@@ -589,11 +592,8 @@ describe('AuthzLinid1 Plugin', () => {
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
 
-        expect(res.status).to.equal(403);
-        expect(res.body).to.have.property('error');
-        expect(res.body.error).to.equal(
-          'Token does not have permission on this branch'
-        );
+        expect(res.status).to.equal(200);
+        expect(res.body).to.have.property('dn', getTestOrg2Dn());
       });
 
       it('should allow search in authorized branch', async () => {
@@ -629,7 +629,7 @@ describe('AuthzLinid1 Plugin', () => {
         expect(res.body).to.have.property('ou', 'TestOrg');
       });
 
-      it('should not return entries from other branches in subnodes search', async () => {
+      it('lists the sub-organizations of another organization', async () => {
         // Create admin user
         const adminEntry = {
           objectClass: ['top', 'inetOrgPerson'],
@@ -656,7 +656,12 @@ describe('AuthzLinid1 Plugin', () => {
         };
         await dm.ldap.add(getTestOrg2Dn(), org2Entry);
 
-        // Try to search subnodes of unauthorized org - should fail
+        await dm.ldap.add(getTestSubOrg2Dn(), {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'SubOrg2',
+          twakeDepartmentPath: 'TestOrg2 / SubOrg2',
+        });
+
         const res = await request
           .get(
             `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}/subnodes`
@@ -665,8 +670,34 @@ describe('AuthzLinid1 Plugin', () => {
           .set('X-Test-User', 'testadmin')
           .set('Accept', 'application/json');
 
+        expect(res.status).to.equal(200);
+        expect((res.body as { dn: string }[]).map(e => e.dn)).to.include(
+          getTestSubOrg2Dn()
+        );
+      });
+
+      it('refuses a caller administering no branch', async () => {
+        await dm.ldap.add(getTestUserDn(), {
+          objectClass: ['top', 'inetOrgPerson'],
+          uid: 'testadmin',
+          sn: 'Admin',
+          cn: 'Test Admin',
+        });
+        await dm.ldap.add(getTestOrg2Dn(), {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou: 'TestOrg2',
+          twakeDepartmentPath: 'TestOrg2',
+        });
+
+        const res = await request
+          .get(
+            `/api/v1/ldap/organizations/${encodeURIComponent(getTestOrg2Dn())}`
+          )
+          .set('Authorization', `Bearer ${adminToken}`)
+          .set('X-Test-User', 'testadmin')
+          .set('Accept', 'application/json');
+
         expect(res.status).to.equal(403);
-        expect(res.body).to.have.property('error');
       });
     });
 

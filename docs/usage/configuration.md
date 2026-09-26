@@ -333,11 +333,11 @@ whichever of the two names it selects. A value other than `req.user` or
 
 #### `core/auth/authzPerBranch`
 
-| CLI                               | Env                                | Default                                          | Description                                                                                                                                                                   |
-| --------------------------------- | ---------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--authz-per-branch-config`       | `DM_AUTHZ_PER_BRANCH_CONFIG`       | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON)                                                                                                                                                   |
-| `--authz-per-branch-cache-ttl`    | `DM_AUTHZ_PER_BRANCH_CACHE_TTL`    | `60`                                             | Cache TTL (seconds)                                                                                                                                                           |
-| `--authz-filter-attached-entries` | `DM_AUTHZ_FILTER_ATTACHED_ENTRIES` | `false`                                          | Judge an attached entry by the organization it hangs off, and filter listings accordingly. Honoured by `authzPerBranch` and `authzLinid1`; does nothing under `authzDynamic`. |
+| CLI                               | Env                                | Default                                          | Description                                                                                                                                                                                |
+| --------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--authz-per-branch-config`       | `DM_AUTHZ_PER_BRANCH_CONFIG`       | `{default:{read:true,write:false,delete:false}}` | Authorization config (JSON)                                                                                                                                                                |
+| `--authz-per-branch-cache-ttl`    | `DM_AUTHZ_PER_BRANCH_CACHE_TTL`    | `60`                                             | Cache TTL (seconds)                                                                                                                                                                        |
+| `--authz-filter-attached-entries` | `DM_AUTHZ_FILTER_ATTACHED_ENTRIES` | `false`                                          | Judge an attached entry by the organization it hangs off, and filter listings accordingly. Honoured by `authzPerBranch`; always on under `authzLinid1`; does nothing under `authzDynamic`. |
 
 #### `core/auth/authzScope`
 

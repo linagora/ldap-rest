@@ -4,6 +4,47 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Group reads are judged
+
+**Who is affected:** a deployment loading `core/ldap/groups` with an
+authorization plugin.
+
+Listing the groups and reading one went to the directory without the
+request, so no authorization plugin saw them: any authenticated caller read
+every group with its members. They are judged like any other read now.
+Under `core/auth/authzPerBranch` without `--authz-filter-attached-entries`,
+that means a `read` grant on the group base (`ou=groups`, or
+`--ldap-group-base`): **a caller without one is answered `403`** where the
+list used to come back.
+
+### authzLinid1 judges accounts and groups by their organization
+
+**Who is affected:** every deployment using `core/auth/authzLinid1`.
+
+It now works as with `--authz-filter-attached-entries`, whatever the option
+says. Without it, a flat `ou=users` was nobody's branch: no administrator
+could list or change an account.
+
+- An administrator lists the accounts and groups attached to their branches,
+  and those attached to none.
+- **The organization tree is readable by every administrator**, not only their
+  own branches: an organization is reference data. `organizations/top` still
+  answers their own branches, so a console starts there. Writes to the tree
+  are judged as before.
+- **A caller named in no `twakeLocalAdminLink` is refused every read** but the
+  top organization's own entry.
+- An account stored under the organization tree without a
+  `twakeDepartmentLink` becomes readable by every administrator. **Where
+  accounts sit under the tree, give them their link before upgrading.** This
+  lists the accounts that have none, under `twakeDepartmentLink: missing`:
+
+  ```bash
+  npm run audit:directory -- --schema static/schemas/twake/users.json \
+    --base ou=users,<base> --filter '(!(twakeDepartmentLink=*))'
+  ```
+
 ## To 0.10.0
 
 ### LDAP base is now required

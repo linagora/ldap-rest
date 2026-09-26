@@ -159,9 +159,10 @@ export interface Config {
    * default: where a branch is a tenant rather than a department, opening a
    * listing across branches is opening a door between customers.
    *
-   * Honoured by the plugins built on `AuthzBase` — `authzPerBranch` and
-   * `authzLinid1`. `authzDynamic` extends `AuthBase` and registers its own
-   * hooks, so it never sees the filter and this option does nothing there.
+   * Honoured by `authzPerBranch`. `authzLinid1` always works this way, its
+   * branches being organizations. `authzDynamic` extends `AuthBase` and
+   * registers its own hooks, so it never sees the filter and this option does
+   * nothing there.
    */
   authz_filter_attached_entries?: boolean;
   authz_unresolved_user?: string;
