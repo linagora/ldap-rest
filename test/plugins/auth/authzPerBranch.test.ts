@@ -5,6 +5,7 @@ import LdapOrganization from '../../../src/plugins/ldap/organizations';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Response } from 'express';
 import type { Role } from '../../../src/abstract/plugin';
+import type { ModifyRequest } from '../../../src/lib/ldapActions';
 import supertest from 'supertest';
 import {
   skipIfMissingEnvVars,
@@ -43,6 +44,10 @@ class TestAuthPlugin extends AuthBase {
 
 // Use getters to ensure env vars are evaluated after setup
 const getUserBranch = () => `ou=users,${process.env.DM_LDAP_BASE}`;
+const getGroupDn = () =>
+  `cn=authzperbranch,ou=groups,${process.env.DM_LDAP_BASE}`;
+const getGroupMemberDn = () => `uid=groupmember,${getUserBranch()}`;
+const getNonMemberDn = () => `uid=nonmember,${getUserBranch()}`;
 
 describe('AuthzPerBranch', function () {
   before(function () {
@@ -78,7 +83,15 @@ describe('AuthzPerBranch', function () {
           },
         },
       },
-      groups: {},
+      groups: {
+        [getGroupDn()]: {
+          [getUserBranch()]: {
+            read: true,
+            write: true,
+            delete: false,
+          },
+        },
+      },
     };
 
     // Set environment variables BEFORE creating DM
@@ -234,6 +247,303 @@ describe('AuthzPerBranch', function () {
 
       // Restore original TTL
       plugin.cacheTTL = originalTTL;
+    });
+  });
+
+  describe('Group permissions', () => {
+    beforeEach(async function () {
+      this.timeout(5000);
+      await server.ldap.add(getGroupMemberDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'groupmember',
+        sn: 'Member',
+        cn: 'Group Member',
+      });
+      await server.ldap.add(getNonMemberDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'nonmember',
+        sn: 'Member',
+        cn: 'Non Member',
+      });
+      await server.ldap.add(getGroupDn(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzperbranch',
+        member: [getGroupMemberDn()],
+      });
+    });
+
+    afterEach(async function () {
+      this.timeout(5000);
+      try {
+        await server.ldap.delete(getGroupDn());
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await server.ldap.delete(getGroupMemberDn());
+      } catch (err) {
+        // Ignore
+      }
+      try {
+        await server.ldap.delete(getNonMemberDn());
+      } catch (err) {
+        // Ignore
+      }
+    });
+
+    it('finds the groups a caller belongs to', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('groupmember')).to.include(
+        getGroupDn()
+      );
+    });
+
+    it('applies the permissions of a group the caller belongs to', async function () {
+      this.timeout(5000);
+      const permissions = await plugin.getUserPermissions(
+        'groupmember',
+        getUserBranch()
+      );
+      expect(permissions).to.deep.equal({
+        read: true,
+        write: true,
+        delete: false,
+      });
+    });
+
+    it('finds no group for a user who is not a member', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('nonmember')).to.deep.equal([]);
+    });
+
+    it('finds no group for a uid that does not resolve', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('nobody')).to.deep.equal([]);
+    });
+  });
+
+  describe('Group rules', () => {
+    const base = () => process.env.DM_LDAP_BASE as string;
+    const alpha = () => `ou=alpha,${base()}`;
+    const beta = () => `ou=beta,${base()}`;
+    const groupA = () => `cn=authzpba,ou=groups,${base()}`;
+    const groupB = () => `cn=authzpbb,ou=groups,${base()}`;
+    const userDn = () => `uid=grpuser,${getUserBranch()}`;
+    // Same uid, another entry: what a directory without the unique overlay
+    // lets through.
+    const homonymDn = () => `uid=grpuser,${base()}`;
+    // groupOfNames needs a member left once the user is removed.
+    const filler = () => `uid=filler,${getUserBranch()}`;
+    const none = { read: false, write: false, delete: false };
+
+    let savedConfig: typeof plugin.authConfig;
+
+    beforeEach(async function () {
+      this.timeout(5000);
+      savedConfig = plugin.authConfig;
+      plugin.authConfig = {
+        default: none,
+        users: {
+          grpuser: { [alpha()]: { read: true, write: false, delete: false } },
+        },
+        groups: {
+          [groupA()]: {
+            [alpha()]: { read: true, write: true, delete: false },
+            [beta()]: { read: true, write: false, delete: false },
+          },
+          // Spelled otherwise than the directory answers: case, and a space
+          // after each comma.
+          [`CN=AuthzPbB, OU=Groups, ${base().toUpperCase().replace(/,/g, ', ')}`]:
+            { [beta()]: { read: false, write: false, delete: true } },
+        },
+      };
+      await server.ldap.add(userDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'grpuser',
+        sn: 'User',
+        cn: 'Group User',
+      });
+      await server.ldap.add(groupA(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzpba',
+        member: [userDn(), filler()],
+      });
+      await server.ldap.add(groupB(), {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'authzpbb',
+        member: [userDn(), filler()],
+      });
+    });
+
+    afterEach(async function () {
+      this.timeout(5000);
+      plugin.authConfig = savedConfig;
+      for (const dn of [groupA(), groupB(), userDn(), homonymDn()]) {
+        try {
+          await server.ldap.delete(dn);
+        } catch (err) {
+          // Ignore
+        }
+      }
+      delete (plugin as unknown as Record<string, unknown>).findUserDn;
+      plugin.forgetGroups();
+    });
+
+    /** Replace the DN lookup on this instance only. */
+    const stubFindUserDn = (
+      fn: (
+        original: (uid: string) => Promise<string | null>,
+        uid: string
+      ) => Promise<string | null>
+    ): void => {
+      const original = plugin['findUserDn'].bind(plugin);
+      (plugin as unknown as Record<string, unknown>).findUserDn = (
+        uid: string
+      ) => fn(original, uid);
+    };
+
+    it('lists a branch granted by a group only, and a shared one once', async function () {
+      this.timeout(5000);
+      const read = await plugin.getAuthorizedBranchesForPermission(
+        'grpuser',
+        'read'
+      );
+      expect(read).to.have.members([alpha(), beta()]);
+      expect(read.filter(b => b === alpha())).to.have.lengthOf(1);
+      expect(
+        await plugin.getAuthorizedBranchesForPermission('grpuser', 'write')
+      ).to.deep.equal([alpha()]);
+    });
+
+    it('merges the rules of two groups', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserPermissions('grpuser', beta())).to.deep.equal({
+        read: true,
+        write: false,
+        delete: true,
+      });
+    });
+
+    it('merges a user rule and a group rule on one branch', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserPermissions('grpuser', alpha())).to.deep.equal(
+        { read: true, write: true, delete: false }
+      );
+    });
+
+    it('matches a group configured with another spelling of its DN', async function () {
+      this.timeout(5000);
+      expect(
+        await plugin.getAuthorizedBranchesForPermission('grpuser', 'delete')
+      ).to.deep.equal([beta()]);
+    });
+
+    it('grants no group to a uid naming two entries, and keeps its user rule', async function () {
+      this.timeout(5000);
+      await server.ldap.add(homonymDn(), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'grpuser',
+        sn: 'Homonym',
+        cn: 'Group User Homonym',
+      });
+      // A member too, so that picking either entry would find a group.
+      await server.ldap.modify(groupA(), { add: { member: homonymDn() } });
+      expect(await plugin.getUserGroups('grpuser')).to.deep.equal([]);
+      expect(await plugin.getUserPermissions('grpuser', alpha())).to.deep.equal(
+        { read: true, write: false, delete: false }
+      );
+    });
+
+    it('forgets a membership as soon as it is removed, not after the TTL', async function () {
+      this.timeout(5000);
+      expect(await plugin.getUserGroups('grpuser')).to.include(groupA());
+      await server.ldap.modify(groupA(), { delete: { member: userDn() } });
+      // The done hooks are launched without being awaited.
+      await new Promise(resolve => setImmediate(resolve));
+      expect(await plugin.getUserGroups('grpuser')).to.not.include(groupA());
+    });
+
+    it('keeps the cache across a modify that touches no membership', async function () {
+      this.timeout(5000);
+      await plugin.getUserGroups('grpuser');
+      await server.ldap.modify(userDn(), { replace: { sn: 'Renamed' } });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(plugin.groupCache.has('grpuser')).to.be.true;
+    });
+
+    it('forgets the cache when a modify touches the attribute users are found by', async function () {
+      this.timeout(5000);
+      await plugin.getUserGroups('grpuser');
+      // A second value: the first one is the RDN and cannot be replaced.
+      const attr = plugin.config.ldap_user_main_attribute || 'uid';
+      await server.ldap.modify(userDn(), { add: { [attr]: 'grpuser2' } });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+    });
+
+    it('shares one lookup between concurrent misses', async function () {
+      this.timeout(5000);
+      let calls = 0;
+      stubFindUserDn((original, uid) => {
+        calls++;
+        return original(uid);
+      });
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => plugin.getUserGroups('grpuser'))
+      );
+      expect(calls).to.equal(1);
+      for (const groups of results) expect(groups).to.include(groupA());
+    });
+
+    it('does not cache a failed lookup', async function () {
+      this.timeout(5000);
+      let failed = false;
+      stubFindUserDn((original, uid) => {
+        if (failed) return original(uid);
+        failed = true;
+        return Promise.reject(new Error('directory unavailable'));
+      });
+      let caught: unknown;
+      try {
+        await plugin.getUserGroups('grpuser');
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).to.be.instanceOf(Error);
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+      expect(await plugin.getUserGroups('grpuser')).to.include(groupA());
+    });
+
+    it('does not cache what a lookup overtaken by a write read', async function () {
+      this.timeout(5000);
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => (release = resolve));
+      stubFindUserDn(async (original, uid) => {
+        await gate;
+        return original(uid);
+      });
+      const lookup = plugin.getUserGroups('grpuser');
+      plugin.forgetGroups();
+      release();
+      expect(await lookup).to.include(groupA());
+      expect(plugin.groupCache.has('grpuser')).to.be.false;
+    });
+
+    it('sees a membership change in each attribute form the hook can be handed', () => {
+      // The modify-done hook filters on these forms to decide whether to
+      // empty the cache. `delete` comes as a list of attribute names or as
+      // attribute/value pairs, and an attribute may carry an option
+      // (`member;binary`) naming the same attribute: the predicate is read
+      // directly, rather than writing each form against a live directory.
+      const touches = (changes: ModifyRequest): boolean =>
+        plugin['touchesMembership'](changes);
+      expect(touches({ delete: ['member'] })).to.be.true;
+      expect(touches({ delete: { member: 'uid=x,dc=example,dc=com' } })).to.be
+        .true;
+      expect(touches({ replace: { 'member;binary': 'x' } })).to.be.true;
+      const main = plugin.config.ldap_user_main_attribute || 'uid';
+      expect(touches({ add: { [main]: 'x' } })).to.be.true;
+      expect(touches({ replace: { sn: 'X' } })).to.be.false;
     });
   });
 

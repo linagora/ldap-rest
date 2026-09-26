@@ -150,6 +150,11 @@ identified caller of the same server is told. A server loading no
 authorization plugin at all answers `unrestricted` to anyone, anonymous
 included, which is what it does.
 
+An identity that names **several** entries — the same `uid` in two branches of
+a directory without the `unique` overlay, which `authzLinid1` refuses with
+`AmbiguousIdentityError` — is answered `403`, not `401`: the caller cannot be
+told apart from the homonym, so no scope can be described for them.
+
 ## See also
 
 - [authz-linid1](authz-linid1.md) — the local-administrator model this serves

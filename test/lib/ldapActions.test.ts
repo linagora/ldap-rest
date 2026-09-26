@@ -557,4 +557,41 @@ describe('ldapActions', function () {
       ).to.include('child@test.org');
     });
   });
+
+  describe('the LDAP base', function () {
+    const settings = [
+      'NODE_ENV',
+      'DM_LDAP_URL',
+      'DM_LDAP_DN',
+      'DM_LDAP_PWD',
+      'DM_LDAP_BASE',
+    ];
+    const saved: Record<string, string | undefined> = {};
+
+    // The whole run shares one environment: whatever this suite sets or
+    // deletes is given back exactly as it was found.
+    before(() => {
+      for (const name of settings) saved[name] = process.env[name];
+    });
+
+    after(() => {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value !== undefined) process.env[name] = value;
+        else delete process.env[name];
+      }
+    });
+
+    it('refuses to start without --ldap-base', () => {
+      // The other connection settings are given, so that the missing base is
+      // the only thing that can be refused, and no directory is needed: the
+      // refusal happens as the configuration is read.
+      process.env.NODE_ENV = 'test';
+      process.env.DM_LDAP_URL = process.env.DM_LDAP_URL || 'ldap://localhost';
+      process.env.DM_LDAP_DN =
+        process.env.DM_LDAP_DN || 'cn=admin,dc=example,dc=com';
+      process.env.DM_LDAP_PWD = process.env.DM_LDAP_PWD || 'admin';
+      delete process.env.DM_LDAP_BASE;
+      expect(() => new DM()).to.throw(/LDAP base is not defined/);
+    });
+  });
 });

@@ -4,6 +4,13 @@
 
 ### Breaking Changes
 
+- A server started without `--ldap-base` (or `DM_LDAP_BASE`) now refuses to
+  start. It used to guess the base from `--ldap-dn`, taking the second RDN of
+  the bind DN — `dc=example` for `cn=admin,dc=example,dc=com`, which is not an
+  entry, so every subtree search answered `NoSuchObject`. A guessed base that
+  happened to exist was worse: the searches returned nothing without an error
+  ([notes](docs/usage/upgrading.md#ldap-base-is-now-required))
+
 - `onLdapChange` gives the full values on each side of a change, not the
   values the request named —
   [notes](docs/usage/upgrading.md#onldapchange-gives-full-values)
@@ -37,6 +44,25 @@
   ([#208](https://github.com/linagora/ldap-rest/issues/208))
 
 ### Bug Fixes
+
+- `core/auth/authzPerBranch`: the `groups` rules of
+  `--authz-per-branch-config` granted nothing — a caller's groups were
+  looked up with a substring match on an attribute holding DNs, which has no
+  substring form, so no group was ever found and the rules were inert
+  ([#212](https://github.com/linagora/ldap-rest/issues/212),
+  [notes](docs/usage/upgrading.md#group-rules-now-apply)). Group DNs in the
+  configuration are now compared as DNs (case and spaces ignored); a uid
+  naming several entries gets no group rule rather than the first entry's;
+  the group cache is emptied by a write made through ldap-rest that can
+  change a membership, and a failed lookup is no longer cached
+
+- `core/auth/authzLinid1`: a uid naming several entries resolved to
+  whichever one the server listed first, and a failed lookup read as "no such
+  user" — which `--authz-unresolved-user allow` lets through unchecked, and
+  which was cached. An ambiguous uid is now refused (403) whatever the
+  policy, a failed lookup fails the request without being cached, and the
+  lookup searches the configured base (`--ldap-base`) instead of the empty
+  one it used to pass, which made every search fail
 
 - Values written into a search filter unescaped: a DN holding `(` or `)`
   failed the search, and one holding `*` matched nothing, a DN attribute

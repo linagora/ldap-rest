@@ -174,10 +174,24 @@ Modifies the organization tree API:
 
 Groups are resolved dynamically:
 
-1. Searches for all groups where user is a member
-2. Uses wildcard DN pattern: `(member=uid={user},*)`
-3. Caches results for configured TTL (default: 60 seconds)
-4. Cache prevents repeated LDAP queries for same user
+1. Resolves the caller to its DN, searching
+   `(<ldap_user_main_attribute>=<uid>)` under the LDAP base (`--ldap-base`)
+2. Searches for all groups where that DN is a member
+3. Matches each group found against the `groups` keys **as DNs**: case and
+   the spaces around `,` and `=` do not matter, so
+   `CN=Editors, OU=Groups,dc=example,dc=com` names the same group as
+   `cn=editors,ou=groups,dc=example,dc=com`
+4. Caches results for configured TTL (default: 60 seconds); concurrent
+   requests for the same user share one lookup
+
+A uid that names **more than one** entry — the same `uid` in two branches,
+which a directory without the `unique` overlay accepts — gets **no group
+rule**: which entry is the caller cannot be told, and picking the first one
+the server lists would hand over another entry's groups. A warning is
+logged; the uid's own `users` rule still applies.
+
+A lookup that fails (500 — the directory's error is not an authorization
+verdict) is not cached: the request fails, and the next one searches again.
 
 ## Sub-branch Inheritance
 
@@ -379,6 +393,11 @@ Group memberships are cached to reduce LDAP queries:
 - **Configurable**: `--authz-per-branch-cache-ttl`
 - **Per-user cache**: Each user's groups cached separately
 - **Automatic expiry**: Cache entries expire after TTL
+- **Dropped on writes**: any add, delete or rename made through ldap-rest
+  empties the cache, and so does a modify touching the group member attribute
+  or `--ldap-user-main-attribute`: removing a member takes effect on the next
+  request. A modify touching anything else keeps the cache. A change made
+  directly in the directory still waits for the TTL
 
 Cache hit/miss logging:
 
@@ -420,7 +439,9 @@ names, this plugin lets them read and refuses every write. Give it an
 
 - Group DNs must be fully qualified
 - Group resolution uses LDAP search - ensure proper indexing
-- Cache can delay permission revocation (up to TTL duration)
+- A membership removed directly in the directory (not through ldap-rest)
+  keeps granting until the cache TTL runs out
+- A uid shared by several entries gets no group rule
 
 ### Authentication Required
 
@@ -531,7 +552,8 @@ Changed permissions don't take effect immediately.
 
 **Solutions:**
 
-1. Wait for group cache TTL to expire
+1. Group memberships changed through ldap-rest apply at once; one changed
+   directly in the directory waits for the group cache TTL
 2. Restart server to clear all caches
 3. Reduce `--authz-per-branch-cache-ttl` for testing
 
@@ -542,17 +564,26 @@ User should inherit group permissions but doesn't.
 
 **Solutions:**
 
-1. Verify user is member of group:
+1. Verify the user's DN is a member of the group:
 
    ```bash
-   ldapsearch -x -b "ou=groups,dc=example,dc=com" "(member=uid=jdoe,*)"
+   ldapsearch -x -b "dc=example,dc=com" \
+     "(member=uid=jdoe,ou=users,dc=example,dc=com)"
    ```
 
-2. Check group DN in config matches LDAP exactly
+2. Check the group DN in config names the group: it is compared as a DN
+   (case and spaces are ignored), but every RDN must be there
 
-3. Ensure group membership uses correct attribute (default: `member`)
+3. Check the uid names a single entry — a uid found in two places gets no
+   group rule, and a warning says so:
 
-4. Configure custom member attribute if needed:
+   ```bash
+   ldapsearch -x -b "dc=example,dc=com" "(uid=jdoe)" dn
+   ```
+
+4. Ensure group membership uses correct attribute (default: `member`)
+
+5. Configure custom member attribute if needed:
    ```bash
    --ldap-group-member-attribute uniqueMember
    ```

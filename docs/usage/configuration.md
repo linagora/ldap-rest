@@ -101,7 +101,7 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 | `--ldap-url`                 | `--ldap-urls`    | `DM_LDAP_URL`            | `ldap://localhost`                 | LDAP server URL(s)                          |
 | `--ldap-dn`                  |                  | `DM_LDAP_DN`             | `cn=admin,dc=example,dc=com`       | Bind DN                                     |
 | `--ldap-pwd`                 |                  | `DM_LDAP_PWD`            | `admin`                            | Password                                    |
-| `--ldap-base`                |                  | `DM_LDAP_BASE`           |                                    | Base DN for searches                        |
+| `--ldap-base`                |                  | `DM_LDAP_BASE`           |                                    | Base DN for searches (required)             |
 | `--ldap-user-main-attribute` |                  | `DM_LDAP_USER_ATTRIBUTE` | `uid`                              | User identifier attribute                   |
 | `--ldap-cache-max`           |                  | `DM_LDAP_CACHE_MAX`      | `1000`                             | Max cache entries                           |
 | `--ldap-cache-ttl`           |                  | `DM_LDAP_CACHE_TTL`      | `0`                                | Search cache TTL (seconds), `0` disables it |

@@ -23,7 +23,7 @@ Main options:
   --ldap-url URL            LDAP server URL
   --ldap-dn DN              LDAP bind DN
   --ldap-pwd PASSWORD       LDAP bind password
-  --ldap-base BASE          LDAP base DN
+  --ldap-base BASE          LDAP base DN (required)
   --plugin PLUGIN           Load plugin (can be specified multiple times)
   --api-prefix PREFIX       API prefix (default: /api)
   --log-level LEVEL         Log level (error, warn, info, debug)

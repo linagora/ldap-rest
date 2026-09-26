@@ -45,30 +45,15 @@ export default class AuthzLinid1 extends AuthzBase {
 
   /**
    * Get user DN from uid
+   *
+   * An identity naming several entries is refused (`AmbiguousIdentityError`)
+   * rather than answered with `null`: under `--authz-unresolved-user allow`,
+   * `null` means "skip authorization", so an ambiguous directory would open
+   * every branch. A failed search propagates for the same reason — it used
+   * to read as `null` too, and `resolveCaller` then cached it.
    */
   async getUserDn(uid: string): Promise<string | null> {
-    try {
-      const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
-      const result = (await this.server.ldap.search(
-        {
-          paged: false,
-          filter,
-          attributes: ['dn'],
-          scope: 'sub',
-        },
-        this.config.ldap_base || ''
-      )) as SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        const dn = result.searchEntries[0].dn;
-        return typeof dn === 'string' ? dn : String(dn);
-      }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error(`Failed to get DN for user ${uid}: ${err}`);
-    }
-
-    return null;
+    return this.findUserDn(uid);
   }
 
   /**
