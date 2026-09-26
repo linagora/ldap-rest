@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/auth/authzLinid1`, `core/auth/authzPerBranch`: a transit branch
+  (`--authz-transit-branch`) through which administrators hand accounts and
+  groups over to organizations they do not manage; an account attached to no
+  organization is in transit and can be claimed —
+  [doc](docs/usage/plugins/auth/authz-linid1.md#transit-handing-an-entry-over)
+  ([#220](https://github.com/linagora/ldap-rest/issues/220))
+
+### Bug Fixes
+
+- authorization by attachment: an entry attached to no organization could be
+  written by nobody, a global administrator included (judged on a branch
+  named `undefined`)
+
 ## v0.11.0 (2026-09-26)
 
 ### Breaking Changes

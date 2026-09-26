@@ -33,6 +33,8 @@ interface AuthzLike extends DmPlugin {
   resolveUser(uid: string): Promise<string | null>;
   getAuthorizedBranches(user: string): Promise<string[]>;
   getUserPermissions(user: string, branch: string): Promise<BranchPermissions>;
+  /** `--authz-transit-branch`, where the plugin honours it. */
+  transitBranch?(): string | undefined;
 }
 
 /** One entity, and whether the caller may create one. */
@@ -84,6 +86,11 @@ export default class AuthzScope extends DmPlugin {
      *   `source` the one this scope comes from — the first loaded, or the one
      *   `--authz-scope-source` names — so a client can tell a scope from one
      *   model among several from the server's whole answer.
+     *
+     *   `transit` is the transit branch (`--authz-transit-branch`) when the
+     *   describing plugin judges entries by their attachment, `null`
+     *   otherwise. Every administrator may put an entry they manage there,
+     *   and claim one from it into a branch they write.
      * tags:
      *   - Authorization
      * responses:
@@ -102,6 +109,7 @@ export default class AuthzScope extends DmPlugin {
      *               read: true
      *               write: true
      *               delete: true
+     *           transit: ou=Transit,ou=organization,dc=example,dc=com
      *           entities:
      *             - name: users
      *               base: ou=users,dc=example,dc=com
@@ -404,6 +412,8 @@ export default class AuthzScope extends DmPlugin {
       source: authz.name,
       sources: sourceNames,
       branches,
+      // Where any administrator may hand an entry over, and claim one from.
+      transit: authz.transitBranch?.() ?? null,
       entities,
     });
   }

@@ -155,6 +155,7 @@ ENV NODE_ENV=production \
  DM_AUTHZ_COMBINE=false \
  DM_AUTHZ_SCOPE_SOURCE= \
  DM_AUTHZ_FILTER_ATTACHED_ENTRIES=false \
+ DM_AUTHZ_TRANSIT_BRANCH= \
  DM_AUTHZ_PER_BRANCH_CONFIG="{\"default\":{\"read\":true,\"write\":false,\"delete\":false}}" \
  DM_AUTHZ_PER_BRANCH_CACHE_TTL="60" \
  DM_AUTHZ_DYNAMIC_BYPASS= \
