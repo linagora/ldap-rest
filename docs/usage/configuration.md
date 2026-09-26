@@ -25,6 +25,7 @@ All LDAP-Rest configuration options.
     - [core/auth/hmac](#coreauthhmac)
     - [core/auth/llng](#coreauthllng)
     - [core/auth/openidconnect](#coreauthopenidconnect)
+    - [core/auth/fake](#coreauthfake)
     - [core/bcl](#corebcl)
   - [Authorization Plugins](#authorization-plugins)
     - [Common to every authorization plugin](#common-to-every-authorization-plugin)
@@ -237,6 +238,14 @@ Empty means the plugin guards every path. Scoping several instances to different
 | CLI            | Plural          | Env              | Default | Description           |
 | -------------- | --------------- | ---------------- | ------- | --------------------- |
 | `--auth-token` | `--auth-tokens` | `DM_AUTH_TOKENS` | `[]`    | Authentication tokens |
+
+#### `core/auth/fake`
+
+| CLI                | Env                 | Default | Description                                    |
+| ------------------ | ------------------- | ------- | ---------------------------------------------- |
+| `--auth-fake-user` | `DM_AUTH_FAKE_USER` |         | Identity every request is served as (required) |
+
+Development only, refused with `NODE_ENV=production` — see [Fake Authentication](plugins/auth/fake.md).
 
 #### `core/auth/totp`
 

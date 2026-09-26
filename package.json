@@ -64,6 +64,10 @@
       "types": "./dist/src/plugins/auth/crowdsec.d.ts",
       "import": "./dist/plugins/auth/crowdsec.js"
     },
+    "./plugin-auth-fake": {
+      "types": "./dist/src/plugins/auth/fake.d.ts",
+      "import": "./dist/plugins/auth/fake.js"
+    },
     "./plugin-auth-hmac": {
       "types": "./dist/src/plugins/auth/hmac.d.ts",
       "import": "./dist/plugins/auth/hmac.js"

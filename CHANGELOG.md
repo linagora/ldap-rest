@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/auth/fake` serves every request as the identity given by
+  `--auth-fake-user`, to see an interface as a given administrator during
+  development. Refused with `NODE_ENV=production` —
+  [doc](docs/usage/plugins/auth/fake.md)
+
 ## v0.10.0 (2026-09-26)
 
 ### Breaking Changes
