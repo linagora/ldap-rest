@@ -14,9 +14,16 @@ import pLimit from 'p-limit';
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
 
-import { escapeDnValue, launchHooks, launchHooksChained } from './utils';
+import {
+  escapeDnValue,
+  isDnInBranch,
+  launchHooks,
+  launchHooksChained,
+  normalizeDn,
+} from './utils';
 import { changeContext } from './changeContext';
-import { ConflictError } from './errors';
+import { ConflictError, NotFoundError } from './errors';
+import { parseSchema, SchemaIndex } from './ldapSchema';
 
 // Typescript interface
 
@@ -202,6 +209,22 @@ function ldapAddError(dn: string, error: unknown): Error {
   return conflict;
 }
 
+/**
+ * Wrap a modify failure, turning objectClassViolation (65) into a 409: the
+ * entry is not of a kind that can hold what was written, typically one
+ * created by another tool without a class its schema declares. The code is
+ * carried over for callers that map it themselves.
+ */
+function ldapModifyError(dn: string, error: unknown): Error {
+  const wrapped = ldapError('LDAP modify error', error);
+  if ((wrapped as { code?: number }).code !== 65) return wrapped;
+  const conflict = new ConflictError(
+    `Entry ${dn} cannot hold this change: ${String(error)}`
+  );
+  (conflict as { code?: number }).code = 65;
+  return conflict;
+}
+
 class ldapActions {
   config: Config;
   options: ClientOptions;
@@ -238,6 +261,16 @@ class ldapActions {
   private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
   private availableConnections: PooledConnection[] = [];
   private isCleaningUp = false;
+  /** See {@link declareObjectClasses}. */
+  private declaredClasses: {
+    base: string;
+    classes: string[];
+    includeBase: boolean;
+  }[] = [];
+  private schemaCache?: { index: SchemaIndex; fetchedAt: number };
+  private schemaLoading?: Promise<SchemaIndex>;
+  /** Whether the last schema read failed, so a failure is logged once. */
+  private schemaUnavailable = false;
 
   constructor(server: DM) {
     this.parent = server;
@@ -632,6 +665,249 @@ class ldapActions {
   }
 
   /**
+   * Declare the object classes an entity gives the entries of its branch.
+   *
+   * An entry created by another tool may lack some of them, and a class it
+   * lacks can forbid an attribute written here: the organization link of an
+   * account made as a bare `inetOrgPerson` is refused by the directory. Every
+   * modify of such an entry adds the auxiliary classes it lacks, see
+   * {@link classRepair}.
+   *
+   * @param base branch holding the entity's entries
+   * @param classes object classes the entity's schema declares
+   * @param includeBase whether the base is itself one of the entries, as the
+   * top organization is
+   */
+  declareObjectClasses(
+    base: string,
+    classes: string[],
+    includeBase = false
+  ): void {
+    if (!base || classes.length === 0) return;
+    this.declaredClasses.push({ base, classes, includeBase });
+  }
+
+  /** The classes declared for the branch holding a DN, the deepest winning. */
+  private declaredFor(dn: string): string[] | undefined {
+    let best: { depth: number; classes: string[] } | undefined;
+    for (const declared of this.declaredClasses) {
+      if (!isDnInBranch(dn, declared.base)) continue;
+      const base = normalizeDn(declared.base);
+      if (!declared.includeBase && normalizeDn(dn) === base) continue;
+      const depth = base.split(',').length;
+      if (!best || depth > best.depth)
+        best = { depth, classes: declared.classes };
+    }
+    return best?.classes;
+  }
+
+  /**
+   * The auxiliary classes to add to an entry being modified: those declared
+   * for its branch that it lacks and whose mandatory attributes it holds or
+   * receives. A missing structural class cannot be added to an existing
+   * entry, and is only reported.
+   *
+   * Nothing is added when the change names `objectClass` itself, and a
+   * schema or entry that cannot be read skips the repair: it must never be
+   * what makes a write fail.
+   *
+   * @param dn entry being modified
+   * @param changes the modification, after the hooks
+   * @returns names of the classes to add
+   */
+  private async classRepair(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<string[]> {
+    const declared = this.declaredFor(dn);
+    if (!declared) return [];
+    const named = [
+      ...Object.keys(changes.add || {}),
+      ...Object.keys(changes.replace || {}),
+      ...(Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete || {})),
+    ];
+    if (named.some(name => name.toLowerCase() === 'objectclass')) return [];
+
+    let index: SchemaIndex;
+    try {
+      index = await this.schemaIndex();
+      this.schemaUnavailable = false;
+    } catch (err) {
+      if (!this.schemaUnavailable)
+        this.logger.warn(
+          `Object classes are not repaired: the directory schema could not be read (${String(err)})`
+        );
+      this.schemaUnavailable = true;
+      return [];
+    }
+
+    const auxiliaries = declared.filter(
+      name => index.getObjectClass(name)?.kind === 'AUXILIARY'
+    );
+    let entry: AttributesList | undefined;
+    try {
+      const result = (await this.system.search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: [
+            'objectClass',
+            ...index.resolveAttributes(auxiliaries).must,
+          ],
+        },
+        dn
+      )) as SearchResult;
+      entry = result.searchEntries[0] as AttributesList | undefined;
+    } catch {
+      return [];
+    }
+    if (!entry) return [];
+
+    const raw = entry.objectClass ?? entry.objectclass;
+    const present = (Array.isArray(raw) ? raw : raw ? [raw] : []).map(String);
+    const { auxiliary, structural } = index.missingClasses(declared, present);
+    if (structural.length > 0)
+      this.logger.warn(
+        `${dn} lacks ${structural.join(', ')}, declared by its schema: a structural class cannot be added to an existing entry`
+      );
+
+    const attributeKey = (name: string): string =>
+      index.getAttributeType(name)?.oid ?? name.toLowerCase();
+    // ldapts answers every attribute asked for, an absent one as empty; and
+    // an empty `replace` removes the attribute.
+    const valued = (list?: Record<string, unknown>): string[] =>
+      Object.entries(list || {})
+        .filter(([, value]) =>
+          Array.isArray(value)
+            ? value.length > 0
+            : value !== undefined && value !== null && value !== ''
+        )
+        .map(([name]) => name);
+    const held = new Set(
+      [
+        ...valued(entry),
+        ...valued(changes.add),
+        ...valued(changes.replace),
+      ].map(attributeKey)
+    );
+    const added: string[] = [];
+    for (const oc of auxiliary) {
+      const name = oc.names[0] ?? oc.oid;
+      const lacking = index
+        .resolveAttributes([name])
+        .must.filter(attribute => !held.has(attributeKey(attribute)));
+      if (lacking.length > 0) {
+        this.logger.warn(
+          `${dn} lacks ${name}, declared by its schema, and cannot be given it without ${lacking.join(', ')}`
+        );
+        continue;
+      }
+      added.push(name);
+    }
+    if (added.length > 0)
+      this.logger.info(
+        `${dn}: adding ${added.join(', ')}, declared by its schema and missing from the entry`
+      );
+    return added;
+  }
+
+  /**
+   * DN of the subschema entry the root DSE advertises, or the conventional
+   * `cn=Subschema` when it advertises none.
+   */
+  async subschemaDn(): Promise<string> {
+    try {
+      const result = (await this.system.search(
+        {
+          paged: false,
+          scope: 'base',
+          filter: '(objectClass=*)',
+          attributes: ['subschemaSubentry'],
+        },
+        ''
+      )) as SearchResult;
+      const value = result.searchEntries[0]?.subschemaSubentry;
+      const dn = Array.isArray(value) ? value[0] : value;
+      if (dn) return String(dn);
+    } catch (err) {
+      this.logger.warn(
+        `Unable to read subschemaSubentry from root DSE: ${String(err)}`
+      );
+    }
+    return 'cn=Subschema';
+  }
+
+  /**
+   * The directory schema, kept for `maxAge`: it is large and changes rarely.
+   * Concurrent callers share a single read.
+   *
+   * @param maxAge how old a cached schema may be, in milliseconds
+   * @returns indexed schema
+   */
+  async schemaIndex(maxAge = 3600 * 1000): Promise<SchemaIndex> {
+    if (this.schemaCache && Date.now() - this.schemaCache.fetchedAt < maxAge)
+      return this.schemaCache.index;
+    if (this.schemaLoading) return this.schemaLoading;
+
+    this.schemaLoading = (async (): Promise<SchemaIndex> => {
+      const dn = await this.subschemaDn();
+      const result = (await this.system
+        .search(
+          {
+            paged: false,
+            scope: 'base',
+            filter: '(objectClass=*)',
+            attributes: [
+              'objectClasses',
+              'attributeTypes',
+              'ldapSyntaxes',
+              'matchingRules',
+            ],
+          },
+          dn
+        )
+        .catch((err: unknown) => {
+          if ((err as { code?: number })?.code === 32)
+            throw new NotFoundError(`Subschema entry ${dn} not found`);
+          throw err;
+        })) as SearchResult;
+      const entry = result.searchEntries[0];
+      if (!entry) throw new NotFoundError(`Subschema entry ${dn} not found`);
+
+      const list = (value: AttributeValue | undefined): string[] => {
+        if (value === undefined) return [];
+        const values: (Buffer | string)[] = Array.isArray(value)
+          ? value
+          : [value];
+        return values.map(v => (Buffer.isBuffer(v) ? v.toString('utf8') : v));
+      };
+      const index = new SchemaIndex(
+        parseSchema({
+          objectClasses: list(entry.objectClasses),
+          attributeTypes: list(entry.attributeTypes),
+          ldapSyntaxes: list(entry.ldapSyntaxes),
+          matchingRules: list(entry.matchingRules),
+        })
+      );
+      this.schemaCache = { index, fetchedAt: Date.now() };
+      this.logger.info(
+        `LDAP schema loaded from ${dn}: ` +
+          `${index.schema.objectClasses.length} object classes, ` +
+          `${index.schema.attributeTypes.length} attribute types`
+      );
+      return index;
+    })();
+
+    try {
+      return await this.schemaLoading;
+    } finally {
+      this.schemaLoading = undefined;
+    }
+  }
+
+  /**
    * Hand a search result to `ldapsearchfilter`, which may drop entries the
    * caller is not allowed to see.
    *
@@ -931,6 +1207,17 @@ class ldapActions {
       }
     }
     if (ldapChanges.length !== 0) {
+      const repair = await this.classRepair(dn, changes);
+      if (repair.length > 0)
+        ldapChanges.push(
+          new Change({
+            operation: 'add',
+            modification: new Attribute({
+              type: 'objectClass',
+              values: repair,
+            }),
+          })
+        );
       const pooled = await this.acquireConnection();
       try {
         // Dropped before the write is issued as well as after it lands. The
@@ -954,7 +1241,7 @@ class ldapActions {
         this.logger.warn(
           `Changes that failed: ${dn}, ${JSON.stringify(ldapChanges)}`
         );
-        throw ldapError(`LDAP modify error`, error);
+        throw ldapModifyError(dn, error);
       } finally {
         this.releaseConnection(pooled);
       }

@@ -383,6 +383,23 @@ Content-Type: application/json
 }
 ```
 
+#### Entries created by other tools
+
+An entry written by another tool may lack an object class the schema
+declares, and the directory then refuses an attribute that class carries: a
+bare `inetOrgPerson` in the users branch cannot take `twakeDepartmentLink`,
+which `twakeWhitePages` brings. Every modify through LDAP-Rest (this route,
+`/move`, a state change…) adds the **auxiliary** classes the entry lacks,
+provided it holds, or receives, their mandatory attributes. A missing
+**structural** class, such as `twakeAccount`, cannot be added to an existing
+entry: it is logged as a warning on each modify, and a change the entry
+cannot hold answers `409`.
+
+The same applies to groups under `--ldap-group-base` (when it is set) with
+`--group-class`, and to the organization tree with
+`--ldap-organization-class`. Nothing is added when the change names
+`objectClass` itself.
+
 ### Delete Entry
 
 ```bash

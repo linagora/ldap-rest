@@ -315,6 +315,7 @@ export default abstract class LdapFlat extends DmPlugin {
     if (!this.base) {
       throw new Error(`LDAP base is not defined for ${this.singularName}`);
     }
+    this.ldap.declareObjectClasses(this.base, this.objectClass);
 
     if (config.schemaPath) {
       try {
