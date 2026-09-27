@@ -12,10 +12,9 @@ import AuthBase, { DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
 // The ambient declaration for `lemonldap-ng-handler` lives in
-// src/types/lemonldap-ng-handler.d.ts: `skipLibCheck` lets that fallback
-// coexist with the package's own types when it is installed, whereas the
-// same declaration written here, in a regular source file, would conflict
-// with them.
+// src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be
+// an augmentation of the package instead: conflicting with its types when it
+// is installed, rejected when it is absent.
 type LlngHandler = typeof import('lemonldap-ng-handler');
 
 /**
