@@ -388,17 +388,26 @@ Content-Type: application/json
 An entry written by another tool may lack an object class the schema
 declares, and the directory then refuses an attribute that class carries: a
 bare `inetOrgPerson` in the users branch cannot take `twakeDepartmentLink`,
-which `twakeWhitePages` brings. Every modify through LDAP-Rest (this route,
-`/move`, a state change…) adds the **auxiliary** classes the entry lacks,
-provided it holds, or receives, their mandatory attributes. A missing
-**structural** class, such as `twakeAccount`, cannot be added to an existing
-entry: it is logged as a warning on each modify, and a change the entry
-cannot hold answers `409`.
+which `twakeWhitePages` brings. When a modify through LDAP-Rest (this route,
+`/move`, a state change…) writes such an attribute, the **auxiliary** class
+declared for the branch that allows it is added in the same write, provided
+the entry holds, or receives, that class's mandatory attributes. Only what
+the write needs is added, and a write the directory would accept is never
+changed: several entities may share a branch (`users`, `posixAccounts` and
+`sshPublicKeys` all live in `ou=users`) without every entry being given all
+their classes.
 
-The same applies to groups under `--ldap-group-base` (when it is set) with
-`--group-class`, and to the organization tree with
+A missing **structural** class, such as `twakeAccount`, cannot be added to an
+existing entry: the write answers `409`, and the reason is logged once per
+entry. The same applies to groups under `--ldap-group-base` (when it is set)
+with `--group-class`, and to the organization tree with
 `--ldap-organization-class`. Nothing is added when the change names
 `objectClass` itself.
+
+The repair reads the directory schema, kept for
+`--ldap-raw-schema-cache-ttl`, and the entry's classes when a written
+attribute belongs to a declared auxiliary class. `DM_LDAP_FLAT_AUTO_REPAIR=false`
+turns it off.
 
 ### Delete Entry
 

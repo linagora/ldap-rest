@@ -271,6 +271,8 @@ class ldapActions {
   private schemaLoading?: Promise<SchemaIndex>;
   /** Whether the last schema read failed, so a failure is logged once. */
   private schemaUnavailable = false;
+  /** Class problems already reported, per entry. See {@link warnOnce}. */
+  private classWarnings = new LRUCache<string, true>({ max: 10000 });
 
   constructor(server: DM) {
     this.parent = server;
@@ -669,47 +671,80 @@ class ldapActions {
    *
    * An entry created by another tool may lack some of them, and a class it
    * lacks can forbid an attribute written here: the organization link of an
-   * account made as a bare `inetOrgPerson` is refused by the directory. Every
-   * modify of such an entry adds the auxiliary classes it lacks, see
-   * {@link classRepair}.
+   * account made as a bare `inetOrgPerson` is refused by the directory. A
+   * modify writing such an attribute adds the auxiliary class that allows
+   * it, see {@link classRepair}.
    *
    * @param base branch holding the entity's entries
-   * @param classes object classes the entity's schema declares
+   * @param classes object classes the entity's schema declares; a schema
+   * file may give a single one as a string
    * @param includeBase whether the base is itself one of the entries, as the
    * top organization is
    */
   declareObjectClasses(
     base: string,
-    classes: string[],
+    classes: string[] | string,
     includeBase = false
   ): void {
-    if (!base || classes.length === 0) return;
-    this.declaredClasses.push({ base, classes, includeBase });
+    const list = (Array.isArray(classes) ? classes : [classes]).filter(
+      (name): name is string => typeof name === 'string' && name !== ''
+    );
+    if (!base || list.length === 0) return;
+    this.declaredClasses.push({ base, classes: list, includeBase });
   }
 
-  /** The classes declared for the branch holding a DN, the deepest winning. */
-  private declaredFor(dn: string): string[] | undefined {
-    let best: { depth: number; classes: string[] } | undefined;
+  /**
+   * The classes declared for the branch holding a DN. Several entities may
+   * share a branch — the shipped `users`, `posixAccounts` and
+   * `sshPublicKeys` schemas all live in `ou=users` — so every declaration at
+   * the deepest matching base counts.
+   */
+  private declaredFor(dn: string): string[] {
+    let depth = 0;
+    let classes: string[] = [];
     for (const declared of this.declaredClasses) {
       if (!isDnInBranch(dn, declared.base)) continue;
       const base = normalizeDn(declared.base);
       if (!declared.includeBase && normalizeDn(dn) === base) continue;
-      const depth = base.split(',').length;
-      if (!best || depth > best.depth)
-        best = { depth, classes: declared.classes };
+      const here = base.split(',').length;
+      if (here > depth) {
+        depth = here;
+        classes = [];
+      }
+      if (here === depth) classes.push(...declared.classes);
     }
-    return best?.classes;
+    const seen = new Set<string>();
+    return classes.filter(name => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   /**
-   * The auxiliary classes to add to an entry being modified: those declared
-   * for its branch that it lacks and whose mandatory attributes it holds or
-   * receives. A missing structural class cannot be added to an existing
-   * entry, and is only reported.
+   * Log a class problem of an entry once, not on every write to it: nothing
+   * an administrator can do stops a sync job from touching it again.
+   */
+  private warnOnce(message: string): void {
+    if (this.classWarnings.has(message)) return;
+    this.classWarnings.set(message, true);
+    this.logger.warn(message);
+  }
+
+  /**
+   * The auxiliary classes a modify needs added: for each attribute it writes
+   * that the entry's classes do not allow, a class declared for its branch
+   * that allows it, provided the entry holds or receives that class's
+   * mandatory attributes once the change is applied.
+   *
+   * Only what the write needs is added. Entities sharing a branch declare
+   * classes that are not all meant for every entry: `shadowAccount` is not
+   * something every account should be given because it sits in `ou=users`.
+   * And a write that the directory would have accepted is never changed.
    *
    * Nothing is added when the change names `objectClass` itself, and a
-   * schema or entry that cannot be read skips the repair: it must never be
-   * what makes a write fail.
+   * schema or entry that cannot be read skips the repair.
    *
    * @param dn entry being modified
    * @param changes the modification, after the hooks
@@ -719,8 +754,17 @@ class ldapActions {
     dn: string,
     changes: ModifyRequest
   ): Promise<string[]> {
+    if (this.config.ldap_flat_auto_repair === false) return [];
     const declared = this.declaredFor(dn);
-    if (!declared) return [];
+    if (declared.length === 0) return [];
+    const deleted = Array.isArray(changes.delete)
+      ? changes.delete
+      : Object.entries(changes.delete || {})
+          // Deleting some values leaves the attribute in place.
+          .filter(
+            ([, value]) => !value || (Array.isArray(value) && !value.length)
+          )
+          .map(([name]) => name);
     const named = [
       ...Object.keys(changes.add || {}),
       ...Object.keys(changes.replace || {}),
@@ -743,9 +787,34 @@ class ldapActions {
       return [];
     }
 
-    const auxiliaries = declared.filter(
-      name => index.getObjectClass(name)?.kind === 'AUXILIARY'
-    );
+    const attributeKey = (name: string): string =>
+      index.getAttributeType(name)?.oid ?? name.toLowerCase();
+    const allowedBy = (classes: string[]): Set<string> => {
+      const { must, may } = index.resolveAttributes(classes);
+      return new Set([...must, ...may].map(attributeKey));
+    };
+    // ldapts answers every attribute asked for, an absent one as empty; and
+    // an empty `replace` removes the attribute.
+    const valued = (list?: Record<string, unknown>): string[] =>
+      Object.entries(list || {})
+        .filter(([, value]) =>
+          Array.isArray(value)
+            ? value.length > 0
+            : value !== undefined && value !== null && value !== ''
+        )
+        .map(([name]) => name);
+    const written = [...valued(changes.add), ...valued(changes.replace)];
+
+    // Declared auxiliary classes that could carry something this change
+    // writes. None: the entry is not read at all.
+    const auxiliaries = declared.filter(name => {
+      const oc = index.getObjectClass(name);
+      if (oc?.kind !== 'AUXILIARY') return false;
+      const allows = allowedBy([name]);
+      return written.some(attribute => allows.has(attributeKey(attribute)));
+    });
+    if (auxiliaries.length === 0) return [];
+
     let entry: AttributesList | undefined;
     try {
       const result = (await this.system.search(
@@ -767,48 +836,53 @@ class ldapActions {
 
     const raw = entry.objectClass ?? entry.objectclass;
     const present = (Array.isArray(raw) ? raw : raw ? [raw] : []).map(String);
-    const { auxiliary, structural } = index.missingClasses(declared, present);
-    if (structural.length > 0)
-      this.logger.warn(
-        `${dn} lacks ${structural.join(', ')}, declared by its schema: a structural class cannot be added to an existing entry`
-      );
+    const allowed = allowedBy(present);
+    let needed = written.filter(
+      attribute =>
+        index.getAttributeType(attribute) &&
+        !allowed.has(attributeKey(attribute))
+    );
+    if (needed.length === 0) return [];
 
-    const attributeKey = (name: string): string =>
-      index.getAttributeType(name)?.oid ?? name.toLowerCase();
-    // ldapts answers every attribute asked for, an absent one as empty; and
-    // an empty `replace` removes the attribute.
-    const valued = (list?: Record<string, unknown>): string[] =>
-      Object.entries(list || {})
-        .filter(([, value]) =>
-          Array.isArray(value)
-            ? value.length > 0
-            : value !== undefined && value !== null && value !== ''
-        )
-        .map(([name]) => name);
+    const gone = new Set(deleted.map(attributeKey));
     const held = new Set(
       [
-        ...valued(entry),
-        ...valued(changes.add),
-        ...valued(changes.replace),
+        ...valued(entry).filter(name => !gone.has(attributeKey(name))),
+        ...written,
       ].map(attributeKey)
     );
+    const { auxiliary, structural } = index.missingClasses(declared, present);
     const added: string[] = [];
     for (const oc of auxiliary) {
       const name = oc.names[0] ?? oc.oid;
+      const allows = allowedBy([name]);
+      const covers = needed.filter(attribute =>
+        allows.has(attributeKey(attribute))
+      );
+      if (covers.length === 0) continue;
       const lacking = index
         .resolveAttributes([name])
         .must.filter(attribute => !held.has(attributeKey(attribute)));
       if (lacking.length > 0) {
-        this.logger.warn(
-          `${dn} lacks ${name}, declared by its schema, and cannot be given it without ${lacking.join(', ')}`
+        this.warnOnce(
+          `${dn} needs ${name} for ${covers.join(', ')}, and cannot be given it without ${lacking.join(', ')}`
         );
         continue;
       }
       added.push(name);
+      needed = needed.filter(attribute => !covers.includes(attribute));
     }
+    const blocking = structural.filter(name => {
+      const allows = allowedBy([name]);
+      return needed.some(attribute => allows.has(attributeKey(attribute)));
+    });
+    if (blocking.length > 0)
+      this.warnOnce(
+        `${dn} cannot hold ${needed.join(', ')}: its schema declares ${blocking.join(', ')}, a structural class an existing entry cannot be given`
+      );
     if (added.length > 0)
       this.logger.info(
-        `${dn}: adding ${added.join(', ')}, declared by its schema and missing from the entry`
+        `${dn}: adding ${added.join(', ')}, which the change needs and its schema declares`
       );
     return added;
   }
@@ -840,13 +914,14 @@ class ldapActions {
   }
 
   /**
-   * The directory schema, kept for `maxAge`: it is large and changes rarely.
-   * Concurrent callers share a single read.
+   * The directory schema, kept for `--ldap-raw-schema-cache-ttl`: it is
+   * large and changes rarely. The raw browser and the object class repair
+   * share it, and concurrent callers share a single read.
    *
-   * @param maxAge how old a cached schema may be, in milliseconds
    * @returns indexed schema
    */
-  async schemaIndex(maxAge = 3600 * 1000): Promise<SchemaIndex> {
+  async schemaIndex(): Promise<SchemaIndex> {
+    const maxAge = (this.config.ldap_raw_schema_cache_ttl ?? 3600) * 1000;
     if (this.schemaCache && Date.now() - this.schemaCache.fetchedAt < maxAge)
       return this.schemaCache.index;
     if (this.schemaLoading) return this.schemaLoading;
@@ -1208,16 +1283,17 @@ class ldapActions {
     }
     if (ldapChanges.length !== 0) {
       const repair = await this.classRepair(dn, changes);
-      if (repair.length > 0)
-        ldapChanges.push(
-          new Change({
-            operation: 'add',
-            modification: new Attribute({
-              type: 'objectClass',
-              values: repair,
-            }),
-          })
-        );
+      const repairChange =
+        repair.length > 0
+          ? new Change({
+              operation: 'add',
+              modification: new Attribute({
+                type: 'objectClass',
+                values: repair,
+              }),
+            })
+          : undefined;
+      if (repairChange) ldapChanges.push(repairChange);
       const pooled = await this.acquireConnection();
       try {
         // Dropped before the write is issued as well as after it lands. The
@@ -1228,7 +1304,17 @@ class ldapActions {
         // fails, which is harmless, and `cacheGeneration` keeps a read the write
         // overtook from putting it back.
         this.invalidateCache(dn);
-        await pooled.client.modify(dn, ldapChanges);
+        try {
+          await pooled.client.modify(dn, ldapChanges);
+        } catch (error) {
+          // The repair read the entry before this write: a writer in between
+          // may have given it the class already, and adding it again is
+          // refused (20). What the repair wanted is then there.
+          if (!repairChange || (error as { code?: number })?.code !== 20)
+            throw error;
+          ldapChanges.splice(ldapChanges.indexOf(repairChange), 1);
+          await pooled.client.modify(dn, ldapChanges);
+        }
         // Invalidate cache for this DN
         this.invalidateCache(dn);
         void launchHooks(

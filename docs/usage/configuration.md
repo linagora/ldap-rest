@@ -173,9 +173,10 @@ at `0` otherwise.
 
 #### `core/ldap/flatGeneric`
 
-| CLI                  | Plural                | Env                   | Default | Description           |
-| -------------------- | --------------------- | --------------------- | ------- | --------------------- |
-| `--ldap-flat-schema` | `--ldap-flat-schemas` | `DM_LDAP_FLAT_SCHEMA` | `[]`    | Entity schema path(s) |
+| CLI                       | Plural                | Env                        | Default | Description                                                                                                                           |
+| ------------------------- | --------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `--ldap-flat-schema`      | `--ldap-flat-schemas` | `DM_LDAP_FLAT_SCHEMA`      | `[]`    | Entity schema path(s)                                                                                                                 |
+| `--ldap-flat-auto-repair` |                       | `DM_LDAP_FLAT_AUTO_REPAIR` | `true`  | Add the auxiliary class a write needs to an entry lacking it — [details](plugins/ldap/flat-generic.md#entries-created-by-other-tools) |
 
 #### `core/ldap/bulkImport`
 
@@ -215,13 +216,13 @@ Maintains consistency of department links when organizations are renamed/moved: 
 
 Read-only low-level browsing (root DSE, schema, entries). See [raw plugin](plugins/ldap/raw.md).
 
-| CLI                           | Plural                         | Env                             | Default       | Description                     |
-| ----------------------------- | ------------------------------ | ------------------------------- | ------------- | ------------------------------- |
-| `--ldap-raw-base`             | `--ldap-raw-bases`             | `DM_LDAP_RAW_BASE`              | `--ldap-base` | Subtrees exposed by the API     |
-| `--ldap-raw-hidden-attribute` | `--ldap-raw-hidden-attributes` | `DM_LDAP_RAW_HIDDEN_ATTRIBUTES` | `[]`          | Extra attributes never returned |
-| `--ldap-raw-show-secrets`     |                                | `DM_LDAP_RAW_SHOW_SECRETS`      | `false`       | Serve credential attributes     |
-| `--ldap-raw-max-results`      |                                | `DM_LDAP_RAW_MAX_RESULTS`       | `200`         | Max entries per search/listing  |
-| `--ldap-raw-schema-cache-ttl` |                                | `DM_LDAP_RAW_SCHEMA_CACHE_TTL`  | `3600`        | Schema cache lifetime (seconds) |
+| CLI                           | Plural                         | Env                             | Default       | Description                                                          |
+| ----------------------------- | ------------------------------ | ------------------------------- | ------------- | -------------------------------------------------------------------- |
+| `--ldap-raw-base`             | `--ldap-raw-bases`             | `DM_LDAP_RAW_BASE`              | `--ldap-base` | Subtrees exposed by the API                                          |
+| `--ldap-raw-hidden-attribute` | `--ldap-raw-hidden-attributes` | `DM_LDAP_RAW_HIDDEN_ATTRIBUTES` | `[]`          | Extra attributes never returned                                      |
+| `--ldap-raw-show-secrets`     |                                | `DM_LDAP_RAW_SHOW_SECRETS`      | `false`       | Serve credential attributes                                          |
+| `--ldap-raw-max-results`      |                                | `DM_LDAP_RAW_MAX_RESULTS`       | `200`         | Max entries per search/listing                                       |
+| `--ldap-raw-schema-cache-ttl` |                                | `DM_LDAP_RAW_SCHEMA_CACHE_TTL`  | `3600`        | Schema cache lifetime (seconds), shared with the object class repair |
 
 ### Authentication Plugins
 

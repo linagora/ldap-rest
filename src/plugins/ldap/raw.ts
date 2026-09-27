@@ -164,7 +164,6 @@ export default class LdapRaw extends DmPlugin {
   showSecrets: boolean;
   /** Maximum entries returned by a search or a children listing */
   maxResults: number;
-  private schemaCacheTtl: number;
 
   constructor(server: DM) {
     super(server);
@@ -188,8 +187,6 @@ export default class LdapRaw extends DmPlugin {
         .map(a => a.toLowerCase()),
     ]);
     this.maxResults = this.config.ldap_raw_max_results || 200;
-    this.schemaCacheTtl =
-      (this.config.ldap_raw_schema_cache_ttl ?? 3600) * 1000;
 
     this.logger.info(
       `LDAP raw API enabled on ${this.bases.join(', ')} (read-only)`
@@ -332,12 +329,13 @@ export default class LdapRaw extends DmPlugin {
   }
 
   /**
-   * The parsed directory schema, cached for `--ldap-raw-schema-cache-ttl`.
+   * The parsed directory schema, cached for `--ldap-raw-schema-cache-ttl`
+   * and shared with the object class repair.
    *
    * @returns indexed schema
    */
   async getSchemaIndex(): Promise<SchemaIndex> {
-    return this.server.ldap.schemaIndex(this.schemaCacheTtl);
+    return this.server.ldap.schemaIndex();
   }
 
   /**
