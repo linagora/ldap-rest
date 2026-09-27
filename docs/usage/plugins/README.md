@@ -62,11 +62,11 @@ Connect to external systems:
 
 ## Utility Plugins
 
-| Plugin                          | Description                   |
-| ------------------------------- | ----------------------------- |
-| [static](utilities/static.md)   | Static file server            |
-| [weblogs](utilities/weblogs.md) | HTTP logging                  |
-| [storage](utilities/storage.md) | Keyed storage with a deadline |
+| Plugin                          | Description                                                         |
+| ------------------------------- | ------------------------------------------------------------------- |
+| [static](utilities/static.md)   | Static file server                                                  |
+| [weblogs](utilities/weblogs.md) | HTTP logging                                                        |
+| [storage](utilities/storage.md) | Keyed storage with a deadline, in LDAP, files, PostgreSQL or Valkey |
 
 ## Plugin Dependencies
 

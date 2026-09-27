@@ -462,13 +462,17 @@ Web access logging plugin. No configuration options - just add the plugin to ena
 Keyed storage with a deadline, for the plugins that need to keep something —
 see [Storage](plugins/utilities/storage.md).
 
-| CLI                           | Env                            | Default              | Description                            |
-| ----------------------------- | ------------------------------ | -------------------- | -------------------------------------- |
-| `--storage-backend`           | `DM_STORAGE_BACKEND`           |                      | `ldap` or `file`; required             |
-| `--storage-sweep-interval`    | `DM_STORAGE_SWEEP_INTERVAL`    | `600`                | Seconds between two expiry passes      |
-| `--storage-ldap-base`         | `DM_STORAGE_LDAP_BASE`         |                      | Branch the `ldap` backend writes to    |
-| `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes  |
-| `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    |                      | Directory the `file` backend writes to |
+| CLI                           | Env                            | Default              | Description                                      |
+| ----------------------------- | ------------------------------ | -------------------- | ------------------------------------------------ |
+| `--storage-backend`           | `DM_STORAGE_BACKEND`           |                      | `ldap`, `file`, `postgres` or `valkey`; required |
+| `--storage-sweep-interval`    | `DM_STORAGE_SWEEP_INTERVAL`    | `600`                | Seconds between two expiry passes                |
+| `--storage-ldap-base`         | `DM_STORAGE_LDAP_BASE`         |                      | Branch the `ldap` backend writes to              |
+| `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes            |
+| `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    |                      | Directory the `file` backend writes to           |
+| `--storage-postgres-url`      | `DM_STORAGE_POSTGRES_URL`      |                      | Connection string of the `postgres` backend      |
+| `--storage-postgres-table`    | `DM_STORAGE_POSTGRES_TABLE`    | `ldap_rest_storage`  | Table it writes to                               |
+| `--storage-valkey-url`        | `DM_STORAGE_VALKEY_URL`        |                      | URL of the `valkey` backend                      |
+| `--storage-valkey-prefix`     | `DM_STORAGE_VALKEY_PREFIX`     | `ldap-rest:`         | Prefix of the keys it writes                     |
 
 #### `core/configApi`
 

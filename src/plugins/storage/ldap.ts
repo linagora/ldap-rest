@@ -41,20 +41,6 @@ export default class LdapStore extends Store {
     return `cn=${createHash('sha256').update(key).digest('hex')},${this.base}`;
   }
 
-  /** `<deadline> <key>\n<value>`, the deadline first as in the file store. */
-  private static encode(key: string, record: StoredRecord): string {
-    return `${record.deadline} ${LdapStore.readable(key)}\n${record.value}`;
-  }
-
-  private static decode(value: unknown): StoredRecord | null {
-    const text = String(value);
-    const cut = text.indexOf('\n');
-    const head = cut < 0 ? text : text.slice(0, cut);
-    const deadline = parseInt(head.split(' ')[0], 10);
-    if (!Number.isFinite(deadline)) return null;
-    return { deadline, value: cut < 0 ? '' : text.slice(cut + 1) };
-  }
-
   protected async load(key: string): Promise<StoredRecord | null> {
     try {
       const res = (await this.server.ldap.search(
@@ -62,7 +48,7 @@ export default class LdapStore extends Store {
         this.dn(key)
       )) as SearchResult;
       const entry = res.searchEntries?.[0];
-      return entry ? LdapStore.decode(entry.description) : null;
+      return entry ? LdapStore.decodeRecord(entry.description) : null;
     } catch (err) {
       // 32 is noSuchObject, the ordinary outcome. Read the code and not the
       // sentence: the sentence is one this repository writes about itself.
@@ -76,7 +62,7 @@ export default class LdapStore extends Store {
 
   protected async save(key: string, record: StoredRecord): Promise<void> {
     const dn = this.dn(key);
-    const description = LdapStore.encode(key, record);
+    const description = LdapStore.encodeRecord(key, record);
     try {
       await this.server.ldap.add(dn, {
         objectClass: ['top', this.objectClass],
@@ -121,7 +107,7 @@ export default class LdapStore extends Store {
       this.base
     )) as SearchResult;
     for (const entry of res.searchEntries || []) {
-      const record = LdapStore.decode(entry.description);
+      const record = LdapStore.decodeRecord(entry.description);
       // A record nothing can be read from goes too: it cannot expire on its
       // own and would sit there forever.
       if (record !== null && record.deadline > now) continue;

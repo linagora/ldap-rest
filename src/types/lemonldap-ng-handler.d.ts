@@ -10,10 +10,13 @@
  * Without this file, `tsc` fails with "Cannot find module
  * 'lemonldap-ng-handler'" whenever the package happens to be absent, which
  * breaks the build for the whole project over one optional plugin. This
- * declares only what src/plugins/auth/llng.ts uses. `skipLibCheck` (set in
- * tsconfig.json) is what lets this declaration coexist with the package's
- * real, more complete types when it is installed, instead of conflicting
- * with them.
+ * declares only what src/plugins/auth/llng.ts uses.
+ *
+ * An ambient module declaration takes precedence over the resolved package,
+ * so `tsc` checks against this file even when `lemonldap-ng-handler` is
+ * installed: the package's own types are never consulted. Each signature
+ * here must stay one the real module accepts, and nothing else checks it:
+ * the plugin's tests replace the module with a stand-in.
  */
 declare module 'lemonldap-ng-handler' {
   import type { Response } from 'express';
