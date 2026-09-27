@@ -1,25 +1,22 @@
 # Changelog
 
-## Unreleased
+## v0.11.1 (2026-09-27)
 
 ### Features
 
 - `core/auth/authzLinid1`, `core/auth/authzPerBranch`: a transit branch
-  (`--authz-transit-branch`) through which administrators hand accounts and
-  groups over to organizations they do not manage; an account attached to no
-  organization is in transit and can be claimed —
+  (`--authz-transit-branch`) to hand accounts and groups over between
+  organizations; an account attached to none is in transit, option or not —
   [doc](docs/usage/plugins/auth/authz-linid1.md#transit-handing-an-entry-over)
   ([#220](https://github.com/linagora/ldap-rest/issues/220))
-- `core/storage`: `postgres` and `valkey` backends, needing the optional `pg`
-  and `iovalkey` packages; a Valkey instance must not evict —
+- `core/storage`: `postgres` and `valkey` backends —
   [doc](docs/usage/plugins/utilities/storage.md#backends)
   ([#183](https://github.com/linagora/ldap-rest/issues/183))
 
 ### Bug Fixes
 
-- authorization by attachment: an entry attached to no organization could be
-  written by nobody, a global administrator included (judged on a branch
-  named `undefined`)
+- authorization by attachment: nobody, a global administrator included, could
+  write an entry attached to no organization
 
 ## v0.11.0 (2026-09-26)
 
