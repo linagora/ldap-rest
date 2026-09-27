@@ -33,12 +33,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../../lib/errors';
-import {
-  parseSchema,
-  SchemaIndex,
-  type LdapSchema,
-} from '../../lib/ldapSchema';
-import type { AttributeValue } from '../../lib/ldapActions';
+import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -169,9 +164,6 @@ export default class LdapRaw extends DmPlugin {
   showSecrets: boolean;
   /** Maximum entries returned by a search or a children listing */
   maxResults: number;
-  private schemaCacheTtl: number;
-  private schemaCache?: { index: SchemaIndex; fetchedAt: number };
-  private schemaPromise?: Promise<SchemaIndex>;
 
   constructor(server: DM) {
     super(server);
@@ -195,8 +187,6 @@ export default class LdapRaw extends DmPlugin {
         .map(a => a.toLowerCase()),
     ]);
     this.maxResults = this.config.ldap_raw_max_results || 200;
-    this.schemaCacheTtl =
-      (this.config.ldap_raw_schema_cache_ttl ?? 3600) * 1000;
 
     this.logger.info(
       `LDAP raw API enabled on ${this.bases.join(', ')} (read-only)`
@@ -335,83 +325,17 @@ export default class LdapRaw extends DmPlugin {
    * @returns DN of the subschema entry
    */
   async getSubschemaDn(): Promise<string> {
-    try {
-      const result = await this.searchDirectory('', {
-        scope: 'base',
-        filter: '(objectClass=*)',
-        attributes: ['subschemaSubentry'],
-      });
-      const value = result.searchEntries[0]?.subschemaSubentry;
-      const dn = Array.isArray(value) ? value[0] : value;
-      if (dn) return String(dn);
-    } catch (err) {
-      this.logger.warn(
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        `Unable to read subschemaSubentry from root DSE: ${err}`
-      );
-    }
-    return 'cn=Subschema';
+    return this.server.ldap.subschemaDn();
   }
 
   /**
-   * Fetch and parse the directory schema, with a cache: it is large and
-   * changes rarely. Concurrent callers share a single fetch.
+   * The parsed directory schema, cached for `--ldap-raw-schema-cache-ttl`
+   * and shared with the object class repair.
    *
    * @returns indexed schema
    */
   async getSchemaIndex(): Promise<SchemaIndex> {
-    if (
-      this.schemaCache &&
-      Date.now() - this.schemaCache.fetchedAt < this.schemaCacheTtl
-    )
-      return this.schemaCache.index;
-    if (this.schemaPromise) return this.schemaPromise;
-
-    this.schemaPromise = (async (): Promise<SchemaIndex> => {
-      const dn = await this.getSubschemaDn();
-      const result = await this.searchDirectory(dn, {
-        scope: 'base',
-        filter: '(objectClass=*)',
-        attributes: [
-          'objectClasses',
-          'attributeTypes',
-          'ldapSyntaxes',
-          'matchingRules',
-        ],
-      });
-      const entry = result.searchEntries[0];
-      if (!entry) throw new NotFoundError(`Subschema entry ${dn} not found`);
-
-      const list = (value: AttributeValue | undefined): string[] => {
-        if (value === undefined) return [];
-        const values: (Buffer | string)[] = Array.isArray(value)
-          ? value
-          : [value];
-        return values.map(v => (Buffer.isBuffer(v) ? v.toString('utf8') : v));
-      };
-
-      const index = new SchemaIndex(
-        parseSchema({
-          objectClasses: list(entry.objectClasses),
-          attributeTypes: list(entry.attributeTypes),
-          ldapSyntaxes: list(entry.ldapSyntaxes),
-          matchingRules: list(entry.matchingRules),
-        })
-      );
-      this.schemaCache = { index, fetchedAt: Date.now() };
-      this.logger.info(
-        `LDAP schema loaded from ${dn}: ` +
-          `${index.schema.objectClasses.length} object classes, ` +
-          `${index.schema.attributeTypes.length} attribute types`
-      );
-      return index;
-    })();
-
-    try {
-      return await this.schemaPromise;
-    } finally {
-      this.schemaPromise = undefined;
-    }
+    return this.server.ldap.schemaIndex();
   }
 
   /**

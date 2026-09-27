@@ -151,6 +151,11 @@ export default class LdapOrganizations extends DmPlugin {
 
     this.pathAttr = this.config.ldap_organization_path_attribute as string;
     this.linkAttr = this.config.ldap_organization_link_attribute as string;
+    dm.ldap.declareObjectClasses(
+      this.config.ldap_top_organization,
+      this.config.ldap_organization_class || [],
+      true
+    );
 
     // Load organization schema if provided
     if (this.config.organization_schema) {

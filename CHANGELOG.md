@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- An entry created by another tool without an auxiliary class its schema
+  declares is given it when a write needs it, so an account made as a bare
+  `inetOrgPerson` can be attached to an organization
+  (`--ldap-flat-auto-repair`, on by default); a change such an entry cannot
+  hold answers `409` instead of `500` —
+  [doc](docs/usage/plugins/ldap/flat-generic.md#entries-created-by-other-tools)
+
 ## v0.11.1 (2026-09-27)
 
 ### Features

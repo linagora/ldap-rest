@@ -145,6 +145,13 @@ export default class LdapGroups extends DmPlugin {
     if (!this.base) {
       throw new Error('LDAP base is not defined, please set --ldap-group-base');
     }
+    // Not on the fallback: groups would then be declared for the whole
+    // directory, and any entry outside the other bases given their classes.
+    if (this.config.ldap_group_base)
+      server.ldap.declareObjectClasses(
+        this.base,
+        (this.config.group_class as string[]) || []
+      );
     if (this.config.group_schema) {
       fs.readFile(this.config.group_schema, (err, data) => {
         if (err) {

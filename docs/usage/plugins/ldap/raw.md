@@ -197,7 +197,7 @@ Combine with an authentication plugin ([token](../auth/token.md), [oidc](../auth
 
 ## How It Works
 
-- **Schema fetch**: the root DSE is read for `subschemaSubentry` (falling back to `cn=Subschema`), then the subschema entry is fetched and parsed once per `--ldap-raw-schema-cache-ttl`. Concurrent callers share a single fetch.
+- **Schema fetch**: the root DSE is read for `subschemaSubentry` (falling back to `cn=Subschema`), then the subschema entry is fetched and parsed once per `--ldap-raw-schema-cache-ttl`. Concurrent callers share a single fetch, and so does the [object class repair](flat-generic.md#entries-created-by-other-tools), which loads it even without this plugin.
 - **Operational attributes**: entries are read with `*` and `+`. When the server rejects `+`, the read is retried with `*` alone.
 - **Missing entries**: the LDAP "no such object" result (code 32) is mapped to a 404.
 

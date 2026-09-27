@@ -256,4 +256,51 @@ describe('LDAP schema parser', () => {
       expect(cyclic.getAttributeSyntax('p')).to.equal(undefined);
     });
   });
+  describe('missingClasses', () => {
+    const index = new SchemaIndex(
+      parseSchema({
+        objectClasses: [
+          "( 2.5.6.0 NAME 'top' ABSTRACT MUST objectClass )",
+          "( 2.5.6.6 NAME 'person' SUP top STRUCTURAL MUST ( sn $ cn ) )",
+          "( 2.16.840.1.113730.3.2.2 NAME 'inetOrgPerson' SUP person STRUCTURAL )",
+          "( TwakeObjectClass:0 NAME 'twakeAccount' SUP top STRUCTURAL MUST uid )",
+          "( TwakeObjectClass:1 NAME 'twakeWhitePages' SUP top AUXILIARY MAY twakeDepartmentLink )",
+        ],
+        attributeTypes: [],
+        ldapSyntaxes: [],
+        matchingRules: [],
+      })
+    );
+    const declared = ['top', 'twakeAccount', 'twakeWhitePages'];
+
+    it('should tell the auxiliary classes an entry lacks from the structural ones', () => {
+      const { auxiliary, structural } = index.missingClasses(declared, [
+        'top',
+        'inetOrgPerson',
+      ]);
+      expect(auxiliary.map(oc => oc.names[0])).to.deep.equal([
+        'twakeWhitePages',
+      ]);
+      expect(structural).to.deep.equal(['twakeAccount']);
+    });
+
+    it('should find nothing missing on an entry holding every class, however spelled', () => {
+      const { auxiliary, structural } = index.missingClasses(declared, [
+        'TOP',
+        'twakeaccount',
+        'TwakeObjectClass:1',
+      ]);
+      expect(auxiliary).to.deep.equal([]);
+      expect(structural).to.deep.equal([]);
+    });
+
+    it('should ignore a declared class the directory does not know', () => {
+      const { auxiliary, structural } = index.missingClasses(
+        ['top', 'twakeUnknown'],
+        ['top', 'inetOrgPerson']
+      );
+      expect(auxiliary).to.deep.equal([]);
+      expect(structural).to.deep.equal([]);
+    });
+  });
 });

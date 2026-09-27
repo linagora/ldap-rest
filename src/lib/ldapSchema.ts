@@ -501,4 +501,33 @@ export class SchemaIndex {
     }
     return { must: [...must], may: [...may] };
   }
+
+  /**
+   * The classes a schema declares for an entry and the entry lacks, split by
+   * what can be done about them: an auxiliary class can be added to an
+   * existing entry, a structural one cannot. Classes the directory does not
+   * know, and abstract ones, are left out.
+   *
+   * @param declared classes the entity's schema gives its entries
+   * @param present classes the entry carries
+   * @returns the missing auxiliary definitions and structural names
+   */
+  missingClasses(
+    declared: string[],
+    present: string[]
+  ): { auxiliary: ObjectClassDefinition[]; structural: string[] } {
+    const held = new Set(
+      present.map(name => this.getObjectClass(name)?.oid ?? name.toLowerCase())
+    );
+    const auxiliary: ObjectClassDefinition[] = [];
+    const structural: string[] = [];
+    for (const name of declared) {
+      const oc = this.getObjectClass(name);
+      if (!oc || held.has(oc.oid)) continue;
+      held.add(oc.oid);
+      if (oc.kind === 'AUXILIARY') auxiliary.push(oc);
+      else if (oc.kind === 'STRUCTURAL') structural.push(oc.names[0] ?? name);
+    }
+    return { auxiliary, structural };
+  }
 }

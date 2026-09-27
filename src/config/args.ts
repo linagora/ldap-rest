@@ -96,6 +96,8 @@ export interface Config {
 
   // LDAP Flat generic plugin
   ldap_flat_schema?: string[];
+  /** Add the auxiliary classes a modify needs, see ldapActions.classRepair */
+  ldap_flat_auto_repair?: boolean;
 
   // LDAP enterprise rules plugin
   enterprise_domain_name_attribute?: string;
@@ -582,6 +584,7 @@ const configArgs: ConfigTemplate = [
     'array',
     '--ldap-flat-schemas',
   ],
+  ['--ldap-flat-auto-repair', 'DM_LDAP_FLAT_AUTO_REPAIR', true, 'boolean'],
 
   // LDAP raw (low-level browsing) plugin
   ['--ldap-raw-base', 'DM_LDAP_RAW_BASE', [], 'array', '--ldap-raw-bases'],
