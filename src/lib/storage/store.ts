@@ -75,6 +75,39 @@ export default abstract class Store {
   }
 
   /**
+   * `<deadline> <key>\n<value>`, for a backend that keeps a record as one
+   * string: the deadline first, so a short read still has it, and the key
+   * beside it so an operator can tell what a record is about.
+   */
+  protected static encodeRecord(key: string, record: StoredRecord): string {
+    return `${record.deadline} ${Store.readable(key)}\n${record.value}`;
+  }
+
+  protected static decodeRecord(value: unknown): StoredRecord | null {
+    const text = String(value);
+    const cut = text.indexOf('\n');
+    const head = cut < 0 ? text : text.slice(0, cut);
+    const deadline = parseInt(head.split(' ')[0], 10);
+    if (!Number.isFinite(deadline)) return null;
+    return { deadline, value: cut < 0 ? '' : text.slice(cut + 1) };
+  }
+
+  /**
+   * Reach whatever the backend keeps its records in. Every operation opens
+   * on its own; calling this early only moves a failure to startup, where an
+   * operator reads it, instead of the first request that needs the store.
+   */
+  async open(): Promise<void> {
+    // Nothing to reach for a backend that shares the server's own resources.
+  }
+
+  /** Stop sweeping and let go of any connection. */
+  close(): Promise<void> {
+    this.stopSweeping();
+    return Promise.resolve();
+  }
+
+  /**
    * The value kept under this key, or null.
    *
    * A record past its deadline is not one: it is dropped and answered as

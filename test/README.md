@@ -30,6 +30,17 @@ This means tests work:
 - ✅ Locally without installing LDAP
 - ✅ With your existing LDAP server if configured
 
+The PostgreSQL and Valkey storage backends are tested against the servers
+named by `DM_TEST_POSTGRES_URL` and `DM_TEST_VALKEY_URL`, and skipped without
+them:
+
+```bash
+docker run --rm -d -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:17-alpine
+docker run --rm -d -p 6379:6379 valkey/valkey:8-alpine
+export DM_TEST_POSTGRES_URL=postgres://postgres:pw@localhost:5432/postgres
+export DM_TEST_VALKEY_URL=redis://localhost:6379
+```
+
 ## Documentation
 
 See [Testing with Embedded LDAP](../docs/testing-with-embedded-ldap.md) for complete documentation.

@@ -232,6 +232,14 @@
       "types": "./dist/src/plugins/storage/ldap.d.ts",
       "import": "./dist/plugins/storage/ldap.js"
     },
+    "./plugin-storage-postgres": {
+      "types": "./dist/src/plugins/storage/postgres.d.ts",
+      "import": "./dist/plugins/storage/postgres.js"
+    },
+    "./plugin-storage-valkey": {
+      "types": "./dist/src/plugins/storage/valkey.d.ts",
+      "import": "./dist/plugins/storage/valkey.js"
+    },
     "./plugin-twake-appaccountsapi": {
       "types": "./dist/src/plugins/twake/appAccountsApi.d.ts",
       "import": "./dist/plugins/twake/appAccountsApi.js"
@@ -727,6 +735,7 @@
     "@types/mocha": "^10.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.5.1",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
@@ -755,7 +764,9 @@
   "optionalDependencies": {
     "@linagora/rabbitmq-client": "^0.1.2",
     "express-openid-connect": "^2.19.2",
+    "iovalkey": "^0.4.0",
     "lemonldap-ng-handler": "^0.7.3",
+    "pg": "^8.23.0",
     "re2": "^1.22.1"
   },
   "engines": {

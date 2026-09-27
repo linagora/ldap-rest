@@ -26,13 +26,17 @@ which is invisible in a configuration.
   --storage-ldap-base ou=Records,dc=example,dc=com
 ```
 
-| Option                        | Environment                    | Default              | Description                                               |
-| ----------------------------- | ------------------------------ | -------------------- | --------------------------------------------------------- |
-| `--storage-backend`           | `DM_STORAGE_BACKEND`           | _(none)_             | `ldap` or `file`. Empty means the plugin refuses to start |
-| `--storage-sweep-interval`    | `DM_STORAGE_SWEEP_INTERVAL`    | `600`                | Seconds between two passes dropping expired records       |
-| `--storage-ldap-base`         | `DM_STORAGE_LDAP_BASE`         | _(none)_             | Branch the `ldap` backend writes to                       |
-| `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes                     |
-| `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    | _(none)_             | Directory the `file` backend writes to                    |
+| Option                        | Environment                    | Default              | Description                                                                     |
+| ----------------------------- | ------------------------------ | -------------------- | ------------------------------------------------------------------------------- |
+| `--storage-backend`           | `DM_STORAGE_BACKEND`           | _(none)_             | `ldap`, `file`, `postgres` or `valkey`. Empty means the plugin refuses to start |
+| `--storage-sweep-interval`    | `DM_STORAGE_SWEEP_INTERVAL`    | `600`                | Seconds between two passes dropping expired records                             |
+| `--storage-ldap-base`         | `DM_STORAGE_LDAP_BASE`         | _(none)_             | Branch the `ldap` backend writes to                                             |
+| `--storage-ldap-object-class` | `DM_STORAGE_LDAP_OBJECT_CLASS` | `applicationProcess` | Object class of the entries it writes                                           |
+| `--storage-file-directory`    | `DM_STORAGE_FILE_DIRECTORY`    | _(none)_             | Directory the `file` backend writes to                                          |
+| `--storage-postgres-url`      | `DM_STORAGE_POSTGRES_URL`      | _(none)_             | Connection string of the `postgres` backend                                     |
+| `--storage-postgres-table`    | `DM_STORAGE_POSTGRES_TABLE`    | `ldap_rest_storage`  | Table it writes to, `schema.table` accepted                                     |
+| `--storage-valkey-url`        | `DM_STORAGE_VALKEY_URL`        | _(none)_             | URL of the `valkey` backend (`redis://…` or `rediss://…`)                       |
+| `--storage-valkey-prefix`     | `DM_STORAGE_VALKEY_PREFIX`     | `ldap-rest:`         | Prefix of the keys it writes                                                    |
 
 `core/storage` is in the priority list, so it is registered before the
 plugins that consume it whatever order they are written in. A consumer that
@@ -61,18 +65,65 @@ The directory is the plugin's own: nothing else should be writing there, and
 the sweeper removes what it finds expired. It is local to one process, so it
 suits a single instance, not a cluster sharing one verdict.
 
+### `postgres`
+
+One row per record in `--storage-postgres-table`, with the consumer's
+namespace and key kept verbatim beside the value and an `expires_at` column,
+so a `SELECT` tells what a record is about. Needs the optional `pg` package.
+
+The table is created at the first connection when it is not there. A role
+that may not create tables works once it exists:
+
+```sql
+CREATE TABLE ldap_rest_storage (
+  namespace text NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY (namespace, key)
+);
+CREATE INDEX ldap_rest_storage_expires_at ON ldap_rest_storage (expires_at);
+GRANT SELECT, INSERT, UPDATE, DELETE ON ldap_rest_storage TO ldap_rest;
+```
+
+Several instances can share the table and sweep it at once. PostgreSQL
+refuses a NUL in `text`, so a key holding one cannot be kept: the write
+fails.
+
+### `valkey`
+
+One key per record, `--storage-valkey-prefix` followed by the namespace and
+the key, expiring with the record: nothing is left to sweep. Works with Redis
+too. Needs the optional `iovalkey` package.
+
+**The instance must not evict.** An instance configured as a cache
+(`allkeys-lru`, `volatile-lru` and the like) drops keys under memory pressure,
+and every key this backend writes has a TTL: a Back-Channel Logout mark
+evicted early reopens the session it closed. Use an instance with
+`maxmemory-policy noeviction`, which answers a full memory with a failed
+write — reported to the identity provider — rather than a silent loss.
+
+A connection lost while running is retried in the background; meanwhile, reads
+answer "absent" with a warning and writes fail at once instead of waiting.
+
+`postgres` and `valkey` connect at startup, and report there an address that
+does not answer or a package that is not installed; the server starts anyway,
+and every operation tries to connect again.
+
 ## Expiry
 
 Two rules the backends do not get to reinterpret:
 
 - **Expiry is enforced on read.** A record past its deadline is answered as
   absent whatever the sweeper has done, so a sweeper running late is a
-  storage cost, never a wrong answer.
+  storage cost, never a wrong answer. Expiry is judged by this server's clock,
+  the sweep and the Valkey TTL included, so a database clock running ahead
+  cannot drop a record early.
 - **The deadline belongs to the consumer.** How long a record lives is the
   policy of whoever wrote it. The store is told an instant and respects it.
 
-Keys are namespaced per consumer, so two of them cannot collide in one branch
-or one directory.
+Keys are namespaced per consumer, so two of them cannot collide in one branch,
+directory, table or instance.
 
 ## For Plugin Authors
 

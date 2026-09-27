@@ -76,6 +76,10 @@ export interface Config {
   storage_ldap_base?: string;
   storage_ldap_object_class?: string;
   storage_file_directory?: string;
+  storage_postgres_url?: string;
+  storage_postgres_table?: string;
+  storage_valkey_url?: string;
+  storage_valkey_prefix?: string;
 
   // Back-Channel Logout. Where the marks live is core/storage's business;
   // what stays here is how long one is kept.
@@ -476,8 +480,9 @@ const configArgs: ConfigTemplate = [
 
   // Keyed storage
   //
-  // Which sub-plugin keeps the records: `ldap` or `file`. Empty means none is
-  // loaded, and a consumer asking for one says so.
+  // Which sub-plugin keeps the records: `ldap`, `file`, `postgres` or
+  // `valkey`. Empty means none is loaded, and a consumer asking for one says
+  // so.
   ['--storage-backend', 'DM_STORAGE_BACKEND', ''],
   // Reads enforce expiry whatever the sweeper has done, so a long interval
   // costs storage rather than correctness — with one exception: `file` will
@@ -495,6 +500,15 @@ const configArgs: ConfigTemplate = [
   // The directory `storage/file` writes to, one file per record, so nothing
   // else should be writing there.
   ['--storage-file-directory', 'DM_STORAGE_FILE_DIRECTORY', ''],
+  ['--storage-postgres-url', 'DM_STORAGE_POSTGRES_URL', ''],
+  [
+    '--storage-postgres-table',
+    'DM_STORAGE_POSTGRES_TABLE',
+    'ldap_rest_storage',
+  ],
+  // The instance must not evict: see docs/usage/plugins/utilities/storage.md.
+  ['--storage-valkey-url', 'DM_STORAGE_VALKEY_URL', ''],
+  ['--storage-valkey-prefix', 'DM_STORAGE_VALKEY_PREFIX', 'ldap-rest:'],
 
   // Back-Channel Logout
   //

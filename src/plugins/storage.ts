@@ -33,6 +33,8 @@ import type Store from '../lib/storage/store';
 
 import FileStore from './storage/file';
 import LdapStore from './storage/ldap';
+import PostgresStore from './storage/postgres';
+import ValkeyStore from './storage/valkey';
 
 /**
  * The one instance, if there is one.
@@ -45,6 +47,8 @@ import LdapStore from './storage/ldap';
  * guarantee is held here rather than stated in a comment.
  */
 let onlyInstance: Storage | undefined;
+
+const KNOWN = 'ldap, file, postgres, valkey';
 
 export default class Storage extends DmPlugin {
   name = 'storage';
@@ -94,18 +98,56 @@ export default class Storage extends DmPlugin {
         );
         break;
       }
+      case 'postgres': {
+        const url = server.config.storage_postgres_url as string;
+        if (!url)
+          throw new Error(
+            'storage: the postgres backend needs --storage-postgres-url, ' +
+              'the database it writes its records to.'
+          );
+        this.store = new PostgresStore(
+          server.logger,
+          url,
+          (server.config.storage_postgres_table as string) ||
+            'ldap_rest_storage'
+        );
+        break;
+      }
+      case 'valkey': {
+        const url = server.config.storage_valkey_url as string;
+        if (!url)
+          throw new Error(
+            'storage: the valkey backend needs --storage-valkey-url, the ' +
+              'server it writes its records to.'
+          );
+        this.store = new ValkeyStore(
+          server.logger,
+          url,
+          (server.config.storage_valkey_prefix as string) ?? ''
+        );
+        break;
+      }
       default:
         throw new Error(
           backend
-            ? `storage: unknown backend "${backend}". Known: ldap, file.`
+            ? `storage: unknown backend "${backend}". Known: ${KNOWN}.`
             : 'storage: --storage-backend says which sub-plugin keeps the ' +
-                'records. Known: ldap, file.'
+                `records. Known: ${KNOWN}.`
         );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     onlyInstance = this;
     this.logger.info(`storage: records kept by ${this.store.name}`);
+    // A constructor cannot wait, and an `api()` would mount the
+    // authentication dispatcher ahead of the plugins that must run before it.
+    // Started here, a wrong address or a missing driver is in the log at
+    // startup rather than at the first record written.
+    this.store
+      .open()
+      .catch(err =>
+        this.logger.error(err instanceof Error ? err.message : String(err))
+      );
     this.store.startSweeping(
       (server.config.storage_sweep_interval as number) || 0
     );

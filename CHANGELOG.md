@@ -10,6 +10,10 @@
   organization is in transit and can be claimed —
   [doc](docs/usage/plugins/auth/authz-linid1.md#transit-handing-an-entry-over)
   ([#220](https://github.com/linagora/ldap-rest/issues/220))
+- `core/storage`: `postgres` and `valkey` backends, needing the optional `pg`
+  and `iovalkey` packages; a Valkey instance must not evict —
+  [doc](docs/usage/plugins/utilities/storage.md#backends)
+  ([#183](https://github.com/linagora/ldap-rest/issues/183))
 
 ### Bug Fixes
 

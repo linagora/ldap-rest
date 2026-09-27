@@ -24,6 +24,24 @@ jobs:
       matrix:
         node-version: [20.x, 22.x, 24.x, 26.x]
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,6 +79,9 @@ jobs:
       # mix two very different situations into one meaningless figure.
       - name: Run tests and check coverage
         run: npm run coverage:check
+        env:
+          DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
+          DM_TEST_VALKEY_URL: redis://localhost:6379
 
   lsc-plugin-test:
     runs-on: ubuntu-latest
