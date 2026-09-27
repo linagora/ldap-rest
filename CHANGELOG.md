@@ -1,15 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.11.2 (2026-09-27)
 
 ### Bug Fixes
 
-- An entry created by another tool without an auxiliary class its schema
-  declares is given it when a write needs it, so an account made as a bare
-  `inetOrgPerson` can be attached to an organization
-  (`--ldap-flat-auto-repair`, on by default); a change such an entry cannot
-  hold answers `409` instead of `500` —
+- `core/ldap/flatGeneric`: attaching an account another tool created as a bare
+  `inetOrgPerson` no longer fails: a write under a declared branch adds the
+  auxiliary class it needs (`--ldap-flat-auto-repair`, on by default), and a
+  change the entry cannot hold answers `409` instead of `500` —
   [doc](docs/usage/plugins/ldap/flat-generic.md#entries-created-by-other-tools)
+  ([#223](https://github.com/linagora/ldap-rest/pull/223))
 
 ## v0.11.1 (2026-09-27)
 
