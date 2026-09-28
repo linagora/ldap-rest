@@ -616,21 +616,44 @@ describe('Twake lifecycle events plugin', function () {
       }
     });
 
-    it('stops the server when the broker cannot be reached', async () => {
-      const exit = process.exit;
-      const codes: (string | number | null | undefined)[] = [];
-      process.exit = (code => {
-        codes.push(code);
-      }) as typeof process.exit;
+    it('is refused when the broker cannot be reached', async () => {
+      rabbit.client = null;
+      const late = new TwakeLifecycleEvents(dm);
+      let refused: Error | undefined;
+      await dm
+        .registerPlugin('core/twake/lifecycleEvents', late, 'lifecycleLate')
+        .catch((err: Error) => (refused = err));
+      expect(refused?.message).to.match(/RabbitMQ at --rabbitmq-url cannot be/);
+      expect(dm.loadedPlugins).not.to.have.property('lifecycleLate');
+    });
+
+    it('warns when SCIM locks accounts another way', () => {
+      const warned: string[] = [];
+      const { warn } = plugin.logger;
+      plugin.logger.warn = ((m: string) => {
+        warned.push(m);
+        return plugin.logger;
+      }) as typeof warn;
+      const scim = dm.loadedPlugins.scim;
       try {
-        plugin.afterLoad();
-        rabbit.client = null;
-        plugin.afterLoad();
-        await waitFor(() => codes.length > 0, { what: 'process.exit' });
+        for (const config of [
+          { scim_user_lock_attribute: 'pwdAccountLockedTime' },
+          {
+            scim_user_lock_attribute: 'nsAccountLock',
+            scim_user_lock_value: 'TRUE',
+          },
+        ]) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          dm.loadedPlugins.scim = { config } as any;
+          plugin.afterLoad();
+        }
       } finally {
-        process.exit = exit;
+        plugin.logger.warn = warn;
+        if (scim) dm.loadedPlugins.scim = scim;
+        else delete dm.loadedPlugins.scim;
       }
-      expect(codes).to.deep.equal([1]);
+      expect(warned).to.have.length(1);
+      expect(warned[0]).to.match(/SCIM locks an account with nsAccountLock/);
     });
   });
 
@@ -641,26 +664,62 @@ describe('Twake lifecycle events plugin', function () {
     expect(parseDeletedAt('yesterday', 'generalizedTime')).to.equal(undefined);
   });
 
-  it('follows the lock attribute SCIM follows, spaces trimmed', () => {
-    expect(
-      lifecycleAttributes({
+  describe('lock', () => {
+    const lock = (options: Partial<typeof dm.config>) => {
+      const { lock, lockValue } = lifecycleAttributes({
         ...dm.config,
         twake_lifecycle_lock_attribute: '',
-        scim_user_lock_attribute: ' nsAccountLock ',
-      }).lock
-    ).to.equal('nsAccountLock');
-  });
+        twake_lifecycle_lock_value: '',
+        scim_user_lock_attribute: '',
+        scim_user_lock_value: '',
+        ...options,
+      });
+      return [lock, lockValue];
+    };
 
-  it('takes the lock value SCIM writes, the administrative lock by default', () => {
-    const value = (twake: string, scim: string): string =>
-      lifecycleAttributes({
-        ...dm.config,
-        twake_lifecycle_lock_value: twake,
-        scim_user_lock_value: scim,
-      }).lockValue;
-    expect(value('', '')).to.equal(LOCKED);
-    expect(value('', ' TRUE ')).to.equal('TRUE');
-    expect(value('true', 'TRUE')).to.equal('true');
+    it('follows the lock SCIM follows, spaces trimmed', () => {
+      expect(
+        lock({
+          scim_user_lock_attribute: ' nsAccountLock ',
+          scim_user_lock_value: ' TRUE ',
+        })
+      ).to.deep.equal(['nsAccountLock', 'TRUE']);
+    });
+
+    it('takes the administrative lock by default, and its own value first', () => {
+      expect(lock({})).to.deep.equal(['pwdAccountLockedTime', LOCKED]);
+      expect(
+        lock({
+          twake_lifecycle_lock_attribute: 'nsAccountLock',
+          twake_lifecycle_lock_value: 'true',
+          scim_user_lock_attribute: 'nsAccountLock',
+          scim_user_lock_value: 'TRUE',
+        })
+      ).to.deep.equal(['nsAccountLock', 'true']);
+    });
+
+    it('reads a blank value of its own as none', () => {
+      expect(
+        lock({
+          twake_lifecycle_lock_value: ' ',
+          scim_user_lock_attribute: 'nsAccountLock',
+          scim_user_lock_value: 'TRUE',
+        })
+      ).to.deep.equal(['nsAccountLock', 'TRUE']);
+    });
+
+    it('refuses an attribute without its value, even when SCIM has one for another', () => {
+      expect(() =>
+        lock({ twake_lifecycle_lock_attribute: 'nsAccountLock' })
+      ).to.throw(/--twake-lifecycle-lock-value must say what marks/);
+      expect(() =>
+        lock({
+          twake_lifecycle_lock_attribute: 'nsAccountLock',
+          scim_user_lock_attribute: 'pwdAccountLockedTime',
+          scim_user_lock_value: LOCKED,
+        })
+      ).to.throw(/--twake-lifecycle-lock-value must say what marks/);
+    });
   });
 
   describe('rules', () => {

@@ -105,11 +105,12 @@ export default abstract class DmPlugin {
    * Called once every plugin is loaded, before `afterLoad`: refuse a
    * configuration this plugin cannot serve.
    *
-   * `afterLoad` is an opinion, logged and served anyway. Throwing here stops
-   * the server from starting — for a setting that would otherwise make the
-   * plugin answer on behalf of something that is not there.
+   * `afterLoad` is an opinion, logged and served anyway. Throwing here, or
+   * rejecting, stops the server from starting — for a setting that would
+   * otherwise make the plugin answer on behalf of something that is not
+   * there, or a service it cannot work without.
    */
-  assertComposition?(): void;
+  assertComposition?(): MaybePromise<void>;
 
   /* Uniq name of this plugin */
   abstract name: string;

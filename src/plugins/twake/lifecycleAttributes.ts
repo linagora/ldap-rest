@@ -6,7 +6,7 @@
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { DEFAULT_LOCK_VALUE } from '../scim/mapping';
+import { DEFAULT_LOCK_ATTRIBUTE, resolveLockConfig } from '../scim/mapping';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
@@ -27,18 +27,27 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
       `--twake-lifecycle-deleted-at-format must be iso8601 or generalizedTime, got '${format}'`
     );
   }
+  const own = config.twake_lifecycle_lock_attribute?.trim();
+  const scim =
+    config.scim_user_lock_attribute?.trim() || DEFAULT_LOCK_ATTRIBUTE;
+  // SCIM's value goes with SCIM's attribute only: nsAccountLock falling back
+  // to the ppolicy value would never read as locked
+  const lock = resolveLockConfig(
+    own || scim,
+    config.twake_lifecycle_lock_value?.trim() ||
+      (!own || own.toLowerCase() === scim.toLowerCase()
+        ? config.scim_user_lock_value || ''
+        : ''),
+    {
+      attribute: '--twake-lifecycle-lock-attribute',
+      value: '--twake-lifecycle-lock-value',
+    }
+  );
   return {
     role: config.twake_lifecycle_role_attribute || '',
-    // Trimmed as SCIM trims it, or the two would follow different attributes
-    lock:
-      config.twake_lifecycle_lock_attribute?.trim() ||
-      config.scim_user_lock_attribute?.trim() ||
-      'pwdAccountLockedTime',
+    lock: lock.attribute,
     // The administrative lock only: a ppolicy lockout timestamp is not it
-    lockValue:
-      config.twake_lifecycle_lock_value?.trim() ||
-      config.scim_user_lock_value?.trim() ||
-      DEFAULT_LOCK_VALUE,
+    lockValue: lock.value,
     deleted: config.twake_lifecycle_deleted_attribute || '',
     deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',
     deletedAt: config.twake_lifecycle_deleted_at_attribute || '',

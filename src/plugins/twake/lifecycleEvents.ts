@@ -19,6 +19,7 @@ import type { ChangeContext } from '../../lib/changeContext';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { parseDn, unescapeDnValue } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
+import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
 
 import {
   first,
@@ -195,19 +196,39 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       );
   }
 
-  afterLoad(): void {
+  /**
+   * core/rabbitmq connects lazily and hands back no client when it cannot:
+   * every event would then be lost, so the server does not start.
+   */
+  async assertComposition(): Promise<void> {
     if (this.rules.length === 0) return;
-    // core/rabbitmq connects lazily and hands back no client when it cannot:
-    // every event would then be lost, so the server does not run that way.
-    void this.requirePlugin<RabbitMq>('rabbitmq')
-      ?.getRawClient()
-      .then(client => {
-        if (client) return;
-        this.logger.error(
-          `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached, stopping`
-        );
-        process.exit(1);
-      });
+    if (!(await this.requirePlugin<RabbitMq>('rabbitmq')?.getRawClient()))
+      throw new Error(
+        `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
+      );
+  }
+
+  /**
+   * SCIM deactivates by writing its own lock: on another attribute or
+   * value, `disabled` and `enabled` never follow a SCIM `active` change.
+   */
+  afterLoad(): void {
+    const scim = this.server.loadedPlugins.scim?.config;
+    if (!scim) return;
+    const attribute =
+      scim.scim_user_lock_attribute?.trim() || DEFAULT_LOCK_ATTRIBUTE;
+    // SCIM refused to start on a non-default attribute without its value
+    const value = scim.scim_user_lock_value?.trim() || DEFAULT_LOCK_VALUE;
+    const { lock, lockValue } = this.attrs;
+    if (
+      attribute.toLowerCase() !== lock.toLowerCase() ||
+      value.toLowerCase() !== lockValue.toLowerCase()
+    )
+      this.logger.warn(
+        `${this.name}: SCIM locks an account with ${attribute}: ${value}, ` +
+          `these events read ${lock}: ${lockValue}, so a SCIM deactivation ` +
+          'publishes no disabled'
+      );
   }
 
   hooks: Hooks = {

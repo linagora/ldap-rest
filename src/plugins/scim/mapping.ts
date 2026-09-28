@@ -290,12 +290,16 @@ const LDAP_ATTRIBUTE_NAME = /^([A-Za-z][A-Za-z0-9-]*|\d+(\.\d+)+)$/;
  */
 export function resolveLockConfig(
   attribute: string,
-  value: string
+  value: string,
+  options = {
+    attribute: '--scim-user-lock-attribute',
+    value: '--scim-user-lock-value',
+  }
 ): { attribute: string; value: string } {
   const attr = (attribute || '').trim() || DEFAULT_LOCK_ATTRIBUTE;
   if (!LDAP_ATTRIBUTE_NAME.test(attr)) {
     throw new Error(
-      `--scim-user-lock-attribute must be an LDAP attribute name, got '${attr}'`
+      `${options.attribute} must be an LDAP attribute name, got '${attr}'`
     );
   }
   // LDAP attribute descriptions are case-insensitive (RFC 4512 section 2.5),
@@ -307,7 +311,7 @@ export function resolveLockConfig(
     // The ppolicy overlay's own "locked forever" convention.
     if (isDefaultAttr) return { attribute: attr, value: DEFAULT_LOCK_VALUE };
     throw new Error(
-      `--scim-user-lock-attribute is '${attr}', so --scim-user-lock-value ` +
+      `${options.attribute} is '${attr}', so ${options.value} ` +
         `must say what marks an account locked (for nsAccountLock on 389-ds, ` +
         `'TRUE'). The default '${DEFAULT_LOCK_VALUE}' only means anything to ` +
         `${DEFAULT_LOCK_ATTRIBUTE}.`
@@ -315,8 +319,8 @@ export function resolveLockConfig(
   }
   if (!isDefaultAttr && val === DEFAULT_LOCK_VALUE) {
     warn(
-      `--scim-user-lock-value is the ppolicy convention '${DEFAULT_LOCK_VALUE}' ` +
-        `but --scim-user-lock-attribute is '${attr}', not ` +
+      `${options.value} is the ppolicy convention '${DEFAULT_LOCK_VALUE}' ` +
+        `but ${options.attribute} is '${attr}', not ` +
         `${DEFAULT_LOCK_ATTRIBUTE}. Unless '${attr}' is a GeneralizedTime your ` +
         `directory reads as a lock, every deactivation will answer 200 and ` +
         `read back as active:false while the account keeps binding. Verify a ` +
@@ -325,7 +329,7 @@ export function resolveLockConfig(
   }
   if (isDefaultAttr && !GENERALIZED_TIME.test(val)) {
     warn(
-      `--scim-user-lock-value '${val}' is not a GeneralizedTime, and ` +
+      `${options.value} '${val}' is not a GeneralizedTime, and ` +
         `${DEFAULT_LOCK_ATTRIBUTE} holds one. The directory will refuse the ` +
         `write, or — where the attribute was redefined locally — store a value ` +
         `it does not read as a lock. The ppolicy convention is ` +

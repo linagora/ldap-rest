@@ -185,14 +185,14 @@ export class DM {
     this.ready = new Promise((resolve, reject) => {
       if (promises.length > 0) {
         Promise.all(promises)
-          .then(() => {
+          .then(async () => {
             this.setupErrorMiddleware();
             this.warnUnauthenticatedRoutes();
             // Before `afterLoad`, and outside it: a plugin's opinion there is
             // logged and served anyway, while two authorization models
             // judging the same requests is a configuration nobody decided,
             // and the server does not start on it.
-            assertAuthzComposition(this);
+            await assertAuthzComposition(this);
             this._composed = true;
             this.afterLoad();
             resolve();
@@ -667,10 +667,10 @@ export class DM {
    * @param obj the plugin about to be registered
    * @throws Error when the composition would be refused at startup
    */
-  private admitToComposition(obj: DmPlugin): void {
+  private async admitToComposition(obj: DmPlugin): Promise<void> {
     this.loadedPlugins[obj.name] = obj;
     try {
-      assertAuthzComposition(this, obj);
+      await assertAuthzComposition(this, obj);
     } finally {
       delete this.loadedPlugins[obj.name];
     }
@@ -707,7 +707,7 @@ export class DM {
         }
       }
     }
-    if (this._composed) this.admitToComposition(obj);
+    if (this._composed) await this.admitToComposition(obj);
     if (obj.api) {
       this.mountAuthDispatcher(obj);
       this.logger.debug(`Plugin ${obj.name} has API, registering it`);

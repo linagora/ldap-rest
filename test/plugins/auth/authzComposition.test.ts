@@ -620,6 +620,18 @@ describe('Authorization plugins loaded together', function () {
       );
     });
 
+    it('should not start when a check of a plugin rejects', async () => {
+      process.env.DM_PLUGINS =
+        '../../test/__plugins__/refused-composition/index.js';
+      const server = new DM();
+      let refused: Error | undefined;
+      await server.ready.catch((err: Error) => {
+        refused = err;
+      });
+      expect(refused, 'ready rejected').to.be.instanceOf(Error);
+      expect(refused!.message).to.match(/the service is unreachable/);
+    });
+
     it('should start once the branch plugin is scoped away from the tokens', async () => {
       process.env.DM_PLUGINS = [
         DYNAMIC,
