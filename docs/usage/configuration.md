@@ -498,6 +498,7 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-organization-base`             | `DM_TWAKE_INSTANCE_ORGANIZATION_BASE`             |                                       | Branch of the organization entries                        |
 | `--twake-instance-organization-id-attribute`     | `DM_TWAKE_INSTANCE_ORGANIZATION_ID_ATTRIBUTE`     | `ou`                                  | Attribute holding an organization's id                    |
 | `--twake-instance-organization-domain-attribute` | `DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE` | `twakeDomain`                         | Attribute holding an organization's domain                |
+| `--twake-instance-organization-name-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_NAME_ATTRIBUTE`   | `description`                         | Attribute holding an organization's name                  |
 | `--twake-instance-organization-fqdn-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE`   |                                       | Address attribute of an organization (empty: not written) |
 
 See [instances](plugins/integrations/instances.md).

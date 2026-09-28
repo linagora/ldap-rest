@@ -202,12 +202,24 @@ export default class TwakeInstances extends DmPlugin {
       this.fqdnAttribute,
       this.sentAttribute,
       ...(this.config.twake_instance_organization_base
-        ? [this.organizationDomain, this.organizationFqdn]
+        ? [
+            this.organizationDomain,
+            this.organizationFqdn,
+            this.organizationName,
+          ]
         : []),
     ].filter(a => a && !schema.getAttributeType(a));
     if (missing.length)
       throw new Error(
         `${this.name}: the directory schema defines no ${missing.join(', ')}; load a schema that does, or name other attributes`
+      );
+    if (
+      this.organizationFqdn &&
+      this.organizationFqdn.toLowerCase() ===
+        this.organizationName.toLowerCase()
+    )
+      throw new Error(
+        `${this.name}: an organization's name and address cannot share the attribute ${this.organizationName}`
       );
     /**
      * @openapi
@@ -322,22 +334,27 @@ export default class TwakeInstances extends DmPlugin {
     return this.serialized(`organization:${org.id}`, async () => {
       const entry = await this.findOrganization(org.id);
       if (!entry) throw new NotFoundError(`No organization ${org.id}`);
-      if (first(this.value(entry, this.sentAttribute))) return 'ready';
+      // organization.created reads the name from the entry, which an entry
+      // written before it was kept there lacks
+      if (org.name && !first(this.value(entry, this.organizationName))) {
+        await this.server.ldap.modify(entry.dn as string, {
+          replace: { [this.organizationName]: org.name },
+        });
+        entry[this.organizationName] = org.name;
+      }
       const known =
         this.organizationFqdn &&
         first(this.value(entry, this.organizationFqdn));
-      const request: InstanceRequest = {
-        id: org.id,
-        email: this.organizationMail(org.id, org.domain),
-        publicName: org.name,
-        locale: this.locale,
-        orgId: org.id,
-        orgDomain: org.domain,
-        offer: this.config.twake_instance_cloudery_organization_offer,
-      };
+      const request = this.organizationRequest(org);
       const found = known
         ? { fqdn: known, ready: true }
         : await this.provider.find(request);
+      // Marked: link it again (idempotent) and release what is still held
+      if (first(this.value(entry, this.sentAttribute))) {
+        if (found?.ready) await this.organizationReady(entry, found.fqdn);
+        else await this.releaseMembers(entry.dn as string);
+        return 'ready';
+      }
       let fqdn = found?.ready && found.fqdn;
       if (!found) {
         if (this.provider instanceof ClouderyProvider)
@@ -348,6 +365,51 @@ export default class TwakeInstances extends DmPlugin {
       await this.organizationReady(entry, fqdn);
       return 'ready';
     });
+  }
+
+  private organizationRequest(org: {
+    id: string;
+    name: string;
+    domain: string;
+  }): InstanceRequest {
+    return {
+      id: org.id,
+      email: this.organizationMail(org.id, org.domain),
+      publicName: org.name,
+      locale: this.locale,
+      orgId: org.id,
+      orgDomain: org.domain,
+      offer: this.config.twake_instance_cloudery_organization_offer,
+    };
+  }
+
+  /**
+   * The Cloudery builds no member instance for an organization it does not
+   * have, so a member asks for a missing one first. The organization is
+   * marked when its own workplace.created arrives. Not serialized on the
+   * organization: its work releases members, which would wait on this one.
+   */
+  private async requestOrganization(id: string): Promise<void> {
+    if (!(this.provider instanceof ClouderyProvider)) return;
+    const entry = await this.findOrganization(id);
+    if (!entry || first(this.value(entry, this.sentAttribute))) return;
+    const name = first(this.value(entry, this.organizationName));
+    const domain = first(this.value(entry, this.organizationDomain));
+    if (!name || !domain) {
+      this.logger.warn(
+        `${this.name}: organization ${id} has no ${this.organizationName} or ${this.organizationDomain}, so its instance cannot be asked for`
+      );
+      return;
+    }
+    const request = this.organizationRequest({ id, name, domain });
+    if (await this.provider.find(request)) return;
+    await this.provider.createOrganization({ id, name, domain });
+    try {
+      await this.provider.create(request);
+    } catch (err) {
+      // Another member of the same new organization may have asked first
+      if (!(await this.provider.find(request))) throw err;
+    }
   }
 
   async onWorkplaceCreated(message: WorkplaceCreated): Promise<void> {
@@ -376,13 +438,16 @@ export default class TwakeInstances extends DmPlugin {
       this.logger.debug(`${this.name}: no account here for ${internalEmail}`);
       return;
     }
-    const dn = found.dn as string;
+    await this.settle(found.dn as string, workplaceFqdn);
+  }
+
+  private async settle(dn: string, fqdn: string): Promise<void> {
     await this.serialized(dn, async () => {
       const entry = await this.read(dn);
       const account = entry && this.account(dn, entry);
       if (!entry || !account) return;
       if (first(this.value(entry, this.sentAttribute))) return;
-      await this.ready(dn, entry, account, workplaceFqdn);
+      await this.ready(dn, entry, account, fqdn);
     });
   }
 
@@ -393,6 +458,7 @@ export default class TwakeInstances extends DmPlugin {
     account: Account,
     req?: Request
   ): Promise<'ready' | 'pending'> {
+    if (account.orgId) await this.requestOrganization(account.orgId);
     const found = await this.provider.find(account);
     const fqdn = found
       ? found.ready && found.fqdn
@@ -416,6 +482,24 @@ export default class TwakeInstances extends DmPlugin {
         req
       );
     if (first(this.value(entry, this.sentAttribute))) return;
+    // The Cloudery refuses a member's user.created until its organization is
+    // linked; organizationReady sends it then. Only members below the
+    // organization entry are held, as only those are found to be released
+    const org =
+      this.provider instanceof ClouderyProvider &&
+      account.orgId &&
+      (await this.findOrganization(account.orgId));
+    if (org && !first(this.value(org, this.sentAttribute))) {
+      if (dn.toLowerCase().endsWith(`,${(org.dn as string).toLowerCase()}`)) {
+        this.logger.info(
+          `${this.name}: ${dn} waits for organization ${account.orgId}`
+        );
+        return;
+      }
+      this.logger.warn(
+        `${this.name}: ${dn} is not below its organization entry, so it is announced before organization ${account.orgId} is linked; clear its ${this.sentAttribute} and send it again once the organization is announced`
+      );
+    }
     await this.announce(
       this.config.twake_instance_auth_exchange || 'auth',
       this.config.twake_instance_user_created_key || 'user.created',
@@ -445,8 +529,15 @@ export default class TwakeInstances extends DmPlugin {
     fqdn: string
   ): Promise<void> {
     const dn = entry.dn as string;
-    // Done once announced: an organization entry need not hold its address
-    if (first(this.value(entry, this.sentAttribute))) return;
+    const id = first(this.value(entry, this.organizationId));
+    // The link is idempotent: an organization marked by an earlier version
+    // was never linked, and gets linked on its next replay
+    if (id && this.provider instanceof ClouderyProvider)
+      await this.provider.linkOrganization(id, fqdn);
+    // Done once announced: an organization entry need not hold its address.
+    // Its members are still released, in case a previous run stopped midway
+    if (first(this.value(entry, this.sentAttribute)))
+      return this.releaseMembers(dn);
     if (
       this.organizationFqdn &&
       !first(this.value(entry, this.organizationFqdn))
@@ -454,17 +545,67 @@ export default class TwakeInstances extends DmPlugin {
       await this.server.ldap.modify(dn, {
         replace: { [this.organizationFqdn]: fqdn },
       });
-    const id = first(this.value(entry, this.organizationId));
     const domain = first(this.value(entry, this.organizationDomain));
+    const name = first(this.value(entry, this.organizationName));
     await this.announce(
       this.config.twake_instance_b2b_exchange || 'b2b',
       this.config.twake_instance_organization_created_key ||
         'organization.created',
-      { organizationId: id, workplaceFqdn: fqdn, ...(domain ? { domain } : {}) }
+      {
+        organizationId: id,
+        workplaceFqdn: fqdn,
+        ...(name ? { organization: name } : {}),
+        ...(domain ? { domain } : {}),
+      }
     );
     await this.server.ldap.modify(dn, {
       replace: { [this.sentAttribute]: new Date().toISOString() },
     });
+    await this.releaseMembers(dn);
+  }
+
+  /** Send the user.created held while the organization at `dn` was pending */
+  private async releaseMembers(dn: string): Promise<void> {
+    const members = (await this.server.ldap.search(
+      {
+        paged: false,
+        scope: 'sub',
+        filter: `(&(${this.fqdnAttribute}=*)(!(${this.sentAttribute}=*)))`,
+      },
+      dn
+    )) as SearchResult;
+    // Each member on its own, so one that fails does not hold back the rest
+    let failed = 0;
+    for (const member of members.searchEntries) {
+      try {
+        await this.release(member);
+      } catch (err) {
+        failed++;
+        this.logger.error(
+          `${this.name}: ${member.dn} not released: ${String(err)}`
+        );
+      }
+    }
+    if (failed)
+      throw new Error(
+        `${this.name}: ${failed} member(s) of ${dn} not released`
+      );
+  }
+
+  /** Announce a held member, with the address rule ensureInstance applies */
+  private async release(member: AttributesList): Promise<void> {
+    const dn = member.dn as string;
+    const account = this.account(dn, member);
+    const known = first(this.value(member, this.fqdnAttribute));
+    if (!account || !known) return;
+    const confirmed =
+      known.toLowerCase() === this.provider.address(account)
+        ? { fqdn: known, ready: true }
+        : await this.provider.find(account, known);
+    if (confirmed?.ready) return this.settle(dn, confirmed.fqdn);
+    this.logger.warn(
+      `${this.name}: ${dn} stays held, its address ${known} is not confirmed; ensureInstance sends it once it is`
+    );
   }
 
   /**
@@ -490,6 +631,12 @@ export default class TwakeInstances extends DmPlugin {
   private get organizationDomain(): string {
     return (
       this.config.twake_instance_organization_domain_attribute || 'twakeDomain'
+    );
+  }
+
+  private get organizationName(): string {
+    return (
+      this.config.twake_instance_organization_name_attribute || 'description'
     );
   }
 
