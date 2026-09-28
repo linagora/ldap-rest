@@ -35,6 +35,22 @@ publishes nothing.
 The lock attribute is requested by name when the entry is read, so an
 operational one such as `pwdAccountLockedTime` is seen on both sides.
 
+## What is not published
+
+- A rename or a move publishes nothing. The `$dn.*` groups of the new DN may
+  then differ from the ones consumers know, and an entry moved into or out of
+  a rule's pattern publishes neither `created` nor `deleted`.
+- Clearing the deleted attribute of a tombstone (a restore) publishes nothing,
+  whatever else the same write changes. Later changes are published again, as
+  for any account.
+- A change made outside LDAP-Rest is not seen. A lock set by the directory
+  itself, such as a ppolicy lockout after failed binds, publishes no
+  `disabled`, and the unlock through LDAP-Rest that follows publishes
+  `enabled` with no `disabled` before it.
+- The rule's `dn` expression is matched against the DN as the write gave it,
+  not a normalized form: `uid=alice, ou=users,…`, with a space, does not match
+  a pattern written without one.
+
 ## Deployments with other plugins
 
 - `core/twake/cozyProvision` and `core/twake/clouderyProvision` publish their
@@ -45,10 +61,6 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - `core/ldap/trash` moves a deleted entry instead of removing it, and a move
   made by the trash is not seen by `core/ldap/onChange`. A deletion in a
   branch the trash watches publishes nothing.
-
-Erasing a tombstone (`core/twake/tombstone`) also removes it from its groups. No rule
-should match those group entries: nothing tells the plugin that these
-membership changes belong to an erase, so it would publish them.
 
 ## Configuration
 
@@ -134,12 +146,13 @@ a routing key, or an object with:
 
 Payload and `when` values are sources:
 
-- `$attr`: the attribute after the write
+- `$attr`: the attribute after the write; for a removed entry, which has no
+  "after", the attribute before it
 - `$previous.attr`: the attribute before the write
 - `$dn.name`: a named group of the rule's `dn` expression
 - `$context.actor`, `$context.requestId`, `$context.source`: who made the
   write, the request it belongs to, and the API it came through (`rest`,
-  `scim`); empty for a write no request made
+  `scim`); left out for a write no request made, such as a scheduled task
 - `$attr|domain`, `$previous.attr|domain`: what follows the `@`
 - `$now`: the current time, ISO 8601
 - anything else: the value itself
@@ -147,6 +160,9 @@ Payload and `when` values are sources:
 `$attr` and `$previous.attr` carry the first value of a multi-valued
 attribute. A source with no value leaves its field out. Every message carries
 a random AMQP `messageId`.
+
+A source can read any attribute of the entry: `$userPassword` would put the
+password hash in the message.
 
 The rules are checked at startup: a malformed one, such as a payload value
 that is not a string, stops the server with an error naming its `dn`.
