@@ -31,7 +31,8 @@ interface Published {
 class StubRabbitMq {
   name = 'rabbitmq';
   published: Published[] = [];
-  fail = false;
+  /** A routing key whose publish throws */
+  failOn = '';
   client: object | null = {};
   async getRawClient(): Promise<object | null> {
     return this.client;
@@ -44,7 +45,7 @@ class StubRabbitMq {
   ): Promise<void> {
     // Silent without a client, like RabbitMq.publish
     if (!this.client) return;
-    if (this.fail) throw new Error('broker down');
+    if (routingKey === this.failOn) throw new Error('broker down');
     this.published.push({
       exchange,
       routingKey,
@@ -121,6 +122,7 @@ const RULES = [
 describe('Twake lifecycle events plugin', function () {
   let dm: DM;
   let rabbit: StubRabbitMq;
+  let plugin: TwakeLifecycleEvents;
   let handled: { dn: string; done: Promise<unknown> }[] = [];
 
   const dnOf = (name: string): string => `uid=${name},${BASE}`;
@@ -164,12 +166,13 @@ describe('Twake lifecycle events plugin', function () {
     dm.config.twake_lifecycle_deleted_value = 'deleted';
     dm.config.twake_lifecycle_deleted_at_attribute = 'roomNumber';
     dm.config.twake_lifecycle_rules = JSON.stringify(RULES);
+    dm.config.rabbitmq_url = 'amqp://stub';
     await dm.ready;
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
     await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
-    const plugin = new TwakeLifecycleEvents(dm);
+    plugin = new TwakeLifecycleEvents(dm);
     const hook = plugin.hooks.onLdapEntryChange!;
     plugin.hooks.onLdapEntryChange = (dn, ...rest) => {
       const done = Promise.resolve(hook(dn, ...rest));
@@ -181,13 +184,13 @@ describe('Twake lifecycle events plugin', function () {
 
   beforeEach(() => {
     rabbit.published = [];
-    rabbit.fail = false;
+    rabbit.failOn = '';
     rabbit.client = {};
     handled = [];
   });
 
   afterEach(async () => {
-    rabbit.fail = false;
+    rabbit.failOn = '';
     rabbit.client = {};
     for (const name of [
       'lc-alice',
@@ -477,47 +480,95 @@ describe('Twake lifecycle events plugin', function () {
     });
   });
 
-  it('logs a failed publish and lets the write succeed', async () => {
-    rabbit.fail = true;
-    await add('lc-alice');
-    await seen(dnOf('lc-alice'));
-    const res = await dm.ldap.search(
-      { scope: 'base', paged: false },
-      dnOf('lc-alice')
-    );
-    expect(res).to.have.nested.property('searchEntries.length', 1);
-  });
-
-  it('logs an event lost for want of a broker, and does not call it published', async () => {
-    rabbit.client = null;
+  /** What this plugin logged while `write` ran. */
+  async function logsOf(
+    write: () => Promise<void>
+  ): Promise<{ level: string; entry: Record<string, unknown> }[]> {
     const logged: { level: string; entry: Record<string, unknown> }[] = [];
     const logger = dm.logger;
     const { error, info } = logger;
-    logger.error = ((entry: Record<string, unknown>) => {
-      logged.push({ level: 'error', entry });
-      return logger;
-    }) as typeof logger.error;
-    logger.info = ((entry: Record<string, unknown>) => {
-      logged.push({ level: 'info', entry });
-      return logger;
-    }) as typeof logger.info;
+    const capture =
+      (level: string) =>
+      (entry: Record<string, unknown>): typeof logger => {
+        logged.push({ level, entry });
+        return logger;
+      };
+    logger.error = capture('error') as typeof logger.error;
+    logger.info = capture('info') as typeof logger.info;
     try {
-      await add('lc-alice');
-      await seen(dnOf('lc-alice'));
+      await write();
     } finally {
       logger.error = error;
       logger.info = info;
     }
-    expect(rabbit.published).to.deep.equal([]);
-    const mine = logged.filter(
+    return logged.filter(
       l => (l.entry as { plugin?: string })?.plugin === 'twakeLifecycleEvents'
     );
-    expect(mine).to.have.length(1);
-    expect(mine[0].level).to.equal('error');
-    expect(mine[0].entry).to.include({
+  }
+
+  it('logs a failed publish, publishes the next targets, and lets the write succeed', async () => {
+    await add('lc-alice', { businessCategory: 'user_request' });
+    await seen(dnOf('lc-alice'));
+    rabbit.published = [];
+    rabbit.failOn = 'account.deleted';
+    const logs = await logsOf(async () => {
+      await dm.ldap.delete(dnOf('lc-alice'));
+      await seen(dnOf('lc-alice'), 2);
+    });
+    expect(keys()).to.deep.equal(['account.deleted.notify']);
+    expect(
+      logs.map(l => [l.level, l.entry.routingKey, l.entry.result])
+    ).to.deep.equal([
+      ['error', 'account.deleted', 'error'],
+      ['info', 'account.deleted.notify', 'published'],
+    ]);
+    expect(logs[0].entry.error).to.match(/broker down/);
+  });
+
+  it('logs an event lost for want of a broker, and does not call it published', async () => {
+    rabbit.client = null;
+    const logs = await logsOf(async () => {
+      await add('lc-alice');
+      await seen(dnOf('lc-alice'));
+    });
+    expect(rabbit.published).to.deep.equal([]);
+    expect(logs).to.have.length(1);
+    expect(logs[0].level).to.equal('error');
+    expect(logs[0].entry).to.include({
       event: 'created',
       routingKey: 'account.created',
       result: 'no broker',
+    });
+  });
+
+  describe('broker', () => {
+    it('refuses rules without --rabbitmq-url', () => {
+      const url = dm.config.rabbitmq_url;
+      dm.config.rabbitmq_url = '';
+      try {
+        expect(() => new TwakeLifecycleEvents(dm)).to.throw(
+          /--twake-lifecycle-rules needs --rabbitmq-url/
+        );
+      } finally {
+        dm.config.rabbitmq_url = url;
+      }
+    });
+
+    it('stops the server when the broker cannot be reached', async () => {
+      const exit = process.exit;
+      const codes: (string | number | null | undefined)[] = [];
+      process.exit = (code => {
+        codes.push(code);
+      }) as typeof process.exit;
+      try {
+        plugin.afterLoad();
+        rabbit.client = null;
+        plugin.afterLoad();
+        await waitFor(() => codes.length > 0, { what: 'process.exit' });
+      } finally {
+        process.exit = exit;
+      }
+      expect(codes).to.deep.equal([1]);
     });
   });
 

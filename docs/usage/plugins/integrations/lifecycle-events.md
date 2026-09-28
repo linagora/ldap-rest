@@ -31,9 +31,10 @@ publish `disabled`, later changes to it (a lock written afterwards included)
 publish nothing, and removing it publishes nothing, since its deletion was
 already announced.
 
-A publish that fails is logged. It never fails the write that caused it, and
-the event is not replayed: writing the same value again changes nothing, so it
-publishes nothing.
+A publish that fails is logged as an error, and the next targets are still
+published. It never fails the write that caused it, and the event is not
+replayed: writing the same value again changes nothing, so it publishes
+nothing.
 
 The lock attribute is requested by name when the entry is read, so an
 operational one such as `pwdAccountLockedTime` is seen on both sides.
@@ -93,9 +94,10 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - `--twake-lifecycle-rules`: a JSON file, or the JSON itself.
 
 Each option has a `DM_` environment variable, for example
-`DM_TWAKE_LIFECYCLE_RULES`. The events go through `core/rabbitmq`: without a
-broker (no `--rabbitmq-url`, or one that cannot be reached), they are lost,
-and each one is logged as an error.
+`DM_TWAKE_LIFECYCLE_RULES`. The events go through `core/rabbitmq`. With rules
+configured, the server does not start without `--rabbitmq-url`, and stops if
+that broker cannot be reached once every plugin is loaded. An event that finds
+no broker later on is lost, and logged as an error.
 
 ## Rules
 

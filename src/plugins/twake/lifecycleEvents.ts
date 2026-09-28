@@ -173,6 +173,25 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       this.logger.warn(
         `${this.name}: --twake-lifecycle-rules is empty, nothing will be published`
       );
+    else if (!this.config.rabbitmq_url)
+      throw new Error(
+        `${this.name}: --twake-lifecycle-rules needs --rabbitmq-url`
+      );
+  }
+
+  afterLoad(): void {
+    if (this.rules.length === 0) return;
+    // core/rabbitmq connects lazily and hands back no client when it cannot:
+    // every event would then be lost, so the server does not run that way.
+    void this.requirePlugin<RabbitMq>('rabbitmq')
+      ?.getRawClient()
+      .then(client => {
+        if (client) return;
+        this.logger.error(
+          `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached, stopping`
+        );
+        process.exit(1);
+      });
   }
 
   hooks: Hooks = {
