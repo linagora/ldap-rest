@@ -257,7 +257,10 @@ function isAuthenticator(plugin: DmPlugin): plugin is DmPlugin & Authenticator {
  *        `server.loadedPlugins`; only what concerns it is checked
  * @throws Error naming the plugins when the composition is ambiguous
  */
-export function assertAuthzComposition(server: DM, candidate?: DmPlugin): void {
+export function assertAuthzComposition(
+  server: DM,
+  candidate?: DmPlugin
+): Promise<void> {
   const authenticators: Authenticator[] = [...server.authenticators];
   if (
     candidate &&
@@ -367,5 +370,9 @@ export function assertAuthzComposition(server: DM, candidate?: DmPlugin): void {
         'by both, or set --authz-combine to make the AND deliberate.'
     );
 
-  for (const plugin of plugins) plugin.assertComposition?.();
+  // A refusal of the authorization models above throws at once; a plugin's
+  // own may have to reach a service first, so the caller awaits the rest.
+  return (async (): Promise<void> => {
+    for (const plugin of plugins) await plugin.assertComposition?.();
+  })();
 }
