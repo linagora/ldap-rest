@@ -140,6 +140,24 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
     expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
   });
 
+  it('should log out on /logout/ and on HEAD, as a GET route would', async () => {
+    const issuer = 'http://rpil-forms.example.test';
+    const request = await build(issuer, true);
+
+    for (const res of [
+      await request
+        .get('/logout/')
+        .set('Cookie', (await login(request, issuer)).cookie),
+      await request
+        .head('/logout')
+        .set('Cookie', (await login(request, issuer)).cookie),
+    ]) {
+      expect(res.status).to.equal(302);
+      expect(new URL(res.headers.location).pathname).to.equal('/logout');
+      expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+    }
+  });
+
   it('should still reach the provider without a session', async () => {
     const issuer = 'http://rpil-anonymous.example.test';
     const request = await build(issuer, true);

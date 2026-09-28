@@ -20,7 +20,8 @@ import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
 /**
- * The routes `express-openid-connect` serves itself.
+ * The routes this plugin answers itself: `/logout` in `authMethod`, the others
+ * through `express-openid-connect`.
  *
  * They belong to this plugin whatever it is scoped to: a provider has to be
  * able to reach the callback and to POST a logout token, and a catch-all
@@ -33,6 +34,9 @@ const OWN_ROUTES = ['/login', '/logout', '/callback', '/backchannel-logout'];
  * discovery document names no `end_session_endpoint`.
  */
 const NO_END_SESSION = /^end_session_endpoint must be configured/;
+
+/** `/logout` as express matches a route: any case, trailing slash or not. */
+const LOGOUT = /^\/logout\/?$/i;
 
 /**
  * A hook list as `DM` holds it: whichever plugins registered under that name.
@@ -314,14 +318,17 @@ export default class OpenIDConnect extends AuthBase {
         new Error(`${this.name}: api() has not built the router`)
       );
     this.router(req, res, (err?: unknown) => {
-      if (err && req.path === '/logout' && this.noEndSession(err))
+      if (err && LOGOUT.test(req.path) && this.noEndSession(err))
         // The library clears the session before it asks for the provider's
         // logout URL, so what is left is the redirect it could not build.
         // The provider's session survives and will log the caller back in:
         // that is the provider's limit, and a 500 would not lift it.
         return res.redirect(this.config.base_url as string);
       if (err) return serverError(res, err as Error);
-      if (req.method === 'GET' && req.path === '/logout')
+      if (
+        (req.method === 'GET' || req.method === 'HEAD') &&
+        LOGOUT.test(req.path)
+      )
         // A failure comes back through this same callback, as `err`.
         return void (
           res as unknown as {
