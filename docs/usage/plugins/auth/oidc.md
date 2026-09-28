@@ -99,6 +99,11 @@ issue refresh tokens to this client (LemonLDAP::NG: _Issue refresh tokens_
 in the relying party's options). A token the provider gives no expiry keeps
 the session for the cookie's own lifetime.
 
+Nothing serialises the renewals: requests arriving together with the same
+expired cookie each send the refresh token. A provider that rotates refresh
+tokens refuses all but one, and the requests it refused end their session:
+the caller signs in again, silently while the provider's session lasts.
+
 ## Logout
 
 `/logout` ends the session at the provider as well (RP-Initiated Logout): the

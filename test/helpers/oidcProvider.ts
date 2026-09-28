@@ -117,3 +117,11 @@ export const build = async (
   server.setupErrorMiddleware();
   return supertest(server.app);
 };
+
+/** Whether the response expires the session cookie */
+export const clearsSession = (
+  setCookie: string | string[] | undefined
+): boolean =>
+  ([] as string[])
+    .concat(setCookie ?? [])
+    .some(c => /^appSession=;/.test(c) && /Expires=Thu, 01 Jan 1970/.test(c));

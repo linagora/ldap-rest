@@ -9,13 +9,12 @@
 import { expect } from 'chai';
 import nock from 'nock';
 
-import { BASE_URL, build, login } from '../../helpers/oidcProvider';
-
-/** Whether the response expires the session cookie */
-const clearsSession = (setCookie: string | string[] | undefined): boolean =>
-  ([] as string[])
-    .concat(setCookie ?? [])
-    .some(c => /^appSession=;/.test(c) && /Expires=Thu, 01 Jan 1970/.test(c));
+import {
+  BASE_URL,
+  build,
+  clearsSession,
+  login,
+} from '../../helpers/oidcProvider';
 
 describe('OpenID Connect, RP-Initiated Logout', function () {
   afterEach(() => nock.cleanAll());

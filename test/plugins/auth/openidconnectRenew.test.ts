@@ -8,7 +8,12 @@ import type { Response } from 'express';
 import nock from 'nock';
 
 import type { DM } from '../../../src/bin';
-import { build, cookies, login } from '../../helpers/oidcProvider';
+import {
+  build,
+  clearsSession,
+  cookies,
+  login,
+} from '../../helpers/oidcProvider';
 
 /** A route the plugin guards, answering who it found */
 const ping = (server: DM): void => {
@@ -96,6 +101,7 @@ describe('OpenID Connect, access token expiry', function () {
       .set('Cookie', cookie)
       .set('Accept', 'application/json');
     expect(api.status, 'an API client').to.equal(401);
+    expect(clearsSession(api.headers['set-cookie'])).to.equal(true);
 
     const page = await request
       .get('/api/admin/ping')
@@ -120,5 +126,6 @@ describe('OpenID Connect, access token expiry', function () {
       .set('Accept', 'application/json');
 
     expect(res.status).to.equal(401);
+    expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
   });
 });

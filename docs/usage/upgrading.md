@@ -13,8 +13,8 @@ decision or a configuration change appear here; see the
 A session used to last as long as its cookie, a day of inactivity and a week
 at most. It now ends when its access token expires, unless the provider gave
 a refresh token to renew it: a browser then goes back through the provider,
-silently while the provider's own session lasts, and an API client is
-answered `401`.
+silently while the provider's own session lasts, and a client asking for
+JSON only (`Accept: application/json`) is answered `401`.
 
 To keep sessions going without that round trip, have the provider issue
 refresh tokens to the client

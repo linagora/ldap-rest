@@ -10,8 +10,9 @@
 
 ### Bug Fixes
 
-- `core/auth/openidconnect`: an API client with no session is answered `401`;
-  it got no answer at all
+- `core/auth/openidconnect`: a client asking for JSON only
+  (`Accept: application/json`) with no session is answered `401`; it got no
+  answer at all
 
 ## v0.12.0 (2026-09-28)
 
