@@ -15,7 +15,7 @@ const { auth, requiresAuth } = oidc;
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
 import { launchHooksChained } from '../../lib/utils';
-import { serverError } from '../../lib/expressFormatedResponses';
+import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
@@ -340,7 +340,10 @@ export default class OpenIDConnect extends AuthBase {
         ).oidc.logout({
           logoutParams: { post_logout_redirect_uri: undefined },
         });
-      requiresAuth()(req, res, () => {
+      // No session: a browser has already been sent to the provider, an
+      // API client comes back here with the refusal as `err`.
+      requiresAuth()(req, res, (err?: unknown) => {
+        if (err) return unauthorized(res);
         const claims = (
           req as unknown as { oidc: { user: Record<string, unknown> } }
         ).oidc.user;
