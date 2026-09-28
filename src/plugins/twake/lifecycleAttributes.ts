@@ -6,12 +6,14 @@
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
+import { DEFAULT_LOCK_VALUE } from '../scim/mapping';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
 export interface LifecycleAttributes {
   role: string;
   lock: string;
+  lockValue: string;
   deleted: string;
   deletedValue: string;
   deletedAt: string;
@@ -32,6 +34,11 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
       config.twake_lifecycle_lock_attribute?.trim() ||
       config.scim_user_lock_attribute?.trim() ||
       'pwdAccountLockedTime',
+    // The administrative lock only: a ppolicy lockout timestamp is not it
+    lockValue:
+      config.twake_lifecycle_lock_value?.trim() ||
+      config.scim_user_lock_value?.trim() ||
+      DEFAULT_LOCK_VALUE,
     deleted: config.twake_lifecycle_deleted_attribute || '',
     deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',
     deletedAt: config.twake_lifecycle_deleted_at_attribute || '',
@@ -61,18 +68,29 @@ export function first(
   return text === '' ? undefined : text;
 }
 
-/** Case-insensitive, whatever the matching rule of the deleted attribute. */
-export function isTombstone(
+/** Case-insensitive, whatever the matching rule of the attribute. */
+function holds(
   entry: AttributesList,
-  attrs: LifecycleAttributes
+  attribute: string,
+  wanted: string
 ): boolean {
-  const value = valueOf(entry, attrs.deleted);
+  const value = valueOf(entry, attribute);
   if (value === undefined) return false;
-  const wanted = attrs.deletedValue.toLowerCase();
+  const lower = wanted.toLowerCase();
   return (Array.isArray(value) ? value : [value]).some(
-    v => String(v).toLowerCase() === wanted
+    v => String(v).toLowerCase() === lower
   );
 }
+
+export const isTombstone = (
+  entry: AttributesList,
+  attrs: LifecycleAttributes
+): boolean => holds(entry, attrs.deleted, attrs.deletedValue);
+
+export const isLocked = (
+  entry: AttributesList,
+  attrs: LifecycleAttributes
+): boolean => holds(entry, attrs.lock, attrs.lockValue);
 
 /** A deletion date as the directory holds it, or undefined if unreadable. */
 export function parseDeletedAt(

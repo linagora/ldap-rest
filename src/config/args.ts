@@ -286,6 +286,7 @@ export interface Config {
   cloudery_workflow_max_attempts?: number;
   twake_lifecycle_role_attribute?: string;
   twake_lifecycle_lock_attribute?: string;
+  twake_lifecycle_lock_value?: string;
   twake_lifecycle_deleted_attribute?: string;
   twake_lifecycle_deleted_value?: string;
   twake_lifecycle_deleted_at_attribute?: string;
@@ -751,6 +752,7 @@ const configArgs: ConfigTemplate = [
   // Account lifecycle attributes
   ['--twake-lifecycle-role-attribute', 'DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE', ''],
   ['--twake-lifecycle-lock-attribute', 'DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE', ''],
+  ['--twake-lifecycle-lock-value', 'DM_TWAKE_LIFECYCLE_LOCK_VALUE', ''],
   [
     '--twake-lifecycle-deleted-attribute',
     'DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE',

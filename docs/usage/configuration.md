@@ -451,6 +451,7 @@ Automatically creates/updates/deletes applicative account entries when users are
 | ---------------------------------------- | ----------------------------------------- | ---------------------------- | -------------------------------------- |
 | `--twake-lifecycle-role-attribute`       | `DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE`       |                              | Role attribute                         |
 | `--twake-lifecycle-lock-attribute`       | `DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE`       | `--scim-user-lock-attribute` | Lock attribute                         |
+| `--twake-lifecycle-lock-value`           | `DM_TWAKE_LIFECYCLE_LOCK_VALUE`           | `--scim-user-lock-value`     | Value marking an account locked        |
 | `--twake-lifecycle-deleted-attribute`    | `DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE`    |                              | Attribute marking a tombstone          |
 | `--twake-lifecycle-deleted-value`        | `DM_TWAKE_LIFECYCLE_DELETED_VALUE`        | `TRUE`                       | Value marking a tombstone              |
 | `--twake-lifecycle-deleted-at-attribute` | `DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE` |                              | Deletion date attribute                |

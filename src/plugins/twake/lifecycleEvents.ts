@@ -12,18 +12,16 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 
-import type { Entry } from 'ldapts';
-
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { diffEntries } from '../ldap/onChange';
 import type RabbitMq from '../rabbitmq';
 
 import {
   first,
+  isLocked,
   isTombstone,
   lifecycleAttributes,
   parseDeletedAt,
@@ -219,7 +217,7 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       return before ? this.publish(rule, 'deleted', ctx) : undefined;
     if (!before) {
       await this.publish(rule, 'created', ctx);
-      if (first(valueOf(after, this.attrs.lock)) !== undefined)
+      if (isLocked(after, this.attrs))
         await this.publish(rule, 'disabled', ctx);
       return;
     }
@@ -232,10 +230,9 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       )
     )
       await this.publish(rule, 'roleChanged', ctx);
-    const changes = diffEntries(before as Entry, after as Entry);
-    const lock = valueOf(changes, this.attrs.lock);
-    if (lock?.[0] === null) await this.publish(rule, 'disabled', ctx);
-    else if (lock?.[1] === null) await this.publish(rule, 'enabled', ctx);
+    const locked = isLocked(after, this.attrs);
+    if (locked !== isLocked(before, this.attrs))
+      await this.publish(rule, locked ? 'disabled' : 'enabled', ctx);
   }
 
   private resolve(source: string, ctx: EventContext): string | undefined {

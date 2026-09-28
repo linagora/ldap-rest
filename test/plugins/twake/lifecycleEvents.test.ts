@@ -18,6 +18,8 @@ import { waitFor } from '../../helpers/waitFor';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
 const LOCKED = '000001010000Z';
+// What slapd writes on a ppolicy lockout
+const LOCKOUT = '20260102030405Z';
 
 interface Published {
   exchange: string;
@@ -339,6 +341,32 @@ describe('Twake lifecycle events plugin', function () {
     expect(keys()).to.deep.equal(['account.created', 'account.disabled']);
   });
 
+  it('publishes only created for an entry added with a lockout timestamp', async () => {
+    await add('lc-alice', { pwdAccountLockedTime: LOCKOUT });
+    await seen(dnOf('lc-alice'));
+    expect(keys()).to.deep.equal(['account.created']);
+  });
+
+  it('takes a lockout timestamp for no lock, and the lock value for one', async () => {
+    await add('lc-alice');
+    const lock = (value: string): Promise<boolean> =>
+      dm.ldap.modify(dnOf('lc-alice'), {
+        replace: { pwdAccountLockedTime: value },
+      });
+    await lock(LOCKOUT);
+    await lock(LOCKED);
+    await lock(LOCKOUT);
+    await dm.ldap.modify(dnOf('lc-alice'), {
+      delete: ['pwdAccountLockedTime'],
+    });
+    await seen(dnOf('lc-alice'), 5);
+    expect(keys()).to.deep.equal([
+      'account.created',
+      'account.disabled',
+      'account.enabled',
+    ]);
+  });
+
   describe('deletion', () => {
     const deletedAt = '2026-01-02T03:04:05.000Z';
 
@@ -508,6 +536,18 @@ describe('Twake lifecycle events plugin', function () {
         scim_user_lock_attribute: ' nsAccountLock ',
       }).lock
     ).to.equal('nsAccountLock');
+  });
+
+  it('takes the lock value SCIM writes, the administrative lock by default', () => {
+    const value = (twake: string, scim: string): string =>
+      lifecycleAttributes({
+        ...dm.config,
+        twake_lifecycle_lock_value: twake,
+        scim_user_lock_value: scim,
+      }).lockValue;
+    expect(value('', '')).to.equal(LOCKED);
+    expect(value('', ' TRUE ')).to.equal('TRUE');
+    expect(value('true', 'TRUE')).to.equal('true');
   });
 
   describe('rules', () => {

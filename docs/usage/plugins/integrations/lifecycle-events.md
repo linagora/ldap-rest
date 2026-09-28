@@ -13,15 +13,18 @@ Each event is a change of state, read from the entry before and after a write
 (`onLdapEntryChange`, from `core/ldap/onChange`). A write that changes nothing
 publishes nothing.
 
-- `created`: an entry is added. An entry added with the lock attribute set,
-  as a SCIM create with `active: false` does, publishes `created` then
-  `disabled`.
+- `created`: an entry is added. An entry added locked, as a SCIM create with
+  `active: false` does, publishes `created` then `disabled`.
 - `roleChanged`: the role attribute gets different values. Case is ignored:
   `Admin` and `admin` are one role.
-- `disabled`: the lock attribute is set.
-- `enabled`: the lock attribute is cleared.
+- `disabled`: the lock attribute takes the lock value.
+- `enabled`: the lock attribute no longer holds the lock value.
 - `deleted`: the entry becomes a tombstone (the deleted attribute takes the
   deleted value), or an entry that is not a tombstone is removed.
+
+An account is locked when its lock attribute holds the lock value, by default
+the ppolicy administrative lock `000001010000Z`. Any other value, such as the
+timestamp of a ppolicy lockout after failed binds, is not a lock here.
 
 A tombstone announces nothing else: the write that makes it does not also
 publish `disabled`, later changes to it (a lock written afterwards included)
@@ -43,10 +46,9 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - Clearing the deleted attribute of a tombstone (a restore) publishes nothing,
   whatever else the same write changes. Later changes are published again, as
   for any account.
-- A change made outside LDAP-Rest is not seen. A lock set by the directory
-  itself, such as a ppolicy lockout after failed binds, publishes no
-  `disabled`, and the unlock through LDAP-Rest that follows publishes
-  `enabled` with no `disabled` before it.
+- A change made outside LDAP-Rest is not seen. A ppolicy lockout after failed
+  binds is written by the directory itself, and holds a timestamp rather than
+  the lock value: it publishes nothing, and neither does clearing it.
 - The rule's `dn` expression is matched against the DN as the write gave it,
   not a normalized form: `uid=alice, ou=users,…`, with a space, does not match
   a pattern written without one.
@@ -68,6 +70,7 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 --plugin core/twake/lifecycleEvents \
 --twake-lifecycle-role-attribute title \
 --twake-lifecycle-lock-attribute pwdAccountLockedTime \
+--twake-lifecycle-lock-value 000001010000Z \
 --twake-lifecycle-deleted-attribute employeeType \
 --twake-lifecycle-deleted-value deleted \
 --twake-lifecycle-deleted-at-attribute roomNumber \
@@ -76,8 +79,11 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 ```
 
 - `--twake-lifecycle-role-attribute`: empty means no `roleChanged`.
-- `--twake-lifecycle-lock-attribute`: defaults to
-  `--scim-user-lock-attribute`, so SCIM `active` and the events agree.
+- `--twake-lifecycle-lock-attribute`, `--twake-lifecycle-lock-value`: default
+  to `--scim-user-lock-attribute` and `--scim-user-lock-value`, so SCIM
+  `active` and the events agree. The lock value defaults to `000001010000Z`.
+  Only changes written through LDAP-Rest are seen: a lockout set by the
+  directory publishes nothing.
 - `--twake-lifecycle-deleted-attribute`, `--twake-lifecycle-deleted-value`
   (default `TRUE`, compared case-insensitively): what marks a tombstone. Empty
   means entries are never tombstones, and only a removal publishes `deleted`.
