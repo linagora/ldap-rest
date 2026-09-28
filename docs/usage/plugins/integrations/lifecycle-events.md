@@ -25,7 +25,9 @@ publish `disabled`, later changes to it (a lock written afterwards included)
 publish nothing, and removing it publishes nothing, since its deletion was
 already announced.
 
-A publish that fails is logged. It never fails the write that caused it.
+A publish that fails is logged. It never fails the write that caused it, and
+the event is not replayed: writing the same value again changes nothing, so it
+publishes nothing.
 
 The lock attribute is requested by name when the entry is read, so an
 operational one such as `pwdAccountLockedTime` is seen on both sides.

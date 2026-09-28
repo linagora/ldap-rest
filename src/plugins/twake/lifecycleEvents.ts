@@ -260,7 +260,6 @@ export default class TwakeLifecycleEvents extends DmPlugin {
         });
         this.logger.info({ ...log, result: 'published' });
       } catch (err) {
-        // The write is done; a lost event is replayed by writing again.
         this.logger.error({ ...log, result: 'error', error: String(err) });
       }
     }
