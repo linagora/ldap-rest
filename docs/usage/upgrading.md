@@ -4,6 +4,64 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### twake/instances replaces cozyProvision and clouderyProvision
+
+**Who is affected:** a deployment loading `core/twake/cozyProvision` or
+`core/twake/clouderyProvision`.
+
+Replace the plugin with `core/twake/instances`
+([doc](plugins/integrations/instances.md)); the server refuses to start with
+both. Its options are its own. From cozyProvision, with
+`--twake-instance-provider cozy-stack` and `--twake-instance-dn` set to the
+accounts' branch:
+
+- `--cozy-admin-url` → `--twake-instance-cozy-url`
+- `--cozy-admin-user` → `--twake-instance-cozy-user`
+- `--cozy-admin-passphrase` → `--twake-instance-cozy-passphrase`
+- `--cozy-org-domain` → `--twake-instance-cozy-domain` (the instances'
+  domain) and `--twake-instance-cozy-org-domain`
+- `--cozy-org-id` → `--twake-instance-cozy-org-id`
+- `--cozy-context-name` → `--twake-instance-cozy-context`
+- `--cozy-apps` → `--twake-instance-cozy-apps`
+- `--cozy-default-locale` → `--twake-instance-locale`
+- `--cozy-auth-exchange` → `--twake-instance-auth-exchange`
+- `--cozy-b2b-exchange` → `--twake-instance-b2b-exchange`
+- `--cozy-user-created-routing-key` → `--twake-instance-user-created-key`
+
+From clouderyProvision, with `--twake-instance-provider cloudery`:
+
+- `--cloudery-manager-url` → `--twake-instance-cloudery-url`
+- `--cloudery-manager-token` → `--twake-instance-cloudery-token`
+- `--cloudery-offer` → `--twake-instance-cloudery-offer`
+- `--cloudery-domain` → `--twake-instance-cloudery-domain`
+- `--cloudery-default-locale` → `--twake-instance-locale`
+- `--cloudery-fqdn-attribute` → `--twake-instance-fqdn-attribute`
+- `--cloudery-user-branch` → `--twake-instance-dn`, with an `org` group for
+  the organization id; `--twake-instance-id '{uid}{org}'` keeps the slugs
+
+What no longer happens:
+
+- An account gets its instance on any add under `--twake-instance-dn`, not
+  only a SCIM create.
+- `domain.user.deleted` is not published, and `--cozy-user-deleted-routing-key`
+  has no plugin to read it. With the Cloudery, deleting an account no longer
+  deletes its instance; cozy-stack instances still are.
+- clouderyProvision's writes on a SCIM create are gone:
+  `twakeOrganizationId`, `twakeOrganizationRole`, `twakeInvited`,
+  `twakePhones`, `cn` set to the userName, and the lower-casing of the SCIM
+  `userName`. The `x-cloudery-org-*` headers are not read; the organization
+  comes from the DN. `--cloudery-org-*`, `--cloudery-phones-attribute`,
+  `--cloudery-invited-attribute` and the workflow polling options are gone:
+  the address arrives with `workplace.created` instead.
+- With cozy-stack, the instance address drops the uid's dots and lower-cases
+  it, as the Cloudery's slugs do: an account whose uid holds a dot or a
+  capital gets a different address than cozyProvision gave it. Its OIDC id
+  is still the uid.
+
+`user.created` keeps its fields, `twakeId` still being the account's uid.
+
 ## To 0.11.0
 
 ### Group reads are judged

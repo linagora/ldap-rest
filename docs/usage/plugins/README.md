@@ -60,6 +60,7 @@ Connect to external systems:
 | [calendar](integrations/calendar.md)                 | Twake Calendar resources and users   |
 | [app-accounts](integrations/app-accounts.md)         | Applicative accounts API             |
 | [lifecycle-events](integrations/lifecycle-events.md) | Account lifecycle events to RabbitMQ |
+| [instances](integrations/instances.md)               | Workplace instance of each account   |
 
 ## Utility Plugins
 
