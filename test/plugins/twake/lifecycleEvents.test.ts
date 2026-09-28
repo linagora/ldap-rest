@@ -1,0 +1,317 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { expect } from 'chai';
+import type { Request } from 'express';
+
+import { DM } from '../../../src/bin';
+import OnLdapChange from '../../../src/plugins/ldap/onChange';
+import TwakeLifecycleEvents, {
+  parseRules,
+} from '../../../src/plugins/twake/lifecycleEvents';
+import { parseDeletedAt } from '../../../src/plugins/twake/lifecycleAttributes';
+import { waitFor } from '../../helpers/waitFor';
+
+const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
+const LOCKED = '000001010000Z';
+
+interface Published {
+  exchange: string;
+  routingKey: string;
+  message: Record<string, string>;
+  messageId?: string;
+}
+
+class StubRabbitMq {
+  name = 'rabbitmq';
+  published: Published[] = [];
+  fail = false;
+  async publish(
+    exchange: string,
+    routingKey: string,
+    message: Record<string, string>,
+    options?: { messageId?: string }
+  ): Promise<void> {
+    if (this.fail) throw new Error('broker down');
+    this.published.push({
+      exchange,
+      routingKey,
+      message,
+      messageId: options?.messageId,
+    });
+  }
+}
+
+const RULES = [
+  {
+    dn: `^uid=(?<id>lc-[^,]+),${BASE}$`,
+    exchange: 'accounts',
+    payload: {
+      id: '$dn.id',
+      email: '$mail',
+      role: '$title',
+      domain: '$mail|domain',
+      kind: 'account',
+      actor: '$context.actor',
+      source: '$context.source',
+    },
+    events: {
+      created: 'account.created',
+      roleChanged: {
+        routingKey: 'account.role.changed',
+        payload: {
+          id: '$dn.id',
+          role: '$title',
+          previousRole: '$previous.title',
+        },
+      },
+      disabled: 'account.disabled',
+      enabled: 'account.enabled',
+      deleted: [
+        {
+          routingKey: 'account.deleted',
+          payload: {
+            id: '$dn.id',
+            email: '$mail',
+            reasonCode: '$businessCategory',
+            deletedAt: '$roomNumber',
+          },
+        },
+        {
+          routingKey: 'account.deleted.notify',
+          exchange: 'notifications',
+          when: { $businessCategory: 'user_request' },
+          payload: { id: '$dn.id', mobile: '$previous.mobile' },
+        },
+      ],
+    },
+  },
+  {
+    dn: `^uid=(?<id>[^,]+),ou=(?<org>lc-[^,]+),${BASE}$`,
+    exchange: 'accounts',
+    payload: { id: '$dn.id', org: '$dn.org' },
+    events: { created: 'member.created' },
+  },
+];
+
+describe('Twake lifecycle events plugin', function () {
+  let dm: DM;
+  let rabbit: StubRabbitMq;
+  let handled: { dn: string; done: Promise<unknown> }[] = [];
+
+  const dnOf = (name: string): string => `uid=${name},${BASE}`;
+
+  /**
+   * Wait until the plugin has handled `count` changes of `dn` since the test
+   * began, and finished publishing for them.
+   */
+  async function seen(dn: string, count = 1): Promise<void> {
+    const mine = (): typeof handled =>
+      handled.filter(h => h.dn.toLowerCase() === dn.toLowerCase());
+    await waitFor(() => mine().length >= count, {
+      what: `${count} change(s) of ${dn}`,
+    });
+    await Promise.all(mine().map(h => h.done));
+  }
+
+  async function add(
+    name: string,
+    extra: Record<string, string | string[]> = {}
+  ): Promise<void> {
+    await dm.ldap.add(dnOf(name), {
+      objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+      cn: name,
+      sn: name,
+      uid: name,
+      mail: `${name}@example.org`,
+      ...extra,
+    });
+  }
+
+  function keys(): string[] {
+    return rabbit.published.map(p => p.routingKey);
+  }
+
+  before(async () => {
+    dm = new DM();
+    dm.config.twake_lifecycle_role_attribute = 'title';
+    dm.config.twake_lifecycle_lock_attribute = 'pwdAccountLockedTime';
+    dm.config.twake_lifecycle_deleted_attribute = 'employeeType';
+    dm.config.twake_lifecycle_deleted_value = 'deleted';
+    dm.config.twake_lifecycle_deleted_at_attribute = 'roomNumber';
+    dm.config.twake_lifecycle_rules = JSON.stringify(RULES);
+    await dm.ready;
+    rabbit = new StubRabbitMq();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dm.loadedPlugins['rabbitmq'] = rabbit as any;
+    await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
+    const plugin = new TwakeLifecycleEvents(dm);
+    const hook = plugin.hooks.onLdapEntryChange!;
+    plugin.hooks.onLdapEntryChange = (dn, ...rest) => {
+      const done = Promise.resolve(hook(dn, ...rest));
+      handled.push({ dn, done });
+      return done;
+    };
+    await dm.registerPlugin('core/twake/lifecycleEvents', plugin);
+  });
+
+  beforeEach(() => {
+    rabbit.published = [];
+    rabbit.fail = false;
+    handled = [];
+  });
+
+  afterEach(async () => {
+    rabbit.fail = false;
+    for (const name of ['lc-alice', 'other-carol']) {
+      await dm.ldap.delete(dnOf(name)).catch(() => undefined);
+    }
+  });
+
+  it('publishes created with the configured payload', async () => {
+    await add('lc-alice', { title: 'member' });
+    await seen(dnOf('lc-alice'));
+    expect(rabbit.published).to.have.length(1);
+    const [p] = rabbit.published;
+    expect(p.exchange).to.equal('accounts');
+    expect(p.routingKey).to.equal('account.created');
+    expect(p.message).to.deep.equal({
+      id: 'lc-alice',
+      email: 'lc-alice@example.org',
+      role: 'member',
+      domain: 'example.org',
+      kind: 'account',
+    });
+    expect(p.messageId).to.match(/^[0-9a-f-]{36}$/);
+  });
+
+  it('carries who wrote the entry, and through which door', async () => {
+    const req = { user: 'jdoe', headers: {} } as unknown as Request;
+    await dm.ldap.forRequest(req).add(dnOf('lc-alice'), {
+      objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+      cn: 'lc-alice',
+      sn: 'lc-alice',
+      uid: 'lc-alice',
+    });
+    await seen(dnOf('lc-alice'));
+    expect(rabbit.published[0].message).to.include({
+      actor: 'jdoe',
+      source: 'rest',
+    });
+  });
+
+  it('publishes for an entry nested under a branch of its own', async () => {
+    const org = `ou=lc-org,${BASE}`;
+    const dn = `uid=dave,${org}`;
+    await dm.ldap.add(org, {
+      objectClass: ['top', 'organizationalUnit'],
+      ou: 'lc-org',
+    });
+    try {
+      await dm.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+        cn: 'dave',
+        sn: 'dave',
+        uid: 'dave',
+      });
+      await seen(dn);
+      expect(
+        rabbit.published.map(p => [p.routingKey, p.message])
+      ).to.deep.equal([['member.created', { id: 'dave', org: 'lc-org' }]]);
+    } finally {
+      await dm.ldap.delete(dn).catch(() => undefined);
+      await dm.ldap.delete(org).catch(() => undefined);
+    }
+  });
+
+  it('publishes nothing for an entry no rule matches', async () => {
+    await add('other-carol');
+    await dm.ldap.modify(dnOf('other-carol'), { replace: { title: 'admin' } });
+    await seen(dnOf('other-carol'), 2);
+    expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('publishes roleChanged with the previous role, once per real change', async () => {
+    await add('lc-alice', { title: 'member' });
+    await seen(dnOf('lc-alice'));
+    rabbit.published = [];
+    await dm.ldap.modify(dnOf('lc-alice'), { replace: { title: 'admin' } });
+    // Resending the same role changes nothing, so nothing is published
+    await dm.ldap.modify(dnOf('lc-alice'), { replace: { title: 'admin' } });
+    await dm.ldap.modify(dnOf('lc-alice'), {
+      replace: { mail: 'alice@example.org' },
+    });
+    await seen(dnOf('lc-alice'), 3);
+    expect(rabbit.published.map(p => [p.routingKey, p.message])).to.deep.equal([
+      [
+        'account.role.changed',
+        { id: 'lc-alice', role: 'admin', previousRole: 'member' },
+      ],
+    ]);
+  });
+
+  it('publishes disabled and enabled when an operational lock is set and cleared', async () => {
+    await add('lc-alice');
+    await dm.ldap.modify(dnOf('lc-alice'), {
+      replace: { pwdAccountLockedTime: LOCKED },
+    });
+    await seen(dnOf('lc-alice'), 2);
+    await dm.ldap.modify(dnOf('lc-alice'), {
+      delete: ['pwdAccountLockedTime'],
+    });
+    await seen(dnOf('lc-alice'), 3);
+    expect(keys()).to.deep.equal([
+      'account.created',
+      'account.disabled',
+      'account.enabled',
+    ]);
+  });
+
+  it('logs a failed publish and lets the write succeed', async () => {
+    rabbit.fail = true;
+    await add('lc-alice');
+    await seen(dnOf('lc-alice'));
+    const res = await dm.ldap.search(
+      { scope: 'base', paged: false },
+      dnOf('lc-alice')
+    );
+    expect(res).to.have.nested.property('searchEntries.length', 1);
+  });
+
+  it('reads a GeneralizedTime deletion date', () => {
+    expect(
+      parseDeletedAt('20260102030405Z', 'generalizedTime')?.toISOString()
+    ).to.equal('2026-01-02T03:04:05.000Z');
+    expect(parseDeletedAt('yesterday', 'generalizedTime')).to.equal(undefined);
+  });
+
+  describe('rules', () => {
+    it('reads them from a file', () => {
+      const file = path.join(
+        os.tmpdir(),
+        `lifecycle-rules-${process.pid}.json`
+      );
+      fs.writeFileSync(file, JSON.stringify(RULES));
+      try {
+        expect(parseRules(file)).to.have.length(RULES.length);
+      } finally {
+        fs.unlinkSync(file);
+      }
+    });
+
+    it('refuses an unknown event', () => {
+      expect(() =>
+        parseRules(
+          JSON.stringify([{ dn: '.', exchange: 'x', events: { removed: 'k' } }])
+        )
+      ).to.throw(/Unknown lifecycle event "removed"/);
+    });
+
+    it('refuses a target without an exchange', () => {
+      expect(() =>
+        parseRules(JSON.stringify([{ dn: '.', events: { created: 'k' } }]))
+      ).to.throw(/needs an exchange/);
+    });
+  });
+});
