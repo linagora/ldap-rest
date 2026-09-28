@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/twake/lifecycleEvents`: groups too, with `updated`, `memberAdded`
+  and `memberRemoved`, `$changed.` sources and member lists in payloads
+  ([#233](https://github.com/linagora/ldap-rest/pull/233)).
+  [doc](docs/usage/plugins/integrations/lifecycle-events.md)
+
 ## v0.12.0 (2026-09-28)
 
 ### Deprecations

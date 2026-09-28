@@ -292,6 +292,7 @@ export interface Config {
   twake_lifecycle_deleted_at_attribute?: string;
   twake_lifecycle_deleted_at_format?: string;
   twake_lifecycle_rules?: string;
+  twake_lifecycle_member_attribute?: string;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -820,6 +821,11 @@ const configArgs: ConfigTemplate = [
   ],
   // twake/lifecycleEvents plugin
   ['--twake-lifecycle-rules', 'DM_TWAKE_LIFECYCLE_RULES', ''],
+  [
+    '--twake-lifecycle-member-attribute',
+    'DM_TWAKE_LIFECYCLE_MEMBER_ATTRIBUTE',
+    'member',
+  ],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
   [

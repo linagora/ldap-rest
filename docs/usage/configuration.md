@@ -457,6 +457,7 @@ Automatically creates/updates/deletes applicative account entries when users are
 | `--twake-lifecycle-deleted-at-attribute` | `DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE` |                              | Deletion date attribute                                                                                          |
 | `--twake-lifecycle-deleted-at-format`    | `DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT`    | `iso8601`                    | `iso8601` or `generalizedTime`                                                                                   |
 | `--twake-lifecycle-rules`                | `DM_TWAKE_LIFECYCLE_RULES`                |                              | Rules: a JSON file, or the JSON itself                                                                           |
+| `--twake-lifecycle-member-attribute`     | `DM_TWAKE_LIFECYCLE_MEMBER_ATTRIBUTE`     | `member`                     | Attribute holding a group's members                                                                              |
 
 See [lifecycle events](plugins/integrations/lifecycle-events.md).
 

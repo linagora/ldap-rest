@@ -1,11 +1,12 @@
 # Lifecycle Events
 
-`core/twake/lifecycleEvents` publishes an account's lifecycle to RabbitMQ from
-the directory write itself. REST, SCIM and any other plugin writing through
+`core/twake/lifecycleEvents` publishes an account's or a group's lifecycle to
+RabbitMQ from the directory write itself. REST, SCIM and any other plugin writing through
 LDAP-Rest announce the same events, with the same payloads.
 
-Which entries are accounts, which attributes carry the role, the lock and the
-deletion, and where each event goes are configuration.
+Which entries are accounts or groups, which attributes carry the role, the
+lock, the deletion and the members, and where each event goes are
+configuration.
 
 ## Events
 
@@ -22,6 +23,14 @@ publishes nothing.
   role in a single-valued attribute.
 - `disabled`: the lock attribute takes the lock value.
 - `enabled`: the lock attribute no longer holds the lock value.
+- `updated`: a target whose payload has `$changed.` sources publishes when one
+  of them changed, with those that did not left out. A target without them
+  publishes on every change of the entry.
+- `memberAdded`, `memberRemoved`: the member attribute gains or loses values.
+  The old and new lists are compared as sets, so a whole list replaced
+  publishes only the members that came or went. The group placeholder
+  (`--group-dummy-user`) is never a member here. A group created with
+  members publishes `created` only, its members in `$members`.
 - `deleted`: the entry becomes a tombstone (the deleted attribute takes the
   deleted value), or an entry that is not a tombstone is removed.
 
@@ -102,6 +111,8 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - `--twake-lifecycle-deleted-at-attribute`,
   `--twake-lifecycle-deleted-at-format` (`iso8601`, the default, or
   `generalizedTime`): the deletion date. It is always published as ISO 8601.
+- `--twake-lifecycle-member-attribute` (default `member`): the attribute
+  `memberAdded`, `memberRemoved` and member lists read.
 - `--twake-lifecycle-rules`: a JSON file, or the JSON itself.
 
 Each option has a `DM_` environment variable, for example
@@ -177,12 +188,34 @@ Payload and `when` values are sources:
 - `$context.actor`, `$context.requestId`, `$context.source`: who made the
   write, the request it belongs to, and the API it came through (`rest`,
   `scim`); left out for a write no request made, such as a scheduled task
+- `$changed.attr`: the attribute after the write, only if the write changed
+  it; an attribute the write removed gives `""`
 - `$attr|domain`, `$previous.attr|domain`: what follows the `@`
 - `$now`: the current time, ISO 8601
 - anything else: the value itself
 
 `$attr` and `$previous.attr` carry the first value of a multi-valued
-attribute. A source with no value leaves its field out. Every message carries
+attribute. A source with no value leaves its field out.
+
+A payload field can also list members, as an object with one key:
+
+- `$members`: the members after the write
+- `$added`, `$removed`: the members `memberAdded` and `memberRemoved` are about
+
+```json
+"members": { "$added": { "username": "$uid", "email": "$mail" } }
+```
+
+Each member is read once, and shaped by the object it maps to, whose
+sources are its own attributes (`$attr`) or plain values; any other source is
+refused at startup. A tombstone is left
+out, and a target whose `$added` or `$removed` is left empty publishes
+nothing. A member no longer in the directory is known by its RDN alone:
+`uid=jdoe,…` gives `{ "username": "jdoe" }` above. A group of 1,000 members
+takes 1,000 reads, one after the other, off the path of the write's
+response. A member that cannot be read, for a reason other than being gone,
+drops that target, logged as an error: a member the service account may not
+read silences every target of the group that lists its members. Every message carries
 a random AMQP `messageId`.
 
 A source can read any attribute of the entry: `$userPassword` would put the
