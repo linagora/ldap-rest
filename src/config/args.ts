@@ -293,6 +293,8 @@ export interface Config {
   twake_lifecycle_deleted_at_format?: string;
   twake_lifecycle_rules?: string;
   twake_lifecycle_member_attribute?: string;
+  twake_group_base?: string;
+  twake_group_user_base?: string;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -826,6 +828,9 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_LIFECYCLE_MEMBER_ATTRIBUTE',
     'member',
   ],
+  // twake/groups plugin
+  ['--twake-group-base', 'DM_TWAKE_GROUP_BASE', ''],
+  ['--twake-group-user-base', 'DM_TWAKE_GROUP_USER_BASE', ''],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
   [
