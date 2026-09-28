@@ -340,10 +340,10 @@ export default class OpenIDConnect extends AuthBase {
         ).oidc.logout({
           logoutParams: { post_logout_redirect_uri: undefined },
         });
-      void this.renewExpired(req).then(() =>
+      const guard = (): void =>
         // No session: a browser has already been sent to the provider, an
         // API client comes back here with the refusal as `err`.
-        requiresAuth()(req, res, (err?: unknown) => {
+        void requiresAuth()(req, res, (err?: unknown) => {
           if (err) return unauthorized(res);
           const claims = (
             req as unknown as { oidc: { user: Record<string, unknown> } }
@@ -366,8 +366,12 @@ export default class OpenIDConnect extends AuthBase {
             typeof named === 'string' ? named : String(claims.sub)
           );
           next();
-        })
-      );
+        });
+      // Synchronous unless a refresh token has to be sent: nothing else here
+      // waits, and a request that needs no renewal is not made to.
+      const renewal = this.renewExpired(req);
+      if (renewal) void renewal.then(guard);
+      else guard();
     });
   }
 
@@ -381,11 +385,11 @@ export default class OpenIDConnect extends AuthBase {
    * inactivity and a week at most, whatever the provider said, and nothing
    * here reads the access token otherwise. A token with no expiry is kept.
    *
-   * Never rejects: a refused or failed renewal ends the session.
-   *
    * @param req the request, after the library's router
+   * @returns the renewal under way, which never rejects: a refused or failed
+   * one ends the session. Undefined when there is nothing to wait for.
    */
-  private async renewExpired(req: DmRequest): Promise<void> {
+  private renewExpired(req: DmRequest): Promise<void> | undefined {
     const oidc = (
       req as unknown as {
         oidc: {
@@ -395,21 +399,23 @@ export default class OpenIDConnect extends AuthBase {
       }
     ).oidc;
     const token = oidc.accessToken;
-    if (!token?.isExpired()) return;
-    if (oidc.refreshToken) {
-      try {
-        await token.refresh();
-        return;
-      } catch (err) {
+    if (!token?.isExpired()) return undefined;
+    // As a back-channel logout does: no session, so `requiresAuth` sends the
+    // caller to the provider, or answers 401 to an API client.
+    const end = (): void => {
+      (req as unknown as { appSession?: unknown }).appSession = undefined;
+    };
+    if (!oidc.refreshToken) return void end();
+    return token.refresh().then(
+      () => undefined,
+      (err: unknown) => {
         this.logger.info(
           `${this.name}: the provider refused to renew an access token, ` +
             `so the session ends: ${String(err)}`
         );
+        end();
       }
-    }
-    // As a back-channel logout does: no session, so `requiresAuth` sends the
-    // caller to the provider, or answers 401 to an API client.
-    (req as unknown as { appSession?: unknown }).appSession = undefined;
+    );
   }
 
   /**
