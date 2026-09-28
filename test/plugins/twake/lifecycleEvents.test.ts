@@ -19,6 +19,13 @@ import {
 import { waitFor } from '../../helpers/waitFor';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
+const GROUPS = `ou=groups,${process.env.DM_LDAP_BASE}`;
+const MEMBER = {
+  username: '$uid',
+  email: '$mail',
+  lastName: '$sn',
+  kind: 'person',
+};
 const LOCKED = '000001010000Z';
 // What slapd writes on a ppolicy lockout
 const LOCKOUT = '20260102030405Z';
@@ -58,6 +65,37 @@ class StubRabbitMq {
 }
 
 const RULES = [
+  {
+    dn: `^cn=(?<id>lcg-[^,]+),${GROUPS}$`,
+    exchange: 'groups',
+    events: {
+      created: {
+        routingKey: 'group.created',
+        payload: {
+          id: '$dn.id',
+          name: '$description',
+          members: { $members: MEMBER },
+        },
+      },
+      updated: {
+        routingKey: 'group.updated',
+        payload: {
+          id: '$dn.id',
+          name: '$changed.description',
+          color: '$changed.businessCategory',
+        },
+      },
+      memberAdded: {
+        routingKey: 'group.member.added',
+        payload: { id: '$dn.id', members: { $added: MEMBER } },
+      },
+      memberRemoved: {
+        routingKey: 'group.member.removed',
+        payload: { id: '$dn.id', members: { $removed: MEMBER } },
+      },
+      deleted: { routingKey: 'group.deleted', payload: { id: '$dn.id' } },
+    },
+  },
   {
     dn: `^uid=(?<id>lc-[^,]+),${BASE}$`,
     exchange: 'accounts',
@@ -603,6 +641,194 @@ describe('Twake lifecycle events plugin', function () {
     });
   });
 
+  describe('groups', () => {
+    const groupDn = `cn=lcg-team,${GROUPS}`;
+    const placeholder = (): string => dm.config.group_dummy_user as string;
+    const messages = (): [string, unknown][] =>
+      rabbit.published
+        .filter(p => p.exchange === 'groups')
+        .map(p => [p.routingKey, p.message]);
+
+    async function group(members: string[] = []): Promise<void> {
+      await dm.ldap.add(groupDn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'lcg-team',
+        description: 'Team',
+        member: [placeholder(), ...members],
+      });
+      await seen(groupDn);
+      rabbit.published = [];
+      handled = [];
+    }
+
+    before(async () => {
+      await dm.ldap
+        .add(GROUPS, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'groups',
+        })
+        .catch(() => undefined);
+    });
+
+    afterEach(async () => {
+      await dm.ldap.delete(groupDn).catch(() => undefined);
+    });
+
+    it('publishes created with its members read, the placeholder left out', async () => {
+      await add('lc-alice');
+      await dm.ldap.add(groupDn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'lcg-team',
+        description: 'Team',
+        member: [placeholder(), dnOf('lc-alice')],
+      });
+      await seen(groupDn);
+      expect(messages()).to.deep.equal([
+        [
+          'group.created',
+          {
+            id: 'lcg-team',
+            name: 'Team',
+            members: [
+              {
+                username: 'lc-alice',
+                email: 'lc-alice@example.org',
+                lastName: 'lc-alice',
+                kind: 'person',
+              },
+            ],
+          },
+        ],
+      ]);
+    });
+
+    it('publishes updated with the changed fields only', async () => {
+      await group();
+      await dm.ldap.modify(groupDn, {
+        replace: { description: 'Core' },
+        add: { businessCategory: '#fff' },
+      });
+      await seen(groupDn);
+      await dm.ldap.modify(groupDn, { delete: ['businessCategory'] });
+      await seen(groupDn, 2);
+      expect(messages()).to.deep.equal([
+        ['group.updated', { id: 'lcg-team', name: 'Core', color: '#fff' }],
+        ['group.updated', { id: 'lcg-team', color: '' }],
+      ]);
+    });
+
+    it('publishes no updated when only the members change', async () => {
+      await add('lc-alice');
+      await group();
+      await dm.ldap.modify(groupDn, { add: { member: dnOf('lc-alice') } });
+      await seen(groupDn);
+      expect(keys()).to.deep.equal(['group.member.added']);
+    });
+
+    it('announces a replaced member list as what was added and removed', async () => {
+      await add('lc-alice');
+      await add('lc-bob');
+      await group([dnOf('lc-alice')]);
+      await dm.ldap.modify(groupDn, {
+        replace: { member: [dnOf('lc-bob')] },
+      });
+      await seen(groupDn);
+      expect(messages()).to.deep.equal([
+        [
+          'group.member.added',
+          {
+            id: 'lcg-team',
+            members: [
+              {
+                username: 'lc-bob',
+                email: 'lc-bob@example.org',
+                lastName: 'lc-bob',
+                kind: 'person',
+              },
+            ],
+          },
+        ],
+        [
+          'group.member.removed',
+          {
+            id: 'lcg-team',
+            members: [
+              {
+                username: 'lc-alice',
+                email: 'lc-alice@example.org',
+                lastName: 'lc-alice',
+                kind: 'person',
+              },
+            ],
+          },
+        ],
+      ]);
+    });
+
+    it('leaves the placeholder out when the last member leaves', async () => {
+      await add('lc-alice');
+      await group([dnOf('lc-alice')]);
+      await dm.ldap.modify(groupDn, {
+        replace: { member: [placeholder()] },
+      });
+      await seen(groupDn);
+      expect(keys()).to.deep.equal(['group.member.removed']);
+      expect(
+        (rabbit.published[0].message as unknown as { members: unknown[] })
+          .members
+      ).to.have.length(1);
+    });
+
+    it('names a member no longer in the directory by its RDN', async () => {
+      await group([dnOf('lc-gone')]);
+      await dm.ldap.modify(groupDn, { delete: { member: dnOf('lc-gone') } });
+      await seen(groupDn);
+      expect(messages()).to.deep.equal([
+        [
+          'group.member.removed',
+          {
+            id: 'lcg-team',
+            members: [{ username: 'lc-gone', kind: 'person' }],
+          },
+        ],
+      ]);
+    });
+
+    it('leaves a tombstone out of the members', async () => {
+      await add('lc-alice', { employeeType: 'deleted' });
+      await add('lc-bob');
+      await dm.ldap.add(groupDn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'lcg-team',
+        member: [dnOf('lc-alice'), dnOf('lc-bob')],
+      });
+      await seen(groupDn);
+      const created = rabbit.published.find(
+        p => p.routingKey === 'group.created'
+      );
+      expect(
+        (
+          created?.message as unknown as { members: { username: string }[] }
+        ).members.map(m => m.username)
+      ).to.deep.equal(['lc-bob']);
+    });
+
+    it('publishes no member.removed when only a tombstone left', async () => {
+      await add('lc-alice', { employeeType: 'deleted' });
+      await group([dnOf('lc-alice')]);
+      await dm.ldap.modify(groupDn, { delete: { member: dnOf('lc-alice') } });
+      await seen(groupDn);
+      expect(keys()).to.deep.equal([]);
+    });
+
+    it('publishes deleted when the group is removed', async () => {
+      await group();
+      await dm.ldap.delete(groupDn);
+      await seen(groupDn);
+      expect(messages()).to.deep.equal([['group.deleted', { id: 'lcg-team' }]]);
+    });
+  });
+
   describe('broker', () => {
     it('refuses rules without --rabbitmq-url', () => {
       const url = dm.config.rabbitmq_url;
@@ -778,6 +1004,33 @@ describe('Twake lifecycle events plugin', function () {
           ])
         )
       ).to.throw(/"created" of \.: "payload" must be an object of strings/);
+    });
+
+    it('takes a member list as a payload value, and refuses any other object', () => {
+      const rule = (members: unknown): string =>
+        JSON.stringify([
+          {
+            dn: '.',
+            exchange: 'x',
+            events: { created: { routingKey: 'k', payload: { members } } },
+          },
+        ]);
+      expect(() =>
+        parseRules(rule({ $added: { username: '$uid' } }))
+      ).not.to.throw();
+      expect(() => parseRules(rule({ $all: { username: '$uid' } }))).to.throw(
+        /"payload" must be an object of strings, or of \$members/
+      );
+      expect(() => parseRules(rule({ $added: { username: 1 } }))).to.throw(
+        /"payload" must be an object of strings/
+      );
+      for (const source of ['$context.actor', '$dn.id', '$now'])
+        expect(() =>
+          parseRules(rule({ $added: { username: '$uid', other: source } }))
+        ).to.throw(/member attributes \(\$attr\) or plain values/);
+      expect(() =>
+        parseRules(rule({ $added: { username: '$uid', kind: 'person' } }))
+      ).not.to.throw();
     });
 
     it('refuses a condition value that is not a string', () => {
