@@ -1200,12 +1200,19 @@ class ldapActions {
         [dn, entry],
         changeContext(req)
       );
-      return true;
     } catch (error) {
       throw ldapAddError(dn, error);
     } finally {
       this.releaseConnection(pooled);
     }
+    // After the finally, so no pooled connection is held while subscribers
+    // run; launchHooks logs their errors, the add having succeeded
+    await launchHooks(
+      this.parent.hooks.ldapaddafter,
+      [dn, entry],
+      changeContext(req)
+    );
+    return true;
   }
 
   /*
