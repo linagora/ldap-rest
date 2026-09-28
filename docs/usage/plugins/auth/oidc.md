@@ -85,6 +85,20 @@ client (`Accept: application/json`) receives 401. Every other authentication
 plugin in this repository answers JSON 401 throughout — the difference is
 kept because it is what makes a login work at all.
 
+## Session lifetime
+
+A session lasts no longer than its access token. Once the token has expired,
+the next request renews it with the refresh token, when the provider gave
+one; without a refresh token, or when the provider refuses the renewal, the
+session ends and the request is answered as an unauthenticated one: the
+browser goes back through the provider, which signs the caller in again
+without asking anything while its own session lasts.
+
+So that renewals do not cost a round trip through the provider, have it
+issue refresh tokens to this client (LemonLDAP::NG: _Issue refresh tokens_
+in the relying party's options). A token the provider gives no expiry keeps
+the session for the cookie's own lifetime.
+
 ## Logout
 
 `/logout` ends the session at the provider as well (RP-Initiated Logout): the

@@ -4,6 +4,22 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### An OpenID Connect session ends with its access token
+
+**Who is affected:** a deployment loading `core/auth/openidconnect`.
+
+A session used to last as long as its cookie, a day of inactivity and a week
+at most. It now ends when its access token expires, unless the provider gave
+a refresh token to renew it: a browser then goes back through the provider,
+silently while the provider's own session lasts, and an API client is
+answered `401`.
+
+To keep sessions going without that round trip, have the provider issue
+refresh tokens to the client
+([details](plugins/auth/oidc.md#session-lifetime)).
+
 ## To 0.12.0
 
 ### twake/instances replaces cozyProvision and clouderyProvision

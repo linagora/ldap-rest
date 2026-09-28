@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `core/auth/openidconnect`: a session ends with its access token, unless a
+  refresh token renews it —
+  [notes](docs/usage/upgrading.md#an-openid-connect-session-ends-with-its-access-token)
+
 ### Bug Fixes
 
 - `core/auth/openidconnect`: an API client with no session is answered `401`;

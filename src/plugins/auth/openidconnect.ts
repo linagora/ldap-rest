@@ -340,33 +340,76 @@ export default class OpenIDConnect extends AuthBase {
         ).oidc.logout({
           logoutParams: { post_logout_redirect_uri: undefined },
         });
-      // No session: a browser has already been sent to the provider, an
-      // API client comes back here with the refusal as `err`.
-      requiresAuth()(req, res, (err?: unknown) => {
-        if (err) return unauthorized(res);
-        const claims = (
-          req as unknown as { oidc: { user: Record<string, unknown> } }
-        ).oidc.user;
-        const claim = (this.config.oidc_username_claim as string) || 'sub';
-        const named = claims[claim];
-        if (claim !== 'sub' && typeof named !== 'string')
-          // Once per session rather than per request would need somewhere to
-          // remember it; a provider that does not send the claim sends it for
-          // nobody, so the line repeats until the configuration is fixed.
-          this.logger.warn(
-            `${this.name}: no "${claim}" claim on this session, so ` +
-              'req.userName falls back to the sub. Check ' +
-              '--oidc-username-claim against the scopes the provider is ' +
-              'asked for'
+      void this.renewExpired(req).then(() =>
+        // No session: a browser has already been sent to the provider, an
+        // API client comes back here with the refusal as `err`.
+        requiresAuth()(req, res, (err?: unknown) => {
+          if (err) return unauthorized(res);
+          const claims = (
+            req as unknown as { oidc: { user: Record<string, unknown> } }
+          ).oidc.user;
+          const claim = (this.config.oidc_username_claim as string) || 'sub';
+          const named = claims[claim];
+          if (claim !== 'sub' && typeof named !== 'string')
+            // Once per session rather than per request would need somewhere to
+            // remember it; a provider that does not send the claim sends it for
+            // nobody, so the line repeats until the configuration is fixed.
+            this.logger.warn(
+              `${this.name}: no "${claim}" claim on this session, so ` +
+                'req.userName falls back to the sub. Check ' +
+                '--oidc-username-claim against the scopes the provider is ' +
+                'asked for'
+            );
+          this.publishIdentity(
+            req,
+            String(claims.sub),
+            typeof named === 'string' ? named : String(claims.sub)
           );
-        this.publishIdentity(
-          req,
-          String(claims.sub),
-          typeof named === 'string' ? named : String(claims.sub)
-        );
-        next();
-      });
+          next();
+        })
+      );
     });
+  }
+
+  /**
+   * Keep a session no longer than its access token: past its expiry, renewed
+   * with the refresh token when the provider gave one, ended otherwise, so
+   * the caller goes back through the provider, which asks again if its own
+   * session is over.
+   *
+   * The library leaves the cookie alive for its own duration, a day of
+   * inactivity and a week at most, whatever the provider said, and nothing
+   * here reads the access token otherwise. A token with no expiry is kept.
+   *
+   * Never rejects: a refused or failed renewal ends the session.
+   *
+   * @param req the request, after the library's router
+   */
+  private async renewExpired(req: DmRequest): Promise<void> {
+    const oidc = (
+      req as unknown as {
+        oidc: {
+          refreshToken?: string;
+          accessToken?: { isExpired(): boolean; refresh(): Promise<unknown> };
+        };
+      }
+    ).oidc;
+    const token = oidc.accessToken;
+    if (!token?.isExpired()) return;
+    if (oidc.refreshToken) {
+      try {
+        await token.refresh();
+        return;
+      } catch (err) {
+        this.logger.info(
+          `${this.name}: the provider refused to renew an access token, ` +
+            `so the session ends: ${String(err)}`
+        );
+      }
+    }
+    // As a back-channel logout does: no session, so `requiresAuth` sends the
+    // caller to the provider, or answers 401 to an API client.
+    (req as unknown as { appSession?: unknown }).appSession = undefined;
   }
 
   /**
