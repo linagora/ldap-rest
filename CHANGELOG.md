@@ -7,6 +7,12 @@
 - `core/auth/openidconnect`: `/logout` ends the session at the provider too
   (RP-Initiated Logout), and `GET /v1/config` publishes the route —
   [doc](docs/usage/plugins/auth/oidc.md#logout)
+- `core/twake/lifecycleEvents`: publishes an account's lifecycle (created,
+  role changed, disabled, enabled, deleted) to RabbitMQ from the directory
+  write, so every API writing the entry announces the same events. Entries,
+  attributes, exchanges, routing keys and payloads are configuration
+  ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
+- `ldapaddafter` hook, awaited after an add ([docs](docs/plugin-development/hooks.md#ldapaddafter))
 
 ## v0.11.2 (2026-09-27)
 
