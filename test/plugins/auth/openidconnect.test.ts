@@ -97,7 +97,7 @@ describe('OpenID Connect Plugin', () => {
 
       expect(plugin).to.be.an.instanceOf(OpenIDConnect);
       expect(plugin.name).to.equal('openidconnect');
-      expect(plugin.roles).to.deep.equal(['auth']);
+      expect(plugin.roles).to.deep.equal(['auth', 'configurable']);
     });
   });
 
@@ -123,7 +123,10 @@ describe('OpenID Connect Plugin', () => {
 
     it('should have auth role', () => {
       expect(plugin.roles).to.include('auth');
-      expect(plugin.roles.length).to.equal(1);
+    });
+
+    it('should publish its logout route to the config API', () => {
+      expect(plugin.roles).to.include('configurable');
     });
 
     it('should have api method', () => {

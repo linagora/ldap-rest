@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/auth/openidconnect`: `/logout` ends the session at the provider too
+  (RP-Initiated Logout), and `GET /v1/config` publishes the route — declare
+  `--base-url` as a post-logout redirect URI —
+  [doc](docs/usage/plugins/auth/oidc.md#logout),
+  [notes](docs/usage/upgrading.md#openid-connect-logs-out-at-the-provider)
+
 ## v0.11.2 (2026-09-27)
 
 ### Bug Fixes
