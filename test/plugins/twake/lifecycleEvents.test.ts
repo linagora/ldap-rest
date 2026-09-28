@@ -616,11 +616,15 @@ describe('Twake lifecycle events plugin', function () {
       }
     });
 
-    it('refuses to start when the broker cannot be reached', async () => {
+    it('is refused when the broker cannot be reached', async () => {
       rabbit.client = null;
-      let error: unknown;
-      await plugin.api().catch(e => (error = e));
-      expect(String(error)).to.match(/RabbitMQ at --rabbitmq-url cannot be/);
+      const late = new TwakeLifecycleEvents(dm);
+      let refused: Error | undefined;
+      await dm
+        .registerPlugin('core/twake/lifecycleEvents', late, 'lifecycleLate')
+        .catch((err: Error) => (refused = err));
+      expect(refused?.message).to.match(/RabbitMQ at --rabbitmq-url cannot be/);
+      expect(dm.loadedPlugins).not.to.have.property('lifecycleLate');
     });
   });
 
