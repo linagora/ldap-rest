@@ -51,7 +51,7 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-base-map`                    | `DM_SCIM_BASE_MAP`                    | —                                                  | Path to JSON file mapping authenticated user → `{userBase, groupBase}`                           |
 | `--scim-user-object-class`           | `DM_SCIM_USER_OBJECT_CLASSES`         | `top, inetOrgPerson, organizationalPerson, person` | Object classes for created Users                                                                 |
 | `--scim-user-rdn-attribute`          | `DM_SCIM_USER_RDN_ATTRIBUTE`          | `uid`                                              | RDN attribute for Users                                                                          |
-| `--scim-user-lock-attribute`         | `DM_SCIM_USER_LOCK_ATTRIBUTE`         | `pwdAccountLockedTime`                             | LDAP attribute whose presence marks a User as `active: false`                                    |
+| `--scim-user-lock-attribute`         | `DM_SCIM_USER_LOCK_ATTRIBUTE`         | `pwdAccountLockedTime`                             | LDAP attribute whose lock value marks a User as `active: false`                                  |
 | `--scim-user-lock-value`             | `DM_SCIM_USER_LOCK_VALUE`             | —                                                  | Value written to that attribute when deactivating (required unless the attribute is the default) |
 | `--scim-group-object-class`          | `DM_SCIM_GROUP_OBJECT_CLASSES`        | `top, groupOfNames`                                | Object classes for created Groups                                                                |
 | `--scim-group-rdn-attribute`         | `DM_SCIM_GROUP_RDN_ATTRIBUTE`         | `cn`                                               | RDN attribute for Groups                                                                         |
@@ -113,23 +113,23 @@ All responses have `Content-Type: application/scim+json`.
 
 ### Default mapping (LDAP ⇄ SCIM User)
 
-| SCIM                                 | LDAP                                        |
-| ------------------------------------ | ------------------------------------------- |
-| `id`                                 | `uid` (or `entryUUID`)                      |
-| `userName`                           | `uid`                                       |
-| `externalId`                         | `employeeNumber`                            |
-| `name.familyName`                    | `sn`                                        |
-| `name.givenName`                     | `givenName`                                 |
-| `name.formatted`                     | `cn`                                        |
-| `displayName`                        | `displayName`                               |
-| `title`                              | `title`                                     |
-| `preferredLanguage`                  | `preferredLanguage`                         |
-| `emails[primary=true].value`         | `mail`                                      |
-| `emails[primary=false].value`        | `mailAlternateAddress`                      |
-| `phoneNumbers[primary=true].value`   | `telephoneNumber`                           |
-| `phoneNumbers[primary=false].value`  | `mobile`                                    |
-| `active`                             | pseudo (false if the lock attribute is set) |
-| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp`       |
+| SCIM                                 | LDAP                                                      |
+| ------------------------------------ | --------------------------------------------------------- |
+| `id`                                 | `uid` (or `entryUUID`)                                    |
+| `userName`                           | `uid`                                                     |
+| `externalId`                         | `employeeNumber`                                          |
+| `name.familyName`                    | `sn`                                                      |
+| `name.givenName`                     | `givenName`                                               |
+| `name.formatted`                     | `cn`                                                      |
+| `displayName`                        | `displayName`                                             |
+| `title`                              | `title`                                                   |
+| `preferredLanguage`                  | `preferredLanguage`                                       |
+| `emails[primary=true].value`         | `mail`                                                    |
+| `emails[primary=false].value`        | `mailAlternateAddress`                                    |
+| `phoneNumbers[primary=true].value`   | `telephoneNumber`                                         |
+| `phoneNumbers[primary=false].value`  | `mobile`                                                  |
+| `active`                             | pseudo (false if the lock attribute holds the lock value) |
+| `meta.created` / `meta.lastModified` | `createTimestamp` / `modifyTimestamp`                     |
 
 Override with `--scim-user-mapping /path/to/user-mapping.json` (same schema as
 `static/schemas/scim/default-mapping.json`).
@@ -140,14 +140,18 @@ SCIM models account status with the boolean `active` (RFC 7643 §4.1.1), and it
 is how Okta, Entra ID and JumpCloud disable a user — they PATCH `active` to
 `false` rather than DELETE the resource.
 
-LDAP has no single equivalent, so the plugin models it on the **presence of one
-attribute**: present means locked, absent means active.
+LDAP has no single equivalent, so the plugin models it on **one attribute
+holding one value**: `--scim-user-lock-value` in `--scim-user-lock-attribute`
+means locked, anything else means active. A ppolicy lockout after failed binds
+is a timestamp in `pwdAccountLockedTime`, so it reads as active, and
+`"active": true` leaves it in place. It lasts `pwdLockoutDuration`, or until
+an administrator clears it when that is 0.
 
 | SCIM              | LDAP                                            |
 | ----------------- | ----------------------------------------------- |
 | `"active": false` | write `--scim-user-lock-value` to the attribute |
-| `"active": true`  | remove the attribute                            |
-| attribute absent  | `"active": true`                                |
+| `"active": true`  | remove the attribute if it holds the lock value |
+| lock value absent | `"active": true`                                |
 
 The default targets the ppolicy overlay:
 
@@ -184,8 +188,8 @@ neither can be told apart from a deliberate local schema:
 
 **None of this can tell whether your directory honours the value you chose.**
 The checks are on the shape of the configuration. `active` is read back from
-the mere presence of the attribute, so a value the directory stores and
-ignores still reads as `false`. Verify once, by hand, that a deactivation
+the value this plugin wrote, so a value the directory stores and ignores still
+reads as `false`. Verify once, by hand, that a deactivation
 actually prevents a bind.
 
 `active` is not a mapping entry and must not be added to a mapping file: it is
@@ -347,16 +351,16 @@ group entries works; use a mapping override if you would rather name it there.
 SCIM filters are translated to LDAP filters (RFC 4515). Values are always escaped
 via `escapeLdapFilter()` — no LDAP injection is possible.
 
-| SCIM                             | LDAP                          |
-| -------------------------------- | ----------------------------- |
-| `userName eq "alice"`            | `(uid=alice)`                 |
-| `name.familyName sw "Du"`        | `(sn=Du*)`                    |
-| `emails.value co "@example.com"` | `(mail=*@example.com*)`       |
-| `displayName pr`                 | `(displayName=*)`             |
-| `active eq true`                 | `(!(pwdAccountLockedTime=*))` |
-| `active pr`                      | `(objectClass=*)`             |
-| `a eq "x" and b eq "y"`          | `(&(a=x)(b=y))`               |
-| `not (a eq "x")`                 | `(!(a=x))`                    |
+| SCIM                             | LDAP                                      |
+| -------------------------------- | ----------------------------------------- |
+| `userName eq "alice"`            | `(uid=alice)`                             |
+| `name.familyName sw "Du"`        | `(sn=Du*)`                                |
+| `emails.value co "@example.com"` | `(mail=*@example.com*)`                   |
+| `displayName pr`                 | `(displayName=*)`                         |
+| `active eq true`                 | `(!(pwdAccountLockedTime=000001010000Z))` |
+| `active pr`                      | `(objectClass=*)`                         |
+| `a eq "x" and b eq "y"`          | `(&(a=x)(b=y))`                           |
+| `not (a eq "x")`                 | `(!(a=x))`                                |
 
 Unknown SCIM attributes raise `400 invalidFilter`.
 

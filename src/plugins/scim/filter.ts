@@ -21,7 +21,11 @@
  */
 import { escapeLdapFilter } from '../../lib/utils';
 
-import { DEFAULT_LOCK_ATTRIBUTE, scimPathToLdapAttribute } from './mapping';
+import {
+  DEFAULT_LOCK_ATTRIBUTE,
+  DEFAULT_LOCK_VALUE,
+  scimPathToLdapAttribute,
+} from './mapping';
 import type { ResourceMapping } from './types';
 import { scimInvalidFilter } from './errors';
 
@@ -161,8 +165,9 @@ function tokenize(input: string): Token[] {
 const ACTIVE_PSEUDO = '\u0000active';
 
 export interface FilterOptions {
-  /** LDAP attribute whose presence marks a User as locked. */
+  /** LDAP attribute and value that mark a User as locked. */
   lockAttribute?: string;
+  lockValue?: string;
   /**
    * Whether this resource type carries SCIM `active`. Users do; Groups do
    * not, and must get `invalidFilter` rather than a filter built out of a
@@ -330,7 +335,7 @@ class Parser {
         "filter on 'id' only supports 'eq' with a string value"
       );
     }
-    // 'active' → presence of the lock attribute (emitted in emitComparison).
+    // 'active' → the lock value in the lock attribute (emitted in emitComparison).
     // Only for a resource type that has it; otherwise fall through and let
     // the mapping lookup below reject it as unknown.
     if (path === 'active' && this.opts.supportsActive) return ACTIVE_PSEUDO;
@@ -355,10 +360,19 @@ class Parser {
         value === true ||
         (typeof value === 'string' && value.toLowerCase() === 'true');
       const lockAttr = this.opts.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
-      const locked = `(${lockAttr}=*)`;
-      const unlocked = `(!(${lockAttr}=*))`;
-      // active=true  <=> lock attribute absent
-      // active=false <=> lock attribute present
+      // The ppolicy value means nothing to another attribute: the pair comes
+      // whole, as resolveLockConfig() requires it.
+      if (
+        !this.opts.lockValue &&
+        lockAttr.toLowerCase() !== DEFAULT_LOCK_ATTRIBUTE.toLowerCase()
+      )
+        throw new Error(`No lock value given for '${lockAttr}'`);
+      const lockValue = escapeLdapFilter(
+        this.opts.lockValue || DEFAULT_LOCK_VALUE
+      );
+      const locked = `(${lockAttr}=${lockValue})`;
+      const unlocked = `(!${locked})`;
+      // Match the value, not presence: a ppolicy lockout timestamp is active.
       if (op === 'eq') return truthy ? unlocked : locked;
       if (op === 'ne') return truthy ? locked : unlocked;
       throw scimInvalidFilter(`Operator '${op}' not supported for 'active'`);

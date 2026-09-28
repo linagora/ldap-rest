@@ -7,7 +7,11 @@
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { DEFAULT_LOCK_ATTRIBUTE, resolveLockConfig } from '../scim/mapping';
+import {
+  DEFAULT_LOCK_ATTRIBUTE,
+  holdsValue,
+  resolveLockConfig,
+} from '../scim/mapping';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
@@ -80,29 +84,15 @@ export function first(
   return text === '' ? undefined : text;
 }
 
-/** Case-insensitive, whatever the matching rule of the attribute. */
-function holds(
-  entry: AttributesList,
-  attribute: string,
-  wanted: string
-): boolean {
-  const value = valueOf(entry, attribute);
-  if (value === undefined) return false;
-  const lower = wanted.toLowerCase();
-  return (Array.isArray(value) ? value : [value]).some(
-    v => String(v).toLowerCase() === lower
-  );
-}
-
 export const isTombstone = (
   entry: AttributesList,
   attrs: LifecycleAttributes
-): boolean => holds(entry, attrs.deleted, attrs.deletedValue);
+): boolean => holdsValue(entry, attrs.deleted, attrs.deletedValue);
 
 export const isLocked = (
   entry: AttributesList,
   attrs: LifecycleAttributes
-): boolean => holds(entry, attrs.lock, attrs.lockValue);
+): boolean => holdsValue(entry, attrs.lock, attrs.lockValue);
 
 export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
   const iso = date.toISOString();

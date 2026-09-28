@@ -4,6 +4,16 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### SCIM `active` reads the lock value
+
+**Who is affected:** a SCIM client of a directory with ppolicy lockouts. An
+account locked out after failed binds now reads `active: true`, is left out
+of `active eq false`, and keeps its lockout on `"active": true`; only the
+configured lock value reads as inactive. See
+[the SCIM plugin documentation](plugins/integrations/scim.md#deactivating-an-account-active).
+
 ## To 0.12.0
 
 ### twake/instances replaces cozyProvision and clouderyProvision

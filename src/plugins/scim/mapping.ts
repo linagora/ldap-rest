@@ -205,9 +205,9 @@ export interface MappingContext {
   baseUrl?: string;
   scimPrefix: string;
   /**
-   * LDAP attribute whose *presence* marks the account as locked, and the
-   * value written to lock it. Both come from `resolveLockConfig()`, which is
-   * the only place the defaults live: re-defaulting here would let a context
+   * LDAP attribute, and the value in it that marks the account as locked and
+   * is written to lock it. Both come from `resolveLockConfig()`, which is the
+   * only place the defaults live: re-defaulting here would let a context
    * built outside the plugin reach the directory with a pair the startup
    * guard never saw. Groups have no `active`, so they pass empty strings.
    */
@@ -217,8 +217,8 @@ export interface MappingContext {
 
 /**
  * SCIM `active` (RFC 7643 section 4.1.1) has no direct LDAP equivalent. We
- * model it on the presence of one attribute: present means locked, absent
- * means active.
+ * model it on one attribute holding one value: that value means locked,
+ * anything else, absence included, means active.
  *
  * The default is the ppolicy overlay's `pwdAccountLockedTime`, whose
  * conventional "locked forever" value is a GeneralizedTime in the distant
@@ -360,13 +360,38 @@ export function readActive(value: unknown): boolean | undefined {
   throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
 }
 
-/** Is this entry locked, per the configured lock attribute? */
-export function isLocked(entry: AttributesList, ctx: MappingContext): boolean {
-  const raw = entry[ctx.lockAttribute];
+/**
+ * Is this entry locked, per the configured lock pair? Only the lock value
+ * counts: a ppolicy lockout after failed binds is a timestamp in the same
+ * attribute, and it does not deactivate the account.
+ */
+export function isLocked(
+  entry: AttributesList,
+  ctx: Pick<MappingContext, 'lockAttribute' | 'lockValue'>
+): boolean {
+  return holdsValue(entry, ctx.lockAttribute, ctx.lockValue);
+}
+
+/**
+ * Does the entry hold this value in this attribute? Both compared
+ * case-insensitively, whatever the attribute's matching rule, and an
+ * attribute given as an empty array is absent. SCIM `active` and the twake
+ * lifecycle plugins read the same lock pair through it.
+ */
+export function holdsValue(
+  entry: AttributesList,
+  attribute: string,
+  value: string
+): boolean {
+  if (!attribute) return false;
+  const name = attribute.toLowerCase();
+  const key = Object.keys(entry).find(k => k.toLowerCase() === name);
+  const raw = key === undefined ? undefined : entry[key];
   if (raw == null) return false;
-  // A directory may answer an empty array for an attribute it does not hold.
-  if (Array.isArray(raw)) return raw.length > 0;
-  return String(raw).length > 0;
+  const wanted = value.toLowerCase();
+  return (Array.isArray(raw) ? raw : [raw]).some(
+    v => v != null && v.toString().toLowerCase() === wanted
+  );
 }
 
 /** Resolve the SCIM id for an LDAP entry, per configuration. */

@@ -40,6 +40,7 @@ import {
 import {
   DEFAULT_LOCK_ATTRIBUTE,
   DEFAULT_LOCK_VALUE,
+  holdsValue,
   readActive,
   scimPathToLdapAttribute,
 } from './mapping';
@@ -51,8 +52,8 @@ export interface PatchContext {
   /** The LDAP attribute holding members, default 'member'. */
   memberAttribute?: string;
   /**
-   * For Users: the attribute whose presence marks the account as locked, and
-   * the value to write when SCIM `active` is set to false.
+   * For Users: the attribute and value that mark the account as locked;
+   * SCIM `active: false` writes that value.
    */
   lockAttribute?: string;
   lockValue?: string;
@@ -402,17 +403,28 @@ async function applyOperation(
 
   // Special: `active` on Users. RFC 7643 section 4.1.1 makes it readWrite,
   // and it is the operation every identity provider uses to deactivate an
-  // account, but it has no mapping entry: it is the *absence* of the lock
-  // attribute. Locking writes the attribute, unlocking removes it.
+  // account, but it has no mapping entry: it is the absence of the lock
+  // value. Locking writes the value, unlocking removes it.
   if (top === 'active' && ctx.supportsActive) {
     if (sub || filter) {
       throw scimInvalidPath(`'active' has no sub-attribute (got '${op.path}')`);
     }
-    const lockAttr = ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
+    const configured = ctx.lockAttribute || DEFAULT_LOCK_ATTRIBUTE;
+    // The directory answers the attribute under its schema name, whatever
+    // case the configuration spelled it in.
+    const lockAttr =
+      Object.keys(ctx.current).find(
+        k => k.toLowerCase() === configured.toLowerCase()
+      ) ?? configured;
     // `remove active` restores the default, which is an active account.
     const wanted = operation === 'remove' ? true : activeValue(op.value);
-    if (wanted) entry.drop(lockAttr);
-    else entry.set(lockAttr, [ctx.lockValue || DEFAULT_LOCK_VALUE]);
+    const lockValue = ctx.lockValue || DEFAULT_LOCK_VALUE;
+    if (!wanted) entry.set(lockAttr, [lockValue]);
+    // Only the lock value is ours: a ppolicy lockout stays in place.
+    else if (
+      holdsValue({ [lockAttr]: entry.get(lockAttr) }, lockAttr, lockValue)
+    )
+      entry.drop(lockAttr);
     return;
   }
 
