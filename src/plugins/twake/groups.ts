@@ -47,6 +47,31 @@ const read = (entry: AttributesList, attribute: string): string | undefined =>
 const ORG = '{org}';
 
 const GROUP_SORT = ['displayName', 'description', 'createdAt'];
+const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle'];
+
+/** A member's public profile: its fields, and the attribute each reads. */
+const MEMBER_FIELDS: Record<string, string> = {
+  uid: 'uid',
+  _id: 'entryUUID',
+  cn: 'cn',
+  sn: 'sn',
+  givenName: 'givenName',
+  displayName: 'displayName',
+  mail: 'mail',
+  mobile: 'mobile',
+  jobTitle: 'twakeJobTitle',
+  company: 'twakeCompany',
+  organizationRole: 'twakeOrganizationRole',
+  organizationId: 'twakeOrganizationId',
+};
+const NAME_FIELDS: Record<string, string> = {
+  familyName: 'sn',
+  givenName: 'givenName',
+  additionalName: 'twakeAdditionalName',
+  namePrefix: 'twakeNamePrefix',
+};
+const TECHNICAL = 'twakeIsTechnical';
+
 const NOT_FOUND = {
   organization: 'Organization not found',
   group: 'Group not found',
@@ -138,6 +163,7 @@ export default class TwakeGroups extends LdapGroups {
   private readonly color: string;
   private readonly createdAt: string;
   private readonly maxPage: number;
+  private readonly memberFields: Record<string, string>;
 
   constructor(server: DM) {
     super(server);
@@ -167,6 +193,10 @@ export default class TwakeGroups extends LdapGroups {
     this.createdAt =
       this.config.twake_group_created_at_attribute || 'twakeCreatedAt';
     this.maxPage = this.config.twake_group_max_page_limit || 1000;
+    this.memberFields = {
+      ...MEMBER_FIELDS,
+      ...this.config.twake_group_member_fields,
+    };
   }
 
   /**
@@ -323,6 +353,10 @@ export default class TwakeGroups extends LdapGroups {
         res.json(group);
       })
     );
+    app.get(
+      `${base}/:groupId/members`,
+      route('listing group members', (q, r, o) => this.membersRoute(q, r, o))
+    );
     app.patch(
       `${base}/:groupId`,
       route('updating group', (q, r, o) => this.updateRoute(q, r, o))
@@ -336,10 +370,24 @@ export default class TwakeGroups extends LdapGroups {
         res.json({ success: true });
       })
     );
+    app.post(
+      `${base}/:groupId/members`,
+      route('adding group members', (q, r, o) => this.addMembersRoute(q, r, o))
+    );
+    app.delete(
+      `${base}/:groupId/members/:userId`,
+      route('removing group member', (q, r, o) =>
+        this.removeMemberRoute(q, r, o)
+      )
+    );
   }
 
   private groupDn(org: string, id: string): string {
     return `${this.cn}=${escapeDnValue(id)},${this.groupBaseOf(org)}`;
+  }
+
+  private get userAttribute(): string {
+    return this.config.ldap_user_main_attribute || 'uid';
   }
 
   /** Every route answers 404 for a missing organization, 410 for a deleted one. */
@@ -581,6 +629,194 @@ export default class TwakeGroups extends LdapGroups {
     await this.onGroup(() =>
       this.modifyGroup(this.groupDn(org, id), { replace }, req)
     );
+    res.json({ success: true });
+  }
+
+  private async membersRoute(
+    req: Request,
+    res: Response,
+    org: string
+  ): Promise<void> {
+    const p = this.page(req, MEMBER_SORT);
+    const id = req.params.groupId as string;
+    const group = await this.readGroup(org, id);
+    if (!group) throw notFound('group');
+    const usernames = [
+      ...new Map(
+        (group.members as string[]).map(u => [u.toLowerCase(), u])
+      ).values(),
+    ];
+    const profiles = await this.profiles(org, usernames);
+    let members = usernames.map(
+      u => profiles.get(u.toLowerCase()) ?? { uid: u }
+    );
+    if (p.search) {
+      const needle = p.search.toLowerCase();
+      members = members.filter(m =>
+        [m.uid, m.displayName || m.cn, m.mail].some(v =>
+          text(v).toLowerCase().includes(needle)
+        )
+      );
+    }
+    members = this.sorted(members, p.sortBy ?? 'uid', p.desc);
+    const totalPages = Math.ceil(members.length / p.limit);
+    res.json({
+      organizationId: org,
+      id,
+      members: members.slice(p.offset, p.offset + p.limit),
+      pagination: {
+        page: p.page,
+        limit: p.limit,
+        total: members.length,
+        totalPages,
+        hasNextPage: p.page < totalPages,
+        hasPreviousPage: p.page > 1,
+      },
+    });
+  }
+
+  /**
+   * Users of the organization by name, read in pages of the size limit. A
+   * tombstone is no user: it cannot be added, as it would join hidden.
+   */
+  private async users(
+    org: string,
+    usernames: string[],
+    attributes: string[]
+  ): Promise<AttributesList[]> {
+    const { deleted, deletedValue } = this.attrs;
+    const live = deleted
+      ? `(!(${deleted}=${escapeLdapFilter(deletedValue)}))`
+      : '';
+    const out: AttributesList[] = [];
+    for (let i = 0; i < usernames.length; i += this.maxPage) {
+      const chunk = usernames.slice(i, i + this.maxPage);
+      const filter = `(&(|${chunk
+        .map(u => `(${this.userAttribute}=${escapeLdapFilter(u)})`)
+        .join('')})${live})`;
+      try {
+        const { searchEntries } = (await this.ldap.search(
+          { paged: false, scope: 'one', filter, attributes },
+          this.userBaseOf(org)
+        )) as SearchResult;
+        out.push(...searchEntries);
+      } catch (err) {
+        if (extractLdapCode(err) !== 32) throw err;
+      }
+    }
+    return out;
+  }
+
+  private async profiles(
+    org: string,
+    usernames: string[]
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const attributes = [
+      ...new Set([
+        ...Object.values(this.memberFields),
+        ...Object.values(NAME_FIELDS),
+        TECHNICAL,
+      ]),
+    ];
+    const byName = new Map<string, Record<string, unknown>>();
+    for (const entry of await this.users(org, usernames, attributes)) {
+      const name = read(entry, this.userAttribute);
+      if (!name) continue;
+      const profile: Record<string, unknown> = {};
+      for (const [field, attribute] of Object.entries(this.memberFields)) {
+        const value = read(entry, attribute);
+        if (value !== undefined) profile[field] = value;
+      }
+      const fullName: Record<string, string> = {};
+      for (const [field, attribute] of Object.entries(NAME_FIELDS)) {
+        const value = read(entry, attribute);
+        if (value !== undefined) fullName[field] = value;
+      }
+      if (Object.keys(fullName).length) profile.name = fullName;
+      profile.isTechnical = read(entry, TECHNICAL)?.toUpperCase() === 'TRUE';
+      byName.set(name.toLowerCase(), profile);
+    }
+    return byName;
+  }
+
+  private async addMembersRoute(
+    req: Request,
+    res: Response,
+    org: string
+  ): Promise<void> {
+    const { usernames } = bodyOf(req);
+    if (!Array.isArray(usernames) || usernames.length === 0)
+      throw invalid('usernames must be a non-empty array');
+    if (!usernames.every(u => typeof u === 'string' && u.length > 0))
+      throw invalid('usernames must be an array of non-empty strings');
+    if (usernames.length > this.maxPage)
+      throw invalid(
+        `usernames cannot exceed ${this.maxPage} entries per request`
+      );
+    const id = req.params.groupId as string;
+    const group = await this.readGroup(org, id);
+    if (!group) throw notFound('group');
+    const wanted = [
+      ...new Map((usernames as string[]).map(u => [u.toLowerCase(), u])).keys(),
+    ];
+    const found = new Map(
+      (await this.users(org, wanted, [this.userAttribute])).map(e => {
+        const name = read(e, this.userAttribute) || '';
+        return [name.toLowerCase(), name];
+      })
+    );
+    if (wanted.some(u => !found.has(u))) throw notFound('user');
+    const held = new Set((group.members as string[]).map(u => u.toLowerCase()));
+    const added = wanted
+      .filter(u => !held.has(u))
+      .map(
+        u =>
+          `${this.userAttribute}=${escapeDnValue(found.get(u)!)},${this.userBaseOf(org)}`
+      );
+    const dn = this.groupDn(org, id);
+    if (added.length) {
+      await this.onGroup(() =>
+        this.ldap.modify(dn, { add: { member: added } }, req)
+      );
+      await this.dropPlaceholder(dn, req);
+    }
+    res.json({ success: true });
+  }
+
+  private async dropPlaceholder(dn: string, req: Request): Promise<void> {
+    const placeholder = this.config.group_dummy_user;
+    if (!placeholder) return;
+    try {
+      await this.ldap.modify(dn, { delete: { member: placeholder } }, req);
+    } catch (err) {
+      // Not there, or the last member left
+      if (![16, 65].includes(extractLdapCode(err) ?? 0)) throw err;
+    }
+  }
+
+  private async removeMemberRoute(
+    req: Request,
+    res: Response,
+    org: string
+  ): Promise<void> {
+    const dn = this.groupDn(org, req.params.groupId as string);
+    const member = `${this.userAttribute}=${escapeDnValue(
+      req.params.userId as string
+    )},${this.userBaseOf(org)}`;
+    try {
+      await this.ldap.modify(dn, { delete: { member } }, req);
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) throw notFound('group');
+      if (code === 16) throw notFound('member');
+      if (code !== 65 || !this.config.group_dummy_user) throw err;
+      // The last member: groupOfNames needs one, so the placeholder takes its seat.
+      await this.ldap.modify(
+        dn,
+        { replace: { member: [this.config.group_dummy_user] } },
+        req
+      );
+    }
     res.json({ success: true });
   }
 }

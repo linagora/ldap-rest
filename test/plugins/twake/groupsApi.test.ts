@@ -210,6 +210,73 @@ describe('Twake groups plugin routes', function () {
     await api.patch(`${route()}/nope`).send({ description: 'x' }).expect(404);
   });
 
+  it('adds members, lists their profiles, and removes them down to the placeholder', async () => {
+    const id = await create('Eng');
+    await api
+      .post(`${route()}/${id}/members`)
+      .send({ usernames: ['TGA-alice', 'tga-bob', 'tga-alice'] })
+      .expect(200);
+    expect((await api.get(`${route()}/${id}`)).body.members).to.have.members([
+      'tga-alice',
+      'tga-bob',
+    ]);
+    const listed = await api
+      .get(`${route()}/${id}/members?sortBy=uid&sortOrder=desc`)
+      .expect(200);
+    expect(listed.body.id).to.equal(id);
+    expect(listed.body.members[0]).to.deep.include({
+      uid: 'tga-bob',
+      mail: 'tga-bob@acme.example.org',
+      name: { familyName: 'Doe', givenName: 'tga-bob' },
+      isTechnical: false,
+    });
+    expect(listed.body.pagination).to.include({ total: 2, hasNextPage: false });
+
+    await api.delete(`${route()}/${id}/members/tga-alice`).expect(200);
+    await api.delete(`${route()}/${id}/members/tga-bob`).expect(200);
+    expect((await api.get(`${route()}/${id}`)).body.members).to.deep.equal([]);
+    const res = await api
+      .delete(`${route()}/${id}/members/tga-bob`)
+      .expect(404);
+    expect(res.body.code).to.equal('MEMBER_NOT_FOUND');
+  });
+
+  it('refuses unknown users and invalid member lists', async () => {
+    const id = await create('Eng');
+    const unknown = await api
+      .post(`${route()}/${id}/members`)
+      .send({ usernames: ['tga-alice', 'nobody'] })
+      .expect(404);
+    expect(unknown.body.code).to.equal('USER_NOT_FOUND');
+    const tombstone = `uid=tga-gone,${users('acme')}`;
+    await dm.ldap.add(tombstone, {
+      objectClass: ['top', 'inetOrgPerson'],
+      cn: 'tga-gone',
+      sn: 'Gone',
+      uid: 'tga-gone',
+      employeeType: 'deleted',
+    });
+    try {
+      const gone = await api
+        .post(`${route()}/${id}/members`)
+        .send({ usernames: ['tga-gone'] })
+        .expect(404);
+      expect(gone.body.code).to.equal('USER_NOT_FOUND');
+    } finally {
+      await dm.ldap.delete(tombstone);
+    }
+    expect((await api.get(`${route()}/${id}`)).body.members).to.deep.equal([]);
+    for (const usernames of [[], [''], 'tga-alice'])
+      await api
+        .post(`${route()}/${id}/members`)
+        .send({ usernames })
+        .expect(400);
+    await api
+      .post(`${route()}/nope/members`)
+      .send({ usernames: ['tga-alice'] })
+      .expect(404);
+  });
+
   it('deletes a group', async () => {
     const id = await create('Eng');
     await api.delete(`${route()}/${id}`).expect(200);

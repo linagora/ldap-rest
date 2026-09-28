@@ -302,6 +302,7 @@ export interface Config {
   twake_group_color_attribute?: string;
   twake_group_created_at_attribute?: string;
   twake_group_max_page_limit?: number;
+  twake_group_member_fields?: Record<string, string>;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -870,6 +871,7 @@ const configArgs: ConfigTemplate = [
     1000,
     'number',
   ],
+  ['--twake-group-member-fields', 'DM_TWAKE_GROUP_MEMBER_FIELDS', {}, 'json'],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
   [
