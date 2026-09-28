@@ -62,6 +62,7 @@ Connect to external systems:
 | [lifecycle-events](integrations/lifecycle-events.md) | Account lifecycle events to RabbitMQ |
 | [instances](integrations/instances.md)               | Workplace instance of each account   |
 | [tombstone](integrations/tombstone.md)               | Deleted accounts kept as tombstones  |
+| [groups](integrations/groups.md)                     | Organization groups                  |
 
 ## Utility Plugins
 
