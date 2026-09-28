@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `core/auth/openidconnect`: a session ends with its access token, unless a
+  refresh token renews it —
+  [notes](docs/usage/upgrading.md#an-openid-connect-session-ends-with-its-access-token)
+
+### Bug Fixes
+
+- `core/auth/openidconnect`: a client asking for JSON only
+  (`Accept: application/json`) with no session is answered `401`; it got no
+  answer at all
+
 ## v0.12.0 (2026-09-28)
 
 ### Deprecations

@@ -15,7 +15,7 @@ const { auth, requiresAuth } = oidc;
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
 import { launchHooksChained } from '../../lib/utils';
-import { serverError } from '../../lib/expressFormatedResponses';
+import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
@@ -340,30 +340,82 @@ export default class OpenIDConnect extends AuthBase {
         ).oidc.logout({
           logoutParams: { post_logout_redirect_uri: undefined },
         });
-      requiresAuth()(req, res, () => {
-        const claims = (
-          req as unknown as { oidc: { user: Record<string, unknown> } }
-        ).oidc.user;
-        const claim = (this.config.oidc_username_claim as string) || 'sub';
-        const named = claims[claim];
-        if (claim !== 'sub' && typeof named !== 'string')
-          // Once per session rather than per request would need somewhere to
-          // remember it; a provider that does not send the claim sends it for
-          // nobody, so the line repeats until the configuration is fixed.
-          this.logger.warn(
-            `${this.name}: no "${claim}" claim on this session, so ` +
-              'req.userName falls back to the sub. Check ' +
-              '--oidc-username-claim against the scopes the provider is ' +
-              'asked for'
+      const guard = (): void =>
+        // No session: a browser has already been sent to the provider, an
+        // API client comes back here with the refusal as `err`.
+        void requiresAuth()(req, res, (err?: unknown) => {
+          if (err) return unauthorized(res);
+          const claims = (
+            req as unknown as { oidc: { user: Record<string, unknown> } }
+          ).oidc.user;
+          const claim = (this.config.oidc_username_claim as string) || 'sub';
+          const named = claims[claim];
+          if (claim !== 'sub' && typeof named !== 'string')
+            // Once per session rather than per request would need somewhere to
+            // remember it; a provider that does not send the claim sends it for
+            // nobody, so the line repeats until the configuration is fixed.
+            this.logger.warn(
+              `${this.name}: no "${claim}" claim on this session, so ` +
+                'req.userName falls back to the sub. Check ' +
+                '--oidc-username-claim against the scopes the provider is ' +
+                'asked for'
+            );
+          this.publishIdentity(
+            req,
+            String(claims.sub),
+            typeof named === 'string' ? named : String(claims.sub)
           );
-        this.publishIdentity(
-          req,
-          String(claims.sub),
-          typeof named === 'string' ? named : String(claims.sub)
-        );
-        next();
-      });
+          next();
+        });
+      // Synchronous unless a refresh token has to be sent: nothing else here
+      // waits, and a request that needs no renewal is not made to.
+      const renewal = this.renewExpired(req);
+      if (renewal) void renewal.then(guard);
+      else guard();
     });
+  }
+
+  /**
+   * Keep a session no longer than its access token: past its expiry, renewed
+   * with the refresh token when the provider gave one, ended otherwise, so
+   * the caller goes back through the provider, which asks again if its own
+   * session is over.
+   *
+   * The library leaves the cookie alive for its own duration, a day of
+   * inactivity and a week at most, whatever the provider said, and nothing
+   * here reads the access token otherwise. A token with no expiry is kept.
+   *
+   * @param req the request, after the library's router
+   * @returns the renewal under way, which never rejects: a refused or failed
+   * one ends the session. Undefined when there is nothing to wait for.
+   */
+  private renewExpired(req: DmRequest): Promise<void> | undefined {
+    const oidc = (
+      req as unknown as {
+        oidc: {
+          refreshToken?: string;
+          accessToken?: { isExpired(): boolean; refresh(): Promise<unknown> };
+        };
+      }
+    ).oidc;
+    const token = oidc.accessToken;
+    if (!token?.isExpired()) return undefined;
+    // As a back-channel logout does: no session, so `requiresAuth` sends the
+    // caller to the provider, or answers 401 to an API client.
+    const end = (): void => {
+      (req as unknown as { appSession?: unknown }).appSession = undefined;
+    };
+    if (!oidc.refreshToken) return void end();
+    return token.refresh().then(
+      () => undefined,
+      (err: unknown) => {
+        this.logger.info(
+          `${this.name}: the provider refused to renew an access token, ` +
+            `so the session ends: ${String(err)}`
+        );
+        end();
+      }
+    );
   }
 
   /**
