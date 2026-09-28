@@ -70,7 +70,9 @@ membership changes belong to an erase, so it would publish them.
 - `--twake-lifecycle-rules`: a JSON file, or the JSON itself.
 
 Each option has a `DM_` environment variable, for example
-`DM_TWAKE_LIFECYCLE_RULES`. The plugin needs `--rabbitmq-url`.
+`DM_TWAKE_LIFECYCLE_RULES`. The events go through `core/rabbitmq`: without a
+broker (no `--rabbitmq-url`, or one that cannot be reached), they are lost,
+and each one is logged as an error.
 
 ## Rules
 

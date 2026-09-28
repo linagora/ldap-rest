@@ -27,12 +27,18 @@ class StubRabbitMq {
   name = 'rabbitmq';
   published: Published[] = [];
   fail = false;
+  client: object | null = {};
+  async getRawClient(): Promise<object | null> {
+    return this.client;
+  }
   async publish(
     exchange: string,
     routingKey: string,
     message: Record<string, string>,
     options?: { messageId?: string }
   ): Promise<void> {
+    // Silent without a client, like RabbitMq.publish
+    if (!this.client) return;
     if (this.fail) throw new Error('broker down');
     this.published.push({
       exchange,
@@ -159,11 +165,13 @@ describe('Twake lifecycle events plugin', function () {
   beforeEach(() => {
     rabbit.published = [];
     rabbit.fail = false;
+    rabbit.client = {};
     handled = [];
   });
 
   afterEach(async () => {
     rabbit.fail = false;
+    rabbit.client = {};
     for (const name of ['lc-alice', 'other-carol']) {
       await dm.ldap.delete(dnOf(name)).catch(() => undefined);
     }
@@ -371,6 +379,39 @@ describe('Twake lifecycle events plugin', function () {
       dnOf('lc-alice')
     );
     expect(res).to.have.nested.property('searchEntries.length', 1);
+  });
+
+  it('logs an event lost for want of a broker, and does not call it published', async () => {
+    rabbit.client = null;
+    const logged: { level: string; entry: Record<string, unknown> }[] = [];
+    const logger = dm.logger;
+    const { error, info } = logger;
+    logger.error = ((entry: Record<string, unknown>) => {
+      logged.push({ level: 'error', entry });
+      return logger;
+    }) as typeof logger.error;
+    logger.info = ((entry: Record<string, unknown>) => {
+      logged.push({ level: 'info', entry });
+      return logger;
+    }) as typeof logger.info;
+    try {
+      await add('lc-alice');
+      await seen(dnOf('lc-alice'));
+    } finally {
+      logger.error = error;
+      logger.info = info;
+    }
+    expect(rabbit.published).to.deep.equal([]);
+    const mine = logged.filter(
+      l => (l.entry as { plugin?: string })?.plugin === 'twakeLifecycleEvents'
+    );
+    expect(mine).to.have.length(1);
+    expect(mine[0].level).to.equal('error');
+    expect(mine[0].entry).to.include({
+      event: 'created',
+      routingKey: 'account.created',
+      result: 'no broker',
+    });
   });
 
   it('reads a GeneralizedTime deletion date', () => {

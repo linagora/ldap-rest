@@ -249,6 +249,11 @@ export default class TwakeLifecycleEvents extends DmPlugin {
         routingKey: target.routingKey,
         messageId,
       };
+      // Without a client, rabbitmq.publish returns without error or sending.
+      if (!(await rabbitmq.getRawClient())) {
+        this.logger.error({ ...log, result: 'no broker' });
+        continue;
+      }
       try {
         await rabbitmq.publish(target.exchange, target.routingKey, message, {
           messageId,
