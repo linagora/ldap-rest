@@ -34,7 +34,7 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
   // to the ppolicy value would never read as locked
   const lock = resolveLockConfig(
     own || scim,
-    config.twake_lifecycle_lock_value ||
+    config.twake_lifecycle_lock_value?.trim() ||
       (!own || own.toLowerCase() === scim.toLowerCase()
         ? config.scim_user_lock_value || ''
         : ''),

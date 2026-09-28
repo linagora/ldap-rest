@@ -626,6 +626,35 @@ describe('Twake lifecycle events plugin', function () {
       expect(refused?.message).to.match(/RabbitMQ at --rabbitmq-url cannot be/);
       expect(dm.loadedPlugins).not.to.have.property('lifecycleLate');
     });
+
+    it('warns when SCIM locks accounts another way', () => {
+      const warned: string[] = [];
+      const { warn } = plugin.logger;
+      plugin.logger.warn = ((m: string) => {
+        warned.push(m);
+        return plugin.logger;
+      }) as typeof warn;
+      const scim = dm.loadedPlugins.scim;
+      try {
+        for (const config of [
+          { scim_user_lock_attribute: 'pwdAccountLockedTime' },
+          {
+            scim_user_lock_attribute: 'nsAccountLock',
+            scim_user_lock_value: 'TRUE',
+          },
+        ]) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          dm.loadedPlugins.scim = { config } as any;
+          plugin.afterLoad();
+        }
+      } finally {
+        plugin.logger.warn = warn;
+        if (scim) dm.loadedPlugins.scim = scim;
+        else delete dm.loadedPlugins.scim;
+      }
+      expect(warned).to.have.length(1);
+      expect(warned[0]).to.match(/SCIM locks an account with nsAccountLock/);
+    });
   });
 
   it('reads a GeneralizedTime deletion date', () => {
@@ -667,6 +696,16 @@ describe('Twake lifecycle events plugin', function () {
           scim_user_lock_value: 'TRUE',
         })
       ).to.deep.equal(['nsAccountLock', 'true']);
+    });
+
+    it('reads a blank value of its own as none', () => {
+      expect(
+        lock({
+          twake_lifecycle_lock_value: ' ',
+          scim_user_lock_attribute: 'nsAccountLock',
+          scim_user_lock_value: 'TRUE',
+        })
+      ).to.deep.equal(['nsAccountLock', 'TRUE']);
     });
 
     it('refuses an attribute without its value, even when SCIM has one for another', () => {

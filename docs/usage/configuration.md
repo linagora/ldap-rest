@@ -447,16 +447,16 @@ Automatically creates/updates/deletes applicative account entries when users are
 
 #### `core/twake/lifecycleEvents`
 
-| CLI                                      | Env                                       | Default                      | Description                            |
-| ---------------------------------------- | ----------------------------------------- | ---------------------------- | -------------------------------------- |
-| `--twake-lifecycle-role-attribute`       | `DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE`       |                              | Role attribute                         |
-| `--twake-lifecycle-lock-attribute`       | `DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE`       | `--scim-user-lock-attribute` | Lock attribute                         |
-| `--twake-lifecycle-lock-value`           | `DM_TWAKE_LIFECYCLE_LOCK_VALUE`           | `--scim-user-lock-value`     | Value marking an account locked        |
-| `--twake-lifecycle-deleted-attribute`    | `DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE`    |                              | Attribute marking a tombstone          |
-| `--twake-lifecycle-deleted-value`        | `DM_TWAKE_LIFECYCLE_DELETED_VALUE`        | `TRUE`                       | Value marking a tombstone              |
-| `--twake-lifecycle-deleted-at-attribute` | `DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE` |                              | Deletion date attribute                |
-| `--twake-lifecycle-deleted-at-format`    | `DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT`    | `iso8601`                    | `iso8601` or `generalizedTime`         |
-| `--twake-lifecycle-rules`                | `DM_TWAKE_LIFECYCLE_RULES`                |                              | Rules: a JSON file, or the JSON itself |
+| CLI                                      | Env                                       | Default                      | Description                                                                                                      |
+| ---------------------------------------- | ----------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--twake-lifecycle-role-attribute`       | `DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE`       |                              | Role attribute                                                                                                   |
+| `--twake-lifecycle-lock-attribute`       | `DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE`       | `--scim-user-lock-attribute` | Lock attribute                                                                                                   |
+| `--twake-lifecycle-lock-value`           | `DM_TWAKE_LIFECYCLE_LOCK_VALUE`           | see description              | Value marking an account locked: SCIM's with SCIM's attribute, required with another than `pwdAccountLockedTime` |
+| `--twake-lifecycle-deleted-attribute`    | `DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE`    |                              | Attribute marking a tombstone                                                                                    |
+| `--twake-lifecycle-deleted-value`        | `DM_TWAKE_LIFECYCLE_DELETED_VALUE`        | `TRUE`                       | Value marking a tombstone                                                                                        |
+| `--twake-lifecycle-deleted-at-attribute` | `DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE` |                              | Deletion date attribute                                                                                          |
+| `--twake-lifecycle-deleted-at-format`    | `DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT`    | `iso8601`                    | `iso8601` or `generalizedTime`                                                                                   |
+| `--twake-lifecycle-rules`                | `DM_TWAKE_LIFECYCLE_RULES`                |                              | Rules: a JSON file, or the JSON itself                                                                           |
 
 See [lifecycle events](plugins/integrations/lifecycle-events.md).
 
