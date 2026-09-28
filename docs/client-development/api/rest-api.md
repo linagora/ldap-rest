@@ -244,6 +244,8 @@ curl -H "Accept: application/json" \
 - `features.ldapFlatGeneric.flatResources`: Array of flat LDAP resources (users, positions, etc.)
 - `features.ldapGroups`: Group management configuration (if enabled)
 - `features.ldapOrganizations`: Organization tree configuration (if enabled)
+- `features.openidconnect.endpoints.logout`: the logout route, when OpenID Connect
+  guards the server ([details](../../usage/plugins/auth/oidc.md#logout))
 
 ---
 

@@ -85,6 +85,33 @@ client (`Accept: application/json`) receives 401. Every other authentication
 plugin in this repository answers JSON 401 throughout — the difference is
 kept because it is what makes a login work at all.
 
+## Logout
+
+`/logout` ends the session at the provider as well (RP-Initiated Logout): the
+browser is sent to the provider's `end_session_endpoint` with the id token as
+`id_token_hint`, and the provider closes its own session — and, with
+[Back-Channel Logout](back-channel-logout.md), tells the other applications.
+No `post_logout_redirect_uri` is sent: the caller ends on the provider's own
+logout page, and nothing has to be registered there.
+
+Ending the cookie alone would not log anyone out: every guarded path goes
+through the provider, which still holds its session and logs the caller back
+in without asking anything.
+
+A provider whose discovery document names no `end_session_endpoint` gets a
+local logout — the cookie is dropped, the browser goes to `--base-url` — and
+a warning saying the provider may log the caller back in.
+
+`GET /v1/config` (with `core/configApi`) publishes the route, so a front-end
+knows it can offer a sign-out control. The key is `openidconnect` whatever
+the instance is named:
+
+```json
+"features": {
+  "openidconnect": { "enabled": true, "endpoints": { "logout": "/logout" } }
+}
+```
+
 ## How It Works
 
 1. Uses `express-openid-connect` for OAuth2/OIDC flow

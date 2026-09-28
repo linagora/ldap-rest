@@ -20,13 +20,23 @@ import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
 /**
- * The routes `express-openid-connect` serves itself.
+ * The routes this plugin answers itself: `/logout` in `authMethod`, the others
+ * through `express-openid-connect`.
  *
  * They belong to this plugin whatever it is scoped to: a provider has to be
  * able to reach the callback and to POST a logout token, and a catch-all
  * authentication answering `/callback` with a 401 breaks every login.
  */
 const OWN_ROUTES = ['/login', '/logout', '/callback', '/backchannel-logout'];
+
+/**
+ * How `openid-client` refuses to build a logout URL for a provider whose
+ * discovery document names no `end_session_endpoint`.
+ */
+const NO_END_SESSION = /^end_session_endpoint must be configured/;
+
+/** `/logout` as express matches a route: any case, trailing slash or not. */
+const LOGOUT = /^\/logout\/?$/i;
 
 /**
  * A hook list as `DM` holds it: whichever plugins registered under that name.
@@ -69,9 +79,14 @@ const walkSubscribers = async <T>(
 
 export default class OpenIDConnect extends AuthBase {
   name = 'openidconnect';
-  roles: Role[] = ['auth'] as const;
+  // A scoped instance must carry a name, and a front-end looks for the
+  // logout route here whatever it is.
+  configApiKey = 'openidconnect';
+  roles: Role[] = ['auth', 'configurable'] as const;
   /** The library's router, built once: `auth()` returns a fresh one per call. */
   private router?: RequestHandler;
+  /** Set once the missing `end_session_endpoint` has been reported. */
+  private warnedNoEndSession = false;
 
   constructor(server: DM) {
     super(server);
@@ -111,6 +126,19 @@ export default class OpenIDConnect extends AuthBase {
         response_type: 'code',
         scope: 'openid profile email',
       },
+      // RP-Initiated Logout: `/logout` sends the browser to the provider's
+      // `end_session_endpoint`, which closes the SSO session and tells the
+      // other applications through Back-Channel Logout. Left off, `/logout`
+      // only dropped the cookie, and the next request went through the
+      // provider and came back logged in without being asked anything: a
+      // logout with nothing to show for it.
+      //
+      // The route is served in `authMethod` rather than by the library,
+      // which always sends a `post_logout_redirect_uri` — one the provider
+      // refuses unless it was registered, for a return nobody needs: the
+      // provider's own logout page is where the caller is done.
+      idpLogout: true,
+      routes: { logout: false },
       // Back-Channel Logout, handed to whoever subscribed. This plugin knows
       // how to receive a logout token and how to ask whether the session in
       // front of it is still alive; where that answer is kept is a plugin of
@@ -214,6 +242,19 @@ export default class OpenIDConnect extends AuthBase {
   }
 
   /**
+   * What `GET /v1/config` publishes under `features`.
+   *
+   * A front-end served by this server cannot tell otherwise that a session
+   * can be ended here: the logout route is this plugin's, and exists only
+   * when it is loaded.
+   *
+   * @returns the logout route, relative to the server root
+   */
+  getConfigApiData(): Record<string, unknown> {
+    return { enabled: true, endpoints: { logout: '/logout' } };
+  }
+
+  /**
    * Paths this authentication claims.
    *
    * Its own routes come with it. Scoped to `/api/admin`, the plugin would
@@ -280,7 +321,25 @@ export default class OpenIDConnect extends AuthBase {
         new Error(`${this.name}: api() has not built the router`)
       );
     this.router(req, res, (err?: unknown) => {
+      if (err && LOGOUT.test(req.path) && this.noEndSession(err))
+        // The library clears the session before it asks for the provider's
+        // logout URL, so what is left is the redirect it could not build.
+        // The provider's session survives and will log the caller back in:
+        // that is the provider's limit, and a 500 would not lift it.
+        return res.redirect(this.config.base_url as string);
       if (err) return serverError(res, err as Error);
+      if (
+        (req.method === 'GET' || req.method === 'HEAD') &&
+        LOGOUT.test(req.path)
+      )
+        // A failure comes back through this same callback, as `err`.
+        return void (
+          res as unknown as {
+            oidc: { logout: (params: object) => Promise<void> };
+          }
+        ).oidc.logout({
+          logoutParams: { post_logout_redirect_uri: undefined },
+        });
       requiresAuth()(req, res, () => {
         const claims = (
           req as unknown as { oidc: { user: Record<string, unknown> } }
@@ -305,5 +364,29 @@ export default class OpenIDConnect extends AuthBase {
         next();
       });
     });
+  }
+
+  /**
+   * Whether `/logout` failed because the provider offers no RP-Initiated
+   * Logout, rather than for a reason worth a 500.
+   *
+   * Warned once: the provider's discovery document does not change while
+   * the server runs.
+   *
+   * @param err what the library handed back
+   * @returns true when the provider has no `end_session_endpoint`
+   */
+  private noEndSession(err: unknown): boolean {
+    if (!(err instanceof Error) || !NO_END_SESSION.test(err.message))
+      return false;
+    if (!this.warnedNoEndSession) {
+      this.warnedNoEndSession = true;
+      this.logger.warn(
+        `${this.name}: the provider publishes no end_session_endpoint, so ` +
+          '/logout ends the session here only, and the provider may log ' +
+          'the caller back in'
+      );
+    }
+    return true;
   }
 }

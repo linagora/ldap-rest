@@ -149,7 +149,7 @@ export default class ConfigApi extends DmPlugin {
         try {
           const pluginConfig = plugin.getConfigApiData();
           if (pluginConfig) {
-            features[pluginName] = pluginConfig;
+            features[plugin.configApiKey ?? pluginName] = pluginConfig;
           }
         } catch (err) {
           this.logger.warn(
