@@ -292,6 +292,38 @@ export interface Config {
   twake_lifecycle_deleted_at_attribute?: string;
   twake_lifecycle_deleted_at_format?: string;
   twake_lifecycle_rules?: string;
+  twake_instance_dn?: string[];
+  twake_instance_skip_attribute?: string;
+  twake_instance_skip_value?: string;
+  twake_instance_provider?: string;
+  twake_instance_id?: string;
+  twake_instance_fqdn_attribute?: string;
+  twake_instance_sent_attribute?: string;
+  twake_instance_locale?: string;
+  twake_instance_timeout?: number;
+  twake_instance_cloudery_url?: string;
+  twake_instance_cloudery_token?: string;
+  twake_instance_cloudery_offer?: string;
+  twake_instance_cloudery_domain?: string;
+  twake_instance_cloudery_organization_offer?: string;
+  twake_instance_cozy_url?: string;
+  twake_instance_cozy_user?: string;
+  twake_instance_cozy_passphrase?: string;
+  twake_instance_cozy_domain?: string;
+  twake_instance_cozy_context?: string;
+  twake_instance_cozy_apps?: string;
+  twake_instance_cozy_org_id?: string;
+  twake_instance_cozy_org_domain?: string;
+  twake_instance_auth_exchange?: string;
+  twake_instance_b2b_exchange?: string;
+  twake_instance_user_created_key?: string;
+  twake_instance_organization_created_key?: string;
+  twake_instance_workplace_created_key?: string;
+  twake_instance_queue?: string;
+  twake_instance_organization_base?: string;
+  twake_instance_organization_id_attribute?: string;
+  twake_instance_organization_domain_attribute?: string;
+  twake_instance_organization_fqdn_attribute?: string;
   rabbitmq_url?: string;
 
   // Applicative Accounts plugin
@@ -776,6 +808,95 @@ const configArgs: ConfigTemplate = [
   // twake/lifecycleEvents plugin
   ['--twake-lifecycle-rules', 'DM_TWAKE_LIFECYCLE_RULES', ''],
 
+  // twake/instances plugin
+  ['--twake-instance-dn', 'DM_TWAKE_INSTANCE_DN', [], 'array'],
+  ['--twake-instance-skip-attribute', 'DM_TWAKE_INSTANCE_SKIP_ATTRIBUTE', ''],
+  ['--twake-instance-skip-value', 'DM_TWAKE_INSTANCE_SKIP_VALUE', ''],
+  ['--twake-instance-provider', 'DM_TWAKE_INSTANCE_PROVIDER', 'cloudery'],
+  ['--twake-instance-id', 'DM_TWAKE_INSTANCE_ID', '{uid}'],
+  [
+    '--twake-instance-fqdn-attribute',
+    'DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE',
+    'twakeWorkspaceUrl',
+  ],
+  [
+    '--twake-instance-sent-attribute',
+    'DM_TWAKE_INSTANCE_SENT_ATTRIBUTE',
+    'twakeCreatedEventAt',
+  ],
+  ['--twake-instance-locale', 'DM_TWAKE_INSTANCE_LOCALE', ''],
+  ['--twake-instance-timeout', 'DM_TWAKE_INSTANCE_TIMEOUT', 30000, 'number'],
+  ['--twake-instance-cloudery-url', 'DM_TWAKE_INSTANCE_CLOUDERY_URL', ''],
+  ['--twake-instance-cloudery-token', 'DM_TWAKE_INSTANCE_CLOUDERY_TOKEN', ''],
+  [
+    '--twake-instance-cloudery-offer',
+    'DM_TWAKE_INSTANCE_CLOUDERY_OFFER',
+    'b2b_twake_default',
+  ],
+  ['--twake-instance-cloudery-domain', 'DM_TWAKE_INSTANCE_CLOUDERY_DOMAIN', ''],
+  [
+    '--twake-instance-cloudery-organization-offer',
+    'DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER',
+    '',
+  ],
+  ['--twake-instance-cozy-url', 'DM_TWAKE_INSTANCE_COZY_URL', ''],
+  ['--twake-instance-cozy-user', 'DM_TWAKE_INSTANCE_COZY_USER', 'admin'],
+  ['--twake-instance-cozy-passphrase', 'DM_TWAKE_INSTANCE_COZY_PASSPHRASE', ''],
+  ['--twake-instance-cozy-domain', 'DM_TWAKE_INSTANCE_COZY_DOMAIN', ''],
+  [
+    '--twake-instance-cozy-context',
+    'DM_TWAKE_INSTANCE_COZY_CONTEXT',
+    'default',
+  ],
+  [
+    '--twake-instance-cozy-apps',
+    'DM_TWAKE_INSTANCE_COZY_APPS',
+    'home,drive,settings,notes,dataproxy',
+  ],
+  ['--twake-instance-cozy-org-id', 'DM_TWAKE_INSTANCE_COZY_ORG_ID', ''],
+  ['--twake-instance-cozy-org-domain', 'DM_TWAKE_INSTANCE_COZY_ORG_DOMAIN', ''],
+  ['--twake-instance-auth-exchange', 'DM_TWAKE_INSTANCE_AUTH_EXCHANGE', 'auth'],
+  ['--twake-instance-b2b-exchange', 'DM_TWAKE_INSTANCE_B2B_EXCHANGE', 'b2b'],
+  [
+    '--twake-instance-user-created-key',
+    'DM_TWAKE_INSTANCE_USER_CREATED_KEY',
+    'user.created',
+  ],
+  [
+    '--twake-instance-organization-created-key',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_CREATED_KEY',
+    'organization.created',
+  ],
+  [
+    '--twake-instance-workplace-created-key',
+    'DM_TWAKE_INSTANCE_WORKPLACE_CREATED_KEY',
+    'workplace.created',
+  ],
+  [
+    '--twake-instance-queue',
+    'DM_TWAKE_INSTANCE_QUEUE',
+    'workplace.created.ldap-rest',
+  ],
+  [
+    '--twake-instance-organization-base',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_BASE',
+    '',
+  ],
+  [
+    '--twake-instance-organization-id-attribute',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_ID_ATTRIBUTE',
+    'ou',
+  ],
+  [
+    '--twake-instance-organization-domain-attribute',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE',
+    'twakeDomain',
+  ],
+  [
+    '--twake-instance-organization-fqdn-attribute',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE',
+    '',
+  ],
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
 
   // Applicative Accounts plugin
