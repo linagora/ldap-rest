@@ -268,6 +268,100 @@ describe('Twake lifecycle events plugin', function () {
     ]);
   });
 
+  describe('deletion', () => {
+    const deletedAt = '2026-01-02T03:04:05.000Z';
+
+    async function tombstone(reason = 'member_deleted'): Promise<void> {
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        replace: {
+          employeeType: 'deleted',
+          roomNumber: deletedAt,
+          businessCategory: reason,
+          pwdAccountLockedTime: LOCKED,
+        },
+        delete: ['mobile'],
+      });
+    }
+
+    beforeEach(async () => {
+      await add('lc-alice', { mobile: '+33600000000' });
+      await seen(dnOf('lc-alice'));
+      rabbit.published = [];
+    });
+
+    it('publishes deleted, and not disabled, when the entry becomes a tombstone', async () => {
+      await tombstone();
+      await seen(dnOf('lc-alice'), 2);
+      expect(
+        rabbit.published.map(p => [p.routingKey, p.message])
+      ).to.deep.equal([
+        [
+          'account.deleted',
+          {
+            id: 'lc-alice',
+            email: 'lc-alice@example.org',
+            reasonCode: 'member_deleted',
+            deletedAt,
+          },
+        ],
+      ]);
+    });
+
+    it('publishes deleted and not disabled when the lock follows in a second write', async () => {
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        replace: { employeeType: 'deleted', roomNumber: deletedAt },
+      });
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        replace: { pwdAccountLockedTime: LOCKED },
+      });
+      await seen(dnOf('lc-alice'), 3);
+      expect(keys()).to.deep.equal(['account.deleted']);
+    });
+
+    it('publishes a target only when its condition holds', async () => {
+      await tombstone('user_request');
+      await seen(dnOf('lc-alice'), 2);
+      expect(
+        rabbit.published.map(p => [p.exchange, p.routingKey, p.message])
+      ).to.deep.include([
+        'notifications',
+        'account.deleted.notify',
+        { id: 'lc-alice', mobile: '+33600000000' },
+      ]);
+    });
+
+    it('publishes nothing for other changes to a tombstone', async () => {
+      await tombstone();
+      await seen(dnOf('lc-alice'), 2);
+      rabbit.published = [];
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        delete: ['pwdAccountLockedTime'],
+        replace: { title: 'admin' },
+      });
+      await seen(dnOf('lc-alice'), 3);
+      expect(rabbit.published).to.deep.equal([]);
+    });
+
+    it('publishes nothing when a tombstone is removed', async () => {
+      await tombstone();
+      await seen(dnOf('lc-alice'), 2);
+      rabbit.published = [];
+      await dm.ldap.delete(dnOf('lc-alice'));
+      await seen(dnOf('lc-alice'), 3);
+      expect(rabbit.published).to.deep.equal([]);
+    });
+
+    it('publishes deleted when a live entry is removed', async () => {
+      await dm.ldap.delete(dnOf('lc-alice'));
+      await seen(dnOf('lc-alice'), 2);
+      expect(
+        rabbit.published.map(p => [p.routingKey, p.message])
+      ).to.deep.equal([
+        ['account.deleted', { id: 'lc-alice', email: 'lc-alice@example.org' }],
+      ]);
+    });
+  });
+
   it('logs a failed publish and lets the write succeed', async () => {
     rabbit.fail = true;
     await add('lc-alice');
