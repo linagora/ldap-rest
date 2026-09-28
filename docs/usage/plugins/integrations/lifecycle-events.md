@@ -83,7 +83,10 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - `--twake-lifecycle-role-attribute`: empty means no `roleChanged`.
 - `--twake-lifecycle-lock-attribute`, `--twake-lifecycle-lock-value`: default
   to `--scim-user-lock-attribute` and `--scim-user-lock-value`, so SCIM
-  `active` and the events agree. The lock value defaults to `000001010000Z`.
+  `active` and the events agree; SCIM's value only goes with SCIM's
+  attribute. `pwdAccountLockedTime` defaults to `000001010000Z`; any other
+  attribute needs its value, or the server does not start, as for
+  [SCIM](scim.md).
   Only changes written through LDAP-Rest are seen: a lockout set by the
   directory publishes nothing.
 - `--twake-lifecycle-deleted-attribute`, `--twake-lifecycle-deleted-value`
@@ -96,9 +99,9 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 
 Each option has a `DM_` environment variable, for example
 `DM_TWAKE_LIFECYCLE_RULES`. The events go through `core/rabbitmq`. With rules
-configured, the server does not start without `--rabbitmq-url`, and stops if
-that broker cannot be reached once every plugin is loaded. An event that finds
-no broker later on is lost, and logged as an error.
+configured, the server does not start without `--rabbitmq-url`, nor when
+that broker cannot be reached. An event that finds no broker later on is
+lost, and logged as an error.
 
 ## Rules
 
