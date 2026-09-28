@@ -27,9 +27,10 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
   }
   return {
     role: config.twake_lifecycle_role_attribute || '',
+    // Trimmed as SCIM trims it, or the two would follow different attributes
     lock:
-      config.twake_lifecycle_lock_attribute ||
-      config.scim_user_lock_attribute ||
+      config.twake_lifecycle_lock_attribute?.trim() ||
+      config.scim_user_lock_attribute?.trim() ||
       'pwdAccountLockedTime',
     deleted: config.twake_lifecycle_deleted_attribute || '',
     deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',

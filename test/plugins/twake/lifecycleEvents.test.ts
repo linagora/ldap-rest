@@ -10,7 +10,10 @@ import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeLifecycleEvents, {
   parseRules,
 } from '../../../src/plugins/twake/lifecycleEvents';
-import { parseDeletedAt } from '../../../src/plugins/twake/lifecycleAttributes';
+import {
+  lifecycleAttributes,
+  parseDeletedAt,
+} from '../../../src/plugins/twake/lifecycleAttributes';
 import { waitFor } from '../../helpers/waitFor';
 
 const BASE = `ou=users,${process.env.DM_LDAP_BASE}`;
@@ -434,6 +437,16 @@ describe('Twake lifecycle events plugin', function () {
       parseDeletedAt('20260102030405Z', 'generalizedTime')?.toISOString()
     ).to.equal('2026-01-02T03:04:05.000Z');
     expect(parseDeletedAt('yesterday', 'generalizedTime')).to.equal(undefined);
+  });
+
+  it('follows the lock attribute SCIM follows, spaces trimmed', () => {
+    expect(
+      lifecycleAttributes({
+        ...dm.config,
+        twake_lifecycle_lock_attribute: '',
+        scim_user_lock_attribute: ' nsAccountLock ',
+      }).lock
+    ).to.equal('nsAccountLock');
   });
 
   describe('rules', () => {
