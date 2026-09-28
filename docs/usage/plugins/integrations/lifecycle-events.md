@@ -37,7 +37,9 @@ already announced.
 A publish that fails is logged as an error, and the next targets are still
 published. It never fails the write that caused it, and the event is not
 replayed: writing the same value again changes nothing, so it publishes
-nothing.
+nothing. With `core/twake/tombstone`, a lost `deleted` is published again by
+deleting the tombstone once more (see below); a lost `disabled`, `enabled`,
+`created` or `roleChanged` has no such path.
 
 The lock attribute is requested by name when the entry is read, so an
 operational one such as `pwdAccountLockedTime` is seen on both sides.
@@ -57,6 +59,11 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 
 ## Deployments with other plugins
 
+- `core/twake/tombstone` answers a second delete of a tombstone without
+  writing anything, and fires `twakedeletionreplay`; this plugin then
+  publishes `deleted` again, with the tombstone as it is (same deletion date).
+  This explicit delete is how a `deleted` event a broker outage lost is
+  replayed.
 - `core/twake/cozyProvision` and `core/twake/clouderyProvision` publish their
   own deletion event on `--cozy-user-deleted-routing-key`. When a `deleted`
   rule here publishes it, set that option to `""`. Turning it off without a
