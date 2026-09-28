@@ -1,4 +1,7 @@
+import { EventEmitter } from 'node:events';
+
 import { expect } from 'chai';
+import type { Request } from 'express';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
@@ -10,6 +13,7 @@ import LdapGroups from '../../../src/plugins/ldap/groups';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import Scim from '../../../src/plugins/scim/scim';
 import TwakeLifecycleEvents from '../../../src/plugins/twake/lifecycleEvents';
+import TwakeInstances from '../../../src/plugins/twake/instances';
 import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
 
@@ -40,6 +44,8 @@ describe('Twake tombstone plugin', function () {
   let rabbit: StubRabbitMq;
   let raw: DM;
   let handled: { dn: string; done: Promise<unknown> }[] = [];
+  /** What ldapaddafter subscribers are handed, as core/twake/instances is */
+  let added: { dn: string; entry: AttributesList }[] = [];
 
   const flat = (name: string): string => `uid=${name},${USERS}`;
   const nested = (name: string): string => `uid=${name},${ORG}`;
@@ -158,11 +164,17 @@ describe('Twake tombstone plugin', function () {
     await dm.registerPlugin('core/ldap/groups', groups);
     await dm.registerPlugin('core/scim', new Scim(dm));
     plugin.afterLoad();
+    (dm.hooks.ldapaddafter ||= []).push(
+      ([dn, entry]: [string, AttributesList]) => {
+        added.push({ dn, entry });
+      }
+    );
   });
 
   beforeEach(() => {
     rabbit.published = [];
     handled = [];
+    added = [];
   });
 
   // Cleanup through a server that loads no plugin: it deletes for real and
@@ -385,6 +397,174 @@ describe('Twake tombstone plugin', function () {
         .query({ filter: 'userName sw "ts-"' })
         .expect(200);
       expect(res.body.totalResults).to.equal(0);
+    });
+
+    it('replaces a tombstone with a new entry on create', async () => {
+      await supertest(dm.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'ts-alice',
+          name: { familyName: 'Alice' },
+        })
+        .expect(201);
+      // add, tombstone, erase, new entry
+      await seen(flat('ts-alice'), 4);
+      const entry = await read(flat('ts-alice'));
+      expect(entry).not.to.have.property('employeeType');
+      expect(entry).not.to.have.property('roomNumber');
+      expect(rabbit.published.map(p => p.routingKey)).to.deep.equal([
+        'created',
+      ]);
+    });
+
+    it('puts the tombstone and its memberships back when the directory refuses the create', async () => {
+      await add(flat('plain-bob'));
+      await groups.addGroup('ts-group', [flat('ts-alice'), flat('plain-bob')]);
+      await seen(flat('plain-bob'));
+      rabbit.published = [];
+      const before = (await read(flat('ts-alice')))?.roomNumber;
+      const res = await supertest(dm.app)
+        .post('/scim/v2/Users')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'ts-alice',
+          name: { familyName: 'Alice' },
+          // Not IA5: the directory refuses the mail
+          emails: [{ value: 'aliçe@example.org', primary: true }],
+        });
+      expect(res.status).to.be.at.least(400);
+      await waitFor(
+        async () => (await read(flat('ts-alice')))?.employeeType === 'deleted',
+        { what: 'the tombstone to be put back' }
+      );
+      expect((await read(flat('ts-alice')))?.roomNumber).to.equal(before);
+      await waitFor(async () => (await members()).includes(flat('ts-alice')), {
+        what: 'the memberships to be put back',
+      });
+      expect(rabbit.published).to.deep.equal([]);
+      // core/twake/instances gives no instance to the tombstone put back
+      const restored = added.filter(a => a.dn === flat('ts-alice')).pop();
+      const instances = new TwakeInstances(
+        Object.assign(Object.create(dm) as DM, {
+          config: {
+            ...dm.config,
+            twake_instance_dn: [`^uid=ts-[^,]+,${USERS}$`],
+            twake_instance_provider: 'cloudery',
+            twake_instance_cloudery_url: 'http://cloudery.invalid',
+            twake_instance_cloudery_domain: 'example.org',
+          },
+        })
+      ) as unknown as {
+        account: (dn: string, entry: AttributesList) => unknown;
+      };
+      expect(restored?.entry).to.include({ employeeType: 'deleted' });
+      expect(instances.account(flat('ts-alice'), restored!.entry)).to.equal(
+        undefined
+      );
+      const { employeeType: _, ...alive } = restored!.entry;
+      expect(instances.account(flat('ts-alice'), alive)).not.to.equal(
+        undefined
+      );
+    });
+
+    it('takes the placeholder out of a group the tombstone is put back in', async () => {
+      const solo = `cn=ts-solo,${GROUPS}`;
+      await dm.ldap.add(solo, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'ts-solo',
+        member: flat('ts-alice'),
+      });
+      try {
+        const res = await supertest(dm.app)
+          .post('/scim/v2/Users')
+          .set('Content-Type', 'application/scim+json')
+          .send({
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            userName: 'ts-alice',
+            name: { familyName: 'Alice' },
+            emails: [{ value: 'aliçe@example.org', primary: true }],
+          });
+        expect(res.status).to.be.at.least(400);
+        await waitFor(
+          async () => (await read(solo))?.member === flat('ts-alice'),
+          { what: 'the membership alone to be put back' }
+        );
+      } finally {
+        await dm.ldap.delete(solo).catch(() => undefined);
+      }
+    });
+
+    it('waits for the response to end, not for the client to leave', async () => {
+      // Time for a restore to run, if anything started one
+      const pause = (): Promise<void> =>
+        new Promise(resolve => setTimeout(resolve, 200));
+      const res = new EventEmitter() as EventEmitter & { end: () => void };
+      let ended = 0;
+      res.end = () => {
+        ended++;
+      };
+      const req = {
+        originalUrl: '/scim/v2/Users',
+        headers: {},
+        res,
+      } as unknown as Request;
+      await plugin.hooks.ldapaddrequest!([flat('ts-alice'), {}, req]);
+      expect(await read(flat('ts-alice'))).to.equal(undefined);
+      // The client goes away before the add is issued
+      res.emit('close');
+      await pause();
+      await add(flat('ts-alice'));
+      res.end();
+      expect(ended).to.equal(1);
+      await pause();
+      const entry = await read(flat('ts-alice'));
+      expect(entry).to.have.property('uid', 'ts-alice');
+      expect(entry).not.to.have.property('employeeType');
+    });
+  });
+
+  describe('lock', () => {
+    const withLock = (
+      settings: Record<string, string>,
+      check: () => void
+    ): void => {
+      const saved = { ...dm.config };
+      Object.assign(dm.config, settings);
+      try {
+        check();
+      } finally {
+        Object.assign(dm.config, saved);
+      }
+    };
+
+    it('refuses a lock attribute other than the ppolicy one without its value', () => {
+      withLock(
+        {
+          twake_lifecycle_lock_attribute: 'nsAccountLock',
+          twake_lifecycle_lock_value: '',
+          scim_user_lock_attribute: '',
+          scim_user_lock_value: '',
+        },
+        () =>
+          expect(() => new TwakeTombstone(dm)).to.throw(
+            /--twake-lifecycle-lock-value must say what marks an account locked/
+          )
+      );
+    });
+
+    it("does not borrow SCIM's lock value for another attribute", () => {
+      withLock(
+        {
+          twake_lifecycle_lock_attribute: 'nsAccountLock',
+          twake_lifecycle_lock_value: '',
+          scim_user_lock_attribute: 'carLicense',
+          scim_user_lock_value: 'L',
+        },
+        () => expect(() => new TwakeTombstone(dm)).to.throw(/nsAccountLock/)
+      );
     });
   });
 

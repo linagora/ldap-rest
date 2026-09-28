@@ -89,11 +89,11 @@ export default class TwakeTombstone extends DmPlugin {
   }
 
   /**
-   * Last in the delete chain: a plugin that may refuse the request
+   * Last in the delete and add chains: a plugin that may refuse the request
    * judges it before a tombstone is written or erased.
    */
   afterLoad(): void {
-    for (const name of ['ldapdeleterequest'] as const) {
+    for (const name of ['ldapdeleterequest', 'ldapaddrequest'] as const) {
       const list = this.server.hooks[name];
       const own = this.hooks[name];
       const at = list && own ? list.indexOf(own) : -1;
@@ -117,6 +117,15 @@ export default class TwakeTombstone extends DmPlugin {
         kept.push(one);
       }
       return [kept, req];
+    },
+
+    ldapaddrequest: async ([dn, entry, req]) => {
+      if (this.isScim(req) && this.matches(dn)) {
+        const existing = await this.read(dn);
+        if (existing && isTombstone(existing, this.attrs))
+          await this.replace(dn, existing, req!);
+      }
+      return [dn, entry, req];
     },
 
     ldapsearchrequest: ([base, opts, req]) => {
@@ -261,6 +270,75 @@ export default class TwakeTombstone extends DmPlugin {
           `a tombstone. Leave that branch out of --trash-watched-bases, or ` +
           `load one of the two plugins only`
       );
+  }
+
+  /**
+   * Erase a tombstone so a SCIM create can take its identity. The directory
+   * may still refuse the add; the tombstone and its memberships are then put
+   * back once the response is sent.
+   */
+  private async replace(
+    dn: string,
+    tombstone: AttributesList,
+    req: Request
+  ): Promise<void> {
+    const groups = await this.groupsOf(dn);
+    const dummy = this.config.group_dummy_user;
+    const placeholders = new Set(dummy ? await this.groupsOf(dummy) : []);
+    await this.erase(dn, { force: true, req });
+    const res = req.res;
+    if (!res) return;
+    // Not on 'close': it also fires when the client goes away, possibly
+    // before the add is issued, and 'finish' then never fires at all. The
+    // handler ends the response once the add has settled, client or not.
+    const end = res.end.bind(res);
+    res.end = ((...args: unknown[]) => {
+      res.end = end;
+      const ended = (end as (...a: unknown[]) => Response)(...args);
+      this.restore(dn, tombstone, groups, placeholders).catch((err: unknown) =>
+        this.logger.error({
+          plugin: this.name,
+          event: 'restore',
+          dn,
+          error: String(err),
+        })
+      );
+      return ended;
+    }) as typeof end;
+  }
+
+  /**
+   * Put back a tombstone the add did not replace, with its memberships. A
+   * group the erase left holding only the placeholder loses it again.
+   */
+  private async restore(
+    dn: string,
+    tombstone: AttributesList,
+    groups: string[],
+    placeholders: Set<string>
+  ): Promise<void> {
+    if (await this.read(dn)) return;
+    // ldapts lists an attribute asked for by name even when the entry has
+    // none, and an add refuses an attribute without values.
+    const attributes = Object.fromEntries(
+      Object.entries(tombstone).filter(
+        ([name, value]) =>
+          name !== 'dn' && !(Array.isArray(value) && value.length === 0)
+      )
+    );
+    await this.server.ldap.add(dn, attributes);
+    const dummy = this.config.group_dummy_user;
+    for (const group of groups) {
+      await this.server.ldap.modify(group, { add: { member: dn } });
+      if (!dummy || placeholders.has(group)) continue;
+      await this.server.ldap
+        .modify(group, { delete: { member: dummy } })
+        .catch((err: unknown) => {
+          // No placeholder: the group was not left empty.
+          if (extractLdapCode(err) !== 16) throw err;
+        });
+    }
+    this.logger.warn({ plugin: this.name, event: 'restore', dn });
   }
 
   private matches(dn: string): boolean {
