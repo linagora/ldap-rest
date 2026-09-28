@@ -124,10 +124,14 @@ export default class OpenIDConnect extends AuthBase {
       // other applications through Back-Channel Logout. Left off, `/logout`
       // only dropped the cookie, and the next request went through the
       // provider and came back logged in without being asked anything: a
-      // logout with nothing to show for it. The browser returns to
-      // `base_url`, which the provider must accept as a post-logout redirect
-      // URI. A provider without the endpoint is handled in `authMethod`.
+      // logout with nothing to show for it.
+      //
+      // The route is served in `authMethod` rather than by the library,
+      // which always sends a `post_logout_redirect_uri` — one the provider
+      // refuses unless it was registered, for a return nobody needs: the
+      // provider's own logout page is where the caller is done.
       idpLogout: true,
+      routes: { logout: false },
       // Back-Channel Logout, handed to whoever subscribed. This plugin knows
       // how to receive a logout token and how to ask whether the session in
       // front of it is still alive; where that answer is kept is a plugin of
@@ -317,6 +321,15 @@ export default class OpenIDConnect extends AuthBase {
         // that is the provider's limit, and a 500 would not lift it.
         return res.redirect(this.config.base_url as string);
       if (err) return serverError(res, err as Error);
+      if (req.method === 'GET' && req.path === '/logout')
+        // A failure comes back through this same callback, as `err`.
+        return void (
+          res as unknown as {
+            oidc: { logout: (params: object) => Promise<void> };
+          }
+        ).oidc.logout({
+          logoutParams: { post_logout_redirect_uri: undefined },
+        });
       requiresAuth()(req, res, () => {
         const claims = (
           req as unknown as { oidc: { user: Record<string, unknown> } }

@@ -4,20 +4,6 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## To 0.12.0
-
-### OpenID Connect logs out at the provider
-
-**Who is affected:** a deployment using `core/auth/openidconnect` whose users
-reach `/logout`.
-
-`/logout` used to drop the session cookie alone; it now sends the browser to
-the provider's `end_session_endpoint` (RP-Initiated Logout), which then sends
-it back to `--base-url`. **Declare `--base-url` as a post-logout redirect URI
-at the provider**, or the logout stops there with an error. A provider
-without the endpoint keeps the old local logout. See
-[Logout](plugins/auth/oidc.md#logout).
-
 ## To 0.11.0
 
 ### Group reads are judged

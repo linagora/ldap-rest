@@ -89,11 +89,10 @@ kept because it is what makes a login work at all.
 
 `/logout` ends the session at the provider as well (RP-Initiated Logout): the
 browser is sent to the provider's `end_session_endpoint` with the id token as
-`id_token_hint`, the provider closes its own session — and, with
-[Back-Channel Logout](back-channel-logout.md), tells the other applications —
-then sends the browser back to `--base-url`. **Declare `--base-url` as a
-post-logout redirect URI at the provider**, or it refuses to send the browser
-back.
+`id_token_hint`, and the provider closes its own session — and, with
+[Back-Channel Logout](back-channel-logout.md), tells the other applications.
+No `post_logout_redirect_uri` is sent: the caller ends on the provider's own
+logout page, and nothing has to be registered there.
 
 Ending the cookie alone would not log anyone out: every guarded path goes
 through the provider, which still holds its session and logs the caller back
@@ -228,11 +227,6 @@ npm install express-openid-connect
 - `--oidc-client-id`
 - `--oidc-client-secret`
 - `--base-url`
-
-**Problem:** Logout stops at the provider with an error
-
-**Solution:** Declare `--base-url` as a post-logout redirect URI at the
-provider.
 
 **Problem:** Redirect loop
 

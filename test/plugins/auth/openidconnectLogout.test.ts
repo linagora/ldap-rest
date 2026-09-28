@@ -106,9 +106,8 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
     const target = new URL(res.headers.location);
     expect(`${target.origin}${target.pathname}`).to.equal(`${issuer}/logout`);
     expect(target.searchParams.get('id_token_hint')).to.equal(idToken);
-    expect(target.searchParams.get('post_logout_redirect_uri')).to.match(
-      new RegExp(`^${BASE_URL}/?$`)
-    );
+    // Registering a return at the provider is not asked of anyone.
+    expect(target.searchParams.has('post_logout_redirect_uri')).to.equal(false);
     expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
   });
 
@@ -119,7 +118,7 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
     const res = await request.get('/logout');
 
     expect(res.status).to.equal(302);
-    expect(res.headers.location).to.match(new RegExp(`^${issuer}/logout\\?`));
+    expect(res.headers.location).to.equal(`${issuer}/logout`);
   });
 
   it('should end the session here when the provider has no endpoint', async () => {
