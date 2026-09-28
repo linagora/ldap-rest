@@ -748,7 +748,7 @@ const configArgs: ConfigTemplate = [
     'number',
   ],
 
-  // Account lifecycle attributes, shared by the twake lifecycle plugins
+  // Account lifecycle attributes
   ['--twake-lifecycle-role-attribute', 'DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE', ''],
   ['--twake-lifecycle-lock-attribute', 'DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE', ''],
   [

@@ -67,8 +67,8 @@ membership changes belong to an erase, so it would publish them.
 - `--twake-lifecycle-lock-attribute`: defaults to
   `--scim-user-lock-attribute`, so SCIM `active` and the events agree.
 - `--twake-lifecycle-deleted-attribute`, `--twake-lifecycle-deleted-value`
-  (default `TRUE`): what marks a tombstone. Empty means entries are never
-  tombstones, and only a removal publishes `deleted`.
+  (default `TRUE`, compared case-insensitively): what marks a tombstone. Empty
+  means entries are never tombstones, and only a removal publishes `deleted`.
 - `--twake-lifecycle-deleted-at-attribute`,
   `--twake-lifecycle-deleted-at-format` (`iso8601`, the default, or
   `generalizedTime`): the deletion date. It is always published as ISO 8601.

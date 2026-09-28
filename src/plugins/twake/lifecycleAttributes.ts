@@ -1,8 +1,8 @@
 /**
  * @module plugins/twake/lifecycleAttributes
  *
- * The attributes that carry an account's lifecycle, shared by the plugins
- * that write it and the ones that publish it, so both read one configuration.
+ * The attributes that carry an account's lifecycle (its role, its lock, its
+ * deletion), read from the `--twake-lifecycle-*` options.
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
@@ -60,7 +60,7 @@ export function first(
   return text === '' ? undefined : text;
 }
 
-/** `TRUE` and `true` are one boolean. */
+/** Case-insensitive, whatever the matching rule of the deleted attribute. */
 export function isTombstone(
   entry: AttributesList,
   attrs: LifecycleAttributes
