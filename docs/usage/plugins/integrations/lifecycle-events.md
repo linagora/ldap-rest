@@ -148,6 +148,9 @@ Payload and `when` values are sources:
 attribute. A source with no value leaves its field out. Every message carries
 a random AMQP `messageId`.
 
+The rules are checked at startup: a malformed one, such as a payload value
+that is not a string, stops the server with an error naming its `dn`.
+
 ## Dependencies
 
 ```

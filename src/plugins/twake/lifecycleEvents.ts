@@ -42,22 +42,6 @@ export type LifecycleEvent = (typeof LIFECYCLE_EVENTS)[number];
 
 type Payload = Record<string, string>;
 
-interface RawTarget {
-  routingKey: string;
-  exchange?: string;
-  payload?: Payload;
-  when?: Payload;
-}
-
-interface RawRule {
-  dn: string;
-  exchange?: string;
-  payload?: Payload;
-  events?: Partial<
-    Record<LifecycleEvent, string | RawTarget | (string | RawTarget)[]>
-  >;
-}
-
 interface Target {
   exchange: string;
   routingKey: string;
@@ -96,40 +80,75 @@ function sameIgnoringCase(
   return x.size === y.size && [...x].every(v => y.has(v));
 }
 
+type Json = Record<string, unknown>;
+
+const isObject = (value: unknown): value is Json =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+function optionalString(value: unknown, where: string, key: string): void {
+  if (value !== undefined && typeof value !== 'string')
+    throw new Error(`${where}: "${key}" must be a string`);
+}
+
+function optionalPayload(
+  value: unknown,
+  where: string,
+  key: string
+): Payload | undefined {
+  if (value === undefined) return undefined;
+  if (!isObject(value) || Object.values(value).some(v => typeof v !== 'string'))
+    throw new Error(`${where}: "${key}" must be an object of strings`);
+  return value as Payload;
+}
+
 export function parseRules(source: string): Rule[] {
   if (!source.trim()) return [];
-  const text = /^\s*\[/.test(source) ? source : fs.readFileSync(source, 'utf8');
-  const raw = JSON.parse(text) as RawRule[];
+  const text = /^\s*[[{]/.test(source)
+    ? source
+    : fs.readFileSync(source, 'utf8');
+  const raw = JSON.parse(text) as unknown;
   if (!Array.isArray(raw))
     throw new Error('--twake-lifecycle-rules must be a JSON array of rules');
-  return raw.map(rule => {
+  return raw.map((rule: unknown) => {
+    if (!isObject(rule))
+      throw new Error('Every lifecycle rule must be an object');
     if (typeof rule.dn !== 'string')
       throw new Error('Every lifecycle rule needs a "dn" pattern');
+    const { dn } = rule;
+    const ruleWhere = `Lifecycle rule ${dn}`;
+    optionalString(rule.exchange, ruleWhere, 'exchange');
+    const rulePayload = optionalPayload(rule.payload, ruleWhere, 'payload');
+    if (rule.events !== undefined && !isObject(rule.events))
+      throw new Error(`${ruleWhere}: "events" must be an object`);
     const targets: Rule['targets'] = {};
     for (const [event, value] of Object.entries(rule.events || {})) {
       if (!(LIFECYCLE_EVENTS as readonly string[]).includes(event))
         throw new Error(
           `Unknown lifecycle event "${event}"; known: ${LIFECYCLE_EVENTS.join(', ')}`
         );
+      const where = `Lifecycle event "${event}" of ${dn}`;
       targets[event as LifecycleEvent] = (
         Array.isArray(value) ? value : [value]
-      ).map(one => {
-        const t: RawTarget =
-          typeof one === 'string' ? { routingKey: one } : one;
-        const exchange = t.exchange || rule.exchange;
-        if (!exchange || !t.routingKey)
-          throw new Error(
-            `Lifecycle event "${event}" of ${rule.dn} needs an exchange and a routing key`
-          );
+      ).map((one: unknown) => {
+        if (typeof one !== 'string' && !isObject(one))
+          throw new Error(`${where}: a target is a routing key or an object`);
+        const t: Json = typeof one === 'string' ? { routingKey: one } : one;
+        optionalString(t.routingKey, where, 'routingKey');
+        optionalString(t.exchange, where, 'exchange');
+        const exchange = (t.exchange || rule.exchange) as string | undefined;
+        const routingKey = t.routingKey as string | undefined;
+        if (!exchange || !routingKey)
+          throw new Error(`${where} needs an exchange and a routing key`);
         return {
           exchange,
-          routingKey: t.routingKey,
-          payload: t.payload || rule.payload || {},
-          when: t.when || {},
+          routingKey,
+          payload:
+            optionalPayload(t.payload, where, 'payload') || rulePayload || {},
+          when: optionalPayload(t.when, where, 'when') || {},
         };
       });
     }
-    return { dn: new RegExp(rule.dn, 'i'), targets };
+    return { dn: new RegExp(dn, 'i'), targets };
   });
 }
 

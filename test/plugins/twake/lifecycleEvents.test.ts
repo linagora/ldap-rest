@@ -463,5 +463,49 @@ describe('Twake lifecycle events plugin', function () {
         parseRules(JSON.stringify([{ dn: '.', events: { created: 'k' } }]))
       ).to.throw(/needs an exchange/);
     });
+
+    it('refuses an object instead of an array', () => {
+      expect(() =>
+        parseRules(JSON.stringify({ dn: '.', exchange: 'x', events: {} }))
+      ).to.throw(/must be a JSON array/);
+    });
+
+    it('refuses a null target', () => {
+      expect(() =>
+        parseRules(
+          JSON.stringify([
+            { dn: '.', exchange: 'x', events: { created: null } },
+          ])
+        )
+      ).to.throw(/Lifecycle event "created" of \.: a target is/);
+    });
+
+    it('refuses a payload value that is not a string', () => {
+      expect(() =>
+        parseRules(
+          JSON.stringify([
+            {
+              dn: '.',
+              exchange: 'x',
+              events: { created: { routingKey: 'k', payload: { n: 1 } } },
+            },
+          ])
+        )
+      ).to.throw(/"created" of \.: "payload" must be an object of strings/);
+    });
+
+    it('refuses a condition value that is not a string', () => {
+      expect(() =>
+        parseRules(
+          JSON.stringify([
+            {
+              dn: '.',
+              exchange: 'x',
+              events: { deleted: { routingKey: 'k', when: { $a: true } } },
+            },
+          ])
+        )
+      ).to.throw(/"deleted" of \.: "when" must be an object of strings/);
+    });
   });
 });
