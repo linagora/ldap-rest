@@ -3,6 +3,7 @@ import { expect } from 'chai';
 import {
   patchToModifyRequest,
   applyPatchToResource,
+  writePatch,
 } from '../../../src/plugins/scim/patch';
 import { DEFAULT_USER_MAPPING } from '../../../src/plugins/scim/mapping';
 import { ScimError } from '../../../src/plugins/scim/errors';
@@ -24,10 +25,10 @@ describe('SCIM PATCH applicator', () => {
       },
       ctx
     );
-    // The emitted request says what the entry must end up holding, so an
-    // add on an attribute that was not there is a replace.
-    expect(req.replace).to.deep.equal({ displayName: 'Alice' });
-    expect(req.add).to.be.undefined;
+    // An add stays an add: the caller may not see every value the entry
+    // holds, and a replace would drop those it does not see.
+    expect(req.add).to.deep.equal({ displayName: 'Alice' });
+    expect(req.replace).to.be.undefined;
   });
 
   it('add on a multi-valued attribute keeps what is there', async () => {
@@ -115,10 +116,8 @@ describe('SCIM PATCH applicator', () => {
     // RFC 7644 section 3.5.2 applies operations sequentially, so the second
     // displayName wins. Both used to land on the same key and the emitter
     // kept whichever it saw first.
-    expect(req.replace).to.deep.equal({
-      title: 'Dev',
-      displayName: 'Alice Doe',
-    });
+    expect(req.add).to.deep.equal({ title: 'Dev' });
+    expect(req.replace).to.deep.equal({ displayName: 'Alice Doe' });
     expect(req.delete).to.be.undefined;
   });
 
@@ -225,7 +224,7 @@ describe('SCIM PATCH applicator', () => {
         expect(req.delete, name).to.be.undefined;
       });
 
-      it(`replaces it as a fresh value when it is ${name}`, async () => {
+      it(`adds it as a fresh value when it is ${name}`, async () => {
         const req = await patchToModifyRequest(
           {
             schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -233,10 +232,9 @@ describe('SCIM PATCH applicator', () => {
           },
           withEntry(current)
         );
-        // Nothing was there, so this is a replace rather than an add onto an
-        // existing set — and identical whichever way the emptiness rendered.
-        expect(req.replace, name).to.deep.equal({ displayName: 'Alice' });
-        expect(req.add, name).to.be.undefined;
+        // Identical whichever way the emptiness rendered.
+        expect(req.add, name).to.deep.equal({ displayName: 'Alice' });
+        expect(req.replace, name).to.be.undefined;
       });
     }
   });
@@ -333,9 +331,10 @@ describe('SCIM PATCH applicator', () => {
           v === 'ghost' ? undefined : `uid=${v},ou=users,dc=example,dc=com`
         )
       );
-      expect(req.replace).to.deep.equal({
-        member: 'uid=bob,ou=users,dc=example,dc=com',
+      expect(req.delete).to.deep.equal({
+        member: 'uid=alice,ou=users,dc=example,dc=com',
       });
+      expect(req.replace).to.be.undefined;
     });
   });
 
@@ -356,9 +355,39 @@ describe('SCIM PATCH applicator', () => {
         resolveMemberRef: async v => `uid=${v},ou=users,dc=example,dc=com`,
       }
     );
-    // Alice goes, Bob stays.
-    expect(req.replace).to.deep.equal({
-      member: 'uid=bob,ou=users,dc=example,dc=com',
+    // Alice goes, and only Alice is named: Bob, and any member the caller's
+    // read did not show, stay.
+    expect(req.delete).to.deep.equal({
+      member: 'uid=alice,ou=users,dc=example,dc=com',
+    });
+    expect(req.replace).to.be.undefined;
+  });
+
+  it('removes a member without touching the members it could not see', async () => {
+    // An `ldapsearchfilter` hid a member from this read: the working copy
+    // holds Bob and Carol, the directory also Dave.
+    const req = await patchToModifyRequest(
+      {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'remove', path: 'members[value eq "bob"]' },
+          { op: 'add', path: 'members', value: [{ value: 'erin' }] },
+        ],
+      },
+      {
+        mapping: DEFAULT_USER_MAPPING,
+        current: {
+          member: [
+            'uid=bob,ou=users,dc=example,dc=com',
+            'uid=carol,ou=users,dc=example,dc=com',
+          ],
+        },
+        resolveMemberRef: async v => `uid=${v},ou=users,dc=example,dc=com`,
+      }
+    );
+    expect(req).to.deep.equal({
+      add: { member: 'uid=erin,ou=users,dc=example,dc=com' },
+      delete: { member: 'uid=bob,ou=users,dc=example,dc=com' },
     });
   });
 
@@ -376,6 +405,42 @@ describe('SCIM PATCH applicator', () => {
       expect(err).to.be.instanceOf(ScimError);
       expect((err as ScimError).scimType).to.equal('invalidPath');
     }
+  });
+
+  describe('writePatch', () => {
+    const gone = Object.assign(new Error('noSuchAttribute'), { code: 16 });
+
+    it('plays a PATCH once more when a concurrent write removed a value', async () => {
+      let tries = 0;
+      await writePatch('cn=g', async () => {
+        if (++tries === 1) throw gone;
+      });
+      expect(tries).to.equal(2);
+    });
+
+    it('answers 409 when the second attempt meets the same', async () => {
+      let tries = 0;
+      let error: unknown;
+      await writePatch('cn=g', async () => {
+        tries++;
+        throw gone;
+      }).catch(e => (error = e));
+      expect(tries).to.equal(2);
+      expect(error).to.be.instanceOf(ScimError);
+      expect((error as ScimError).statusCode).to.equal(409);
+    });
+
+    it('lets any other error through at once', async () => {
+      let tries = 0;
+      const other = Object.assign(new Error('busy'), { code: 51 });
+      let error: unknown;
+      await writePatch('cn=g', async () => {
+        tries++;
+        throw other;
+      }).catch(e => (error = e));
+      expect(tries).to.equal(1);
+      expect(error).to.equal(other);
+    });
   });
 
   it('unknown op throws invalidValue', async () => {

@@ -45,7 +45,7 @@ import {
 } from './mapping';
 import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';
-import { patchToModifyRequest } from './patch';
+import { patchToModifyRequest, writePatch } from './patch';
 import {
   scimInvalidValue,
   scimNotFound,
@@ -396,34 +396,51 @@ export class ScimGroups {
     patch: PatchRequest
   ): Promise<ScimGroup> {
     const dn = this.dnForId(id, req);
-    const current = await this.currentEntry(req, id); // ensure exists
-    const changes = await patchToModifyRequest(patch, {
-      mapping: this.mapping,
-      memberAttribute: 'member',
-      resolveMemberRef: async value => this.users.resolveRef(req, value),
-      current,
+    await writePatch(dn, async () => {
+      const current = await this.currentEntry(req, id); // ensure exists
+      const changes = await patchToModifyRequest(patch, {
+        mapping: this.mapping,
+        memberAttribute: 'member',
+        resolveMemberRef: async value => this.users.resolveRef(req, value),
+        current,
+      });
+
+      // groupOfNames requires at least one member, so a patch that empties the
+      // attribute gets the configured placeholder instead of a schema
+      // violation. A bare remove deletes the attribute: replace it. A removal
+      // of named members leaves any the read did not show; the placeholder
+      // only joins when none the caller saw remain.
+      const removed =
+        changes.delete && !Array.isArray(changes.delete)
+          ? changes.delete.member
+          : undefined;
+      if (removed !== undefined) {
+        const placeholder =
+          (this.config.group_dummy_user as string) || 'cn=fakeuser';
+        if (removed === '') {
+          delete (changes.delete as Record<string, unknown>).member;
+          if (Object.keys(changes.delete!).length === 0) delete changes.delete;
+          if (!changes.replace) changes.replace = {};
+          changes.replace.member = [placeholder];
+        } else {
+          const gone = ([] as string[]).concat(removed as string | string[]);
+          const left = ([] as unknown[])
+            .concat(current.member ?? [], changes.add?.member ?? [])
+            .map(String)
+            .filter(m => !gone.includes(m));
+          if (left.length === 0) {
+            if (!changes.add) changes.add = {};
+            changes.add.member = placeholder;
+          }
+        }
+      }
+
+      // An empty change set still goes through ldapActions: `ldapmodifyrequest`
+      // is where write permission is checked, and an empty modify touches the
+      // directory not at all. Permissive: re-adding a member the read did not
+      // show is no error.
+      await this.ldap.forRequest(req).modify(dn, changes, { permissive: true });
     });
-
-    // groupOfNames requires at least one member, so a patch that empties the
-    // attribute gets the configured placeholder instead of a schema
-    // violation. The emitted delete says the members are gone; replace it.
-    if (
-      changes.delete &&
-      !Array.isArray(changes.delete) &&
-      'member' in changes.delete
-    ) {
-      const placeholder =
-        (this.config.group_dummy_user as string) || 'cn=fakeuser';
-      delete changes.delete.member;
-      if (Object.keys(changes.delete).length === 0) delete changes.delete;
-      if (!changes.replace) changes.replace = {};
-      changes.replace.member = [placeholder];
-    }
-
-    // An empty change set still goes through ldapActions: `ldapmodifyrequest`
-    // is where write permission is checked, and an empty modify touches the
-    // directory not at all.
-    await this.ldap.forRequest(req).modify(dn, changes);
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimgroupupdatedone, id, updated);
     return updated;

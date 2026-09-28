@@ -43,7 +43,7 @@ import {
 } from './mapping';
 import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';
-import { patchToModifyRequest } from './patch';
+import { patchToModifyRequest, writePatch } from './patch';
 import {
   scimInvalidValue,
   scimNotFound,
@@ -416,30 +416,34 @@ export class ScimUsers {
     patch: PatchRequest
   ): Promise<ScimUser> {
     const dn = this.dnForId(id, req);
-    const current = await this.currentEntry(req, id); // ensure exists
-    const changes = await patchToModifyRequest(patch, {
-      mapping: this.mapping,
-      lockAttribute: this.lockAttribute,
-      lockValue: this.lockValue,
-      supportsActive: true,
-      current,
-    });
-    // An empty change set still goes to ldapActions rather than returning
-    // early: `ldapmodifyrequest` — where write permission is checked — runs
-    // before the changes are examined, and an empty one touches the
-    // directory not at all. Answering 200 without it told a caller with no
-    // write permission that its write had succeeded.
-    //
-    // `req` must reach ldapActions: the authorization plugins hook
-    // `ldapmodifyrequest` and skip every check when it is missing.
-    try {
-      await this.ldap.forRequest(req).modify(dn, changes);
-    } catch (err) {
-      if (touchesLock(changes, this.lockAttribute)) {
-        throw this.lockSchemaError(err);
+    await writePatch(dn, async () => {
+      const current = await this.currentEntry(req, id); // ensure exists
+      const changes = await patchToModifyRequest(patch, {
+        mapping: this.mapping,
+        lockAttribute: this.lockAttribute,
+        lockValue: this.lockValue,
+        supportsActive: true,
+        current,
+      });
+      // An empty change set still goes to ldapActions rather than returning
+      // early: `ldapmodifyrequest` — where write permission is checked — runs
+      // before the changes are examined, and an empty one touches the
+      // directory not at all. Answering 200 without it told a caller with no
+      // write permission that its write had succeeded.
+      //
+      // `req` must reach ldapActions: the authorization plugins hook
+      // `ldapmodifyrequest` and skip every check when it is missing.
+      try {
+        await this.ldap
+          .forRequest(req)
+          .modify(dn, changes, { permissive: true });
+      } catch (err) {
+        if (touchesLock(changes, this.lockAttribute)) {
+          throw this.lockSchemaError(err);
+        }
+        throw err;
       }
-      throw err;
-    }
+    });
     const updated = await this.get(req, id);
     void launchHooks(this.hooks.scimuserupdatedone, id, updated);
     return updated;

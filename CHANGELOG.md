@@ -14,6 +14,12 @@
   ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
 - `ldapaddafter` hook, awaited after an add ([docs](docs/plugin-development/hooks.md#ldapaddafter))
 
+### Bug Fixes
+
+- `core/scim`: two PATCHes removing different group members at once both
+  apply; the second no longer puts back the member the first removed
+  ([docs](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+
 ## v0.11.2 (2026-09-27)
 
 ### Bug Fixes

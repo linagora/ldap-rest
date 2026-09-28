@@ -305,6 +305,17 @@ mapping contains an entry with `scim: "department"`; otherwise the server return
 `400 invalidFilter`. Same for PATCH: operations on unmapped paths produce
 `400 invalidPath`.
 
+A PATCH `add`, or a `remove` naming values, changes only the values it names:
+values the caller's read did not show, such as group members an
+`ldapsearchfilter` hides, stay. Two PATCHes changing different values of
+the same attribute both apply. Adding a value already there succeeds where
+the directory honours the permissive modify control; removing one another
+write just removed replays the PATCH on a fresh read, then answers `409`.
+A `replace`, or a `remove` of a whole attribute, sets the attribute to what
+the caller sent, and so does a group `PUT` for its members, hidden ones
+included. A group left with no member the caller saw gets the
+`--group-dummy-user` placeholder.
+
 ### Schema advertisement
 
 Schemas listed under `GET /scim/v2/Schemas` are read from
