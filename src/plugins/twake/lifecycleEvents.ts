@@ -17,6 +17,7 @@ import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
+import { parseDn, unescapeDnValue } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -76,6 +77,21 @@ function sameIgnoringCase(
   const x = set(a);
   const y = set(b);
   return x.size === y.size && [...x].every(v => y.has(v));
+}
+
+/**
+ * The DN as rules see it: no spaces around separators, and escaped commas in
+ * hex so that a group such as `(?<id>[^,]+)` takes the whole value.
+ */
+function dnForRules(dn: string): string {
+  return parseDn(dn)
+    .map(rdn => {
+      const eq = rdn.indexOf('=');
+      if (eq === -1) return rdn;
+      const value = rdn.slice(eq + 1).trim();
+      return `${rdn.slice(0, eq).trim()}=${value.replace(/\\,/g, '\\2C')}`;
+    })
+    .join(',');
 }
 
 type Json = Record<string, unknown>;
@@ -207,9 +223,14 @@ export default class TwakeLifecycleEvents extends DmPlugin {
   private match(
     dn: string
   ): { rule: Rule; groups: Record<string, string> } | undefined {
+    const spelled = dnForRules(dn);
     for (const rule of this.rules) {
-      const m = rule.dn.exec(dn);
-      if (m) return { rule, groups: { ...m.groups } };
+      const m = rule.dn.exec(spelled);
+      if (!m) continue;
+      const groups: Record<string, string> = {};
+      for (const [name, value] of Object.entries(m.groups || {}))
+        if (value !== undefined) groups[name] = unescapeDnValue(value);
+      return { rule, groups };
     }
     return undefined;
   }

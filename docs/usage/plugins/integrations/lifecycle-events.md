@@ -50,9 +50,6 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - A change made outside LDAP-Rest is not seen. A ppolicy lockout after failed
   binds is written by the directory itself, and holds a timestamp rather than
   the lock value: it publishes nothing, and neither does clearing it.
-- The rule's `dn` expression is matched against the DN as the write gave it,
-  not a normalized form: `uid=alice, ou=users,…`, with a space, does not match
-  a pattern written without one.
 
 ## Deployments with other plugins
 
@@ -104,6 +101,11 @@ no broker later on is lost, and logged as an error.
 The rules are an array. The first rule whose `dn` regular expression matches
 the entry's DN (case-insensitively) decides what is published; an entry no
 rule matches publishes nothing.
+
+The DN is matched without spaces around its separators, and with escaped
+commas written `\2C`: `uid=a\, b, ou=users,…` is read as `uid=a\2C b,ou=users,…`,
+so `(?<id>[^,]+)` takes the whole value. A `$dn.name` group is unescaped:
+`a, b`.
 
 ```json
 [

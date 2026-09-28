@@ -195,6 +195,7 @@ describe('Twake lifecycle events plugin', function () {
     for (const name of [
       'lc-alice',
       'lc-bob',
+      'lc-a\\,b',
       'other-carol',
       'neg-admin',
       'neg-member',
@@ -284,6 +285,25 @@ describe('Twake lifecycle events plugin', function () {
       await dm.ldap.delete(dn).catch(() => undefined);
       await dm.ldap.delete(org).catch(() => undefined);
     }
+  });
+
+  it('matches a DN spelled with spaces', async () => {
+    const spaced = `uid=lc-alice, ${BASE.replace(/,/g, ' , ')}`;
+    await dm.ldap.add(spaced, {
+      objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+      cn: 'lc-alice',
+      sn: 'lc-alice',
+      uid: 'lc-alice',
+    });
+    await seen(spaced);
+    expect(keys()).to.deep.equal(['account.created']);
+    expect(rabbit.published[0].message.id).to.equal('lc-alice');
+  });
+
+  it('takes an escaped comma into the id', async () => {
+    await add('lc-a\\,b', { uid: 'lc-a,b' });
+    await seen(dnOf('lc-a\\,b'));
+    expect(rabbit.published[0].message.id).to.equal('lc-a,b');
   });
 
   it('publishes nothing for an entry no rule matches', async () => {
