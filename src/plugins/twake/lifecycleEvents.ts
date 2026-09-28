@@ -239,7 +239,29 @@ export default class TwakeLifecycleEvents extends DmPlugin {
         after as AttributesList | null,
         context
       ),
+    // core/twake/tombstone, on a second delete of a tombstone: nothing is
+    // written, so this is the one way the deletion is announced again.
+    twakedeletionreplay: (
+      dn: string,
+      entry: AttributesList,
+      context: ChangeContext
+    ) => this.replay(dn, entry, context),
   };
+
+  private async replay(
+    dn: string,
+    entry: AttributesList,
+    change: ChangeContext
+  ): Promise<void> {
+    const found = this.match(dn);
+    if (!found || !isTombstone(entry, this.attrs)) return;
+    await this.publish(found.rule, 'deleted', {
+      before: entry,
+      after: entry,
+      dn: found.groups,
+      change,
+    });
+  }
 
   private match(
     dn: string

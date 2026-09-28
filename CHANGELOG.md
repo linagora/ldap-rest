@@ -20,6 +20,13 @@
   ([docs](docs/usage/plugins/integrations/instances.md),
   [upgrade](docs/usage/upgrading.md#twakeinstances-replaces-cozyprovision-and-clouderyprovision))
 
+- `core/twake/tombstone`: the delete of a matching account writes a
+  tombstone (deleted flag, date, reason, lock) instead, and a second delete
+  announces it again. SCIM treats a tombstone as gone, and a SCIM create with
+  its identity replaces it. `POST /api/v1/twake/tombstones/erase` removes a
+  tombstone and its group memberships once the deletion is old enough, or
+  when forced ([docs](docs/usage/plugins/integrations/tombstone.md))
+
 ### Bug Fixes
 
 - `core/scim`: two PATCHes removing different group members at once both

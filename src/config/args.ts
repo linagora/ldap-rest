@@ -324,6 +324,14 @@ export interface Config {
   twake_instance_organization_id_attribute?: string;
   twake_instance_organization_domain_attribute?: string;
   twake_instance_organization_fqdn_attribute?: string;
+  twake_lifecycle_reason_attribute?: string;
+  twake_tombstone_dn?: string[];
+  twake_tombstone_default_reason?: string;
+  twake_tombstone_reason_header?: string;
+  twake_tombstone_reasons?: string[];
+  twake_tombstone_clear_attributes?: string[];
+  twake_tombstone_erase_min_age?: number;
+  twake_tombstone_group_bases?: string[];
   rabbitmq_url?: string;
 
   // Applicative Accounts plugin
@@ -781,7 +789,7 @@ const configArgs: ConfigTemplate = [
     'number',
   ],
 
-  // Account lifecycle attributes
+  // Account lifecycle attributes, shared by the twake lifecycle plugins
   ['--twake-lifecycle-role-attribute', 'DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE', ''],
   ['--twake-lifecycle-lock-attribute', 'DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE', ''],
   ['--twake-lifecycle-lock-value', 'DM_TWAKE_LIFECYCLE_LOCK_VALUE', ''],
@@ -805,8 +813,44 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT',
     'iso8601',
   ],
+  [
+    '--twake-lifecycle-reason-attribute',
+    'DM_TWAKE_LIFECYCLE_REASON_ATTRIBUTE',
+    '',
+  ],
   // twake/lifecycleEvents plugin
   ['--twake-lifecycle-rules', 'DM_TWAKE_LIFECYCLE_RULES', ''],
+  // twake/tombstone plugin
+  ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
+  [
+    '--twake-tombstone-default-reason',
+    'DM_TWAKE_TOMBSTONE_DEFAULT_REASON',
+    'deleted',
+  ],
+  [
+    '--twake-tombstone-reason-header',
+    'DM_TWAKE_TOMBSTONE_REASON_HEADER',
+    'x-deletion-reason',
+  ],
+  ['--twake-tombstone-reasons', 'DM_TWAKE_TOMBSTONE_REASONS', [], 'array'],
+  [
+    '--twake-tombstone-clear-attributes',
+    'DM_TWAKE_TOMBSTONE_CLEAR_ATTRIBUTES',
+    [],
+    'array',
+  ],
+  [
+    '--twake-tombstone-erase-min-age',
+    'DM_TWAKE_TOMBSTONE_ERASE_MIN_AGE',
+    2592000,
+    'number',
+  ],
+  [
+    '--twake-tombstone-group-bases',
+    'DM_TWAKE_TOMBSTONE_GROUP_BASES',
+    [],
+    'array',
+  ],
 
   // twake/instances plugin
   ['--twake-instance-dn', 'DM_TWAKE_INSTANCE_DN', [], 'array'],

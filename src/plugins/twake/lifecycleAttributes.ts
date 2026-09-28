@@ -2,7 +2,8 @@
  * @module plugins/twake/lifecycleAttributes
  *
  * The attributes that carry an account's lifecycle (its role, its lock, its
- * deletion), read from the `--twake-lifecycle-*` options.
+ * deletion), read from the `--twake-lifecycle-*` options: the ones
+ * `core/twake/lifecycleEvents` reads, and `core/twake/tombstone` writes.
  */
 import type { Config } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
@@ -18,6 +19,7 @@ export interface LifecycleAttributes {
   deletedValue: string;
   deletedAt: string;
   deletedAtFormat: DeletedAtFormat;
+  reason: string;
 }
 
 export function lifecycleAttributes(config: Config): LifecycleAttributes {
@@ -52,6 +54,7 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
     deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',
     deletedAt: config.twake_lifecycle_deleted_at_attribute || '',
     deletedAtFormat: format,
+    reason: config.twake_lifecycle_reason_attribute || '',
   };
 }
 
@@ -100,6 +103,13 @@ export const isLocked = (
   entry: AttributesList,
   attrs: LifecycleAttributes
 ): boolean => holds(entry, attrs.lock, attrs.lockValue);
+
+export function formatDeletedAt(date: Date, format: DeletedAtFormat): string {
+  const iso = date.toISOString();
+  return format === 'iso8601'
+    ? iso
+    : iso.replace(/[-:T]/g, '').replace(/\.\d+Z$/, 'Z');
+}
 
 /** A deletion date as the directory holds it, or undefined if unreadable. */
 export function parseDeletedAt(
