@@ -13,6 +13,12 @@
   attributes, exchanges, routing keys and payloads are configuration
   ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
 - `ldapaddafter` hook, awaited after an add ([docs](docs/plugin-development/hooks.md#ldapaddafter))
+- `core/twake/instances`: every account created through this server gets its
+  workplace instance, then `user.created` (at least once). It replaces
+  `core/twake/cozyProvision` and `core/twake/clouderyProvision`, with renamed
+  options: load one, not both
+  ([docs](docs/usage/plugins/integrations/instances.md),
+  [upgrade](docs/usage/upgrading.md#twakeinstances-replaces-cozyprovision-and-clouderyprovision))
 
 ## v0.11.2 (2026-09-27)
 

@@ -462,6 +462,47 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 
 **Requires:** `core/ldap/onChange`, `core/rabbitmq`
 
+#### `core/twake/instances`
+
+| CLI                                              | Env                                               | Default                               | Description                                               |
+| ------------------------------------------------ | ------------------------------------------------- | ------------------------------------- | --------------------------------------------------------- |
+| `--twake-instance-dn`                            | `DM_TWAKE_INSTANCE_DN`                            | `[]`                                  | DN expressions of the accounts to equip                   |
+| `--twake-instance-skip-attribute`                | `DM_TWAKE_INSTANCE_SKIP_ATTRIBUTE`                |                                       | Attribute marking an account with no instance             |
+| `--twake-instance-skip-value`                    | `DM_TWAKE_INSTANCE_SKIP_VALUE`                    |                                       | Its value                                                 |
+| `--twake-instance-provider`                      | `DM_TWAKE_INSTANCE_PROVIDER`                      | `cloudery`                            | `cloudery` or `cozy-stack`                                |
+| `--twake-instance-id`                            | `DM_TWAKE_INSTANCE_ID`                            | `{uid}`                               | Instance id template                                      |
+| `--twake-instance-fqdn-attribute`                | `DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE`                | `twakeWorkspaceUrl`                   | Address attribute                                         |
+| `--twake-instance-sent-attribute`                | `DM_TWAKE_INSTANCE_SENT_ATTRIBUTE`                | `twakeCreatedEventAt`                 | Date the creation event was sent                          |
+| `--twake-instance-locale`                        | `DM_TWAKE_INSTANCE_LOCALE`                        | `en`, `fr` with cozy-stack            | Locale when the entry has none                            |
+| `--twake-instance-timeout`                       | `DM_TWAKE_INSTANCE_TIMEOUT`                       | `30000`                               | Milliseconds a provider call may take                     |
+| `--twake-instance-cloudery-url`                  | `DM_TWAKE_INSTANCE_CLOUDERY_URL`                  |                                       | Cloudery API                                              |
+| `--twake-instance-cloudery-token`                | `DM_TWAKE_INSTANCE_CLOUDERY_TOKEN`                |                                       | Its token                                                 |
+| `--twake-instance-cloudery-domain`               | `DM_TWAKE_INSTANCE_CLOUDERY_DOMAIN`               |                                       | Domain of the instances                                   |
+| `--twake-instance-cloudery-offer`                | `DM_TWAKE_INSTANCE_CLOUDERY_OFFER`                | `b2b_twake_default`                   | Offer of an account's instance                            |
+| `--twake-instance-cloudery-organization-offer`   | `DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER`   |                                       | Offer of an organization's instance                       |
+| `--twake-instance-cozy-url`                      | `DM_TWAKE_INSTANCE_COZY_URL`                      |                                       | cozy-stack admin API                                      |
+| `--twake-instance-cozy-user`                     | `DM_TWAKE_INSTANCE_COZY_USER`                     | `admin`                               | Its user                                                  |
+| `--twake-instance-cozy-passphrase`               | `DM_TWAKE_INSTANCE_COZY_PASSPHRASE`               |                                       | Its passphrase                                            |
+| `--twake-instance-cozy-domain`                   | `DM_TWAKE_INSTANCE_COZY_DOMAIN`                   |                                       | Domain of the instances                                   |
+| `--twake-instance-cozy-context`                  | `DM_TWAKE_INSTANCE_COZY_CONTEXT`                  | `default`                             | cozy-stack context                                        |
+| `--twake-instance-cozy-apps`                     | `DM_TWAKE_INSTANCE_COZY_APPS`                     | `home,drive,settings,notes,dataproxy` | Apps installed on a new instance                          |
+| `--twake-instance-cozy-org-id`                   | `DM_TWAKE_INSTANCE_COZY_ORG_ID`                   |                                       | Organization id when the DN gives none                    |
+| `--twake-instance-cozy-org-domain`               | `DM_TWAKE_INSTANCE_COZY_ORG_DOMAIN`               |                                       | Organization domain when the DN gives none                |
+| `--twake-instance-auth-exchange`                 | `DM_TWAKE_INSTANCE_AUTH_EXCHANGE`                 | `auth`                                | Exchange of account events                                |
+| `--twake-instance-b2b-exchange`                  | `DM_TWAKE_INSTANCE_B2B_EXCHANGE`                  | `b2b`                                 | Exchange of organization events                           |
+| `--twake-instance-user-created-key`              | `DM_TWAKE_INSTANCE_USER_CREATED_KEY`              | `user.created`                        | Routing key of an account's creation                      |
+| `--twake-instance-organization-created-key`      | `DM_TWAKE_INSTANCE_ORGANIZATION_CREATED_KEY`      | `organization.created`                | Routing key of an organization's creation                 |
+| `--twake-instance-workplace-created-key`         | `DM_TWAKE_INSTANCE_WORKPLACE_CREATED_KEY`         | `workplace.created`                   | Routing key the Cloudery announces on                     |
+| `--twake-instance-queue`                         | `DM_TWAKE_INSTANCE_QUEUE`                         | `workplace.created.ldap-rest`         | Queue shared by the replicas                              |
+| `--twake-instance-organization-base`             | `DM_TWAKE_INSTANCE_ORGANIZATION_BASE`             |                                       | Branch of the organization entries                        |
+| `--twake-instance-organization-id-attribute`     | `DM_TWAKE_INSTANCE_ORGANIZATION_ID_ATTRIBUTE`     | `ou`                                  | Attribute holding an organization's id                    |
+| `--twake-instance-organization-domain-attribute` | `DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE` | `twakeDomain`                         | Attribute holding an organization's domain                |
+| `--twake-instance-organization-fqdn-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE`   |                                       | Address attribute of an organization (empty: not written) |
+
+See [instances](plugins/integrations/instances.md).
+
+**Requires:** `core/rabbitmq`
+
 ### Utility Plugins
 
 #### `core/static`
