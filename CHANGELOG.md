@@ -2,36 +2,40 @@
 
 ## Unreleased
 
+### Deprecations
+
+- `core/twake/cozyProvision` and `core/twake/clouderyProvision` are replaced
+  by `core/twake/instances`, whose options are renamed; the server does not
+  start with both —
+  [notes](docs/usage/upgrading.md#twakeinstances-replaces-cozyprovision-and-clouderyprovision)
+
 ### Features
 
-- `core/auth/openidconnect`: `/logout` ends the session at the provider too
-  (RP-Initiated Logout), and `GET /v1/config` publishes the route —
-  [doc](docs/usage/plugins/auth/oidc.md#logout)
-- `core/twake/lifecycleEvents`: publishes an account's lifecycle (created,
-  role changed, disabled, enabled, deleted) to RabbitMQ from the directory
-  write, so every API writing the entry announces the same events. Entries,
-  attributes, exchanges, routing keys and payloads are configuration
-  ([docs](docs/usage/plugins/integrations/lifecycle-events.md))
-- `ldapaddafter` hook, awaited after an add ([docs](docs/plugin-development/hooks.md#ldapaddafter))
-- `core/twake/instances`: every account created through this server gets its
-  workplace instance, then `user.created` (at least once). It replaces
-  `core/twake/cozyProvision` and `core/twake/clouderyProvision`, with renamed
-  options: load one, not both
-  ([docs](docs/usage/plugins/integrations/instances.md),
-  [upgrade](docs/usage/upgrading.md#twakeinstances-replaces-cozyprovision-and-clouderyprovision))
-
-- `core/twake/tombstone`: the delete of a matching account writes a
-  tombstone (deleted flag, date, reason, lock) instead, and a second delete
-  announces it again. SCIM treats a tombstone as gone, and a SCIM create with
-  its identity replaces it. `POST /api/v1/twake/tombstones/erase` removes a
-  tombstone and its group memberships once the deletion is old enough, or
-  when forced ([docs](docs/usage/plugins/integrations/tombstone.md))
+- `core/auth/openidconnect`: `/logout` also ends the session at the provider
+  (RP-Initiated Logout) — [doc](docs/usage/plugins/auth/oidc.md#logout)
+  ([#224](https://github.com/linagora/ldap-rest/pull/224))
+- `core/twake/lifecycleEvents`: publishes account lifecycle events (created,
+  role changed, disabled, enabled, deleted) to RabbitMQ, whichever API wrote
+  the entry — [doc](docs/usage/plugins/integrations/lifecycle-events.md)
+  ([#203](https://github.com/linagora/ldap-rest/pull/203))
+- `core/twake/instances`: each account created through this server gets its
+  workplace instance, announced with `user.created` —
+  [doc](docs/usage/plugins/integrations/instances.md)
+  ([#228](https://github.com/linagora/ldap-rest/pull/228))
+- `core/twake/tombstone`: a deleted account stays as a tombstone, its
+  identifiers reserved, until an operator erases it —
+  [doc](docs/usage/plugins/integrations/tombstone.md)
+  ([#204](https://github.com/linagora/ldap-rest/pull/204))
+- `ldapaddafter` hook, awaited once an add has written the entry —
+  [doc](docs/plugin-development/hooks.md#ldapaddafter)
+  ([#227](https://github.com/linagora/ldap-rest/pull/227))
 
 ### Bug Fixes
 
-- `core/scim`: two PATCHes removing different group members at once both
-  apply; the second no longer puts back the member the first removed
-  ([docs](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior))
+- `core/scim`: two PATCHes removing different members of a group at once no
+  longer undo each other —
+  [doc](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior)
+  ([#231](https://github.com/linagora/ldap-rest/pull/231))
 
 ## v0.11.2 (2026-09-27)
 
