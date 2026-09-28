@@ -13,7 +13,9 @@ Each event is a change of state, read from the entry before and after a write
 (`onLdapEntryChange`, from `core/ldap/onChange`). A write that changes nothing
 publishes nothing.
 
-- `created`: an entry is added.
+- `created`: an entry is added. An entry added with the lock attribute set,
+  as a SCIM create with `active: false` does, publishes `created` then
+  `disabled`.
 - `roleChanged`: the role attribute gets a different value.
 - `disabled`: the lock attribute is set.
 - `enabled`: the lock attribute is cleared.

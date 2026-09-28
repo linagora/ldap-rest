@@ -276,6 +276,12 @@ describe('Twake lifecycle events plugin', function () {
     ]);
   });
 
+  it('publishes created then disabled for an entry added locked', async () => {
+    await add('lc-alice', { pwdAccountLockedTime: LOCKED });
+    await seen(dnOf('lc-alice'));
+    expect(keys()).to.deep.equal(['account.created', 'account.disabled']);
+  });
+
   describe('deletion', () => {
     const deletedAt = '2026-01-02T03:04:05.000Z';
 

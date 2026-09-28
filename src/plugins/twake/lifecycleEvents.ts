@@ -179,7 +179,12 @@ export default class TwakeLifecycleEvents extends DmPlugin {
     if (!after) return this.publish(rule, 'deleted', ctx);
     if (isTombstone(after, this.attrs))
       return before ? this.publish(rule, 'deleted', ctx) : undefined;
-    if (!before) return this.publish(rule, 'created', ctx);
+    if (!before) {
+      await this.publish(rule, 'created', ctx);
+      if (first(valueOf(after, this.attrs.lock)) !== undefined)
+        await this.publish(rule, 'disabled', ctx);
+      return;
+    }
 
     const changes = diffEntries(before as Entry, after as Entry);
     if (valueOf(changes, this.attrs.role))
