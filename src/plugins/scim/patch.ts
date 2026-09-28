@@ -24,8 +24,14 @@ import type {
   AttributeValue,
   ModifyRequest,
 } from '../../lib/ldapActions';
+import { extractLdapCode } from '../../lib/ldapCodes';
 
-import { scimInvalidPath, scimNoTarget, scimInvalidValue } from './errors';
+import {
+  ScimError,
+  scimInvalidPath,
+  scimNoTarget,
+  scimInvalidValue,
+} from './errors';
 import {
   type ResourceMapping,
   type PatchOperation,
@@ -102,6 +108,8 @@ function asValues(v: AttributeValue | undefined): string[] {
 class WorkingEntry {
   private readonly values = new Map<string, string[]>();
   private readonly touched = new Set<string>();
+  /** Attributes an operation of this request set as a whole */
+  private readonly whole = new Set<string>();
 
   constructor(private readonly current: AttributesList) {}
 
@@ -112,21 +120,26 @@ class WorkingEntry {
   }
 
   set(attr: string, values: string[]): void {
-    this.touched.add(attr);
-    this.values.set(attr, values);
+    this.whole.add(attr);
+    this.write(attr, values);
   }
 
   append(attr: string, values: string[]): void {
     const kept = this.get(attr);
-    this.set(attr, [...kept, ...values.filter(v => !kept.includes(v))]);
+    this.write(attr, [...kept, ...values.filter(v => !kept.includes(v))]);
   }
 
   drop(attr: string, values?: string[]): void {
     if (!values) return this.set(attr, []);
-    this.set(
+    this.write(
       attr,
       this.get(attr).filter(v => !values.includes(v))
     );
+  }
+
+  private write(attr: string, values: string[]): void {
+    this.touched.add(attr);
+    this.values.set(attr, values);
   }
 
   diff(): ModifyRequest {
@@ -137,6 +150,22 @@ class WorkingEntry {
       const added = after.filter(v => !before.includes(v));
       const removed = before.filter(v => !after.includes(v));
       if (added.length === 0 && removed.length === 0) continue;
+      // Values added or removed one by one are sent as such. `before` is the
+      // entry as the caller read it, and another write may have changed it
+      // since: a `replace` computed from it would undo that write, where an
+      // `add` and a `delete` of the values named leave it in place.
+      if (!this.whole.has(attr)) {
+        if (added.length > 0) {
+          if (!req.add) req.add = {};
+          req.add[attr] = added.length === 1 ? added[0] : added;
+        }
+        if (removed.length > 0) {
+          if (!req.delete) req.delete = {};
+          (req.delete as AttributesList)[attr] =
+            removed.length === 1 ? removed[0] : removed;
+        }
+        continue;
+      }
       if (after.length === 0) {
         // Nothing to delete if it was not there to begin with.
         if (before.length === 0) continue;
@@ -149,9 +178,7 @@ class WorkingEntry {
       // `replace` would carry the snapshot with it: two requests each adding
       // a different value to the same attribute would both write
       // `[snapshot + mine]`, and whichever landed second would silently drop
-      // the other's. `add` lets the directory merge them, and turns the one
-      // collision that remains — the same value twice — into an error rather
-      // than a loss.
+      // the other's. `add` lets the directory merge them.
       if (removed.length === 0 && before.length > 0) {
         if (!req.add) req.add = {};
         req.add[attr] = added.length === 1 ? added[0] : added;
@@ -431,6 +458,30 @@ export async function patchToModifyRequest(
     await applyOperation(op, entry, ctx);
   }
   return entry.diff();
+}
+
+/**
+ * Write a PATCH, read and computed anew by `attempt` each time. A delete
+ * only names values the read showed, so noSuchAttribute means a concurrent
+ * write removed one of them: the PATCH is played once more on a fresh read,
+ * then refused with 409.
+ */
+export async function writePatch(
+  dn: string,
+  attempt: () => Promise<void>
+): Promise<void> {
+  for (let tries = 1; ; tries++) {
+    try {
+      return await attempt();
+    } catch (err) {
+      if (extractLdapCode(err) !== 16) throw err;
+      if (tries === 2)
+        throw new ScimError(
+          409,
+          `${dn} changed while this PATCH was being applied; nothing was written. Retry the request.`
+        );
+    }
+  }
 }
 
 /**

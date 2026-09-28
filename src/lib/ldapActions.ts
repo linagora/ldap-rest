@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 
 import type { Request } from 'express';
-import { Client, Attribute, Change } from 'ldapts';
+import { Client, Attribute, Change, Control } from 'ldapts';
 import type { ClientOptions, SearchResult, SearchOptions } from 'ldapts';
 import type winston from 'winston';
 import { LRUCache } from 'lru-cache';
@@ -72,7 +72,11 @@ export interface RequestBoundLdap {
     base?: string
   ): Promise<SearchResult | AsyncGenerator<SearchResult>>;
   add(dn: string, entry: AttributesList): Promise<boolean>;
-  modify(dn: string, changes: ModifyRequest): Promise<boolean>;
+  modify(
+    dn: string,
+    changes: ModifyRequest,
+    options?: ModifyOptions
+  ): Promise<boolean>;
   rename(dn: string, newRdn: string): Promise<boolean>;
   delete(dn: string | string[]): Promise<boolean>;
 }
@@ -83,6 +87,17 @@ export interface ModifyRequest {
   replace?: AttributesList;
   delete?: string[] | AttributesList;
 }
+
+export interface ModifyOptions {
+  /**
+   * Send the permissive modify control, not critical: a directory that
+   * honours it accepts an add of a value already there (OpenLDAP 2.4 still
+   * refuses a delete of an absent one); one that does not ignores it.
+   */
+  permissive?: boolean;
+}
+
+const PERMISSIVE_MODIFY = '1.2.840.113556.1.4.1413';
 
 // Code
 
@@ -660,7 +675,7 @@ class ldapActions {
     return {
       search: (options, base) => this.search(options, base ?? this.base, req),
       add: (dn, entry) => this.add(dn, entry, req),
-      modify: (dn, changes) => this.modify(dn, changes, req),
+      modify: (dn, changes, options) => this.modify(dn, changes, req, options),
       rename: (dn, newRdn) => this.rename(dn, newRdn, req),
       delete: dn => this.delete(dn, req),
     };
@@ -1221,7 +1236,8 @@ class ldapActions {
   async modify(
     dn: string,
     changes: ModifyRequest,
-    req?: Request
+    req?: Request,
+    options: ModifyOptions = {}
   ): Promise<boolean> {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
@@ -1311,8 +1327,11 @@ class ldapActions {
         // fails, which is harmless, and `cacheGeneration` keeps a read the write
         // overtook from putting it back.
         this.invalidateCache(dn);
+        const controls = options.permissive
+          ? [new Control(PERMISSIVE_MODIFY, { critical: false })]
+          : undefined;
         try {
-          await pooled.client.modify(dn, ldapChanges);
+          await pooled.client.modify(dn, ldapChanges, controls);
         } catch (error) {
           // The repair read the entry before this write: a writer in between
           // may have given it the class already, and adding it again is
@@ -1320,7 +1339,7 @@ class ldapActions {
           if (!repairChange || (error as { code?: number })?.code !== 20)
             throw error;
           ldapChanges.splice(ldapChanges.indexOf(repairChange), 1);
-          await pooled.client.modify(dn, ldapChanges);
+          await pooled.client.modify(dn, ldapChanges, controls);
         }
         // Invalidate cache for this DN
         this.invalidateCache(dn);

@@ -60,9 +60,12 @@ describe('ldapActions.forRequest', () => {
       'rename',
       'delete',
     ]);
-    // The request is the last argument of each underlying call.
+    // The request follows the operation's own arguments in each underlying
+    // call; only `modify` takes its options after it.
     for (const call of calls) {
-      expect(call.args[call.args.length - 1], call.method).to.equal(req);
+      const at =
+        call.method === 'modify' ? call.args.length - 2 : call.args.length - 1;
+      expect(call.args[at], call.method).to.equal(req);
     }
   });
 
@@ -75,9 +78,10 @@ describe('ldapActions.forRequest', () => {
   it('exposes no way to pass a request of its own', () => {
     const { bound } = bind();
     // Each method takes exactly the arguments of the unbound one, minus the
-    // request — so there is no argument position left to forget.
+    // request — so there is no argument position left to forget. `modify`'s
+    // third is its options, not a request.
     expect(bound.add.length).to.equal(2);
-    expect(bound.modify.length).to.equal(2);
+    expect(bound.modify.length).to.equal(3);
     expect(bound.rename.length).to.equal(2);
     expect(bound.delete.length).to.equal(1);
   });

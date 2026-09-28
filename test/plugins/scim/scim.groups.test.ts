@@ -231,6 +231,172 @@ describe('SCIM Groups (integration)', function () {
     expect(hasUser).to.not.be.true;
   });
 
+  describe('concurrent PATCHes', () => {
+    const others = ['scim-m1', 'scim-m2'];
+    const dnOf = (uid: string) => `uid=${uid},${userBase}`.toLowerCase();
+    const members = async (): Promise<string[]> => {
+      const found = (await plugin.ldap.search(
+        { scope: 'base', paged: false, attributes: ['member'] },
+        `cn=scim-testgroup,${groupBase}`
+      )) as { searchEntries: { member?: string | string[] }[] };
+      return ([] as string[])
+        .concat(found.searchEntries[0]?.member ?? [])
+        .map(m => m.toLowerCase());
+    };
+    const remove = (uid: string) =>
+      supertest(server.app)
+        .patch('/scim/v2/Groups/scim-testgroup')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'remove', path: `members[value eq "${uid}"]` }],
+        });
+
+    beforeEach(async () => {
+      for (const uid of others)
+        await plugin.ldap
+          .add(`uid=${uid},${userBase}`, {
+            objectClass: ['top', 'inetOrgPerson'],
+            cn: uid,
+            sn: uid,
+            uid,
+          })
+          .catch(() => undefined);
+      await supertest(server.app)
+        .post('/scim/v2/Groups')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'scim-testgroup',
+          members: [
+            { value: 'scim-groupuser' },
+            ...others.map(value => ({ value })),
+          ],
+        })
+        .expect(201);
+    });
+
+    afterEach(async () => {
+      for (const uid of others)
+        await plugin.ldap
+          .delete(`uid=${uid},${userBase}`)
+          .catch(() => undefined);
+    });
+
+    it('both apply when each removes a different member', async () => {
+      // Each used to replace the list from its own read, and the second
+      // put back the member the first had removed
+      const [one, two] = await Promise.all([
+        remove('scim-m1'),
+        remove('scim-m2'),
+      ]);
+      expect([one.status, two.status]).to.deep.equal([200, 200]);
+      expect(await members()).to.deep.equal([dnOf('scim-groupuser')]);
+    });
+
+    it('plays again on a fresh read when another removed the same member', async () => {
+      // Another writer removes scim-m1 between this PATCH's read and write
+      let raced = false;
+      const race = async (args: unknown[]) => {
+        if (!raced) {
+          raced = true;
+          await plugin.ldap.modify(`cn=scim-testgroup,${groupBase}`, {
+            delete: { member: `uid=scim-m1,${userBase}` },
+          });
+        }
+        return args;
+      };
+      server.hooks.ldapmodifyrequest = [
+        ...(server.hooks.ldapmodifyrequest || []),
+        race as never,
+      ];
+      try {
+        await remove('scim-m1').expect(200);
+      } finally {
+        server.hooks.ldapmodifyrequest = server.hooks.ldapmodifyrequest!.filter(
+          h => h !== (race as never)
+        );
+      }
+      expect(await members()).to.have.members([
+        dnOf('scim-groupuser'),
+        dnOf('scim-m2'),
+      ]);
+    });
+  });
+
+  it('PATCH removes a member without dropping one a search filter hides', async () => {
+    const hiddenDn = `uid=scim-hidden,${userBase}`;
+    await plugin.ldap
+      .add(hiddenDn, {
+        objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+        cn: 'Hidden',
+        sn: 'Hidden',
+        uid: 'scim-hidden',
+      })
+      .catch(() => undefined);
+    await supertest(server.app)
+      .post('/scim/v2/Groups')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'scim-testgroup',
+        members: [{ value: 'scim-groupuser' }, { value: 'scim-hidden' }],
+      })
+      .expect(201);
+    // What a plugin hiding some members from API reads does
+    const hide = ([result, req, opts]: [
+      { searchEntries: Record<string, unknown>[] },
+      unknown,
+      unknown,
+    ]) => {
+      if (req)
+        for (const e of result.searchEntries)
+          if (Array.isArray(e.member))
+            e.member = (e.member as string[]).filter(
+              m => m.toLowerCase() !== hiddenDn.toLowerCase()
+            );
+      return [result, req, opts];
+    };
+    server.hooks.ldapsearchfilter = [
+      ...(server.hooks.ldapsearchfilter || []),
+      hide as never,
+    ];
+    const patch = (Operations: unknown[]) =>
+      supertest(server.app)
+        .patch('/scim/v2/Groups/scim-testgroup')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations,
+        })
+        .expect(200);
+    try {
+      await patch([
+        { op: 'remove', path: 'members[value eq "scim-groupuser"]' },
+      ]);
+      // Adding back the member it cannot see: already there, no error
+      await patch([
+        { op: 'add', path: 'members', value: [{ value: 'scim-hidden' }] },
+      ]);
+    } finally {
+      server.hooks.ldapsearchfilter = server.hooks.ldapsearchfilter!.filter(
+        h => h !== (hide as never)
+      );
+      const found = (await plugin.ldap.search(
+        { scope: 'base', paged: false, attributes: ['member'] },
+        `cn=scim-testgroup,${groupBase}`
+      )) as { searchEntries: { member?: string | string[] }[] };
+      const members = ([] as string[])
+        .concat(found.searchEntries[0]?.member ?? [])
+        .map(m => m.toLowerCase());
+      await plugin.ldap.delete(hiddenDn).catch(() => undefined);
+      expect(members).to.include(hiddenDn.toLowerCase());
+      expect(members).not.to.include(
+        `uid=scim-groupuser,${userBase}`.toLowerCase()
+      );
+    }
+  });
+
   it('keeps the members when a removal names someone the directory lost', async () => {
     // The routine way an identity provider meets this: it withdraws a member
     // that has since been deleted from the directory, so the reference does
