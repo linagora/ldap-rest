@@ -86,6 +86,9 @@ export default abstract class DmPlugin {
   /* Function to provide configuration for config API */
   getConfigApiData?(): Record<string, unknown> | undefined;
 
+  /** Key of that configuration under `features`; the instance name otherwise */
+  configApiKey?: string;
+
   /**
    * Called once every plugin is loaded, before the first request.
    *

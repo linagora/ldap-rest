@@ -103,7 +103,8 @@ local logout — the cookie is dropped, the browser goes to `--base-url` — and
 a warning saying the provider may log the caller back in.
 
 `GET /v1/config` (with `core/configApi`) publishes the route, so a front-end
-knows it can offer a sign-out control:
+knows it can offer a sign-out control. The key is `openidconnect` whatever
+the instance is named:
 
 ```json
 "features": {

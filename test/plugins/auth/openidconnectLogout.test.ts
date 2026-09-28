@@ -95,7 +95,8 @@ const login = async (
 
 const build = async (
   issuer: string,
-  endSession: boolean
+  endSession: boolean,
+  name?: string
 ): Promise<ReturnType<typeof supertest>> => {
   provider(issuer, endSession);
   const server = new DM();
@@ -109,7 +110,7 @@ const build = async (
     ...server.config,
     auth_path_prefix: ['/api/admin'],
   });
-  await server.registerPlugin('openidconnect', new OpenIDConnect(scoped));
+  await server.registerPlugin('openidconnect', new OpenIDConnect(scoped), name);
   await server.registerPlugin('configApi', new ConfigApi(server));
   server.setupErrorMiddleware();
   return supertest(server.app);
@@ -180,8 +181,8 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
     expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
   });
 
-  it('should publish the logout route in /v1/config', async () => {
-    const request = await build('http://config.example.test', true);
+  it('should publish the logout route in /v1/config, whatever the instance is named', async () => {
+    const request = await build('http://config.example.test', true, 'oidc');
 
     const res = await request
       .get('/api/v1/config')

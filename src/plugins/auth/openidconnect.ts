@@ -79,6 +79,9 @@ const walkSubscribers = async <T>(
 
 export default class OpenIDConnect extends AuthBase {
   name = 'openidconnect';
+  // A scoped instance must carry a name, and a front-end looks for the
+  // logout route here whatever it is.
+  configApiKey = 'openidconnect';
   roles: Role[] = ['auth', 'configurable'] as const;
   /** The library's router, built once: `auth()` returns a fresh one per call. */
   private router?: RequestHandler;
