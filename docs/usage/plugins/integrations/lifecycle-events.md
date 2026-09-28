@@ -15,8 +15,11 @@ publishes nothing.
 
 - `created`: an entry is added. An entry added locked, as a SCIM create with
   `active: false` does, publishes `created` then `disabled`.
-- `roleChanged`: the role attribute gets different values. Case is ignored:
-  `Admin` and `admin` are one role.
+- `roleChanged`: the role attribute gets different values. Case and order are
+  ignored: `Admin` and `admin` are one role. A multi-valued role attribute is
+  compared as a set, but `$title` carries its first value only, so
+  `[x, y]` to `[x, z]` publishes `x` as both role and previous role: keep the
+  role in a single-valued attribute.
 - `disabled`: the lock attribute takes the lock value.
 - `enabled`: the lock attribute no longer holds the lock value.
 - `deleted`: the entry becomes a tombstone (the deleted attribute takes the
@@ -44,9 +47,10 @@ operational one such as `pwdAccountLockedTime` is seen on both sides.
 - A rename or a move publishes nothing. The `$dn.*` groups of the new DN may
   then differ from the ones consumers know, and an entry moved into or out of
   a rule's pattern publishes neither `created` nor `deleted`.
-- Clearing the deleted attribute of a tombstone (a restore) publishes nothing,
-  whatever else the same write changes. Later changes are published again, as
-  for any account.
+- A tombstone cannot be restored. Clearing its deleted attribute is not a
+  supported operation: it publishes nothing, whatever else the same write
+  changes, and later changes are published again as for any account, to
+  consumers that consider it deleted.
 - A change made outside LDAP-Rest is not seen. A ppolicy lockout after failed
   binds is written by the directory itself, and holds a timestamp rather than
   the lock value: it publishes nothing, and neither does clearing it.

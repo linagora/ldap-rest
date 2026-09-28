@@ -4,9 +4,11 @@ import path from 'node:path';
 
 import { expect } from 'chai';
 import type { Request } from 'express';
+import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
+import Scim from '../../../src/plugins/scim/scim';
 import TwakeLifecycleEvents, {
   parseRules,
 } from '../../../src/plugins/twake/lifecycleEvents';
@@ -261,6 +263,46 @@ describe('Twake lifecycle events plugin', function () {
     await dm.ldap.rename(dnOf('lc-alice'), dnOf('lc-bob'));
     await seen(dnOf('lc-bob'));
     expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it("publishes nothing for a move into another rule's pattern", async () => {
+    const org = `ou=lc-org,${BASE}`;
+    const moved = `uid=lc-alice,${org}`;
+    await dm.ldap.add(org, {
+      objectClass: ['top', 'organizationalUnit'],
+      ou: 'lc-org',
+    });
+    try {
+      await add('lc-alice');
+      await seen(dnOf('lc-alice'));
+      rabbit.published = [];
+      await dm.ldap.rename(dnOf('lc-alice'), moved);
+      await seen(moved);
+      expect(rabbit.published).to.deep.equal([]);
+    } finally {
+      await dm.ldap.delete(moved).catch(() => undefined);
+      await dm.ldap.delete(org).catch(() => undefined);
+    }
+  });
+
+  it('publishes created then disabled for a SCIM create with active false', async () => {
+    dm.config.scim_user_base = BASE;
+    dm.config.scim_user_lock_attribute = 'pwdAccountLockedTime';
+    dm.config.scim_user_lock_value = LOCKED;
+    await dm.registerPlugin('core/scim', new Scim(dm));
+    const res = await supertest(dm.app)
+      .post('/scim/v2/Users')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'lc-alice',
+        name: { familyName: 'lc-alice' },
+        active: false,
+      });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    await seen(dnOf('lc-alice'));
+    expect(keys()).to.deep.equal(['account.created', 'account.disabled']);
+    expect(rabbit.published[0].message.source).to.equal('scim');
   });
 
   it('publishes for an entry nested under a branch of its own', async () => {
