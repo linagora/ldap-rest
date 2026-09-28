@@ -125,7 +125,7 @@ describe('OpenID Connect Plugin', () => {
       expect(plugin.roles).to.include('auth');
     });
 
-    it('should publish its logout route to the config API', () => {
+    it('should have configurable role', () => {
       expect(plugin.roles).to.include('configurable');
     });
 
