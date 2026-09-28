@@ -259,6 +259,15 @@ describe('Twake lifecycle events plugin', function () {
     ]);
   });
 
+  it('publishes no roleChanged when only the case of the role changes', async () => {
+    await add('lc-alice', { title: 'member' });
+    await seen(dnOf('lc-alice'));
+    rabbit.published = [];
+    await dm.ldap.modify(dnOf('lc-alice'), { replace: { title: 'Member' } });
+    await seen(dnOf('lc-alice'), 2);
+    expect(rabbit.published).to.deep.equal([]);
+  });
+
   it('publishes disabled and enabled when an operational lock is set and cleared', async () => {
     await add('lc-alice');
     await dm.ldap.modify(dnOf('lc-alice'), {

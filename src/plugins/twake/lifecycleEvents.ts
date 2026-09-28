@@ -18,7 +18,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
-import type { AttributesList } from '../../lib/ldapActions';
+import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { diffEntries } from '../ldap/onChange';
 import type RabbitMq from '../rabbitmq';
 
@@ -75,6 +75,25 @@ interface EventContext {
   before: AttributesList;
   dn: Record<string, string>;
   change: ChangeContext;
+}
+
+/**
+ * Role attributes such as `title` match case-insensitively: a change of case
+ * alone is no change of role.
+ */
+function sameIgnoringCase(
+  a: AttributeValue | undefined,
+  b: AttributeValue | undefined
+): boolean {
+  const set = (value: AttributeValue | undefined): Set<string> =>
+    new Set(
+      (value === undefined ? [] : Array.isArray(value) ? value : [value]).map(
+        v => v.toString().toLowerCase()
+      )
+    );
+  const x = set(a);
+  const y = set(b);
+  return x.size === y.size && [...x].every(v => y.has(v));
 }
 
 export function parseRules(source: string): Rule[] {
@@ -186,9 +205,15 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       return;
     }
 
-    const changes = diffEntries(before as Entry, after as Entry);
-    if (valueOf(changes, this.attrs.role))
+    if (
+      this.attrs.role &&
+      !sameIgnoringCase(
+        valueOf(before, this.attrs.role),
+        valueOf(after, this.attrs.role)
+      )
+    )
       await this.publish(rule, 'roleChanged', ctx);
+    const changes = diffEntries(before as Entry, after as Entry);
     const lock = valueOf(changes, this.attrs.lock);
     if (lock?.[0] === null) await this.publish(rule, 'disabled', ctx);
     else if (lock?.[1] === null) await this.publish(rule, 'enabled', ctx);

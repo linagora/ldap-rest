@@ -16,7 +16,8 @@ publishes nothing.
 - `created`: an entry is added. An entry added with the lock attribute set,
   as a SCIM create with `active: false` does, publishes `created` then
   `disabled`.
-- `roleChanged`: the role attribute gets a different value.
+- `roleChanged`: the role attribute gets different values. Case is ignored:
+  `Admin` and `admin` are one role.
 - `disabled`: the lock attribute is set.
 - `enabled`: the lock attribute is cleared.
 - `deleted`: the entry becomes a tombstone (the deleted attribute takes the
@@ -133,7 +134,7 @@ a routing key, or an object with:
 
 Payload and `when` values are sources:
 
-- `$attr`: the attribute after the write (its first value)
+- `$attr`: the attribute after the write
 - `$previous.attr`: the attribute before the write
 - `$dn.name`: a named group of the rule's `dn` expression
 - `$context.actor`, `$context.requestId`, `$context.source`: who made the
@@ -143,8 +144,9 @@ Payload and `when` values are sources:
 - `$now`: the current time, ISO 8601
 - anything else: the value itself
 
-A source with no value leaves its field out. Every message carries a random
-AMQP `messageId`.
+`$attr` and `$previous.attr` carry the first value of a multi-valued
+attribute. A source with no value leaves its field out. Every message carries
+a random AMQP `messageId`.
 
 ## Dependencies
 
