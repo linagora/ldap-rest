@@ -195,19 +195,17 @@ export default class TwakeLifecycleEvents extends DmPlugin {
       );
   }
 
-  afterLoad(): void {
+  /**
+   * No route: this is the one step of loading that is awaited, so the server
+   * can still refuse to start. core/rabbitmq connects lazily and hands back
+   * no client when it cannot, and every event would then be lost.
+   */
+  async api(): Promise<void> {
     if (this.rules.length === 0) return;
-    // core/rabbitmq connects lazily and hands back no client when it cannot:
-    // every event would then be lost, so the server does not run that way.
-    void this.requirePlugin<RabbitMq>('rabbitmq')
-      ?.getRawClient()
-      .then(client => {
-        if (client) return;
-        this.logger.error(
-          `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached, stopping`
-        );
-        process.exit(1);
-      });
+    if (!(await this.requirePlugin<RabbitMq>('rabbitmq')?.getRawClient()))
+      throw new Error(
+        `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
+      );
   }
 
   hooks: Hooks = {
