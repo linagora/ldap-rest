@@ -72,6 +72,11 @@ export interface Hooks {
     args: [string, AttributesList],
     context?: ChangeContext
   ) => MaybePromise<void>;
+  /** See docs/plugin-development/hooks.md#ldapaddafter */
+  ldapaddafter?: (
+    args: [string, AttributesList],
+    context?: ChangeContext
+  ) => MaybePromise<void>;
   // modify
   ldapmodifyrequest?: ChainedHook<[string, ModifyRequest, number, Request?]>;
   ldapmodifydone?: (

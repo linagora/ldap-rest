@@ -45,6 +45,33 @@ describe('LdapUsersFlat validation with standard schema (via flatGeneric)', func
     });
   });
 
+  describe('when an ldapaddafter subscriber fails', () => {
+    afterEach(() => {
+      delete server.hooks.ldapaddafter;
+      delete server.hooks.ldapstandardUseradddone;
+    });
+
+    it('still creates the user and fires its adddone hook', async () => {
+      const done: string[] = [];
+      server.hooks.ldapaddafter = [
+        () => {
+          throw new Error('provider down');
+        },
+      ];
+      server.hooks.ldapstandardUseradddone = [
+        ([dn]: [string]) => void done.push(dn),
+      ];
+      expect(
+        await plugin.addUser('testuser2', {
+          cn: 'Test User 2',
+          sn: 'User',
+          mail: 'testuser2-after@example.org',
+        })
+      ).to.be.true;
+      expect(done).to.deep.equal([`uid=testuser2,${USER_BRANCH}`]);
+    });
+  });
+
   describe('New user with standard schema validation', () => {
     it('should add/delete user with required fields', async () => {
       await plugin.addUser('testuser2', {

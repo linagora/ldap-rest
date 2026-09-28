@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `ldapaddafter` hook, awaited after an add ([docs](docs/plugin-development/hooks.md#ldapaddafter))
+
 ## v0.11.2 (2026-09-27)
 
 ### Bug Fixes
