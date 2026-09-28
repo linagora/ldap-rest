@@ -292,6 +292,72 @@ describe('Twake tombstone plugin', function () {
     });
   });
 
+  describe('erase', () => {
+    beforeEach(async () => {
+      await add(flat('ts-alice'));
+      await add(flat('plain-bob'));
+      await groups.addGroup('ts-group', [flat('ts-alice'), flat('plain-bob')]);
+      await dm.ldap.delete(flat('ts-alice'));
+      await seen(flat('ts-alice'), 2);
+      rabbit.published = [];
+    });
+
+    it('refuses a recent deletion unless forced', async () => {
+      let error: unknown;
+      await plugin.erase(flat('ts-alice')).catch(e => (error = e));
+      expect(error).to.have.property('statusCode', 409);
+      expect(await read(flat('ts-alice'))).to.not.equal(undefined);
+    });
+
+    it('erases an old enough deletion, with its memberships, publishing nothing', async () => {
+      await dm.ldap.modify(flat('ts-alice'), {
+        replace: { roomNumber: '2020-01-01T00:00:00.000Z' },
+      });
+      await plugin.erase(flat('ts-alice'));
+      await seen(flat('ts-alice'), 4);
+      expect(await read(flat('ts-alice'))).to.equal(undefined);
+      expect(await members()).to.deep.equal([flat('plain-bob')]);
+      expect(rabbit.published).to.deep.equal([]);
+    });
+
+    it('erases the last member of a group, leaving the placeholder', async () => {
+      const solo = `cn=ts-solo,${GROUPS}`;
+      await dm.ldap.add(solo, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'ts-solo',
+        member: flat('ts-alice'),
+      });
+      try {
+        await plugin.erase(flat('ts-alice'), { force: true });
+        expect(await read(flat('ts-alice'))).to.equal(undefined);
+        expect((await read(solo))?.member).to.equal(dm.config.group_dummy_user);
+      } finally {
+        await dm.ldap.delete(solo).catch(() => undefined);
+      }
+    });
+
+    it('erases through the API when forced', async () => {
+      await supertest(dm.app)
+        .post('/api/v1/twake/tombstones/erase')
+        .send({ dn: flat('ts-alice') })
+        .expect(409);
+      await supertest(dm.app)
+        .post('/api/v1/twake/tombstones/erase')
+        .send({ dn: flat('ts-alice'), force: true })
+        .expect(200);
+      await seen(flat('ts-alice'), 3);
+      expect(await read(flat('ts-alice'))).to.equal(undefined);
+      expect(rabbit.published).to.deep.equal([]);
+    });
+
+    it('answers 404 for an entry that is not a tombstone', async () => {
+      await supertest(dm.app)
+        .post('/api/v1/twake/tombstones/erase')
+        .send({ dn: flat('plain-bob'), force: true })
+        .expect(404);
+    });
+  });
+
   describe('SCIM', () => {
     beforeEach(async () => {
       await add(flat('ts-alice'));
@@ -319,6 +385,42 @@ describe('Twake tombstone plugin', function () {
         .query({ filter: 'userName sw "ts-"' })
         .expect(200);
       expect(res.body.totalResults).to.equal(0);
+    });
+  });
+
+  describe('with core/ldap/trash', () => {
+    const composed = (watched: string): TwakeTombstone => {
+      dm.config.trash_watched_bases = watched;
+      return new TwakeTombstone(dm);
+    };
+
+    beforeEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dm.loadedPlugins['trash'] = { name: 'trash' } as any;
+    });
+
+    afterEach(() => {
+      delete dm.loadedPlugins['trash'];
+      delete dm.config.trash_watched_bases;
+    });
+
+    it('refuses to start when the trash watches a tombstone branch', () => {
+      expect(() => composed(USERS).assertComposition()).to.throw(
+        /core\/ldap\/trash watches the branch/
+      );
+    });
+
+    it('refuses to start when the trash watches everything', () => {
+      expect(() => composed('').assertComposition()).to.throw(
+        /core\/ldap\/trash watches the branch/
+      );
+    });
+
+    it('starts when the trash watches another branch', () => {
+      // core/ldap/trash splits its list on commas: each item is a suffix
+      expect(() =>
+        composed('ou=elsewhere,ou=users').assertComposition()
+      ).not.to.throw();
     });
   });
 });

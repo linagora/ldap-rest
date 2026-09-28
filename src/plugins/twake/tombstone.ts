@@ -12,22 +12,29 @@
  *
  * See `docs/usage/plugins/integrations/tombstone.md`.
  */
-import type { Request } from 'express';
+import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
-import { BadRequestError } from '../../lib/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from '../../lib/errors';
+import { jsonBody } from '../../lib/expressFormatedResponses';
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { escapeLdapFilter, launchHooks } from '../../lib/utils';
+import { asyncHandler, escapeLdapFilter, launchHooks } from '../../lib/utils';
 
 import {
+  first,
   formatDeletedAt,
   isTombstone,
   lifecycleAttributes,
+  parseDeletedAt,
   valueOf,
   type LifecycleAttributes,
 } from './lifecycleAttributes';
@@ -44,10 +51,14 @@ export default class TwakeTombstone extends DmPlugin {
   private readonly reasonHeader: string;
   private readonly reasons: string[];
   private readonly clearAttributes: string[];
+  private readonly eraseMinAge: number;
+  private readonly groupBases: string[];
   private readonly scimPrefix: string;
 
   /** Deletes asked for through {@link tombstone}, with their reason. */
   private readonly reasonFor = new Map<string, string>();
+  /** Entries being erased: their delete must reach the directory. */
+  private readonly erasing = new Set<string>();
 
   constructor(server: DM) {
     super(server);
@@ -66,6 +77,10 @@ export default class TwakeTombstone extends DmPlugin {
       cfg.twake_tombstone_reason_header || 'x-deletion-reason'
     ).toLowerCase();
     this.clearAttributes = cfg.twake_tombstone_clear_attributes || [];
+    this.eraseMinAge = cfg.twake_tombstone_erase_min_age ?? 2592000;
+    this.groupBases = cfg.twake_tombstone_group_bases?.length
+      ? cfg.twake_tombstone_group_bases
+      : [cfg.ldap_group_base || cfg.ldap_base || ''];
     this.scimPrefix = cfg.scim_prefix || '/scim/v2';
     if (this.patterns.length === 0)
       this.logger.warn(
@@ -75,7 +90,7 @@ export default class TwakeTombstone extends DmPlugin {
 
   /**
    * Last in the delete chain: a plugin that may refuse the request
-   * judges it before a tombstone is written.
+   * judges it before a tombstone is written or erased.
    */
   afterLoad(): void {
     for (const name of ['ldapdeleterequest'] as const) {
@@ -92,7 +107,7 @@ export default class TwakeTombstone extends DmPlugin {
     ldapdeleterequest: async ([dn, req]) => {
       const kept: string[] = [];
       for (const one of Array.isArray(dn) ? dn : [dn]) {
-        if (this.matches(one)) {
+        if (!this.erasing.has(one) && this.matches(one)) {
           const entry = await this.read(one);
           if (entry) {
             await this.writeTombstone(one, entry, this.reasonOf(one, req), req);
@@ -119,6 +134,52 @@ export default class TwakeTombstone extends DmPlugin {
     },
   };
 
+  api(app: Express): void {
+    /**
+     * @openapi
+     * summary: Erase a tombstone
+     * description: |
+     *   Removes a deleted account for good, with its group memberships. The
+     *   deletion must be older than `--twake-tombstone-erase-min-age`, unless
+     *   `force` is true. Nothing is published.
+     * tags:
+     *   - Twake
+     * requestBody:
+     *   required: true
+     *   content:
+     *     application/json:
+     *       schema:
+     *         type: object
+     *         required: [dn]
+     *         properties:
+     *           dn: { type: string }
+     *           force: { type: boolean, default: false }
+     * responses:
+     *   '200':
+     *     description: Erased.
+     *     content:
+     *       application/json:
+     *         example: { success: true }
+     *   '404':
+     *     description: No tombstone at this DN.
+     *   '409':
+     *     description: The deletion is too recent and `force` is not set.
+     */
+    app.post(
+      `${this.config.api_prefix}/v1/twake/tombstones/erase`,
+      asyncHandler(async (req: Request, res: Response) => {
+        const body = jsonBody(req, res, 'dn') as
+          | { dn: unknown; force?: unknown }
+          | false;
+        if (!body) return;
+        if (typeof body.dn !== 'string')
+          throw new BadRequestError('Field dn must be a string');
+        await this.erase(body.dn, { force: body.force === true, req });
+        res.json({ success: true });
+      })
+    );
+  }
+
   /**
    * Delete an entry as a tombstone recording this reason. Goes through the
    * directory's delete, so every plugin judging deletes judges this one.
@@ -134,6 +195,72 @@ export default class TwakeTombstone extends DmPlugin {
     } finally {
       this.reasonFor.delete(dn);
     }
+  }
+
+  /**
+   * Remove a tombstone and its group memberships. Refused while the deletion
+   * is younger than the configured age, unless forced.
+   */
+  async erase(
+    dn: string,
+    { force = false, req }: { force?: boolean; req?: Request } = {}
+  ): Promise<void> {
+    const entry = await this.read(dn);
+    if (!entry || !isTombstone(entry, this.attrs))
+      throw new NotFoundError(`No tombstone at ${dn}`);
+    if (!force) {
+      const raw = first(valueOf(entry, this.attrs.deletedAt));
+      const at = raw && parseDeletedAt(raw, this.attrs.deletedAtFormat);
+      if (!at)
+        throw new ConflictError(
+          `${dn} holds no readable deletion date (--twake-lifecycle-deleted-at-attribute); force it to erase now`
+        );
+      if (Date.now() - at.getTime() < this.eraseMinAge * 1000)
+        throw new ConflictError(
+          `${dn} was deleted less than ${this.eraseMinAge} seconds ago; force it to erase now`
+        );
+    }
+    this.erasing.add(dn);
+    try {
+      await this.server.ldap.delete(dn, req);
+    } finally {
+      this.erasing.delete(dn);
+    }
+    // Only once the delete has been judged and has landed: a refused erase
+    // keeps the memberships.
+    await this.leaveGroups(dn);
+    this.logger.info({ plugin: this.name, event: 'erase', dn, force });
+  }
+
+  /**
+   * core/ldap/trash moves a deleted entry away before this plugin, last in
+   * the delete chain, sees it: no tombstone would be written, and an erase
+   * would move the tombstone instead of removing it.
+   */
+  assertComposition(): void {
+    if (!this.server.loadedPlugins.trash) return;
+    // Read as core/ldap/trash reads it, none meaning every branch. It splits
+    // on every comma, DNs included (#226): followed as it behaves, since
+    // that is what decides which deletes it moves away.
+    const watched = String(this.config.trash_watched_bases || '')
+      .split(',')
+      .map(base => base.trim().toLowerCase())
+      .filter(Boolean);
+    const clash = this.patterns.filter(p => {
+      const branch = p.source.toLowerCase().replace(/\$$/, '');
+      return (
+        watched.length === 0 ||
+        watched.some(base => branch === base || branch.endsWith(`,${base}`))
+      );
+    });
+    if (clash.length)
+      throw new Error(
+        `${this.name}: core/ldap/trash watches the branch of ${clash
+          .map(p => p.source)
+          .join(', ')}, and would move those entries instead of leaving ` +
+          `a tombstone. Leave that branch out of --trash-watched-bases, or ` +
+          `load one of the two plugins only`
+      );
   }
 
   private matches(dn: string): boolean {
@@ -215,5 +342,62 @@ export default class TwakeTombstone extends DmPlugin {
       clear.length ? { replace, delete: clear } : { replace }
     );
     this.logger.info({ plugin: this.name, event: 'tombstone', dn, reason });
+  }
+
+  private async groupsOf(dn: string): Promise<string[]> {
+    const found: string[] = [];
+    for (const base of this.groupBases.filter(Boolean)) {
+      try {
+        const groups = (await this.server.ldap.search(
+          {
+            paged: false,
+            scope: 'sub',
+            filter: `(member=${escapeLdapFilter(dn)})`,
+            attributes: ['dn'],
+          },
+          base
+        )) as SearchResult;
+        found.push(...groups.searchEntries.map(g => g.dn));
+      } catch (err) {
+        if (extractLdapCode(err) !== 32) throw err;
+      }
+    }
+    return found;
+  }
+
+  private async leaveGroups(dn: string): Promise<void> {
+    for (const group of await this.groupsOf(dn))
+      await this.leaveGroup(group, dn);
+  }
+
+  /**
+   * core/ldap/groups and refint clean the same memberships once the delete
+   * lands, so each outcome of a race with them counts as done.
+   */
+  private async leaveGroup(group: string, dn: string): Promise<void> {
+    const dummy = this.config.group_dummy_user;
+    let placeholder = false;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.server.ldap.modify(
+          group,
+          placeholder
+            ? { add: { member: dummy! }, delete: { member: dn } }
+            : { delete: { member: dn } }
+        );
+        return;
+      } catch (err) {
+        const code = extractLdapCode(err);
+        // Already removed.
+        if (code === 16) return;
+        if (attempt >= 2) throw err;
+        // The last member of a groupOfNames hands its place to the
+        // placeholder core/ldap/groups keeps in empty groups; one already
+        // there means someone else did, and only the member is left to go.
+        if (code === 65 && dummy) placeholder = true;
+        else if (code === 20) placeholder = false;
+        else throw err;
+      }
+    }
   }
 }
