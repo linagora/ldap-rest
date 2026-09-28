@@ -63,6 +63,7 @@ const RULES = [
       domain: '$mail|domain',
       kind: 'account',
       actor: '$context.actor',
+      requestId: '$context.requestId',
       source: '$context.source',
     },
     events: {
@@ -101,6 +102,17 @@ const RULES = [
     exchange: 'accounts',
     payload: { id: '$dn.id', org: '$dn.org' },
     events: { created: 'member.created' },
+  },
+  {
+    dn: `^uid=(?<id>neg-[^,]+),${BASE}$`,
+    exchange: 'accounts',
+    payload: { id: '$dn.id' },
+    events: {
+      created: [
+        { routingKey: 'admin.created', when: { $title: 'admin' } },
+        { routingKey: 'other.created', when: { $title: '!admin' } },
+      ],
+    },
   },
 ];
 
@@ -175,7 +187,14 @@ describe('Twake lifecycle events plugin', function () {
   afterEach(async () => {
     rabbit.fail = false;
     rabbit.client = {};
-    for (const name of ['lc-alice', 'other-carol']) {
+    for (const name of [
+      'lc-alice',
+      'lc-bob',
+      'other-carol',
+      'neg-admin',
+      'neg-member',
+      'neg-none',
+    ]) {
       await dm.ldap.delete(dnOf(name)).catch(() => undefined);
     }
   });
@@ -210,6 +229,32 @@ describe('Twake lifecycle events plugin', function () {
       actor: 'jdoe',
       source: 'rest',
     });
+    expect(rabbit.published[0].message.requestId).to.match(/^[0-9a-f-]{36}$/);
+  });
+
+  it('publishes a target whose condition is negated only when it differs', async () => {
+    await add('neg-admin', { title: 'admin' });
+    await seen(dnOf('neg-admin'));
+    await add('neg-member', { title: 'member' });
+    await seen(dnOf('neg-member'));
+    await add('neg-none');
+    await seen(dnOf('neg-none'));
+    expect(
+      rabbit.published.map(p => [p.routingKey, p.message.id])
+    ).to.deep.equal([
+      ['admin.created', 'neg-admin'],
+      ['other.created', 'neg-member'],
+      ['other.created', 'neg-none'],
+    ]);
+  });
+
+  it('publishes nothing for a rename', async () => {
+    await add('lc-alice', { title: 'member' });
+    await seen(dnOf('lc-alice'));
+    rabbit.published = [];
+    await dm.ldap.rename(dnOf('lc-alice'), dnOf('lc-bob'));
+    await seen(dnOf('lc-bob'));
+    expect(rabbit.published).to.deep.equal([]);
   });
 
   it('publishes for an entry nested under a branch of its own', async () => {
@@ -366,6 +411,22 @@ describe('Twake lifecycle events plugin', function () {
       });
       await seen(dnOf('lc-alice'), 3);
       expect(rabbit.published).to.deep.equal([]);
+    });
+
+    it('publishes nothing for a restore, and publishes again afterwards', async () => {
+      await tombstone();
+      await seen(dnOf('lc-alice'), 2);
+      rabbit.published = [];
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        delete: ['employeeType', 'pwdAccountLockedTime'],
+      });
+      await seen(dnOf('lc-alice'), 3);
+      expect(rabbit.published).to.deep.equal([]);
+      await dm.ldap.modify(dnOf('lc-alice'), {
+        replace: { pwdAccountLockedTime: LOCKED },
+      });
+      await seen(dnOf('lc-alice'), 4);
+      expect(keys()).to.deep.equal(['account.disabled']);
     });
 
     it('publishes nothing when a tombstone is removed', async () => {
