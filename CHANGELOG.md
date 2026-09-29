@@ -8,6 +8,13 @@
   refresh token renews it —
   [notes](docs/usage/upgrading.md#an-openid-connect-session-ends-with-its-access-token)
 
+### Features
+
+- `core/twake/lifecycleEvents`: groups too, with `updated`, `memberAdded`
+  and `memberRemoved`, `$changed.` sources and member lists in payloads
+  ([#233](https://github.com/linagora/ldap-rest/pull/233)).
+  [doc](docs/usage/plugins/integrations/lifecycle-events.md)
+
 ### Bug Fixes
 
 - `core/auth/openidconnect`: a client asking for JSON only

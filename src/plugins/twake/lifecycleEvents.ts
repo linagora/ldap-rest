@@ -1,9 +1,10 @@
 /**
  * @module plugins/twake/lifecycleEvents
  *
- * Publishes an account's lifecycle to RabbitMQ from the directory write
- * itself, so every API that writes the entry announces the same thing:
- * created, role changed, disabled, enabled, deleted.
+ * Publishes an account's or a group's lifecycle to RabbitMQ from the
+ * directory write itself, so every API that writes the entry announces the
+ * same thing: created, role changed, disabled, enabled, updated, members
+ * added or removed, deleted.
  *
  * Which entries are accounts, which attributes carry the role, the lock and
  * the deletion, and where each event goes are configuration: see
@@ -16,8 +17,18 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
-import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
-import { parseDn, unescapeDnValue } from '../../lib/utils';
+import { extractLdapCode } from '../../lib/ldapCodes';
+import type {
+  AttributesList,
+  AttributeValue,
+  SearchResult,
+} from '../../lib/ldapActions';
+import {
+  isDummyMemberDn,
+  normalizeDn,
+  parseDn,
+  unescapeDnValue,
+} from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 import { DEFAULT_LOCK_ATTRIBUTE, DEFAULT_LOCK_VALUE } from '../scim/mapping';
 
@@ -36,17 +47,29 @@ export const LIFECYCLE_EVENTS = [
   'roleChanged',
   'disabled',
   'enabled',
+  'updated',
+  'memberAdded',
+  'memberRemoved',
   'deleted',
 ] as const;
 export type LifecycleEvent = (typeof LIFECYCLE_EVENTS)[number];
 
-type Payload = Record<string, string>;
+const MEMBER_LISTS = ['$members', '$added', '$removed'] as const;
+
+/** A payload field listing members, each read and shaped by `fields`. */
+interface MemberList {
+  list: (typeof MEMBER_LISTS)[number];
+  fields: Record<string, string>;
+}
+
+type Payload = Record<string, string | MemberList>;
+type Condition = Record<string, string>;
 
 interface Target {
   exchange: string;
   routingKey: string;
   payload: Payload;
-  when: Payload;
+  when: Condition;
 }
 
 interface Rule {
@@ -59,6 +82,8 @@ interface EventContext {
   before: AttributesList;
   dn: Record<string, string>;
   change: ChangeContext;
+  added?: string[];
+  removed?: string[];
 }
 
 /**
@@ -105,15 +130,81 @@ function optionalString(value: unknown, where: string, key: string): void {
     throw new Error(`${where}: "${key}" must be a string`);
 }
 
+const isStrings = (value: unknown): value is Condition =>
+  isObject(value) && Object.values(value).every(v => typeof v === 'string');
+
+function optionalCondition(
+  value: unknown,
+  where: string,
+  key: string
+): Condition | undefined {
+  if (value === undefined) return undefined;
+  if (!isStrings(value))
+    throw new Error(`${where}: "${key}" must be an object of strings`);
+  return value;
+}
+
+/**
+ * A member's sources are its own attributes or plain values: `$dn.`,
+ * `$context.` or `$now` would be read as attribute names and dropped.
+ */
+const MEMBER_SOURCE = /^(?:[^$].*|\$(?!now$)[A-Za-z][A-Za-z0-9-]*)$/;
+
+function memberList(value: unknown): MemberList | undefined {
+  if (!isObject(value)) return undefined;
+  const entries = Object.entries(value);
+  if (entries.length !== 1) return undefined;
+  const [list, fields] = entries[0];
+  if (
+    !(MEMBER_LISTS as readonly string[]).includes(list) ||
+    !isStrings(fields) ||
+    !Object.values(fields).every(s => MEMBER_SOURCE.test(s))
+  )
+    return undefined;
+  return { list: list as MemberList['list'], fields };
+}
+
 function optionalPayload(
   value: unknown,
   where: string,
   key: string
 ): Payload | undefined {
   if (value === undefined) return undefined;
-  if (!isObject(value) || Object.values(value).some(v => typeof v !== 'string'))
-    throw new Error(`${where}: "${key}" must be an object of strings`);
-  return value as Payload;
+  const fields = isObject(value) ? Object.entries(value) : undefined;
+  const payload: Payload = {};
+  for (const [field, source] of fields || []) {
+    const parsed = typeof source === 'string' ? source : memberList(source);
+    if (parsed === undefined) break;
+    payload[field] = parsed;
+  }
+  if (!fields || Object.keys(payload).length !== fields.length)
+    throw new Error(
+      `${where}: "${key}" must be an object of strings, or of ` +
+        `${MEMBER_LISTS.join(', ')} each mapped to an object of member ` +
+        'attributes ($attr) or plain values'
+    );
+  return payload;
+}
+
+/** Two values of an attribute are the same set, whatever their order. */
+function sameValues(
+  a: AttributeValue | undefined,
+  b: AttributeValue | undefined
+): boolean {
+  const list = (value: AttributeValue | undefined): string[] =>
+    (value === undefined ? [] : Array.isArray(value) ? value : [value])
+      .map(v => v.toString())
+      .sort();
+  return list(a).join('\0') === list(b).join('\0');
+}
+
+/** A DN as compared between two member lists. */
+function dnKey(dn: string): string {
+  try {
+    return normalizeDn(dn);
+  } catch {
+    return dn.toLowerCase();
+  }
 }
 
 export function parseRules(source: string): Rule[] {
@@ -159,7 +250,7 @@ export function parseRules(source: string): Rule[] {
           routingKey,
           payload:
             optionalPayload(t.payload, where, 'payload') || rulePayload || {},
-          when: optionalPayload(t.when, where, 'when') || {},
+          when: optionalCondition(t.when, where, 'when') || {},
         };
       });
     }
@@ -178,10 +269,13 @@ export default class TwakeLifecycleEvents extends DmPlugin {
 
   private readonly rules: Rule[];
   private readonly attrs: LifecycleAttributes;
+  private readonly memberAttribute: string;
 
   constructor(server: DM) {
     super(server);
     this.attrs = lifecycleAttributes(this.config);
+    this.memberAttribute =
+      this.config.twake_lifecycle_member_attribute || 'member';
     // An operational lock such as pwdAccountLockedTime is in neither side of
     // onLdapEntryChange unless asked for by name.
     this.followedOperationalAttributes = [this.attrs.lock];
@@ -316,6 +410,84 @@ export default class TwakeLifecycleEvents extends DmPlugin {
     const locked = isLocked(after, this.attrs);
     if (locked !== isLocked(before, this.attrs))
       await this.publish(rule, locked ? 'disabled' : 'enabled', ctx);
+    await this.publish(rule, 'updated', ctx);
+    // A set difference, so a whole list replaced announces only what moved.
+    const added = this.memberDiff(after, before);
+    const removed = this.memberDiff(before, after);
+    if (added.length)
+      await this.publish(rule, 'memberAdded', { ...ctx, added });
+    if (removed.length)
+      await this.publish(rule, 'memberRemoved', { ...ctx, removed });
+  }
+
+  /** The members of an entry, the group placeholder left out. */
+  private members(entry: AttributesList): string[] {
+    const value = valueOf(entry, this.memberAttribute);
+    const list =
+      value === undefined ? [] : Array.isArray(value) ? value : [value];
+    return list
+      .map(v => v.toString())
+      .filter(m => !isDummyMemberDn(m, this.config.group_dummy_user));
+  }
+
+  private memberDiff(from: AttributesList, other: AttributesList): string[] {
+    const held = new Set(this.members(other).map(dnKey));
+    return this.members(from).filter(m => !held.has(dnKey(m)));
+  }
+
+  /**
+   * A member list of a payload: one read per member, a tombstone left out,
+   * and a member no longer in the directory given its RDN alone.
+   */
+  private async memberPayloads(
+    { list, fields }: MemberList,
+    ctx: EventContext
+  ): Promise<Record<string, string>[]> {
+    const dns =
+      list === '$added'
+        ? ctx.added || []
+        : list === '$removed'
+          ? ctx.removed || []
+          : this.members(ctx.after);
+    const attributes = Object.values(fields)
+      .filter(s => s.startsWith('$'))
+      .map(s => s.slice(1));
+    if (this.attrs.deleted) attributes.push(this.attrs.deleted);
+    const out: Record<string, string>[] = [];
+    for (const dn of dns) {
+      const entry = await this.readMember(dn, attributes);
+      if (!entry || isTombstone(entry, this.attrs)) continue;
+      const one: Record<string, string> = {};
+      for (const [field, source] of Object.entries(fields)) {
+        const value = source.startsWith('$')
+          ? first(valueOf(entry, source.slice(1)))
+          : source;
+        if (value !== undefined) one[field] = value;
+      }
+      out.push(one);
+    }
+    return out;
+  }
+
+  private async readMember(
+    dn: string,
+    attributes: string[]
+  ): Promise<AttributesList | undefined> {
+    try {
+      const { searchEntries } = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes },
+        dn
+      )) as SearchResult;
+      if (searchEntries[0]) return searchEntries[0];
+    } catch (err) {
+      if (extractLdapCode(err) !== 32) throw err;
+    }
+    const [rdn] = parseDn(dn);
+    const eq = rdn?.indexOf('=') ?? -1;
+    if (eq === -1) return undefined;
+    return {
+      [rdn.slice(0, eq).trim()]: unescapeDnValue(rdn.slice(eq + 1).trim()),
+    };
   }
 
   private resolve(source: string, ctx: EventContext): string | undefined {
@@ -335,6 +507,11 @@ export default class TwakeLifecycleEvents extends DmPlugin {
     } else if (expr.startsWith('previous.')) {
       attr = expr.slice('previous.'.length);
       value = first(valueOf(ctx.before, attr));
+    } else if (expr.startsWith('changed.')) {
+      attr = expr.slice('changed.'.length);
+      const now = valueOf(ctx.after, attr);
+      // A removed value is a change too: it reads as empty.
+      if (!sameValues(valueOf(ctx.before, attr), now)) value = first(now) ?? '';
     } else {
       value = first(valueOf(ctx.after, attr));
     }
@@ -365,11 +542,39 @@ export default class TwakeLifecycleEvents extends DmPlugin {
           : value === wanted;
       });
       if (!applies) continue;
-      const message: Record<string, string> = {};
-      for (const [field, source] of Object.entries(target.payload)) {
-        const value = this.resolve(source, ctx);
-        if (value !== undefined) message[field] = value;
+      const message: Record<string, unknown> = {};
+      // A payload made of `$changed.` fields says what changed: with none of
+      // them changed, there is nothing to say.
+      let watches = false;
+      let changed = false;
+      // Only tombstones came or went: nobody to announce.
+      let empty = false;
+      try {
+        for (const [field, source] of Object.entries(target.payload)) {
+          if (typeof source !== 'string') {
+            const members = await this.memberPayloads(source, ctx);
+            if (!members.length && source.list !== '$members') empty = true;
+            message[field] = members;
+            continue;
+          }
+          const value = this.resolve(source, ctx);
+          if (source.startsWith('$changed.')) {
+            watches = true;
+            if (value !== undefined) changed = true;
+          }
+          if (value !== undefined) message[field] = value;
+        }
+      } catch (err) {
+        this.logger.error({
+          plugin: this.name,
+          event,
+          routingKey: target.routingKey,
+          result: 'members unreadable',
+          error: String(err),
+        });
+        continue;
       }
+      if (empty || (watches && !changed)) continue;
       const messageId = randomUUID();
       const log = {
         plugin: this.name,
