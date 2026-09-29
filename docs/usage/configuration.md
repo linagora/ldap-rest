@@ -521,6 +521,25 @@ Reads the `--twake-lifecycle-*` attributes above, and:
 
 See [tombstone](plugins/integrations/tombstone.md).
 
+#### `core/twake/groups`
+
+Extends `core/ldap/groups`, whose options it reads too.
+
+| CLI                                           | Env                                            | Default            | Description                                           |
+| --------------------------------------------- | ---------------------------------------------- | ------------------ | ----------------------------------------------------- |
+| `--twake-group-base`                          | `DM_TWAKE_GROUP_BASE`                          |                    | Group branch of an organization, with `{org}`         |
+| `--twake-group-user-base`                     | `DM_TWAKE_GROUP_USER_BASE`                     |                    | User branch of an organization, with `{org}`          |
+| `--twake-group-organization-dn`               | `DM_TWAKE_GROUP_ORGANIZATION_DN`               |                    | Organization entry, with `{org}` (empty: not checked) |
+| `--twake-group-organization-status-attribute` | `DM_TWAKE_GROUP_ORGANIZATION_STATUS_ATTRIBUTE` | `twakeOrgStatus`   | Organization status attribute                         |
+| `--twake-group-organization-deleted-value`    | `DM_TWAKE_GROUP_ORGANIZATION_DELETED_VALUE`    | `deleted`          | Status of a deleted organization                      |
+| `--twake-group-display-name-attribute`        | `DM_TWAKE_GROUP_DISPLAY_NAME_ATTRIBUTE`        | `twakeDisplayName` | Group display name attribute                          |
+| `--twake-group-color-attribute`               | `DM_TWAKE_GROUP_COLOR_ATTRIBUTE`               | `twakeGroupColor`  | Group color attribute                                 |
+| `--twake-group-created-at-attribute`          | `DM_TWAKE_GROUP_CREATED_AT_ATTRIBUTE`          | `twakeCreatedAt`   | Group creation date attribute                         |
+| `--twake-group-max-page-limit`                | `DM_TWAKE_GROUP_MAX_PAGE_LIMIT`                | `1000`             | Largest page, and most users added at once            |
+| `--twake-group-member-fields`                 | `DM_TWAKE_GROUP_MEMBER_FIELDS`                 | `{}`               | Member profile fields over the defaults, as JSON      |
+
+See [groups](plugins/integrations/groups.md).
+
 ### Utility Plugins
 
 #### `core/static`

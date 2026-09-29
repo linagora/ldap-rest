@@ -14,6 +14,10 @@
   and `memberRemoved`, `$changed.` sources and member lists in payloads
   ([#233](https://github.com/linagora/ldap-rest/pull/233)).
   [doc](docs/usage/plugins/integrations/lifecycle-events.md)
+- `core/twake/groups`: organization groups, one branch per organization,
+  under `/v1/organizations/:id/groups`
+  ([#234](https://github.com/linagora/ldap-rest/pull/234)).
+  [doc](docs/usage/plugins/integrations/groups.md)
 
 ### Bug Fixes
 

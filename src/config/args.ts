@@ -293,6 +293,16 @@ export interface Config {
   twake_lifecycle_deleted_at_format?: string;
   twake_lifecycle_rules?: string;
   twake_lifecycle_member_attribute?: string;
+  twake_group_base?: string;
+  twake_group_user_base?: string;
+  twake_group_organization_dn?: string;
+  twake_group_organization_status_attribute?: string;
+  twake_group_organization_deleted_value?: string;
+  twake_group_display_name_attribute?: string;
+  twake_group_color_attribute?: string;
+  twake_group_created_at_attribute?: string;
+  twake_group_max_page_limit?: number;
+  twake_group_member_fields?: Record<string, string>;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -826,6 +836,42 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_LIFECYCLE_MEMBER_ATTRIBUTE',
     'member',
   ],
+  // twake/groups plugin
+  ['--twake-group-base', 'DM_TWAKE_GROUP_BASE', ''],
+  ['--twake-group-user-base', 'DM_TWAKE_GROUP_USER_BASE', ''],
+  ['--twake-group-organization-dn', 'DM_TWAKE_GROUP_ORGANIZATION_DN', ''],
+  [
+    '--twake-group-organization-status-attribute',
+    'DM_TWAKE_GROUP_ORGANIZATION_STATUS_ATTRIBUTE',
+    'twakeOrgStatus',
+  ],
+  [
+    '--twake-group-organization-deleted-value',
+    'DM_TWAKE_GROUP_ORGANIZATION_DELETED_VALUE',
+    'deleted',
+  ],
+  [
+    '--twake-group-display-name-attribute',
+    'DM_TWAKE_GROUP_DISPLAY_NAME_ATTRIBUTE',
+    'twakeDisplayName',
+  ],
+  [
+    '--twake-group-color-attribute',
+    'DM_TWAKE_GROUP_COLOR_ATTRIBUTE',
+    'twakeGroupColor',
+  ],
+  [
+    '--twake-group-created-at-attribute',
+    'DM_TWAKE_GROUP_CREATED_AT_ATTRIBUTE',
+    'twakeCreatedAt',
+  ],
+  [
+    '--twake-group-max-page-limit',
+    'DM_TWAKE_GROUP_MAX_PAGE_LIMIT',
+    1000,
+    'number',
+  ],
+  ['--twake-group-member-fields', 'DM_TWAKE_GROUP_MEMBER_FIELDS', {}, 'json'],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
   [

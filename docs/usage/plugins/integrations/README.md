@@ -18,6 +18,7 @@ Plugins for connecting LDAP-Rest to external systems.
 | [lifecycle-events](lifecycle-events.md) | Account lifecycle events to RabbitMQ     |
 | [instances](instances.md)               | Workplace instance of each account       |
 | [tombstone](tombstone.md)               | Deleted accounts kept as tombstones      |
+| [groups](groups.md)                     | Organization groups                      |
 
 ## Prerequisites
 
