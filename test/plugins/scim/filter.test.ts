@@ -95,15 +95,15 @@ describe('SCIM filter parser', () => {
   describe('active pseudo-attribute', () => {
     it('active eq true → disabled-account filter', () => {
       const r = scimFilterToLdap('active eq true', m, USERS);
-      expect(r.ldapFilter).to.equal('(!(pwdAccountLockedTime=*))');
+      expect(r.ldapFilter).to.equal('(!(pwdAccountLockedTime=000001010000Z))');
     });
     it('active eq false', () => {
       const r = scimFilterToLdap('active eq false', m, USERS);
-      expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
+      expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=000001010000Z)');
     });
     it('active ne true', () => {
       const r = scimFilterToLdap('active ne true', m, USERS);
-      expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=*)');
+      expect(r.ldapFilter).to.equal('(pwdAccountLockedTime=000001010000Z)');
     });
     it('active pr matches every entry instead of emitting (active=*)', () => {
       // `active` is not an LDAP attribute; the directory would answer
@@ -112,12 +112,21 @@ describe('SCIM filter parser', () => {
       expect(r.ldapFilter).to.equal('(objectClass=*)');
       expect(r.ldapFilter).to.not.match(/active/);
     });
-    it('honours a configured lock attribute', () => {
+    it('honours a configured lock attribute and value', () => {
       const r = scimFilterToLdap('active eq false', m, {
         ...USERS,
         lockAttribute: 'nsAccountLock',
+        lockValue: 'TRUE',
       });
-      expect(r.ldapFilter).to.equal('(nsAccountLock=*)');
+      expect(r.ldapFilter).to.equal('(nsAccountLock=TRUE)');
+    });
+    it('refuses a configured lock attribute without its value', () => {
+      expect(() =>
+        scimFilterToLdap('active eq false', m, {
+          ...USERS,
+          lockAttribute: 'nsAccountLock',
+        })
+      ).to.throw(/No lock value given for 'nsAccountLock'/);
     });
     it('combines with another clause', () => {
       const r = scimFilterToLdap(
@@ -125,7 +134,9 @@ describe('SCIM filter parser', () => {
         m,
         USERS
       );
-      expect(r.ldapFilter).to.equal('(&(uid=bob)(pwdAccountLockedTime=*))');
+      expect(r.ldapFilter).to.equal(
+        '(&(uid=bob)(pwdAccountLockedTime=000001010000Z))'
+      );
     });
     it('rejects an unsupported operator on active', () => {
       expect(() => scimFilterToLdap('active co "x"', m, USERS)).to.throw(

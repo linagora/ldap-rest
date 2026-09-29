@@ -440,6 +440,41 @@ describe('SCIM Users (integration)', function () {
       expect(off.body.active).to.be.false;
     });
 
+    it('takes another value in the lock attribute for active, and leaves it', async () => {
+      await create({}).expect(201);
+      // What a lock SCIM did not set looks like, such as a ppolicy lockout
+      await server.ldap.modify(`uid=scim-alice,${userBase}`, {
+        replace: { employeeType: 'contractor' },
+      });
+      const got = await supertest(server.app)
+        .get('/scim/v2/Users/scim-alice')
+        .expect(200);
+      expect(got.body.active).to.be.true;
+      const inactive = await supertest(server.app)
+        .get(
+          '/scim/v2/Users?filter=' +
+            encodeURIComponent('userName eq "scim-alice" and active eq false')
+        )
+        .expect(200);
+      expect(inactive.body.totalResults).to.equal(0);
+
+      await supertest(server.app)
+        .put('/scim/v2/Users/scim-alice')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'scim-alice',
+          name: { familyName: 'Doe' },
+          active: true,
+        })
+        .expect(200);
+      const { searchEntries } = (await server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['employeeType'] },
+        `uid=scim-alice,${userBase}`
+      )) as { searchEntries: { employeeType?: string }[] };
+      expect(searchEntries[0].employeeType).to.equal('contractor');
+    });
+
     it('reads the string form on POST and PUT, not only on PATCH', async () => {
       // `active: "false"` used to miss the strict `=== false` test, so POST
       // created an enabled account and PUT deleted the lock attribute —

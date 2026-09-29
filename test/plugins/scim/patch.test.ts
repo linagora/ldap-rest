@@ -577,6 +577,29 @@ describe('SCIM PATCH applicator', () => {
       expect(req.delete).to.deep.equal({ pwdAccountLockedTime: '' });
     });
 
+    it('replace active=true removes it under a differently cased name', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: true }],
+        },
+        { ...lockedCtx, lockAttribute: 'pwdaccountlockedtime' }
+      );
+      expect(req.delete).to.deep.equal({ pwdAccountLockedTime: '' });
+    });
+
+    it('replace active=true leaves a lockout after failed binds', async () => {
+      const req = await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'active', value: true }],
+        },
+        { ...activeCtx, current: { pwdAccountLockedTime: '20260101000000Z' } }
+      );
+      expect(req.delete).to.equal(undefined);
+      expect(req.replace).to.equal(undefined);
+    });
+
     it('remove active restores the default, an active account', async () => {
       const req = await patchToModifyRequest(
         {

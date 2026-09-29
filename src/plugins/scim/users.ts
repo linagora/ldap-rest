@@ -39,6 +39,7 @@ import {
   scimUserToLdap,
   requiredLdapAttributes,
   resolveLockConfig,
+  isLocked,
   type MappingContext,
 } from './mapping';
 import { scimFilterToLdap } from './filter';
@@ -71,14 +72,19 @@ export interface ScimUsersOptions {
   hooks: { [K: string]: Function[] | undefined };
 }
 
-/** Does this change set write or clear the attribute backing `active`? */
+/**
+ * Does this change set write or clear the attribute backing `active`? A
+ * PATCH writes it under the name the directory answered, whatever case the
+ * configuration spelled it in.
+ */
 function touchesLock(changes: ModifyRequest, lockAttribute: string): boolean {
-  if (changes.replace && lockAttribute in changes.replace) return true;
-  if (changes.add && lockAttribute in changes.add) return true;
+  const lock = lockAttribute.toLowerCase();
   const del = changes.delete;
-  if (Array.isArray(del)) return del.includes(lockAttribute);
-  if (del && typeof del === 'object') return lockAttribute in del;
-  return false;
+  return [
+    ...Object.keys(changes.replace || {}),
+    ...Object.keys(changes.add || {}),
+    ...(Array.isArray(del) ? del : Object.keys(del || {})),
+  ].some(name => name.toLowerCase() === lock);
 }
 
 export class ScimUsers {
@@ -200,6 +206,7 @@ export class ScimUsers {
     if (query.filter) {
       const translated = scimFilterToLdap(query.filter, this.mapping, {
         lockAttribute: this.lockAttribute,
+        lockValue: this.lockValue,
         supportsActive: true,
       });
       if (translated.idEquals) {
@@ -376,7 +383,10 @@ export class ScimUsers {
       changes.replace![this.lockAttribute] = this.lockValue;
     } else if (
       active === true &&
-      hasAttrValue(currentEntry[this.lockAttribute])
+      isLocked(currentEntry, {
+        lockAttribute: this.lockAttribute,
+        lockValue: this.lockValue,
+      })
     ) {
       (changes.delete as string[]).push(this.lockAttribute);
     }

@@ -13,6 +13,11 @@
 - `core/auth/openidconnect`: a client asking for JSON only
   (`Accept: application/json`) with no session is answered `401`; it got no
   answer at all
+- `core/scim`: `active` reads, filters and clears only the configured
+  lock value, so a ppolicy lockout after failed binds reads as active and
+  `"active": true` leaves it in place
+  ([#232](https://github.com/linagora/ldap-rest/pull/232)).
+  [doc](docs/usage/plugins/integrations/scim.md#deactivating-an-account-active)
 
 ## v0.12.0 (2026-09-28)
 

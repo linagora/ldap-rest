@@ -73,11 +73,19 @@ describe('SCIM mapping', () => {
     });
     it('marks locked accounts as active=false', () => {
       const user = ldapToScimUser(
-        { uid: 'bob', pwdAccountLockedTime: '20260101000000Z' },
+        { uid: 'bob', pwdAccountLockedTime: '000001010000Z' },
         DEFAULT_USER_MAPPING,
         userCtx
       );
       expect(user.active).to.be.false;
+    });
+    it('reads a lockout after failed binds as active', () => {
+      const user = ldapToScimUser(
+        { uid: 'bob', pwdAccountLockedTime: '20260101000000Z' },
+        DEFAULT_USER_MAPPING,
+        userCtx
+      );
+      expect(user.active).to.be.true;
     });
     it('treats an empty lock attribute as active', () => {
       const user = ldapToScimUser(
@@ -88,7 +96,11 @@ describe('SCIM mapping', () => {
       expect(user.active).to.be.true;
     });
     it('reads a configured lock attribute', () => {
-      const ctx = { ...userCtx, lockAttribute: 'nsAccountLock' };
+      const ctx = {
+        ...userCtx,
+        lockAttribute: 'nsAccountLock',
+        lockValue: 'TRUE',
+      };
       expect(
         ldapToScimUser(
           { uid: 'bob', nsAccountLock: 'TRUE' },
@@ -99,7 +111,7 @@ describe('SCIM mapping', () => {
       // The default attribute must no longer be consulted.
       expect(
         ldapToScimUser(
-          { uid: 'bob', pwdAccountLockedTime: '20260101000000Z' },
+          { uid: 'bob', pwdAccountLockedTime: '000001010000Z' },
           DEFAULT_USER_MAPPING,
           ctx
         ).active
