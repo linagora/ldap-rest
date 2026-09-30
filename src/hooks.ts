@@ -245,7 +245,7 @@ export interface Hooks {
    * - scimuserupdatedone:  VoidHook<[string, ScimUser]>
    * - scimuserdelete:      ChainedHook<[string, Request?]>
    * - scimuserdeletedone:  VoidHook<[string]>
-   * - scimgroupcreate:     ChainedHook<[ScimGroup, Request?]>
+   * - scimgroupcreate:     ChainedHook<[ScimGroup, Request?, string]>  — [group, req, groupBase]
    * - scimgroupcreatedone: VoidHook<[ScimGroup]>
    * - scimgroupupdate:     ChainedHook<[string, ScimGroup, Request?]>
    * - scimgroupupdatedone: VoidHook<[string, ScimGroup]>

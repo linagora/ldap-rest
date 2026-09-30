@@ -620,6 +620,11 @@ Other plugins can observe and transform SCIM operations via the dynamic hooks
 `scimuserdelete`, `scimuserdeletedone`, and their `scimgroup*` equivalents, plus
 `scimbulkdone` for Bulk.
 
+`scimgroupcreate` receives the group, the request and the group base. A
+group's RDN value is its `displayName`, unless the hook sets `id` on the group
+and the group mapping stores nothing in the RDN attribute: that `id` is then
+the RDN value. An `id` sent by the client is ignored.
+
 ## Exposing the configuration to client apps (`configApi`)
 
 Load `core/configApi` alongside the SCIM plugin, and `GET /api/v1/config` will
