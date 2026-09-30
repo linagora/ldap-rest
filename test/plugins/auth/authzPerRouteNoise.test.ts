@@ -75,7 +75,11 @@ describe('An identity-less request, and the log it writes', function () {
     expect(debugged, 'the rest').to.equal(2);
   });
 
-  it('should stop warning once it has written enough of them', async () => {
+  // A `function`, not an arrow: in an arrow `this` is the describe's Suite,
+  // and Suite#timeout also re-arms the timer of every test already finished
+  // in it — the first case would then fail 60 s later, "done() called
+  // multiple times", in the middle of whatever file runs by then.
+  it('should stop warning once it has written enough of them', async function () {
     // Every path here is new, so the set can never answer "seen": what has
     // to hold is the count of lines written.
     this.timeout(60000);
