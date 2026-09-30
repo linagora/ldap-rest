@@ -1,7 +1,12 @@
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import Scim from '../../../src/plugins/scim/scim';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 
 const ORGS = `ou=tga-orgs,${process.env.DM_LDAP_BASE}`;
@@ -32,8 +37,19 @@ describe('Twake groups plugin routes', function () {
   };
 
   before(async () => {
+    const mapping = join(
+      tmpdir(),
+      `tga-scim-group-mapping-${process.pid}.json`
+    );
+    writeFileSync(
+      mapping,
+      JSON.stringify({ entries: [{ scim: 'displayName', ldap: 'o' }] })
+    );
     dm = new DM();
     Object.assign(dm.config, {
+      scim_user_base: users('acme'),
+      scim_group_base: `ou=groups,${orgDn('acme')}`,
+      scim_group_mapping: mapping,
       twake_group_base: `ou=groups,ou={org},${ORGS}`,
       twake_group_user_base: `ou=users,ou={org},${ORGS}`,
       twake_group_organization_dn: `ou={org},${ORGS}`,
@@ -52,6 +68,7 @@ describe('Twake groups plugin routes', function () {
     await dm.ready;
     groups = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', groups);
+    await dm.registerPlugin('core/scim', new Scim(dm));
     for (let tries = 0; !groups.schema; tries++) {
       if (tries === 200) throw new Error('the group schema did not load');
       await new Promise(r => setTimeout(r, 10));
@@ -315,6 +332,88 @@ describe('Twake groups plugin routes', function () {
     expect(attributes).not.to.have.property('o');
     expect(attributes.O).to.deep.equal({ type: 'string', required: false });
     expect(attributes).to.have.keys('O', 'BUSINESSCATEGORY', 'OU');
+  });
+
+  it('gives a SCIM group a generated cn and keeps its name in the display name attribute', async () => {
+    const scim = (req: supertest.Test): supertest.Test =>
+      req.set('Content-Type', 'application/scim+json');
+    const created = await scim(api.post('/scim/v2/Groups'))
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'chosen-by-client',
+        displayName: 'Eng & Ops',
+        members: [{ value: 'tga-alice' }],
+      })
+      .expect(201);
+    const { id } = created.body as { id: string };
+    expect(id).to.match(/^[0-9a-f-]{36}$/);
+    expect(created.body.displayName).to.equal('Eng & Ops');
+
+    const group = (await api.get(`${route()}/${id}`).expect(200)).body;
+    expect(group).to.deep.include({
+      cn: id,
+      displayName: 'Eng & Ops',
+      members: ['tga-alice'],
+    });
+    expect(group.createdAt).to.be.a('string').and.not.be.empty;
+
+    const found = await api
+      .get(
+        `/scim/v2/Groups?filter=${encodeURIComponent('displayName eq "Eng & Ops"')}`
+      )
+      .expect(200);
+    expect(found.body.Resources.map((g: { id: string }) => g.id)).to.deep.equal(
+      [id]
+    );
+
+    await scim(api.patch(`/scim/v2/Groups/${id}`))
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: 'Platform' }],
+      })
+      .expect(200);
+    expect(
+      (await api.get(`/scim/v2/Groups/${id}`).expect(200)).body.displayName
+    ).to.equal('Platform');
+  });
+
+  it('still names a SCIM group after a hook that drops the base', async () => {
+    const legacy = ([group, req]: unknown[]) => [group, req];
+    const hooks = dm.hooks.scimgroupcreate as unknown[];
+    hooks.unshift(legacy);
+    try {
+      const created = await api
+        .post('/scim/v2/Groups')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Legacy',
+        })
+        .expect(201);
+      expect(created.body.id).to.match(/^[0-9a-f-]{36}$/);
+    } finally {
+      hooks.splice(hooks.indexOf(legacy), 1);
+    }
+  });
+
+  it('warns when the SCIM group mapping writes the RDN attribute', () => {
+    const mapping = dm.config.scim_group_mapping;
+    const realWarn = groups.logger.warn;
+    const warned: string[] = [];
+    groups.logger.warn = ((m: string) => {
+      warned.push(m);
+    }) as unknown as typeof groups.logger.warn;
+    try {
+      groups.afterLoad();
+      expect(warned).to.deep.equal([]);
+      dm.config.scim_group_mapping = '';
+      groups.afterLoad();
+      expect(warned).to.have.length(1);
+      expect(warned[0]).to.match(/writes displayName to cn/);
+    } finally {
+      groups.logger.warn = realWarn;
+      dm.config.scim_group_mapping = mapping;
+    }
   });
 
   it('does not serve the flat group routes', async () => {
