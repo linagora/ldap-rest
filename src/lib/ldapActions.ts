@@ -277,11 +277,10 @@ class ldapActions {
   private availableConnections: PooledConnection[] = [];
   private isCleaningUp = false;
   /** See {@link declareObjectClasses}. */
-  private declaredClasses: {
-    base: string;
-    classes: string[];
-    includeBase: boolean;
-  }[] = [];
+  private declaredClasses = new Map<
+    string,
+    { base: string; classes: string[]; includeBase: boolean }
+  >();
   private schemaCache?: { index: SchemaIndex; fetchedAt: number };
   private schemaLoading?: Promise<SchemaIndex>;
   /** Whether the last schema read failed, so a failure is logged once. */
@@ -705,7 +704,14 @@ class ldapActions {
       (name): name is string => typeof name === 'string' && name !== ''
     );
     if (!base || list.length === 0) return;
-    this.declaredClasses.push({ base, classes: list, includeBase });
+    // Keyed so that declaring again, as each new instance of an entity
+    // does, adds nothing
+    const key = JSON.stringify([
+      normalizeDn(base),
+      list.map(name => name.toLowerCase()).sort(),
+      includeBase,
+    ]);
+    this.declaredClasses.set(key, { base, classes: list, includeBase });
   }
 
   /**
@@ -717,7 +723,7 @@ class ldapActions {
   private declaredFor(dn: string): string[] {
     let depth = 0;
     let classes: string[] = [];
-    for (const declared of this.declaredClasses) {
+    for (const declared of this.declaredClasses.values()) {
       if (!isDnInBranch(dn, declared.base)) continue;
       const base = normalizeDn(declared.base);
       if (!declared.includeBase && normalizeDn(dn) === base) continue;

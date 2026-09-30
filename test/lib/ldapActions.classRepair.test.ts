@@ -198,6 +198,20 @@ describe('Object class repair on modify', function () {
     }
   });
 
+  it('should keep one declaration per distinct base and classes', () => {
+    const dm = bare();
+    for (let i = 0; i < 3; i++) {
+      dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+      dm.ldap.declareObjectClasses(usersBase.toUpperCase(), [
+        'twakeWhitePages',
+        'TOP',
+      ]);
+    }
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages'], true);
+    dm.ldap.declareObjectClasses(usersBase, ['posixAccount']);
+    expect((dm.ldap as any).declaredClasses.size).to.equal(3);
+  });
+
   it('should take classes a schema file gives as a single string', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(
