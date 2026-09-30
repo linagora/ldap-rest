@@ -538,6 +538,12 @@ Retrieve all users or filter by attributes.
 - `match` - Filter value (partial match with wildcards)
 - `attribute` - Attribute name to filter on
 - `attributes` - Comma-separated list of attributes to return
+- `limit` - Return at most this many users; `X-Result-Truncated: true` then
+  says others were left out. Without it, a list longer than the directory's
+  size limit is answered `422`
+  ([details](../../usage/plugins/ldap/flat-generic.md#long-lists)). Only the
+  flat entities' lists (users and the other schema-driven entities) take
+  `limit` for now; the [groups list](#list-groups) does not.
 
 **Example Request (all users):**
 
@@ -763,6 +769,11 @@ Retrieve all groups or filter by name.
 
 - `match` - Filter groups by CN (supports LDAP filter format or simple string)
 - `attributes` - Comma-separated list of attributes to return
+
+This list does not take `limit` yet: `?limit=` is ignored, no
+`X-Result-Truncated` header is sent, and a list longer than the directory's
+size limit fails with `500` rather than the `422` of the
+[users list](#list-users).
 
 **Example Request (all groups):**
 
@@ -1046,6 +1057,7 @@ curl -X DELETE \
 | 403         | Forbidden - Insufficient permissions   |
 | 404         | Not Found - Resource doesn't exist     |
 | 409         | Conflict - Resource already exists     |
+| 422         | Unprocessable - see below              |
 | 500         | Internal Server Error                  |
 
 ### Error Response Format
@@ -1140,6 +1152,18 @@ All errors return a JSON object with an error message:
 }
 ```
 
+#### 422 Unprocessable Entity
+
+**List longer than the directory's size limit** (flat entities' lists, when
+no `limit` was given —
+[details](../../usage/plugins/ldap/flat-generic.md#long-lists)):
+
+```json
+{
+  "error": "Too many entries to list at once: the directory's size limit was exceeded. Narrow the search, or pass `limit`."
+}
+```
+
 #### 500 Internal Server Error
 
 **LDAP Connection Error:**
@@ -1202,9 +1226,15 @@ Use the correct operation type:
 - **add**: Add values to multi-valued attributes (error if already exists)
 - **delete**: Remove attributes or specific values
 
-### Pagination
+### Long Lists
 
-For large result sets, consider implementing client-side pagination or use LDAP paging (controlled server-side).
+The API has no pagination. A flat entity's list (users and the other
+schema-driven entities) takes `limit` to bound its answer, and says with
+`X-Result-Truncated: true` that entries were left out: narrow the search with
+`match` and `attribute` to reach them. Without `limit`, a list longer than the
+directory's size limit is answered `422`. See
+[long lists](../../usage/plugins/ldap/flat-generic.md#long-lists); the groups
+list does not take `limit` yet.
 
 ### Schema Validation
 

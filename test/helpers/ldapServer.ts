@@ -430,6 +430,22 @@ export class LdapTestServer {
   }
 
   /**
+   * Apply an LDIF of changes to `cn=config`, as the container's root.
+   *
+   * For a test that needs the server configured differently — a size limit
+   * on one account — and undoes it afterwards: the server is shared by the
+   * whole suite.
+   *
+   * @param ldif changes, in `ldapmodify` format
+   */
+  modifyConfig(ldif: string): void {
+    execSync(
+      `docker exec -i ${this.containerName} ldapmodify -Y EXTERNAL -H ldapi:///`,
+      { input: ldif, stdio: 'pipe' }
+    );
+  }
+
+  /**
    * Stop the LDAP server
    */
   async stop(): Promise<void> {

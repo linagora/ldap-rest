@@ -18,9 +18,19 @@
   under `/v1/organizations/:id/groups`
   ([#234](https://github.com/linagora/ldap-rest/pull/234)).
   [doc](docs/usage/plugins/integrations/groups.md)
+- `abstract/ldapFlat`: `GET /api/v1/ldap/users`, and the list of every other
+  flat entity, take `limit` and answer at most that many entries, with
+  `X-Result-Truncated: true` when others were left out. The groups list
+  does not take it yet —
+  [doc](docs/usage/plugins/ldap/flat-generic.md#long-lists)
 
 ### Bug Fixes
 
+- `abstract/ldapFlat`: `GET /api/v1/ldap/users`, and the list of every other
+  flat entity, answer `422` naming the cause to a list longer than the
+  directory's size limit; it was a `500`. The groups list still answers
+  `500` —
+  [doc](docs/usage/plugins/ldap/flat-generic.md#long-lists)
 - `core/auth/openidconnect`: a client asking for JSON only
   (`Accept: application/json`) with no session is answered `401`; it got no
   answer at all

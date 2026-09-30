@@ -84,6 +84,13 @@ export class UriTooLongError extends HttpError {
   }
 }
 
+export class UnprocessableEntityError extends HttpError {
+  constructor(message = 'Unprocessable Entity') {
+    super(message, 422);
+    this.name = 'UnprocessableEntityError';
+  }
+}
+
 export class TooManyRequestsError extends HttpError {
   constructor(message = 'Too Many Requests') {
     super(message, 429);
