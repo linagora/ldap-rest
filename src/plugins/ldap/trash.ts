@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
+import { isDnInBranch, normalizeDn } from '../../lib/utils';
 
 class TrashPlugin extends DmPlugin {
   name = 'trash';
@@ -38,17 +39,34 @@ class TrashPlugin extends DmPlugin {
 
     const watchedBases = this.config.trash_watched_bases;
     if (typeof watchedBases === 'string' && watchedBases) {
+      // A DN holds commas: bases are separated by `;`
       this.watchedBases = watchedBases
-        .split(',')
+        .split(';')
         .map((base: string) => base.trim())
         .filter((base: string) => base.length > 0);
+    }
+    const ldapBase = this.config.ldap_base;
+    if (ldapBase) {
+      const suffix = normalizeDn(ldapBase);
+      for (const base of this.watchedBases) {
+        // Full DNs joined by commas still end with the base: it shows twice
+        if (
+          !isDnInBranch(base, ldapBase) ||
+          normalizeDn(base).split(suffix).length > 2
+        )
+          this.logger.warn(
+            `Trash watched base "${base}" is not one DN under ${ldapBase}: ` +
+              `--trash-watched-bases takes full DNs separated by ";", and ` +
+              `as written the trash may catch nothing under it`
+          );
+      }
     }
 
     this.addMetadata = this.config.trash_add_metadata !== 'false';
     this.autoCreateTrash = this.config.trash_auto_create !== 'false';
 
     this.logger.info(
-      `Trash plugin initialized: base=${this.trashBase}, watched=${this.watchedBases.join(',')}, metadata=${this.addMetadata}`
+      `Trash plugin initialized: base=${this.trashBase}, watched=${this.watchedBases.join(';')}, metadata=${this.addMetadata}`
     );
   }
 
@@ -57,9 +75,7 @@ class TrashPlugin extends DmPlugin {
    */
   private isWatched(dn: string): boolean {
     // NEVER intercept deletes from trash itself (prevent infinite loop)
-    // Use proper DN suffix matching to avoid false positives
-    // (e.g., "uid=trash-user,ou=people" should not match "ou=trash")
-    if (dn === this.trashBase || dn.endsWith(',' + this.trashBase)) {
+    if (isDnInBranch(dn, this.trashBase)) {
       return false;
     }
 
@@ -68,11 +84,7 @@ class TrashPlugin extends DmPlugin {
       return true;
     }
 
-    // Use proper DN suffix matching to avoid false positives
-    // (e.g., "ou=users" should not match "uid=users-admin,ou=people")
-    return this.watchedBases.some(
-      base => dn === base || dn.endsWith(',' + base)
-    );
+    return this.watchedBases.some(base => isDnInBranch(dn, base));
   }
 
   /**

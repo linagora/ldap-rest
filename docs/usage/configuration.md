@@ -191,7 +191,7 @@ at `0` otherwise.
 | CLI                     | Env                      | Default | Description                 |
 | ----------------------- | ------------------------ | ------- | --------------------------- |
 | `--trash-base`          | `DM_TRASH_BASE`          |         | Trash container DN          |
-| `--trash-watched-bases` | `DM_TRASH_WATCHED_BASES` |         | DNs to watch for deletions  |
+| `--trash-watched-bases` | `DM_TRASH_WATCHED_BASES` |         | `;`-separated DNs to watch  |
 | `--trash-add-metadata`  | `DM_TRASH_ADD_METADATA`  | `true`  | Add deletion metadata       |
 | `--trash-auto-create`   | `DM_TRASH_AUTO_CREATE`   | `true`  | Auto-create trash container |
 

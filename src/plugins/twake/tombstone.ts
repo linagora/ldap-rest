@@ -27,7 +27,12 @@ import { jsonBody } from '../../lib/expressFormatedResponses';
 import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { asyncHandler, escapeLdapFilter, launchHooks } from '../../lib/utils';
+import {
+  asyncHandler,
+  escapeLdapFilter,
+  isDnInBranch,
+  launchHooks,
+} from '../../lib/utils';
 
 import {
   first,
@@ -248,18 +253,18 @@ export default class TwakeTombstone extends DmPlugin {
    */
   assertComposition(): void {
     if (!this.server.loadedPlugins.trash) return;
-    // Read as core/ldap/trash reads it, none meaning every branch. It splits
-    // on every comma, DNs included (#226): followed as it behaves, since
-    // that is what decides which deletes it moves away.
+    // Read as core/ldap/trash reads it, none meaning every branch
     const watched = String(this.config.trash_watched_bases || '')
-      .split(',')
-      .map(base => base.trim().toLowerCase())
+      .split(';')
+      .map(base => base.trim())
       .filter(Boolean);
     const clash = this.patterns.filter(p => {
-      const branch = p.source.toLowerCase().replace(/\$$/, '');
+      const branch = p.source.replace(/\$$/, '');
       return (
         watched.length === 0 ||
-        watched.some(base => branch === base || branch.endsWith(`,${base}`))
+        watched.some(
+          base => isDnInBranch(branch, base) || isDnInBranch(base, branch)
+        )
       );
     });
     if (clash.length)

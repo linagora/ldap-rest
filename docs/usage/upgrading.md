@@ -43,6 +43,23 @@ To repair an organization, clear `--twake-instance-sent-attribute` on its
 marked members, then replay its `workplace.created` or call
 `ensureOrganization` for it ([details](plugins/integrations/instances.md#organizations)).
 
+### Trash watched bases are separated by `;`
+
+**Who is affected:** a deployment loading `core/ldap/trash` with
+`--trash-watched-bases` set.
+
+The list was split on commas, so a DN such as `ou=users,dc=example,dc=com`
+became the suffixes `ou=users`, `dc=example` and `dc=com`, and the trash
+caught deletes in every branch under `dc=com`. Each base is now a whole DN,
+and bases are separated by `;`:
+`ou=users,dc=example,dc=com;ou=groups,dc=example,dc=com`. A single DN needs
+no change. A list of full DNs joined by commas, such as
+`ou=users,dc=example,dc=com,ou=groups,dc=example,dc=com`, or a list of RDNs,
+such as `ou=users,ou=groups`, now reads as one DN that no entry sits under,
+so the trash catches nothing and deletes there are permanent: rewrite it with
+`;`, each branch as its full DN. The server logs a warning at startup for a
+watched base that is not one DN under `--ldap-base`.
+
 ## To 0.12.0
 
 ### twake/instances replaces cozyProvision and clouderyProvision

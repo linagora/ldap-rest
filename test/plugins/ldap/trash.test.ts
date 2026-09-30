@@ -165,6 +165,67 @@ describe('Trash Plugin', function () {
   });
 
   describe('Watched branches', () => {
+    it('reads each `;`-separated base as a whole DN', () => {
+      const previous = server.config.trash_watched_bases;
+      server.config.trash_watched_bases =
+        'ou=users,dc=example,dc=com; ou=groups,dc=example,dc=com';
+      try {
+        const watching = new TrashPlugin(server);
+        const isWatched = (dn: string): boolean => watching['isWatched'](dn);
+        expect(isWatched('uid=a,ou=users,dc=example,dc=com')).to.equal(true);
+        expect(isWatched('cn=g,ou=groups,dc=example,dc=com')).to.equal(true);
+        expect(isWatched('uid=a,ou=other,dc=example,dc=com')).to.equal(false);
+        expect(isWatched('uid=a,ou=users,dc=other,dc=com')).to.equal(false);
+      } finally {
+        server.config.trash_watched_bases = previous;
+      }
+    });
+
+    it('matches a watched base whatever its case and spacing', () => {
+      const previous = server.config.trash_watched_bases;
+      server.config.trash_watched_bases = 'ou=Users, dc=example, dc=com';
+      try {
+        const watching = new TrashPlugin(server);
+        expect(
+          watching['isWatched']('uid=a,ou=users,dc=example,dc=com')
+        ).to.equal(true);
+        expect(
+          watching['isWatched']('UID=a, OU=USERS,DC=Example,dc=com')
+        ).to.equal(true);
+      } finally {
+        server.config.trash_watched_bases = previous;
+      }
+    });
+
+    it('warns about each watched base that is not one DN under --ldap-base', () => {
+      const previous = server.config.trash_watched_bases;
+      const realWarn = server.logger.warn;
+      const warned: string[] = [];
+      server.logger.warn = ((m: string) => {
+        warned.push(m);
+      }) as unknown as typeof server.logger.warn;
+      const base = String(server.config.ldap_base);
+      try {
+        server.config.trash_watched_bases = `ou=users,${base};OU=Groups, ${base.toUpperCase()}`;
+        new TrashPlugin(server);
+        expect(warned).to.deep.equal([]);
+        for (const stale of [
+          `ou=users,${base},ou=groups,${base}`,
+          'ou=users,ou=groups',
+          `ou=users,${base}x`,
+        ]) {
+          warned.length = 0;
+          server.config.trash_watched_bases = stale;
+          new TrashPlugin(server);
+          expect(warned, stale).to.have.length(1);
+          expect(warned[0]).to.match(/is not one DN under/);
+        }
+      } finally {
+        server.logger.warn = realWarn;
+        server.config.trash_watched_bases = previous;
+      }
+    });
+
     it('should not intercept deletes within trash itself', async function () {
       this.timeout(10000);
 

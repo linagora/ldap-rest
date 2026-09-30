@@ -7,6 +7,10 @@
 - `core/auth/openidconnect`: a session ends with its access token, unless a
   refresh token renews it —
   [notes](docs/usage/upgrading.md#an-openid-connect-session-ends-with-its-access-token)
+- `core/ldap/trash`: `--trash-watched-bases` separates its DNs with `;`, so
+  each base is a whole branch.
+  [notes](docs/usage/upgrading.md#trash-watched-bases-are-separated-by-)
+  ([#226](https://github.com/linagora/ldap-rest/issues/226))
 
 ### Features
 
