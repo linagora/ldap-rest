@@ -39,6 +39,9 @@
   `"active": true` leaves it in place
   ([#232](https://github.com/linagora/ldap-rest/pull/232)).
   [doc](docs/usage/plugins/integrations/scim.md#deactivating-an-account-active)
+- `declareObjectClasses` keeps one declaration per base and class set, so
+  building the same `LdapFlat` again no longer grows the list
+  ([#229](https://github.com/linagora/ldap-rest/issues/229))
 
 ## v0.12.0 (2026-09-28)
 
