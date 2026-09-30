@@ -65,9 +65,37 @@ has written the organization entry. With the Cloudery it creates the
 Cloudery organization first. The organization entry, found under
 `--twake-instance-organization-base` by
 `--twake-instance-organization-id-attribute`, gets the address when
-`--twake-instance-organization-fqdn-attribute` names where, then
-`organization.created` is published on the b2b exchange, and the entry is
-marked. The mark, not the address, says the organization is done.
+`--twake-instance-organization-fqdn-attribute` names where. With the
+Cloudery the organization is then linked to its instance (`PATCH
+/api/v2/organizations/<id>` with `instance_fqdn`), which the Cloudery needs
+before it takes its members' `user.created`. Then `organization.created` is
+published on the b2b exchange, and the entry is marked. The message carries
+the organization's id, address, domain, and its name as `organization`, read
+from `--twake-instance-organization-name-attribute`, which
+`ensureOrganization` fills from `name` when the entry has none. The mark, not
+the address, says the organization is done.
+
+With the Cloudery, a member's `user.created` waits for its organization's: a
+member under an organization entry that is not marked yet gets its address
+but no event and no mark. A member outside its organization entry is not
+held, since nothing would find it to release it: it is announced with a
+warning, and needs sending again once the organization is linked. A stored
+address the provider does not confirm keeps a member held, with a warning,
+until `ensureInstance` sends it. Once the organization is
+marked, every member under its entry with an address and no mark gets its
+`user.created`, each on its own: one that fails is logged, the others are
+still sent, and the message is redelivered. A stored address is sent only
+if it is the one the provider gives the account, or once the provider
+confirms it. Nothing of this is kept in memory: the organization's
+`workplace.created` again, or `ensureOrganization` on a marked organization,
+links the organization again and sends whatever is still held, from any
+replica. That also links an organization marked before the link existed.
+
+The Cloudery builds no member instance for an organization it does not
+have. Before asking for a member's instance, the plugin asks for its
+organization and the organization's instance when the Cloudery has neither,
+so making sure of a member also repairs an organization whose creation
+failed.
 
 ## Providers
 

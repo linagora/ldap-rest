@@ -190,6 +190,20 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     if (!res.ok && res.status !== 409)
       throw await refused('Cloudery refused the organization', res);
   }
+
+  /** The Cloudery takes a member's user.created once its organization is linked */
+  async linkOrganization(id: string, fqdn: string): Promise<void> {
+    const res = await this.call(
+      `${this.url}/api/v2/organizations/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: this.headers(),
+        body: JSON.stringify({ instance_fqdn: fqdn }),
+      }
+    );
+    if (!res.ok)
+      throw await refused('Cloudery refused to link the organization', res);
+  }
 }
 
 export class CozyStackProvider

@@ -28,6 +28,21 @@ of `active eq false`, and keeps its lockout on `"active": true`; only the
 configured lock value reads as inactive. See
 [the SCIM plugin documentation](plugins/integrations/scim.md#deactivating-an-account-active).
 
+### twake/instances links an organization before its members
+
+**Who is affected:** a deployment running 0.12.0 with
+`--twake-instance-provider cloudery` and `--twake-instance-organization-base`.
+
+0.12.0 sent each member's `user.created` at once and marked the member, while
+the Cloudery refused it because the organization was not linked to its
+instance. The plugin now links the organization and holds its members until
+then, but only releases members that are not marked, so those already marked
+are not sent again on their own.
+
+To repair an organization, clear `--twake-instance-sent-attribute` on its
+marked members, then replay its `workplace.created` or call
+`ensureOrganization` for it ([details](plugins/integrations/instances.md#organizations)).
+
 ## To 0.12.0
 
 ### twake/instances replaces cozyProvision and clouderyProvision

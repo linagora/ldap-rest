@@ -334,6 +334,7 @@ export interface Config {
   twake_instance_organization_base?: string;
   twake_instance_organization_id_attribute?: string;
   twake_instance_organization_domain_attribute?: string;
+  twake_instance_organization_name_attribute?: string;
   twake_instance_organization_fqdn_attribute?: string;
   twake_lifecycle_reason_attribute?: string;
   twake_tombstone_dn?: string[];
@@ -987,6 +988,11 @@ const configArgs: ConfigTemplate = [
     '--twake-instance-organization-domain-attribute',
     'DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE',
     'twakeDomain',
+  ],
+  [
+    '--twake-instance-organization-name-attribute',
+    'DM_TWAKE_INSTANCE_ORGANIZATION_NAME_ATTRIBUTE',
+    'description',
   ],
   [
     '--twake-instance-organization-fqdn-attribute',

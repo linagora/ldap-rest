@@ -105,6 +105,11 @@ const rest = (): Request => ({ user: 'admin' }) as unknown as Request;
 const search = (fqdn: string) =>
   nock(CLOUDERY).get('/api/v2/instances').query({ fqdn, limit: '1' });
 
+const link = (id: string, fqdn: string) =>
+  nock(CLOUDERY)
+    .patch(`/api/v2/organizations/${id}`, { instance_fqdn: fqdn })
+    .reply(200, {});
+
 async function refusal(work: Promise<unknown>): Promise<unknown> {
   let error: unknown;
   await work.catch(e => (error = e));
@@ -123,19 +128,22 @@ describe('Twake instances plugin', function () {
     let dm: DM;
     let rabbit: StubRabbitMq;
 
+    const CLOUDERY_CONFIG = {
+      twake_instance_provider: 'cloudery',
+      twake_instance_cloudery_url: CLOUDERY,
+      twake_instance_cloudery_token: 'tok',
+      twake_instance_cloudery_domain: 'example.org',
+      twake_instance_cloudery_offer: 'standard',
+      twake_instance_cloudery_organization_offer: 'organization',
+      twake_instance_id: '{uid}{org}',
+      twake_instance_organization_base: ORGS,
+      twake_instance_organization_domain_attribute: 'l',
+      twake_instance_organization_name_attribute: 'st',
+      twake_instance_organization_fqdn_attribute: 'description',
+    };
+
     before(async () => {
-      ({ dm, rabbit } = await server({
-        twake_instance_provider: 'cloudery',
-        twake_instance_cloudery_url: CLOUDERY,
-        twake_instance_cloudery_token: 'tok',
-        twake_instance_cloudery_domain: 'example.org',
-        twake_instance_cloudery_offer: 'standard',
-        twake_instance_cloudery_organization_offer: 'organization',
-        twake_instance_id: '{uid}{org}',
-        twake_instance_organization_base: ORGS,
-        twake_instance_organization_domain_attribute: 'l',
-        twake_instance_organization_fqdn_attribute: 'description',
-      }));
+      ({ dm, rabbit } = await server(CLOUDERY_CONFIG));
       await dm.ldap
         .add(ORGS, {
           objectClass: ['top', 'organizationalUnit'],
@@ -268,6 +276,23 @@ describe('Twake instances plugin', function () {
       ).to.match(/defines no twakeNoSuchMark/);
     });
 
+    it('refuses to start when an organization’s name and address share an attribute', async () => {
+      const dm2 = new DM();
+      Object.assign(dm2.config, dm.config, {
+        twake_instance_organization_name_attribute: 'description',
+      });
+      await dm2.ready;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dm2.loadedPlugins['rabbitmq'] = new StubRabbitMq() as any;
+      expect(
+        String(
+          await refusal(
+            dm2.registerPlugin('core/twake/instances', new TwakeInstances(dm2))
+          )
+        )
+      ).to.match(/cannot share the attribute description/);
+    });
+
     it('asks nothing for a technical account or an entry outside the rules', async () => {
       await dm.ldap.add(
         dnOf('in-bot'),
@@ -370,6 +395,9 @@ describe('Twake instances plugin', function () {
         objectClass: ['top', 'organizationalUnit'],
         ou: 'acme1',
         l: 'acme.example',
+      });
+      await dm.ldap.modify(`ou=acme1,${ORGS}`, {
+        replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
       });
       await dm.ldap.add(`ou=users,ou=acme1,${ORGS}`, {
         objectClass: ['top', 'organizationalUnit'],
@@ -665,6 +693,7 @@ describe('Twake instances plugin', function () {
           objectClass: ['top', 'organizationalUnit'],
           ou: 'acme1',
           l: 'acme.example',
+          st: 'Acme',
         });
       });
 
@@ -706,6 +735,7 @@ describe('Twake instances plugin', function () {
           ou: 'acme2',
         });
         try {
+          link('acme2', 'acme2.example.org');
           await rabbit.handler!({
             twakeId: 'acme2',
             internalEmail: 'acme2@acme2.example',
@@ -725,26 +755,350 @@ describe('Twake instances plugin', function () {
         }
       });
 
-      it('announces organization.created when its instance is built', async () => {
-        await rabbit.handler!({
-          twakeId: 'acme1',
-          internalEmail: 'acme1@acme.example',
+      const ORG_CREATED = {
+        key: 'organization.created',
+        message: {
+          organizationId: 'acme1',
           workplaceFqdn: 'acme1.example.org',
+          organization: 'Acme',
+          domain: 'acme.example',
+        },
+      };
+      const orgWorkplace = {
+        twakeId: 'acme1',
+        internalEmail: 'acme1@acme.example',
+        workplaceFqdn: 'acme1.example.org',
+      };
+      const ORG_INSTANCE = {
+        fqdn: 'acme1.example.org',
+        internal_email: 'acme1@acme.example',
+        oidc: 'acme1',
+        instantiated_at: null,
+      };
+      const erin = orgDnOf('acme1', 'in.erin');
+      const erinWorkplace = {
+        twakeId: 'inerinacme1',
+        internalEmail: 'in.erin@acme.example',
+        workplaceFqdn: 'inerinacme1.example.org',
+      };
+      const ERIN_CREATED = {
+        key: 'user.created',
+        message: {
+          twakeId: 'in.erin',
+          internalEmail: 'in.erin@acme.example',
+          workplaceFqdn: 'inerinacme1.example.org',
+          organizationId: 'acme1',
+          domain: 'acme.example',
+          organizationDomain: 'acme.example',
+        },
+      };
+
+      const addErin = async (): Promise<void> => {
+        await dm.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
         });
+        search('acme1.example.org').reply(200, { items: [ORG_INSTANCE] });
+        search('inerinacme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances')
+          .reply(202, {});
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: 'in.erin@acme.example' },
+          rest()
+        );
+      };
+
+      afterEach(async () => {
+        await dm.ldap.delete(erin).catch(() => undefined);
+      });
+
+      it('announces organization.created when its instance is built', async () => {
+        const linked = link('acme1', 'acme1.example.org');
+        await rabbit.handler!(orgWorkplace);
+        expect(linked.isDone()).to.equal(true);
         expect(await read(dm, orgDn)).to.have.property(
           'description',
           'acme1.example.org'
         );
-        expect(rabbit.published).to.deep.equal([
-          {
-            key: 'organization.created',
-            message: {
-              organizationId: 'acme1',
-              workplaceFqdn: 'acme1.example.org',
-              domain: 'acme.example',
-            },
-          },
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+      });
+
+      it('announces nothing while the Cloudery refuses to link the organization', async () => {
+        nock(CLOUDERY).patch('/api/v2/organizations/acme1').reply(500, 'down');
+        expect(await refusal(rabbit.handler!(orgWorkplace))).to.be.an('error');
+        expect(rabbit.published).to.deep.equal([]);
+        expect(await read(dm, orgDn)).not.to.have.property('businessCategory');
+      });
+
+      it('holds a member’s user.created until its organization is announced', async () => {
+        await addErin();
+        await rabbit.handler!(erinWorkplace);
+        expect(rabbit.published).to.deep.equal([]);
+        expect(await read(dm, erin)).to.include({
+          description: 'inerinacme1.example.org',
+        });
+        expect(await read(dm, erin)).not.to.have.property('businessCategory');
+        expect(await plugin(dm).ensureInstance(erin, rest())).to.equal('ready');
+        expect(rabbit.published).to.deep.equal([]);
+
+        link('acme1', 'acme1.example.org');
+        await rabbit.handler!(orgWorkplace);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
+        expect(await read(dm, erin)).to.have.property('businessCategory');
+
+        await rabbit.handler!(erinWorkplace);
+        link('acme1', 'acme1.example.org');
+        await rabbit.handler!(orgWorkplace);
+        expect(rabbit.published).to.have.length(2);
+      });
+
+      it('sends each event once, the organization’s first, when both instances arrive together', async () => {
+        await addErin();
+        link('acme1', 'acme1.example.org');
+        await Promise.all([
+          rabbit.handler!(erinWorkplace),
+          rabbit.handler!(orgWorkplace),
         ]);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
+      });
+
+      it('links an already marked organization and sends its held user.created on a replay', async () => {
+        await addErin();
+        await rabbit.handler!(erinWorkplace);
+        await dm.ldap.modify(orgDn, {
+          replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
+        });
+        const linked = link('acme1', 'acme1.example.org');
+        await rabbit.handler!(orgWorkplace);
+        expect(linked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([ERIN_CREATED]);
+      });
+
+      it('releases the other members when one fails, and a changed address only once confirmed', async () => {
+        await addErin();
+        await rabbit.handler!(erinWorkplace);
+        const frank = orgDnOf('acme1', 'in.frank');
+        search('infrankacme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances')
+          .reply(202, {});
+        await dm.ldap.add(
+          frank,
+          { ...person('in.frank'), mail: 'in.frank@acme.example' },
+          rest()
+        );
+        try {
+          await dm.ldap.modify(frank, {
+            replace: { description: 'elsewhere.example.org' },
+          });
+          link('acme1', 'acme1.example.org');
+          search('elsewhere.example.org').reply(500, 'down');
+          expect(await refusal(rabbit.handler!(orgWorkplace))).to.match(
+            /1 member\(s\) of .* not released/
+          );
+          expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
+          expect(await read(dm, frank)).not.to.have.property(
+            'businessCategory'
+          );
+        } finally {
+          await dm.ldap.delete(frank).catch(() => undefined);
+        }
+      });
+
+      const warnings = (): { warned: string[]; restore: () => void } => {
+        const warned: string[] = [];
+        const logger = plugin(dm).logger;
+        const { warn } = logger;
+        logger.warn = ((m: string) => {
+          warned.push(m);
+          return logger;
+        }) as typeof warn;
+        return { warned, restore: () => (logger.warn = warn) };
+      };
+
+      it('warns when a member stays held for an address it cannot confirm', async () => {
+        await addErin();
+        await rabbit.handler!(erinWorkplace);
+        await dm.ldap.modify(erin, {
+          replace: { description: 'elsewhere.example.org' },
+        });
+        link('acme1', 'acme1.example.org');
+        search('elsewhere.example.org').reply(200, { items: [] });
+        const { warned, restore } = warnings();
+        try {
+          await rabbit.handler!(orgWorkplace);
+        } finally {
+          restore();
+        }
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        expect(warned.join('\n')).to.match(/in\.erin.* stays held/);
+      });
+
+      it('writes the name it is given to an organization entry without one', async () => {
+        await dm.ldap.modify(orgDn, { delete: ['st'] });
+        search('acme1.example.org').reply(200, {
+          items: [{ ...ORG_INSTANCE, instantiated_at: '2026-01-01T00:00:00Z' }],
+        });
+        link('acme1', 'acme1.example.org');
+        expect(
+          await plugin(dm).ensureOrganization({
+            id: 'acme1',
+            name: 'Acme',
+            domain: 'acme.example',
+          })
+        ).to.equal('ready');
+        expect(await read(dm, orgDn)).to.include({ st: 'Acme' });
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+      });
+
+      it('announces a member outside its organization entry, with a warning', async () => {
+        const outside = `ou=outside,${ORGS}`;
+        const gus = `uid=out.gus,ou=acme1,${outside}`;
+        const other = await server({
+          ...CLOUDERY_CONFIG,
+          twake_instance_dn: [
+            `^uid=[^,]+,ou=(?<org>[^,]+),ou=outside,${ORGS}$`,
+          ],
+        });
+        await dm.ldap.add(outside, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'outside',
+        });
+        await dm.ldap.add(`ou=acme1,${outside}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'acme1',
+        });
+        const warned: string[] = [];
+        const logger = plugin(other.dm).logger;
+        const { warn } = logger;
+        logger.warn = ((m: string) => {
+          warned.push(m);
+          return logger;
+        }) as typeof warn;
+        try {
+          search('acme1.example.org').reply(200, { items: [ORG_INSTANCE] });
+          search('outgusacme1.example.org')
+            .reply(200, { items: [] })
+            .post('/api/v1/instances')
+            .reply(202, {});
+          await other.dm.ldap.add(
+            gus,
+            { ...person('out.gus'), mail: 'out.gus@acme.example' },
+            rest()
+          );
+          await other.rabbit.handler!({
+            twakeId: 'outgusacme1',
+            internalEmail: 'out.gus@acme.example',
+            workplaceFqdn: 'outgusacme1.example.org',
+          });
+        } finally {
+          logger.warn = warn;
+          for (const dn of [gus, `ou=acme1,${outside}`, outside])
+            await dm.ldap.delete(dn).catch(() => undefined);
+        }
+        expect(other.rabbit.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+        expect(warned.join('\n')).to.match(/not below its organization entry/);
+      });
+
+      it('refuses to start when the schema defines no name attribute', async () => {
+        expect(
+          await refusal(
+            server({
+              ...CLOUDERY_CONFIG,
+              twake_instance_organization_name_attribute: 'noSuchAttribute',
+            })
+          )
+        ).to.match(/schema defines no noSuchAttribute/);
+      });
+
+      it('warns, and asks for no organization, when its entry has no name', async () => {
+        await dm.ldap.modify(orgDn, { delete: ['st'] });
+        await dm.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
+        });
+        const warned: string[] = [];
+        const logger = plugin(dm).logger;
+        const { warn } = logger;
+        logger.warn = ((m: string) => {
+          warned.push(m);
+          return logger;
+        }) as typeof warn;
+        try {
+          const scope = search('inerinacme1.example.org')
+            .reply(200, { items: [] })
+            .post('/api/v1/instances', body => body.slug === 'inerinacme1')
+            .reply(202, {});
+          await dm.ldap.add(
+            erin,
+            { ...person('in.erin'), mail: 'in.erin@acme.example' },
+            rest()
+          );
+          expect(scope.isDone()).to.equal(true);
+        } finally {
+          logger.warn = warn;
+        }
+        expect(warned.join('\n')).to.match(/organization acme1 has no st or l/);
+      });
+
+      it('takes the organization’s instance another member asked for first', async () => {
+        await dm.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
+        });
+        const scope = search('acme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v2/organizations')
+          .reply(201, {})
+          .post('/api/v1/instances', body => body.slug === 'acme1')
+          .reply(409, 'taken')
+          .get('/api/v2/instances')
+          .query({ fqdn: 'acme1.example.org', limit: '1' })
+          .reply(200, { items: [ORG_INSTANCE] })
+          .get('/api/v2/instances')
+          .query({ fqdn: 'inerinacme1.example.org', limit: '1' })
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'inerinacme1')
+          .reply(202, {});
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: 'in.erin@acme.example' },
+          rest()
+        );
+        expect(scope.isDone()).to.equal(true);
+      });
+
+      it('asks for a missing organization before a member’s instance', async () => {
+        await dm.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
+        });
+        const scope = search('acme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v2/organizations', {
+            ldap_branch: 'acme1',
+            name: 'Acme',
+            custom_domain: 'acme.example',
+          })
+          .reply(201, {})
+          .post('/api/v1/instances', body => body.slug === 'acme1')
+          .reply(202, {})
+          .get('/api/v2/instances')
+          .query({ fqdn: 'inerinacme1.example.org', limit: '1' })
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'inerinacme1')
+          .reply(202, {});
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: 'in.erin@acme.example' },
+          rest()
+        );
+        expect(scope.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([]);
       });
     });
   });
@@ -770,7 +1124,23 @@ describe('Twake instances plugin', function () {
         twake_instance_cozy_domain: 'example.org',
         twake_instance_cozy_org_id: 'linagora',
         twake_instance_cozy_org_domain: 'linagora.example',
+        twake_instance_organization_base: ORGS,
+        twake_instance_organization_domain_attribute: 'l',
+        twake_instance_organization_name_attribute: 'st',
       }));
+      // An organization not announced yet: cozy-stack holds none of its members
+      for (const [dn, ou] of [
+        [ORGS, 'in-orgs'],
+        [`ou=linagora,${ORGS}`, 'linagora'],
+      ])
+        await dm.ldap
+          .add(dn, { objectClass: ['top', 'organizationalUnit'], ou })
+          .catch(() => undefined);
+    });
+
+    after(async () => {
+      for (const dn of [`ou=linagora,${ORGS}`, ORGS])
+        await dm.ldap.delete(dn).catch(() => undefined);
     });
 
     beforeEach(() => (rabbit.published = []));
@@ -812,7 +1182,7 @@ describe('Twake instances plugin', function () {
       );
     });
 
-    it('builds the instance as cozyProvision did, and announces the account in the request', async () => {
+    it('builds the instance as cozyProvision did, and announces the account in the request, its organization announced or not', async () => {
       const scope = nock(COZY)
         .get('/instances/in-alice.example.org')
         .reply(404)
