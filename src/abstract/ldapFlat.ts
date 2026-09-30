@@ -18,6 +18,7 @@ import type {
   AttributeValue,
   LdapList,
   ModifyRequest,
+  SearchOptions,
   SearchResult,
 } from '../lib/ldapActions';
 import {
@@ -56,7 +57,9 @@ import {
   ConflictError,
   HttpError,
   NotFoundError,
+  UnprocessableEntityError,
 } from '../lib/errors';
+import { extractLdapCode } from '../lib/ldapCodes';
 
 import DmPlugin from './plugin';
 
@@ -68,6 +71,57 @@ import DmPlugin from './plugin';
  */
 function asList(value: AttributeValue): string[] {
   return (Array.isArray(value) ? value : [value]).map(item => String(item));
+}
+
+/** RFC 4511 `maxInt`: the most a search request's size limit can say. */
+const LDAP_MAX_INT = 2147483647;
+
+/**
+ * Entries keyed by their main attribute, up to `limit` distinct identifiers.
+ *
+ * Counted after the entries without that attribute are dropped, not as the
+ * directory counts them: a subtree search returns the branch's own entry
+ * too, and it names nothing a client could ask for.
+ *
+ * @param mainAttribute attribute holding the identifier
+ * @param limit how many identifiers to keep, all when absent
+ * @returns the map being filled, and `add`, false once an entry past `limit`
+ *          was met and left out
+ */
+function entryCollector(
+  mainAttribute: string,
+  limit?: number
+): { entries: LdapList; add(batch: AttributesList[]): boolean } {
+  const entries: LdapList = {};
+  const seen = new Set<string>();
+  return {
+    entries,
+    add(batch: AttributesList[]): boolean {
+      for (const e of batch) {
+        const value = e[mainAttribute];
+        if (!value) continue;
+        const id = String(Array.isArray(value) ? value[0] : value);
+        if (!seen.has(id)) {
+          if (limit !== undefined && seen.size >= limit) return false;
+          seen.add(id);
+        }
+        entries[id] = e;
+      }
+      return true;
+    },
+  };
+}
+
+/** What {@link LdapFlat.listEntries} is asked for. */
+export interface ListEntriesOptions {
+  /** LDAP filter, every entry of the branch when absent */
+  filter?: string;
+  /** attributes to return, all when absent */
+  attributes?: string[];
+  /** incoming request, forwarded to the authorization hooks */
+  req?: Request;
+  /** keep at most this many entries, all when absent */
+  limit?: number;
 }
 
 /**
@@ -555,6 +609,11 @@ export default abstract class LdapFlat extends DmPlugin {
      *   several names separated by commas, and the clauses are then joined
      *   with `|`. The `attributes`
      *   parameter limits which LDAP attributes are returned.
+     *
+     *   Without `limit`, the answer holds every match or fails: a directory
+     *   whose size limit is below the number of matches makes it a `422`.
+     *   With `limit`, at most that many entries come back, and the
+     *   `X-Result-Truncated: true` header says others were left out.
      * tags:
      *   - Entities
      * parameters:
@@ -593,9 +652,26 @@ export default abstract class LdapFlat extends DmPlugin {
      *       Comma-separated list of LDAP attributes to include in each
      *       returned entry. Omit to return all attributes.
      *     example: uid,cn,mail
+     *   - in: query
+     *     name: limit
+     *     required: false
+     *     schema: { type: integer, minimum: 1 }
+     *     description: |
+     *       Return at most this many entries. When more match, the response
+     *       carries `X-Result-Truncated: true`. It also does when the
+     *       directory refused to list every match, even if fewer than
+     *       `limit` came back: the directory does not say whether it cut
+     *       that answer short.
+     *     example: 50
      * responses:
      *   '200':
      *     description: Map of entries keyed by mainAttribute value.
+     *     headers:
+     *       X-Result-Truncated:
+     *         description: |
+     *           `true` when `limit` was given and the answer may not hold
+     *           every match (see `limit`). Absent otherwise.
+     *         schema: { type: string, enum: ['true'] }
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/FlatList' }
@@ -611,10 +687,21 @@ export default abstract class LdapFlat extends DmPlugin {
      *             cn: Bob Jones
      *             mail: bob@example.com
      *   '400':
-     *     description: Invalid LDAP attribute name in `attribute` parameter.
+     *     description: |
+     *       Invalid LDAP attribute name in `attribute` parameter, or `limit`
+     *       is not a positive integer.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
+     *   '422':
+     *     description: |
+     *       No `limit` was given and more entries match than the directory
+     *       will list in one answer (LDAP `sizeLimitExceeded`).
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *         example:
+     *           error: "Too many entries to list at once: the directory's size limit was exceeded. Narrow the search, or pass `limit`."
      */
     // List entries
     app.get(
@@ -636,8 +723,30 @@ export default abstract class LdapFlat extends DmPlugin {
         if (req.query.attributes && typeof req.query.attributes === 'string') {
           args.attributes = req.query.attributes.split(',');
         }
-        const list = await this.listEntries({ ...args, req });
-        res.json(this.projectList(list));
+        let limit: number | undefined;
+        if (req.query.limit !== undefined) {
+          const raw = req.query.limit;
+          limit = typeof raw === 'string' && /^\d+$/.test(raw) ? +raw : NaN;
+          if (!Number.isSafeInteger(limit) || limit < 1)
+            throw new BadRequestError(
+              'Query parameter "limit" must be a positive integer'
+            );
+        }
+        let listed: { entries: LdapList; truncated: boolean };
+        try {
+          listed = await this.listEntriesLimited({ ...args, limit, req });
+        } catch (err) {
+          // The directory's refusal to list that many, which the caller can
+          // do something about; not a fault of the server. With `limit`, the
+          // listing answers a refusal itself.
+          if (limit !== undefined || extractLdapCode(err) !== 4) throw err;
+          throw new UnprocessableEntityError(
+            "Too many entries to list at once: the directory's size limit " +
+              'was exceeded. Narrow the search, or pass `limit`.'
+          );
+        }
+        if (listed.truncated) res.set('X-Result-Truncated', 'true');
+        res.json(this.projectList(listed.entries));
       })
     );
 
@@ -1579,44 +1688,87 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
-   * List entries from LDAP
+   * List entries from LDAP.
+   *
+   * @returns the entries; {@link listEntriesLimited} also says whether
+   *          `limit` left some out
    */
-  async listEntries({
+  async listEntries(options: ListEntriesOptions): Promise<LdapList> {
+    return (await this.listEntriesLimited(options)).entries;
+  }
+
+  /**
+   * List entries, and say whether some were left out.
+   *
+   * Without `limit`, every match or a failure: a directory that will not
+   * list them all ends the search with `sizeLimitExceeded` (4), which
+   * travels out as it came. Anything shorter would pass for the whole list.
+   *
+   * With `limit`, the walk stops at the first entry past it, so a small limit
+   * costs a page rather than the branch. A refusal is answered the way
+   * `plugins/ldap/organizations` answers it for child organizations, where
+   * the measurements behind it are written down: a second search bounded by
+   * `sizeLimit`, which ldapts returns entries for instead of raising the
+   * refusal. That answer is flagged as truncated whatever it holds. The
+   * server silently cuts a bounded search at its own hard limit, and ldapts
+   * drops the result code that would say so, so fewer entries than asked
+   * for do not prove the list whole. Only a walk that ran to its end does —
+   * which is also why the bounded search is the fallback and not the first
+   * attempt. With a limit, a refusal never travels out.
+   *
+   * @returns the entries, keyed by main attribute, and whether any were left
+   *          out
+   */
+  async listEntriesLimited({
     filter,
     attributes,
     req,
-  }: {
-    filter?: string;
-    attributes?: string[];
-    req?: Request;
-  }): Promise<LdapList> {
-    filter = filter || '(objectClass=*)';
-    const args: {
-      paged: boolean;
-      filter: string;
-      attributes?: string[];
-    } = {
-      paged: true,
-      filter,
+    limit,
+  }: ListEntriesOptions): Promise<{ entries: LdapList; truncated: boolean }> {
+    const walk: SearchOptions = {
+      paged:
+        limit === undefined ? true : { pageSize: Math.min(limit + 1, 100) },
+      filter: filter || '(objectClass=*)',
     };
-    if (attributes && attributes.length > 0) args.attributes = attributes;
-    const ldapRes = await this.ldap.search(args, this.base, req);
-    const res: LdapList = {};
-    for await (const tmp of ldapRes as AsyncGenerator<SearchResult>) {
-      tmp.searchEntries.forEach(e => {
-        if (e[this.mainAttribute]) {
-          const value = e[this.mainAttribute];
-          let id: string;
-          if (Array.isArray(value)) {
-            id = typeof value[0] === 'string' ? value[0] : String(value[0]);
-          } else {
-            id = typeof value === 'string' ? value : String(value);
-          }
-          res[id] = e;
-        }
-      });
+    if (attributes && attributes.length > 0) walk.attributes = attributes;
+    try {
+      const pages = (await this.ldap.search(
+        walk,
+        this.base,
+        req
+      )) as AsyncGenerator<SearchResult>;
+      const list = entryCollector(this.mainAttribute, limit);
+      // A paged search fails from the walk, not from the call above. Leaving
+      // the loop early returns the generator, which releases the connection.
+      for await (const page of pages) {
+        if (!list.add(page.searchEntries))
+          return { entries: list.entries, truncated: true };
+      }
+      return { entries: list.entries, truncated: false };
+    } catch (err) {
+      if (limit === undefined || extractLdapCode(err) !== 4) throw err;
     }
-    return res;
+    const list = entryCollector(this.mainAttribute, limit);
+    try {
+      const bounded = (await this.ldap.search(
+        {
+          ...walk,
+          paged: false,
+          // One over: the branch's own entry comes back too, and is dropped.
+          sizeLimit: Math.min(limit + 1, LDAP_MAX_INT),
+        },
+        this.base,
+        req
+      )) as SearchResult;
+      list.add(bounded.searchEntries);
+    } catch (err) {
+      // Reached only if the bound was lost on the way — an `ldapsearchopts`
+      // hook rewriting the options. ldapts then raises the refusal and drops
+      // the entries sent before it, so all that is left to answer is that
+      // some exist.
+      if (extractLdapCode(err) !== 4) throw err;
+    }
+    return { entries: list.entries, truncated: true };
   }
 
   async searchEntriesByName(

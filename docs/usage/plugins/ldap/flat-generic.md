@@ -318,13 +318,13 @@ For each schema, the plugin generates REST API endpoints:
 ### List Entries
 
 ```bash
-GET /api/v1/ldap/{pluralName}?match={filter}&attributes={attrs}
+GET /api/v1/ldap/{pluralName}?match={value}&attribute={attrs}&attributes={attrs}&limit={n}
 ```
 
 **Example:**
 
 ```bash
-curl http://localhost:8081/api/v1/ldap/users?match=uid=*smith*&attributes=uid,cn,mail
+curl 'http://localhost:8081/api/v1/ldap/users?match=smith&attribute=uid&attributes=uid,cn,mail&limit=50'
 ```
 
 **Response:**
@@ -339,6 +339,33 @@ curl http://localhost:8081/api/v1/ldap/users?match=uid=*smith*&attributes=uid,cn
   }
 }
 ```
+
+#### Long lists
+
+A directory lists at most a set number of entries per search for the account
+LDAP-Rest binds as (OpenLDAP: `olcSizeLimit`, default 500, or `olcLimits`;
+`size.prtotal` bounds paged searches). A list longer than that is refused as
+a whole, never cut short:
+
+- **Without `limit`**, the answer is every match or `422`:
+
+  ```json
+  {
+    "error": "Too many entries to list at once: the directory's size limit was exceeded. Narrow the search, or pass `limit`."
+  }
+  ```
+
+- **With `limit`** (a positive integer, `400` otherwise), at most `limit`
+  entries come back, with the header `X-Result-Truncated: true` when others
+  were left out. When the directory refuses the list, LDAP-Rest asks again for
+  `limit` entries and answers what it gets — possibly fewer, if the account's
+  own limit is lower — always with the header: the directory does not say
+  whether that answer was cut, so a shorter one is not taken for complete.
+  A request with `limit` is never answered `422`.
+
+The header is absent from a complete answer. LDAP-Rest sets no CORS headers:
+a browser client on another origin sees `X-Result-Truncated` only if the
+proxy answering for it lists the header in `Access-Control-Expose-Headers`.
 
 ### Get Entry
 

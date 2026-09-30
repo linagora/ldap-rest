@@ -538,6 +538,10 @@ Retrieve all users or filter by attributes.
 - `match` - Filter value (partial match with wildcards)
 - `attribute` - Attribute name to filter on
 - `attributes` - Comma-separated list of attributes to return
+- `limit` - Return at most this many users; `X-Result-Truncated: true` then
+  says others were left out. Without it, a list longer than the directory's
+  size limit is answered `422`
+  ([details](../../usage/plugins/ldap/flat-generic.md#long-lists))
 
 **Example Request (all users):**
 
