@@ -664,6 +664,10 @@
       "import": "./static/schemas/twake/nomenclature/twakeTitle.json",
       "require": "./static/schemas/twake/nomenclature/twakeTitle.json"
     },
+    "./schema-twake-organizationgroups": {
+      "import": "./static/schemas/twake/organizationGroups.json",
+      "require": "./static/schemas/twake/organizationGroups.json"
+    },
     "./schema-twake-organizations": {
       "import": "./static/schemas/twake/organizations.json",
       "require": "./static/schemas/twake/organizations.json"

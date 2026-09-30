@@ -10,6 +10,7 @@ const users = (org: string): string => `ou=users,${orgDn(org)}`;
 
 describe('Twake groups plugin routes', function () {
   let dm: DM;
+  let groups: TwakeGroups;
   let api: supertest.Agent;
   const route = (org = 'acme'): string => `/api/v1/organizations/${org}/groups`;
 
@@ -46,10 +47,15 @@ describe('Twake groups plugin routes', function () {
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
       group_class: ['top', 'groupOfNames'],
-      group_schema: '',
+      group_schema: 'static/schemas/twake/organizationGroups.json',
     });
     await dm.ready;
-    await dm.registerPlugin('core/twake/groups', new TwakeGroups(dm));
+    groups = new TwakeGroups(dm);
+    await dm.registerPlugin('core/twake/groups', groups);
+    for (let tries = 0; !groups.schema; tries++) {
+      if (tries === 200) throw new Error('the group schema did not load');
+      await new Promise(r => setTimeout(r, 10));
+    }
     api = supertest(dm.app);
     await ou(ORGS);
     await ou(orgDn('acme'));
@@ -281,6 +287,34 @@ describe('Twake groups plugin routes', function () {
     const id = await create('Eng');
     await api.delete(`${route()}/${id}`).expect(200);
     await api.delete(`${route()}/${id}`).expect(404);
+  });
+
+  it('validates groups against the organization group schema', async () => {
+    for (const [field, value] of [
+      ['twakeDepartmentLink', ORGS],
+      ['cn', 'not-a-uuid'],
+      ['BUSINESSCATEGORY', 'blue'],
+    ]) {
+      const refused = await groups._validateOneChange(field, value).then(
+        () => false,
+        () => true
+      );
+      expect(refused, field).to.equal(true);
+    }
+    expect(await groups._validateOneChange('O', 'Team')).to.equal(true);
+    expect(
+      await groups._validateOneChange('BUSINESSCATEGORY', '#abc')
+    ).to.equal(true);
+  });
+
+  it('declares its attributes under their configured names, whatever the schema case', () => {
+    const { attributes } = groups['adaptSchema']({
+      strict: true,
+      attributes: { o: { type: 'string', required: false } },
+    });
+    expect(attributes).not.to.have.property('o');
+    expect(attributes.O).to.deep.equal({ type: 'string', required: false });
+    expect(attributes).to.have.keys('O', 'BUSINESSCATEGORY', 'OU');
   });
 
   it('does not serve the flat group routes', async () => {

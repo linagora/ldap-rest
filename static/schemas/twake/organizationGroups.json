@@ -1,0 +1,32 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "groupOfNames", "twakeGroup"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "test": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "required": true
+    },
+    "member": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
+      },
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    }
+  }
+}
