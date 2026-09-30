@@ -81,7 +81,9 @@ const LDAP_MAX_INT = 2147483647;
  *
  * Counted after the entries without that attribute are dropped, not as the
  * directory counts them: a subtree search returns the branch's own entry
- * too, and it names nothing a client could ask for.
+ * too, and it names nothing a client could ask for. When the search named
+ * the attribute, ldapts gives such an entry an empty array rather than
+ * nothing, so emptiness is read from the first value.
  *
  * @param mainAttribute attribute holding the identifier
  * @param limit how many identifiers to keep, all when absent
@@ -99,8 +101,9 @@ function entryCollector(
     add(batch: AttributesList[]): boolean {
       for (const e of batch) {
         const value = e[mainAttribute];
-        if (!value) continue;
-        const id = String(Array.isArray(value) ? value[0] : value);
+        const first = Array.isArray(value) ? value[0] : value;
+        if (first === undefined || first === null || first === '') continue;
+        const id = String(first);
         if (!seen.has(id)) {
           if (limit !== undefined && seen.size >= limit) return false;
           seen.add(id);
@@ -650,7 +653,8 @@ export default abstract class LdapFlat extends DmPlugin {
      *     schema: { type: string }
      *     description: |
      *       Comma-separated list of LDAP attributes to include in each
-     *       returned entry. Omit to return all attributes.
+     *       returned entry. Omit to return all attributes. The
+     *       `mainAttribute` is always returned: it keys the map.
      *     example: uid,cn,mail
      *   - in: query
      *     name: limit
@@ -1700,21 +1704,13 @@ export default abstract class LdapFlat extends DmPlugin {
   /**
    * List entries, and say whether some were left out.
    *
-   * Without `limit`, every match or a failure: a directory that will not
-   * list them all ends the search with `sizeLimitExceeded` (4), which
-   * travels out as it came. Anything shorter would pass for the whole list.
-   *
-   * With `limit`, the walk stops at the first entry past it, so a small limit
-   * costs a page rather than the branch. A refusal is answered the way
-   * `plugins/ldap/organizations` answers it for child organizations, where
-   * the measurements behind it are written down: a second search bounded by
-   * `sizeLimit`, which ldapts returns entries for instead of raising the
-   * refusal. That answer is flagged as truncated whatever it holds. The
-   * server silently cuts a bounded search at its own hard limit, and ldapts
-   * drops the result code that would say so, so fewer entries than asked
-   * for do not prove the list whole. Only a walk that ran to its end does —
-   * which is also why the bounded search is the fallback and not the first
-   * attempt. With a limit, a refusal never travels out.
+   * What the answers are is in docs/usage/plugins/ldap/flat-generic.md
+   * ("Long lists"). What the code has to work around: a search carrying a
+   * `sizeLimit` is never refused by ldapts — it returns the entries it got
+   * and drops the result code, including when the server cut the answer at
+   * its own, lower, limit. A bounded search therefore cannot prove a list
+   * whole, and only serves as the fallback once the paged walk, which can,
+   * has been refused. Its answer is flagged as truncated whatever it holds.
    *
    * @returns the entries, keyed by main attribute, and whether any were left
    *          out
@@ -1726,18 +1722,30 @@ export default abstract class LdapFlat extends DmPlugin {
     limit,
   }: ListEntriesOptions): Promise<{ entries: LdapList; truncated: boolean }> {
     const walk: SearchOptions = {
+      // `limit + 2`: the branch's own entry, `limit` entries and the one
+      // that says there are more, so that a first page can settle it.
       paged:
-        limit === undefined ? true : { pageSize: Math.min(limit + 1, 100) },
+        limit === undefined ? true : { pageSize: Math.min(limit + 2, 100) },
       filter: filter || '(objectClass=*)',
     };
-    if (attributes && attributes.length > 0) walk.attributes = attributes;
+    if (attributes && attributes.length > 0) {
+      // Entries are keyed, and counted, by the main attribute: a list that
+      // leaves it out would drop every entry.
+      const main = this.mainAttribute.toLowerCase();
+      walk.attributes = attributes.some(a => a.toLowerCase() === main)
+        ? attributes
+        : [...attributes, this.mainAttribute];
+    }
+    // One collector for both searches: an `ldapsearchfilter` hook may have
+    // let through, before the walk was refused, entries the bounded search
+    // spends its `sizeLimit` on without returning.
+    const list = entryCollector(this.mainAttribute, limit);
     try {
       const pages = (await this.ldap.search(
         walk,
         this.base,
         req
       )) as AsyncGenerator<SearchResult>;
-      const list = entryCollector(this.mainAttribute, limit);
       // A paged search fails from the walk, not from the call above. Leaving
       // the loop early returns the generator, which releases the connection.
       for await (const page of pages) {
@@ -1748,13 +1756,12 @@ export default abstract class LdapFlat extends DmPlugin {
     } catch (err) {
       if (limit === undefined || extractLdapCode(err) !== 4) throw err;
     }
-    const list = entryCollector(this.mainAttribute, limit);
     try {
       const bounded = (await this.ldap.search(
         {
           ...walk,
           paged: false,
-          // One over: the branch's own entry comes back too, and is dropped.
+          // One over: room for the branch's own entry, which is dropped.
           sizeLimit: Math.min(limit + 1, LDAP_MAX_INT),
         },
         this.base,
