@@ -200,6 +200,29 @@ describe('ldapActions', function () {
           expect(err).to.have.property('message');
         }
       });
+
+      it('writes the entry an ldapaddrequest hook returns', async () => {
+        const dm = new DM();
+        ldapActions = new LdapActions(dm);
+        dm.hooks.ldapaddrequest = [
+          ([dn, entry, req]: [string, Record<string, unknown>, unknown]) => [
+            dn,
+            { ...entry, description: 'from the hook' },
+            req,
+          ],
+        ] as typeof dm.hooks.ldapaddrequest;
+        await ldapActions.add(testDN, {
+          objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
+          cn: 'Test User',
+          sn: 'User',
+          uid: 'testuser',
+        });
+        const { searchEntries } = (await ldapActions.search(
+          { paged: false, scope: 'base', attributes: ['description'] },
+          testDN
+        )) as SearchResult;
+        expect(searchEntries[0].description).to.equal('from the hook');
+      });
     });
 
     describe('rename', () => {

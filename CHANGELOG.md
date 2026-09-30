@@ -42,6 +42,10 @@
 - `declareObjectClasses` keeps one declaration per base and class set, so
   building the same `LdapFlat` again no longer grows the list
   ([#229](https://github.com/linagora/ldap-rest/issues/229))
+- An add writes the entry the `ldapaddrequest` hooks return, the one
+  `ldapadddone` and `ldapaddafter` receive; a hook returning a new object
+  had its changes dropped
+  ([#244](https://github.com/linagora/ldap-rest/issues/244))
 
 ## v0.12.0 (2026-09-28)
 
