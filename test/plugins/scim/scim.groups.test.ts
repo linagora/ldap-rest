@@ -99,6 +99,35 @@ describe('SCIM Groups (integration)', function () {
     expect(res.headers.location).to.not.match(/^https?:/);
   });
 
+  it('keeps displayName as the RDN when the mapping stores it there', async () => {
+    let seenBase: string | undefined;
+    const hook = ([group, req, base]: [
+      Record<string, unknown>,
+      unknown,
+      string,
+    ]) => {
+      seenBase = base;
+      return [{ ...group, id: 'from-hook' }, req, base];
+    };
+    (server.hooks.scimgroupcreate ||= []).push(hook);
+    try {
+      const res = await supertest(server.app)
+        .post('/scim/v2/Groups')
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'scim-testgroup',
+        })
+        .expect(201);
+      expect(res.body.id).to.equal('scim-testgroup');
+      expect(res.body.displayName).to.equal('scim-testgroup');
+      expect(seenBase).to.equal(groupBase);
+    } finally {
+      const hooks = server.hooks.scimgroupcreate as unknown[];
+      hooks.splice(hooks.indexOf(hook), 1);
+    }
+  });
+
   it('stores and returns the client externalId', async () => {
     const created = await supertest(server.app)
       .post('/scim/v2/Groups')

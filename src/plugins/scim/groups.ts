@@ -84,6 +84,7 @@ export class ScimGroups {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private readonly hooks: { [K: string]: Function[] | undefined };
   private readonly mapping: ResourceMapping;
+  private readonly attributes: string[];
   private readonly rdnAttribute: string;
   private readonly objectClass: string[];
   private readonly idAttribute: string;
@@ -115,6 +116,10 @@ export class ScimGroups {
       ),
       (this.config.scim_group_external_id_attribute as string) || ''
     );
+    this.attributes = requiredLdapAttributes(this.mapping, [
+      this.rdnAttribute,
+      'member',
+    ]);
   }
 
   private ctx(req?: DmRequest): MappingContext {
@@ -199,7 +204,7 @@ export class ScimGroups {
         {
           paged: false,
           scope: 'base',
-          attributes: [...requiredLdapAttributes(this.mapping), 'member'],
+          attributes: this.attributes,
         },
         dn
       )) as SearchResult;
@@ -270,7 +275,7 @@ export class ScimGroups {
       directory: this.ldap.forRequest(req),
       base,
       filter: ldapFilter,
-      attributes: [...requiredLdapAttributes(this.mapping), 'member'],
+      attributes: this.attributes,
       startIndex,
       count,
       maxScanned: this.maxScanned,
@@ -293,17 +298,23 @@ export class ScimGroups {
     if (!resource.displayName) {
       throw scimInvalidValue('displayName is required');
     }
+    const base = this.baseResolver.groupBase(req);
+    // RFC 7643 section 3.1: the client never chooses `id`. A
+    // `scimgroupcreate` hook may assign one to name the entry, unless the
+    // mapping already fills the RDN attribute, which the id would overwrite.
     const hookInput = await launchHooksChained(this.hooks.scimgroupcreate, [
-      resource,
+      { ...resource, id: undefined },
       req,
-    ] as [ScimGroup, DmRequest]);
+      base,
+    ] as [ScimGroup, DmRequest, string]);
     const group = hookInput[0];
 
-    const { rdn, attributes } = scimGroupToLdap(
+    const { rdn: named, attributes } = scimGroupToLdap(
       group,
       this.mapping,
       this.objectClass
     );
+    const rdn = (!attributes[this.rdnAttribute] && group.id) || named;
     if (!rdn) throw scimInvalidValue('displayName is required');
     validateDnValue(rdn, this.rdnAttribute);
     attributes[this.rdnAttribute] = rdn;
@@ -326,7 +337,6 @@ export class ScimGroups {
     }
     attributes.member = memberDns;
 
-    const base = this.baseResolver.groupBase(req);
     const dn = `${this.rdnAttribute}=${escapeDnValue(rdn)},${base}`;
 
     try {
@@ -458,7 +468,7 @@ export class ScimGroups {
         {
           paged: false,
           scope: 'base',
-          attributes: [...requiredLdapAttributes(this.mapping), 'member'],
+          attributes: this.attributes,
         },
         dn
       )) as SearchResult;

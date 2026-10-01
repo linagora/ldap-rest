@@ -30,6 +30,13 @@ import {
   unescapeDnValue,
 } from '../../lib/utils';
 import LdapGroups from '../ldap/groups';
+import { BaseResolver } from '../scim/baseResolver';
+import {
+  DEFAULT_GROUP_MAPPING,
+  loadMappingFile,
+  mergeMapping,
+} from '../scim/mapping';
+import type { ScimGroup } from '../scim/types';
 
 import {
   first,
@@ -232,6 +239,15 @@ export default class TwakeGroups extends LdapGroups {
   hooks: Hooks = {
     ldapaddrequest: ([dn, entry, req]) => {
       this.checkMembers(dn, entry.member);
+      // A group written without the routes, through SCIM, is dated too. Only
+      // one holding the display name: its classes then allow the date, which
+      // a plain groupOfNames would refuse.
+      if (
+        this.organizationOf(dn) !== undefined &&
+        valueOf(entry, this.displayName) !== undefined &&
+        valueOf(entry, this.createdAt) === undefined
+      )
+        entry = { ...entry, [this.createdAt]: new Date().toISOString() };
       return [dn, entry, req];
     },
     ldapmodifyrequest: ([dn, changes, op, req]) => {
@@ -244,7 +260,40 @@ export default class TwakeGroups extends LdapGroups {
       req,
       opts,
     ],
+    // A SCIM group of an organization gets a generated cn, as one made by
+    // the routes does.
+    scimgroupcreate: ([group, req, base]: [ScimGroup, Request, string?]) => {
+      // A hook written for the two-element form drops the base
+      base ??= new BaseResolver(this.config).groupBase(req);
+      return [
+        this.groupPattern.test(parseDn(base).join(','))
+          ? { ...group, id: randomUUID() }
+          : group,
+        req,
+        base,
+      ];
+    },
   };
+
+  /**
+   * The id a `scimgroupcreate` hook assigns names the entry only when the
+   * SCIM group mapping leaves the RDN attribute alone.
+   */
+  afterLoad(): void {
+    if (!this.server.loadedPlugins.scim) return;
+    const rdn = (this.config.scim_group_rdn_attribute as string) || 'cn';
+    const override = (this.config.scim_group_mapping as string) || '';
+    const writer = mergeMapping(
+      DEFAULT_GROUP_MAPPING,
+      override ? loadMappingFile(override) : undefined
+    ).entries.find(e => e.ldap?.toLowerCase() === rdn.toLowerCase());
+    if (writer)
+      this.logger.warn(
+        `${this.name}: the SCIM group mapping writes ${writer.scim} to ${rdn}, ` +
+          `so SCIM groups keep it as their RDN instead of a generated cn: ` +
+          `map ${writer.scim} to another attribute with --scim-group-mapping`
+      );
+  }
 
   /** The organization a group DN belongs to, if it is a group at all. */
   organizationOf(dn: string): string | undefined {

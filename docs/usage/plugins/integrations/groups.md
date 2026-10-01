@@ -52,7 +52,7 @@ A group reads:
 ```
 
 `members` are the RDN values of the organization's users. A group without a
-display name, such as one a SCIM client created, reads its `cn`.
+display name reads its `cn`.
 
 - `GET /groups?page&limit&search&sortBy&sortOrder`: `search` (2 characters
   or more) matches the display name and the description; `sortBy` is
@@ -205,9 +205,13 @@ SCIM groups take the organization's group branch through SCIM's per-request
 group base (`--scim-group-base-header`, `--scim-base-header-root`), the same
 classes through `--scim-group-object-class`, and the provider's `externalId`
 through `--scim-group-external-id-attribute`. Map SCIM `displayName` to the
-display name attribute in `--scim-group-mapping`. A SCIM group's `cn` is its
-`displayName` for now; a generated `cn` for SCIM groups is left to a later
-change.
+display name attribute in `--scim-group-mapping`: the name is kept there,
+SCIM reads, updates and `displayName` filters go through it, and a SCIM group
+of an organization gets a generated `cn` (a UUID), which is also its SCIM
+`id`, and a creation date, as a group made by the routes does. Without that
+mapping, a SCIM group's `cn` is its `displayName`, and the plugin logs a
+warning at startup. A group whose `cn` is already its `displayName` keeps
+that `cn` and `id`.
 
 ## Dependencies
 

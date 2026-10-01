@@ -1,6 +1,9 @@
 import { expect } from 'chai';
+import type { SearchResult } from 'ldapts';
+import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import Scim from '../../../src/plugins/scim/scim';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 
 const ORGS = `ou=tg-orgs,${process.env.DM_LDAP_BASE}`;
@@ -61,6 +64,9 @@ describe('Twake groups plugin', function () {
     await dm.ready;
     plugin = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', plugin);
+    dm.config.scim_group_base = `ou=groups,${orgDn('acme')}`;
+    dm.config.scim_group_object_class = ['top', 'groupOfNames'];
+    await dm.registerPlugin('core/scim', new Scim(dm));
     await ou(ORGS);
     for (const org of ['acme', 'other']) {
       await ou(orgDn(org));
@@ -157,6 +163,22 @@ describe('Twake groups plugin', function () {
       `ou=groups,${orgDn('acme')}`
     )) as { searchEntries: unknown[] };
     expect(searchEntries).to.have.length(1);
+  });
+
+  it('creates a plain groupOfNames SCIM group without a creation date', async () => {
+    await supertest(dm.app)
+      .post('/scim/v2/Groups')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'team',
+      })
+      .expect(201);
+    const { searchEntries } = (await dm.ldap.search(
+      { paged: false, scope: 'base', attributes: ['*'] },
+      groupDn('acme', 'team')
+    )) as SearchResult;
+    expect(searchEntries[0]).not.to.have.property('twakeCreatedAt');
   });
 
   it('leaves the member cleanup of an erase to the directory', () => {
