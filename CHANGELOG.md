@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Features
+
+- `core/twake/instances`: `--twake-instance-organization-account` names an
+  account of each organization that gets the organization instance's address,
+  see [instances](docs/usage/plugins/integrations/instances.md#organizations)
+  ([#255](https://github.com/linagora/ldap-rest/issues/255))
+
 ### Fixes
 
 - `core/auth/hmac` hashes the body bytes received, as documented, instead of
