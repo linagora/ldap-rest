@@ -76,13 +76,25 @@ const events: {
   drive_quota_attribute: 'onLdapDriveQuotaChange',
 };
 
+/**
+ * The entry read before a delete or a rename, kept for its "done" hook, and
+ * how many of those on its DN are under way
+ */
+interface Pending {
+  entry?: Entry;
+  inFlight: number;
+}
+
 class OnLdapChange extends DmPlugin {
   name = 'onLdapChange';
   roles: Role[] = ['consistency'] as const;
 
+  // Each kept until the "end" hook of its operation, which fires whatever
+  // became of it: a write refused, failed, or taken out of its request by
+  // another plugin (trash, tombstone) never reaches its "done" hook.
   stack: Record<number, Entry> = {};
-  pendingDeletions: Map<string, Entry> = new Map();
-  pendingRenames: Map<string, Entry> = new Map();
+  pendingDeletions: Map<string, Pending> = new Map();
+  pendingRenames: Map<string, Pending> = new Map();
 
   hooks: Hooks = {
     ldapadddone: async ([dn, attributes], context) => {
@@ -121,15 +133,17 @@ class OnLdapChange extends DmPlugin {
       this.publish(dn, before, after, context);
     },
 
+    ldapmodifyend: op => {
+      delete this.stack[op];
+    },
+
     ldaprenamerequest: async ([dn, newDn, req]) => {
-      const entry = await this.read(dn);
-      if (entry) this.pendingRenames.set(dn, entry);
+      this.hold(this.pendingRenames, dn, await this.read(dn));
       return [dn, newDn, req];
     },
 
     ldaprenamedone: async ([dn, newDn], context) => {
-      const before = this.pendingRenames.get(dn);
-      this.pendingRenames.delete(dn);
+      const before = this.take(this.pendingRenames, dn);
       if (!before) {
         // A move reaches this hook too (`ldapActions.move` is a modifyDN), and
         // it launches no `ldaprenamerequest` — that is an authorization hook,
@@ -147,23 +161,54 @@ class OnLdapChange extends DmPlugin {
       this.publish(newDn, before, after, context);
     },
 
+    ldaprenameend: ([dn]) => {
+      this.release(this.pendingRenames, dn);
+    },
+
     ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
       for (const target of Array.isArray(dn) ? dn : [dn]) {
-        const entry = await this.read(target);
-        if (entry) this.pendingDeletions.set(target, entry);
+        this.hold(this.pendingDeletions, target, await this.read(target));
       }
       return [dn, req] as [string | string[], Request?];
     },
 
     ldapdeletedone: (dn: string | string[], context?: ChangeContext) => {
       for (const target of Array.isArray(dn) ? dn : [dn]) {
-        const before = this.pendingDeletions.get(target);
-        if (!before) continue;
-        this.pendingDeletions.delete(target);
-        this.publish(target, before, null, context);
+        const before = this.take(this.pendingDeletions, target);
+        if (before) this.publish(target, before, null, context);
       }
     },
+
+    ldapdeleteend: dns => {
+      for (const dn of dns) this.release(this.pendingDeletions, dn);
+    },
   };
+
+  /** Keep the entry read before an operation on `dn`, for its "done" hook */
+  private hold(
+    map: Map<string, Pending>,
+    dn: string,
+    entry: Entry | undefined
+  ): void {
+    const pending = map.get(dn) ?? { inFlight: 0 };
+    pending.inFlight++;
+    if (entry) pending.entry = entry;
+    map.set(dn, pending);
+  }
+
+  /** The entry kept for `dn`, which no other "done" hook will get */
+  private take(map: Map<string, Pending>, dn: string): Entry | undefined {
+    const pending = map.get(dn);
+    const entry = pending?.entry;
+    if (pending) pending.entry = undefined;
+    return entry;
+  }
+
+  /** An operation on `dn` is over: forget its entry once none is under way */
+  private release(map: Map<string, Pending>, dn: string): void {
+    const pending = map.get(dn);
+    if (pending && --pending.inFlight <= 0) map.delete(dn);
+  }
 
   async read(dn: string): Promise<Entry | undefined> {
     const followed = new Set(

@@ -83,18 +83,34 @@ export interface Hooks {
     args: [string, ModifyRequest, number],
     context?: ChangeContext
   ) => MaybePromise<void>;
+  /**
+   * Once a modify is over, whatever became of it, after its `ldapmodifydone`
+   * subscribers have returned; with the operation number
+   */
+  ldapmodifyend?: (op: number) => MaybePromise<void>;
   // delete
   ldapdeleterequest?: ChainedHook<[string | string[], Request?]>;
   ldapdeletedone?: (
     dn: string | string[],
     context?: ChangeContext
   ) => MaybePromise<void>;
+  /**
+   * Once a delete is over, whatever became of it, after its `ldapdeletedone`
+   * subscribers have returned; with the DNs it was asked for, before any
+   * `ldapdeleterequest` took one out
+   */
+  ldapdeleteend?: (dn: string[]) => MaybePromise<void>;
   // rename
   ldaprenamerequest?: ChainedHook<[string, string, Request?]>;
   ldaprenamedone?: (
     args: [string, string],
     context?: ChangeContext
   ) => MaybePromise<void>;
+  /**
+   * Once a rename is over, whatever became of it, after its `ldaprenamedone`
+   * subscribers have returned; with the DNs it was asked for
+   */
+  ldaprenameend?: (args: [string, string]) => MaybePromise<void>;
 
   /**
    * Plugins

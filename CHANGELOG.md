@@ -8,6 +8,13 @@
   [notes](docs/usage/upgrading.md#--twake-instance-organization-account-is-removed)
   ([#261](https://github.com/linagora/ldap-rest/pull/261))
 
+### Features
+
+- Plugin API: `ldapmodifyend`, `ldapdeleteend` and `ldaprenameend` fire once
+  a write is over, whatever became of it, for a plugin that keeps something
+  from a request hook to a "done" one —
+  [hooks](docs/plugin-development/hooks.md#ldapmodifyend-ldapdeleteend-ldaprenameend)
+
 ### Fixes
 
 - Browser `HmacAuthClient`: `post`, `put` and `patch` send a string body as
@@ -20,6 +27,13 @@
   UTF-8, which would be read as other characters —
   [notes](docs/usage/upgrading.md#hmac-refuses-a-body-it-does-not-sign)
   ([#257](https://github.com/linagora/ldap-rest/issues/257))
+
+- `core/ldap/onChange` no longer keeps, for the life of the process, the
+  entry it read before a write that never completed: a delete the trash or a
+  tombstone takes over, and any modify, delete or rename refused by a hook
+  or by the directory. After a refused rename, a later move of the entry no
+  longer published a rename with that stale entry as its "before"
+  ([#225](https://github.com/linagora/ldap-rest/issues/225))
 
 ## v0.13.4 (2026-10-02)
 

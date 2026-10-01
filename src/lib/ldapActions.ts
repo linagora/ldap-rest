@@ -1252,9 +1252,25 @@ class ldapActions {
     req?: Request,
     options: ModifyOptions = {}
   ): Promise<boolean> {
+    const op: number = this.opNumber();
+    const done: Promise<void>[] = [];
+    try {
+      return await this.applyModify(dn, changes, req, options, op, done);
+    } finally {
+      this.endOperation(done, this.parent.hooks.ldapmodifyend, op);
+    }
+  }
+
+  private async applyModify(
+    dn: string,
+    changes: ModifyRequest,
+    req: Request | undefined,
+    options: ModifyOptions,
+    op: number,
+    done: Promise<void>[]
+  ): Promise<boolean> {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
-    const op: number = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.parent.hooks.ldapmodifyrequest,
       [dn, changes, op, req]
@@ -1356,10 +1372,12 @@ class ldapActions {
         }
         // Invalidate cache for this DN
         this.invalidateCache(dn);
-        void launchHooks(
-          this.parent.hooks.ldapmodifydone,
-          [dn, changes, op],
-          options.context ?? changeContext(req)
+        done.push(
+          launchHooks(
+            this.parent.hooks.ldapmodifydone,
+            [dn, changes, op],
+            options.context ?? changeContext(req)
+          )
         );
         return true;
       } catch (error) {
@@ -1396,10 +1414,12 @@ class ldapActions {
       } else {
         this.logger.debug(`Modify on ${dn} had nothing to apply`);
       }
-      void launchHooks(
-        this.parent.hooks.ldapmodifydone,
-        [dn, {}, op],
-        options.context ?? changeContext(req)
+      done.push(
+        launchHooks(
+          this.parent.hooks.ldapmodifydone,
+          [dn, {}, op],
+          options.context ?? changeContext(req)
+        )
       );
       return false;
     }
@@ -1408,6 +1428,20 @@ class ldapActions {
   async rename(dn: string, newRdn: string, req?: Request): Promise<boolean> {
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
+    const done: Promise<void>[] = [];
+    try {
+      return await this.applyRename(dn, newRdn, req, done);
+    } finally {
+      this.endOperation(done, this.parent.hooks.ldaprenameend, [dn, newRdn]);
+    }
+  }
+
+  private async applyRename(
+    dn: string,
+    newRdn: string,
+    req: Request | undefined,
+    done: Promise<void>[]
+  ): Promise<boolean> {
     [dn, newRdn] = await launchHooksChained(
       this.parent.hooks.ldaprenamerequest,
       [dn, newRdn, req]
@@ -1431,10 +1465,12 @@ class ldapActions {
       // subtree too: renaming a container moves every DN under it.
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
-      void launchHooks(
-        this.parent.hooks.ldaprenamedone,
-        [dn, newRdn],
-        changeContext(req)
+      done.push(
+        launchHooks(
+          this.parent.hooks.ldaprenamedone,
+          [dn, newRdn],
+          changeContext(req)
+        )
       );
       return true;
     } catch (error) {
@@ -1501,12 +1537,20 @@ class ldapActions {
     LDAP delete
    */
   async delete(dn: string | string[], req?: Request): Promise<boolean> {
-    if (Array.isArray(dn)) {
-      dn = dn.map(d => this.setDn(d));
-    } else {
-      dn = this.setDn(dn);
+    const requested = (Array.isArray(dn) ? dn : [dn]).map(d => this.setDn(d));
+    const done: Promise<void>[] = [];
+    try {
+      return await this.applyDelete([...requested], req, done);
+    } finally {
+      this.endOperation(done, this.parent?.hooks.ldapdeleteend, requested);
     }
-    if (!Array.isArray(dn)) dn = [dn];
+  }
+
+  private async applyDelete(
+    dn: string | string[],
+    req: Request | undefined,
+    done: Promise<void>[]
+  ): Promise<boolean> {
     [dn] = (await launchHooksChained(this.parent?.hooks.ldapdeleterequest, [
       dn,
       req,
@@ -1530,10 +1574,12 @@ class ldapActions {
         } catch (error) {
           throw ldapError(`LDAP delete error`, error);
         }
-        void launchHooks(
-          this.parent.hooks.ldapdeletedone,
-          entry,
-          changeContext(req)
+        done.push(
+          launchHooks(
+            this.parent.hooks.ldapdeletedone,
+            entry,
+            changeContext(req)
+          )
         );
       }
       return true;
@@ -1549,6 +1595,22 @@ class ldapActions {
       dn += `,${this.base}`;
     }
     return dn;
+  }
+
+  /**
+   * Launch the "end" hooks of a write once its "done" hooks have returned,
+   * whatever became of it: written, refused by a request hook, taken out of
+   * the request by one, or failed in the directory. A plugin keeping state
+   * from a request hook to a done one drops there what no done hook took.
+   */
+  private endOperation(
+    done: Promise<void>[],
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+    hooks: Function[] | undefined,
+    ...args: unknown[]
+  ): void {
+    if (!hooks?.length) return;
+    void Promise.all(done).then(() => launchHooks(hooks, ...args));
   }
 
   opNumber(): number {
