@@ -87,9 +87,15 @@ for it.
 --twake-group-user-base 'ou=users,ou={org},dc=example,dc=com' \
 --twake-group-organization-dn 'ou={org},dc=example,dc=com' \
 --group-class top,groupOfNames,twakeGroup \
---group-dummy-user cn=placeholder
+--group-dummy-user cn=placeholder \
+--group-schema static/schemas/twake/organizationGroups.json
 ```
 
+- `--group-schema`: `static/schemas/twake/organizationGroups.json` declares
+  the groups' `cn`, members and description. The default group schema
+  describes department groups and requires `twakeDepartmentLink`, which these
+  groups do not have. Groups created through SCIM are written directly and
+  are not checked against this schema.
 - `--twake-group-base`, `--twake-group-user-base`: required, each with
   `{org}`.
 - `--twake-group-organization-dn`: the organization entry. Empty means no
@@ -99,8 +105,9 @@ for it.
 - `--twake-group-display-name-attribute` (default `twakeDisplayName`),
   `--twake-group-color-attribute` (default `twakeGroupColor`),
   `--twake-group-created-at-attribute` (default `twakeCreatedAt`): the
-  group's attributes. The group classes (`--group-class`) must allow them,
-  and so must `--group-schema` when it is set.
+  group's attributes. The group classes (`--group-class`) must allow them.
+  The plugin adds them to the loaded group schema under these names, in any
+  case, so a renamed attribute needs no schema of its own.
 - `--twake-group-max-page-limit` (default 1000): the largest page, and the
   most users added in one request.
 - `--twake-group-member-fields`: JSON of `{ field: attribute }` for the member

@@ -160,9 +160,11 @@ export default class LdapGroups extends DmPlugin {
           );
         } else {
           try {
-            this.schema = JSON.parse(
-              transformSchemas(data.toString(), this.config)
-            ) as Schema;
+            this.schema = this.adaptSchema(
+              JSON.parse(
+                transformSchemas(data.toString(), this.config)
+              ) as Schema
+            );
             this.logger.debug('Group schema loaded');
           } catch (e) {
             this.logger.error(
@@ -173,6 +175,14 @@ export default class LdapGroups extends DmPlugin {
         }
       });
     }
+  }
+
+  /**
+   * The loaded group schema, before it is used: a subclass declares there
+   * the attributes it writes.
+   */
+  protected adaptSchema(schema: Schema): Schema {
+    return schema;
   }
 
   /**

@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import type { Express, Request, Response } from 'express';
 
 import type { DM } from '../../bin';
+import type { Schema, SchemaAttribute } from '../../config/schema';
 import type { Hooks } from '../../hooks';
 import { BadRequestError, HttpError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
@@ -108,9 +109,10 @@ function isDisplayName(name: unknown): name is string {
   );
 }
 
+const COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
 const isColor = (color: unknown): color is string =>
-  typeof color === 'string' &&
-  /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color);
+  typeof color === 'string' && COLOR.test(color);
 
 const text = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
@@ -197,6 +199,28 @@ export default class TwakeGroups extends LdapGroups {
       ...MEMBER_FIELDS,
       ...this.config.twake_group_member_fields,
     };
+  }
+
+  /**
+   * Declare the group attributes under their configured names, whatever case
+   * the schema spells them in, or add them when it does not: the schema does
+   * not have to follow a renamed attribute.
+   */
+  protected adaptSchema(schema: Schema): Schema {
+    const own: Record<string, SchemaAttribute> = {
+      [this.displayName]: { type: 'string', required: true },
+      [this.color]: { type: 'string', test: COLOR.source },
+      [this.createdAt]: { type: 'string' },
+    };
+    for (const [name, spec] of Object.entries(own)) {
+      const key = Object.keys(schema.attributes).find(
+        k => k.toLowerCase() === name.toLowerCase()
+      );
+      const declared = key ? schema.attributes[key] : spec;
+      if (key) delete schema.attributes[key];
+      schema.attributes[name] = declared;
+    }
+    return schema;
   }
 
   /**
