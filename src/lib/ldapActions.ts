@@ -21,7 +21,7 @@ import {
   launchHooksChained,
   normalizeDn,
 } from './utils';
-import { changeContext } from './changeContext';
+import { changeContext, type ChangeContext } from './changeContext';
 import { ConflictError, NotFoundError } from './errors';
 import { parseSchema, SchemaIndex } from './ldapSchema';
 
@@ -95,6 +95,11 @@ export interface ModifyOptions {
    * refuses a delete of an absent one); one that does not ignores it.
    */
   permissive?: boolean;
+  /**
+   * The change context the write is announced with, for a write made on
+   * behalf of a request but not authorized as it.
+   */
+  context?: ChangeContext;
 }
 
 const PERMISSIVE_MODIFY = '1.2.840.113556.1.4.1413';
@@ -1354,7 +1359,7 @@ class ldapActions {
         void launchHooks(
           this.parent.hooks.ldapmodifydone,
           [dn, changes, op],
-          changeContext(req)
+          options.context ?? changeContext(req)
         );
         return true;
       } catch (error) {
@@ -1394,7 +1399,7 @@ class ldapActions {
       void launchHooks(
         this.parent.hooks.ldapmodifydone,
         [dn, {}, op],
-        changeContext(req)
+        options.context ?? changeContext(req)
       );
       return false;
     }
