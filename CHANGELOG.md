@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0 (2026-10-01)
 
 ### Breaking Changes
 
@@ -50,6 +50,21 @@
   `ldapadddone` and `ldapaddafter` receive; a hook returning a new object
   had its changes dropped
   ([#244](https://github.com/linagora/ldap-rest/issues/244))
+- `core/twake/instances`: an organization is linked to its instance before
+  its members are sent, which the Cloudery refused otherwise
+  ([#236](https://github.com/linagora/ldap-rest/pull/236)).
+  [notes](docs/usage/upgrading.md#twakeinstances-links-an-organization-before-its-members)
+- `core/twake/groups`: `static/schemas/twake/organizationGroups.json`, a
+  group schema for organization groups; the default one refused them
+  ([#238](https://github.com/linagora/ldap-rest/issues/238)).
+  [doc](docs/usage/plugins/integrations/groups.md)
+- `core/twake/groups`: a SCIM group of an organization gets a generated
+  `cn`, its SCIM `id`, once `--scim-group-mapping` maps `displayName` to the
+  display name attribute, and SCIM no longer refuses a duplicate
+  `displayName`. A `scimgroupcreate` hook receives the group base and may
+  set the new group's `id`
+  ([#239](https://github.com/linagora/ldap-rest/issues/239)).
+  [doc](docs/usage/plugins/integrations/groups.md#scim-groups)
 
 ## v0.12.0 (2026-09-28)
 
