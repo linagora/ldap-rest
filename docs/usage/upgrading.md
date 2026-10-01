@@ -16,10 +16,8 @@ or `application/scim+json` — in particular a bulk import upload
 Such a body is read by its route after the signature is checked, so the
 signature never covered it. The request is now answered `401`, and the
 bundled browser client throws on a `FormData` body instead of signing it
-without its body. The bulk import API cannot be used under HMAC until the
-signature covers the bytes received
-([#251](https://github.com/linagora/ldap-rest/issues/251)); use another
-authentication for it.
+without its body. The bulk import API, whose upload its route reads, cannot
+be used under HMAC: use another authentication for it.
 
 ## To 0.13.0
 
