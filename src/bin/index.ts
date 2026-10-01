@@ -109,6 +109,14 @@ export class DM {
 
     this.app = express();
     this.app.use(bodyParser.json());
+    // Parsed here, not only by the SCIM routes: core/auth/hmac hashes the body
+    // before those routes run.
+    this.app.use(
+      bodyParser.json({
+        type: 'application/scim+json',
+        limit: `${(this.config.scim_bulk_max_payload_size as number) || 1048576}b`,
+      })
+    );
     this.app.use(bodyParser.urlencoded({ extended: true }));
     this.logger = buildLogger(this.config);
     this.ldap = new ldapActions(this);
