@@ -208,9 +208,13 @@ through `--scim-group-external-id-attribute`. Map SCIM `displayName` to the
 display name attribute in `--scim-group-mapping`: the name is kept there,
 SCIM reads, updates and `displayName` filters go through it, and a SCIM group
 of an organization gets a generated `cn` (a UUID), which is also its SCIM
-`id`, and a creation date, as a group made by the routes does. Without that
-mapping, a SCIM group's `cn` is its `displayName`, and the plugin logs a
-warning at startup. A group whose `cn` is already its `displayName` keeps
+`id`, and a creation date, as a group made by the routes does. The date is
+added only to a group that holds the display name attribute, so classes that
+allow the display name must allow the creation date too: the default
+attributes both come with `twakeGroup`, but a display name kept in an
+attribute `groupOfNames` allows, such as `description`, next to the default
+`twakeCreatedAt` makes every SCIM create fail. Without that mapping, a SCIM
+group's `cn` is its `displayName`, and the plugin logs a warning at startup. A group whose `cn` is already its `displayName` keeps
 that `cn` and `id`.
 
 ## Dependencies
