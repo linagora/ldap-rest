@@ -269,13 +269,13 @@ describe('AuthHmac', () => {
       const signature = generateHmacSignature(
         secret,
         'POST',
-        '/api/hello',
+        '/scim/v2/Groups',
         timestamp,
         body
       );
 
       const res = await request(app)
-        .post('/api/hello')
+        .post('/scim/v2/Groups')
         .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
         .set('Content-Type', 'application/scim+json')
         .send(JSON.stringify(body));
@@ -288,13 +288,13 @@ describe('AuthHmac', () => {
       const signature = generateHmacSignature(
         secret,
         'POST',
-        '/api/hello',
+        '/scim/v2/Groups',
         timestamp,
         { displayName: 'admins' }
       );
 
       const res = await request(app)
-        .post('/api/hello')
+        .post('/scim/v2/Groups')
         .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
         .set('Content-Type', 'application/scim+json')
         .send(JSON.stringify({ displayName: 'other' }));
