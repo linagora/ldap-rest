@@ -206,7 +206,8 @@ describe('Trash Plugin', function () {
       }) as unknown as typeof server.logger.warn;
       const base = String(server.config.ldap_base);
       try {
-        server.config.trash_watched_bases = `ou=users,${base};OU=Groups, ${base.toUpperCase()}`;
+        // The base spelled inside an RDN value is not the base repeated
+        server.config.trash_watched_bases = `ou=users,${base};OU=Groups, ${base.toUpperCase()};ou=x,${base}x,${base}`;
         new TrashPlugin(server);
         expect(warned).to.deep.equal([]);
         for (const stale of [

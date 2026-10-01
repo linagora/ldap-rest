@@ -17,7 +17,7 @@ import type { Request } from 'express';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { Hooks } from '../../hooks';
 import type { SearchResult } from '../../lib/ldapActions';
-import { isDnInBranch, normalizeDn } from '../../lib/utils';
+import { isDnInBranch, normalizeDn, parseDn } from '../../lib/utils';
 
 class TrashPlugin extends DmPlugin {
   name = 'trash';
@@ -47,12 +47,16 @@ class TrashPlugin extends DmPlugin {
     }
     const ldapBase = this.config.ldap_base;
     if (ldapBase) {
-      const suffix = normalizeDn(ldapBase);
+      const suffix = parseDn(normalizeDn(ldapBase));
+      // Compared RDN by RDN: as a substring, `dc=com` is also in `dc=company`
+      const holdsBase = (rdns: string[]): boolean =>
+        rdns.some((_, i) => suffix.every((rdn, j) => rdns[i + j] === rdn));
       for (const base of this.watchedBases) {
-        // Full DNs joined by commas still end with the base: it shows twice
+        // Full DNs joined by commas still end with the base: it shows again
+        // above it
         if (
           !isDnInBranch(base, ldapBase) ||
-          normalizeDn(base).split(suffix).length > 2
+          holdsBase(parseDn(normalizeDn(base)).slice(0, -suffix.length))
         )
           this.logger.warn(
             `Trash watched base "${base}" is not one DN under ${ldapBase}: ` +
