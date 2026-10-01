@@ -16,7 +16,7 @@ Plugin to intercept LDAP delete operations and move entries to a trash branch in
 ### Environment Variables
 
 - `DM_TRASH_BASE`: LDAP base DN for trash (default: `ou=trash,dc=example,dc=com`)
-- `DM_TRASH_WATCHED_BASES`: Comma-separated list of branches to watch (default: all branches except trash)
+- `DM_TRASH_WATCHED_BASES`: branches to watch, each a full DN, separated by `;` (default: all branches except trash)
 - `DM_TRASH_ADD_METADATA`: Add metadata to trashed entries (default: `true`)
 - `DM_TRASH_AUTO_CREATE`: Auto-create trash branch if missing (default: `true`)
 
@@ -25,7 +25,7 @@ Plugin to intercept LDAP delete operations and move entries to a trash branch in
 ```bash
 --plugin core/ldap/trash \
 --trash-base "ou=trash,dc=example,dc=com" \
---trash-watched-bases "ou=users,dc=example,dc=com,ou=groups,dc=example,dc=com" \
+--trash-watched-bases "ou=users,dc=example,dc=com;ou=groups,dc=example,dc=com" \
 --trash-add-metadata true \
 --trash-auto-create true
 ```
@@ -68,7 +68,7 @@ This watches all LDAP branches except the trash branch itself.
 ldap-rest \
   --plugin core/ldap/trash \
   --trash-base "ou=trash,dc=example,dc=com" \
-  --trash-watched-bases "ou=users,dc=example,dc=com,ou=groups,dc=example,dc=com"
+  --trash-watched-bases "ou=users,dc=example,dc=com;ou=groups,dc=example,dc=com"
 ```
 
 This only intercepts deletes from `ou=users` and `ou=groups`. Deletes from other branches proceed normally.
@@ -248,7 +248,7 @@ ldap-rest \
   --ldap-pwd "admin" \
   --ldap-base "dc=example,dc=com" \
   --trash-base "ou=trash,dc=example,dc=com" \
-  --trash-watched-bases "ou=users,dc=example,dc=com,ou=groups,dc=example,dc=com" \
+  --trash-watched-bases "ou=users,dc=example,dc=com;ou=groups,dc=example,dc=com" \
   --trash-add-metadata true \
   --auth-token "secret-token"
 ```

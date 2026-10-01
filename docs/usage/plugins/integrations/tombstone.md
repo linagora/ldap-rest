@@ -38,16 +38,8 @@ a delete that an authorization plugin refuses writes nothing.
 
 `core/ldap/trash` moves a deleted entry before this plugin sees the delete,
 so no tombstone would be written in a branch it watches. The server refuses
-to start when `--trash-watched-bases` covers a `--twake-tombstone-dn`
-pattern, read the way the trash reads it today, and an empty list watches
-every branch.
-
-The trash splits `--trash-watched-bases` on every comma, a bug
-([#226](https://github.com/linagora/ldap-rest/issues/226)): a base such as
-`ou=users,dc=example,dc=com` becomes the suffixes `ou=users`, `dc=example`
-and `dc=com`, and `dc=com` watches every branch below it. The check follows
-the trash as it behaves, so such a value refuses to start next to any
-tombstone pattern under `dc=com`.
+to start when one of the `;`-separated `--trash-watched-bases` covers or sits under
+a `--twake-tombstone-dn` pattern, and an empty list watches every branch.
 
 ## Reason
 

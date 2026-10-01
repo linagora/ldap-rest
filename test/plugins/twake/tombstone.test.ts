@@ -596,11 +596,36 @@ describe('Twake tombstone plugin', function () {
       );
     });
 
-    it('starts when the trash watches another branch', () => {
-      // core/ldap/trash splits its list on commas: each item is a suffix
+    it('starts when the trash watches other branches', () => {
       expect(() =>
-        composed('ou=elsewhere,ou=users').assertComposition()
+        composed(
+          'ou=elsewhere,dc=example,dc=com;ou=groups,dc=example,dc=com'
+        ).assertComposition()
       ).not.to.throw();
+    });
+
+    it('refuses to start when one of the watched bases is a tombstone branch', () => {
+      expect(() =>
+        composed(`ou=elsewhere,dc=example,dc=com;${USERS}`).assertComposition()
+      ).to.throw(/core\/ldap\/trash watches the branch/);
+    });
+
+    it('refuses to start when a watched base differs from a tombstone branch in case or spacing only', () => {
+      expect(() =>
+        composed(USERS.toUpperCase().replace(/,/g, ', ')).assertComposition()
+      ).to.throw(/core\/ldap\/trash watches the branch/);
+    });
+
+    it('refuses to start when the trash watches a branch under a tombstone branch', () => {
+      const patterns = dm.config.twake_tombstone_dn;
+      dm.config.twake_tombstone_dn = [`${USERS}$`];
+      try {
+        expect(() => composed(`ou=sub,${USERS}`).assertComposition()).to.throw(
+          /core\/ldap\/trash watches the branch/
+        );
+      } finally {
+        dm.config.twake_tombstone_dn = patterns;
+      }
     });
   });
 });
