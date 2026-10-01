@@ -43,7 +43,7 @@ describe('Twake tombstone plugin', function () {
   let groups: LdapGroups;
   let rabbit: StubRabbitMq;
   let raw: DM;
-  let handled: { dn: string; done: Promise<unknown> }[] = [];
+  let handled: { dn: string; done: Promise<unknown>; args: unknown[] }[] = [];
   /** What ldapaddafter subscribers are handed, as core/twake/instances is */
   let added: { dn: string; entry: AttributesList }[] = [];
 
@@ -151,7 +151,7 @@ describe('Twake tombstone plugin', function () {
       ) => unknown;
       events.hooks[name] = (dn: string, ...args: unknown[]) => {
         const done = Promise.resolve(hook(dn, ...args));
-        handled.push({ dn, done });
+        handled.push({ dn, done, args });
         return done;
       };
     }
@@ -278,6 +278,17 @@ describe('Twake tombstone plugin', function () {
         deletedAt: new Date(first as string).toISOString(),
       });
       expect((await read(dn))?.roomNumber).to.equal(first);
+    });
+
+    it('announces the tombstone as the request that deleted it', async () => {
+      const dn = flat('ts-alice');
+      await add(dn);
+      await seen(dn);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await dm.ldap.delete(dn, { user: 'jdoe', headers: {} } as any);
+      await seen(dn, 2);
+      const [, , context] = handled[handled.length - 1].args;
+      expect(context).to.include({ actor: 'jdoe' });
     });
 
     it('keeps the tombstone in its groups', async () => {

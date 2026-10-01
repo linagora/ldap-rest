@@ -420,9 +420,13 @@ export default class TwakeTombstone extends DmPlugin {
     const clear = this.clearAttributes.filter(
       a => valueOf(entry, a) !== undefined
     );
+    // Announced as the deleting request, not authorized as it: the delete
+    // already was, and a caller may hold delete rights without write ones.
     await this.server.ldap.modify(
       dn,
-      clear.length ? { replace, delete: clear } : { replace }
+      clear.length ? { replace, delete: clear } : { replace },
+      undefined,
+      { context: changeContext(req) }
     );
     this.logger.info({ plugin: this.name, event: 'tombstone', dn, reason });
   }
