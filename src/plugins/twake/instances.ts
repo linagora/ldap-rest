@@ -23,7 +23,14 @@ import {
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import { asyncHandler, escapeLdapFilter, rdnValue } from '../../lib/utils';
+import {
+  asyncHandler,
+  escapeDnValue,
+  escapeLdapFilter,
+  escapeRegex,
+  rdnValue,
+  unescapeDnValue,
+} from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import {
@@ -149,6 +156,20 @@ export default class TwakeInstances extends DmPlugin {
       return [dn, entry, req];
     },
     ldapaddafter: async ([dn, entry]) => {
+      const org = this.organizationOf(dn);
+      if (org)
+        await this.serialized(`organization:${org}`, async () => {
+          try {
+            await this.giveOrganizationAddress(org);
+          } catch (err) {
+            this.logger.error({
+              plugin: this.name,
+              event: 'organization account',
+              dn,
+              error: String(err),
+            });
+          }
+        });
       const account = this.account(dn, entry);
       if (!account) return;
       await this.serialized(dn, async () => {
@@ -534,6 +555,17 @@ export default class TwakeInstances extends DmPlugin {
     // was never linked, and gets linked on its next replay
     if (id && this.provider instanceof ClouderyProvider)
       await this.provider.linkOrganization(id, fqdn);
+    // Before the mark check, so a replay fills an account added since. Its
+    // failure must not hold back the announcement and the members
+    if (id)
+      await this.fillOrganizationAccount(id, fqdn).catch(err =>
+        this.logger.error({
+          plugin: this.name,
+          event: 'organization account',
+          organization: id,
+          error: String(err),
+        })
+      );
     // Done once announced: an organization entry need not hold its address.
     // Its members are still released, in case a previous run stopped midway
     if (first(this.value(entry, this.sentAttribute)))
@@ -562,6 +594,53 @@ export default class TwakeInstances extends DmPlugin {
       replace: { [this.sentAttribute]: new Date().toISOString() },
     });
     await this.releaseMembers(dn);
+  }
+
+  /** The organization whose account `dn` is, if it is one */
+  private organizationOf(dn: string): string | undefined {
+    const template = this.config.twake_instance_organization_account;
+    if (!template) return undefined;
+    const source = escapeRegex(template)
+      .replace('\\{id\\}', '(?<id>(?:[^,\\\\]|\\\\.)+)')
+      .replace(/\\\{id\\\}/g, '\\k<id>');
+    const id = new RegExp(`^${source}$`, 'i').exec(dn)?.groups?.id;
+    return id && unescapeDnValue(id);
+  }
+
+  /**
+   * An organization account added once its organization is announced. One
+   * added before is filled by organizationReady
+   */
+  private async giveOrganizationAddress(id: string): Promise<void> {
+    const org = await this.findOrganization(id);
+    if (!org || !first(this.value(org, this.sentAttribute))) return;
+    let fqdn =
+      this.organizationFqdn && first(this.value(org, this.organizationFqdn));
+    if (!fqdn) {
+      const found = await this.provider.find(
+        this.organizationRequest({
+          id,
+          name: first(this.value(org, this.organizationName)) || '',
+          domain: first(this.value(org, this.organizationDomain)) || '',
+        })
+      );
+      if (found?.ready) fqdn = found.fqdn;
+    }
+    if (fqdn) await this.fillOrganizationAccount(id, fqdn);
+  }
+
+  private async fillOrganizationAccount(
+    id: string,
+    fqdn: string
+  ): Promise<void> {
+    const template = this.config.twake_instance_organization_account;
+    if (!template) return;
+    const dn = template.replace(/\{id\}/g, () => escapeDnValue(id));
+    const entry = await this.read(dn);
+    if (!entry || first(this.value(entry, this.fqdnAttribute))) return;
+    await this.server.ldap.modify(dn, {
+      replace: { [this.fqdnAttribute]: fqdn },
+    });
   }
 
   /** Send the user.created held while the organization at `dn` was pending */
