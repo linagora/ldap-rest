@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `core/auth/hmac` accepts a signed SCIM write sent as
+  `application/scim+json`; it hashed an empty body and answered 401
+  ([#246](https://github.com/linagora/ldap-rest/issues/246))
+
 ## v0.13.0 (2026-10-01)
 
 ### Breaking Changes

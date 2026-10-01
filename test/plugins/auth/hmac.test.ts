@@ -261,6 +261,45 @@ describe('AuthHmac', () => {
 
       expect(res.status).to.equal(401);
     });
+
+    it('should hash an application/scim+json body', async () => {
+      const timestamp = Date.now();
+      const body = { displayName: 'admins' };
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        body
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set('Content-Type', 'application/scim+json')
+        .send(JSON.stringify(body));
+
+      expect(res.status).to.not.equal(401);
+    });
+
+    it('should reject an application/scim+json body it was not signed for', async () => {
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        { displayName: 'admins' }
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set('Content-Type', 'application/scim+json')
+        .send(JSON.stringify({ displayName: 'other' }));
+
+      expect(res.status).to.equal(401);
+    });
   });
 
   describe('Multiple services', () => {
