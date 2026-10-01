@@ -4,6 +4,21 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 0.13.2
+
+### HMAC refuses a body it cannot check
+
+**Who is affected:** a client of `core/auth/hmac` that sends a POST, PATCH or
+PUT body other than `application/json`, `application/x-www-form-urlencoded`
+or `application/scim+json` — in particular a bulk import upload
+(`multipart/form-data`).
+
+Such a body is read by its route after the signature is checked, so the
+signature never covered it. The request is now answered `401`, and the
+bundled browser client throws on a `FormData` body instead of signing it
+without its body. The bulk import API, whose upload its route reads, cannot
+be used under HMAC: use another authentication for it.
+
 ## To 0.13.0
 
 ### An OpenID Connect session ends with its access token

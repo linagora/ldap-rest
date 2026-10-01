@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.13.2 (2026-10-01)
+
+### Security
+
+- `core/auth/hmac`: the signature did not cover a body that no global parser
+  had read — a `multipart/form-data` upload, a `text/plain` body — and such a
+  request was accepted with whatever body it carried. It is refused now —
+  [notes](docs/usage/upgrading.md#hmac-refuses-a-body-it-cannot-check)
+  ([GHSA-j5c6-cg2q-vrfw](https://github.com/linagora/ldap-rest/security/advisories/GHSA-j5c6-cg2q-vrfw))
+
 ## v0.13.1 (2026-10-01)
 
 ### Fixes

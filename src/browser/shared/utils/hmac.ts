@@ -144,8 +144,9 @@ export class HmacAuthClient {
       if (typeof options.body === 'string') {
         body = options.body;
       } else if (options.body instanceof FormData) {
-        // For FormData, we can't easily sign it, so skip body hash
-        body = undefined;
+        // Its encoded bytes are not known here, and the server refuses a
+        // body it cannot check against the signature
+        throw new Error('A FormData body cannot be signed with HMAC');
       } else {
         body = options.body;
       }
