@@ -58,6 +58,11 @@ DM_AUTH_HMAC_WINDOW=120000  # Default: 120000ms (2 minutes)
    - `timestamp`: Unix timestamp in milliseconds (e.g., `1698765432000`)
    - `body-hash`: SHA256(request_body) for POST/PATCH/PUT, empty string for GET/DELETE/HEAD
 
+   Only a body the server parses before checking the signature can be signed:
+   `application/json`, `application/x-www-form-urlencoded` and
+   `application/scim+json`. A POST, PATCH or PUT carrying any other body,
+   such as a `multipart/form-data` bulk import upload, is refused with `401`.
+
 2. **Client sends Authorization header:**
 
    ```

@@ -1,6 +1,7 @@
 import { DM } from '../../../src/bin';
 import type { Express } from 'express';
 import request from 'supertest';
+import multer from 'multer';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { expect } from 'chai';
@@ -299,6 +300,68 @@ describe('AuthHmac', () => {
         .send(JSON.stringify({ displayName: 'other' }));
 
       expect(res.status).to.equal(401);
+    });
+
+    it('should refuse a multipart body no global parser read', async () => {
+      // As ldap/bulkImport does: the route parses its upload itself
+      app.post(
+        '/api/hmac-upload',
+        multer({ storage: multer.memoryStorage() }).single('file'),
+        (_req, res) => {
+          res.json({ ok: true });
+        }
+      );
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hmac-upload',
+        timestamp
+      );
+
+      const res = await request(app)
+        .post('/api/hmac-upload')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .attach('file', Buffer.from('uid\nalice\n'), 'users.csv');
+
+      expect(res.status).to.equal(401);
+    });
+
+    it('should refuse a text/plain body no global parser read', async () => {
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set('Content-Type', 'text/plain')
+        .send('anything');
+
+      expect(res.status).to.equal(401);
+    });
+
+    it('should accept a POST without a body', async () => {
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set(
+          'Authorization',
+          createAuthHeader(serviceId, timestamp, signature)
+        );
+
+      expect(res.status).to.not.equal(401);
     });
   });
 

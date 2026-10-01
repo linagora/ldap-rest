@@ -144,6 +144,16 @@ export default class AuthHmac extends AuthBase {
 
     // Calculate body hash
     const bodyHash = this.calculateBodyHash(req);
+    if (bodyHash === undefined) {
+      // No global parser read this body: its media type is parsed, if at
+      // all, by the route, after this check. Hashing nothing would accept a
+      // signature that does not cover the body the route then reads.
+      this.logger.warn(
+        `Refusing ${req.method} ${req.originalUrl || req.url} from service ${serviceId}: ` +
+          `its body (${req.headers['content-type'] || 'no Content-Type'}) cannot be checked against the signature`
+      );
+      return unauthorized(res);
+    }
 
     // Reconstruct signing string
     const method = req.method.toUpperCase();
@@ -183,9 +193,10 @@ export default class AuthHmac extends AuthBase {
 
   /**
    * Calculate SHA256 hash of request body
-   * Returns empty string for GET/DELETE/HEAD methods
+   * Returns empty string for GET/DELETE/HEAD methods, and undefined for a
+   * body no global parser read, which cannot be checked
    */
-  private calculateBodyHash(req: DmRequest): string {
+  private calculateBodyHash(req: DmRequest): string | undefined {
     const method = req.method.toUpperCase();
 
     // No body for these methods
@@ -199,6 +210,12 @@ export default class AuthHmac extends AuthBase {
       hash.update(bodyString);
       return hash.digest('hex');
     }
+
+    // body-parser leaves req.body undefined both when there is no body and
+    // when the media type is not one it was given
+    const length = parseInt(req.headers['content-length'] ?? '', 10);
+    if (req.headers['transfer-encoding'] !== undefined || length > 0)
+      return undefined;
 
     return '';
   }
