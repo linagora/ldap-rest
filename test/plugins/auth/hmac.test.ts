@@ -302,6 +302,63 @@ describe('AuthHmac', () => {
       expect(res.status).to.equal(401);
     });
 
+    for (const [label, type, raw] of [
+      ['JSON with spaces', 'application/json', '{"uid": "a"}'],
+      [
+        'JSON with an escaped character',
+        'application/json',
+        '{"uid":"\\u00e9"}',
+      ],
+      ['JSON with a float', 'application/json', '{"n":1.0}'],
+      [
+        'a form',
+        'application/x-www-form-urlencoded',
+        'uid=a&mail=a%40example.com',
+      ],
+    ]) {
+      it(`should hash the bytes of ${label} as sent`, async () => {
+        const timestamp = Date.now();
+        const signature = generateHmacSignature(
+          secret,
+          'POST',
+          '/api/hello',
+          timestamp,
+          raw
+        );
+
+        const res = await request(app)
+          .post('/api/hello')
+          .set(
+            'Authorization',
+            createAuthHeader(serviceId, timestamp, signature)
+          )
+          .set('Content-Type', type)
+          .send(raw);
+
+        expect(res.status).to.not.equal(401);
+      });
+    }
+
+    it('should refuse JSON whose bytes differ from what was signed', async () => {
+      const timestamp = Date.now();
+      // Same object, other bytes
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        '{"uid":"a"}'
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set('Content-Type', 'application/json')
+        .send('{"uid": "a"}');
+
+      expect(res.status).to.equal(401);
+    });
+
     it('should refuse a multipart body no global parser read', async () => {
       // As ldap/bulkImport does: the route parses its upload itself
       app.post(

@@ -4,6 +4,21 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### HMAC hashes the body bytes received
+
+**Who is affected:** a client of `core/auth/hmac` that signs a body other than
+the bytes it sends.
+
+The server used to hash the body re-serialized with `JSON.stringify` after
+parsing, and now hashes the bytes received, as documented. A client that
+sends its body as `JSON.stringify` writes it and hashes that string, as the
+bundled browser client does, sees no change. One that hashed a
+`JSON.stringify` rendering but sent other bytes (indented JSON, spaces after
+`:`, a form body hashed as the JSON of its fields) is now refused with `401`:
+hash the bytes sent instead.
+
 ## To 0.13.2
 
 ### HMAC refuses a body it cannot check

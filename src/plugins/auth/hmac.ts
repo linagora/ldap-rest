@@ -12,7 +12,8 @@
  *   - METHOD: HTTP method (GET, POST, PATCH, DELETE, etc.)
  *   - PATH: Request path with query string
  *   - timestamp: Unix timestamp in milliseconds
- *   - body-hash: SHA256(request_body) for POST/PATCH, empty for GET/DELETE
+ *   - body-hash: SHA256 of the body bytes for POST/PATCH/PUT, empty for
+ *     GET/DELETE/HEAD and for a request without a body
  *
  * @group Plugins
  */
@@ -21,6 +22,7 @@ import { createHmac, createHash, timingSafeEqual } from 'crypto';
 import type { Response } from 'express';
 
 import { unauthorized } from '../../lib/expressFormatedResponses';
+import { rawBodyOf } from '../../lib/rawBody';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
@@ -202,17 +204,13 @@ export default class AuthHmac extends AuthBase {
     // No body for these methods
     if (method === 'GET' || method === 'DELETE' || method === 'HEAD') return '';
 
-    // Hash the body if present
-    if (req.body) {
-      const bodyString =
-        typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      const hash = createHash('sha256');
-      hash.update(bodyString);
-      return hash.digest('hex');
-    }
+    // Hash the bytes received, as the client signed them
+    const raw = rawBodyOf(req);
+    if (raw)
+      return raw.length ? createHash('sha256').update(raw).digest('hex') : '';
 
-    // body-parser leaves req.body undefined both when there is no body and
-    // when the media type is not one it was given
+    // No global parser read a body: either there is none, or its media type
+    // is not one they were given
     const length = parseInt(req.headers['content-length'] ?? '', 10);
     if (req.headers['transfer-encoding'] !== undefined || length > 0)
       return undefined;

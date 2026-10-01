@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `core/auth/hmac` hashes the body bytes received, as documented, instead of
+  the body re-serialized with `JSON.stringify`: a request whose JSON is not
+  serialized that way, or a form body, was refused —
+  [notes](docs/usage/upgrading.md#hmac-hashes-the-body-bytes-received)
+  ([#251](https://github.com/linagora/ldap-rest/issues/251))
+
 ## v0.13.2 (2026-10-01)
 
 ### Security

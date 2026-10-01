@@ -23,6 +23,7 @@ import type winston from 'winston';
 import type { Request, Response, NextFunction } from 'express';
 
 import { parseConfig } from '../lib/parseConfig';
+import { keepRawBody } from '../lib/rawBody';
 import configArgs, { type Config } from '../config/args';
 import type { Hooks } from '../hooks';
 import ldapActions from '../lib/ldapActions';
@@ -108,16 +109,21 @@ export class DM {
     this.config = parseConfig(configArgs);
 
     this.app = express();
-    this.app.use(bodyParser.json());
+    // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
+    // the client signed them, not the body re-serialized.
+    this.app.use(bodyParser.json({ verify: keepRawBody }));
     // Parsed here, not only by the SCIM routes: core/auth/hmac hashes the body
     // before those routes run.
     this.app.use(
       bodyParser.json({
         type: 'application/scim+json',
         limit: `${(this.config.scim_bulk_max_payload_size as number) || 1048576}b`,
+        verify: keepRawBody,
       })
     );
-    this.app.use(bodyParser.urlencoded({ extended: true }));
+    this.app.use(
+      bodyParser.urlencoded({ extended: true, verify: keepRawBody })
+    );
     this.logger = buildLogger(this.config);
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
