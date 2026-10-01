@@ -10,6 +10,11 @@
   [notes](docs/usage/upgrading.md#hmac-hashes-the-body-bytes-received)
   ([#251](https://github.com/linagora/ldap-rest/issues/251))
 
+- `core/scim`: `--scim-bulk-max-payload-size` applies to a SCIM request sent
+  as `application/json` too; it was cut at body-parser's 100kb default and
+  answered 413. The `application/scim+json` parser added in v0.13.1 now only
+  covers the SCIM prefix
+
 ## v0.13.2 (2026-10-01)
 
 ### Security

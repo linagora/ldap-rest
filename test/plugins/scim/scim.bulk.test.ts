@@ -107,6 +107,19 @@ describe('SCIM Bulk (integration)', function () {
     expect(found, 'group should contain bulk-u1').to.be.true;
   });
 
+  it('takes an application/json body past the default parser limit', async () => {
+    // Over body-parser's 100kb default, under --scim-bulk-max-payload-size
+    const res = await supertest(server.app)
+      .post('/scim/v2/Bulk')
+      .set('Content-Type', 'application/json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+        Operations: [],
+        padding: 'x'.repeat(200000),
+      });
+    expect(res.status).to.not.equal(413);
+  });
+
   it('honors failOnErrors', async () => {
     const res = await supertest(server.app)
       .post('/scim/v2/Bulk')

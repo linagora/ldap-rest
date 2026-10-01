@@ -62,7 +62,7 @@ All SCIM endpoints sit behind the auth middleware registered before the plugin
 | `--scim-max-results`                 | `DM_SCIM_MAX_RESULTS`                 | `200`                                              | Maximum page size (caps `count`)                                                                 |
 | `--scim-max-scanned`                 | `DM_SCIM_MAX_SCANNED`                 | `10000`                                            | Entries a list may walk before answering `400 tooMany`                                           |
 | `--scim-bulk-max-operations`         | `DM_SCIM_BULK_MAX_OPERATIONS`         | `100`                                              | Max `/Bulk` operations per request                                                               |
-| `--scim-bulk-max-payload-size`       | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE`       | `1048576`                                          | Max `/Bulk` payload size in bytes                                                                |
+| `--scim-bulk-max-payload-size`       | `DM_SCIM_BULK_MAX_PAYLOAD_SIZE`       | `1048576`                                          | Max body size of a SCIM request (`/Bulk` included), in bytes                                     |
 | `--scim-etag`                        | `DM_SCIM_ETAG`                        | `false`                                            | Advertise ETag support in discovery (not yet implemented)                                        |
 | `--scim-base-url`                    | `DM_SCIM_BASE_URL`                    | auto from request                                  | Override external base URL for `meta.location` values                                            |
 

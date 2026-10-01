@@ -111,16 +111,19 @@ export class DM {
     this.app = express();
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
-    this.app.use(bodyParser.json({ verify: keepRawBody }));
-    // Parsed here, not only by the SCIM routes: core/auth/hmac hashes the body
-    // before those routes run.
+    //
+    // SCIM bodies are parsed here, not by the SCIM routes: core/auth/hmac
+    // hashes the body before those routes run. Mounted ahead of the global
+    // parser so that an application/json SCIM request gets the SCIM limit too.
     this.app.use(
+      (this.config.scim_prefix as string) || '/scim/v2',
       bodyParser.json({
-        type: 'application/scim+json',
+        type: ['application/json', 'application/scim+json'],
         limit: `${(this.config.scim_bulk_max_payload_size as number) || 1048576}b`,
         verify: keepRawBody,
       })
     );
+    this.app.use(bodyParser.json({ verify: keepRawBody }));
     this.app.use(
       bodyParser.urlencoded({ extended: true, verify: keepRawBody })
     );

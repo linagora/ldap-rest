@@ -10,7 +10,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import type { Express, Request } from 'express';
-import bodyParser from 'body-parser';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
@@ -579,19 +578,6 @@ export default class Scim extends DmPlugin {
 
   api(app: Express): void {
     const prefix = this.scimPrefix;
-
-    // SCIM 2.0 uses Content-Type: application/scim+json (RFC 7644 §3.1.1).
-    // The global bodyParser.json() installed by DM only accepts application/json,
-    // so we install a scoped parser that handles both for all SCIM routes.
-    app.use(
-      prefix,
-      bodyParser.json({
-        type: ['application/json', 'application/scim+json'],
-        limit: `${
-          (this.config.scim_bulk_max_payload_size as number) || 1048576
-        }b`,
-      })
-    );
 
     // RFC 7644 section 3.9 makes `attributes` and `excludedAttributes`
     // mutually exclusive. Refuse the pair before any handler runs, not while
