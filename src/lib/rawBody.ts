@@ -4,30 +4,41 @@
  */
 import type { IncomingMessage } from 'http';
 
-const rawBodies = new WeakMap<IncomingMessage, Buffer>();
+/** A body as a global parser read it */
+export interface RawBody {
+  /** The bytes received, once Content-Encoding is removed */
+  bytes: Buffer;
+  /** The charset the parser decodes them with, lowercased */
+  encoding: string;
+}
+
+const rawBodies = new WeakMap<IncomingMessage, RawBody>();
 
 /**
- * body-parser `verify` callback keeping the bytes it read, for
- * core/auth/hmac to hash what the client signed
+ * body-parser `verify` callback keeping the bytes it read, and the charset it
+ * decodes them with, for core/auth/hmac to hash what the client signed
  *
  * @param req the request
  * @param _res the response
- * @param buf the body read
+ * @param bytes the body read
+ * @param encoding the charset body-parser decodes it with: its own reading
+ * of the Content-Type, or its default
  */
 export function keepRawBody(
   req: IncomingMessage,
   _res: unknown,
-  buf: Buffer
+  bytes: Buffer,
+  encoding: string
 ): void {
-  rawBodies.set(req, buf);
+  rawBodies.set(req, { bytes, encoding });
 }
 
 /**
- * The bytes a global parser read from a request body.
+ * The body a global parser read from a request.
  *
  * @param req the request
- * @returns them, or undefined when no global parser read the body
+ * @returns it, or undefined when no global parser read the body
  */
-export function rawBodyOf(req: IncomingMessage): Buffer | undefined {
+export function rawBodyOf(req: IncomingMessage): RawBody | undefined {
   return rawBodies.get(req);
 }

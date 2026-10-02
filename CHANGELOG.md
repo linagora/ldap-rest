@@ -15,6 +15,12 @@
   as `text/plain` and was refused
   ([#259](https://github.com/linagora/ldap-rest/issues/259))
 
+- `core/auth/hmac` refuses a GET, DELETE or HEAD carrying a body, which
+  the signature did not cover, and a signed body under a charset other than
+  UTF-8, which would be read as other characters —
+  [notes](docs/usage/upgrading.md#hmac-refuses-a-body-it-does-not-sign)
+  ([#257](https://github.com/linagora/ldap-rest/issues/257))
+
 ## v0.13.4 (2026-10-02)
 
 ### Features

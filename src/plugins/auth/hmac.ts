@@ -147,9 +147,10 @@ export default class AuthHmac extends AuthBase {
     // Calculate body hash
     const bodyHash = this.calculateBodyHash(req);
     if (bodyHash === undefined) {
-      // No global parser read this body: its media type is parsed, if at
-      // all, by the route, after this check. Hashing nothing would accept a
-      // signature that does not cover the body the route then reads.
+      // A body no global parser read (its route parses it, if at all, after
+      // this check), one on a method signed without a body, or one under a
+      // charset other than UTF-8. Hashing nothing would accept a signature
+      // that does not cover the body the route then reads.
       this.logger.warn(
         `Refusing ${req.method} ${req.originalUrl || req.url} from service ${serviceId}: ` +
           `its body (${req.headers['content-type'] || 'no Content-Type'}) cannot be checked against the signature`
@@ -200,22 +201,28 @@ export default class AuthHmac extends AuthBase {
    */
   private calculateBodyHash(req: DmRequest): string | undefined {
     const method = req.method.toUpperCase();
+    const raw = rawBodyOf(req);
+    const length = parseInt(req.headers['content-length'] ?? '', 10);
+    // A body no global parser read: its media type is not one they were given
+    const unread =
+      !raw && (req.headers['transfer-encoding'] !== undefined || length > 0);
 
-    // No body for these methods
-    if (method === 'GET' || method === 'DELETE' || method === 'HEAD') return '';
+    // Signed without a body: one they carry anyway would reach the route
+    // unsigned
+    if (method === 'GET' || method === 'DELETE' || method === 'HEAD')
+      return raw?.bytes.length || unread ? undefined : '';
+
+    if (unread) return undefined;
+    if (!raw?.bytes.length) return '';
+
+    // The signature covers the bytes, not the Content-Type saying how to read
+    // them: the same bytes resent under another charset would be read as
+    // other characters. The charset is the one the parser decodes with, not
+    // a reading of the header of our own, which could disagree with it.
+    if (raw.encoding !== 'utf-8') return undefined;
 
     // Hash the bytes received, as the client signed them
-    const raw = rawBodyOf(req);
-    if (raw)
-      return raw.length ? createHash('sha256').update(raw).digest('hex') : '';
-
-    // No global parser read a body: either there is none, or its media type
-    // is not one they were given
-    const length = parseInt(req.headers['content-length'] ?? '', 10);
-    if (req.headers['transfer-encoding'] !== undefined || length > 0)
-      return undefined;
-
-    return '';
+    return createHash('sha256').update(raw.bytes).digest('hex');
   }
 
   /**

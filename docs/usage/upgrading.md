@@ -19,6 +19,18 @@ organization entry then keeps the address, but only for organizations
 announced from then on. An organization already announced does not get it:
 take its address from its account or from the Cloudery.
 
+### HMAC refuses a body it does not sign
+
+**Who is affected:** a client of `core/auth/hmac` that sends a body with a
+GET, DELETE or HEAD, or a signed body under a `charset` other than UTF-8.
+
+These methods are signed without a body, so one they carried reached the
+route unsigned; and the signature covers the bytes, not the charset that says
+how to read them. Both are now answered `401`: send GET, DELETE and HEAD
+without a body (and without `Transfer-Encoding`, which announces one), and
+bodies in UTF-8
+([#257](https://github.com/linagora/ldap-rest/issues/257)).
+
 ## To 0.13.3
 
 ### HMAC hashes the body bytes received

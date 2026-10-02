@@ -402,6 +402,128 @@ describe('AuthHmac', () => {
       expect(res.status).to.equal(401);
     });
 
+    for (const method of ['get', 'delete'] as const) {
+      it(`should refuse a ${method.toUpperCase()} carrying a body`, async () => {
+        // Signed without one, as GET, DELETE and HEAD are
+        const timestamp = Date.now();
+        const signature = generateHmacSignature(
+          secret,
+          method.toUpperCase(),
+          '/api/hello',
+          timestamp
+        );
+
+        const res = await request(app)
+          [method]('/api/hello')
+          .set(
+            'Authorization',
+            createAuthHeader(serviceId, timestamp, signature)
+          )
+          .set('Content-Type', 'application/json')
+          .send('{"a":"b"}');
+
+        expect(res.status).to.equal(401);
+      });
+    }
+
+    it('should accept a DELETE without a body', async () => {
+      const timestamp = Date.now();
+      const signature = generateHmacSignature(
+        secret,
+        'DELETE',
+        '/api/hello',
+        timestamp
+      );
+
+      const res = await request(app)
+        .delete('/api/hello')
+        .set(
+          'Authorization',
+          createAuthHeader(serviceId, timestamp, signature)
+        );
+
+      expect(res.status).to.not.equal(401);
+    });
+
+    it('should refuse a signed body sent under another charset than UTF-8', async () => {
+      const timestamp = Date.now();
+      const raw = 'cn=%C3%A9';
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        raw
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set(
+          'Content-Type',
+          'application/x-www-form-urlencoded; charset=iso-8859-1'
+        )
+        .send(raw);
+
+      expect(res.status).to.equal(401);
+    });
+
+    for (const [label, contentType, raw] of [
+      [
+        'a form',
+        'application/x-www-form-urlencoded; foo="; charset=utf-8"; charset=iso-8859-1',
+        Buffer.from('cn=%C3%A9'),
+      ],
+      [
+        'JSON',
+        'application/json; x="; charset=utf-8"; charset=utf-16le',
+        Buffer.from('{"a":"b"}', 'utf16le'),
+      ],
+    ] as const) {
+      it(`should read the charset of ${label} as the parser does`, async () => {
+        // Another parameter's quoted value names UTF-8; the charset the
+        // parser decodes with is the last one
+        const timestamp = Date.now();
+        // Signed on the bytes sent, which the helper would re-encode
+        const bodyHash = createHash('sha256').update(raw).digest('hex');
+        const signature = createHmac('sha256', secret)
+          .update(`POST|/api/hello|${timestamp}|${bodyHash}`)
+          .digest('hex');
+
+        const res = await request(app)
+          .post('/api/hello')
+          .set(
+            'Authorization',
+            createAuthHeader(serviceId, timestamp, signature)
+          )
+          .set('Content-Type', contentType)
+          .serialize(() => raw as unknown as string) // the bytes as they are
+          .send(raw);
+
+        expect(res.status).to.equal(401);
+      });
+    }
+
+    it('should accept a signed body that names UTF-8', async () => {
+      const timestamp = Date.now();
+      const raw = '{"cn":"é"}';
+      const signature = generateHmacSignature(
+        secret,
+        'POST',
+        '/api/hello',
+        timestamp,
+        raw
+      );
+
+      const res = await request(app)
+        .post('/api/hello')
+        .set('Authorization', createAuthHeader(serviceId, timestamp, signature))
+        .set('Content-Type', 'application/json; charset=UTF-8')
+        .send(raw);
+
+      expect(res.status).to.not.equal(401);
+    });
+
     it('should accept a POST without a body', async () => {
       const timestamp = Date.now();
       const signature = generateHmacSignature(
