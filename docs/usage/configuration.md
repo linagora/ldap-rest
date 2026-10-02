@@ -479,7 +479,7 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-cloudery-url`                  | `DM_TWAKE_INSTANCE_CLOUDERY_URL`                  |                                       | Cloudery API                                              |
 | `--twake-instance-cloudery-token`                | `DM_TWAKE_INSTANCE_CLOUDERY_TOKEN`                |                                       | Its token                                                 |
 | `--twake-instance-cloudery-domain`               | `DM_TWAKE_INSTANCE_CLOUDERY_DOMAIN`               |                                       | Domain of the instances                                   |
-| `--twake-instance-cloudery-offer`                | `DM_TWAKE_INSTANCE_CLOUDERY_OFFER`                | `b2b_twake_default`                   | Offer of an account's instance                            |
+| `--twake-instance-cloudery-offer`                | `DM_TWAKE_INSTANCE_CLOUDERY_OFFER`                | `b2b_twake_default`                   | Offer of an account's instance, or one per DN expression  |
 | `--twake-instance-cloudery-organization-offer`   | `DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER`   |                                       | Offer of an organization's instance                       |
 | `--twake-instance-cozy-url`                      | `DM_TWAKE_INSTANCE_COZY_URL`                      |                                       | cozy-stack admin API                                      |
 | `--twake-instance-cozy-user`                     | `DM_TWAKE_INSTANCE_COZY_USER`                     | `admin`                               | Its user                                                  |

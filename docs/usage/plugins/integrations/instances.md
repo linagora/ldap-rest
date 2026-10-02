@@ -149,6 +149,15 @@ and no such group, `--twake-instance-cozy-org-id` and
 ```
 
 A DN holds commas, so in `DM_TWAKE_INSTANCE_DN` end each expression with `;`.
+
+With the Cloudery, `--twake-instance-cloudery-offer` is the offer of every
+account's instance, or one offer per `--twake-instance-dn` expression,
+separated by `;` in the same order: `personal;business` gives the accounts
+the first expression matches `personal`, those of the second `business`. A
+final `;` is ignored. An expression with an empty item, or none, leaves the
+choice to the Cloudery. More offers than expressions stop the server at
+startup. An organization's own instance keeps
+`--twake-instance-cloudery-organization-offer`.
 Every option and its default is listed in the
 [configuration reference](../../configuration.md). The plugin needs
 `--rabbitmq-url`.
