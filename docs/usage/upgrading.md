@@ -13,8 +13,11 @@ decision or a configuration change appear here; see the
 `DM_TWAKE_INSTANCE_ORGANIZATION_ACCOUNT`.
 
 The option is ignored, and no account gets the organization's address any
-more. Set `--twake-instance-organization-fqdn-attribute` so the organization
-entry keeps its address, and copy it to the account yourself.
+more. An account that already got it keeps it. To copy the address to
+accounts yourself, set `--twake-instance-organization-fqdn-attribute`. The
+organization entry then keeps the address, but only for organizations
+announced from then on. An organization already announced does not get it:
+take its address from its account or from the Cloudery.
 
 ## To 0.13.3
 
