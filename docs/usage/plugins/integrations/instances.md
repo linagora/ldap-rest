@@ -75,16 +75,6 @@ from `--twake-instance-organization-name-attribute`, which
 `ensureOrganization` fills from `name` when the entry has none. The mark, not
 the address, says the organization is done.
 
-`--twake-instance-organization-account` names an account of the
-organization by a DN template, `{id}` standing for the organization id, for
-example `uid={id},ou=users,ou={id},ou=organizations,dc=example,dc=com`. It
-is usually a technical account, kept from an instance of its own by
-`--twake-instance-skip-attribute`. When the organization is announced, and on
-any replay, the account gets the organization's address in
-`--twake-instance-fqdn-attribute`, when it exists and has none. An account
-added once the organization is marked gets it at creation, read from the
-organization entry or else from the provider.
-
 With the Cloudery, a member's `user.created` waits for its organization's: a
 member under an organization entry that is not marked yet gets its address
 but no event and no mark. A member outside its organization entry is not

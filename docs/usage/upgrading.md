@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### `--twake-instance-organization-account` is removed
+
+**Who is affected:** a deployment that sets
+`--twake-instance-organization-account` or
+`DM_TWAKE_INSTANCE_ORGANIZATION_ACCOUNT`.
+
+The option is ignored, and no account gets the organization's address any
+more. Set `--twake-instance-organization-fqdn-attribute` so the organization
+entry keeps its address, and copy it to the account yourself.
+
 ## To 0.13.3
 
 ### HMAC hashes the body bytes received
