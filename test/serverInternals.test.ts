@@ -8,6 +8,7 @@ import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
 import type { Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
+import { jsonBodyParser } from '../src/lib/rawBody';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {
@@ -232,6 +233,38 @@ describe('Server internals', () => {
       expect(warnings.find(w => w.includes('X-Forwarded-For'))).to.equal(
         undefined
       );
+    });
+  });
+
+  describe('body parsers', () => {
+    // Over body-parser's 100kb default
+    const big = { padding: 'x'.repeat(200000) };
+
+    it('should leave the SCIM prefix to the global parser without the SCIM plugin', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.post('/scim/v2/probe', (_req, res) => {
+        res.json({});
+      });
+
+      const res = await request(dm.app).post('/scim/v2/probe').send(big);
+      expect(res.status).to.equal(413);
+    });
+
+    it('should run a registered parser ahead of the global ones', async () => {
+      const dm = new DM();
+      await dm.ready;
+      dm.app.post(['/big/probe', '/api/probe'], (req, res) => {
+        res.json({ length: (req.body as typeof big).padding.length });
+      });
+      dm.registerBodyParser('/big', jsonBodyParser({ limit: '1mb' }));
+
+      const res = await request(dm.app).post('/big/probe').send(big);
+      expect(res.status).to.equal(200);
+      expect(res.body).to.deep.equal({ length: 200000 });
+      expect(
+        (await request(dm.app).post('/api/probe').send(big)).status
+      ).to.equal(413);
     });
   });
 });

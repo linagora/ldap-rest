@@ -1,10 +1,13 @@
 /**
- * The bytes of a request body, as the global parsers read them
+ * The bytes of a request body, as the parsers ahead of the routes read them
  * @module lib/rawBody
  */
 import type { IncomingMessage } from 'http';
 
-/** A body as a global parser read it */
+import bodyParser from 'body-parser';
+import type { RequestHandler } from 'express';
+
+/** A body as such a parser read it */
 export interface RawBody {
   /** The bytes received, once Content-Encoding is removed */
   bytes: Buffer;
@@ -34,11 +37,24 @@ export function keepRawBody(
 }
 
 /**
- * The body a global parser read from a request.
+ * The body a parser kept from a request, with `keepRawBody`.
  *
  * @param req the request
- * @returns it, or undefined when no global parser read the body
+ * @returns it, or undefined when no parser kept it
  */
 export function rawBodyOf(req: IncomingMessage): RawBody | undefined {
   return rawBodies.get(req);
+}
+
+/**
+ * A JSON parser that keeps the bytes it reads, for `DM.registerBodyParser`:
+ * core/auth/hmac refuses a body whose bytes were not kept
+ *
+ * @param options body-parser JSON options
+ * @returns the parser
+ */
+export function jsonBodyParser(
+  options: Omit<bodyParser.OptionsJson, 'verify'> = {}
+): RequestHandler {
+  return bodyParser.json({ ...options, verify: keepRawBody });
 }

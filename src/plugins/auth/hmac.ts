@@ -147,7 +147,7 @@ export default class AuthHmac extends AuthBase {
     // Calculate body hash
     const bodyHash = this.calculateBodyHash(req);
     if (bodyHash === undefined) {
-      // A body no global parser read (its route parses it, if at all, after
+      // A body no parser kept (its route parses it, if at all, after
       // this check), one on a method signed without a body, or one under a
       // charset other than UTF-8. Hashing nothing would accept a signature
       // that does not cover the body the route then reads.
@@ -197,13 +197,13 @@ export default class AuthHmac extends AuthBase {
   /**
    * Calculate SHA256 hash of request body
    * Returns empty string for GET/DELETE/HEAD methods, and undefined for a
-   * body no global parser read, which cannot be checked
+   * body no parser kept, which cannot be checked
    */
   private calculateBodyHash(req: DmRequest): string | undefined {
     const method = req.method.toUpperCase();
     const raw = rawBodyOf(req);
     const length = parseInt(req.headers['content-length'] ?? '', 10);
-    // A body no global parser read: its media type is not one they were given
+    // A body no parser kept: its media type is not one they were given
     const unread =
       !raw && (req.headers['transfer-encoding'] !== undefined || length > 0);
 

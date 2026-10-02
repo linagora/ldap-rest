@@ -5,6 +5,7 @@ import multer from 'multer';
 import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { expect } from 'chai';
+import { scimBodyParser } from '../../../src/plugins/scim/scim';
 import { createHmac, createHash } from 'crypto';
 
 /**
@@ -212,6 +213,8 @@ describe('AuthHmac', () => {
       process.env.DM_AUTH_HMAC = `${serviceId}:${secret}:Test Service`;
       dm = new DM();
       await dm.ready;
+      // The parser core/scim registers, without its routes
+      dm.registerBodyParser('/scim/v2', scimBodyParser(dm.config));
       const p = new AuthHmac(dm);
       const h = new HelloWorld(dm);
       await dm.registerPlugin('authHmac', p);

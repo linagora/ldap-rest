@@ -690,6 +690,27 @@ api(app: Express): void {
 }
 ```
 
+#### Parsing request bodies
+
+The server parses `application/json` (up to 100 kB) and
+`application/x-www-form-urlencoded` bodies before authentication runs, so
+that `core/auth/hmac` can check them. A plugin that needs another media type
+or limit under its prefix registers its own parser, which runs ahead of
+those:
+
+```typescript
+import { jsonBodyParser } from '../../lib/rawBody';
+
+api(app: Express): void {
+  this.server.registerBodyParser('/myplugin', jsonBodyParser({ limit: '1mb' }));
+}
+```
+
+`jsonBodyParser` keeps the bytes it reads, which `core/auth/hmac` hashes. Any
+other parser must pass `keepRawBody` as `verify`, or `core/auth/hmac` refuses
+its bodies with `401`. A parser mounted with `app.use()` in `api()` runs
+after authentication, too late for that check.
+
 #### Error Handling Best Practices
 
 The `asyncHandler` wrapper automatically catches errors and passes them to the global error middleware. This ensures:
