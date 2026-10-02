@@ -1,12 +1,20 @@
 # Changelog
 
-## Unreleased
+## v0.14.0 (2026-10-02)
 
 ### Breaking Changes
 
 - `core/twake/instances`: `--twake-instance-organization-account` is removed,
   [notes](docs/usage/upgrading.md#--twake-instance-organization-account-is-removed)
-  ([#261](https://github.com/linagora/ldap-rest/pull/261))
+  ([#262](https://github.com/linagora/ldap-rest/pull/262))
+
+### Security
+
+- `core/auth/hmac` refuses a GET, DELETE or HEAD carrying a body, which
+  the signature did not cover, and a signed body under a charset other than
+  UTF-8, which would be read as other characters —
+  [notes](docs/usage/upgrading.md#hmac-refuses-a-body-it-does-not-sign)
+  ([#257](https://github.com/linagora/ldap-rest/issues/257))
 
 ### Features
 
@@ -27,12 +35,6 @@
   `application/json` unless the caller sets another `Content-Type`; it went
   as `text/plain` and was refused
   ([#259](https://github.com/linagora/ldap-rest/issues/259))
-
-- `core/auth/hmac` refuses a GET, DELETE or HEAD carrying a body, which
-  the signature did not cover, and a signed body under a charset other than
-  UTF-8, which would be read as other characters —
-  [notes](docs/usage/upgrading.md#hmac-refuses-a-body-it-does-not-sign)
-  ([#257](https://github.com/linagora/ldap-rest/issues/257))
 
 - `core/ldap/onChange` no longer keeps, for the life of the process, the
   entry it read before a write that never completed: a delete the trash or a
