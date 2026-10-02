@@ -47,6 +47,13 @@ bundled browser client does, sees no change. One that hashed a
 hash the bytes sent instead, before compressing them if the request carries
 a `Content-Encoding`.
 
+A request without a body is signed with an empty `body-hash`, as documented.
+0.13.2 hashed the `{}` the parser left for a request that carries
+`Content-Type: application/json` without a body, and required
+`sha256("{}")`. A client that signs this way is now refused with `401`. The
+bundled browser client sends no `Content-Type` without a body and is not
+affected.
+
 ## To 0.13.2
 
 ### HMAC refuses a body it cannot check
