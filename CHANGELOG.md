@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `core/twake/instances`: `--twake-instance-organization-account` is removed,
+  [notes](docs/usage/upgrading.md#--twake-instance-organization-account-is-removed)
+  ([#261](https://github.com/linagora/ldap-rest/pull/261))
+
 ## v0.13.3 (2026-10-02)
 
 ### Features

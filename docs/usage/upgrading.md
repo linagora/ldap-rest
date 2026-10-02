@@ -6,6 +6,16 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### `--twake-instance-organization-account` is removed
+
+**Who is affected:** a deployment that sets
+`--twake-instance-organization-account` or
+`DM_TWAKE_INSTANCE_ORGANIZATION_ACCOUNT`.
+
+The option is ignored, and no account gets the organization's address any
+more. Set `--twake-instance-organization-fqdn-attribute` so the organization
+entry keeps its address, and copy it to the account yourself.
+
 ### HMAC hashes the body bytes received
 
 **Who is affected:** a client of `core/auth/hmac` that signs a body other than

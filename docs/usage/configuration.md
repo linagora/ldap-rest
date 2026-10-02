@@ -500,7 +500,6 @@ See [lifecycle events](plugins/integrations/lifecycle-events.md).
 | `--twake-instance-organization-domain-attribute` | `DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE` | `twakeDomain`                         | Attribute holding an organization's domain                |
 | `--twake-instance-organization-name-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_NAME_ATTRIBUTE`   | `description`                         | Attribute holding an organization's name                  |
 | `--twake-instance-organization-fqdn-attribute`   | `DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE`   |                                       | Address attribute of an organization (empty: not written) |
-| `--twake-instance-organization-account`          | `DM_TWAKE_INSTANCE_ORGANIZATION_ACCOUNT`          |                                       | Organization account DN, `{id}` its id (empty: none)      |
 
 See [instances](plugins/integrations/instances.md).
 

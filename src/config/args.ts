@@ -336,7 +336,6 @@ export interface Config {
   twake_instance_organization_domain_attribute?: string;
   twake_instance_organization_name_attribute?: string;
   twake_instance_organization_fqdn_attribute?: string;
-  twake_instance_organization_account?: string;
   twake_lifecycle_reason_attribute?: string;
   twake_tombstone_dn?: string[];
   twake_tombstone_default_reason?: string;
@@ -998,11 +997,6 @@ const configArgs: ConfigTemplate = [
   [
     '--twake-instance-organization-fqdn-attribute',
     'DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE',
-    '',
-  ],
-  [
-    '--twake-instance-organization-account',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_ACCOUNT',
     '',
   ],
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
