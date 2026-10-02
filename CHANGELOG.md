@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `core/twake/groups`: an empty `search` (`?search=`) lists every group or
+  member instead of answering 400 `INVALID_SEARCH_QUERY`
+
 ## v0.14.0 (2026-10-02)
 
 ### Breaking Changes

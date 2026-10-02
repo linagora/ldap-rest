@@ -186,6 +186,8 @@ describe('Twake groups plugin routes', function () {
     });
     const found = await api.get(`${route()}?search=firs`).expect(200);
     expect(found.body.groups).to.have.length(1);
+    const empty = await api.get(`${route()}?search=`).expect(200);
+    expect(empty.body.groups).to.have.length(2);
     expect(
       (await api.get(`${route()}?search=f`).expect(400)).body.code
     ).to.equal('INVALID_SEARCH_QUERY');
