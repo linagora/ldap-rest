@@ -15,6 +15,11 @@
   answered 413. The `application/scim+json` parser added in v0.13.1 now only
   covers the SCIM prefix
 
+- Browser `HmacAuthClient`: `post`, `put` and `patch` send a string body as
+  `application/json` unless the caller sets another `Content-Type`; it went
+  as `text/plain` and was refused
+  ([#259](https://github.com/linagora/ldap-rest/issues/259))
+
 ## v0.13.2 (2026-10-01)
 
 ### Security
