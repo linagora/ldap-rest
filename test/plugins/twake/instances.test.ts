@@ -876,6 +876,101 @@ describe('Twake instances plugin', function () {
         expect(rabbit.published).to.deep.equal([ERIN_CREATED]);
       });
 
+      describe('the organization account', () => {
+        const account = orgDnOf('acme1', 'acme1');
+        const addAccount = async (): Promise<void> => {
+          await dm.ldap
+            .add(`ou=users,${orgDn}`, {
+              objectClass: ['top', 'organizationalUnit'],
+              ou: 'users',
+            })
+            .catch(() => undefined);
+          await dm.ldap.add(
+            account,
+            { ...person('acme1'), employeeType: 'technical' },
+            rest()
+          );
+        };
+        const address = async (): Promise<unknown> =>
+          (await read(dm, account))?.description;
+
+        beforeEach(() => {
+          dm.config.twake_instance_organization_account = `uid={id},ou=users,ou={id},${ORGS}`;
+        });
+
+        afterEach(async () => {
+          dm.config.twake_instance_organization_account = '';
+          await dm.ldap.delete(account).catch(() => undefined);
+        });
+
+        it('gets the address once the organization is announced, not before', async () => {
+          const found = search('acme1.example.org').reply(200, {
+            items: [{ ...ORG_INSTANCE, instantiated_at: '2026-01-01' }],
+          });
+          await addAccount();
+          expect(found.isDone()).to.equal(false);
+          expect(await address()).to.equal(undefined);
+          link('acme1', 'acme1.example.org');
+          await rabbit.handler!(orgWorkplace);
+          expect(await address()).to.equal('acme1.example.org');
+          expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        });
+
+        it('gets it on the replay of an organization already marked', async () => {
+          dm.config.twake_instance_organization_account = '';
+          await addAccount();
+          await dm.ldap.modify(orgDn, {
+            replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
+          });
+          dm.config.twake_instance_organization_account = `uid={id},ou=users,ou={id},${ORGS}`;
+          link('acme1', 'acme1.example.org');
+          await rabbit.handler!(orgWorkplace);
+          expect(await address()).to.equal('acme1.example.org');
+          expect(rabbit.published).to.deep.equal([]);
+        });
+
+        it('gets it at creation once the organization is announced', async () => {
+          await dm.ldap.modify(orgDn, {
+            replace: {
+              description: 'acme1.example.org',
+              businessCategory: '2026-01-01T00:00:00.000Z',
+            },
+          });
+          await addAccount();
+          expect(await address()).to.equal('acme1.example.org');
+        });
+
+        it('gets it at creation from the provider when the entry holds none', async () => {
+          await dm.ldap.modify(orgDn, {
+            replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
+          });
+          const found = search('acme1.example.org').reply(200, {
+            items: [{ ...ORG_INSTANCE, instantiated_at: '2026-01-01' }],
+          });
+          await addAccount();
+          expect(found.isDone()).to.equal(true);
+          expect(await address()).to.equal('acme1.example.org');
+        });
+
+        it('gets nothing without the option', async () => {
+          dm.config.twake_instance_organization_account = '';
+          await addAccount();
+          link('acme1', 'acme1.example.org');
+          await rabbit.handler!(orgWorkplace);
+          expect(await address()).to.equal(undefined);
+        });
+
+        it('keeps an address it already has', async () => {
+          await addAccount();
+          await dm.ldap.modify(account, {
+            replace: { description: 'own.example.org' },
+          });
+          link('acme1', 'acme1.example.org');
+          await rabbit.handler!(orgWorkplace);
+          expect(await address()).to.equal('own.example.org');
+        });
+      });
+
       it('releases the other members when one fails, and a changed address only once confirmed', async () => {
         await addErin();
         await rabbit.handler!(erinWorkplace);
