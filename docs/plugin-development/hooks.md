@@ -19,6 +19,9 @@ Typescript definitions into [hooks.ts](./src/hooks.ts)
 - **ldapmodifyrequest**: called before any ldapmodify
 - **ldapdeleterequest**: called before any ldapdelete
 - **ldaprenamerequest**: called before any ldap rename/modifyDN operation
+- **ldapmodifyend**, **ldapdeleteend**, **ldaprenameend**: launched once a
+  modify, delete or rename is over, whatever became of it, see
+  [below](#ldapmodifyend-ldapdeleteend-ldaprenameend)
 
 ### ldapaddafter
 
@@ -40,6 +43,28 @@ the account the entry describes.
 - `ldapadddone` and `onLdapEntryChange` fire whatever this hook does, and in
   no set order with it: an add event may or may not include what a
   subscriber here wrote.
+
+### ldapmodifyend, ldapdeleteend, ldaprenameend
+
+For a plugin that keeps something from a request hook to the matching "done"
+one, as core/ldap/onChange keeps the entry it read. A write that is refused
+by a request hook, that one of them takes out of the request (core/ldap/trash
+and core/twake/tombstone do with a delete), or that the directory refuses,
+never reaches its "done" hook; its "end" hook fires all the same.
+
+- Each gets the number of its operation. A modify's request and "done" hooks
+  are given it in their arguments; for every modify, delete and rename,
+  `currentOperation()` (`lib/operation`) returns it inside the request and
+  "done" hooks. Key what you keep by it rather than by DN: two writes of one
+  DN may be under way, and only the operation tells them apart.
+  Outside those hooks it is whatever encloses the call (an add made from a
+  delete's request hook sees the delete's number): in an end hook, use the
+  number it is given.
+- It is launched once the "done" subscribers of the operation have returned,
+  and is not awaited by the write.
+- A move (`ldapActions.move`) launches no request hook and no end hook, and
+  its `ldaprenamedone` runs outside any operation, even when a request hook
+  made it.
 
 ## [onChange](../usage/plugins/ldap/on-change.md) hooks
 

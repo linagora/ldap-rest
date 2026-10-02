@@ -14,6 +14,7 @@ import type { AttributeValue, SearchResult } from '../../lib/ldapActions';
 import { launchHooks } from '../../lib/utils';
 import type { Config } from '../../bin';
 import type { ChangeContext } from '../../lib/changeContext';
+import { currentOperation } from '../../lib/operation';
 
 export type ChangesToNotify = Record<
   string,
@@ -80,9 +81,15 @@ class OnLdapChange extends DmPlugin {
   name = 'onLdapChange';
   roles: Role[] = ['consistency'] as const;
 
+  // The entries read before a write, keyed by its operation number, each
+  // kept until the "end" hook of that operation, which fires whatever became
+  // of it: a write refused, failed, or taken out of its request by another
+  // plugin (trash, tombstone) never reaches its "done" hook. Keyed by DN
+  // instead, a refused delete could not tell its own entry from that of
+  // another delete of the same DN under way.
   stack: Record<number, Entry> = {};
-  pendingDeletions: Map<string, Entry> = new Map();
-  pendingRenames: Map<string, Entry> = new Map();
+  pendingDeletions: Map<number, Map<string, Entry>> = new Map();
+  pendingRenames: Map<number, { dn: string; entry: Entry }> = new Map();
 
   hooks: Hooks = {
     ldapadddone: async ([dn, attributes], context) => {
@@ -121,16 +128,22 @@ class OnLdapChange extends DmPlugin {
       this.publish(dn, before, after, context);
     },
 
+    ldapmodifyend: op => {
+      delete this.stack[op];
+    },
+
     ldaprenamerequest: async ([dn, newDn, req]) => {
-      const entry = await this.read(dn);
-      if (entry) this.pendingRenames.set(dn, entry);
+      const op = currentOperation();
+      const entry = op === undefined ? undefined : await this.read(dn);
+      if (op !== undefined && entry) this.pendingRenames.set(op, { dn, entry });
       return [dn, newDn, req];
     },
 
     ldaprenamedone: async ([dn, newDn], context) => {
-      const before = this.pendingRenames.get(dn);
-      this.pendingRenames.delete(dn);
-      if (!before) {
+      const op = currentOperation();
+      const pending =
+        op === undefined ? undefined : this.pendingRenames.get(op);
+      if (!pending || pending.dn !== dn) {
         // A move reaches this hook too (`ldapActions.move` is a modifyDN), and
         // it launches no `ldaprenamerequest` — that is an authorization hook,
         // and the write that drove the move was already judged. So there is no
@@ -139,29 +152,46 @@ class OnLdapChange extends DmPlugin {
         this.logger.debug(`${dn}: no snapshot: a move made outside a request`);
         return;
       }
+      this.pendingRenames.delete(op!);
       const after = await this.read(newDn);
       if (!after) {
         this.logger.warn(`Could not read ${newDn} after the rename of ${dn}`);
         return;
       }
-      this.publish(newDn, before, after, context);
+      this.publish(newDn, pending.entry, after, context);
+    },
+
+    ldaprenameend: op => {
+      this.pendingRenames.delete(op);
     },
 
     ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
+      const op = currentOperation();
+      if (op === undefined) return [dn, req] as [string | string[], Request?];
       for (const target of Array.isArray(dn) ? dn : [dn]) {
         const entry = await this.read(target);
-        if (entry) this.pendingDeletions.set(target, entry);
+        if (!entry) continue;
+        let kept = this.pendingDeletions.get(op);
+        if (!kept)
+          this.pendingDeletions.set(op, (kept = new Map<string, Entry>()));
+        kept.set(target, entry);
       }
       return [dn, req] as [string | string[], Request?];
     },
 
     ldapdeletedone: (dn: string | string[], context?: ChangeContext) => {
+      const op = currentOperation();
+      const kept = op === undefined ? undefined : this.pendingDeletions.get(op);
       for (const target of Array.isArray(dn) ? dn : [dn]) {
-        const before = this.pendingDeletions.get(target);
+        const before = kept?.get(target);
         if (!before) continue;
-        this.pendingDeletions.delete(target);
+        kept!.delete(target);
         this.publish(target, before, null, context);
       }
+    },
+
+    ldapdeleteend: op => {
+      this.pendingDeletions.delete(op);
     },
   };
 
