@@ -56,7 +56,7 @@ DM_AUTH_HMAC_WINDOW=120000  # Default: 120000ms (2 minutes)
    - `METHOD`: HTTP method (GET, POST, PATCH, DELETE, PUT, etc.)
    - `PATH`: Request path with query string (e.g., `/api/v1/ldap/users?filter=active`)
    - `timestamp`: Unix timestamp in milliseconds (e.g., `1698765432000`)
-   - `body-hash`: SHA256 of the body bytes as sent for POST/PATCH/PUT, empty string for GET/DELETE/HEAD and for a request without a body. The server hashes the bytes it received, so the body need not be serialized in any particular way.
+   - `body-hash`: SHA256 of the body bytes for POST/PATCH/PUT, empty string for GET/DELETE/HEAD and for a request without a body. The server hashes the bytes it received, so the body need not be serialized in any particular way. With a `Content-Encoding` (gzip, deflate, br), it hashes them once decoded: sign the body before compressing it.
 
    Only a body the server parses before checking the signature can be signed:
    `application/json`, `application/x-www-form-urlencoded` and, under the
@@ -269,7 +269,7 @@ Our approach provides a good balance between security and simplicity:
 1. Verify signing string format: `METHOD|PATH|timestamp|body-hash`
 2. Ensure METHOD is uppercase (GET, POST, etc.)
 3. Include full path with query parameters
-4. For POST/PATCH/PUT: verify body hash is SHA256(JSON.stringify(body))
+4. For POST/PATCH/PUT: verify body hash is the SHA256 of the exact bytes sent, before any compression, not of a re-serialized object
 5. For GET/DELETE/HEAD: body-hash must be empty string
 6. Ensure secret is exactly the same on client and server
 7. Use hex encoding for signature (lowercase)
