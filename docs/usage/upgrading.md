@@ -17,7 +17,8 @@ sends its body as `JSON.stringify` writes it and hashes that string, as the
 bundled browser client does, sees no change. One that hashed a
 `JSON.stringify` rendering but sent other bytes (indented JSON, spaces after
 `:`, a form body hashed as the JSON of its fields) is now refused with `401`:
-hash the bytes sent instead.
+hash the bytes sent instead, before compressing them if the request carries
+a `Content-Encoding`.
 
 ## To 0.13.2
 
