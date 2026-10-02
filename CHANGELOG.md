@@ -11,8 +11,9 @@
 ### Features
 
 - Plugin API: `ldapmodifyend`, `ldapdeleteend` and `ldaprenameend` fire once
-  a write is over, whatever became of it, for a plugin that keeps something
-  from a request hook to a "done" one —
+  a write is over, whatever became of it, with its operation number, which
+  `currentOperation()` gives the request and "done" hooks of a modify, delete
+  or rename: for a plugin that keeps something from one to the other —
   [hooks](docs/plugin-development/hooks.md#ldapmodifyend-ldapdeleteend-ldaprenameend)
 
 ### Fixes

@@ -52,13 +52,16 @@ by a request hook, that one of them takes out of the request (core/ldap/trash
 and core/twake/tombstone do with a delete), or that the directory refuses,
 never reaches its "done" hook; its "end" hook fires all the same.
 
-- `ldapmodifyend` gets the operation number `ldapmodifyrequest` and
-  `ldapmodifydone` were given; `ldapdeleteend` the DNs the delete was asked
-  for, before any `ldapdeleterequest` took one out; `ldaprenameend` the old
-  and new DNs the rename was asked for.
+- Each gets the number of its operation. A modify's request and "done" hooks
+  are given it in their arguments; for every modify, delete and rename,
+  `currentOperation()` (`lib/operation`) returns it inside the request and
+  "done" hooks. Key what you keep by it rather than by DN: two writes of one
+  DN may be under way, and only the operation tells them apart.
 - It is launched once the "done" subscribers of the operation have returned,
   and is not awaited by the write.
-- A move (`ldapActions.move`) launches no request hook, and no end hook.
+- A move (`ldapActions.move`) launches no request hook and no end hook, and
+  its `ldaprenamedone` runs outside any operation, even when a request hook
+  made it.
 
 ## [onChange](../usage/plugins/ldap/on-change.md) hooks
 

@@ -96,10 +96,10 @@ export interface Hooks {
   ) => MaybePromise<void>;
   /**
    * Once a delete is over, whatever became of it, after its `ldapdeletedone`
-   * subscribers have returned; with the DNs it was asked for, before any
-   * `ldapdeleterequest` took one out
+   * subscribers have returned; with the operation number its request and
+   * done hooks read from `currentOperation()`
    */
-  ldapdeleteend?: (dn: string[]) => MaybePromise<void>;
+  ldapdeleteend?: (op: number) => MaybePromise<void>;
   // rename
   ldaprenamerequest?: ChainedHook<[string, string, Request?]>;
   ldaprenamedone?: (
@@ -108,9 +108,10 @@ export interface Hooks {
   ) => MaybePromise<void>;
   /**
    * Once a rename is over, whatever became of it, after its `ldaprenamedone`
-   * subscribers have returned; with the DNs it was asked for
+   * subscribers have returned; with the operation number its request and
+   * done hooks read from `currentOperation()`
    */
-  ldaprenameend?: (args: [string, string]) => MaybePromise<void>;
+  ldaprenameend?: (op: number) => MaybePromise<void>;
 
   /**
    * Plugins

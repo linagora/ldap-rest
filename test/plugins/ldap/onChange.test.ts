@@ -261,7 +261,10 @@ describe('onChange', () => {
         hooks.push(hook);
         return () => hooks.splice(hooks.indexOf(hook), 1);
       };
+      // Refuses once onChange has read the entry, and says how much it kept
+      let keptWhenRefused = 0;
       const refuse = () => {
+        keptWhenRefused = kept();
         throw new Error('refused');
       };
       const failure = async (write: Promise<unknown>) => {
@@ -304,6 +307,7 @@ describe('onChange', () => {
           remove();
         }
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+        expect(keptWhenRefused, 'kept when refused').to.equal(1);
       });
 
       it('keeps nothing of a delete the directory refuses', async () => {
@@ -337,12 +341,57 @@ describe('onChange', () => {
           remove();
         }
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+        expect(keptWhenRefused, 'kept when refused').to.equal(1);
       });
 
       it('keeps nothing of a modify the directory refuses', async () => {
         const dn = await addUser('ochmodbad');
         // inetOrgPerson holds no uidNumber
         await failure(dm.ldap.modify(dn, { replace: { uidNumber: 'x' } }));
+        await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+      });
+
+      it('publishes a delete while another of the same DN is refused', async () => {
+        const dn = await addUser('ochrace');
+        const allowed = {} as unknown as Request;
+        const denied = {} as unknown as Request;
+        // Ahead of onChange, as the authorization plugins are
+        const hooks = dm.hooks.ldapdeleterequest!;
+        const deny = ([d, req]: [string[], Request?]) => {
+          if (req === denied) throw new Error('refused');
+          return [d, req];
+        };
+        hooks.unshift(deny);
+        // Holds the allowed delete once onChange has read the entry
+        let open!: () => void;
+        const gate = new Promise<void>(resolve => (open = resolve));
+        const remove = later(
+          'ldapdeleterequest',
+          async ([d, req]: [string[], Request?]) => {
+            if (req === allowed) await gate;
+            return [d, req];
+          }
+        );
+        try {
+          const write = dm.ldap.delete(dn, allowed);
+          await waitFor(() => onChange.pendingDeletions.size === 1, {
+            what: 'the entry read',
+          });
+          expect((await failure(dm.ldap.delete(dn, denied))).message).to.equal(
+            'refused'
+          );
+          // Let the refused delete's end hook run
+          await new Promise(resolve => setImmediate(resolve));
+          open();
+          await write;
+        } finally {
+          hooks.splice(hooks.indexOf(deny), 1);
+          remove();
+        }
+        await waitFor(
+          () => entryChanges.some(([d, , after]) => d === dn && after === null),
+          { what: `the delete of ${dn}` }
+        );
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
       });
 

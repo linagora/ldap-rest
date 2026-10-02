@@ -22,6 +22,7 @@ import {
   normalizeDn,
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
+import { outsideOperation, runOperation } from './operation';
 import { ConflictError, NotFoundError } from './errors';
 import { parseSchema, SchemaIndex } from './ldapSchema';
 
@@ -1255,7 +1256,9 @@ class ldapActions {
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {
-      return await this.applyModify(dn, changes, req, options, op, done);
+      return await runOperation(op, () =>
+        this.applyModify(dn, changes, req, options, op, done)
+      );
     } finally {
       this.endOperation(done, this.parent.hooks.ldapmodifyend, op);
     }
@@ -1428,11 +1431,14 @@ class ldapActions {
   async rename(dn: string, newRdn: string, req?: Request): Promise<boolean> {
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
+    const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {
-      return await this.applyRename(dn, newRdn, req, done);
+      return await runOperation(op, () =>
+        this.applyRename(dn, newRdn, req, done)
+      );
     } finally {
-      this.endOperation(done, this.parent.hooks.ldaprenameend, [dn, newRdn]);
+      this.endOperation(done, this.parent.hooks.ldaprenameend, op);
     }
   }
 
@@ -1518,11 +1524,15 @@ class ldapActions {
       // dropped by the same hook. `ldaprenamerequest` is deliberately not
       // launched: it is an authorization hook, and this write has already
       // been judged by the `ldap*request` hook of whatever drove it —
-      // re-running it here would judge the same write twice.
-      void launchHooks(
-        this.parent.hooks.ldaprenamedone,
-        [dn, newDn],
-        changeContext(req)
+      // re-running it here would judge the same write twice. Outside the
+      // operation a request hook may have moved it from (the trash moves
+      // from ldapdeleterequest): this move is not that write.
+      void outsideOperation(() =>
+        launchHooks(
+          this.parent.hooks.ldaprenamedone,
+          [dn, newDn],
+          changeContext(req)
+        )
       );
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
@@ -1538,11 +1548,14 @@ class ldapActions {
    */
   async delete(dn: string | string[], req?: Request): Promise<boolean> {
     const requested = (Array.isArray(dn) ? dn : [dn]).map(d => this.setDn(d));
+    const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {
-      return await this.applyDelete([...requested], req, done);
+      return await runOperation(op, () =>
+        this.applyDelete(requested, req, done)
+      );
     } finally {
-      this.endOperation(done, this.parent?.hooks.ldapdeleteend, requested);
+      this.endOperation(done, this.parent?.hooks.ldapdeleteend, op);
     }
   }
 
@@ -1600,8 +1613,9 @@ class ldapActions {
   /**
    * Launch the "end" hooks of a write once its "done" hooks have returned,
    * whatever became of it: written, refused by a request hook, taken out of
-   * the request by one, or failed in the directory. A plugin keeping state
-   * from a request hook to a done one drops there what no done hook took.
+   * the request by one, or failed in the directory, with its operation
+   * number. A plugin keeping state from a request hook to a done one, keyed
+   * by `currentOperation()`, drops there what no done hook took.
    */
   private endOperation(
     done: Promise<void>[],
