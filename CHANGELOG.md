@@ -16,6 +16,10 @@
   or rename: for a plugin that keeps something from one to the other —
   [hooks](docs/plugin-development/hooks.md#ldapmodifyend-ldapdeleteend-ldaprenameend)
 
+- Plugin API: `registerBodyParser` runs a plugin's body parser ahead of the
+  global ones and of authentication —
+  [plugin development](docs/plugin-development/README.md#parsing-request-bodies)
+
 ### Fixes
 
 - Browser `HmacAuthClient`: `post`, `put` and `patch` send a string body as
@@ -35,6 +39,10 @@
   or by the directory. After a refused rename, a later move of the entry no
   longer published a rename with that stale entry as its "before"
   ([#225](https://github.com/linagora/ldap-rest/issues/225))
+
+- `core/scim` parses SCIM bodies only when it is loaded: without it, a
+  request under `--scim-prefix` is held to the global 100 kB limit again
+  ([#268](https://github.com/linagora/ldap-rest/issues/268))
 
 ## v0.13.4 (2026-10-02)
 

@@ -60,7 +60,7 @@ DM_AUTH_HMAC_WINDOW=120000  # Default: 120000ms (2 minutes)
 
    Only a body the server parses before checking the signature can be signed:
    `application/json`, `application/x-www-form-urlencoded` and, under the
-   SCIM prefix, `application/scim+json`. A POST, PATCH or PUT carrying any other body,
+   prefix of a loaded `core/scim`, `application/scim+json`. A POST, PATCH or PUT carrying any other body,
    such as a `multipart/form-data` bulk import upload, is refused with `401`.
    So is a GET, DELETE or HEAD carrying a body, since they are signed without
    one.

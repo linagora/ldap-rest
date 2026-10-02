@@ -97,6 +97,8 @@ export class DM {
     dispatcherMounted: false,
   };
   private _errorMiddlewareSetup: boolean = false;
+  /** The parsers plugins mount ahead of the global ones, see registerBodyParser */
+  private readonly bodyParsers = express.Router();
   /**
    * Whether the plugins of the configuration are loaded and their
    * composition checked. A plugin registered after that — a server
@@ -111,18 +113,7 @@ export class DM {
     this.app = express();
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
-    //
-    // SCIM bodies are parsed here, not by the SCIM routes: core/auth/hmac
-    // hashes the body before those routes run. Mounted ahead of the global
-    // parser so that an application/json SCIM request gets the SCIM limit too.
-    this.app.use(
-      (this.config.scim_prefix as string) || '/scim/v2',
-      bodyParser.json({
-        type: ['application/json', 'application/scim+json'],
-        limit: `${(this.config.scim_bulk_max_payload_size as number) || 1048576}b`,
-        verify: keepRawBody,
-      })
-    );
+    this.app.use(this.bodyParsers);
     this.app.use(bodyParser.json({ verify: keepRawBody }));
     this.app.use(
       bodyParser.urlencoded({ extended: true, verify: keepRawBody })
@@ -299,6 +290,22 @@ export class DM {
   registerAuthenticator(plugin: AuthBase): void {
     this.mountAuthDispatcherNow();
     if (!this.authenticators.includes(plugin)) this.authenticators.push(plugin);
+  }
+
+  /**
+   * Parse the bodies under `path` with `parser`, ahead of the global JSON and
+   * form parsers, which then leave them alone: for another media type or
+   * size limit there. Authentication runs before the routes, so a parser
+   * mounted by a route would come too late for core/auth/hmac.
+   *
+   * The parser must pass `keepRawBody` as `verify`: core/auth/hmac refuses a
+   * body whose bytes were not kept.
+   *
+   * @param path the prefix whose bodies `parser` reads
+   * @param parser a body-parser middleware
+   */
+  registerBodyParser(path: string, parser: express.RequestHandler): void {
+    this.bodyParsers.use(path, parser);
   }
 
   /**
