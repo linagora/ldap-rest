@@ -73,6 +73,8 @@ export default class TwakeInstances extends DmPlugin {
   protected readonly sentAttribute: string;
   private readonly locale: string;
   private readonly lifecycle: LifecycleAttributes;
+  /** The Cloudery offer of each `--twake-instance-dn` expression, when several */
+  private readonly offers: string[] = [];
   /** Work on one account, or organization, waits for the work before it */
   private readonly queues = new Map<string, Promise<unknown>>();
 
@@ -125,11 +127,17 @@ export default class TwakeInstances extends DmPlugin {
         throw new Error(
           `${this.name}: --twake-instance-cloudery-url and --twake-instance-cloudery-domain are required`
         );
+      const offers = (cfg.twake_instance_cloudery_offer || '').split(';');
+      if (offers.length > 1 && offers.length > this.patterns.length)
+        throw new Error(
+          `${this.name}: --twake-instance-cloudery-offer has more offers than --twake-instance-dn has expressions`
+        );
+      if (offers.length > 1) this.offers = offers;
       this.provider = new ClouderyProvider(
         cfg.twake_instance_cloudery_url.replace(/\/$/, ''),
         cfg.twake_instance_cloudery_token || '',
         cfg.twake_instance_cloudery_domain,
-        cfg.twake_instance_cloudery_offer || '',
+        offers.length > 1 ? '' : offers[0],
         timeout
       );
       this.locale = cfg.twake_instance_locale || 'en';
@@ -809,6 +817,7 @@ export default class TwakeInstances extends DmPlugin {
     const orgDomain = match.groups?.org
       ? email.split('@')[1]
       : (cozy && this.config.twake_instance_cozy_org_domain) || undefined;
+    const offer = this.offers[this.patterns.findIndex(p => p.test(dn))];
     return {
       id: this.id(uid, match),
       // cozyProvision's OIDC id, the uid; the Cloudery's is the slug
@@ -823,6 +832,7 @@ export default class TwakeInstances extends DmPlugin {
       phone: first(this.value(entry, 'mobile')),
       ...(orgId ? { orgId } : {}),
       ...(orgDomain ? { orgDomain } : {}),
+      ...(offer ? { offer } : {}),
     };
   }
 

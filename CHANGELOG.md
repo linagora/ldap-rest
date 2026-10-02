@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/twake/instances`: `--twake-instance-cloudery-offer` takes one offer
+  per `--twake-instance-dn` expression, separated by `;` in the same order,
+  see [instances](docs/usage/plugins/integrations/instances.md#configuration);
+  a single offer still applies to every account
+  ([#263](https://github.com/linagora/ldap-rest/issues/263))
+
 ## v0.13.3 (2026-10-02)
 
 ### Features

@@ -421,6 +421,7 @@ describe('Twake instances plugin', function () {
         oidc: 'indaveacme1',
         org_id: 'acme1',
         org_domain: 'acme.example',
+        offer: 'standard',
       });
       await rabbit.handler!({
         twakeId: 'indaveacme1',
@@ -680,6 +681,86 @@ describe('Twake instances plugin', function () {
           'ready'
         );
         expect(rabbit.published).to.have.lengthOf(1);
+      });
+    });
+
+    describe('with one offer per DN expression', () => {
+      let dm2: DM;
+      const orgDn = `ou=acme3,${ORGS}`;
+
+      before(async () => {
+        ({ dm: dm2 } = await server({
+          ...CLOUDERY_CONFIG,
+          twake_instance_cloudery_offer: 'personal;business',
+        }));
+        await dm2.ldap.add(orgDn, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'acme3',
+          l: 'acme.example',
+        });
+      });
+
+      after(async () => {
+        for (const dn of [
+          dnOf('in-erin'),
+          orgDnOf('acme3', 'in.frank'),
+          `ou=users,${orgDn}`,
+          orgDn,
+        ])
+          await dm2.ldap.delete(dn).catch(() => undefined);
+      });
+
+      const offerAsked = async (
+        fqdn: string,
+        add: () => Promise<unknown>
+      ): Promise<unknown> => {
+        let asked: Record<string, unknown> = {};
+        search(fqdn)
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => {
+            asked = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(202, {});
+        await add();
+        return asked.offer;
+      };
+
+      it('keeps the organization’s own offer', async () => {
+        nock(CLOUDERY).post('/api/v2/organizations').reply(201, {});
+        expect(
+          await offerAsked('acme3.example.org', () =>
+            plugin(dm2).ensureOrganization({
+              id: 'acme3',
+              name: 'Acme',
+              domain: 'acme.example',
+            })
+          )
+        ).to.equal('organization');
+      });
+
+      it('asks for the offer of the expression the account matches', async () => {
+        await dm2.ldap.modify(orgDn, {
+          replace: { businessCategory: '2026-01-01T00:00:00.000Z' },
+        });
+        await dm2.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
+        });
+        expect(
+          await offerAsked('in-erin.example.org', () =>
+            dm2.ldap.add(dnOf('in-erin'), person('in-erin'), rest())
+          )
+        ).to.equal('personal');
+        expect(
+          await offerAsked('infrankacme3.example.org', () =>
+            dm2.ldap.add(
+              orgDnOf('acme3', 'in.frank'),
+              { ...person('in.frank'), mail: 'in.frank@acme.example' },
+              rest()
+            )
+          )
+        ).to.equal('business');
       });
     });
 
@@ -1408,6 +1489,12 @@ describe('Twake instances plugin', function () {
         'core/twake/clouderyProvision',
       ])
         expect(await construct({ plugin: [old] })).to.throw(/load one of them/);
+    });
+
+    it('refuses more Cloudery offers than DN expressions', async () => {
+      expect(
+        await construct({ twake_instance_cloudery_offer: 'a;b;c' })
+      ).to.throw(/more offers/);
     });
 
     it('refuses an id template naming a group no DN rule captures', async () => {
