@@ -1,6 +1,7 @@
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { expect } from 'chai';
+import type { RequestHandler } from 'express';
 
 import { DM } from '../../../src/bin';
 import AuthHmac from '../../../src/plugins/auth/hmac';
@@ -26,6 +27,11 @@ describe('HmacAuthClient against core/auth/hmac', () => {
     dm.app.post('/api/hmac-client-echo', (req, res) => {
       res.json({ type: req.headers['content-type'], body: req.body });
     });
+    const method: RequestHandler = (req, res) => {
+      res.json({ method: req.method });
+    };
+    dm.app.get('/api/hmac-client-echo', method);
+    dm.app.delete('/api/hmac-client-echo', method);
     server = dm.app.listen(0);
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     // The client takes the path it signs from the page's origin
@@ -67,5 +73,14 @@ describe('HmacAuthClient against core/auth/hmac', () => {
       type: 'application/x-www-form-urlencoded',
       body: { a: 'b' },
     });
+  });
+
+  it('signs a GET and a DELETE, which carry no body', async () => {
+    const got = await client.get(`${origin}/api/hmac-client-echo`);
+    expect(got.status).to.equal(200);
+    expect(await got.json()).to.deep.equal({ method: 'GET' });
+    const deleted = await client.delete(`${origin}/api/hmac-client-echo`);
+    expect(deleted.status).to.equal(200);
+    expect(await deleted.json()).to.deep.equal({ method: 'DELETE' });
   });
 });
