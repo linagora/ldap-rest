@@ -324,9 +324,18 @@ describe('onChange', () => {
           sn: 'Doe',
         });
         created.push(child, ou);
-        // Not a leaf (66)
-        await failure(dm.ldap.delete(ou));
+        const remove = later('ldapdeleterequest', (args: unknown) => {
+          keptWhenRefused = kept();
+          return args;
+        });
+        try {
+          // Not a leaf (66)
+          await failure(dm.ldap.delete(ou));
+        } finally {
+          remove();
+        }
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+        expect(keptWhenRefused, 'kept before the write').to.equal(1);
       });
 
       it('keeps nothing of a modify refused after it was read', async () => {
@@ -346,9 +355,18 @@ describe('onChange', () => {
 
       it('keeps nothing of a modify the directory refuses', async () => {
         const dn = await addUser('ochmodbad');
-        // inetOrgPerson holds no uidNumber
-        await failure(dm.ldap.modify(dn, { replace: { uidNumber: 'x' } }));
+        const remove = later('ldapmodifyrequest', (args: unknown) => {
+          keptWhenRefused = kept();
+          return args;
+        });
+        try {
+          // inetOrgPerson holds no uidNumber
+          await failure(dm.ldap.modify(dn, { replace: { uidNumber: 'x' } }));
+        } finally {
+          remove();
+        }
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+        expect(keptWhenRefused, 'kept before the write').to.equal(1);
       });
 
       it('publishes a delete while another of the same DN is refused', async () => {
@@ -385,6 +403,8 @@ describe('onChange', () => {
           open();
           await write;
         } finally {
+          // Released whatever failed, or the held delete would never end
+          open();
           hooks.splice(hooks.indexOf(deny), 1);
           remove();
         }
@@ -392,6 +412,36 @@ describe('onChange', () => {
           () => entryChanges.some(([d, , after]) => d === dn && after === null),
           { what: `the delete of ${dn}` }
         );
+        await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
+      });
+
+      it('publishes a rename once when its request chain moves the entry', async () => {
+        const dn = await addUser('ochrenmv');
+        const away = user('ochrenmv-away');
+        const newDn = user('ochrenmv2');
+        // A later request hook moves the entry away and back: those moves
+        // are not the rename, and must not take its snapshot
+        const remove = later(
+          'ldaprenamerequest',
+          async ([from, to, req]: [string, string, Request?]) => {
+            await dm.ldap.move(from, away);
+            await dm.ldap.move(away, from);
+            return [from, to, req];
+          }
+        );
+        try {
+          await dm.ldap.rename(dn, newDn);
+        } finally {
+          remove();
+        }
+        created.push(newDn);
+        await waitFor(() => entryChanges.some(([d]) => d === newDn), {
+          what: `the rename to ${newDn}`,
+        });
+        await settle('ochrenmv');
+        const renames = entryChanges.filter(([, before]) => before?.dn === dn);
+        expect(renames.map(([d]) => d)).to.eql([newDn]);
+        expect(entryChanges.filter(([d]) => d === away)).to.eql([]);
         await waitFor(() => kept() === 0, { what: 'the snapshot dropped' });
       });
 

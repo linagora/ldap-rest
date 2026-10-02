@@ -57,6 +57,9 @@ never reaches its "done" hook; its "end" hook fires all the same.
   `currentOperation()` (`lib/operation`) returns it inside the request and
   "done" hooks. Key what you keep by it rather than by DN: two writes of one
   DN may be under way, and only the operation tells them apart.
+  Outside those hooks it is whatever encloses the call (an add made from a
+  delete's request hook sees the delete's number): in an end hook, use the
+  number it is given.
 - It is launched once the "done" subscribers of the operation have returned,
   and is not awaited by the write.
 - A move (`ldapActions.move`) launches no request hook and no end hook, and

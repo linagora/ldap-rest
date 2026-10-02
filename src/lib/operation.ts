@@ -40,7 +40,14 @@ export function outsideOperation<T>(fn: () => T): T {
 /**
  * The operation a hook is called for.
  *
- * @returns its number, or undefined outside a modify, delete or rename
+ * Inside the request and "done" hooks of a modify, delete or rename, it is
+ * that write. Elsewhere it is whatever encloses the call: an add or a search
+ * made from a delete's request hook (the trash, a tombstone) sees the
+ * delete's number, and the "end" hooks run in their caller's context, so an
+ * end subscriber must use the number it is given, not this.
+ *
+ * @returns the number of the modify, delete or rename the call runs inside,
+ * or undefined outside any
  */
 export function currentOperation(): number | undefined {
   return operations.getStore();
