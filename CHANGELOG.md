@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Security
+
+- `lsc-plugin`: jackson-databind 2.22.1 → 2.22.3, clearing five advisories
+  (CVE-2026-19032, CVE-2026-68497, CVE-2026-83557, CVE-2026-91776,
+  CVE-2026-91777)
+
 ### Fixes
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
