@@ -27,7 +27,8 @@ GET, DELETE or HEAD, or a signed body under a `charset` other than UTF-8.
 These methods are signed without a body, so one they carried reached the
 route unsigned; and the signature covers the bytes, not the charset that says
 how to read them. Both are now answered `401`: send GET, DELETE and HEAD
-without a body, and bodies in UTF-8
+without a body (and without `Transfer-Encoding`, which announces one), and
+bodies in UTF-8
 ([#257](https://github.com/linagora/ldap-rest/issues/257)).
 
 ## To 0.13.3

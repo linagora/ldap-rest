@@ -32,15 +32,6 @@ interface HmacService {
   name: string;
 }
 
-/**
- * Whether a Content-Type reads its body as UTF-8: it names no charset, or
- * that one
- */
-function isUtf8(contentType: string | undefined): boolean {
-  const charset = /;\s*charset\s*=\s*"?([^";\s]+)/i.exec(contentType ?? '');
-  return !charset || /^utf-?8$/i.test(charset[1]);
-}
-
 export default class AuthHmac extends AuthBase {
   protected knownIdentities(): string[] {
     return [...this.services.values()].map(service => service.name);
@@ -219,18 +210,19 @@ export default class AuthHmac extends AuthBase {
     // Signed without a body: one they carry anyway would reach the route
     // unsigned
     if (method === 'GET' || method === 'DELETE' || method === 'HEAD')
-      return raw?.length || unread ? undefined : '';
+      return raw?.bytes.length || unread ? undefined : '';
 
     if (unread) return undefined;
-    if (!raw?.length) return '';
+    if (!raw?.bytes.length) return '';
 
     // The signature covers the bytes, not the Content-Type saying how to read
     // them: the same bytes resent under another charset would be read as
-    // other characters
-    if (!isUtf8(req.headers['content-type'])) return undefined;
+    // other characters. The charset is the one the parser decodes with, not
+    // a reading of the header of our own, which could disagree with it.
+    if (raw.encoding !== 'utf-8') return undefined;
 
     // Hash the bytes received, as the client signed them
-    return createHash('sha256').update(raw).digest('hex');
+    return createHash('sha256').update(raw.bytes).digest('hex');
   }
 
   /**

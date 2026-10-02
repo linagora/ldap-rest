@@ -468,6 +468,42 @@ describe('AuthHmac', () => {
       expect(res.status).to.equal(401);
     });
 
+    for (const [label, contentType, raw] of [
+      [
+        'a form',
+        'application/x-www-form-urlencoded; foo="; charset=utf-8"; charset=iso-8859-1',
+        Buffer.from('cn=%C3%A9'),
+      ],
+      [
+        'JSON',
+        'application/json; x="; charset=utf-8"; charset=utf-16le',
+        Buffer.from('{"a":"b"}', 'utf16le'),
+      ],
+    ] as const) {
+      it(`should read the charset of ${label} as the parser does`, async () => {
+        // Another parameter's quoted value names UTF-8; the charset the
+        // parser decodes with is the last one
+        const timestamp = Date.now();
+        // Signed on the bytes sent, which the helper would re-encode
+        const bodyHash = createHash('sha256').update(raw).digest('hex');
+        const signature = createHmac('sha256', secret)
+          .update(`POST|/api/hello|${timestamp}|${bodyHash}`)
+          .digest('hex');
+
+        const res = await request(app)
+          .post('/api/hello')
+          .set(
+            'Authorization',
+            createAuthHeader(serviceId, timestamp, signature)
+          )
+          .set('Content-Type', contentType)
+          .serialize(() => raw as unknown as string) // the bytes as they are
+          .send(raw);
+
+        expect(res.status).to.equal(401);
+      });
+    }
+
     it('should accept a signed body that names UTF-8', async () => {
       const timestamp = Date.now();
       const raw = '{"cn":"é"}';
