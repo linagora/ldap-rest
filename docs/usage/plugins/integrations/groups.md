@@ -55,8 +55,8 @@ A group reads:
 display name reads its `cn`.
 
 - `GET /groups?page&limit&search&sortBy&sortOrder`: `search` (2 characters
-  or more) matches the display name and the description; `sortBy` is
-  `displayName`, `description` or `createdAt`. Answers
+  or more; an empty one lists everything) matches the display name and the
+  description; `sortBy` is `displayName`, `description` or `createdAt`. Answers
   `{ organizationId, groups, pagination: { page, limit, total, totalPages } }`.
 - `POST /groups` with `{ name, description?, color? }`: `name` is at most 256
   characters, not blank, without control characters, and unique in the

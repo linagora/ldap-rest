@@ -496,7 +496,8 @@ export default class TwakeGroups extends LdapGroups {
       1,
       Math.min(parseInt(req.query.limit as string) || 20, this.maxPage)
     );
-    const search = req.query.search as string | undefined;
+    // An empty search box sends `search=`: that is no search, not a short one
+    const search = (req.query.search as string | undefined) || undefined;
     if (
       search !== undefined &&
       (typeof search !== 'string' || search.length < 2)
