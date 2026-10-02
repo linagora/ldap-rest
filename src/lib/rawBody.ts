@@ -4,6 +4,9 @@
  */
 import type { IncomingMessage } from 'http';
 
+import bodyParser from 'body-parser';
+import type { RequestHandler } from 'express';
+
 /** A body as such a parser read it */
 export interface RawBody {
   /** The bytes received, once Content-Encoding is removed */
@@ -41,4 +44,17 @@ export function keepRawBody(
  */
 export function rawBodyOf(req: IncomingMessage): RawBody | undefined {
   return rawBodies.get(req);
+}
+
+/**
+ * A JSON parser that keeps the bytes it reads, for `DM.registerBodyParser`:
+ * core/auth/hmac refuses a body whose bytes were not kept
+ *
+ * @param options body-parser JSON options
+ * @returns the parser
+ */
+export function jsonBodyParser(
+  options: Omit<bodyParser.OptionsJson, 'verify'> = {}
+): RequestHandler {
+  return bodyParser.json({ ...options, verify: keepRawBody });
 }

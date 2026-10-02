@@ -17,7 +17,8 @@
   [hooks](docs/plugin-development/hooks.md#ldapmodifyend-ldapdeleteend-ldaprenameend)
 
 - Plugin API: `registerBodyParser` runs a plugin's body parser ahead of the
-  global ones and of authentication —
+  global ones and of authentication, and `jsonBodyParser` builds one that
+  keeps the bytes `core/auth/hmac` checks —
   [plugin development](docs/plugin-development/README.md#parsing-request-bodies)
 
 ### Fixes
@@ -40,8 +41,10 @@
   longer published a rename with that stale entry as its "before"
   ([#225](https://github.com/linagora/ldap-rest/issues/225))
 
-- `core/scim` parses SCIM bodies only when it is loaded: without it, a
-  request under `--scim-prefix` is held to the global 100 kB limit again
+- `core/scim` parses SCIM bodies only when it is loaded: without it, an
+  `application/json` request under `--scim-prefix` is held to the global
+  100 kB limit again, and an `application/scim+json` body is no longer read,
+  so `core/auth/hmac` refuses it with `401`
   ([#268](https://github.com/linagora/ldap-rest/issues/268))
 
 ## v0.13.4 (2026-10-02)

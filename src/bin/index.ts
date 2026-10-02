@@ -298,8 +298,9 @@ export class DM {
    * size limit there. Authentication runs before the routes, so a parser
    * mounted by a route would come too late for core/auth/hmac.
    *
-   * The parser must pass `keepRawBody` as `verify`: core/auth/hmac refuses a
-   * body whose bytes were not kept.
+   * `jsonBodyParser` builds a JSON one that keeps the bytes it reads; any
+   * other must pass `keepRawBody` as `verify`: core/auth/hmac refuses a body
+   * whose bytes were not kept.
    *
    * @param path the prefix whose bodies `parser` reads
    * @param parser a body-parser middleware

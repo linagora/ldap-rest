@@ -699,20 +699,17 @@ or limit under its prefix registers its own parser, which runs ahead of
 those:
 
 ```typescript
-import bodyParser from 'body-parser';
-import { keepRawBody } from '../../lib/rawBody';
+import { jsonBodyParser } from '../../lib/rawBody';
 
 api(app: Express): void {
-  this.server.registerBodyParser(
-    '/myplugin',
-    bodyParser.json({ limit: '1mb', verify: keepRawBody })
-  );
+  this.server.registerBodyParser('/myplugin', jsonBodyParser({ limit: '1mb' }));
 }
 ```
 
-Pass `keepRawBody` as `verify`: `core/auth/hmac` hashes the bytes it keeps,
-and refuses a body whose bytes were not kept. A parser mounted with
-`app.use()` in `api()` runs after authentication, too late for that check.
+`jsonBodyParser` keeps the bytes it reads, which `core/auth/hmac` hashes. Any
+other parser must pass `keepRawBody` as `verify`, or `core/auth/hmac` refuses
+its bodies with `401`. A parser mounted with `app.use()` in `api()` runs
+after authentication, too late for that check.
 
 #### Error Handling Best Practices
 

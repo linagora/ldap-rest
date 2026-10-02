@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import bodyParser from 'body-parser';
 import request from 'supertest';
 
 import { DM } from '../src/bin';
@@ -9,7 +8,7 @@ import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
 import type { Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
-import { keepRawBody } from '../src/lib/rawBody';
+import { jsonBodyParser } from '../src/lib/rawBody';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {
@@ -258,10 +257,7 @@ describe('Server internals', () => {
       dm.app.post(['/big/probe', '/api/probe'], (req, res) => {
         res.json({ length: (req.body as typeof big).padding.length });
       });
-      dm.registerBodyParser(
-        '/big',
-        bodyParser.json({ limit: '1mb', verify: keepRawBody })
-      );
+      dm.registerBodyParser('/big', jsonBodyParser({ limit: '1mb' }));
 
       const res = await request(dm.app).post('/big/probe').send(big);
       expect(res.status).to.equal(200);

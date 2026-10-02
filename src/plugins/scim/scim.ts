@@ -9,15 +9,15 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-import bodyParser from 'body-parser';
-import type { Express, Request } from 'express';
+import type { Express, Request, RequestHandler } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
-import { keepRawBody } from '../../lib/rawBody';
+import { jsonBodyParser } from '../../lib/rawBody';
+import type { Config } from '../../config/args';
 
 import { BaseResolver } from './baseResolver';
 import { ScimUsers } from './users';
@@ -432,6 +432,21 @@ import {
  *         resourceType: { type: string, example: Schema }
  *         location: { type: string }
  */
+/**
+ * The parser core/scim registers under its prefix: application/json too, so
+ * that a SCIM request sent as such gets the SCIM limit rather than the global
+ * parser's 100kb
+ *
+ * @param config the configuration holding the SCIM limit
+ * @returns the parser
+ */
+export function scimBodyParser(config: Config): RequestHandler {
+  return jsonBodyParser({
+    type: ['application/json', 'application/scim+json'],
+    limit: `${(config.scim_bulk_max_payload_size as number) || 1048576}b`,
+  });
+}
+
 export default class Scim extends DmPlugin {
   name = 'scim';
   roles: Role[] = ['api', 'configurable'] as const;
@@ -581,16 +596,7 @@ export default class Scim extends DmPlugin {
   api(app: Express): void {
     const prefix = this.scimPrefix;
 
-    // application/json too, so that a SCIM request sent as such gets the
-    // SCIM limit rather than the global parser's 100kb
-    this.server.registerBodyParser(
-      prefix,
-      bodyParser.json({
-        type: ['application/json', 'application/scim+json'],
-        limit: `${(this.config.scim_bulk_max_payload_size as number) || 1048576}b`,
-        verify: keepRawBody,
-      })
-    );
+    this.server.registerBodyParser(prefix, scimBodyParser(this.config));
 
     // RFC 7644 section 3.9 makes `attributes` and `excludedAttributes`
     // mutually exclusive. Refuse the pair before any handler runs, not while
