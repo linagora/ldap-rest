@@ -1497,6 +1497,36 @@ describe('Twake instances plugin', function () {
       ).to.throw(/more offers/);
     });
 
+    it('reads the Cloudery offers as written in an environment variable', async () => {
+      const offersOf = async (offer: string) => {
+        const instances = (
+          await construct({
+            twake_instance_dn: ['ou=a$', 'ou=b$', 'ou=c$'],
+            twake_instance_cloudery_offer: offer,
+          })
+        )() as unknown as {
+          account: (dn: string, entry: AttributesList) => { offer?: string };
+        };
+        return ['a', 'b', 'c'].map(
+          ou =>
+            instances.account(`uid=x,ou=${ou}`, {
+              uid: 'x',
+              mail: 'x@example.org',
+            }).offer
+        );
+      };
+      expect(await offersOf(' personal ;; business ;')).to.deep.equal([
+        'personal',
+        undefined,
+        'business',
+      ]);
+      expect(await offersOf('personal;business')).to.deep.equal([
+        'personal',
+        'business',
+        undefined,
+      ]);
+    });
+
     it('refuses an id template naming a group no DN rule captures', async () => {
       expect(await construct({ twake_instance_id: '{uid}{orgg}' })).to.throw(
         /\{orgg\}/

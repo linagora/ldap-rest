@@ -127,7 +127,11 @@ export default class TwakeInstances extends DmPlugin {
         throw new Error(
           `${this.name}: --twake-instance-cloudery-url and --twake-instance-cloudery-domain are required`
         );
-      const offers = (cfg.twake_instance_cloudery_offer || '').split(';');
+      const offers = (cfg.twake_instance_cloudery_offer || '')
+        .split(';')
+        .map(o => o.trim());
+      // Ends with `;` like the expressions of DM_TWAKE_INSTANCE_DN
+      if (offers.length > 1 && offers[offers.length - 1] === '') offers.pop();
       if (offers.length > 1 && offers.length > this.patterns.length)
         throw new Error(
           `${this.name}: --twake-instance-cloudery-offer has more offers than --twake-instance-dn has expressions`
