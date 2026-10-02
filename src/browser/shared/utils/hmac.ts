@@ -175,6 +175,11 @@ export class HmacAuthClient {
     }
 
     if (typeof body === 'string') {
+      // fetch would send it as text/plain, which the server does not read:
+      // a string here is JSON already serialized, unless the caller says
+      // otherwise
+      if (!headers.has('Content-Type'))
+        headers.set('Content-Type', 'application/json');
       return body;
     }
 
