@@ -21,6 +21,9 @@
   change of its members' roles is published on the `--twake-space-exchange`
   topic exchange (default `space`) as `twake.space.*` events; the server does
   not start when the broker cannot be reached
+- `core/twake/spaces`: when a deleted user was a space's last admin, its
+  editors, or else its viewers, become admins; a space left with no user of
+  its own is deleted
 
 ### Fixes
 

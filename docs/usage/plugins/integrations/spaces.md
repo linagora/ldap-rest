@@ -29,6 +29,11 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   be added.
 - An erased user or group leaves its spaces through the directory: enable the
   `refint` overlay on the three role attributes.
+- When a user who is erased or becomes a tombstone was the last admin among
+  a space's users, its editors become admins, or its viewers when it has no
+  editor. A space left with no user of its own is deleted, whatever groups
+  it links. Both happen shortly after the deletion, and publish their
+  events.
 - With `--twake-space-user-role-attribute`, each user entry holds one
   `<space id>:<role>` value per space they are in, their resolved role. It
   follows every write of a space, every change of a linked group's members,
@@ -188,6 +193,6 @@ organization's users, groups and organization entry.
 ```
 core/twake/spaces
   ├─ requires: core/twake/groups
-  ├─ requires: core/ldap/onChange (with a user role attribute or RabbitMQ)
+  ├─ requires: core/ldap/onChange
   └─ requires: core/rabbitmq (with RabbitMQ)
 ```
