@@ -8,6 +8,13 @@
   (CVE-2026-19032, CVE-2026-68497, CVE-2026-83557, CVE-2026-91776,
   CVE-2026-91777)
 
+### Features
+
+- `core/twake/spaces`: spaces of an organization, under
+  `/api/v1/organizations/:id/spaces`, holding users and linked groups each as
+  viewer, editor or admin, and always one admin:
+  [spaces](docs/usage/plugins/integrations/spaces.md)
+
 ### Fixes
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
