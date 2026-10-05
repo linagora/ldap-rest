@@ -14,6 +14,9 @@
   `/api/v1/organizations/:id/spaces`, holding users and linked groups each as
   viewer, editor or admin; the routes keep one admin:
   [spaces](docs/usage/plugins/integrations/spaces.md)
+- `core/twake/spaces`: `--twake-space-user-role-attribute` keeps each user's
+  role in every space, linked groups included, on their entry as
+  `<space id>:<role>`
 
 ### Fixes
 

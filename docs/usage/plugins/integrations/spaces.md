@@ -29,6 +29,12 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   be added.
 - An erased user or group leaves its spaces through the directory: enable the
   `refint` overlay on the three role attributes.
+- With `--twake-space-user-role-attribute`, each user entry holds one
+  `<space id>:<role>` value per space they are in, their resolved role. It
+  follows every write of a space, every change of a linked group's members,
+  and the deletion of a linked group, whichever API makes them, shortly after
+  the write. Other values of the attribute are left alone. A tombstone keeps
+  the values it held when it was deleted.
 
 ## Routes
 
@@ -108,10 +114,14 @@ organization's users, groups and organization entry.
   `--twake-space-editor-attribute` (default `twakeSpaceEditor`),
   `--twake-space-viewer-attribute` (default `twakeSpaceViewer`): the role
   attributes, holding DNs.
+- `--twake-space-user-role-attribute` (no default): the multi-valued user
+  attribute holding the user's role in each space, such as `twakeSpaceRole`.
+  Unset, no user entry is written.
 
 ## Dependencies
 
 ```
 core/twake/spaces
-  └─ requires: core/twake/groups
+  ├─ requires: core/twake/groups
+  └─ requires: core/ldap/onChange (with a user role attribute)
 ```

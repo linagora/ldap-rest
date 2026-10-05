@@ -21,6 +21,7 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
+import { currentOperation } from '../../lib/operation';
 import { escapeDnValue, escapeLdapFilter } from '../../lib/utils';
 
 import type TwakeGroups from './groups';
@@ -72,6 +73,20 @@ interface SpaceEntry {
   id: string;
   name: string;
   holders: Holder[];
+}
+
+/** The member DNs of groups, by group DN key. */
+type Members = Map<string, string[]>;
+
+interface Resolved {
+  dn: string;
+  role: SpaceRole;
+}
+
+interface DeletedGroup {
+  org: string;
+  members: string[];
+  spaces: { id: string; role: SpaceRole }[];
 }
 
 export type Space = {
@@ -142,12 +157,21 @@ function holdersOf(
 export default class TwakeSpaces extends DmPlugin {
   name = 'twakeSpaces';
   roles: Role[] = ['api'];
-  dependencies = { twakeGroups: 'core/twake/groups' };
+  dependencies: Record<string, string> = { twakeGroups: 'core/twake/groups' };
 
   private readonly spaceBase: string;
   private readonly spacePattern: RegExp;
   private readonly displayName: string;
   readonly roleAttributes: Record<SpaceRole, string>;
+  private readonly userRole: string;
+  /**
+   * The groups being deleted, by operation and DN: once deleted, their
+   * members are gone, and refint may take them out of their spaces before
+   * the deletion is followed.
+   */
+  private readonly deleting = new Map<number, Map<string, DeletedGroup>>();
+  /** Changes are followed one at a time, in the order they land. */
+  private following: Promise<void> = Promise.resolve();
 
   constructor(server: DM) {
     super(server);
@@ -162,6 +186,8 @@ export default class TwakeSpaces extends DmPlugin {
       editor: this.config.twake_space_editor_attribute || 'twakeSpaceEditor',
       viewer: this.config.twake_space_viewer_attribute || 'twakeSpaceViewer',
     };
+    this.userRole = this.config.twake_space_user_role_attribute || '';
+    if (this.userRole) this.dependencies.onLdapChange = 'core/ldap/onChange';
   }
 
   private get groups(): TwakeGroups {
@@ -180,7 +206,52 @@ export default class TwakeSpaces extends DmPlugin {
           if (set) this.checkHolders(dn, valueOf(set, attribute));
       return [dn, changes, op, req];
     },
+    ldapdeleterequest: async ([dn, req]) => {
+      const op = currentOperation();
+      if (this.userRole && op !== undefined)
+        for (const one of [dn].flat()) {
+          const deleted = await this.deletedGroup(one);
+          if (!deleted) continue;
+          if (!this.deleting.has(op)) this.deleting.set(op, new Map());
+          this.deleting.get(op)!.set(dnKey(one), deleted);
+        }
+      return [dn, req];
+    },
+    ldapdeletedone: dn => {
+      const op = currentOperation();
+      const kept = op === undefined ? undefined : this.deleting.get(op);
+      for (const one of [dn].flat()) {
+        const deleted = kept?.get(dnKey(one));
+        if (deleted) this.queue(one, () => this.unlink(one, deleted));
+      }
+    },
+    ldapdeleteend: op => {
+      this.deleting.delete(op);
+    },
+    onLdapEntryChange: (dn, before, after) => {
+      if (this.userRole)
+        this.queue(dn, () =>
+          this.follow(
+            dn,
+            before as AttributesList | null,
+            after as AttributesList | null
+          )
+        );
+    },
   };
+
+  private queue(dn: string, task: () => Promise<void>): void {
+    this.following = this.following.then(() =>
+      task().catch((err: unknown) => {
+        this.logger.error({
+          plugin: this.name,
+          event: 'follow',
+          dn,
+          error: String(err),
+        });
+      })
+    );
+  }
 
   /** The organization a space DN belongs to, if it is a space at all. */
   organizationOf(dn: string): string | undefined {
@@ -325,6 +396,7 @@ export default class TwakeSpaces extends DmPlugin {
             await this.orgGroups(
               org,
               linked.map(g => g.name),
+              [],
               req
             )
           ).map(e => [
@@ -446,12 +518,26 @@ export default class TwakeSpaces extends DmPlugin {
         throw err;
       }
     };
-    const [entries, tombstones] = await Promise.all([
+    const [entries, hidden] = await Promise.all([
       search(),
-      this.groups.tombstonesOf(org, req),
+      this.hidden(org, req),
     ]);
-    const hidden = new Set(tombstones.map(dnKey));
     return entries.map(e => this.entryOf(org, e, hidden));
+  }
+
+  private async hidden(org: string, req?: Request): Promise<Set<string>> {
+    return new Set((await this.groups.tombstonesOf(org, req)).map(dnKey));
+  }
+
+  /** A filter for the spaces holding any of these DNs, whatever the role. */
+  private holding(dns: string[]): string {
+    return `(|${dns
+      .flatMap(dn =>
+        Object.values(this.roleAttributes).map(
+          a => `(${a}=${escapeLdapFilter(dn)})`
+        )
+      )
+      .join('')})`;
   }
 
   private async space(
@@ -515,6 +601,7 @@ export default class TwakeSpaces extends DmPlugin {
   private async orgGroups(
     org: string,
     ids: string[],
+    extra: string[] = [],
     req?: Request
   ): Promise<AttributesList[]> {
     const cn = this.groups.cn;
@@ -529,12 +616,203 @@ export default class TwakeSpaces extends DmPlugin {
             cn,
             this.config.twake_group_display_name_attribute ||
               'twakeDisplayName',
+            ...extra,
           ],
           req
         ))
       );
     }
     return out;
+  }
+
+  /** The members of the groups these spaces link, by group DN. */
+  private async membersOf(
+    org: string,
+    spaces: (SpaceEntry | undefined)[]
+  ): Promise<Members> {
+    const ids = new Set(
+      spaces.flatMap(
+        s => s?.holders.filter(h => h.kind === 'group').map(h => h.name) ?? []
+      )
+    );
+    return new Map(
+      (await this.orgGroups(org, [...ids], ['member'])).map(e => [
+        dnKey(e.dn as string),
+        values(e.member),
+      ])
+    );
+  }
+
+  /** Each user's role in a space: the strongest of their own and their groups'. */
+  private resolve(
+    org: string,
+    space: SpaceEntry | undefined,
+    members: Members,
+    hidden: Set<string>
+  ): Map<string, Resolved> {
+    const users = dnKey(this.groups.userBaseOf(org));
+    const roles = new Map<string, Resolved>();
+    for (const holder of space?.holders ?? [])
+      for (const dn of holder.kind === 'member'
+        ? [holder.dn]
+        : (members.get(dnKey(holder.dn)) ?? [])) {
+        const key = dnKey(dn);
+        if (hidden.has(key) || dnKey(parentOf(dn)) !== users) continue;
+        const held = roles.get(key)?.role;
+        if (
+          !held ||
+          SPACE_ROLES.indexOf(holder.role) > SPACE_ROLES.indexOf(held)
+        )
+          roles.set(key, { dn, role: holder.role });
+      }
+    return roles;
+  }
+
+  /** A space written, or a group whose members changed. */
+  private async follow(
+    dn: string,
+    before: AttributesList | null,
+    after: AttributesList | null
+  ): Promise<void> {
+    let org = this.organizationOf(dn);
+    if (org !== undefined) {
+      const hidden = await this.hidden(org);
+      const [was, is] = [before, after].map(e =>
+        e ? this.entryOf(org!, e, hidden) : undefined
+      );
+      const members = await this.membersOf(org, [was, is]);
+      return this.settle(org, was, is, [members, members], hidden);
+    }
+    org = this.groups.organizationOf(dn);
+    // A deleted group is followed from its deletion: see unlink
+    if (org === undefined || !before || !after) return;
+    const key = dnKey(dn);
+    const was = values(before.member);
+    const is = values(after.member);
+    const set = (list: string[]): string => list.map(dnKey).sort().join('\n');
+    if (set(was) === set(is)) return;
+    const hidden = await this.hidden(org);
+    for (const space of await this.spaces(org, this.holding([dn]))) {
+      const members = await this.membersOf(org, [space]);
+      await this.settle(
+        org,
+        space,
+        space,
+        [new Map(members).set(key, was), new Map(members).set(key, is)],
+        hidden
+      );
+    }
+  }
+
+  /** A group about to be deleted, if it is one linked to spaces. */
+  private async deletedGroup(dn: string): Promise<DeletedGroup | undefined> {
+    const org = this.groups.organizationOf(dn);
+    if (org === undefined) return undefined;
+    const spaces = (await this.spaces(org, this.holding([dn]))).flatMap(s => {
+      const held = s.holders.find(h => dnKey(h.dn) === dnKey(dn));
+      return held ? [{ id: s.id, role: held.role }] : [];
+    });
+    if (!spaces.length) return undefined;
+    const [group] = await this.orgGroups(org, [rdnValue(dn)], ['member']);
+    return { org, members: values(group?.member), spaces };
+  }
+
+  /**
+   * A deleted group leaves its spaces, as they are now: refint may or may
+   * not have taken it out of them yet.
+   */
+  private async unlink(dn: string, deleted: DeletedGroup): Promise<void> {
+    const { org, members, spaces } = deleted;
+    const key = dnKey(dn);
+    const hidden = await this.hidden(org);
+    for (const { id, role } of spaces) {
+      const [space] = await this.spaces(org, '(objectClass=*)', id);
+      if (!space) continue;
+      const is = {
+        ...space,
+        holders: space.holders.filter(h => dnKey(h.dn) !== key),
+      };
+      const was = {
+        ...is,
+        holders: [
+          ...is.holders,
+          {
+            kind: 'group' as const,
+            name: rdnValue(dn),
+            role,
+            roles: [role],
+            dn,
+          },
+        ],
+      };
+      const groups = await this.membersOf(org, [is]);
+      await this.settle(
+        org,
+        was,
+        is,
+        [new Map(groups).set(key, members), groups],
+        hidden
+      );
+    }
+  }
+
+  /** Bring every user whose role in a space changed in step with it. */
+  private async settle(
+    org: string,
+    was: SpaceEntry | undefined,
+    is: SpaceEntry | undefined,
+    [membersBefore, membersAfter]: [Members, Members],
+    hidden: Set<string>
+  ): Promise<void> {
+    const id = (is ?? was)!.id;
+    const before = this.resolve(org, was, membersBefore, hidden);
+    const after = this.resolve(org, is, membersAfter, hidden);
+    const changed = new Map<string, { dn: string; role?: SpaceRole }>(
+      [...after].filter(([key, r]) => before.get(key)?.role !== r.role)
+    );
+    for (const [key, { dn }] of before)
+      if (!after.has(key)) changed.set(key, { dn });
+    for (const { dn, role } of changed.values())
+      await this.writeRole(dn, id, role);
+  }
+
+  /** A user's `<space id>:<role>` value of a space, or none without a role. */
+  private async writeRole(
+    dn: string,
+    id: string,
+    role: SpaceRole | undefined
+  ): Promise<void> {
+    const attribute = this.userRole;
+    const wanted = role && `${id}:${role}`;
+    const prefix = `${id}:`.toLowerCase();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const [entry] = (
+          (await this.server.ldap.search(
+            { paged: false, scope: 'base', attributes: [attribute] },
+            dn
+          )) as SearchResult
+        ).searchEntries;
+        if (!entry) return;
+        const held = values(valueOf(entry, attribute));
+        const stale = held.filter(
+          v => v.toLowerCase().startsWith(prefix) && v !== wanted
+        );
+        const missing = wanted && !held.includes(wanted);
+        if (!stale.length && !missing) return;
+        // Only this space's values: the others may be written meanwhile
+        await this.server.ldap.modify(dn, {
+          ...(stale.length && { delete: { [attribute]: stale } }),
+          ...(missing && { add: { [attribute]: wanted } }),
+        });
+        return;
+      } catch (err) {
+        const code = extractLdapCode(err);
+        if (code === 32) return;
+        // Another write took or gave a value between the read and this one
+        if ((code !== 16 && code !== 20) || attempt >= 2) throw err;
+      }
+    }
   }
 
   /** The groups of the organization by lowercased id, as DNs, or a 404. */
@@ -544,7 +822,7 @@ export default class TwakeSpaces extends DmPlugin {
     req?: Request
   ): Promise<Map<string, string>> {
     const found = new Map(
-      (await this.orgGroups(org, ids, req)).map(e => [
+      (await this.orgGroups(org, ids, [], req)).map(e => [
         (read(e, this.groups.cn) || '').toLowerCase(),
         e.dn as string,
       ])
@@ -678,14 +956,7 @@ export default class TwakeSpaces extends DmPlugin {
           req
         )
       ).map(e => dnKey(e.dn as string));
-      const holders = [dn, ...groups]
-        .flatMap(holder =>
-          Object.values(this.roleAttributes).map(
-            a => `(${a}=${escapeLdapFilter(holder)})`
-          )
-        )
-        .join('');
-      filter = `(&${filter}(|${holders}))`;
+      filter = `(&${filter}${this.holding([dn, ...groups])})`;
       const own = new Set([dnKey(dn), ...groups]);
       roleIn = (space: SpaceEntry): SpaceRole | undefined =>
         space.holders.find(h => own.has(dnKey(h.dn)))?.role;
