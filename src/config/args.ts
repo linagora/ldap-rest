@@ -309,6 +309,7 @@ export interface Config {
   twake_space_admin_attribute?: string;
   twake_space_editor_attribute?: string;
   twake_space_viewer_attribute?: string;
+  twake_space_user_role_attribute?: string;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -906,6 +907,11 @@ const configArgs: ConfigTemplate = [
     '--twake-space-viewer-attribute',
     'DM_TWAKE_SPACE_VIEWER_ATTRIBUTE',
     'twakeSpaceViewer',
+  ],
+  [
+    '--twake-space-user-role-attribute',
+    'DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE',
+    '',
   ],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
