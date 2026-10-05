@@ -42,11 +42,13 @@ export class ConfigParser {
     for (const entry of this.config) {
       const key = this.getKeyFromCliArg(entry[0]);
       let value: ConfigResultValue = entry[2];
+      let fromDefault = true;
 
       // Override with env value if exists
       if (entry[1] !== undefined) {
         const envValue = process.env[entry[1]];
         if (envValue !== undefined) {
+          fromDefault = false;
           if (entry[3] === 'boolean') {
             value = envValue.toLowerCase() === 'true';
           } else if (entry[3] === 'number') {
@@ -80,11 +82,10 @@ export class ConfigParser {
         } else if (entry[3] === 'number') {
           value = parseInt(cliValue as string);
         } else if (entry[3] === 'array') {
-          if (Array.isArray(value)) {
-            value = value.concat(cliValue as string[]);
-          } else {
-            value = cliValue as string[];
-          }
+          value = (fromDefault ? [] : (value as string[])).concat(
+            (cliValue as string[]).flatMap(splitCliValue)
+          );
+          fromDefault = false;
         } else if (entry[3] === 'json') {
           try {
             value = JSON.parse(cliValue as string) as Record<
@@ -104,15 +105,9 @@ export class ConfigParser {
       }
       if (entry[3] === 'array' && entry[4] && cliArgs.has(entry[4])) {
         const cliValue = cliArgs.get(entry[4]) || '';
-        if (Array.isArray(value)) {
-          value = value.concat(
-            (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
-          );
-        } else {
-          value = (cliValue as string)
-            .split(/[,\s]+/)
-            .filter(v => v.length > 0);
-        }
+        value = (fromDefault ? [] : (value as string[])).concat(
+          (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
+        );
         cliArgs.delete(entry[4]);
       }
 
@@ -184,6 +179,16 @@ export class ConfigParser {
     }
     return cliArg;
   }
+}
+
+// DNs and DN patterns carry commas of their own
+function splitCliValue(value: string | undefined): string[] {
+  if (value === undefined) return [];
+  if (value.includes('=')) return [value];
+  return value
+    .split(',')
+    .map(v => v.trim())
+    .filter(v => v.length > 0);
 }
 
 export function parseConfig(

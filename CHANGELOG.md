@@ -12,6 +12,11 @@
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
   member instead of answering 400 `INVALID_SEARCH_QUERY`
+- An array option given on the command line replaces its default instead of
+  being added to it, and its singular form splits comma-separated values:
+  `--group-class top,groupOfNames,twakeGroup` no longer fails group creation
+  with 400 "objectClass has invalid value",
+  [details](docs/usage/configuration.md#array-options)
 
 - `core/twake/lifecycleEvents`: an operational attribute such as `entryUUID`
   named by a rule outside a member list is published instead of left out,

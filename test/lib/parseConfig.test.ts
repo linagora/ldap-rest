@@ -172,6 +172,38 @@ describe('ConfigParser', () => {
     expect(result.plugin).to.deep.equal(['a', 'b', 'x', 'y', 'm', 'n']);
   });
 
+  it('should replace the default with a CLI array, split on commas', () => {
+    const parser = new ConfigParser(configArgs);
+    for (const argv of [
+      ['--group-class', 'top,groupOfNames,twakeGroup'],
+      ['--group-classes', 'top,groupOfNames,twakeGroup'],
+      ['--group-class', 'top', '--group-class', 'groupOfNames, twakeGroup'],
+    ]) {
+      const result = parser.parse(['node', 'script.js', ...argv]);
+      expect(result.group_class).to.deep.equal([
+        'top',
+        'groupOfNames',
+        'twakeGroup',
+      ]);
+    }
+  });
+
+  it('should keep a DN given to a singular array option whole', () => {
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse([
+      'node',
+      'script.js',
+      '--ldap-raw-base',
+      'ou=users,dc=example,dc=com',
+      '--ldap-raw-base',
+      'ou=groups,dc=example,dc=com',
+    ]);
+    expect(result.ldap_raw_base).to.deep.equal([
+      'ou=users,dc=example,dc=com',
+      'ou=groups,dc=example,dc=com',
+    ]);
+  });
+
   it('should store additional command-line args', () => {
     const argv = [
       'node',
