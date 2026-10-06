@@ -171,14 +171,18 @@ export const hookOwner = (
 ): { plugin: string; hook: string } | undefined => hookOwners.get(fn);
 
 /**
- * Whether an error is an authorization refusal.
- *
- * The marker as well as the status: plugins wrap a hook's error into a plain
- * `Error` on the way up, which keeps the message and drops the status.
+ * Whether an error is an authorization plugin's refusal, by the marker its
+ * message carries: a plain `Error` wrapping it keeps the message only. Its
+ * message names the branch, so the client is told `AUTHZ_REFUSED` instead.
  */
-export const isRefusal = (err: unknown): boolean =>
-  (err as { statusCode?: number })?.statusCode === 403 ||
+export const isAuthzRefusal = (err: unknown): boolean =>
   /\[authz-forbidden\]/.test(String((err as Error)?.message ?? ''));
+
+/**
+ * Whether an error is a refusal: an authorization plugin's, or any 403.
+ */
+const isRefusal = (err: unknown): boolean =>
+  (err as { statusCode?: number })?.statusCode === 403 || isAuthzRefusal(err);
 
 // launchHooksChained threads a single value through each hook, collecting the
 // returned (possibly modified) value. Any error stops the chain.

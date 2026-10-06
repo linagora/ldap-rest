@@ -26,7 +26,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   isDummyMemberDn,
-  isRefusal,
+  isAuthzRefusal,
   normalizeDn,
   parseDn,
   unescapeDnValue,
@@ -525,7 +525,7 @@ export default class TwakeGroups extends LdapGroups {
         }
         // An authorization plugin refused, maybe through a plain Error:
         // answered without the branch it names
-        if (isRefusal(err)) {
+        if (isAuthzRefusal(err)) {
           res.status(403).json({ error: AUTHZ_REFUSED, code: 'REFUSED' });
           return;
         }

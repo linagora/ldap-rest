@@ -4,6 +4,7 @@ import supertest from 'supertest';
 import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
 import type { Hooks } from '../../../src/hooks';
+import { ForbiddenError } from '../../../src/lib/errors';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
@@ -19,12 +20,16 @@ class ReadSpy extends DmPlugin {
   unseen?: string;
   /** A branch the caller cannot read. */
   refused?: string;
+  /** Refused by another rule than an authorization plugin, with this. */
+  rule?: string;
   hooks: Hooks = {
     ldapsearchrequest: ([base, opts, req]) => {
       if (!req) return [base, opts, req];
       this.bases.add(base.toLowerCase());
       if (this.refused && base.toLowerCase().endsWith(this.refused))
-        throw new Error(`[authz-forbidden] Not allowed to read ${base}`);
+        throw this.rule
+          ? new ForbiddenError(this.rule)
+          : new Error(`[authz-forbidden] Not allowed to read ${base}`);
       if (this.unseen)
         opts = {
           ...opts,
@@ -536,6 +541,20 @@ describe('Twake spaces plugin routes', function () {
         });
     } finally {
       delete spy.refused;
+    }
+  });
+
+  it('keeps the message of a 403 no authorization plugin made', async () => {
+    spy.refused = `ou=spaces,${orgDn('acme')}`.toLowerCase();
+    spy.rule = 'Spaces are closed for maintenance';
+    try {
+      expect((await api.get(route()).expect(403)).body).to.deep.equal({
+        error: 'Spaces are closed for maintenance',
+        code: 'REFUSED',
+      });
+    } finally {
+      delete spy.refused;
+      delete spy.rule;
     }
   });
 
