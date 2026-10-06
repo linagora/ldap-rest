@@ -7,6 +7,7 @@ describe('ConfigParser', () => {
     delete process.env.DM_LLNG_INI;
     delete process.env.DM_PORT;
     delete process.env.DM_PLUGINS;
+    delete process.env.DM_GROUP_CLASSES;
   });
 
   it('should use default values when no env or cli args', () => {
@@ -170,6 +171,105 @@ describe('ConfigParser', () => {
     const result = parser.parse(argv);
     expect(result).to.have.property('plugin').that.is.an('array');
     expect(result.plugin).to.deep.equal(['a', 'b', 'x', 'y', 'm', 'n']);
+  });
+
+  it('should replace the default with a CLI array, split on commas', () => {
+    const parser = new ConfigParser(configArgs);
+    for (const argv of [
+      ['--group-class', 'top,groupOfNames,twakeGroup'],
+      ['--group-classes', 'top,groupOfNames,twakeGroup'],
+      ['--group-class', 'top', '--group-class', 'groupOfNames, twakeGroup'],
+    ]) {
+      const result = parser.parse(['node', 'script.js', ...argv]);
+      expect(result.group_class).to.deep.equal([
+        'top',
+        'groupOfNames',
+        'twakeGroup',
+      ]);
+    }
+  });
+
+  it('should keep a DN given to a singular array option whole', () => {
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse([
+      'node',
+      'script.js',
+      '--ldap-raw-base',
+      'ou=users,dc=example,dc=com',
+      '--ldap-raw-base',
+      'ou=groups,dc=example,dc=com',
+    ]);
+    expect(result.ldap_raw_base).to.deep.equal([
+      'ou=users,dc=example,dc=com',
+      'ou=groups,dc=example,dc=com',
+    ]);
+  });
+
+  it('should replace the default LDAP URL with comma-separated ones', () => {
+    const envUrl = process.env.DM_LDAP_URL;
+    delete process.env.DM_LDAP_URL;
+    try {
+      const parser = new ConfigParser(configArgs);
+      const result = parser.parse([
+        'node',
+        'script.js',
+        '--ldap-url',
+        'ldap://a,ldap://b',
+      ]);
+      expect(result.ldap_url).to.deep.equal(['ldap://a', 'ldap://b']);
+    } finally {
+      if (envUrl !== undefined) process.env.DM_LDAP_URL = envUrl;
+    }
+  });
+
+  it('should add CLI values to those of the environment variable', () => {
+    process.env.DM_GROUP_CLASSES = 'top,groupOfNames';
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse([
+      'node',
+      'script.js',
+      '--group-class',
+      'twakeGroup,twakeStaticGroup',
+    ]);
+    expect(result.group_class).to.deep.equal([
+      'top',
+      'groupOfNames',
+      'twakeGroup',
+      'twakeStaticGroup',
+    ]);
+  });
+
+  it('should keep a secret containing a comma whole', () => {
+    const parser = new ConfigParser(configArgs);
+    const result = parser.parse([
+      'node',
+      'script.js',
+      '--auth-token',
+      's3cr,et:admin',
+      '--auth-hmac',
+      'app:s3cr,et',
+      '--auth-totp',
+      'app:AB,CD:admin',
+    ]);
+    expect(result.auth_token).to.deep.equal(['s3cr,et:admin']);
+    expect(result.auth_hmac).to.deep.equal(['app:s3cr,et']);
+    expect(result.auth_totp).to.deep.equal(['app:AB,CD:admin']);
+  });
+
+  it('should refuse an empty array value', () => {
+    const parser = new ConfigParser(configArgs);
+    for (const argv of [
+      ['--group-class', ''],
+      ['--group-class', ' , '],
+      ['--group-class', 'top', '--group-class', ''],
+      ['--group-classes', ''],
+      ['--auth-token', ''],
+      ['--group-class'],
+    ]) {
+      expect(() => parser.parse(['node', 'script.js', ...argv])).to.throw(
+        /--group-class(es)? has an empty value|--auth-token has an empty value/
+      );
+    }
   });
 
   it('should store additional command-line args', () => {

@@ -59,16 +59,32 @@ All CLI options can be set via environment variables with the `DM_` prefix.
 
 Some options accept multiple values (e.g., `--plugin`, `--auth-token`, `--ldap-url`). These can be configured in several ways:
 
-**Via CLI - repeat the option:**
+**Via CLI - repeat the option, or give it comma-separated values:**
 
 ```bash
-ldap-rest --plugin core/auth/token --plugin core/ldap/flatGeneric --plugin core/ldap/groups
+ldap-rest --plugin core/auth/token --plugin core/ldap/flatGeneric,core/ldap/groups
 ```
+
+Only options holding identifiers split on commas: `--plugin`, `--mail-domain`,
+`--ldap-url`, the object class options (`--user-class`, `--group-class`,
+`--ldap-organization-class`, `--external-branch-class`,
+`--scim-user-object-class`, `--scim-group-object-class`), the attribute
+options (`--ldap-raw-hidden-attribute`, `--applicative-account-attribute`,
+`--ldap-operational-attribute`, `--twake-tombstone-clear-attributes`),
+`--twake-tombstone-reasons`, `--authz-for` and `--trusted-proxy`. Any other
+option takes each value whole, so a DN or a secret keeps its commas.
 
 **Via CLI - use plural form with comma-separated values:**
 
 ```bash
 ldap-rest --plugins core/auth/token,core/ldap/flatGeneric,core/ldap/groups
+```
+
+The plural form splits on commas and spaces whatever the option holds. Give a
+DN, or any value containing a comma, with the repeated singular option:
+
+```bash
+ldap-rest --ldap-raw-base ou=users,dc=example,dc=com --ldap-raw-base ou=groups,dc=example,dc=com
 ```
 
 **Via environment variable - use `;` or `,` as separator:**
@@ -82,6 +98,11 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 ```
 
 > **Note:** If the value contains a semicolon, it will be used as the separator. Otherwise, commas are used. Whitespace around separators is ignored.
+
+Values given on the command line replace the default, and are added to those
+of the environment variable. An empty value on the command line, such as an
+unset variable expanding to nothing, stops the server: leave the option out
+to keep the default.
 
 ## General Options
 

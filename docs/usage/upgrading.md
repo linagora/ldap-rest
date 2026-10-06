@@ -4,6 +4,40 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### An array option on the command line replaces its default
+
+**Who is affected:** a deployment that gives, on the command line, an array
+option that has a default: `--user-class`, `--group-class`,
+`--ldap-organization-class`, `--external-branch-class`,
+`--scim-user-object-class`, `--scim-group-object-class`,
+`--applicative-account-attribute`, `--ldap-operational-attribute` or
+`--ldap-url`, in their singular or plural form.
+
+Their values used to be added to the default, and now replace it. Repeat the
+default values you want to keep:
+
+```bash
+# Until now: top, twakeAccount, twakeWhitePages, twakeExtra
+ldap-rest --user-class twakeExtra
+
+# Now
+ldap-rest --user-class top,twakeAccount,twakeWhitePages,twakeExtra
+```
+
+Without its default classes, an entry is created without its structural
+class. Without the default operational attributes, `appAccountsConsistency`
+recreates an applicative account with `userPassword` and the attributes the
+directory generates. The defaults are listed in
+[the configuration reference](configuration.md).
+
+`--ldap-url ldap://ldap.example.com` no longer keeps `ldap://localhost` next
+to it.
+
+An environment variable already replaced the default, and values given on the
+command line are still added to it.
+
 ## To 0.14.0
 
 ### `--twake-instance-organization-account` is removed

@@ -26,6 +26,7 @@ export type ConfigEntry = [
   ), // default value
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
+  boolean?, // for array type, whether the singular form splits on commas: never for DNs or secrets, which may contain some
 ];
 
 export class ConfigParser {
@@ -42,11 +43,13 @@ export class ConfigParser {
     for (const entry of this.config) {
       const key = this.getKeyFromCliArg(entry[0]);
       let value: ConfigResultValue = entry[2];
+      let fromDefault = true;
 
       // Override with env value if exists
       if (entry[1] !== undefined) {
         const envValue = process.env[entry[1]];
         if (envValue !== undefined) {
+          fromDefault = false;
           if (entry[3] === 'boolean') {
             value = envValue.toLowerCase() === 'true';
           } else if (entry[3] === 'number') {
@@ -80,11 +83,12 @@ export class ConfigParser {
         } else if (entry[3] === 'number') {
           value = parseInt(cliValue as string);
         } else if (entry[3] === 'array') {
-          if (Array.isArray(value)) {
-            value = value.concat(cliValue as string[]);
-          } else {
-            value = cliValue as string[];
-          }
+          value = (fromDefault ? [] : (value as string[])).concat(
+            (cliValue as string[]).flatMap(v =>
+              splitCliValue(entry[0], v, entry[5] ? /,/ : undefined)
+            )
+          );
+          fromDefault = false;
         } else if (entry[3] === 'json') {
           try {
             value = JSON.parse(cliValue as string) as Record<
@@ -103,16 +107,10 @@ export class ConfigParser {
         cliArgs.delete(entry[0]);
       }
       if (entry[3] === 'array' && entry[4] && cliArgs.has(entry[4])) {
-        const cliValue = cliArgs.get(entry[4]) || '';
-        if (Array.isArray(value)) {
-          value = value.concat(
-            (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
-          );
-        } else {
-          value = (cliValue as string)
-            .split(/[,\s]+/)
-            .filter(v => v.length > 0);
-        }
+        const cliValue = cliArgs.get(entry[4]) as string | undefined;
+        value = (fromDefault ? [] : (value as string[])).concat(
+          splitCliValue(entry[4], cliValue, /[,\s]+/)
+        );
         cliArgs.delete(entry[4]);
       }
 
@@ -184,6 +182,29 @@ export class ConfigParser {
     }
     return cliArg;
   }
+}
+
+// An unset variable expands to an empty value, which would replace the
+// default with nothing
+function splitCliValue(
+  arg: string,
+  value: string | undefined,
+  separator?: RegExp
+): string[] {
+  let values: string[] = [];
+  if (value?.trim())
+    values = separator
+      ? value
+          .split(separator)
+          .map(v => v.trim())
+          .filter(v => v.length > 0)
+      : [value];
+  if (values.length === 0)
+    throw new Error(
+      `Error in command line: ${arg} has an empty value. Leave it out to ` +
+        'keep the default'
+    );
+  return values;
 }
 
 export function parseConfig(
