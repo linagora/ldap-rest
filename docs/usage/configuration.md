@@ -130,10 +130,12 @@ Empty items are dropped, and each item is trimmed. A variable that is empty,
 only holds whitespace or only holds separators (`;`, `${A:-};${B:-}`), such as
 `${VAR:-}` in a compose file, counts as unset: the default applies, so an
 environment variable cannot give an empty list to an option whose default is
-not empty. The same
-goes for an empty number or JSON value such as `DM_PORT=`. A number that is
-not one (`DM_PORT=abc`, `--port --log-level debug`) stops the server, and so
-does an empty number on the command line, as an empty array value does.
+not empty. The exception is `DM_LDAP_URL`, whose default `ldap://localhost` is
+a guess: an empty value stops the server. The same
+goes for an empty number or JSON value such as `DM_PORT=`. A number option
+takes an integer only: `DM_PORT=abc`, `DM_PORT=1e3`, `--port 80abc` and
+`--port --log-level debug` stop the server, and so does an empty number on the
+command line, as an empty array value does.
 The plural form of an option takes `;` before `,` too: `--auth-tokens 'a;b,c'`
 is `a` and `b,c`.
 

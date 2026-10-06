@@ -73,6 +73,14 @@ export default class AuthHmac extends AuthBase {
           );
         }
 
+        // A space-separated list read as one entry puts the other services in
+        // the name
+        if (parts.length > 4)
+          this.logger.warn(
+            `HMAC entry ${index} for service "${id}" has ${parts.length} ` +
+              'fields: if several services were given, separate them with `,` or `;`'
+          );
+
         this.services.set(id, { id, secret, name });
       });
     }

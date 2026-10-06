@@ -474,6 +474,7 @@ const configArgs: ConfigTemplate = [
     'array',
     '--ldap-urls',
     'identifiers',
+    true,
   ],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],

@@ -753,6 +753,22 @@ describe('AuthHmac', () => {
       expect(() => new AuthHmac(dm)).to.throw(/--auth-hmac.*separated by/);
     });
 
+    it('should warn about a list merged into one entry, without its secret', () => {
+      const warnings: string[] = [];
+      new AuthHmac({
+        config: {
+          auth_hmac: [
+            'a:secret-key-long-enough-for-hmac-32c:Name b:secret-key-long-enough-for-hmac-32c:Other',
+          ],
+        },
+        logger: { warn: (m: string) => warnings.push(m), info: () => {} },
+      } as unknown as DM);
+      const merged = warnings.filter(w => w.includes('5 fields'));
+      expect(merged).to.have.length(1);
+      expect(merged[0]).to.include('entry 0').and.include('"a"');
+      expect(merged[0]).to.not.include('secret-key');
+    });
+
     it('should refuse an entry with an empty id, secret or name', () => {
       const build = (entry: string) =>
         new AuthHmac({

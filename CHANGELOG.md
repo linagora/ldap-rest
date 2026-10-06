@@ -9,18 +9,18 @@
   `--user-class top,twakeAccount,twakeWhitePages,twakeExtra`, and
   `--ldap-url` no longer keeps `ldap://localhost` next to the URL given,
   [notes](docs/usage/upgrading.md#an-array-option-on-the-command-line-replaces-its-default)
-- An array option holding DNs (`--ldap-raw-base`,
-  `--james-mailing-list-branch`, `--twake-tombstone-dn`,
-  `--twake-tombstone-group-bases`, `--twake-instance-dn`) splits on `;` only
-  from the environment and in its plural CLI form where it has one, and
-  `--auth-hmac` and `--auth-totp` no longer split on spaces, but on newlines (a
-  list separated by spaces is one entry: later HMAC services get 401, a TOTP
-  list stops the server); `core/auth/hmac` and
-  `core/auth/totp` stop the server on an entry that cannot be right; the
-  plural CLI form of the other options gives `;` priority over `,`; an empty variable, or one holding only separators, keeps
-  the default instead of giving `[]` (no empty list is possible for an option
-  with a default),
-  [notes](docs/usage/upgrading.md#array-options-read-from-the-environment-are-split-by-kind-of-option)
+- A DN option read from the environment splits on `;` only,
+  [notes](docs/usage/upgrading.md#a-dn-option-read-from-the-environment-splits-on--only)
+- `--auth-hmac` and `--auth-totp` no longer split on spaces, and
+  `core/auth/hmac` and `core/auth/totp` stop the server on an entry that cannot
+  work,
+  [notes](docs/usage/upgrading.md#hmac-and-totp-entries-are-no-longer-split-on-spaces)
+- The plural command-line form of an array option splits on `;` before `,`,
+  [notes](docs/usage/upgrading.md#the-plural-command-line-form-of-an-array-option-splits-on--first)
+- An empty array variable keeps the default instead of giving `[]` (but an
+  empty `DM_LDAP_URL` still stops the server), and a number option refuses
+  anything but an integer,
+  [notes](docs/usage/upgrading.md#an-empty-environment-variable-or-a-number-that-is-not-one)
 
 ### Security
 

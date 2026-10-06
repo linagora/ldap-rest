@@ -41,6 +41,7 @@ export type ConfigEntry = [
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
   ArrayKind?, // for array type, what the values hold: see ArrayKind
+  boolean?, // whether an empty environment value is refused instead of read as unset: for a default that is a guess, not a safe fallback
 ];
 
 export class ConfigParser {
@@ -69,17 +70,22 @@ export class ConfigParser {
           entry[3] === 'array' && envValue !== undefined
             ? splitValue(envValue, entry[5], 'plural')
             : [];
-        const unset =
-          envValue === undefined ||
-          (entry[3] === 'array' && items.length === 0) ||
-          ((entry[3] === 'number' || entry[3] === 'json') &&
-            envValue.trim() === '');
-        if (!unset) {
+        const empty =
+          envValue !== undefined &&
+          ((entry[3] === 'array' && items.length === 0) ||
+            ((entry[3] === 'number' || entry[3] === 'json') &&
+              envValue.trim() === ''));
+        if (empty && entry[6])
+          throw new Error(
+            `Error in environment variable ${entry[1]}: the value is empty. ` +
+              'Set it, or leave the variable out'
+          );
+        if (envValue !== undefined && !empty) {
           fromDefault = false;
           if (entry[3] === 'boolean') {
             value = envValue.toLowerCase() === 'true';
           } else if (entry[3] === 'number') {
-            value = parseInt(envValue);
+            value = parseNumber(envValue);
             if (Number.isNaN(value))
               throw new Error(
                 `Error in environment variable ${entry[1]}: "${envValue}" is not a number`
@@ -107,7 +113,7 @@ export class ConfigParser {
         if (entry[3] === 'boolean') {
           value = true;
         } else if (entry[3] === 'number') {
-          value = parseInt(cliValue as string);
+          value = cliValue as number;
         } else if (entry[3] === 'array') {
           value = (fromDefault ? [] : (value as string[])).concat(
             (cliValue as string[]).flatMap(v =>
@@ -172,7 +178,7 @@ export class ConfigParser {
               `Error in command line: ${arg} has an empty value. Leave it ` +
                 'out to keep the default'
             );
-          const number = parseInt(argv[i + 1]);
+          const number = parseNumber(argv[i + 1]);
           if (Number.isNaN(number))
             throw new Error(
               `Error in command line: ${arg} takes a number, got ` +
@@ -243,6 +249,12 @@ function splitValue(
         .map(v => v.trim())
         .filter(v => v.length > 0)
     : [value.trim()].filter(v => v.length > 0);
+}
+
+// An integer only: parseInt would read 1e3 as 1 and 80abc as 80
+function parseNumber(value: string): number {
+  const trimmed = value.trim();
+  return /^-?\d+$/.test(trimmed) ? Number(trimmed) : NaN;
 }
 
 // An unset variable expands to an empty value, which would replace the

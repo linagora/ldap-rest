@@ -165,14 +165,43 @@ describe('ConfigParser', () => {
 
     it('should keep the default for a value without any item', () => {
       const group = parse().group_class;
-      const url = parse().ldap_url;
       process.env.DM_GROUP_CLASSES = ',';
-      process.env.DM_LDAP_URL = ';';
       process.env.DM_LDAP_RAW_BASE = ' ; ';
       const result = parse();
       expect(result.group_class).to.deep.equal(group);
-      expect(result.ldap_url).to.deep.equal(url);
       expect(result.ldap_raw_base).to.deep.equal([]);
+    });
+
+    it('should refuse an empty LDAP URL, whose default is a guess', () => {
+      for (const value of ['', ' ', ';', ',']) {
+        process.env.DM_LDAP_URL = value;
+        expect(parse).to.throw(/DM_LDAP_URL.*empty.*leave the variable out/);
+      }
+      process.env.DM_LDAP_URL = 'ldap://a;ldap://b';
+      expect(parse().ldap_url).to.deep.equal(['ldap://a', 'ldap://b']);
+    });
+
+    it('should parse numbers strictly', () => {
+      process.env.DM_PORT = ' 8080 ';
+      expect(parse().port).to.equal(8080);
+      process.env.DM_LDAP_CACHE_MAX = '-1';
+      expect(parse().ldap_cache_max).to.equal(-1);
+      delete process.env.DM_LDAP_CACHE_MAX;
+      for (const value of ['1e3', '8080abc', '80.5', 'abc']) {
+        process.env.DM_PORT = value;
+        expect(parse, value).to.throw(/DM_PORT/);
+      }
+      delete process.env.DM_PORT;
+      const cli = (value: string) => () =>
+        new ConfigParser(configArgs).parse([
+          'node',
+          'script.js',
+          '--port',
+          value,
+        ]);
+      expect(cli(' 90 ')().port).to.equal(90);
+      for (const value of ['1e3', '80abc', '80.5'])
+        expect(cli(value), value).to.throw(/--port/);
     });
 
     it('should keep the default for an empty number', () => {
