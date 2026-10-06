@@ -842,7 +842,8 @@ export default class TwakeSpaces extends DmPlugin {
           ...holders.filter(h => h.kind === 'member').map(h => h.dn),
           ...linked.flatMap(e => values(e.member)),
         ],
-        { id, space: was }
+        { id, space: was },
+        await this.hidden(org)
       );
       if (this.rabbitmq)
         await this.announce(org, moved, context, ids, { was, is, linked });
@@ -856,26 +857,27 @@ export default class TwakeSpaces extends DmPlugin {
     const [wasKeys, isKeys] = [was, is].map(list => new Set(list.map(dnKey)));
     const deleted = after ? undefined : this.unlinking.get(dnKey(dn));
     if (deleted) this.unlinking.delete(dnKey(dn));
+    const hidden = await this.hidden(org);
     const moved = await this.settle(
       org,
       [
         ...was.filter(m => !isKeys.has(dnKey(m))),
         ...is.filter(m => !wasKeys.has(dnKey(m))),
       ],
-      { group: dn, members: wasKeys, spaces: deleted?.spaces }
+      { group: dn, members: wasKeys, spaces: deleted?.spaces },
+      hidden
     );
-    if (!this.rabbitmq) return;
-    if (deleted) this.unlinked(dn, deleted, context);
-    const linking = [
-      ...(deleted?.spaces ?? []),
-      ...(await this.spaces(org, this.holding([dn]))),
-    ];
-    await this.announce(
-      org,
-      moved,
-      context,
-      linking.map(s => s.id)
-    );
+    if (!this.rabbitmq || (!deleted && !moved.length)) return;
+    // The spaces holding the group now: a deleted one refint has not taken
+    // out of them yet
+    const holding = (
+      await this.spaces(org, this.holding([dn]), undefined, undefined, hidden)
+    ).map(s => s.id);
+    if (deleted) this.unlinked(dn, deleted, holding, context);
+    await this.announce(org, moved, context, [
+      ...(deleted?.spaces.map(s => s.id) ?? []),
+      ...holding,
+    ]);
   }
 
   /**
@@ -984,17 +986,24 @@ export default class TwakeSpaces extends DmPlugin {
     }
   }
 
-  /** The spaces a deleted group left. */
+  /**
+   * The spaces a deleted group left. One still holding its DN, without
+   * refint, remembers the announcement for the write that takes it out.
+   */
   private unlinked(
     dn: string,
     deleted: DeletedGroup,
+    holding: string[],
     context: ChangeContext
   ): void {
     const { org, id: group, name, spaces } = deleted;
+    const held = new Set(holding.map(id => id.toLowerCase()));
     for (const { id, role } of spaces) {
       const key = dnKey(this.spaceDn(org, id));
-      if (!this.announced.has(key)) this.announced.set(key, new Set());
-      this.announced.get(key)!.add(dnKey(dn));
+      if (held.has(id.toLowerCase())) {
+        if (!this.announced.has(key)) this.announced.set(key, new Set());
+        this.announced.get(key)!.add(dnKey(dn));
+      }
       this.publishEvent(org, id, 'group.unlinked', context, {
         groups: [{ id: group, name, role }],
       });
@@ -1013,10 +1022,10 @@ export default class TwakeSpaces extends DmPlugin {
   private async settle(
     org: string,
     dns: string[],
-    undo: Undo
+    undo: Undo,
+    hidden: Set<string>
   ): Promise<Moved[]> {
     const users = dnKey(this.groups.userBaseOf(org));
-    const hidden = await this.hidden(org);
     const todo = new Map(
       dns.filter(dn => dnKey(parentOf(dn)) === users).map(dn => [dnKey(dn), dn])
     );
@@ -1175,9 +1184,12 @@ export default class TwakeSpaces extends DmPlugin {
         for (const group of linkedBefore.values())
           if (!byDeletion(group.dn))
             publish('group.unlinked', { groups: [groupOf(group)] });
-        // The DNs this write leaves in the space are still awaited
-        const left = new Set(is.holders.map(h => dnKey(h.dn)));
-        const awaited = [...announced].filter(g => left.has(g));
+        // The DNs this write leaves in the space are still awaited; one it
+        // put back, of a group made again under that DN, is another group
+        const [held, left] = [was, is].map(
+          s => new Set(s.holders.map(h => dnKey(h.dn)))
+        );
+        const awaited = [...announced].filter(g => held.has(g) && left.has(g));
         if (awaited.length) this.announced.set(key, new Set(awaited));
       }
     }

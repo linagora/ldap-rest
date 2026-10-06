@@ -56,6 +56,8 @@ class StubRabbitMq {
  */
 const suite = (role: string) => (): void => {
   let dm: DM;
+  // Loads no plugin: what it writes, nothing hears
+  let raw: DM;
   let api: supertest.Agent;
   let rabbit: StubRabbitMq;
   let spaces: TwakeSpaces;
@@ -174,6 +176,8 @@ const suite = (role: string) => (): void => {
       twake_space_user_role_attribute: role,
     });
     await dm.ready;
+    raw = new DM();
+    await raw.ready;
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
@@ -452,6 +456,69 @@ const suite = (role: string) => (): void => {
     });
     await quiet();
     expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('remembers a deleted group only in the spaces still holding it', async () => {
+    const { announced } = spaces as unknown as {
+      announced: Map<string, Set<string>>;
+    };
+    const remembered = (id: string): boolean =>
+      [...announced.keys()].some(key => key.includes(id.toLowerCase()));
+    const designers = await group('Designers', ['tse-bob']);
+    // refint takes the group out of an editor, not of a viewer
+    const kept = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    const left = await create(undefined, [{ id: designers, role: 'editor' }]);
+    await events(2);
+    const release = hold();
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await waitFor(
+      async () => {
+        const { searchEntries } = (await dm.ldap.search(
+          { paged: false, scope: 'base', attributes: ['owner'] },
+          `cn=${left},ou=spaces,${orgDn}`
+        )) as { searchEntries: { owner?: string[] }[] };
+        return !searchEntries[0].owner?.length;
+      },
+      { what: 'refint to take the group out of the space' }
+    );
+    release();
+    await events(4);
+    expect([remembered(kept), remembered(left)]).to.deep.equal([true, false]);
+    await api.delete(`${route}/${kept}`).expect(200);
+    await events(1);
+    expect(remembered(kept)).to.equal(false);
+  });
+
+  it('unlinks a group made again under the DN of one deleted', async () => {
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await events(1);
+    const dn = `cn=${designers},ou=groups,${orgDn}`;
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await events(2);
+    // Its dead DN leaves the space unheard, and a new group takes it
+    await raw.ldap.modify(`cn=${id},ou=spaces,${orgDn}`, {
+      delete: { seeAlso: dn },
+    });
+    await dm.ldap.add(dn, {
+      objectClass: ['top', 'groupOfNames'],
+      cn: designers,
+      o: 'Designers',
+      member: userDn('tse-carol'),
+    });
+    await api
+      .post(`${route}/${id}/groups`)
+      .send({ groupIds: [designers], role: 'viewer' })
+      .expect(200);
+    expect((await events(2)).map(([key]) => key)).to.deep.equal([
+      'twake.space.group.linked',
+      'twake.space.member.added',
+    ]);
+    await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+    expect((await events(2)).map(([key]) => key)).to.deep.equal([
+      'twake.space.group.unlinked',
+      'twake.space.member.removed',
+    ]);
   });
 
   it('announces a role two changes followed late moved once, with the role attribute', async function () {
