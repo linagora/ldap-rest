@@ -4,6 +4,7 @@ import supertest from 'supertest';
 import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
 import type { Hooks } from '../../../src/hooks';
+import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 
@@ -99,6 +100,7 @@ describe('Twake spaces plugin routes', function () {
       twake_space_viewer_attribute: 'seeAlso',
     });
     await dm.ready;
+    await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
     const groups = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', groups);
     await dm.registerPlugin('core/twake/spaces', new TwakeSpaces(dm));

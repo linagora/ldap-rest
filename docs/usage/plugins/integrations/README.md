@@ -50,5 +50,7 @@ core/twake/lifecycleEvents
   └─ requires: core/rabbitmq
 
 core/twake/spaces
-  └─ requires: core/twake/groups
+  ├─ requires: core/twake/groups
+  ├─ requires: core/ldap/onChange
+  └─ requires: core/rabbitmq (with RabbitMQ)
 ```
