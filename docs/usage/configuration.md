@@ -544,8 +544,8 @@ See [groups](plugins/integrations/groups.md).
 #### `core/twake/spaces`
 
 Requires `core/twake/groups`, whose options it reads for users, groups and the
-organization entry, and `core/ldap/onChange` when
-`--twake-space-user-role-attribute` is set.
+organization entry, and `core/ldap/onChange`; with `--rabbitmq-url`, it
+requires `core/rabbitmq`.
 
 | CLI                                    | Env                                     | Default            | Description                                        |
 | -------------------------------------- | --------------------------------------- | ------------------ | -------------------------------------------------- |
@@ -556,6 +556,7 @@ organization entry, and `core/ldap/onChange` when
 | `--twake-space-editor-attribute`       | `DM_TWAKE_SPACE_EDITOR_ATTRIBUTE`       | `twakeSpaceEditor` | DNs holding the editor role                        |
 | `--twake-space-viewer-attribute`       | `DM_TWAKE_SPACE_VIEWER_ATTRIBUTE`       | `twakeSpaceViewer` | DNs holding the viewer role                        |
 | `--twake-space-user-role-attribute`    | `DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE`    |                    | User attribute holding `<space id>:<role>`, if set |
+| `--twake-space-exchange`               | `DM_TWAKE_SPACE_EXCHANGE`               | `space`            | Topic exchange of the space events                 |
 
 See [spaces](plugins/integrations/spaces.md).
 

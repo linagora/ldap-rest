@@ -29,6 +29,15 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   be added.
 - An erased user or group leaves its spaces through the directory: enable the
   `refint` overlay on the three role attributes.
+- When a user who is erased or becomes a tombstone was the last admin among
+  a space's users, its editors become admins, or its viewers when it has no
+  editor. A space left with no user of its own is deleted, whatever groups
+  it links. Both happen shortly after the deletion, and publish their
+  events. The hand-over relies on refint: without it an erased admin's DN
+  stays in the space and still counts as an admin, so erasing two admins
+  one after the other hands nothing over. A write of the space made at the
+  same moment is retried twice; past that the hand-over is logged and left
+  undone.
 - With `--twake-space-user-role-attribute`, each user entry holds one
   `<space id>:<role>` value per space they are in, their resolved role. It
   follows every write of a space, every change of a linked group's members,
@@ -40,6 +49,64 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   the values it held when it was deleted. The plugin refuses to start when
   core/ldap/trash watches the group branches: a group it moves away is never
   followed.
+- With `--rabbitmq-url`, every write of a space and every change of a
+  member's role is published as an event, see below.
+
+## Events
+
+Each event goes to the `--twake-space-exchange` topic exchange with the
+routing key `twake.space.<event>`. Like the user role attribute, events follow
+every write, whichever API makes it, shortly after it.
+
+```json
+{
+  "organizationId": "acme",
+  "id": "3b9e2c71-5d4a-4f0e-9c8b-1a2d6e7f8091",
+  "members": [
+    {
+      "uuid": "6f1c0a52-8e3b-4d7f-a9c2-5b0e1d4f7a83",
+      "username": "jdoe",
+      "email": "jdoe@acme.example.org",
+      "firstName": "John",
+      "lastName": "Doe",
+      "role": "editor"
+    }
+  ],
+  "actor": "jsmith",
+  "timestamp": "2026-10-06T09:12:44.512Z"
+}
+```
+
+Every event carries `organizationId`, `id` (the space), `actor` (who made
+the write, when known) and `timestamp`. A member is described as above, its
+`uuid` the user's `entryUUID`; a group is `{ id, name, role }`.
+
+- `created`: `name`, `members` (every user in the space with their resolved
+  role, linked groups' members included) and `groups`.
+- `updated`: the changed `name`.
+- `deleted`.
+- `member.added`, `member.role.changed`, `member.removed`: `members`, the one
+  user whose resolved role changed, whatever the cause: a member write, a
+  group linked, unlinked or given another role, a user joining or leaving a
+  linked group. `member.removed` gives the role the user held.
+- `group.linked`, `group.role.changed`, `group.unlinked`: `groups`, the one
+  group, with its name when the event is published. A deleted group is
+  unlinked from each of its spaces once, whether refint or a later write
+  takes its DN out of them. Renaming a linked group publishes nothing.
+
+A user who is deleted or becomes a tombstone publishes no member event.
+
+The server does not start when the broker cannot be reached. An event the
+broker drops later is logged with `result: "no broker"` and not sent again.
+
+Member events compare each moved user's roles before and after a change:
+
+- With `--twake-space-user-role-attribute`, the roles before are the values
+  on the user's entry, so changes made close together announce each role
+  once, in whatever order they are followed.
+- Without it, the roles before are worked out from the directory with the
+  change undone. Two changes followed late may announce a role twice, or
+  not at all. Consumers that need an exact copy resync from the routes.
 
 ## Routes
 
@@ -122,11 +189,14 @@ organization's users, groups and organization entry.
 - `--twake-space-user-role-attribute` (no default): the multi-valued user
   attribute holding the user's role in each space, such as `twakeSpaceRole`.
   Unset, no user entry is written.
+- `--twake-space-exchange` (default `space`): the topic exchange of the
+  events, published only when `--rabbitmq-url` is set.
 
 ## Dependencies
 
 ```
 core/twake/spaces
   ├─ requires: core/twake/groups
-  └─ requires: core/ldap/onChange (with a user role attribute)
+  ├─ requires: core/ldap/onChange
+  └─ requires: core/rabbitmq (with RabbitMQ)
 ```
