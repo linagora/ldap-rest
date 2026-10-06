@@ -27,6 +27,7 @@ import { escapeDnValue, escapeLdapFilter, parseDn } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import type TwakeGroups from './groups';
+import type TwakeTombstone from './tombstone';
 import {
   bodyOf,
   branchPattern,
@@ -191,8 +192,6 @@ export default class TwakeSpaces extends DmPlugin {
   private readonly spaceBase: string;
   private readonly spacePattern: RegExp;
   private readonly userPattern: RegExp;
-  /** The DNs core/twake/tombstone keeps, as it reads them. */
-  private readonly tombstoned: RegExp[];
   private readonly lifecycle: LifecycleAttributes;
   private readonly displayName: string;
   readonly roleAttributes: Record<SpaceRole, string>;
@@ -229,9 +228,6 @@ export default class TwakeSpaces extends DmPlugin {
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
     this.spacePattern = branchPattern(this.spaceBase);
     this.userPattern = branchPattern(this.config.twake_group_user_base!);
-    this.tombstoned = (this.config.twake_tombstone_dn || []).map(
-      pattern => new RegExp(pattern, 'i')
-    );
     this.lifecycle = lifecycleAttributes(this.config);
     this.displayName =
       this.config.twake_space_display_name_attribute || 'twakeDisplayName';
@@ -254,6 +250,12 @@ export default class TwakeSpaces extends DmPlugin {
     return this.server.loadedPlugins.twakeGroups as unknown as TwakeGroups;
   }
 
+  private get tombstone(): TwakeTombstone | undefined {
+    return this.server.loadedPlugins.twakeTombstone as unknown as
+      | TwakeTombstone
+      | undefined;
+  }
+
   hooks: Hooks = {
     ldapaddrequest: ([dn, entry, req]) => {
       for (const attribute of Object.values(this.roleAttributes))
@@ -272,6 +274,9 @@ export default class TwakeSpaces extends DmPlugin {
         for (const one of [dn].flat()) {
           const org = organizationIn(this.userPattern, one);
           if (org !== undefined) {
+            // A delete core/twake/tombstone turns into a tombstone is handed
+            // over when the tombstone is followed; the erase of one, here.
+            if (this.tombstone?.keeps(one)) continue;
             const ids = await this.administered(org, one);
             if (!ids.length) continue;
             if (!this.handing.has(op)) this.handing.set(op, new Map());
@@ -803,16 +808,11 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   /**
-   * The spaces a user is an admin of. Not read for a delete
-   * core/twake/tombstone turns into a tombstone, whose hand-over follows it,
-   * or for the erase of a tombstone, handed over already.
+   * The spaces a user is an admin of. Read again when a tombstone is erased:
+   * its hand-over may have failed, or predate this plugin, and handing over
+   * a space that keeps another admin does nothing.
    */
   private async administered(org: string, dn: string): Promise<string[]> {
-    if (
-      this.server.loadedPlugins.twakeTombstone &&
-      this.tombstoned.some(pattern => pattern.test(dn))
-    )
-      return [];
     try {
       const filter = `(${this.roleAttributes.admin}=${escapeLdapFilter(dn)})`;
       return (await this.spaces(org, filter)).map(s => s.id);

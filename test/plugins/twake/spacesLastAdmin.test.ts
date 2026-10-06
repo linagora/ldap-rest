@@ -6,6 +6,7 @@ import { DM } from '../../../src/bin';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
+import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import { waitFor } from '../../helpers/waitFor';
 
 const ORGS = `ou=tsl-orgs,${process.env.DM_LDAP_BASE}`;
@@ -303,5 +304,163 @@ describe('Twake spaces: last admin deleted', function () {
       { username: 'tsl-bob', role: 'admin' },
       { username: 'tsl-carol', role: 'editor' },
     ]);
+  });
+});
+
+describe('Twake spaces: last admin deleted, with core/twake/tombstone', function () {
+  const orgs = `ou=tst-orgs,${process.env.DM_LDAP_BASE}`;
+  const org = `ou=acme,${orgs}`;
+  const people = `ou=users,${org}`;
+  const person = (uid: string): string => `uid=${uid},${people}`;
+  const route = `/api/v1/organizations/acme/spaces`;
+  let dm: DM;
+  // Loads no plugin: what it writes or deletes, nothing hears
+  let raw: DM;
+  let api: supertest.Agent;
+  let tombstones: TwakeTombstone;
+
+  const ou = (dn: string): Promise<unknown> =>
+    dm.ldap
+      .add(dn, {
+        objectClass: ['top', 'organizationalUnit'],
+        ou: /^ou=([^,]+)/.exec(dn)![1],
+      })
+      .catch(() => undefined);
+
+  const create = async (members: unknown[]): Promise<string> => {
+    const res = await api
+      .post(route)
+      .send({ name: 'Design Sprint', members })
+      .expect(201);
+    return res.body.id as string;
+  };
+
+  const expectMembers = async (
+    id: string,
+    members: unknown[]
+  ): Promise<void> => {
+    // An erased admin may stay in the space without refint
+    const read = async (): Promise<unknown> =>
+      (
+        (await api.get(`${route}/${id}`)).body.members as {
+          username: string;
+        }[]
+      ).filter(m => m.username !== 'tst-alice');
+    const wanted = JSON.stringify(members);
+    await waitFor(async () => JSON.stringify(await read()) === wanted, {
+      what: `space members ${wanted}`,
+    }).catch(async err => {
+      expect(await read(), String(err)).to.deep.equal(members);
+    });
+  };
+
+  before(async () => {
+    dm = new DM();
+    Object.assign(dm.config, {
+      twake_group_base: `ou=groups,ou={org},${orgs}`,
+      twake_group_user_base: `ou=users,ou={org},${orgs}`,
+      twake_group_display_name_attribute: 'o',
+      twake_group_color_attribute: 'businessCategory',
+      twake_group_created_at_attribute: 'ou',
+      twake_lifecycle_deleted_attribute: 'employeeType',
+      twake_lifecycle_deleted_value: 'deleted',
+      twake_lifecycle_lock_attribute: 'carLicense',
+      twake_lifecycle_lock_value: 'L',
+      twake_tombstone_dn: [`^uid=[^,]+,ou=users,ou=[^,]+,${orgs}$`],
+      group_class: ['top', 'groupOfNames'],
+      group_schema: 'static/schemas/twake/organizationGroups.json',
+      twake_space_base: `ou=spaces,ou={org},${orgs}`,
+      twake_space_class: ['top', 'groupOfNames'],
+      twake_space_display_name_attribute: 'O',
+      twake_space_admin_attribute: 'member',
+      twake_space_editor_attribute: 'owner',
+      twake_space_viewer_attribute: 'seeAlso',
+    });
+    await dm.ready;
+    raw = new DM();
+    await raw.ready;
+    await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
+    const groups = new TwakeGroups(dm);
+    await dm.registerPlugin('core/twake/groups', groups);
+    await dm.registerPlugin('core/twake/spaces', new TwakeSpaces(dm));
+    tombstones = new TwakeTombstone(dm);
+    await dm.registerPlugin('core/twake/tombstone', tombstones);
+    tombstones.afterLoad();
+    for (let tries = 0; !groups.schema; tries++) {
+      if (tries === 200) throw new Error('the group schema did not load');
+      await new Promise(r => setTimeout(r, 10));
+    }
+    api = supertest(dm.app);
+    for (const dn of [
+      orgs,
+      org,
+      people,
+      `ou=groups,${org}`,
+      `ou=spaces,${org}`,
+    ])
+      await ou(dn);
+  });
+
+  beforeEach(async () => {
+    for (const uid of ['tst-alice', 'tst-bob'])
+      await dm.ldap
+        .add(person(uid), {
+          objectClass: [
+            'top',
+            'inetOrgPerson',
+            'organizationalPerson',
+            'person',
+          ],
+          cn: uid,
+          sn: 'Doe',
+          givenName: uid,
+          uid,
+          mail: `${uid}@acme.example.org`,
+        })
+        .catch(() => undefined);
+  });
+
+  afterEach(async () => {
+    const { searchEntries } = (await dm.ldap.search(
+      { paged: false, scope: 'one', attributes: ['dn'] },
+      `ou=spaces,${org}`
+    )) as { searchEntries: { dn: string }[] };
+    for (const { dn } of searchEntries) await dm.ldap.delete(dn);
+    for (const uid of ['tst-alice', 'tst-bob'])
+      await raw.ldap.delete(person(uid)).catch(() => undefined);
+  });
+
+  after(async () => {
+    for (const dn of [
+      people,
+      `ou=groups,${org}`,
+      `ou=spaces,${org}`,
+      org,
+      orgs,
+    ])
+      await raw.ldap.delete(dn).catch(() => undefined);
+  });
+
+  it('hands a space over when its last admin is deleted as a tombstone', async () => {
+    const id = await create([
+      { username: 'tst-alice', role: 'admin' },
+      { username: 'tst-bob', role: 'editor' },
+    ]);
+    await dm.ldap.delete(person('tst-alice'));
+    await expectMembers(id, [{ username: 'tst-bob', role: 'admin' }]);
+  });
+
+  it('hands a space over when a tombstone still its admin is erased', async () => {
+    const id = await create([
+      { username: 'tst-alice', role: 'admin' },
+      { username: 'tst-bob', role: 'editor' },
+    ]);
+    // A tombstone written unheard: its hand-over never happened
+    await raw.ldap.modify(person('tst-alice'), {
+      replace: { employeeType: 'deleted', carLicense: 'L' },
+    });
+    await expectMembers(id, [{ username: 'tst-bob', role: 'editor' }]);
+    await tombstones.erase(person('tst-alice'), { force: true });
+    await expectMembers(id, [{ username: 'tst-bob', role: 'admin' }]);
   });
 });

@@ -33,7 +33,8 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   a space's users, its editors become admins, or its viewers when it has no
   editor. A space left with no user of its own is deleted, whatever groups
   it links. Both happen shortly after the deletion, and publish their
-  events. The hand-over relies on refint: without it an erased admin's DN
+  events. Erasing a tombstone checks its spaces again, for a hand-over that
+  failed or was never made. The hand-over relies on refint: without it an erased admin's DN
   stays in the space and still counts as an admin, so erasing two admins
   one after the other hands nothing over. A write of the space made at the
   same moment is retried twice; past that the hand-over is logged and left
