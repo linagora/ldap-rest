@@ -34,6 +34,7 @@ import {
   dnKey,
   invalid,
   isDisplayName,
+  movedInto,
   NAME_RULE,
   notFound,
   ORG,
@@ -280,16 +281,20 @@ export default class TwakeSpaces extends DmPlugin {
           if (set) this.checkHolders(dn, valueOf(set, attribute));
       return [dn, changes, op, req];
     },
-    // A space moved to another organization takes its holders along
+    // A space moved to another organization takes its holders along. The
+    // refusal names none: the caller may not be allowed to read them.
     ldaprenamerequest: async ([dn, newDn, req]) => {
+      const org = movedInto(this.spacePattern, dn, newDn);
+      if (org === undefined) return [dn, newDn, req];
+      const attributes = Object.values(this.roleAttributes);
+      const entry = await this.entry(dn, attributes);
       if (
-        this.organizationOf(newDn) !== undefined &&
-        dnKey(parentOf(newDn)) !== dnKey(parentOf(dn))
-      ) {
-        const entry = await this.entry(dn, Object.values(this.roleAttributes));
-        for (const attribute of Object.values(this.roleAttributes))
-          this.checkHolders(newDn, entry && valueOf(entry, attribute));
-      }
+        entry &&
+        attributes.some(a => this.foreign(org, valueOf(entry, a)) !== undefined)
+      )
+        throw new BadRequestError(
+          `The space holds users or groups of another organization than ${org}`
+        );
       return [dn, newDn, req];
     },
     ldapdeleterequest: async ([dn, req]) => {
@@ -462,15 +467,23 @@ export default class TwakeSpaces extends DmPlugin {
   private checkHolders(dn: string, held: AttributeValue | undefined): void {
     const org = this.organizationOf(dn);
     if (!org) return;
+    const holder = this.foreign(org, held);
+    if (holder !== undefined)
+      throw new BadRequestError(
+        `${holder} is neither a user nor a group of organization ${org}`
+      );
+  }
+
+  /** A holder that is neither a user nor a group of the organization. */
+  private foreign(
+    org: string,
+    held: AttributeValue | undefined
+  ): string | undefined {
     const branches = [
       this.groups.userBaseOf(org),
       this.groups.groupBaseOf(org),
     ].map(dnKey);
-    for (const holder of values(held))
-      if (!branches.includes(dnKey(parentOf(holder))))
-        throw new BadRequestError(
-          `${holder} is neither a user nor a group of organization ${org}`
-        );
+    return values(held).find(h => !branches.includes(dnKey(parentOf(h))));
   }
 
   api(app: Express): void {

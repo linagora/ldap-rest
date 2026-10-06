@@ -142,16 +142,23 @@ describe('Twake groups plugin', function () {
     }
   });
 
-  it('refuses a group moved to another organization with its members', async () => {
-    await user('acme', 'tg-alice');
-    await group('acme', 'team', [userDn('acme', 'tg-alice')]);
-    let error: unknown;
-    await dm.ldap
-      .rename(groupDn('acme', 'team'), groupDn('other', 'team'))
-      .catch(e => (error = e));
-    expect(String(error)).to.match(/is not a user of organization other/);
-    expect(await membersOf('acme', 'team')).to.have.length(2);
-  });
+  for (const [kind, extra] of [
+    ['members', {}],
+    ['tombstones', { employeeType: 'deleted' }],
+  ] as const)
+    it(`refuses a group moved to another organization with its ${kind}`, async () => {
+      await user('acme', 'tg-alice', extra);
+      await group('acme', 'team', [userDn('acme', 'tg-alice')]);
+      let error: unknown;
+      await dm.ldap
+        .rename(groupDn('acme', 'team'), groupDn('other', 'team'))
+        .catch(e => (error = e));
+      // Without naming them, which the caller may not be allowed to read
+      expect(String(error)).to.match(
+        /The group holds members of another organization than other$/
+      );
+      expect(String(error)).not.to.include('tg-alice');
+    });
 
   it('hides a tombstone from member lists, and keeps its membership', async () => {
     await user('acme', 'tg-alice', { employeeType: 'deleted' });

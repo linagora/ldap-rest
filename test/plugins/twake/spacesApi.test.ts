@@ -573,8 +573,8 @@ describe('Twake spaces plugin routes', function () {
         `cn=${id},ou=spaces,${orgDn('other')}`
       )
       .catch((err: Error) => (refused = err));
-    expect(refused?.message).to.match(
-      /neither a user nor a group of organization other/
+    expect(refused?.message).to.equal(
+      'The space holds users or groups of another organization than other'
     );
   });
 
