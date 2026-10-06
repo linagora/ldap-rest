@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/groups`: the group search also matches the `cn` of a group without
+  a display name, which the API answers as its `displayName`
+  ([#289](https://github.com/linagora/ldap-rest/issues/289))
+
 ## v0.15.0 (2026-10-06)
 
 ### Breaking Changes

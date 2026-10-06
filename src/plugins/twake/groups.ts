@@ -716,7 +716,9 @@ export default class TwakeGroups extends LdapGroups {
     let filter = `(${this.cn}=*)`;
     if (p.search) {
       const s = escapeLdapFilter(p.search);
-      filter = `(&${filter}(|(${this.displayName}=*${s}*)(description=*${s}*)))`;
+      // The cn stands in for a missing display name, as in groupOf(); it is
+      // not searched otherwise, being a UUID for groups made here.
+      filter = `(&${filter}(|(${this.displayName}=*${s}*)(description=*${s}*)(&(!(${this.displayName}=*))(${this.cn}=*${s}*))))`;
     }
     const groups = this.sorted(
       (await this.groups(org, filter)).map(e => this.groupOf(org, e)),

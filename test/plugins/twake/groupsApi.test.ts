@@ -196,6 +196,23 @@ describe('Twake groups plugin routes', function () {
     ).to.equal('INVALID_SORT_FIELD');
   });
 
+  it('searches the cn of a group that has no display name', async () => {
+    const id = await create('Alpha');
+    await dm.ldap.add(`cn=Legacy Team,ou=groups,${orgDn('acme')}`, {
+      objectClass: ['top', 'groupOfNames'],
+      cn: 'Legacy Team',
+      member: `uid=tga-alice,${users('acme')}`,
+    });
+    const found = await api.get(`${route()}?search=legacy`).expect(200);
+    expect(
+      found.body.groups.map((g: { displayName: string }) => g.displayName)
+    ).to.deep.equal(['Legacy Team']);
+    const byId = await api
+      .get(`${route()}?search=${id.slice(0, 8)}`)
+      .expect(200);
+    expect(byId.body.groups).to.deep.equal([]);
+  });
+
   it('gets a group, and answers 404 for an unknown one', async () => {
     const id = await create('Eng');
     expect(
