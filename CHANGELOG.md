@@ -16,6 +16,24 @@
   (CVE-2026-19032, CVE-2026-68497, CVE-2026-83557, CVE-2026-91776,
   CVE-2026-91777)
 
+### Features
+
+- `core/twake/spaces`: spaces of an organization, under
+  `/api/v1/organizations/:id/spaces`, holding users and linked groups each as
+  viewer, editor or admin; the routes keep one admin:
+  [spaces](docs/usage/plugins/integrations/spaces.md)
+- `core/twake/spaces`: `--twake-space-user-role-attribute` keeps each user's
+  role in every space, linked groups included, on their entry as
+  `<space id>:<role>`
+- `core/twake/spaces`: with RabbitMQ, every write of a space and every
+  change of its members' roles is published on the `--twake-space-exchange`
+  topic exchange (default `space`) as `twake.space.*` events; the server does
+  not start when the broker cannot be reached
+- `core/twake/spaces`: when a deleted user was a space's last admin, its
+  editors, or else its viewers, become admins; a space left with no user of
+  its own is deleted. `core/twake/spaces` now always loads
+  `core/ldap/onChange`, which reads each entry before and after every write
+
 ### Fixes
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or

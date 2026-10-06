@@ -303,6 +303,14 @@ export interface Config {
   twake_group_created_at_attribute?: string;
   twake_group_max_page_limit?: number;
   twake_group_member_fields?: Record<string, string>;
+  twake_space_base?: string;
+  twake_space_class?: string[];
+  twake_space_display_name_attribute?: string;
+  twake_space_admin_attribute?: string;
+  twake_space_editor_attribute?: string;
+  twake_space_viewer_attribute?: string;
+  twake_space_user_role_attribute?: string;
+  twake_space_exchange?: string;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -885,6 +893,40 @@ const configArgs: ConfigTemplate = [
     'number',
   ],
   ['--twake-group-member-fields', 'DM_TWAKE_GROUP_MEMBER_FIELDS', {}, 'json'],
+  // twake/spaces plugin
+  ['--twake-space-base', 'DM_TWAKE_SPACE_BASE', ''],
+  [
+    '--twake-space-class',
+    'DM_TWAKE_SPACE_CLASS',
+    ['top', 'twakeSpace'],
+    'array',
+  ],
+  [
+    '--twake-space-display-name-attribute',
+    'DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE',
+    'twakeDisplayName',
+  ],
+  [
+    '--twake-space-admin-attribute',
+    'DM_TWAKE_SPACE_ADMIN_ATTRIBUTE',
+    'twakeSpaceAdmin',
+  ],
+  [
+    '--twake-space-editor-attribute',
+    'DM_TWAKE_SPACE_EDITOR_ATTRIBUTE',
+    'twakeSpaceEditor',
+  ],
+  [
+    '--twake-space-viewer-attribute',
+    'DM_TWAKE_SPACE_VIEWER_ATTRIBUTE',
+    'twakeSpaceViewer',
+  ],
+  [
+    '--twake-space-user-role-attribute',
+    'DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE',
+    '',
+  ],
+  ['--twake-space-exchange', 'DM_TWAKE_SPACE_EXCHANGE', 'space'],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
   [

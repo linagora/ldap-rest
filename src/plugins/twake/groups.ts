@@ -49,10 +49,12 @@ import {
  * An attribute's first value, whatever case its name is configured in: the
  * directory answers it under its schema's spelling.
  */
-const read = (entry: AttributesList, attribute: string): string | undefined =>
-  first(valueOf(entry, attribute));
+export const read = (
+  entry: AttributesList,
+  attribute: string
+): string | undefined => first(valueOf(entry, attribute));
 
-const ORG = '{org}';
+export const ORG = '{org}';
 
 const GROUP_SORT = ['displayName', 'description', 'createdAt'];
 const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle'];
@@ -80,15 +82,8 @@ const NAME_FIELDS: Record<string, string> = {
 };
 const TECHNICAL = 'twakeIsTechnical';
 
-const NOT_FOUND = {
-  organization: 'Organization not found',
-  group: 'Group not found',
-  user: 'User not found',
-  member: 'Member not found',
-};
-
 /** A refusal the routes answer as `{ error, code }`. */
-class RouteError extends Error {
+export class RouteError extends Error {
   constructor(
     readonly status: number,
     message: string,
@@ -98,15 +93,19 @@ class RouteError extends Error {
   }
 }
 
-const notFound = (what: keyof typeof NOT_FOUND): RouteError =>
-  new RouteError(404, NOT_FOUND[what], `${what.toUpperCase()}_NOT_FOUND`);
-const invalid = (message: string, code = 'INVALID_INPUT'): RouteError =>
+export const notFound = (what: string): RouteError =>
+  new RouteError(
+    404,
+    `${what[0].toUpperCase()}${what.slice(1)} not found`,
+    `${what.toUpperCase()}_NOT_FOUND`
+  );
+export const invalid = (message: string, code = 'INVALID_INPUT'): RouteError =>
   new RouteError(400, message, code);
 
-const NAME_RULE =
+export const NAME_RULE =
   'name must be a non-blank string of at most 256 characters with no control characters';
 
-function isDisplayName(name: unknown): name is string {
+export function isDisplayName(name: unknown): name is string {
   return (
     typeof name === 'string' &&
     name.trim().length > 0 &&
@@ -125,14 +124,14 @@ const text = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
 /** A request without a JSON object body leaves `req.body` undefined. */
-function bodyOf(req: Request): Record<string, unknown> {
+export function bodyOf(req: Request): Record<string, unknown> {
   const body: unknown = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body))
     throw invalid('Request body must be a JSON object');
   return body as Record<string, unknown>;
 }
 
-interface Page {
+export interface Page {
   page: number;
   limit: number;
   offset: number;
@@ -148,7 +147,7 @@ export function values(value: AttributeValue | undefined): string[] {
 }
 
 /** A DN spelled one way, to compare two spellings of it. */
-function dnKey(dn: string): string {
+export function dnKey(dn: string): string {
   try {
     return normalizeDn(dn);
   } catch {
@@ -156,8 +155,36 @@ function dnKey(dn: string): string {
   }
 }
 
-function parentOf(dn: string): string {
+export function parentOf(dn: string): string {
   return parseDn(dn).slice(1).join(',');
+}
+
+/** The RDN value of a DN, unescaped, or the DN itself if it has none. */
+export function rdnValue(dn: string): string {
+  const [rdn] = parseDn(dn);
+  const eq = rdn.indexOf('=');
+  return eq > 0 ? unescapeDnValue(rdn.slice(eq + 1).trim()) : dn;
+}
+
+/**
+ * The entries one level under a DN pattern holding `{org}`, the organization
+ * captured as one RDN value: `(?:\\.|[^,])+` keeps an escaped comma inside it.
+ */
+export function branchPattern(base: string): RegExp {
+  const [before, after] = parseDn(base)
+    .join(',')
+    .split(ORG)
+    .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${before}(?<org>(?:\\\\.|[^,])+)${after}$`, 'i');
+}
+
+/** The organization of an entry one level under a branch pattern. */
+export function organizationIn(
+  pattern: RegExp,
+  dn: string
+): string | undefined {
+  const m = pattern.exec(parentOf(parseDn(dn).join(',')));
+  return m?.groups ? unescapeDnValue(m.groups.org) : undefined;
 }
 
 export default class TwakeGroups extends LdapGroups {
@@ -171,7 +198,7 @@ export default class TwakeGroups extends LdapGroups {
   private readonly displayName: string;
   private readonly color: string;
   private readonly createdAt: string;
-  private readonly maxPage: number;
+  readonly maxPage: number;
   private readonly memberFields: Record<string, string>;
 
   constructor(server: DM) {
@@ -184,16 +211,7 @@ export default class TwakeGroups extends LdapGroups {
     ])
       if (!pattern.includes(ORG))
         throw new Error(`${this.name}: ${option} must hold ${ORG}`);
-    // The organization is one RDN value: `(?:\\.|[^,])+` keeps an escaped
-    // comma inside it.
-    const [before, after] = parseDn(this.groupBase)
-      .join(',')
-      .split(ORG)
-      .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    this.groupPattern = new RegExp(
-      `^${before}(?<org>(?:\\\\.|[^,])+)${after}$`,
-      'i'
-    );
+    this.groupPattern = branchPattern(this.groupBase);
     this.attrs = lifecycleAttributes(this.config);
     this.orgPattern = this.config.twake_group_organization_dn || '';
     this.displayName =
@@ -297,9 +315,7 @@ export default class TwakeGroups extends LdapGroups {
 
   /** The organization a group DN belongs to, if it is a group at all. */
   organizationOf(dn: string): string | undefined {
-    const spelled = parseDn(dn).join(',');
-    const m = this.groupPattern.exec(parentOf(spelled));
-    return m?.groups ? unescapeDnValue(m.groups.org) : undefined;
+    return organizationIn(this.groupPattern, dn);
   }
 
   groupBaseOf(org: string): string {
@@ -356,8 +372,9 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  private async tombstonesOf(org: string): Promise<string[]> {
+  async tombstonesOf(org: string, req?: Request): Promise<string[]> {
     const { deleted, deletedValue } = this.attrs;
+    if (!deleted) return [];
     try {
       const { searchEntries } = (await this.ldap.search(
         {
@@ -366,7 +383,8 @@ export default class TwakeGroups extends LdapGroups {
           filter: `(${deleted}=${escapeLdapFilter(deletedValue)})`,
           attributes: ['dn'],
         },
-        this.userBaseOf(org)
+        this.userBaseOf(org),
+        req
       )) as SearchResult;
       return searchEntries.map(e => e.dn);
     } catch (err) {
@@ -381,35 +399,7 @@ export default class TwakeGroups extends LdapGroups {
    */
   api(app: Express): void {
     const base = `${this.config.api_prefix}/v1/organizations/:id/groups`;
-    const route =
-      (
-        context: string,
-        handler: (req: Request, res: Response, org: string) => Promise<void>
-      ) =>
-      async (req: Request, res: Response): Promise<void> => {
-        try {
-          const org = req.params.id as string;
-          await this.checkOrganization(org);
-          await handler(req, res, org);
-        } catch (err) {
-          if (err instanceof RouteError) {
-            res.status(err.status).json({ error: err.message, code: err.code });
-            return;
-          }
-          // A rule of another plugin or of the schema refused the write
-          if (err instanceof HttpError && err.statusCode < 500) {
-            res.status(err.statusCode).json({
-              error: err.message,
-              code: err.statusCode === 400 ? 'INVALID_INPUT' : 'REFUSED',
-            });
-            return;
-          }
-          this.logger.error({ plugin: this.name, context, error: String(err) });
-          res
-            .status(500)
-            .json({ error: `Error ${context}`, code: 'INTERNAL_ERROR' });
-        }
-      };
+    const route = this.organizationRoute.bind(this);
     app.get(
       base,
       route('listing groups', (q, r, o) => this.listRoute(q, r, o))
@@ -455,12 +445,48 @@ export default class TwakeGroups extends LdapGroups {
     );
   }
 
-  private groupDn(org: string, id: string): string {
+  /** A route of the organization `:id`; see `RouteError` for refusals. */
+  organizationRoute(
+    context: string,
+    handler: (req: Request, res: Response, org: string) => Promise<void>,
+    plugin = this.name
+  ): (req: Request, res: Response) => Promise<void> {
+    return async (req, res) => {
+      try {
+        const org = req.params.id as string;
+        await this.checkOrganization(org);
+        await handler(req, res, org);
+      } catch (err) {
+        if (err instanceof RouteError) {
+          res.status(err.status).json({ error: err.message, code: err.code });
+          return;
+        }
+        // A rule of another plugin or of the schema refused the write
+        if (err instanceof HttpError && err.statusCode < 500) {
+          res.status(err.statusCode).json({
+            error: err.message,
+            code: err.statusCode === 400 ? 'INVALID_INPUT' : 'REFUSED',
+          });
+          return;
+        }
+        this.logger.error({ plugin, context, error: String(err) });
+        res
+          .status(500)
+          .json({ error: `Error ${context}`, code: 'INTERNAL_ERROR' });
+      }
+    };
+  }
+
+  groupDn(org: string, id: string): string {
     return `${this.cn}=${escapeDnValue(id)},${this.groupBaseOf(org)}`;
   }
 
-  private get userAttribute(): string {
+  get userAttribute(): string {
     return this.config.ldap_user_main_attribute || 'uid';
+  }
+
+  userDn(org: string, username: string): string {
+    return `${this.userAttribute}=${escapeDnValue(username)},${this.userBaseOf(org)}`;
   }
 
   /** Every route answers 404 for a missing organization, 410 for a deleted one. */
@@ -490,7 +516,7 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   /** Page, search and sort of a list route, or a refusal of them. */
-  private page(req: Request, sortable: string[]): Page {
+  page(req: Request, sortable: string[]): Page {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.max(
       1,
@@ -522,7 +548,7 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  private sorted<T extends Record<string, unknown>>(
+  sorted<T extends Record<string, unknown>>(
     items: T[],
     sortBy: string | undefined,
     desc: boolean
@@ -535,18 +561,12 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   /** A group as the routes answer it: members named by their RDN value. */
-  private groupOf(org: string, entry: AttributesList): Record<string, unknown> {
+  groupOf(org: string, entry: AttributesList): Record<string, unknown> {
     const cn = read(entry, this.cn) || '';
     const users = dnKey(this.userBaseOf(org));
     const members = values(entry.member)
       .filter(m => !isDummyMemberDn(m, this.config.group_dummy_user))
-      .map(m => {
-        const [rdn] = parseDn(m);
-        const eq = rdn.indexOf('=');
-        return dnKey(parentOf(m)) === users && eq > 0
-          ? unescapeDnValue(rdn.slice(eq + 1).trim())
-          : m;
-      });
+      .map(m => (dnKey(parentOf(m)) === users ? rdnValue(m) : m));
     return {
       id: cn,
       cn,
@@ -560,11 +580,22 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  private async groups(org: string, filter: string): Promise<AttributesList[]> {
+  async groups(
+    org: string,
+    filter: string,
+    attributes?: string[],
+    req?: Request
+  ): Promise<AttributesList[]> {
     try {
       const { searchEntries } = (await this.ldap.search(
-        { paged: false, scope: 'one', filter },
-        this.groupBaseOf(org)
+        {
+          paged: false,
+          scope: 'one',
+          filter,
+          ...(attributes && { attributes }),
+        },
+        this.groupBaseOf(org),
+        req
       )) as SearchResult;
       return searchEntries;
     } catch (err) {
@@ -715,15 +746,35 @@ export default class TwakeGroups extends LdapGroups {
     const id = req.params.groupId as string;
     const group = await this.readGroup(org, id);
     if (!group) throw notFound('group');
+    res.json({
+      organizationId: org,
+      id,
+      ...(await this.memberPage(p, org, group.members as string[])),
+    });
+  }
+
+  /**
+   * A page of members' public profiles, each with what `extra` adds for its
+   * username.
+   */
+  async memberPage(
+    p: Page,
+    org: string,
+    names: string[],
+    extra: (username: string) => Record<string, unknown> = () => ({}),
+    req?: Request
+  ): Promise<{
+    members: Record<string, unknown>[];
+    pagination: Record<string, number | boolean>;
+  }> {
     const usernames = [
-      ...new Map(
-        (group.members as string[]).map(u => [u.toLowerCase(), u])
-      ).values(),
+      ...new Map(names.map(u => [u.toLowerCase(), u])).values(),
     ];
-    const profiles = await this.profiles(org, usernames);
-    let members = usernames.map(
-      u => profiles.get(u.toLowerCase()) ?? { uid: u }
-    );
+    const profiles = await this.profiles(org, usernames, req);
+    let members = usernames.map(u => ({
+      ...(profiles.get(u.toLowerCase()) ?? { uid: u }),
+      ...extra(u),
+    }));
     if (p.search) {
       const needle = p.search.toLowerCase();
       members = members.filter(m =>
@@ -734,9 +785,7 @@ export default class TwakeGroups extends LdapGroups {
     }
     members = this.sorted(members, p.sortBy ?? 'uid', p.desc);
     const totalPages = Math.ceil(members.length / p.limit);
-    res.json({
-      organizationId: org,
-      id,
+    return {
       members: members.slice(p.offset, p.offset + p.limit),
       pagination: {
         page: p.page,
@@ -746,17 +795,18 @@ export default class TwakeGroups extends LdapGroups {
         hasNextPage: p.page < totalPages,
         hasPreviousPage: p.page > 1,
       },
-    });
+    };
   }
 
   /**
    * Users of the organization by name, read in pages of the size limit. A
    * tombstone is no user: it cannot be added, as it would join hidden.
    */
-  private async users(
+  async users(
     org: string,
     usernames: string[],
-    attributes: string[]
+    attributes: string[],
+    req?: Request
   ): Promise<AttributesList[]> {
     const { deleted, deletedValue } = this.attrs;
     const live = deleted
@@ -771,7 +821,8 @@ export default class TwakeGroups extends LdapGroups {
       try {
         const { searchEntries } = (await this.ldap.search(
           { paged: false, scope: 'one', filter, attributes },
-          this.userBaseOf(org)
+          this.userBaseOf(org),
+          req
         )) as SearchResult;
         out.push(...searchEntries);
       } catch (err) {
@@ -781,9 +832,10 @@ export default class TwakeGroups extends LdapGroups {
     return out;
   }
 
-  private async profiles(
+  async profiles(
     org: string,
-    usernames: string[]
+    usernames: string[],
+    req?: Request
   ): Promise<Map<string, Record<string, unknown>>> {
     const attributes = [
       ...new Set([
@@ -793,7 +845,7 @@ export default class TwakeGroups extends LdapGroups {
       ]),
     ];
     const byName = new Map<string, Record<string, unknown>>();
-    for (const entry of await this.users(org, usernames, attributes)) {
+    for (const entry of await this.users(org, usernames, attributes, req)) {
       const name = read(entry, this.userAttribute);
       if (!name) continue;
       const profile: Record<string, unknown> = {};
@@ -843,10 +895,7 @@ export default class TwakeGroups extends LdapGroups {
     const held = new Set((group.members as string[]).map(u => u.toLowerCase()));
     const added = wanted
       .filter(u => !held.has(u))
-      .map(
-        u =>
-          `${this.userAttribute}=${escapeDnValue(found.get(u)!)},${this.userBaseOf(org)}`
-      );
+      .map(u => this.userDn(org, found.get(u)!));
     const dn = this.groupDn(org, id);
     if (added.length) {
       await this.onGroup(() =>
@@ -874,9 +923,7 @@ export default class TwakeGroups extends LdapGroups {
     org: string
   ): Promise<void> {
     const dn = this.groupDn(org, req.params.groupId as string);
-    const member = `${this.userAttribute}=${escapeDnValue(
-      req.params.userId as string
-    )},${this.userBaseOf(org)}`;
+    const member = this.userDn(org, req.params.userId as string);
     try {
       await this.ldap.modify(dn, { delete: { member } }, req);
     } catch (err) {

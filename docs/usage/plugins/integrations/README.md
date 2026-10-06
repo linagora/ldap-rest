@@ -19,6 +19,7 @@ Plugins for connecting LDAP-Rest to external systems.
 | [instances](instances.md)               | Workplace instance of each account       |
 | [tombstone](tombstone.md)               | Deleted accounts kept as tombstones      |
 | [groups](groups.md)                     | Organization groups                      |
+| [spaces](spaces.md)                     | Organization spaces, with member roles   |
 
 ## Prerequisites
 
@@ -47,4 +48,9 @@ core/twake/calendar
 core/twake/lifecycleEvents
   ├─ requires: core/ldap/onChange
   └─ requires: core/rabbitmq
+
+core/twake/spaces
+  ├─ requires: core/twake/groups
+  ├─ requires: core/ldap/onChange
+  └─ requires: core/rabbitmq (with RabbitMQ)
 ```

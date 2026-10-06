@@ -288,6 +288,10 @@
       "types": "./dist/src/plugins/twake/lifecycleEvents.d.ts",
       "import": "./dist/plugins/twake/lifecycleEvents.js"
     },
+    "./plugin-twake-spaces": {
+      "types": "./dist/src/plugins/twake/spaces.d.ts",
+      "import": "./dist/plugins/twake/spaces.js"
+    },
     "./plugin-twake-tombstone": {
       "types": "./dist/src/plugins/twake/tombstone.d.ts",
       "import": "./dist/plugins/twake/tombstone.js"

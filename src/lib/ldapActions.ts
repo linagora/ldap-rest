@@ -1546,13 +1546,17 @@ class ldapActions {
   /*
     LDAP delete
    */
-  async delete(dn: string | string[], req?: Request): Promise<boolean> {
+  async delete(
+    dn: string | string[],
+    req?: Request,
+    options: Pick<ModifyOptions, 'context'> = {}
+  ): Promise<boolean> {
     const requested = (Array.isArray(dn) ? dn : [dn]).map(d => this.setDn(d));
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {
       return await runOperation(op, () =>
-        this.applyDelete(requested, req, done)
+        this.applyDelete(requested, req, options, done)
       );
     } finally {
       this.endOperation(done, this.parent?.hooks.ldapdeleteend, op);
@@ -1562,6 +1566,7 @@ class ldapActions {
   private async applyDelete(
     dn: string | string[],
     req: Request | undefined,
+    options: Pick<ModifyOptions, 'context'>,
     done: Promise<void>[]
   ): Promise<boolean> {
     [dn] = (await launchHooksChained(this.parent?.hooks.ldapdeleterequest, [
@@ -1591,7 +1596,7 @@ class ldapActions {
           launchHooks(
             this.parent.hooks.ldapdeletedone,
             entry,
-            changeContext(req)
+            options.context ?? changeContext(req)
           )
         );
       }
