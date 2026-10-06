@@ -1448,7 +1448,7 @@ export default class LdapOrganizations extends DmPlugin {
     const baseDn = getParentDn(topOrg);
     // Escape both dn and query to prevent LDAP injection
     const escapedDn = escapeLdapFilter(dn);
-    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)))`;
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)(displayName=*${escapedQuery}*)))`;
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
