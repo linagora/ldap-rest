@@ -1,88 +1,64 @@
 # Changelog
 
-## Unreleased
+## v0.15.0 (2026-10-06)
 
 ### Breaking Changes
 
-- An array option given on the command line replaces its default instead of
-  being added to it: repeat the default values to keep them, as in
-  `--user-class top,twakeAccount,twakeWhitePages,twakeExtra`, and
-  `--ldap-url` no longer keeps `ldap://localhost` next to the URL given,
+- Array options: a value given on the command line replaces the default
+  instead of being added to it,
   [notes](docs/usage/upgrading.md#an-array-option-on-the-command-line-replaces-its-default)
-- A DN option read from the environment splits on `;` only,
-  [notes](docs/usage/upgrading.md#a-dn-option-read-from-the-environment-splits-on--only)
-- `--auth-hmac` and `--auth-totp` no longer split on spaces, and
-  `core/auth/hmac` and `core/auth/totp` stop the server on an entry that cannot
-  work,
-  [notes](docs/usage/upgrading.md#hmac-and-totp-entries-are-no-longer-split-on-spaces)
-- The plural command-line form of an array option splits on `;` before `,`,
-  [notes](docs/usage/upgrading.md#the-plural-command-line-form-of-an-array-option-splits-on--first)
-- An empty array variable keeps the default instead of giving `[]` (but an
-  empty `DM_LDAP_URL` still stops the server), and a number option refuses
-  anything but an integer,
+- Array options from the environment are split according to what they hold:
+  a DN option splits on `;` only, `--auth-hmac` and `--auth-totp` never on
+  spaces, and an empty variable keeps the default; the plural command-line
+  form splits on `;` before `,`,
+  [notes](docs/usage/upgrading.md#to-0150)
+  ([#284](https://github.com/linagora/ldap-rest/issues/284))
+- The server refuses to start on an HMAC or TOTP entry that cannot work, an
+  empty `DM_LDAP_URL`, or a number option that is not an integer,
   [notes](docs/usage/upgrading.md#an-empty-environment-variable-or-a-number-that-is-not-one)
 
 ### Security
 
-- `lsc-plugin`: jackson-databind 2.22.1 → 2.22.3, clearing five advisories
-  (CVE-2026-19032, CVE-2026-68497, CVE-2026-83557, CVE-2026-91776,
-  CVE-2026-91777)
-- Dependencies: proxy-addr 2.0.7 → 2.0.8, behind Express's `trust proxy`
-  (IP spoofing through an IPv4-mapped IPv6 trusted subnet,
-  GHSA-jqcg-44mw-7w3h), and http-cache-semantics 4.2.0 → 4.3.0 (cross-user
-  cached responses through `max-stale`, GHSA-ch52-4w7c-c8xp); for the build
-  only, source-map-js 1.2.1 → 1.2.2 (GHSA-68fv-2mgg-jv7q) and
-  postcss-selector-parser forced to 7.1.6 (GHSA-rj75-hqrm-r3gf), with
-  unchanged browser bundles
+- `core/auth/totp`: an entry whose digits field was not a number registered
+  a user whose code was the string `NaN`, so `Bearer NaN` authenticated; such
+  an entry now stops the server
+  ([#284](https://github.com/linagora/ldap-rest/issues/284))
+- proxy-addr 2.0.8: behind `--trusted-proxy`, an IPv4-mapped IPv6 address
+  could pass for a trusted subnet (GHSA-jqcg-44mw-7w3h); http-cache-semantics
+  4.3.0 (GHSA-ch52-4w7c-c8xp)
+- `lsc-plugin`: jackson-databind 2.22.3 (CVE-2026-19032, CVE-2026-68497,
+  CVE-2026-83557, CVE-2026-91776, CVE-2026-91777)
 
 ### Features
 
-- `core/twake/spaces`: spaces of an organization, under
-  `/api/v1/organizations/:id/spaces`, holding users and linked groups each as
-  viewer, editor or admin; the routes keep one admin:
-  [spaces](docs/usage/plugins/integrations/spaces.md)
-- `core/twake/spaces`: `--twake-space-user-role-attribute` keeps each user's
-  role in every space, linked groups included, on their entry as
-  `<space id>:<role>`
-- `core/twake/spaces`: with RabbitMQ, every write of a space and every
-  change of its members' roles is published on the `--twake-space-exchange`
-  topic exchange (default `space`) as `twake.space.*` events; the server does
-  not start when the broker cannot be reached. Without
-  `--twake-space-user-role-attribute`, changes made close together may
-  announce a member's role twice, or not at all. With either, the server
-  does not start when core/ldap/trash watches the group or space branches
-- `core/twake/spaces`: when a deleted user was a space's last admin, its
-  editors, or else its viewers, become admins; a space left with no user of
-  its own is deleted. `core/twake/spaces` now always loads
-  `core/ldap/onChange`, which reads each entry before and after every write
+- `core/twake/spaces`: spaces of an organization under
+  `/api/v1/organizations/:id/spaces`, holding users and linked groups as
+  viewer, editor or admin,
+  [spaces](docs/usage/plugins/integrations/spaces.md):
+  - `--twake-space-user-role-attribute` keeps each user's role in every space
+    on their entry, as `<space id>:<role>`;
+  - with RabbitMQ, changes are published as `twake.space.*` events on
+    `--twake-space-exchange` (default `space`); without the role attribute,
+    a role changed twice in quick succession may be announced twice or not
+    at all;
+  - when a space's last admin is deleted, its editors, or else its viewers,
+    become admins, and a space left with no user of its own is deleted.
+
+  It loads `core/ldap/onChange`. With the role attribute or RabbitMQ, it
+  does not start when `core/ldap/trash` watches the group or space branches,
+  nor when RabbitMQ cannot be reached.
 
 ### Fixes
 
-- `core/auth/totp`: an entry whose digits field is not an integer from 6 to
-  10 (`secret:name:abc`), or whose secret is not Base32, stops the server; it used to register a user whose
-  code was the string `NaN`, so `Bearer NaN` authenticated
-- Array options read from the environment: an empty variable
-  (`DM_GROUP_CLASSES=`) keeps the default instead of replacing it with
-  nothing, and so does an empty number or JSON value (`DM_PORT=`, formerly
-  `NaN`), while a number that is not one (`DM_PORT=abc`, `--port ''`) stops
-  the server;
-  `DM_LDAP_RAW_BASE="ou=My Unit,dc=x;ou=b,dc=y"` and an HMAC name with spaces
-  are no longer cut; a value starting with `;` is split on `;`;
-  `--authz-dynamic-bypass` and `--twake-space-class` split on commas in their
-  singular CLI form
-  ([#284](https://github.com/linagora/ldap-rest/issues/284))
-- `core/twake/groups`: an empty `search` (`?search=`) lists every group or
-  member instead of answering 400 `INVALID_SEARCH_QUERY`
-- `core/twake/groups`: a request an authorization plugin refuses answers
-  403 `REFUSED` instead of 500 `INTERNAL_ERROR`
-- `core/twake/groups`: moving a group to another organization with its
-  members is refused with a 400, as adding them there is
-- The singular form of an array option holding identifiers splits
-  comma-separated values: `--group-class top,groupOfNames,twakeGroup` no
-  longer fails group creation with 400 "objectClass has invalid value",
+- `core/twake/groups`: `?search=` with an empty value lists everything
+  instead of answering 400; a request an authorization plugin refuses
+  answers 403 instead of 500; moving a group to another organization with
+  its members is refused
+- `--group-class top,groupOfNames,twakeGroup` (comma-separated, singular
+  form) no longer gives one invalid object class,
   [details](docs/usage/configuration.md#array-options)
-- `core/twake/lifecycleEvents`: an operational attribute such as `entryUUID`
-  named by a rule outside a member list is published instead of left out,
+- `core/twake/lifecycleEvents`: an operational attribute such as
+  `entryUUID` named by a rule is published instead of left out,
   [rules](docs/usage/plugins/integrations/lifecycle-events.md#rules)
 
 ## v0.14.0 (2026-10-02)
