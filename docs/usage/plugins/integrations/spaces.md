@@ -69,6 +69,7 @@ every write, whichever API makes it, shortly after it.
 ```json
 {
   "organizationId": "acme",
+  "organizationDomain": "acme.com",
   "id": "3b9e2c71-5d4a-4f0e-9c8b-1a2d6e7f8091",
   "members": [
     {
@@ -88,6 +89,11 @@ every write, whichever API makes it, shortly after it.
 Every event carries `organizationId`, `id` (the space), `actor` (who made
 the write, when known) and `timestamp`. A member is described as above, its
 `uuid` the user's `entryUUID`; a group is `{ id, name, role }`.
+
+`organizationDomain` is the organization's domain, read on its entry
+(`--twake-group-organization-dn`) from
+`--twake-space-organization-domain-attribute`, and kept once read. It is
+left out when that option or the entry gives none.
 
 Writes made close together blur the actor: the member events of two writes
 of one space or group followed together may go out under the first one's.
@@ -210,6 +216,8 @@ organization's users, groups and organization entry.
   Unset, no user entry is written.
 - `--twake-space-exchange` (default `space`): the topic exchange of the
   events, published only when `--rabbitmq-url` is set.
+- `--twake-space-organization-domain-attribute` (default `twakeDomain`): the
+  attribute of the organization entry holding its domain, for the events.
 
 ## Dependencies
 

@@ -608,16 +608,17 @@ Requires `core/twake/groups`, whose options it reads for users, groups and the
 organization entry, and `core/ldap/onChange`; with `--rabbitmq-url`, it
 requires `core/rabbitmq`.
 
-| CLI                                    | Env                                     | Default            | Description                                        |
-| -------------------------------------- | --------------------------------------- | ------------------ | -------------------------------------------------- |
-| `--twake-space-base`                   | `DM_TWAKE_SPACE_BASE`                   |                    | Space branch of an organization, with `{org}`      |
-| `--twake-space-class`                  | `DM_TWAKE_SPACE_CLASS`                  | `top,twakeSpace`   | Object classes of a space                          |
-| `--twake-space-display-name-attribute` | `DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE` | `twakeDisplayName` | Space name attribute                               |
-| `--twake-space-admin-attribute`        | `DM_TWAKE_SPACE_ADMIN_ATTRIBUTE`        | `twakeSpaceAdmin`  | DNs holding the admin role                         |
-| `--twake-space-editor-attribute`       | `DM_TWAKE_SPACE_EDITOR_ATTRIBUTE`       | `twakeSpaceEditor` | DNs holding the editor role                        |
-| `--twake-space-viewer-attribute`       | `DM_TWAKE_SPACE_VIEWER_ATTRIBUTE`       | `twakeSpaceViewer` | DNs holding the viewer role                        |
-| `--twake-space-user-role-attribute`    | `DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE`    |                    | User attribute holding `<space id>:<role>`, if set |
-| `--twake-space-exchange`               | `DM_TWAKE_SPACE_EXCHANGE`               | `space`            | Topic exchange of the space events                 |
+| CLI                                           | Env                                            | Default            | Description                                                     |
+| --------------------------------------------- | ---------------------------------------------- | ------------------ | --------------------------------------------------------------- |
+| `--twake-space-base`                          | `DM_TWAKE_SPACE_BASE`                          |                    | Space branch of an organization, with `{org}`                   |
+| `--twake-space-class`                         | `DM_TWAKE_SPACE_CLASS`                         | `top,twakeSpace`   | Object classes of a space                                       |
+| `--twake-space-display-name-attribute`        | `DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE`        | `twakeDisplayName` | Space name attribute                                            |
+| `--twake-space-admin-attribute`               | `DM_TWAKE_SPACE_ADMIN_ATTRIBUTE`               | `twakeSpaceAdmin`  | DNs holding the admin role                                      |
+| `--twake-space-editor-attribute`              | `DM_TWAKE_SPACE_EDITOR_ATTRIBUTE`              | `twakeSpaceEditor` | DNs holding the editor role                                     |
+| `--twake-space-viewer-attribute`              | `DM_TWAKE_SPACE_VIEWER_ATTRIBUTE`              | `twakeSpaceViewer` | DNs holding the viewer role                                     |
+| `--twake-space-user-role-attribute`           | `DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE`           |                    | User attribute holding `<space id>:<role>`, if set              |
+| `--twake-space-exchange`                      | `DM_TWAKE_SPACE_EXCHANGE`                      | `space`            | Topic exchange of the space events                              |
+| `--twake-space-organization-domain-attribute` | `DM_TWAKE_SPACE_ORGANIZATION_DOMAIN_ATTRIBUTE` | `twakeDomain`      | Organization entry attribute holding its domain, for the events |
 
 See [spaces](plugins/integrations/spaces.md).
 

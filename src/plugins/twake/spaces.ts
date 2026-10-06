@@ -198,6 +198,8 @@ export default class TwakeSpaces extends DmPlugin {
   readonly roleAttributes: Record<SpaceRole, string>;
   private readonly userRole: string;
   private readonly exchange: string;
+  private readonly domainAttribute: string;
+  private readonly domains = new Map<string, string>();
   /**
    * Changes are followed one at a time, each from the directory as it is
    * then, so the order they are followed in does not matter.
@@ -251,6 +253,8 @@ export default class TwakeSpaces extends DmPlugin {
     };
     this.userRole = this.config.twake_space_user_role_attribute || '';
     this.exchange = this.config.twake_space_exchange || 'space';
+    this.domainAttribute =
+      this.config.twake_space_organization_domain_attribute || 'twakeDomain';
     if (this.config.rabbitmq_url) this.dependencies.rabbitmq = 'core/rabbitmq';
   }
 
@@ -1306,17 +1310,47 @@ export default class TwakeSpaces extends DmPlugin {
   ): void {
     const rabbitmq = this.rabbitmq;
     if (!rabbitmq) return;
-    const message = {
-      organizationId: org,
-      id,
-      ...fields,
-      actor: context.actor,
-      timestamp: new Date().toISOString(),
-    };
+    const timestamp = new Date().toISOString();
     // A broker that is down holds up the events, not the role writes
-    this.publishing = this.publishing.then(() =>
-      this.publish(rabbitmq, event, message)
+    this.publishing = this.publishing.then(async () =>
+      this.publish(rabbitmq, event, {
+        organizationId: org,
+        ...(await this.domainOf(org)),
+        id,
+        ...fields,
+        actor: context.actor,
+        timestamp,
+      })
     );
+  }
+
+  /** Kept once found: an organization does not change its domain. */
+  private async domainOf(
+    org: string
+  ): Promise<{ organizationDomain?: string }> {
+    const pattern = this.config.twake_group_organization_dn;
+    if (!pattern) return {};
+    const key = org.toLowerCase();
+    let domain = this.domains.get(key);
+    if (domain === undefined) {
+      const attribute = this.domainAttribute;
+      try {
+        const entry = await this.entry(
+          pattern.replace(ORG, escapeDnValue(org)),
+          [attribute]
+        );
+        domain = entry && read(entry, attribute);
+      } catch (err) {
+        this.logger.warn({
+          plugin: this.name,
+          event: 'organizationDomain',
+          organization: org,
+          error: String(err),
+        });
+      }
+      if (domain) this.domains.set(key, domain);
+    }
+    return domain ? { organizationDomain: domain } : {};
   }
 
   private get rabbitmq(): RabbitMq | null {
