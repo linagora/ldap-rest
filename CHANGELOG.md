@@ -7,6 +7,9 @@
 - `twake/groups`: the group search also matches the `cn` of a group without
   a display name, which the API answers as its `displayName`
   ([#289](https://github.com/linagora/ldap-rest/issues/289))
+- `ldap/organizations`: the subnode search also matches the user's display
+  name (`--display-name-attribute`), so a full name finds the user
+  ([#290](https://github.com/linagora/ldap-rest/issues/290))
 
 ## v0.15.0 (2026-10-06)
 

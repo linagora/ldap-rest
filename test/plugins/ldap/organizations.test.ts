@@ -190,6 +190,35 @@ describe('LDAP Organizations Plugin', function () {
     });
   });
 
+  describe('searchOrganisationSubnodes', () => {
+    it('finds a linked user by the full name in displayName', async () => {
+      const linkAttr = server.config.ldap_organization_link_attribute as string;
+      const user = `uid=fullnamelinked,${process.env.DM_LDAP_BASE}`;
+      await plugin.server.ldap.add(testOrgDn, {
+        objectClass: ['organizationalUnit', 'top'],
+        ou: 'testorg',
+      });
+      try {
+        await plugin.server.ldap.add(user, {
+          objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+          uid: 'fullnamelinked',
+          cn: 'fullnamelinked',
+          sn: 'Valmori',
+          givenName: 'Quentin',
+          displayName: 'Quentin Valmori',
+          [linkAttr]: testOrgDn,
+        });
+        const found = await plugin.searchOrganisationSubnodes(
+          testOrgDn,
+          'Quentin Valmori'
+        );
+        expect(found.map(e => e.dn)).to.deep.equal([user]);
+      } finally {
+        await plugin.server.ldap.delete(user).catch(() => undefined);
+      }
+    });
+  });
+
   describe('checkDeptLink', () => {
     beforeEach(async () => {
       // Create test organization
