@@ -665,6 +665,26 @@ const suite = (role: string) => (): void => {
     rabbit.published = [];
   });
 
+  it('refuses core/ldap/trash on the organization groups and spaces', async () => {
+    const plugin = new TwakeSpaces(dm);
+    dm.loadedPlugins.trash = plugin;
+    try {
+      for (const watched of ['', `ou=groups,${orgDn}`, `ou=spaces,${orgDn}`]) {
+        dm.config.trash_watched_bases = watched;
+        const refused = await plugin.assertComposition().then(
+          () => undefined,
+          (err: Error) => err
+        );
+        expect(refused?.message, watched).to.match(/core\/ldap\/trash/);
+      }
+      dm.config.trash_watched_bases = users;
+      await plugin.assertComposition();
+    } finally {
+      delete dm.loadedPlugins.trash;
+      delete dm.config.trash_watched_bases;
+    }
+  });
+
   it('logs the events a broker gone drops, and starts with no broker', async () => {
     const id = await create();
     await events(1);

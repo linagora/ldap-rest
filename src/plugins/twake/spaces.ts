@@ -372,14 +372,15 @@ export default class TwakeSpaces extends DmPlugin {
    * every event would then be lost, so the server does not start.
    *
    * core/ldap/trash moves a deleted group or space away instead of deleting
-   * it: nothing follows the move, and users would keep the roles it gave.
+   * it: nothing follows the move, so users would keep the roles it gave,
+   * and no event would say it went.
    */
   async assertComposition(): Promise<void> {
     if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
       throw new Error(
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
       );
-    if (!this.userRole || !this.server.loadedPlugins.trash) return;
+    if (!this.follows || !this.server.loadedPlugins.trash) return;
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
     // A watched base above a branch, or in one, holds its entries
     const holds = (pattern: string) => {
@@ -407,9 +408,9 @@ export default class TwakeSpaces extends DmPlugin {
     )
       throw new Error(
         `${this.name}: core/ldap/trash watches the organization groups or ` +
-          `spaces, and users would keep the space roles of a deleted one. ` +
-          `Leave the group and space branches out of --trash-watched-bases, ` +
-          `or unset --twake-space-user-role-attribute`
+          `spaces, and the deletion of one would not be followed: no user ` +
+          `role value or event would say it went. Leave the group and space ` +
+          `branches out of --trash-watched-bases`
       );
   }
 
