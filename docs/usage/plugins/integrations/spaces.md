@@ -33,7 +33,11 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   a space's users, its editors become admins, or its viewers when it has no
   editor. A space left with no user of its own is deleted, whatever groups
   it links. Both happen shortly after the deletion, and publish their
-  events.
+  events. The hand-over relies on refint: without it an erased admin's DN
+  stays in the space and still counts as an admin, so erasing two admins
+  one after the other hands nothing over. A write of the space made at the
+  same moment is retried twice; past that the hand-over is logged and left
+  undone.
 - With `--twake-space-user-role-attribute`, each user entry holds one
   `<space id>:<role>` value per space they are in, their resolved role. It
   follows every write of a space, every change of a linked group's members,

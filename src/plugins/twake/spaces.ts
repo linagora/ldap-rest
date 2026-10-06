@@ -191,6 +191,8 @@ export default class TwakeSpaces extends DmPlugin {
   private readonly spaceBase: string;
   private readonly spacePattern: RegExp;
   private readonly userPattern: RegExp;
+  /** The DNs core/twake/tombstone keeps, as it reads them. */
+  private readonly tombstoned: RegExp[];
   private readonly lifecycle: LifecycleAttributes;
   private readonly displayName: string;
   readonly roleAttributes: Record<SpaceRole, string>;
@@ -226,7 +228,10 @@ export default class TwakeSpaces extends DmPlugin {
     if (!this.spaceBase.includes(ORG))
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
     this.spacePattern = branchPattern(this.spaceBase);
-    this.userPattern = branchPattern(this.config.twake_group_user_base || ORG);
+    this.userPattern = branchPattern(this.config.twake_group_user_base!);
+    this.tombstoned = (this.config.twake_tombstone_dn || []).map(
+      pattern => new RegExp(pattern, 'i')
+    );
     this.lifecycle = lifecycleAttributes(this.config);
     this.displayName =
       this.config.twake_space_display_name_attribute || 'twakeDisplayName';
@@ -797,10 +802,30 @@ export default class TwakeSpaces extends DmPlugin {
     await this.announce(org, moved, context);
   }
 
-  /** The spaces a user is an admin of. */
+  /**
+   * The spaces a user is an admin of. Not read for a delete
+   * core/twake/tombstone turns into a tombstone, whose hand-over follows it,
+   * or for the erase of a tombstone, handed over already.
+   */
   private async administered(org: string, dn: string): Promise<string[]> {
-    const filter = `(${this.roleAttributes.admin}=${escapeLdapFilter(dn)})`;
-    return (await this.spaces(org, filter)).map(s => s.id);
+    if (
+      this.server.loadedPlugins.twakeTombstone &&
+      this.tombstoned.some(pattern => pattern.test(dn))
+    )
+      return [];
+    try {
+      const filter = `(${this.roleAttributes.admin}=${escapeLdapFilter(dn)})`;
+      return (await this.spaces(org, filter)).map(s => s.id);
+    } catch (err) {
+      // The hand-over is lost, the deletion goes on
+      this.logger.error({
+        plugin: this.name,
+        event: 'handOver',
+        dn,
+        error: String(err),
+      });
+      return [];
+    }
   }
 
   /**
@@ -813,35 +838,10 @@ export default class TwakeSpaces extends DmPlugin {
     ids: string[],
     context: ChangeContext
   ): Promise<void> {
-    const key = dnKey(dn);
     for (const id of ids)
       try {
-        const [space] = await this.spaces(org, '(objectClass=*)', id);
-        // Linked groups do not count: a space has users of its own
-        const members =
-          space?.holders.filter(
-            h => h.kind === 'member' && dnKey(h.dn) !== key
-          ) ?? [];
-        if (!space || members.some(h => h.role === 'admin')) continue;
-        if (!members.length) {
-          await this.server.ldap.delete(this.spaceDn(org, id));
-          continue;
-        }
-        const role = members.some(h => h.role === 'editor')
-          ? 'editor'
-          : 'viewer';
-        const promoted = members.filter(h => h.role === role).map(h => h.dn);
-        await this.server.ldap.modify(
-          this.spaceDn(org, id),
-          {
-            delete: { [this.roleAttributes[role]]: promoted },
-            add: { [this.roleAttributes.admin]: promoted },
-          },
-          undefined,
-          { context }
-        );
+        await this.again(() => this.handOverOnce(org, dn, id, context));
       } catch (err) {
-        // A space written meanwhile is left as is, the next ones are not
         this.logger.error({
           plugin: this.name,
           event: 'handOver',
@@ -849,6 +849,38 @@ export default class TwakeSpaces extends DmPlugin {
           error: String(err),
         });
       }
+  }
+
+  private async handOverOnce(
+    org: string,
+    dn: string,
+    id: string,
+    context: ChangeContext
+  ): Promise<void> {
+    const key = dnKey(dn);
+    const [space] = await this.spaces(org, '(objectClass=*)', id);
+    // Linked groups do not count: a space has users of its own
+    const members =
+      space?.holders.filter(h => h.kind === 'member' && dnKey(h.dn) !== key) ??
+      [];
+    if (!space || members.some(h => h.role === 'admin')) return;
+    if (!members.length) {
+      await this.server.ldap.delete(this.spaceDn(org, id), undefined, {
+        context,
+      });
+      return;
+    }
+    const role = members.some(h => h.role === 'editor') ? 'editor' : 'viewer';
+    const promoted = members.filter(h => h.role === role).map(h => h.dn);
+    await this.server.ldap.modify(
+      this.spaceDn(org, id),
+      {
+        delete: { [this.roleAttributes[role]]: promoted },
+        add: { [this.roleAttributes.admin]: promoted },
+      },
+      undefined,
+      { context }
+    );
   }
 
   /** A group about to be deleted, if it is one linked to spaces. */

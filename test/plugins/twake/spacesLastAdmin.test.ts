@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import type { Request } from 'express';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
@@ -212,6 +213,82 @@ describe('Twake spaces: last admin deleted', function () {
         ),
       { what: 'the space deleted event' }
     );
+  });
+
+  it('deletes a space whose users are gone, whatever groups it links', async () => {
+    const group = await api
+      .post('/api/v1/organizations/acme/groups')
+      .send({ name: 'Designers' })
+      .expect(201);
+    const designers = group.body.id as string;
+    await api
+      .post(`/api/v1/organizations/acme/groups/${designers}/members`)
+      .send({ usernames: ['tsl-bob'] })
+      .expect(200);
+    const res = await api
+      .post(route)
+      .send({
+        name: 'Design Sprint',
+        members: [{ username: 'tsl-alice', role: 'admin' }],
+        groups: [{ id: designers, role: 'editor' }],
+      })
+      .expect(201);
+    const id = res.body.id as string;
+    await dm.ldap.delete(userDn('tsl-alice'));
+    await expectMembers(id, undefined);
+    await dm.ldap
+      .delete(`cn=${designers},ou=groups,${orgDn}`)
+      .catch(() => undefined);
+  });
+
+  it('carries who deleted the last admin', async () => {
+    const promoted = await create([
+      { username: 'tsl-alice', role: 'admin' },
+      { username: 'tsl-bob', role: 'editor' },
+    ]);
+    const deleted = await create([{ username: 'tsl-alice', role: 'admin' }]);
+    rabbit.published = [];
+    const req = { user: 'jdoe', headers: {} } as unknown as Request;
+    await dm.ldap.forRequest(req).delete(userDn('tsl-alice'));
+    await expectMembers(deleted, undefined);
+    await expectMembers(promoted, [{ username: 'tsl-bob', role: 'admin' }]);
+    await waitFor(
+      () =>
+        ['twake.space.deleted', 'twake.space.member.role.changed'].every(key =>
+          rabbit.published.some(p => p.routingKey === key)
+        ),
+      { what: 'the space deleted and member promoted events' }
+    );
+    expect(
+      rabbit.published
+        .filter(p =>
+          ['twake.space.deleted', 'twake.space.member.role.changed'].includes(
+            p.routingKey
+          )
+        )
+        .map(p => [p.routingKey, p.message.id, p.message.actor])
+        .sort()
+    ).to.deep.equal([
+      ['twake.space.deleted', deleted, 'jdoe'],
+      ['twake.space.member.role.changed', promoted, 'jdoe'],
+    ]);
+  });
+
+  it('hands a space over once when a tombstone is then erased', async () => {
+    const id = await create([
+      { username: 'tsl-alice', role: 'admin' },
+      { username: 'tsl-bob', role: 'editor' },
+    ]);
+    await tombstone('tsl-alice');
+    await expectMembers(id, [{ username: 'tsl-bob', role: 'admin' }]);
+    await dm.ldap.delete(userDn('tsl-alice'));
+    await new Promise(r => setTimeout(r, 300));
+    await expectMembers(id, [{ username: 'tsl-bob', role: 'admin' }]);
+    expect(
+      rabbit.published.filter(
+        p => p.routingKey === 'twake.space.member.role.changed'
+      )
+    ).to.have.length(1);
   });
 
   it('leaves a space that keeps an admin', async () => {

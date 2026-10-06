@@ -23,7 +23,8 @@
   not start when the broker cannot be reached
 - `core/twake/spaces`: when a deleted user was a space's last admin, its
   editors, or else its viewers, become admins; a space left with no user of
-  its own is deleted
+  its own is deleted. `core/twake/spaces` now always loads
+  `core/ldap/onChange`, which reads each entry before and after every write
 
 ### Fixes
 
