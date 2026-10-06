@@ -28,6 +28,7 @@ import {
   launchHooksChained,
   normalizeDn,
   rdnValue,
+  substringSearchFilter,
   transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
@@ -1432,12 +1433,10 @@ export default class LdapOrganizations extends DmPlugin {
     const cap = this.config.ldap_organization_max_subnodes || 50;
 
     // Search for sub-OUs matching the query
-    // Escape query to prevent LDAP injection
-    const escapedQuery = escapeLdapFilter(query);
     result.push(
       ...(await this.childOrganizations(
         dn,
-        `(&(objectClass=organizationalUnit)(|(ou=*${escapedQuery}*)(description=*${escapedQuery}*)))`,
+        `(&(objectClass=organizationalUnit)${substringSearchFilter(query, 'ou,description')})`,
         cap,
         req
       ))
@@ -1446,9 +1445,9 @@ export default class LdapOrganizations extends DmPlugin {
     // Search for linked entities (users and groups) matching the query
     const topOrg = this.config.ldap_top_organization as string;
     const baseDn = getParentDn(topOrg);
-    // Escape both dn and query to prevent LDAP injection
     const escapedDn = escapeLdapFilter(dn);
-    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})(|(uid=*${escapedQuery}*)(cn=*${escapedQuery}*)(mail=*${escapedQuery}*)(sn=*${escapedQuery}*)(givenName=*${escapedQuery}*)(displayName=*${escapedQuery}*)))`;
+    const displayName = this.config.display_name_attribute || 'displayName';
+    const filter = `(&(${this.config.ldap_organization_link_attribute}=${escapedDn})${substringSearchFilter(query, `uid,cn,mail,sn,givenName,${displayName}`)})`;
     this.server.logger.debug(
       `Searching for linked entities with filter: ${filter} in ${baseDn}`
     );
