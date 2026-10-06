@@ -13,10 +13,13 @@ branch per organization. It serves the groups of an organization under
 - A group's members belong to its organization: adding a user of another
   organization, or of no organization, is refused with a 400, whichever API
   writes the group (REST, SCIM, another plugin), and so is moving a group
-  with its members, tombstones included, to another organization: that
-  refusal names none of them. The placeholder (`--group-dummy-user`) is the
-  one exception. Moving a user to another organization is not checked: the
-  groups of the one it left keep it as a member.
+  with its members, tombstones included, straight into another
+  organization's group branch: that refusal names none of them. The
+  placeholder (`--group-dummy-user`) is the one exception. Not checked:
+  moving a group out of the organizations' branches (to `ou=archive,…`, for
+  instance) or deeper than one level under another organization, which
+  takes its members along, and moving a user to another organization, whose
+  groups in the one it left keep it as a member.
 - An empty group holds the placeholder, because `groupOfNames` needs a member.
   The placeholder is never listed.
 - A tombstone (see [tombstone](tombstone.md)) keeps its memberships until it

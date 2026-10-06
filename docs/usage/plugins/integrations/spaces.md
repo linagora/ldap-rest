@@ -20,9 +20,12 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   linked group does not count as an admin. A tombstoned or erased admin is
   not a request, and can leave a space with none.
 - A space holds users and groups of its organization only: any other value is
-  refused with a 400, whichever API writes or moves the space; a move
-  refused names none of them. Moving a user or group to another
-  organization is not checked: the spaces of the one it left keep it. The
+  refused with a 400, whichever API writes the space, or moves it straight
+  into another organization's space branch; a move refused names none of
+  them. Not checked: moving a space out of the organizations' branches (to
+  `ou=archive,…`, for instance) or deeper than one level under another
+  organization, which takes its holders along, and moving a user or group
+  to another organization, whose spaces in the one it left keep it. The
   one role and the admin are kept by the routes below only; a user or group
   a direct write, or two requests at once, left under two roles reads with
   the strongest, and a role change or removal takes it out of all of them.
