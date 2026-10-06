@@ -9,6 +9,18 @@
   `--user-class top,twakeAccount,twakeWhitePages,twakeExtra`, and
   `--ldap-url` no longer keeps `ldap://localhost` next to the URL given,
   [notes](docs/usage/upgrading.md#an-array-option-on-the-command-line-replaces-its-default)
+- A DN option read from the environment splits on `;` only,
+  [notes](docs/usage/upgrading.md#a-dn-option-read-from-the-environment-splits-on--only)
+- `--auth-hmac` and `--auth-totp` no longer split on spaces, and
+  `core/auth/hmac` and `core/auth/totp` stop the server on an entry that cannot
+  work,
+  [notes](docs/usage/upgrading.md#hmac-and-totp-entries-are-no-longer-split-on-spaces)
+- The plural command-line form of an array option splits on `;` before `,`,
+  [notes](docs/usage/upgrading.md#the-plural-command-line-form-of-an-array-option-splits-on--first)
+- An empty array variable keeps the default instead of giving `[]` (but an
+  empty `DM_LDAP_URL` still stops the server), and a number option refuses
+  anything but an integer,
+  [notes](docs/usage/upgrading.md#an-empty-environment-variable-or-a-number-that-is-not-one)
 
 ### Security
 
@@ -36,6 +48,19 @@
 
 ### Fixes
 
+- `core/auth/totp`: an entry whose digits field is not an integer from 6 to
+  10 (`secret:name:abc`), or whose secret is not Base32, stops the server; it used to register a user whose
+  code was the string `NaN`, so `Bearer NaN` authenticated
+- Array options read from the environment: an empty variable
+  (`DM_GROUP_CLASSES=`) keeps the default instead of replacing it with
+  nothing, and so does an empty number or JSON value (`DM_PORT=`, formerly
+  `NaN`), while a number that is not one (`DM_PORT=abc`, `--port ''`) stops
+  the server;
+  `DM_LDAP_RAW_BASE="ou=My Unit,dc=x;ou=b,dc=y"` and an HMAC name with spaces
+  are no longer cut; a value starting with `;` is split on `;`;
+  `--authz-dynamic-bypass` and `--twake-space-class` split on commas in their
+  singular CLI form
+  ([#284](https://github.com/linagora/ldap-rest/issues/284))
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
   member instead of answering 400 `INVALID_SEARCH_QUERY`
 - The singular form of an array option holding identifiers splits

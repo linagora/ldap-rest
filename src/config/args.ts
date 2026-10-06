@@ -450,11 +450,18 @@ export interface Config {
 const configArgs: ConfigTemplate = [
   // Global options
   ['--port', 'DM_PORT', 8081, 'number'],
-  ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins', true],
+  ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins', 'identifiers'],
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
-  ['--mail-domain', 'DM_MAIL_DOMAIN', [], 'array', '--mail-domains', true],
+  [
+    '--mail-domain',
+    'DM_MAIL_DOMAIN',
+    [],
+    'array',
+    '--mail-domains',
+    'identifiers',
+  ],
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],
@@ -466,6 +473,7 @@ const configArgs: ConfigTemplate = [
     ['ldap://localhost'],
     'array',
     '--ldap-urls',
+    'identifiers',
     true,
   ],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
@@ -504,7 +512,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'twakeAccount', 'twakeWhitePages'],
     'array',
     '--user-classes',
-    true,
+    'identifiers',
   ],
 
   // Plugins options
@@ -517,7 +525,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'organizationalUnit', 'twakeDepartment'],
     'array',
     '--ldap-organization-classes',
-    true,
+    'identifiers',
   ],
   [
     '--ldap-organization-link-attribute',
@@ -607,7 +615,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'groupOfNames'],
     'array',
     '--group-classes',
-    true,
+    'identifiers',
   ],
   [
     '--group-allow-unexistent-members',
@@ -644,7 +652,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'inetOrgPerson'],
     'array',
     '--external-branch-classes',
-    true,
+    'identifiers',
   ],
 
   // static
@@ -666,14 +674,21 @@ const configArgs: ConfigTemplate = [
   ['--ldap-flat-auto-repair', 'DM_LDAP_FLAT_AUTO_REPAIR', true, 'boolean'],
 
   // LDAP raw (low-level browsing) plugin
-  ['--ldap-raw-base', 'DM_LDAP_RAW_BASE', [], 'array', '--ldap-raw-bases'],
+  [
+    '--ldap-raw-base',
+    'DM_LDAP_RAW_BASE',
+    [],
+    'array',
+    '--ldap-raw-bases',
+    'dns',
+  ],
   [
     '--ldap-raw-hidden-attribute',
     'DM_LDAP_RAW_HIDDEN_ATTRIBUTES',
     [],
     'array',
     '--ldap-raw-hidden-attributes',
-    true,
+    'identifiers',
   ],
   ['--ldap-raw-show-secrets', 'DM_LDAP_RAW_SHOW_SECRETS', false, 'boolean'],
   ['--ldap-raw-max-results', 'DM_LDAP_RAW_MAX_RESULTS', 200, 'number'],
@@ -702,6 +717,7 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--james-mailing-list-branches',
+    'dns',
   ],
   [
     '--james-mailbox-type-attribute',
@@ -900,6 +916,8 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_SPACE_CLASS',
     ['top', 'twakeSpace'],
     'array',
+    null,
+    'identifiers',
   ],
   [
     '--twake-space-display-name-attribute',
@@ -928,7 +946,7 @@ const configArgs: ConfigTemplate = [
   ],
   ['--twake-space-exchange', 'DM_TWAKE_SPACE_EXCHANGE', 'space'],
   // twake/tombstone plugin
-  ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array'],
+  ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array', null, 'dns'],
   [
     '--twake-tombstone-default-reason',
     'DM_TWAKE_TOMBSTONE_DEFAULT_REASON',
@@ -945,7 +963,7 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     null,
-    true,
+    'identifiers',
   ],
   [
     '--twake-tombstone-clear-attributes',
@@ -953,7 +971,7 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     null,
-    true,
+    'identifiers',
   ],
   [
     '--twake-tombstone-erase-min-age',
@@ -966,10 +984,12 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_TOMBSTONE_GROUP_BASES',
     [],
     'array',
+    null,
+    'dns',
   ],
 
   // twake/instances plugin
-  ['--twake-instance-dn', 'DM_TWAKE_INSTANCE_DN', [], 'array'],
+  ['--twake-instance-dn', 'DM_TWAKE_INSTANCE_DN', [], 'array', null, 'dns'],
   ['--twake-instance-skip-attribute', 'DM_TWAKE_INSTANCE_SKIP_ATTRIBUTE', ''],
   ['--twake-instance-skip-value', 'DM_TWAKE_INSTANCE_SKIP_VALUE', ''],
   ['--twake-instance-provider', 'DM_TWAKE_INSTANCE_PROVIDER', 'cloudery'],
@@ -1073,7 +1093,7 @@ const configArgs: ConfigTemplate = [
     ['objectClass', 'cn', 'sn', 'givenName', 'displayName', 'description'],
     'array',
     '--applicative-account-attributes',
-    true,
+    'identifiers',
   ],
   [
     '--ldap-operational-attribute',
@@ -1093,7 +1113,7 @@ const configArgs: ConfigTemplate = [
     ],
     'array',
     '--ldap-operational-attributes',
-    true,
+    'identifiers',
   ],
 
   // Trash plugin
@@ -1129,12 +1149,12 @@ const configArgs: ConfigTemplate = [
   ['--auth-fake-user', 'DM_AUTH_FAKE_USER', ''],
 
   // Auth TOTP plugin
-  ['--auth-totp', 'DM_AUTH_TOTP', [], 'array', '--auth-totps'],
+  ['--auth-totp', 'DM_AUTH_TOTP', [], 'array', '--auth-totps', 'phrases'],
   ['--auth-totp-window', 'DM_AUTH_TOTP_WINDOW', 1, 'number'],
   ['--auth-totp-step', 'DM_AUTH_TOTP_STEP', 30, 'number'],
 
   // Auth HMAC plugin
-  ['--auth-hmac', 'DM_AUTH_HMAC', [], 'array', '--auth-hmacs'],
+  ['--auth-hmac', 'DM_AUTH_HMAC', [], 'array', '--auth-hmacs', 'phrases'],
   ['--auth-hmac-window', 'DM_AUTH_HMAC_WINDOW', 120000, 'number'],
 
   // Auth authzPerRoute plugin
@@ -1168,7 +1188,7 @@ const configArgs: ConfigTemplate = [
   // what every plugin did before the option existed. Meant for a plugin's
   // own overrides (`{"authz_for":["oidc"]}`), so a branch model written for
   // administrators does not judge a machine token it cannot name.
-  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array', null, true],
+  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array', null, 'identifiers'],
   // Two plugins judging the LDAP operations of the same requests compose as
   // an AND: the first refusal wins. The server refuses to start on that
   // unless this says the AND is meant.
@@ -1210,7 +1230,14 @@ const configArgs: ConfigTemplate = [
   //  - `any-authenticated`: anything another plugin authenticated, which is
   //    what the plugin did until 0.9.0, by accident rather than by decision;
   //  - `trusted-proxy`: a request `core/auth/trustedProxy` vouched for.
-  ['--authz-dynamic-bypass', 'DM_AUTHZ_DYNAMIC_BYPASS', [], 'array'],
+  [
+    '--authz-dynamic-bypass',
+    'DM_AUTHZ_DYNAMIC_BYPASS',
+    [],
+    'array',
+    null,
+    'identifiers',
+  ],
   ['--authz-dynamic-base', 'DM_AUTHZ_DYNAMIC_BASE', ''],
   ['--authz-dynamic-cache-ttl', 'DM_AUTHZ_DYNAMIC_CACHE_TTL', 60, 'number'],
   [
@@ -1275,7 +1302,7 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--trusted-proxies',
-    true,
+    'identifiers',
   ],
   ['--trusted-proxy-auth-header', 'DM_TRUSTED_PROXY_AUTH_HEADER', 'Auth-User'],
 
@@ -1321,7 +1348,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
     'array',
     '--scim-user-object-classes',
-    true,
+    'identifiers',
   ],
   ['--scim-user-rdn-attribute', 'DM_SCIM_USER_RDN_ATTRIBUTE', 'uid'],
   [
@@ -1336,7 +1363,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'groupOfNames'],
     'array',
     '--scim-group-object-classes',
-    true,
+    'identifiers',
   ],
   ['--scim-group-rdn-attribute', 'DM_SCIM_GROUP_RDN_ATTRIBUTE', 'cn'],
   [

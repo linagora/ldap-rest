@@ -750,9 +750,44 @@ describe('AuthHmac', () => {
       process.env.DM_AUTH_HMAC = 'invalid:format';
       const dm = new DM();
       await dm.ready;
-      const p = new AuthHmac(dm);
-      // Plugin should initialize but log warning
-      expect(p).to.not.be.null;
+      expect(() => new AuthHmac(dm)).to.throw(/--auth-hmac.*separated by/);
+    });
+
+    it('should warn about a list merged into one entry, without its secret', () => {
+      const warnings: string[] = [];
+      new AuthHmac({
+        config: {
+          auth_hmac: [
+            'a:secret-key-long-enough-for-hmac-32c:Name b:secret-key-long-enough-for-hmac-32c:Other',
+          ],
+        },
+        logger: { warn: (m: string) => warnings.push(m), info: () => {} },
+      } as unknown as DM);
+      const merged = warnings.filter(w => w.includes('5 fields'));
+      expect(merged).to.have.length(1);
+      expect(merged[0]).to.include('entry 0').and.include('"a"');
+      expect(merged[0]).to.not.include('secret-key');
+    });
+
+    it('should refuse an entry with an empty id, secret or name', () => {
+      const build = (entry: string) =>
+        new AuthHmac({
+          config: { auth_hmac: [entry] },
+          logger: { warn: () => {}, info: () => {} },
+        } as unknown as DM);
+      for (const entry of [
+        'svc::Name',
+        ':secret-key-long-enough:Name',
+        'svc:secret-key-long-enough:',
+        'svc:secret-key-long-enough: ',
+      ])
+        expect(() => build(entry)).to.throw(
+          /--auth-hmac.*separated by `,`, `;` or newlines/
+        );
+      expect(() => build('a:secret-key-long-enough:A Name')).to.not.throw();
+      expect(() =>
+        build('a:secret-key-long-enough:Acme Corp: Billing')
+      ).to.not.throw();
     });
 
     it('should handle config with colons in service name', async () => {

@@ -6,6 +6,69 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### A DN option read from the environment splits on `;` only
+
+**Who is affected:** a deployment that sets `DM_LDAP_RAW_BASE`,
+`DM_JAMES_MAILING_LIST_BRANCHES`, `DM_TWAKE_TOMBSTONE_DN`,
+`DM_TWAKE_TOMBSTONE_GROUP_BASES` or `DM_TWAKE_INSTANCE_DN`, or gives
+`--ldap-raw-bases` or `--james-mailing-list-branches`.
+
+Their values are no longer cut on spaces or commas: a DN such as
+`DM_LDAP_RAW_BASE="ou=My Unit,dc=example,dc=com"` stays whole. Separate
+several DNs with `;`, as already documented.
+
+### HMAC and TOTP entries are no longer split on spaces
+
+**Who is affected:** a deployment that sets `DM_AUTH_HMAC` or `DM_AUTH_TOTP`,
+or gives `--auth-hmacs` or `--auth-totps`.
+
+Separate entries with `,`, `;` or newlines. A name may now hold spaces, as in
+`id:secret:Registration Service`. A list separated by spaces is read as one
+entry: an HMAC list gives one service, the others cannot authenticate (their
+requests get 401, and a warning is logged), and a TOTP list stops the server.
+
+`core/auth/hmac` and `core/auth/totp` also stop the server on an entry that
+cannot work, instead of skipping it with a warning: an HMAC entry with an
+empty id, secret or name or fewer than 3 fields, a TOTP entry with an empty
+secret or name, more than 3 fields, a secret that is not Base32 or digits that
+are not an integer from 6 to 10. A TOTP entry such as `secret:name:abc` used
+to register a user whose code was the string `NaN`.
+
+### The plural command-line form of an array option splits on `;` first
+
+**Who is affected:** a deployment that gives a plural form such as
+`--auth-tokens`, `--ldap-urls` or `--plugins`.
+
+A value containing `;` is now split on `;` and not on `,`, as the environment
+variable does: `--auth-tokens 'a;b;c'` was one token and is now three, and
+`--auth-tokens 'a;b,c'` was `a;b` and `c` and is now `a` and `b,c`. A value
+without `;` is split as before.
+
+`--authz-dynamic-bypass` and `--twake-space-class` now split on commas in their
+singular form, as the other options holding identifiers do.
+
+### An empty environment variable or a number that is not one
+
+**Who is affected:** a deployment that sets an array option, a number or a JSON
+option to an empty value, or a number option to something else than an integer.
+
+- An array variable that is empty, only holds whitespace or only holds
+  separators (`DM_GROUP_CLASSES=`, `DM_GROUP_CLASSES=,`) keeps the default
+  instead of giving an empty list, which was a silent misconfiguration (a
+  server without object class, for instance). `DM_LDAP_OPERATIONAL_ATTRIBUTES=`
+  used to give `[]` and now gives the default; an option with a non-empty
+  default cannot be given an empty list from the environment.
+- `DM_LDAP_URL=` is the exception: its default, `ldap://localhost`, is a guess,
+  not a fallback, so an empty value still stops the server. Set the variable
+  or leave it out.
+- An empty number or JSON value (`DM_PORT=`) keeps its default instead of
+  giving `NaN` or stopping the server.
+- A number option takes an integer only: `DM_PORT=abc`, `DM_PORT=1e3`,
+  `DM_PORT=8080abc`, `--port ''` or `--port --log-level debug` stop the server
+  instead of giving `NaN` or a truncated value.
+
+Booleans and strings are unchanged.
+
 ### An array option on the command line replaces its default
 
 **Who is affected:** a deployment that gives, on the command line, an array

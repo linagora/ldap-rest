@@ -17,7 +17,7 @@ The companion browser library is [`ldap-browser`](../../../client-development/br
 
 ### Environment Variables
 
-- `DM_LDAP_RAW_BASE`: comma-separated subtrees to expose (default: `--ldap-base`)
+- `DM_LDAP_RAW_BASE`: subtrees to expose, separated by `;` (default: `--ldap-base`)
 - `DM_LDAP_RAW_HIDDEN_ATTRIBUTES`: comma-separated attributes never returned, on top of the credential ones (default: none)
 - `DM_LDAP_RAW_SHOW_SECRETS`: serve credential attributes instead of hiding them (default: `false`)
 - `DM_LDAP_RAW_MAX_RESULTS`: maximum entries returned by a search or a children listing (default: `200`)

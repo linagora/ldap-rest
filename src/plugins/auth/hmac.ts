@@ -57,30 +57,31 @@ export default class AuthHmac extends AuthBase {
     if (hmacConfig && Array.isArray(hmacConfig)) {
       hmacConfig.forEach((entry, index) => {
         const parts = entry.split(':');
-        if (parts.length >= 3) {
-          const id = parts[0].trim();
-          const secret = parts[1].trim();
-          const name = parts.slice(2).join(':').trim(); // Allow colons in name
+        const id = parts[0].trim();
+        const secret = (parts[1] ?? '').trim();
+        const name = parts.slice(2).join(':').trim(); // Allow colons in name
+        if (parts.length < 3 || !id || !secret || !name)
+          throw new Error(
+            `Invalid --auth-hmac entry at index ${index}: expected ` +
+              '"service-id:secret:name", none of them empty; entries are ' +
+              'separated by `,`, `;` or newlines'
+          );
 
-          if (!id || !secret || !name) {
-            this.logger.warn(
-              `Invalid HMAC config at index ${index}: missing id, secret, or name`
-            );
-            return;
-          }
-
-          if (secret.length < 32) {
-            this.logger.warn(
-              `HMAC secret for service "${id}" is too short (minimum 32 characters recommended)`
-            );
-          }
-
-          this.services.set(id, { id, secret, name });
-        } else {
+        if (secret.length < 32) {
           this.logger.warn(
-            `Invalid HMAC config format at index ${index}: expected "service-id:secret:name"`
+            `HMAC secret for service "${id}" is too short (minimum 32 characters recommended)`
           );
         }
+
+        // A space-separated list read as one entry puts the other services in
+        // the name
+        if (parts.length > 4)
+          this.logger.warn(
+            `HMAC entry ${index} for service "${id}" has ${parts.length} ` +
+              'fields: if several services were given, separate them with `,` or `;`'
+          );
+
+        this.services.set(id, { id, secret, name });
       });
     }
 

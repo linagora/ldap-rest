@@ -68,10 +68,12 @@ ldap-rest --plugin core/auth/token --plugin core/ldap/flatGeneric,core/ldap/grou
 Only options holding identifiers split on commas: `--plugin`, `--mail-domain`,
 `--ldap-url`, the object class options (`--user-class`, `--group-class`,
 `--ldap-organization-class`, `--external-branch-class`,
-`--scim-user-object-class`, `--scim-group-object-class`), the attribute
+`--scim-user-object-class`, `--scim-group-object-class`,
+`--twake-space-class`), the attribute
 options (`--ldap-raw-hidden-attribute`, `--applicative-account-attribute`,
 `--ldap-operational-attribute`, `--twake-tombstone-clear-attributes`),
-`--twake-tombstone-reasons`, `--authz-for` and `--trusted-proxy`. Any other
+`--twake-tombstone-reasons`, `--authz-for`, `--authz-dynamic-bypass` and
+`--trusted-proxy`. Any other
 option takes each value whole, so a DN or a secret keeps its commas.
 
 **Via CLI - use plural form with comma-separated values:**
@@ -80,8 +82,9 @@ option takes each value whole, so a DN or a secret keeps its commas.
 ldap-rest --plugins core/auth/token,core/ldap/flatGeneric,core/ldap/groups
 ```
 
-The plural form splits on commas and spaces whatever the option holds. Give a
-DN, or any value containing a comma, with the repeated singular option:
+The plural form splits like the environment variable, see below. Give a
+DN with the repeated singular option, or separate DNs with `;` in the plural
+form:
 
 ```bash
 ldap-rest --ldap-raw-base ou=users,dc=example,dc=com --ldap-raw-base ou=groups,dc=example,dc=com
@@ -97,7 +100,44 @@ export DM_PLUGINS="core/auth/token;core/ldap/flatGeneric;core/ldap/groups"
 export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 ```
 
-> **Note:** If the value contains a semicolon, it will be used as the separator. Otherwise, commas are used. Whitespace around separators is ignored.
+The split depends on what the option holds. The plural form splits the same
+way:
+
+- Options holding identifiers (the list above): a value containing `;` is
+  split on `;` and spaces, any other on `,` and spaces. A value starting with
+  `;` is split on `;` too.
+- Options holding DNs or DN expressions (`--ldap-raw-base`,
+  `--james-mailing-list-branch`, `--twake-tombstone-dn`,
+  `--twake-tombstone-group-bases`, `--twake-instance-dn`): split on `;` only,
+  never on `,` nor spaces, as a DN holds both.
+  `DM_LDAP_RAW_BASE="ou=My Unit,dc=example,dc=com"` is one DN; separate
+  several DNs with `;`.
+- `--auth-hmac` (`id:secret:name`) and `--auth-totp` (`secret:name[:digits]`):
+  split on `;` if the value contains one, else on `,`, and on newlines (one
+  entry per line), never on spaces, so a name keeps its spaces. A list
+  separated by spaces is read as one entry: for HMAC the services after the
+  first cannot authenticate, and for TOTP the entry is refused. Any entry that
+  cannot work stops the server: an HMAC one with an empty id, secret or name or
+  fewer than 3 fields, a TOTP one with an empty secret or name, too many
+  fields, a secret that is not Base32 or digits that are not an integer from 6
+  to 10.
+- Any other option (tokens, paths, rules...): split on `;` if
+  the value contains one, else on `,`, and on spaces. `DM_AUTH_TOKENS="t1 t2"`
+  and `DM_AUTH_TOKENS="t1,t2"` are two tokens, and padded base64 secrets
+  (`YWJj=,ZGVm=`) split on the comma.
+
+Empty items are dropped, and each item is trimmed. A variable that is empty,
+only holds whitespace or only holds separators (`;`, `${A:-};${B:-}`), such as
+`${VAR:-}` in a compose file, counts as unset: the default applies, so an
+environment variable cannot give an empty list to an option whose default is
+not empty. The exception is `DM_LDAP_URL`, whose default `ldap://localhost` is
+a guess: an empty value stops the server. The same
+goes for an empty number or JSON value such as `DM_PORT=`. A number option
+takes an integer only: `DM_PORT=abc`, `DM_PORT=1e3`, `--port 80abc` and
+`--port --log-level debug` stop the server, and so does an empty number on the
+command line, as an empty array value does.
+The plural form of an option takes `;` before `,` too: `--auth-tokens 'a;b,c'`
+is `a` and `b,c`.
 
 Values given on the command line replace the default, and are added to those
 of the environment variable. An empty value on the command line, such as an
