@@ -100,7 +100,9 @@ export DM_PLUGINS="core/auth/token,core/ldap/flatGeneric,core/ldap/groups"
 > **Note:** If the value contains a semicolon, it will be used as the separator. Otherwise, commas are used. Whitespace around separators is ignored.
 
 Values given on the command line replace the default, and are added to those
-of the environment variable.
+of the environment variable. An empty value on the command line, such as an
+unset variable expanding to nothing, stops the server: leave the option out
+to keep the default.
 
 ## General Options
 

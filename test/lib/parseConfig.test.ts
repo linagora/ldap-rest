@@ -256,6 +256,22 @@ describe('ConfigParser', () => {
     expect(result.auth_totp).to.deep.equal(['app:AB,CD:admin']);
   });
 
+  it('should refuse an empty array value', () => {
+    const parser = new ConfigParser(configArgs);
+    for (const argv of [
+      ['--group-class', ''],
+      ['--group-class', ' , '],
+      ['--group-class', 'top', '--group-class', ''],
+      ['--group-classes', ''],
+      ['--auth-token', ''],
+      ['--group-class'],
+    ]) {
+      expect(() => parser.parse(['node', 'script.js', ...argv])).to.throw(
+        /--group-class(es)? has an empty value|--auth-token has an empty value/
+      );
+    }
+  });
+
   it('should store additional command-line args', () => {
     const argv = [
       'node',

@@ -26,7 +26,7 @@ export type ConfigEntry = [
   ), // default value
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
-  boolean?, // for array type, whether the singular form splits on commas
+  boolean?, // for array type, whether the singular form splits on commas: never for DNs or secrets, which may contain some
 ];
 
 export class ConfigParser {
@@ -84,7 +84,9 @@ export class ConfigParser {
           value = parseInt(cliValue as string);
         } else if (entry[3] === 'array') {
           value = (fromDefault ? [] : (value as string[])).concat(
-            (cliValue as string[]).flatMap(v => splitCliValue(v, entry[5]))
+            (cliValue as string[]).flatMap(v =>
+              splitCliValue(entry[0], v, entry[5] ? /,/ : undefined)
+            )
           );
           fromDefault = false;
         } else if (entry[3] === 'json') {
@@ -105,9 +107,9 @@ export class ConfigParser {
         cliArgs.delete(entry[0]);
       }
       if (entry[3] === 'array' && entry[4] && cliArgs.has(entry[4])) {
-        const cliValue = cliArgs.get(entry[4]) || '';
+        const cliValue = cliArgs.get(entry[4]) as string | undefined;
         value = (fromDefault ? [] : (value as string[])).concat(
-          (cliValue as string).split(/[,\s]+/).filter(v => v.length > 0)
+          splitCliValue(entry[4], cliValue, /[,\s]+/)
         );
         cliArgs.delete(entry[4]);
       }
@@ -182,14 +184,27 @@ export class ConfigParser {
   }
 }
 
-// Only identifiers split: DNs and secrets may carry commas of their own
-function splitCliValue(value: string | undefined, split?: boolean): string[] {
-  if (value === undefined) return [];
-  if (!split) return [value];
-  return value
-    .split(',')
-    .map(v => v.trim())
-    .filter(v => v.length > 0);
+// An unset variable expands to an empty value, which would replace the
+// default with nothing
+function splitCliValue(
+  arg: string,
+  value: string | undefined,
+  separator?: RegExp
+): string[] {
+  let values: string[] = [];
+  if (value?.trim())
+    values = separator
+      ? value
+          .split(separator)
+          .map(v => v.trim())
+          .filter(v => v.length > 0)
+      : [value];
+  if (values.length === 0)
+    throw new Error(
+      `Error in command line: ${arg} has an empty value. Leave it out to ` +
+        'keep the default'
+    );
+  return values;
 }
 
 export function parseConfig(
