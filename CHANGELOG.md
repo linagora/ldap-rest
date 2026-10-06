@@ -38,6 +38,8 @@
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
   member instead of answering 400 `INVALID_SEARCH_QUERY`
+- `core/twake/groups`: a request an authorization plugin refuses answers
+  403 `REFUSED` instead of 500 `INTERNAL_ERROR`
 - The singular form of an array option holding identifiers splits
   comma-separated values: `--group-class top,groupOfNames,twakeGroup` no
   longer fails group creation with 400 "objectClass has invalid value",

@@ -464,6 +464,15 @@ export default class TwakeGroups extends LdapGroups {
           res.status(err.status).json({ error: err.message, code: err.code });
           return;
         }
+        // An authorization plugin refused, maybe through a plain Error:
+        // answered as the error middleware does, without the branch named
+        if (/\[authz-forbidden\]/.test(String((err as Error)?.message))) {
+          res.status(403).json({
+            error: 'Token does not have permission on this branch',
+            code: 'REFUSED',
+          });
+          return;
+        }
         // A rule of another plugin or of the schema refused the write
         if (err instanceof HttpError && err.statusCode < 500) {
           res.status(err.statusCode).json({

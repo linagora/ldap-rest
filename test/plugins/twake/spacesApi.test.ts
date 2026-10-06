@@ -10,17 +10,21 @@ import TwakeSpaces from '../../../src/plugins/twake/spaces';
 
 /**
  * The bases of the searches made for a request, and what an authorization
- * plugin filtering them leaves out.
+ * plugin filtering or refusing them leaves out.
  */
 class ReadSpy extends DmPlugin {
   name = 'tspReadSpy';
   bases = new Set<string>();
   /** A filter of the entries the caller cannot see. */
   unseen?: string;
+  /** A branch the caller cannot read. */
+  refused?: string;
   hooks: Hooks = {
     ldapsearchrequest: ([base, opts, req]) => {
       if (!req) return [base, opts, req];
       this.bases.add(base.toLowerCase());
+      if (this.refused && base.toLowerCase().endsWith(this.refused))
+        throw new Error(`[authz-forbidden] Not allowed to read ${base}`);
       if (this.unseen)
         opts = {
           ...opts,
@@ -518,6 +522,20 @@ describe('Twake spaces plugin routes', function () {
       expect(res.body.code).to.equal('LAST_ADMIN');
     } finally {
       delete spy.unseen;
+    }
+  });
+
+  it('answers 403 for a read an authorization plugin refuses', async () => {
+    const id = await create();
+    spy.refused = `ou=spaces,${orgDn('acme')}`.toLowerCase();
+    try {
+      for (const path of [route(), `${route()}/${id}`])
+        expect((await api.get(path).expect(403)).body, path).to.deep.equal({
+          error: 'Token does not have permission on this branch',
+          code: 'REFUSED',
+        });
+    } finally {
+      delete spy.refused;
     }
   });
 

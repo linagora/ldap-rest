@@ -33,7 +33,8 @@ branch per organization. It serves the groups of an organization under
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
 is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
-`{ "error": "...", "code": "..." }`.
+`{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
+answers 403 `REFUSED`.
 
 A group reads:
 
