@@ -33,8 +33,13 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   `<space id>:<role>` value per space they are in, their resolved role. It
   follows every write of a space, every change of a linked group's members,
   and the deletion of a linked group, whichever API makes them, shortly after
-  the write. Other values of the attribute are left alone. A tombstone keeps
-  the values it held when it was deleted.
+  the write. A change only tells which users to look at: each one's values
+  are then rewritten from the directory as it is, so changes made close
+  together end the same whatever order they are followed in. Values not
+  ending in `:viewer`, `:editor` or `:admin` are left alone. A tombstone keeps
+  the values it held when it was deleted. The plugin refuses to start when
+  core/ldap/trash watches the group branches: a group it moves away is never
+  followed.
 
 ## Routes
 

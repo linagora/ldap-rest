@@ -18,6 +18,7 @@ const ROLE = 'carLicense';
 describe('Twake spaces: user roles', function () {
   let dm: DM;
   let api: supertest.Agent;
+  let spaces: TwakeSpaces;
   const route = `/api/v1/organizations/acme/spaces`;
   const groupRoute = `/api/v1/organizations/acme/groups`;
 
@@ -46,6 +47,15 @@ describe('Twake spaces: user roles', function () {
     ).catch(async err => {
       expect(await rolesOf(uid), String(err)).to.deep.equal(wanted);
     });
+  };
+
+  /** Hold back the following of changes until the returned call. */
+  const hold = (): (() => void) => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const queue = spaces as unknown as { following: Promise<void> };
+    queue.following = queue.following.then(() => gate);
+    return release;
   };
 
   const create = async (
@@ -92,7 +102,8 @@ describe('Twake spaces: user roles', function () {
     await dm.registerPlugin('core/ldap/onChange', new OnLdapChange(dm));
     const groups = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', groups);
-    await dm.registerPlugin('core/twake/spaces', new TwakeSpaces(dm));
+    spaces = new TwakeSpaces(dm);
+    await dm.registerPlugin('core/twake/spaces', spaces);
     for (let tries = 0; !groups.schema; tries++) {
       if (tries === 200) throw new Error('the group schema did not load');
       await new Promise(r => setTimeout(r, 10));
@@ -135,7 +146,7 @@ describe('Twake spaces: user roles', function () {
       )) as { searchEntries: { dn: string }[] };
       for (const { dn } of searchEntries) await dm.ldap.delete(dn);
     }
-    for (const uid of UIDS)
+    for (const uid of [...UIDS, 'tss-account'])
       await dm.ldap.delete(userDn(uid)).catch(() => undefined);
   });
 
@@ -239,6 +250,100 @@ describe('Twake spaces: user roles', function () {
       api.delete(`${groupRoute}/${designers}`).expect(200),
     ]);
     await expectRoles('tss-bob', []);
+  });
+
+  for (const order of ['leave, then unlink', 'unlink, then leave'])
+    it(`revokes a role whose group is left and unlinked before either is followed (${order})`, async () => {
+      const designers = await group('Designers', ['tss-bob', 'tss-dave']);
+      const id = await create(undefined, [{ id: designers, role: 'editor' }]);
+      await expectRoles('tss-bob', [`${id}:editor`]);
+      const release = hold();
+      const leave = (): supertest.Test =>
+        api.delete(`${groupRoute}/${designers}/members/tss-bob`).expect(200);
+      const unlink = (): supertest.Test =>
+        api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+      for (const write of order.startsWith('leave')
+        ? [leave, unlink]
+        : [unlink, leave])
+        await write();
+      release();
+      await expectRoles('tss-bob', []);
+    });
+
+  it('gives a role once when a group is linked and joined before either is followed', async () => {
+    const designers = await group('Designers', ['tss-bob']);
+    const id = await create();
+    const release = hold();
+    await api
+      .post(`${route}/${id}/groups`)
+      .send({ groupIds: [designers], role: 'viewer' })
+      .expect(200);
+    await api
+      .post(`${groupRoute}/${designers}/members`)
+      .send({ usernames: ['tss-carol'] })
+      .expect(200);
+    release();
+    await expectRoles('tss-carol', [`${id}:viewer`]);
+    await expectRoles('tss-bob', [`${id}:viewer`]);
+  });
+
+  it('drops the roles of a deleted group whose space is deleted before either is followed', async () => {
+    const designers = await group('Designers', ['tss-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await expectRoles('tss-bob', [`${id}:viewer`]);
+    const release = hold();
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await api.delete(`${route}/${id}`).expect(200);
+    release();
+    await expectRoles('tss-bob', []);
+    await expectRoles('tss-alice', []);
+  });
+
+  it('leaves a tombstone the values it held', async () => {
+    const id = await create([
+      { username: 'tss-alice', role: 'admin' },
+      { username: 'tss-bob', role: 'editor' },
+    ]);
+    await expectRoles('tss-bob', [`${id}:editor`]);
+    await dm.ldap.modify(userDn('tss-bob'), {
+      add: { employeeType: 'deleted' },
+    });
+    await api.delete(`${route}/${id}`).expect(200);
+    // alice is settled by the same follow as bob
+    await expectRoles('tss-alice', []);
+    expect(await rolesOf('tss-bob')).to.deep.equal([`${id}:editor`]);
+  });
+
+  it('settles the other users when one cannot be written', async () => {
+    // An account entry cannot hold the role attribute
+    await dm.ldap.add(userDn('tss-account'), {
+      objectClass: ['top', 'account'],
+      uid: 'tss-account',
+    });
+    const id = await create([
+      { username: 'tss-account', role: 'admin' },
+      { username: 'tss-alice', role: 'admin' },
+      { username: 'tss-bob', role: 'editor' },
+    ]);
+    await expectRoles('tss-alice', [`${id}:admin`]);
+    await expectRoles('tss-bob', [`${id}:editor`]);
+  });
+
+  it('refuses core/ldap/trash on the organization groups', () => {
+    const plugin = new TwakeSpaces(dm);
+    dm.loadedPlugins.trash = plugin;
+    try {
+      for (const watched of ['', ORGS, `ou=groups,${orgDn}`])
+        expect(() => {
+          dm.config.trash_watched_bases = watched;
+          plugin.assertComposition();
+        }, watched).to.throw(/core\/ldap\/trash/);
+      dm.config.trash_watched_bases = users;
+      expect(() => plugin.assertComposition()).not.to.throw();
+    } finally {
+      delete dm.loadedPlugins.trash;
+      delete dm.config.trash_watched_bases;
+    }
   });
 
   it("keeps a user's other values of the attribute", async () => {
