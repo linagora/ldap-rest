@@ -818,13 +818,19 @@ export default class TwakeSpaces extends DmPlugin {
         e ? this.entryOf(org!, e, new Set()) : undefined
       );
       // The holders this write gave another role, or none: the members of a
-      // linked group move with the group's own changes, followed as well
+      // linked group move with the group's own changes, followed as well. A
+      // space renamed to another id moves every role.
+      const ids = [...new Set([was, is].flatMap(s => (s ? [s.id] : [])))];
       const roles = [was, is].map(
         s => new Map(s?.holders.map(h => [dnKey(h.dn), h.role]))
       );
       const holders = [was, is]
         .flatMap(s => s?.holders ?? [])
-        .filter(h => roles[0].get(dnKey(h.dn)) !== roles[1].get(dnKey(h.dn)));
+        .filter(
+          h =>
+            ids.length > 1 ||
+            roles[0].get(dnKey(h.dn)) !== roles[1].get(dnKey(h.dn))
+        );
       const groups = new Set(
         holders.filter(h => h.kind === 'group').map(h => h.name)
       );
@@ -839,7 +845,7 @@ export default class TwakeSpaces extends DmPlugin {
         { id, space: was }
       );
       if (this.rabbitmq)
-        await this.announce(org, moved, context, [id], { was, is, linked });
+        await this.announce(org, moved, context, ids, { was, is, linked });
       return;
     }
     org = this.groups.organizationOf(dn);
@@ -1112,8 +1118,14 @@ export default class TwakeSpaces extends DmPlugin {
       const publish = (event: string, fields?: Record<string, unknown>): void =>
         this.publishEvent(org, id, event, context, fields);
       const key = dnKey(this.spaceDn(org, id));
-      const announced = this.announced.get(key) ?? new Set<string>();
-      this.announced.delete(key);
+      // Under both ids, for a space renamed to another one
+      const announced = new Set<string>();
+      for (const s of [was, is]) {
+        const old = s && dnKey(this.spaceDn(org, s.id));
+        for (const group of (old && this.announced.get(old)) || [])
+          announced.add(group);
+        if (old) this.announced.delete(old);
+      }
       if (!was || !is) {
         whole.add(id.toLowerCase());
         if (!is) publish('deleted');
