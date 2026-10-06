@@ -157,15 +157,15 @@ const suite = (role: string) => (): void => {
   before(async () => {
     dm = new DM();
     Object.assign(dm.config, {
-      twake_designersDnbase: `ou=groups,ou={org},${ORGS}`,
-      twake_designersDnuser_base: `ou=users,ou={org},${ORGS}`,
-      twake_designersDndisplay_name_attribute: 'o',
-      twake_designersDncolor_attribute: 'businessCategory',
-      twake_designersDncreated_at_attribute: 'ou',
+      twake_group_base: `ou=groups,ou={org},${ORGS}`,
+      twake_group_user_base: `ou=users,ou={org},${ORGS}`,
+      twake_group_display_name_attribute: 'o',
+      twake_group_color_attribute: 'businessCategory',
+      twake_group_created_at_attribute: 'ou',
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
-      designersDnclass: ['top', 'groupOfNames'],
-      designersDnschema: 'static/schemas/twake/organizationGroups.json',
+      group_class: ['top', 'groupOfNames'],
+      group_schema: 'static/schemas/twake/organizationGroups.json',
       twake_space_base: `ou=spaces,ou={org},${ORGS}`,
       twake_space_class: ['top', 'groupOfNames'],
       twake_space_display_name_attribute: 'O',
