@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- An array option given on the command line replaces its default instead of
+  being added to it: repeat the default values to keep them, as in
+  `--user-class top,twakeAccount,twakeWhitePages,twakeExtra`, and
+  `--ldap-url` no longer keeps `ldap://localhost` next to the URL given,
+  [notes](docs/usage/upgrading.md#an-array-option-on-the-command-line-replaces-its-default)
+
 ### Security
 
 - `lsc-plugin`: jackson-databind 2.22.1 → 2.22.3, clearing five advisories
@@ -12,10 +20,9 @@
 
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
   member instead of answering 400 `INVALID_SEARCH_QUERY`
-- An array option given on the command line replaces its default instead of
-  being added to it, and its singular form splits comma-separated values:
-  `--group-class top,groupOfNames,twakeGroup` no longer fails group creation
-  with 400 "objectClass has invalid value",
+- The singular form of an array option holding identifiers splits
+  comma-separated values: `--group-class top,groupOfNames,twakeGroup` no
+  longer fails group creation with 400 "objectClass has invalid value",
   [details](docs/usage/configuration.md#array-options)
 
 - `core/twake/lifecycleEvents`: an operational attribute such as `entryUUID`
