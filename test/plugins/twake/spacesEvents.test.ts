@@ -458,6 +458,46 @@ const suite = (role: string) => (): void => {
     expect(rabbit.published).to.deep.equal([]);
   });
 
+  for (const outcome of ['lands', 'fails'])
+    it(`unlinks a group once when its delete ${outcome} while the space is written`, async () => {
+      const designers = await group('Designers', ['tse-bob']);
+      const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+      await events(1);
+      let entered!: () => void;
+      const reached = new Promise<void>(resolve => (entered = resolve));
+      let resume!: () => void;
+      const paused = new Promise<void>(resolve => (resume = resolve));
+      // Holds the delete after core/twake/spaces has read it
+      const pause = async (args: unknown[]): Promise<unknown[]> => {
+        entered();
+        await paused;
+        if (outcome === 'fails') throw new Error('refused');
+        return args;
+      };
+      const chain = (dm.hooks.ldapdeleterequest ||= []) as unknown[];
+      chain.push(pause);
+      try {
+        const deleting = api.delete(`${groupRoute}/${designers}`).then(
+          () => undefined,
+          () => undefined
+        );
+        await reached;
+        await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+        await quiet();
+        resume();
+        await deleting;
+      } finally {
+        chain.splice(chain.indexOf(pause), 1);
+      }
+      await quiet();
+      expect(
+        rabbit.published
+          .filter(p => p.routingKey === 'twake.space.group.unlinked')
+          .map(p => p.message.id)
+      ).to.deep.equal([id]);
+      rabbit.published = [];
+    });
+
   it('remembers a deleted group only in the spaces still holding it', async () => {
     const { announced } = spaces as unknown as {
       announced: Map<string, Set<string>>;

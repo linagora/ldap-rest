@@ -206,11 +206,18 @@ export default class TwakeSpaces extends DmPlugin {
   /**
    * The spaces of a group being deleted, by DN key, read before refint takes
    * it out of them, until its deletion is followed. `op` is the delete
-   * still running.
+   * still running, `owed` the unlinks space writes left to it meanwhile.
    */
   private readonly unlinking = new Map<
     string,
-    DeletedGroup & { op?: number }
+    DeletedGroup & {
+      op?: number;
+      owed?: {
+        id: string;
+        context: ChangeContext;
+        fields: Record<string, unknown>;
+      }[];
+    }
   >();
   /**
    * The groups a deletion announced unlinked, by space DN key, until a write
@@ -321,7 +328,19 @@ export default class TwakeSpaces extends DmPlugin {
     ldapdeleteend: op => {
       this.handing.delete(op);
       for (const [key, deleted] of this.unlinking)
-        if (deleted.op === op) this.unlinking.delete(key);
+        if (deleted.op === op) {
+          this.unlinking.delete(key);
+          // The delete did not land: the unlinks it was to announce for
+          // space writes go out now, as those writes would have
+          for (const { id, context, fields } of deleted.owed ?? [])
+            this.publishEvent(
+              deleted.org,
+              id,
+              'group.unlinked',
+              context,
+              fields
+            );
+        }
     },
     onLdapEntryChange: (dn, before, after, context) => {
       if (this.follows)
@@ -1170,19 +1189,26 @@ export default class TwakeSpaces extends DmPlugin {
           });
         }
         // A group deleted is announced unlinked by its deletion, from the
-        // spaces it was in then: already, or once the deletion that landed
-        // is followed. One unlinked first, then deleted, is announced here.
-        const byDeletion = (dn: string): boolean => {
-          if (announced.delete(dnKey(dn))) return true;
-          const deleted = this.unlinking.get(dnKey(dn));
-          return Boolean(
-            deleted &&
-            deleted.op === undefined &&
-            deleted.spaces.some(s => s.id.toLowerCase() === id.toLowerCase())
-          );
+        // spaces it was in then: already, or once it is followed. One
+        // unlinked first, then deleted, is announced here. A delete still
+        // running is owed the unlink, and announces it if it fails.
+        const byDeletion = (group: Holder): boolean => {
+          if (announced.delete(dnKey(group.dn))) return true;
+          const deleted = this.unlinking.get(dnKey(group.dn));
+          if (
+            !deleted?.spaces.some(s => s.id.toLowerCase() === id.toLowerCase())
+          )
+            return false;
+          if (deleted.op !== undefined)
+            (deleted.owed ??= []).push({
+              id,
+              context,
+              fields: { groups: [groupOf(group)] },
+            });
+          return true;
         };
         for (const group of linkedBefore.values())
-          if (!byDeletion(group.dn))
+          if (!byDeletion(group))
             publish('group.unlinked', { groups: [groupOf(group)] });
         // The DNs this write leaves in the space are still awaited; one it
         // put back, of a group made again under that DN, is another group
