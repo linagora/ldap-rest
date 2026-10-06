@@ -207,6 +207,17 @@ function dnKey(dn: string): string {
   }
 }
 
+/** Every entry attribute the rules read outside member lists. */
+function ruleAttributes(rules: Rule[]): string[] {
+  const attribute =
+    /^\$(?:previous\.|changed\.)?([A-Za-z][A-Za-z0-9-]*)(?:\|domain)?$/;
+  return rules
+    .flatMap(rule => Object.values(rule.targets).flat())
+    .flatMap(t => [...Object.values(t.payload), ...Object.keys(t.when)])
+    .flatMap(s => (typeof s === 'string' ? attribute.exec(s)?.[1] || [] : []))
+    .filter(a => a !== 'now');
+}
+
 export function parseRules(source: string): Rule[] {
   if (!source.trim()) return [];
   const text = /^\s*[[{]/.test(source)
@@ -276,10 +287,13 @@ export default class TwakeLifecycleEvents extends DmPlugin {
     this.attrs = lifecycleAttributes(this.config);
     this.memberAttribute =
       this.config.twake_lifecycle_member_attribute || 'member';
-    // An operational lock such as pwdAccountLockedTime is in neither side of
-    // onLdapEntryChange unless asked for by name.
-    this.followedOperationalAttributes = [this.attrs.lock];
     this.rules = parseRules(this.config.twake_lifecycle_rules || '');
+    // An operational attribute such as pwdAccountLockedTime or entryUUID is
+    // in neither side of onLdapEntryChange unless asked for by name.
+    this.followedOperationalAttributes = [
+      this.attrs.lock,
+      ...ruleAttributes(this.rules),
+    ];
     if (this.rules.length === 0)
       this.logger.warn(
         `${this.name}: --twake-lifecycle-rules is empty, nothing will be published`

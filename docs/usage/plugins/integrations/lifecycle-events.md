@@ -195,7 +195,9 @@ Payload and `when` values are sources:
 - anything else: the value itself
 
 `$attr` and `$previous.attr` carry the first value of a multi-valued
-attribute. A source with no value leaves its field out.
+attribute. A source with no value leaves its field out. Every attribute a
+source names is requested by name when the entry is read, so an operational
+one such as `entryUUID` works anywhere in a payload or a `when`.
 
 A payload field can also list members, as an object with one key:
 

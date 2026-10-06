@@ -157,6 +157,24 @@ const RULES = [
       ],
     },
   },
+  {
+    dn: `^uid=(?<id>op-[^,]+),${BASE}$`,
+    exchange: 'accounts',
+    events: {
+      created: {
+        routingKey: 'op.created',
+        when: { $structuralObjectClass: 'inetOrgPerson' },
+        payload: { id: '$dn.id', uuid: '$entryUUID' },
+      },
+      updated: {
+        routingKey: 'op.updated',
+        payload: {
+          previous: '$previous.entryUUID',
+          csn: '$changed.entryCSN',
+        },
+      },
+    },
+  },
 ];
 
 describe('Twake lifecycle events plugin', function () {
@@ -240,6 +258,7 @@ describe('Twake lifecycle events plugin', function () {
       'neg-admin',
       'neg-member',
       'neg-none',
+      'op-alice',
     ]) {
       await dm.ldap.delete(dnOf(name)).catch(() => undefined);
     }
@@ -292,6 +311,19 @@ describe('Twake lifecycle events plugin', function () {
       ['other.created', 'neg-member'],
       ['other.created', 'neg-none'],
     ]);
+  });
+
+  it('reads the operational attributes a rule references', async () => {
+    await add('op-alice');
+    await seen(dnOf('op-alice'));
+    await dm.ldap.modify(dnOf('op-alice'), { replace: { title: 'member' } });
+    await seen(dnOf('op-alice'), 2);
+    const [created, updated] = rabbit.published;
+    expect(created.routingKey).to.equal('op.created');
+    expect(created.message.uuid).to.match(/^[0-9a-f-]{36}$/);
+    expect(updated.routingKey).to.equal('op.updated');
+    expect(updated.message.previous).to.equal(created.message.uuid);
+    expect(updated.message.csn).to.match(/^\d{14}\.\d+Z#/);
   });
 
   it('publishes nothing for a rename', async () => {
