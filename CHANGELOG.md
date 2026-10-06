@@ -24,7 +24,6 @@
   comma-separated values: `--group-class top,groupOfNames,twakeGroup` no
   longer fails group creation with 400 "objectClass has invalid value",
   [details](docs/usage/configuration.md#array-options)
-
 - `core/twake/lifecycleEvents`: an operational attribute such as `entryUUID`
   named by a rule outside a member list is published instead of left out,
   [rules](docs/usage/plugins/integrations/lifecycle-events.md#rules)
