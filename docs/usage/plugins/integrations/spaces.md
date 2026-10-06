@@ -15,13 +15,15 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
 - A user or a group holds one role in a space. A user's role in a space is
   the strongest of their own role and the roles of the linked groups they
   belong to.
-- A space keeps at least one admin among its users: a request that would
-  demote or remove the last one is refused with 409 `LAST_ADMIN`. A linked
-  group does not count as an admin.
+- The routes keep at least one admin among a space's users: a request that
+  would demote or remove the last one is refused with 409 `LAST_ADMIN`. A
+  linked group does not count as an admin. A tombstoned or erased admin is
+  not a request, and can leave a space with none.
 - A space holds users and groups of its organization only: any other value is
   refused with a 400, whichever API writes the space. The one role and the
-  admin are kept by the routes below only; a user or group a direct write
-  left under two roles reads with the strongest.
+  admin are kept by the routes below only; a user or group a direct write, or
+  two requests at once, left under two roles reads with the strongest, and a
+  role change or removal takes it out of all of them.
 - A tombstone (see [tombstone](tombstone.md)) keeps its roles until it is
   erased, and is hidden from the spaces read through these routes. It cannot
   be added.

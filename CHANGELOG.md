@@ -12,7 +12,7 @@
 
 - `core/twake/spaces`: spaces of an organization, under
   `/api/v1/organizations/:id/spaces`, holding users and linked groups each as
-  viewer, editor or admin, and always one admin:
+  viewer, editor or admin; the routes keep one admin:
   [spaces](docs/usage/plugins/integrations/spaces.md)
 
 ### Fixes
