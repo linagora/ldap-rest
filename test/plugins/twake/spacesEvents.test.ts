@@ -13,6 +13,8 @@ const orgDn = `ou=acme,${ORGS}`;
 const users = `ou=users,${orgDn}`;
 const userDn = (uid: string): string => `uid=${uid},${users}`;
 const UIDS = ['tse-alice', 'tse-bob', 'tse-carol'];
+// A multi-valued attribute of inetOrgPerson, so the test needs no Twake schema
+const ROLE = 'carLicense';
 
 interface Published {
   exchange: string;
@@ -48,8 +50,14 @@ class StubRabbitMq {
   }
 }
 
-describe('Twake spaces: events', function () {
+/**
+ * Without the role attribute, the roles a change moved are worked out with
+ * it undone; with it, they are the values the user entry held.
+ */
+const suite = (role: string) => (): void => {
   let dm: DM;
+  // Loads no plugin: what it writes, nothing hears
+  let raw: DM;
   let api: supertest.Agent;
   let rabbit: StubRabbitMq;
   let spaces: TwakeSpaces;
@@ -90,6 +98,15 @@ describe('Twake spaces: events', function () {
       await following;
       await queues.publishing;
     } while (following !== queues.following);
+  };
+
+  /** Hold back the following of changes until the returned call. */
+  const hold = (): (() => void) => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const queue = spaces as unknown as { following: Promise<void> };
+    queue.following = queue.following.then(() => gate);
+    return release;
   };
 
   /** The events published once `count` have come, without timestamp and actor. */
@@ -156,8 +173,11 @@ describe('Twake spaces: events', function () {
       twake_space_editor_attribute: 'owner',
       twake_space_viewer_attribute: 'seeAlso',
       rabbitmq_url: 'amqp://stub',
+      twake_space_user_role_attribute: role,
     });
     await dm.ready;
+    raw = new DM();
+    await raw.ready;
     rabbit = new StubRabbitMq();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dm.loadedPlugins['rabbitmq'] = rabbit as any;
@@ -438,6 +458,199 @@ describe('Twake spaces: events', function () {
     expect(rabbit.published).to.deep.equal([]);
   });
 
+  for (const outcome of ['lands', 'fails'])
+    it(`unlinks a group once when its delete ${outcome} while the space is written`, async () => {
+      const designers = await group('Designers', ['tse-bob']);
+      const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+      await events(1);
+      let entered!: () => void;
+      const reached = new Promise<void>(resolve => (entered = resolve));
+      let resume!: () => void;
+      const paused = new Promise<void>(resolve => (resume = resolve));
+      // Holds the delete after core/twake/spaces has read it
+      const pause = async (args: unknown[]): Promise<unknown[]> => {
+        entered();
+        await paused;
+        if (outcome === 'fails') throw new Error('refused');
+        return args;
+      };
+      const chain = (dm.hooks.ldapdeleterequest ||= []) as unknown[];
+      chain.push(pause);
+      try {
+        const deleting = api.delete(`${groupRoute}/${designers}`).then(
+          () => undefined,
+          () => undefined
+        );
+        await reached;
+        await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+        await quiet();
+        resume();
+        await deleting;
+      } finally {
+        chain.splice(chain.indexOf(pause), 1);
+      }
+      await quiet();
+      expect(
+        rabbit.published
+          .filter(p => p.routingKey === 'twake.space.group.unlinked')
+          .map(p => p.message.id)
+      ).to.deep.equal([id]);
+      rabbit.published = [];
+    });
+
+  it('remembers a deleted group only in the spaces still holding it', async () => {
+    const { announced } = spaces as unknown as {
+      announced: Map<string, Set<string>>;
+    };
+    const remembered = (id: string): boolean =>
+      [...announced.keys()].some(key => key.includes(id.toLowerCase()));
+    const designers = await group('Designers', ['tse-bob']);
+    // refint takes the group out of an editor, not of a viewer
+    const kept = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    const left = await create(undefined, [{ id: designers, role: 'editor' }]);
+    await events(2);
+    const release = hold();
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await waitFor(
+      async () => {
+        const { searchEntries } = (await dm.ldap.search(
+          { paged: false, scope: 'base', attributes: ['owner'] },
+          `cn=${left},ou=spaces,${orgDn}`
+        )) as { searchEntries: { owner?: string[] }[] };
+        return !searchEntries[0].owner?.length;
+      },
+      { what: 'refint to take the group out of the space' }
+    );
+    release();
+    await events(4);
+    expect([remembered(kept), remembered(left)]).to.deep.equal([true, false]);
+    await api.delete(`${route}/${kept}`).expect(200);
+    await events(1);
+    expect(remembered(kept)).to.equal(false);
+  });
+
+  it('unlinks a group made again under the DN of one deleted', async () => {
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await events(1);
+    const dn = `cn=${designers},ou=groups,${orgDn}`;
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await events(2);
+    // Its dead DN leaves the space unheard, and a new group takes it
+    await raw.ldap.modify(`cn=${id},ou=spaces,${orgDn}`, {
+      delete: { seeAlso: dn },
+    });
+    await dm.ldap.add(dn, {
+      objectClass: ['top', 'groupOfNames'],
+      cn: designers,
+      o: 'Designers',
+      member: userDn('tse-carol'),
+    });
+    await api
+      .post(`${route}/${id}/groups`)
+      .send({ groupIds: [designers], role: 'viewer' })
+      .expect(200);
+    expect((await events(2)).map(([key]) => key)).to.deep.equal([
+      'twake.space.group.linked',
+      'twake.space.member.added',
+    ]);
+    await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+    expect((await events(2)).map(([key]) => key)).to.deep.equal([
+      'twake.space.group.unlinked',
+      'twake.space.member.removed',
+    ]);
+  });
+
+  it('announces a role two changes followed late moved once, with the role attribute', async function () {
+    if (!role) return this.skip();
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create();
+    await events(1);
+    const release = hold();
+    await api
+      .post(`${route}/${id}/groups`)
+      .send({ groupIds: [designers], role: 'viewer' })
+      .expect(200);
+    await api
+      .post(`${groupRoute}/${designers}/members`)
+      .send({ usernames: ['tse-carol'] })
+      .expect(200);
+    release();
+    const at = { organizationId: 'acme', id };
+    expect(await events(3)).to.deep.equal([
+      [
+        'twake.space.group.linked',
+        {
+          ...at,
+          groups: [{ id: designers, name: 'Designers', role: 'viewer' }],
+        },
+      ],
+      [
+        'twake.space.member.added',
+        { ...at, members: [member('tse-bob', 'viewer')] },
+      ],
+      [
+        'twake.space.member.added',
+        { ...at, members: [member('tse-carol', 'viewer')] },
+      ],
+    ]);
+  });
+
+  it('carries the actor of the write that moved a role, or none', async () => {
+    const designers = await group('Designers', ['tse-carol']);
+    const linked = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    const other = await create();
+    await events(2);
+    const as = (user: string): Request =>
+      ({ user, headers: {} }) as unknown as Request;
+    const release = hold();
+    // alice makes carol an editor of a space through her group, while eve
+    // adds carol to another one
+    const designersDn = `cn=${designers},ou=groups,${orgDn}`;
+    await dm.ldap
+      .forRequest(as('alice'))
+      .modify(`cn=${linked},ou=spaces,${orgDn}`, {
+        delete: { seeAlso: designersDn },
+        add: { owner: designersDn },
+      });
+    await dm.ldap
+      .forRequest(as('eve'))
+      .modify(`cn=${other},ou=spaces,${orgDn}`, {
+        add: { seeAlso: userDn('tse-carol') },
+      });
+    release();
+    await quiet();
+    expect(
+      rabbit.published.map(p => [p.routingKey, p.message.id, p.message.actor])
+    ).to.deep.equal([
+      ['twake.space.group.role.changed', linked, 'alice'],
+      ['twake.space.member.role.changed', linked, 'alice'],
+      // With the role attribute, alice's follow writes carol's role in the
+      // other space first, and cannot say who gave it
+      ['twake.space.member.added', other, role ? undefined : 'eve'],
+    ]);
+    rabbit.published = [];
+  });
+
+  it('unlinks a group unlinked, then deleted before the unlink is followed', async () => {
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await events(1);
+    const release = hold();
+    await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    release();
+    await quiet();
+    expect(
+      rabbit.published
+        .filter(p => p.routingKey === 'twake.space.group.unlinked')
+        .map(p => [p.message.id, p.message.groups])
+    ).to.deep.equal([
+      [id, [{ id: designers, name: designers, role: 'viewer' }]],
+    ]);
+    rabbit.published = [];
+  });
+
   it('carries who made the write', async () => {
     const id = await create();
     await events(1);
@@ -450,6 +663,26 @@ describe('Twake spaces: events', function () {
       rabbit.published.map(p => [p.routingKey, p.message.actor])
     ).to.deep.equal([['twake.space.updated', 'jdoe']]);
     rabbit.published = [];
+  });
+
+  it('refuses core/ldap/trash on the organization groups and spaces', async () => {
+    const plugin = new TwakeSpaces(dm);
+    dm.loadedPlugins.trash = plugin;
+    try {
+      for (const watched of ['', `ou=groups,${orgDn}`, `ou=spaces,${orgDn}`]) {
+        dm.config.trash_watched_bases = watched;
+        const refused = await plugin.assertComposition().then(
+          () => undefined,
+          (err: Error) => err
+        );
+        expect(refused?.message, watched).to.match(/core\/ldap\/trash/);
+      }
+      dm.config.trash_watched_bases = users;
+      await plugin.assertComposition();
+    } finally {
+      delete dm.loadedPlugins.trash;
+      delete dm.config.trash_watched_bases;
+    }
   });
 
   it('logs the events a broker gone drops, and starts with no broker', async () => {
@@ -485,4 +718,7 @@ describe('Twake spaces: events', function () {
       spaces.logger.error = error;
     }
   });
-});
+};
+
+describe('Twake spaces: events', suite(''));
+describe('Twake spaces: events, with the user role attribute', suite(ROLE));

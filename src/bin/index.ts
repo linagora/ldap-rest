@@ -32,6 +32,7 @@ import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
 import { assertAuthzComposition } from '../lib/authz/composition';
+import { AUTHZ_REFUSED } from '../lib/errors';
 import { recordHookOwner } from '../lib/utils';
 import pluginPriority from '../plugins/priority.json';
 
@@ -485,12 +486,12 @@ export class DM {
       let clientMessage = err.message;
       if (statusCode === 500 && /\[authz-forbidden\]/.test(err.message)) {
         statusCode = 403;
-        clientMessage = 'Token does not have permission on this branch';
+        clientMessage = AUTHZ_REFUSED;
       } else if (
         statusCode === 403 &&
         /\[authz-forbidden\]/.test(err.message)
       ) {
-        clientMessage = 'Token does not have permission on this branch';
+        clientMessage = AUTHZ_REFUSED;
       }
 
       // Client error (4xx) - log as warning and return error message

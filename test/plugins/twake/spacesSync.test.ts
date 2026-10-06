@@ -320,6 +320,19 @@ describe('Twake spaces: user roles', function () {
     await expectRoles('tss-alice', []);
   });
 
+  it('moves the values of a space renamed to another id', async () => {
+    const designers = await group('Designers', ['tss-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await expectRoles('tss-alice', [`${id}:admin`]);
+    await expectRoles('tss-bob', [`${id}:viewer`]);
+    await dm.ldap.rename(
+      `cn=${id},ou=spaces,${orgDn}`,
+      `cn=tss-renamed,ou=spaces,${orgDn}`
+    );
+    await expectRoles('tss-alice', ['tss-renamed:admin']);
+    await expectRoles('tss-bob', ['tss-renamed:viewer']);
+  });
+
   it('leaves a tombstone the values it held', async () => {
     const id = await create([
       { username: 'tss-alice', role: 'admin' },
@@ -350,11 +363,17 @@ describe('Twake spaces: user roles', function () {
     await expectRoles('tss-bob', [`${id}:editor`]);
   });
 
-  it('refuses core/ldap/trash on the organization groups', async () => {
+  it('refuses core/ldap/trash on the organization groups and spaces', async () => {
     const plugin = new TwakeSpaces(dm);
     dm.loadedPlugins.trash = plugin;
     try {
-      for (const watched of ['', ORGS, `ou=groups,${orgDn}`]) {
+      for (const watched of [
+        '',
+        ORGS,
+        `ou=groups,${orgDn}`,
+        `ou=spaces,${orgDn}`,
+        `${users};ou=spaces,${orgDn}`,
+      ]) {
         dm.config.trash_watched_bases = watched;
         const refused = await plugin.assertComposition().then(
           () => undefined,

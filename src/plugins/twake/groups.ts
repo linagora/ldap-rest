@@ -10,11 +10,12 @@
 import { randomUUID } from 'node:crypto';
 
 import type { Express, Request, Response } from 'express';
+import type { SearchOptions } from 'ldapts';
 
 import type { DM } from '../../bin';
 import type { Schema, SchemaAttribute } from '../../config/schema';
 import type { Hooks } from '../../hooks';
-import { BadRequestError, HttpError } from '../../lib/errors';
+import { AUTHZ_REFUSED, BadRequestError, HttpError } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import type {
   AttributesList,
@@ -25,6 +26,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   isDummyMemberDn,
+  isAuthzRefusal,
   normalizeDn,
   parseDn,
   unescapeDnValue,
@@ -178,6 +180,24 @@ export function branchPattern(base: string): RegExp {
   return new RegExp(`^${before}(?<org>(?:\\\\.|[^,])+)${after}$`, 'i');
 }
 
+/**
+ * The organization a rename moves an entry into, under a branch pattern, if
+ * it changes the entry's parent: what it holds comes along unchecked.
+ */
+export function movedInto(
+  pattern: RegExp,
+  dn: string,
+  newDn: string
+): string | undefined {
+  const org = organizationIn(pattern, newDn);
+  return org !== undefined && dnKey(parentOf(newDn)) !== dnKey(parentOf(dn))
+    ? org
+    : undefined;
+}
+
+/** Search options whose member lists keep the tombstones they hold. */
+const WHOLE = Symbol('whole member lists');
+
 /** The organization of an entry one level under a branch pattern. */
 export function organizationIn(
   pattern: RegExp,
@@ -273,8 +293,37 @@ export default class TwakeGroups extends LdapGroups {
       this.checkMembers(dn, changes.replace?.member);
       return [dn, changes, op, req];
     },
+    // A group moved to another organization takes its members along, the
+    // tombstones it hides too. The refusal names none: the caller may not
+    // be allowed to read them.
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      const org = movedInto(this.groupPattern, dn, newDn);
+      if (org === undefined) return [dn, newDn, req];
+      let members: AttributeValue | undefined;
+      try {
+        const { searchEntries } = (await this.ldap.search(
+          {
+            paged: false,
+            scope: 'base',
+            attributes: ['member'],
+            [WHOLE]: true,
+          } as SearchOptions,
+          dn
+        )) as SearchResult;
+        members = searchEntries[0]?.member;
+      } catch (err) {
+        if (extractLdapCode(err) !== 32) throw err;
+      }
+      if (this.foreign(org, members) !== undefined)
+        throw new BadRequestError(
+          `The group holds members of another organization than ${org}`
+        );
+      return [dn, newDn, req];
+    },
     ldapsearchfilter: async ([result, req, opts]) => [
-      await this.hideTombstones(result),
+      (opts as { [WHOLE]?: boolean } | undefined)?.[WHOLE]
+        ? result
+        : await this.hideTombstones(result),
       req,
       opts,
     ],
@@ -333,14 +382,24 @@ export default class TwakeGroups extends LdapGroups {
   private checkMembers(dn: string, members: AttributeValue | undefined): void {
     const org = this.organizationOf(dn);
     if (!org) return;
+    const member = this.foreign(org, members);
+    if (member !== undefined)
+      throw new BadRequestError(
+        `${member} is not a user of organization ${org}`
+      );
+  }
+
+  /** A member that is not a user of the organization, if any. */
+  private foreign(
+    org: string,
+    members: AttributeValue | undefined
+  ): string | undefined {
     const users = dnKey(this.userBaseOf(org));
-    for (const member of values(members)) {
-      if (isDummyMemberDn(member, this.config.group_dummy_user)) continue;
-      if (dnKey(parentOf(member)) !== users)
-        throw new BadRequestError(
-          `${member} is not a user of organization ${org}`
-        );
-    }
+    return values(members).find(
+      member =>
+        !isDummyMemberDn(member, this.config.group_dummy_user) &&
+        dnKey(parentOf(member)) !== users
+    );
   }
 
   /**
@@ -372,7 +431,11 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  async tombstonesOf(org: string, req?: Request): Promise<string[]> {
+  /**
+   * Read without a request: hiding a tombstone is integrity, not data, and
+   * must not depend on what the caller may see.
+   */
+  async tombstonesOf(org: string): Promise<string[]> {
     const { deleted, deletedValue } = this.attrs;
     if (!deleted) return [];
     try {
@@ -383,8 +446,7 @@ export default class TwakeGroups extends LdapGroups {
           filter: `(${deleted}=${escapeLdapFilter(deletedValue)})`,
           attributes: ['dn'],
         },
-        this.userBaseOf(org),
-        req
+        this.userBaseOf(org)
       )) as SearchResult;
       return searchEntries.map(e => e.dn);
     } catch (err) {
@@ -459,6 +521,12 @@ export default class TwakeGroups extends LdapGroups {
       } catch (err) {
         if (err instanceof RouteError) {
           res.status(err.status).json({ error: err.message, code: err.code });
+          return;
+        }
+        // An authorization plugin refused, maybe through a plain Error:
+        // answered without the branch it names
+        if (isAuthzRefusal(err)) {
+          res.status(403).json({ error: AUTHZ_REFUSED, code: 'REFUSED' });
           return;
         }
         // A rule of another plugin or of the schema refused the write

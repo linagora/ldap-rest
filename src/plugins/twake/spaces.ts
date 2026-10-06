@@ -27,12 +27,14 @@ import { escapeDnValue, escapeLdapFilter, parseDn } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import type TwakeGroups from './groups';
+import type TwakeTombstone from './tombstone';
 import {
   bodyOf,
   branchPattern,
   dnKey,
   invalid,
   isDisplayName,
+  movedInto,
   NAME_RULE,
   notFound,
   ORG,
@@ -191,8 +193,6 @@ export default class TwakeSpaces extends DmPlugin {
   private readonly spaceBase: string;
   private readonly spacePattern: RegExp;
   private readonly userPattern: RegExp;
-  /** The DNs core/twake/tombstone keeps, as it reads them. */
-  private readonly tombstoned: RegExp[];
   private readonly lifecycle: LifecycleAttributes;
   private readonly displayName: string;
   readonly roleAttributes: Record<SpaceRole, string>;
@@ -207,12 +207,24 @@ export default class TwakeSpaces extends DmPlugin {
   /**
    * The spaces of a group being deleted, by DN key, read before refint takes
    * it out of them, until its deletion is followed. `op` is the delete
-   * still running.
+   * still running, `owed` the unlinks space writes left to it meanwhile.
    */
   private readonly unlinking = new Map<
     string,
-    DeletedGroup & { op?: number }
+    DeletedGroup & {
+      op?: number;
+      owed?: {
+        id: string;
+        context: ChangeContext;
+        fields: Record<string, unknown>;
+      }[];
+    }
   >();
+  /**
+   * The groups a deletion announced unlinked, by space DN key, until a write
+   * of the space takes their DN out of it, or finds it gone already.
+   */
+  private readonly announced = new Map<string, Set<string>>();
   /**
    * The spaces a user being deleted is an admin of, by operation and DN,
    * read before refint takes the user out of them.
@@ -229,9 +241,6 @@ export default class TwakeSpaces extends DmPlugin {
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
     this.spacePattern = branchPattern(this.spaceBase);
     this.userPattern = branchPattern(this.config.twake_group_user_base!);
-    this.tombstoned = (this.config.twake_tombstone_dn || []).map(
-      pattern => new RegExp(pattern, 'i')
-    );
     this.lifecycle = lifecycleAttributes(this.config);
     this.displayName =
       this.config.twake_space_display_name_attribute || 'twakeDisplayName';
@@ -254,6 +263,12 @@ export default class TwakeSpaces extends DmPlugin {
     return this.server.loadedPlugins.twakeGroups as unknown as TwakeGroups;
   }
 
+  private get tombstone(): TwakeTombstone | undefined {
+    return this.server.loadedPlugins.twakeTombstone as unknown as
+      | TwakeTombstone
+      | undefined;
+  }
+
   hooks: Hooks = {
     ldapaddrequest: ([dn, entry, req]) => {
       for (const attribute of Object.values(this.roleAttributes))
@@ -266,12 +281,31 @@ export default class TwakeSpaces extends DmPlugin {
           if (set) this.checkHolders(dn, valueOf(set, attribute));
       return [dn, changes, op, req];
     },
+    // A space moved to another organization takes its holders along. The
+    // refusal names none: the caller may not be allowed to read them.
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      const org = movedInto(this.spacePattern, dn, newDn);
+      if (org === undefined) return [dn, newDn, req];
+      const attributes = Object.values(this.roleAttributes);
+      const entry = await this.entry(dn, attributes);
+      if (
+        entry &&
+        attributes.some(a => this.foreign(org, valueOf(entry, a)) !== undefined)
+      )
+        throw new BadRequestError(
+          `The space holds users or groups of another organization than ${org}`
+        );
+      return [dn, newDn, req];
+    },
     ldapdeleterequest: async ([dn, req]) => {
       const op = currentOperation();
       if (op !== undefined)
         for (const one of [dn].flat()) {
           const org = organizationIn(this.userPattern, one);
           if (org !== undefined) {
+            // A delete core/twake/tombstone turns into a tombstone is handed
+            // over when the tombstone is followed; the erase of one, here.
+            if (this.tombstone?.keeps(one)) continue;
             const ids = await this.administered(org, one);
             if (!ids.length) continue;
             if (!this.handing.has(op)) this.handing.set(op, new Map());
@@ -299,7 +333,19 @@ export default class TwakeSpaces extends DmPlugin {
     ldapdeleteend: op => {
       this.handing.delete(op);
       for (const [key, deleted] of this.unlinking)
-        if (deleted.op === op) this.unlinking.delete(key);
+        if (deleted.op === op) {
+          this.unlinking.delete(key);
+          // The delete did not land: the unlinks it was to announce for
+          // space writes go out now, as those writes would have
+          for (const { id, context, fields } of deleted.owed ?? [])
+            this.publishEvent(
+              deleted.org,
+              id,
+              'group.unlinked',
+              context,
+              fields
+            );
+        }
     },
     onLdapEntryChange: (dn, before, after, context) => {
       if (this.follows)
@@ -330,37 +376,46 @@ export default class TwakeSpaces extends DmPlugin {
    * core/rabbitmq connects lazily and hands back no client when it cannot:
    * every event would then be lost, so the server does not start.
    *
-   * core/ldap/trash moves a deleted group away instead of deleting it:
-   * nothing follows the move, and its members would keep the roles it gave.
+   * core/ldap/trash moves a deleted group or space away instead of deleting
+   * it: nothing follows the move, so users would keep the roles it gave,
+   * and no event would say it went.
    */
   async assertComposition(): Promise<void> {
     if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
       throw new Error(
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
       );
-    if (!this.userRole || !this.server.loadedPlugins.trash) return;
-    const branch = parseDn(this.config.twake_group_base || '').reverse();
+    if (!this.follows || !this.server.loadedPlugins.trash) return;
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
-    // A watched base above a group branch, or in one, holds groups
-    const holdsGroups = (base: string): boolean =>
-      parseDn(base)
-        .reverse()
-        .slice(0, branch.length)
-        .every((rdn, i) =>
-          branch[i].includes(ORG)
-            ? type(rdn) === type(branch[i])
-            : dnKey(rdn) === dnKey(branch[i])
-        );
+    // A watched base above a branch, or in one, holds its entries
+    const holds = (pattern: string) => {
+      const branch = parseDn(pattern).reverse();
+      return (base: string): boolean =>
+        parseDn(base)
+          .reverse()
+          .slice(0, branch.length)
+          .every((rdn, i) =>
+            branch[i].includes(ORG)
+              ? type(rdn) === type(branch[i])
+              : dnKey(rdn) === dnKey(branch[i])
+          );
+    };
+    const branches = [this.config.twake_group_base || '', this.spaceBase].map(
+      holds
+    );
     const watched = String(this.config.trash_watched_bases || '')
       .split(';')
       .map(base => base.trim())
       .filter(Boolean);
-    if (watched.length === 0 || watched.some(holdsGroups))
+    if (
+      watched.length === 0 ||
+      watched.some(base => branches.some(held => held(base)))
+    )
       throw new Error(
-        `${this.name}: core/ldap/trash watches the organization groups, and ` +
-          `their members would keep the space roles of a deleted group. ` +
-          `Leave the group branches out of --trash-watched-bases, or unset ` +
-          `--twake-space-user-role-attribute`
+        `${this.name}: core/ldap/trash watches the organization groups or ` +
+          `spaces, and the deletion of one would not be followed: no user ` +
+          `role value or event would say it went. Leave the group and space ` +
+          `branches out of --trash-watched-bases`
       );
   }
 
@@ -390,19 +445,45 @@ export default class TwakeSpaces extends DmPlugin {
     return `cn=${escapeDnValue(id)},${this.spaceBaseOf(org)}`;
   }
 
+  /** An entry as it is, read for no one, or nothing for one missing. */
+  private async entry(
+    dn: string,
+    attributes: string[]
+  ): Promise<AttributesList | undefined> {
+    try {
+      return (
+        (await this.server.ldap.search(
+          { paged: false, scope: 'base', attributes },
+          dn
+        )) as SearchResult
+      ).searchEntries[0];
+    } catch (err) {
+      if (extractLdapCode(err) === 32) return undefined;
+      throw err;
+    }
+  }
+
   /** A space holds users and groups of its organization, whichever API writes it. */
   private checkHolders(dn: string, held: AttributeValue | undefined): void {
     const org = this.organizationOf(dn);
     if (!org) return;
+    const holder = this.foreign(org, held);
+    if (holder !== undefined)
+      throw new BadRequestError(
+        `${holder} is neither a user nor a group of organization ${org}`
+      );
+  }
+
+  /** A holder that is neither a user nor a group of the organization. */
+  private foreign(
+    org: string,
+    held: AttributeValue | undefined
+  ): string | undefined {
     const branches = [
       this.groups.userBaseOf(org),
       this.groups.groupBaseOf(org),
     ].map(dnKey);
-    for (const holder of values(held))
-      if (!branches.includes(dnKey(parentOf(holder))))
-        throw new BadRequestError(
-          `${holder} is neither a user nor a group of organization ${org}`
-        );
+    return values(held).find(h => !branches.includes(dnKey(parentOf(h))));
   }
 
   api(app: Express): void {
@@ -617,7 +698,8 @@ export default class TwakeSpaces extends DmPlugin {
     org: string,
     filter: string,
     id?: string,
-    req?: Request
+    req?: Request,
+    hidden?: Set<string>
   ): Promise<SpaceEntry[]> {
     const search = async (): Promise<AttributesList[]> => {
       try {
@@ -642,15 +724,19 @@ export default class TwakeSpaces extends DmPlugin {
         throw err;
       }
     };
-    const [entries, hidden] = await Promise.all([
+    const [entries, tombstones] = await Promise.all([
       search(),
-      this.hidden(org, req),
+      hidden ?? this.hidden(org),
     ]);
-    return entries.map(e => this.entryOf(org, e, hidden));
+    return entries.map(e => this.entryOf(org, e, tombstones));
   }
 
-  private async hidden(org: string, req?: Request): Promise<Set<string>> {
-    return new Set((await this.groups.tombstonesOf(org, req)).map(dnKey));
+  /**
+   * Whoever asks: a tombstone outside the caller's branches would otherwise
+   * count as a member, and as an admin.
+   */
+  private async hidden(org: string): Promise<Set<string>> {
+    return new Set((await this.groups.tombstonesOf(org)).map(dnKey));
   }
 
   /** A filter for the spaces holding any of these DNs, whatever the role. */
@@ -764,21 +850,36 @@ export default class TwakeSpaces extends DmPlugin {
       const [was, is] = [before, after].map(e =>
         e ? this.entryOf(org!, e, new Set()) : undefined
       );
-      const holders = [was, is].flatMap(s => s?.holders ?? []);
+      // The holders this write gave another role, or none: the members of a
+      // linked group move with the group's own changes, followed as well. A
+      // space renamed to another id moves every role.
+      const ids = [...new Set([was, is].flatMap(s => (s ? [s.id] : [])))];
+      const roles = [was, is].map(
+        s => new Map(s?.holders.map(h => [dnKey(h.dn), h.role]))
+      );
+      const holders = [was, is]
+        .flatMap(s => s?.holders ?? [])
+        .filter(
+          h =>
+            ids.length > 1 ||
+            roles[0].get(dnKey(h.dn)) !== roles[1].get(dnKey(h.dn))
+        );
       const groups = new Set(
         holders.filter(h => h.kind === 'group').map(h => h.name)
       );
       const linked = await this.orgGroups(org, [...groups], ['member']);
+      const id = (is ?? was)!.id;
       const moved = await this.settle(
         org,
         [
           ...holders.filter(h => h.kind === 'member').map(h => h.dn),
           ...linked.flatMap(e => values(e.member)),
         ],
-        { id: (is ?? was)!.id, space: was }
+        { id, space: was },
+        await this.hidden(org)
       );
       if (this.rabbitmq)
-        await this.announce(org, moved, context, { was, is, linked });
+        await this.announce(org, moved, context, ids, { was, is, linked });
       return;
     }
     org = this.groups.organizationOf(dn);
@@ -789,30 +890,35 @@ export default class TwakeSpaces extends DmPlugin {
     const [wasKeys, isKeys] = [was, is].map(list => new Set(list.map(dnKey)));
     const deleted = after ? undefined : this.unlinking.get(dnKey(dn));
     if (deleted) this.unlinking.delete(dnKey(dn));
+    const hidden = await this.hidden(org);
     const moved = await this.settle(
       org,
       [
         ...was.filter(m => !isKeys.has(dnKey(m))),
         ...is.filter(m => !wasKeys.has(dnKey(m))),
       ],
-      { group: dn, members: wasKeys, spaces: deleted?.spaces }
+      { group: dn, members: wasKeys, spaces: deleted?.spaces },
+      hidden
     );
-    if (!this.rabbitmq) return;
-    if (deleted) this.unlinked(deleted, context);
-    await this.announce(org, moved, context);
+    if (!this.rabbitmq || (!deleted && !moved.length)) return;
+    // The spaces holding the group now: a deleted one refint has not taken
+    // out of them yet
+    const holding = (
+      await this.spaces(org, this.holding([dn]), undefined, undefined, hidden)
+    ).map(s => s.id);
+    if (deleted) this.unlinked(dn, deleted, holding, context);
+    await this.announce(org, moved, context, [
+      ...(deleted?.spaces.map(s => s.id) ?? []),
+      ...holding,
+    ]);
   }
 
   /**
-   * The spaces a user is an admin of. Not read for a delete
-   * core/twake/tombstone turns into a tombstone, whose hand-over follows it,
-   * or for the erase of a tombstone, handed over already.
+   * The spaces a user is an admin of. Read again when a tombstone is erased:
+   * its hand-over may have failed, or predate this plugin, and handing over
+   * a space that keeps another admin does nothing.
    */
   private async administered(org: string, dn: string): Promise<string[]> {
-    if (
-      this.server.loadedPlugins.twakeTombstone &&
-      this.tombstoned.some(pattern => pattern.test(dn))
-    )
-      return [];
     try {
       const filter = `(${this.roleAttributes.admin}=${escapeLdapFilter(dn)})`;
       return (await this.spaces(org, filter)).map(s => s.id);
@@ -913,13 +1019,28 @@ export default class TwakeSpaces extends DmPlugin {
     }
   }
 
-  /** The spaces a deleted group left. */
-  private unlinked(deleted: DeletedGroup, context: ChangeContext): void {
+  /**
+   * The spaces a deleted group left. One still holding its DN, without
+   * refint, remembers the announcement for the write that takes it out.
+   */
+  private unlinked(
+    dn: string,
+    deleted: DeletedGroup,
+    holding: string[],
+    context: ChangeContext
+  ): void {
     const { org, id: group, name, spaces } = deleted;
-    for (const { id, role } of spaces)
+    const held = new Set(holding.map(id => id.toLowerCase()));
+    for (const { id, role } of spaces) {
+      const key = dnKey(this.spaceDn(org, id));
+      if (held.has(id.toLowerCase())) {
+        if (!this.announced.has(key)) this.announced.set(key, new Set());
+        this.announced.get(key)!.add(dnKey(dn));
+      }
       this.publishEvent(org, id, 'group.unlinked', context, {
         groups: [{ id: group, name, role }],
       });
+    }
   }
 
   /**
@@ -934,10 +1055,10 @@ export default class TwakeSpaces extends DmPlugin {
   private async settle(
     org: string,
     dns: string[],
-    undo: Undo
+    undo: Undo,
+    hidden: Set<string>
   ): Promise<Moved[]> {
     const users = dnKey(this.groups.userBaseOf(org));
-    const hidden = await this.hidden(org);
     const todo = new Map(
       dns.filter(dn => dnKey(parentOf(dn)) === users).map(dn => [dnKey(dn), dn])
     );
@@ -946,10 +1067,10 @@ export default class TwakeSpaces extends DmPlugin {
       // A tombstone keeps the values it held
       if (hidden.has(key)) continue;
       try {
-        const after = await this.rolesOf(org, dn);
+        const after = await this.rolesOf(org, dn, hidden);
         const before = this.userRole
           ? await this.writeRoles(dn, after)
-          : await this.rolesOf(org, dn, undo);
+          : await this.rolesOf(org, dn, hidden, undo);
         if (before) moved.push({ dn, before, after });
       } catch (err) {
         this.logger.error({
@@ -1001,11 +1122,18 @@ export default class TwakeSpaces extends DmPlugin {
   /**
    * The events of a followed change: the space write itself, then each
    * moved user's roles, except in a space created or deleted by it.
+   *
+   * A role may have moved in a space the change did not touch, by another
+   * change not followed yet. Without the role attribute, that change
+   * announces it. With it, this follow wrote the value, so that change
+   * will find nothing to announce: the role goes out here, without an
+   * actor, as this change's is not the one that moved it.
    */
   private async announce(
     org: string,
     moved: Moved[],
     context: ChangeContext,
+    touched: string[],
     space?: {
       was?: SpaceEntry;
       is?: SpaceEntry;
@@ -1031,6 +1159,15 @@ export default class TwakeSpaces extends DmPlugin {
       });
       const publish = (event: string, fields?: Record<string, unknown>): void =>
         this.publishEvent(org, id, event, context, fields);
+      const key = dnKey(this.spaceDn(org, id));
+      // Under both ids, for a space renamed to another one
+      const announced = new Set<string>();
+      for (const s of [was, is]) {
+        const old = s && dnKey(this.spaceDn(org, s.id));
+        for (const group of (old && this.announced.get(old)) || [])
+          announced.add(group);
+        if (old) this.announced.delete(old);
+      }
       if (!was || !is) {
         whole.add(id.toLowerCase());
         if (!is) publish('deleted');
@@ -1065,23 +1202,51 @@ export default class TwakeSpaces extends DmPlugin {
             groups: [groupOf(group)],
           });
         }
-        // A group gone was announced unlinked when it was deleted
+        // A group deleted is announced unlinked by its deletion, from the
+        // spaces it was in then: already, or once it is followed. One
+        // unlinked first, then deleted, is announced here. A delete still
+        // running is owed the unlink, and announces it if it fails.
+        const byDeletion = (group: Holder): boolean => {
+          if (announced.delete(dnKey(group.dn))) return true;
+          const deleted = this.unlinking.get(dnKey(group.dn));
+          if (
+            !deleted?.spaces.some(s => s.id.toLowerCase() === id.toLowerCase())
+          )
+            return false;
+          if (deleted.op !== undefined)
+            (deleted.owed ??= []).push({
+              id,
+              context,
+              fields: { groups: [groupOf(group)] },
+            });
+          return true;
+        };
         for (const group of linkedBefore.values())
-          if (names.has(dnKey(group.dn)))
+          if (!byDeletion(group))
             publish('group.unlinked', { groups: [groupOf(group)] });
+        // The DNs this write leaves in the space are still awaited; one it
+        // put back, of a group made again under that DN, is another group
+        const [held, left] = [was, is].map(
+          s => new Set(s.holders.map(h => dnKey(h.dn)))
+        );
+        const awaited = [...announced].filter(g => held.has(g) && left.has(g));
+        if (awaited.length) this.announced.set(key, new Set(awaited));
       }
     }
 
+    const own = new Set(touched.map(id => id.toLowerCase()));
     const changes = moved.flatMap(({ dn, before, after }) =>
       [...new Set([...before.keys(), ...after.keys()])].flatMap(id => {
         const [was, is] = [before.get(id), after.get(id)];
         if (was === is || whole.has(id.toLowerCase())) return [];
+        const caught = !own.has(id.toLowerCase());
+        if (caught && !this.userRole) return [];
         const event = !was
           ? 'member.added'
           : !is
             ? 'member.removed'
             : 'member.role.changed';
-        return [{ dn, id, event, role: (is ?? was)! }];
+        return [{ dn, id, event, role: (is ?? was)!, caught }];
       })
     );
     if (!changes.length) return;
@@ -1090,10 +1255,10 @@ export default class TwakeSpaces extends DmPlugin {
       org,
       changes.map(c => c.dn)
     );
-    for (const { dn, id, event, role } of changes) {
+    for (const { dn, id, event, role, caught } of changes) {
       const profile = profiles.get(dnKey(dn));
       if (profile)
-        this.publishEvent(org, id, event, context, {
+        this.publishEvent(org, id, event, caught ? {} : context, {
           members: [{ ...profile, role }],
         });
     }
@@ -1187,9 +1352,14 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   /** A user's roles, in the directory as it is or with a change undone. */
-  private async rolesOf(org: string, dn: string, undo?: Undo): Promise<Roles> {
+  private async rolesOf(
+    org: string,
+    dn: string,
+    hidden: Set<string>,
+    undo?: Undo
+  ): Promise<Roles> {
     const { filter, roleIn } = await this.userIn(org, dn, undefined, undo);
-    let spaces = await this.spaces(org, filter);
+    let spaces = await this.spaces(org, filter, undefined, undefined, hidden);
     if (undo && 'id' in undo) {
       const id = undo.id.toLowerCase();
       spaces = spaces.filter(s => s.id.toLowerCase() !== id);

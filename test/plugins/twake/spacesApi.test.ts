@@ -4,17 +4,37 @@ import supertest from 'supertest';
 import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
 import type { Hooks } from '../../../src/hooks';
+import { ForbiddenError } from '../../../src/lib/errors';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 
-/** The bases of the searches made for a request. */
+/**
+ * The bases of the searches made for a request, and what an authorization
+ * plugin filtering or refusing them leaves out.
+ */
 class ReadSpy extends DmPlugin {
   name = 'tspReadSpy';
   bases = new Set<string>();
+  /** A filter of the entries the caller cannot see. */
+  unseen?: string;
+  /** A branch the caller cannot read. */
+  refused?: string;
+  /** Refused by another rule than an authorization plugin, with this. */
+  rule?: string;
   hooks: Hooks = {
     ldapsearchrequest: ([base, opts, req]) => {
-      if (req) this.bases.add(base.toLowerCase());
+      if (!req) return [base, opts, req];
+      this.bases.add(base.toLowerCase());
+      if (this.refused && base.toLowerCase().endsWith(this.refused))
+        throw this.rule
+          ? new ForbiddenError(this.rule)
+          : new Error(`[authz-forbidden] Not allowed to read ${base}`);
+      if (this.unseen)
+        opts = {
+          ...opts,
+          filter: `(&${String(opts.filter || '(objectClass=*)')}(!${this.unseen}))`,
+        };
       return [base, opts, req];
     },
   };
@@ -494,6 +514,50 @@ describe('Twake spaces plugin routes', function () {
     ).to.deep.equal(['tsp-alice']);
   });
 
+  it('keeps an admin whatever tombstones the caller can see', async () => {
+    const id = await create();
+    await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn('acme')}`, {
+      add: { roleOccupant: userDn('tsp-gone') },
+    });
+    spy.unseen = '(uid=tsp-gone)';
+    try {
+      const res = await api
+        .delete(`${route()}/${id}/members/tsp-alice`)
+        .expect(409);
+      expect(res.body.code).to.equal('LAST_ADMIN');
+    } finally {
+      delete spy.unseen;
+    }
+  });
+
+  it('answers 403 for a read an authorization plugin refuses', async () => {
+    const id = await create();
+    spy.refused = `ou=spaces,${orgDn('acme')}`.toLowerCase();
+    try {
+      for (const path of [route(), `${route()}/${id}`])
+        expect((await api.get(path).expect(403)).body, path).to.deep.equal({
+          error: 'Token does not have permission on this branch',
+          code: 'REFUSED',
+        });
+    } finally {
+      delete spy.refused;
+    }
+  });
+
+  it('keeps the message of a 403 no authorization plugin made', async () => {
+    spy.refused = `ou=spaces,${orgDn('acme')}`.toLowerCase();
+    spy.rule = 'Spaces are closed for maintenance';
+    try {
+      expect((await api.get(route()).expect(403)).body).to.deep.equal({
+        error: 'Spaces are closed for maintenance',
+        code: 'REFUSED',
+      });
+    } finally {
+      delete spy.refused;
+      delete spy.rule;
+    }
+  });
+
   it('refuses a direct write of a user or group of another organization', async () => {
     const id = await create();
     const dn = `cn=${id},ou=spaces,${orgDn('acme')}`;
@@ -517,6 +581,20 @@ describe('Twake spaces plugin routes', function () {
       })
       .catch((err: Error) => (created = err));
     expect(created?.message).to.match(/neither a user nor a group/);
+  });
+
+  it('refuses a space moved to another organization with its holders', async () => {
+    const id = await create();
+    let refused: Error | undefined;
+    await dm.ldap
+      .rename(
+        `cn=${id},ou=spaces,${orgDn('acme')}`,
+        `cn=${id},ou=spaces,${orgDn('other')}`
+      )
+      .catch((err: Error) => (refused = err));
+    expect(refused?.message).to.equal(
+      'The space holds users or groups of another organization than other'
+    );
   });
 
   it('links groups with a role, changes it and unlinks them', async () => {

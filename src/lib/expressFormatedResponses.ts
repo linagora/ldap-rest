@@ -5,6 +5,8 @@
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
+import { AUTHZ_REFUSED } from './errors';
+
 /**
  * The server's logger, once the `DM` constructor has installed it.
  *
@@ -149,7 +151,7 @@ export const serverError = (res: Response, err: unknown): void => {
   if (statusCode >= 400 && statusCode < 500) {
     const clientMessage =
       statusCode === 403 && /\[authz-forbidden\]/.test(message)
-        ? 'Token does not have permission on this branch'
+        ? AUTHZ_REFUSED
         : message;
     _logger?.warn(`Client error ${statusCode}: ${clientMessage}`);
     res.status(statusCode).json({ error: clientMessage });

@@ -20,20 +20,27 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   linked group does not count as an admin. A tombstoned or erased admin is
   not a request, and can leave a space with none.
 - A space holds users and groups of its organization only: any other value is
-  refused with a 400, whichever API writes the space. The one role and the
-  admin are kept by the routes below only; a user or group a direct write, or
-  two requests at once, left under two roles reads with the strongest, and a
-  role change or removal takes it out of all of them.
+  refused with a 400, whichever API writes the space, or moves it straight
+  into another organization's space branch; a move refused names none of
+  them. Not checked: moving a space out of the organizations' branches (to
+  `ou=archive,…`, for instance) or deeper than one level under another
+  organization, which takes its holders along, and moving a user or group
+  to another organization, whose spaces in the one it left keep it. The
+  one role and the admin are kept by the routes below only; a user or group
+  a direct write, or two requests at once, left under two roles reads with
+  the strongest, and a role change or removal takes it out of all of them.
 - A tombstone (see [tombstone](tombstone.md)) keeps its roles until it is
-  erased, and is hidden from the spaces read through these routes. It cannot
-  be added.
+  erased, and is hidden from the spaces read through these routes, whatever
+  the caller may read of the user branch: it never counts as an admin. It
+  cannot be added.
 - An erased user or group leaves its spaces through the directory: enable the
   `refint` overlay on the three role attributes.
 - When a user who is erased or becomes a tombstone was the last admin among
   a space's users, its editors become admins, or its viewers when it has no
   editor. A space left with no user of its own is deleted, whatever groups
   it links. Both happen shortly after the deletion, and publish their
-  events. The hand-over relies on refint: without it an erased admin's DN
+  events. Erasing a tombstone checks its spaces again, for a hand-over that
+  failed or was never made. The hand-over relies on refint: without it an erased admin's DN
   stays in the space and still counts as an admin, so erasing two admins
   one after the other hands nothing over. A write of the space made at the
   same moment is retried twice; past that the hand-over is logged and left
@@ -46,11 +53,12 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   are then rewritten from the directory as it is, so changes made close
   together end the same whatever order they are followed in. Values not
   ending in `:viewer`, `:editor` or `:admin` are left alone. A tombstone keeps
-  the values it held when it was deleted. The plugin refuses to start when
-  core/ldap/trash watches the group branches: a group it moves away is never
-  followed.
+  the values it held when it was deleted.
 - With `--rabbitmq-url`, every write of a space and every change of a
   member's role is published as an event, see below.
+- With either of the two, the plugin refuses to start when core/ldap/trash
+  watches the group or space branches: a group or space it moves away is
+  never followed.
 
 ## Events
 
@@ -81,6 +89,13 @@ Every event carries `organizationId`, `id` (the space), `actor` (who made
 the write, when known) and `timestamp`. A member is described as above, its
 `uuid` the user's `entryUUID`; a group is `{ id, name, role }`.
 
+Writes made close together blur the actor: the member events of two writes
+of one space or group followed together may go out under the first one's.
+With `--twake-space-user-role-attribute`, the follow of a write may find a
+role another write moved in another space, not followed yet: it publishes
+that event with no actor, as the later follow finds nothing left to
+announce.
+
 - `created`: `name`, `members` (every user in the space with their resolved
   role, linked groups' members included) and `groups`.
 - `updated`: the changed `name`.
@@ -92,12 +107,15 @@ the write, when known) and `timestamp`. A member is described as above, its
 - `group.linked`, `group.role.changed`, `group.unlinked`: `groups`, the one
   group, with its name when the event is published. A deleted group is
   unlinked from each of its spaces once, whether refint or a later write
-  takes its DN out of them. Renaming a linked group publishes nothing.
+  takes its DN out of them; one unlinked, then deleted before the unlink is
+  followed, is unlinked too, under its id for a name. Renaming a linked group
+  publishes nothing.
 
 A user who is deleted or becomes a tombstone publishes no member event.
 
 The server does not start when the broker cannot be reached. An event the
-broker drops later is logged with `result: "no broker"` and not sent again.
+broker cannot take once the server runs is logged with `result: "error"` and
+not sent again.
 
 Member events compare each moved user's roles before and after a change:
 
@@ -112,8 +130,9 @@ Member events compare each moved user's roles before and after a change:
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
 is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
-`{ "error": "...", "code": "..." }`. A write answers `{ "success": true }`
-unless stated otherwise.
+`{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
+answers 403 `REFUSED`. A write answers `{ "success": true }` unless stated
+otherwise.
 
 A space reads, strongest role first:
 

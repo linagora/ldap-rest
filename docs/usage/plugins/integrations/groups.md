@@ -12,8 +12,14 @@ branch per organization. It serves the groups of an organization under
   display name attribute, an optional color and its creation date.
 - A group's members belong to its organization: adding a user of another
   organization, or of no organization, is refused with a 400, whichever API
-  writes the group (REST, SCIM, another plugin). The placeholder
-  (`--group-dummy-user`) is the one exception.
+  writes the group (REST, SCIM, another plugin), and so is moving a group
+  with its members, tombstones included, straight into another
+  organization's group branch: that refusal names none of them. The
+  placeholder (`--group-dummy-user`) is the one exception. Not checked:
+  moving a group out of the organizations' branches (to `ou=archive,…`, for
+  instance) or deeper than one level under another organization, which
+  takes its members along, and moving a user to another organization, whose
+  groups in the one it left keep it as a member.
 - An empty group holds the placeholder, because `groupOfNames` needs a member.
   The placeholder is never listed.
 - A tombstone (see [tombstone](tombstone.md)) keeps its memberships until it
@@ -33,7 +39,8 @@ branch per organization. It serves the groups of an organization under
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
 is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
-`{ "error": "...", "code": "..." }`.
+`{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
+answers 403 `REFUSED`.
 
 A group reads:
 

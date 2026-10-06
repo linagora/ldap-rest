@@ -112,7 +112,7 @@ export default class TwakeTombstone extends DmPlugin {
     ldapdeleterequest: async ([dn, req]) => {
       const kept: string[] = [];
       for (const one of Array.isArray(dn) ? dn : [dn]) {
-        if (!this.erasing.has(one) && this.matches(one)) {
+        if (this.keeps(one)) {
           const entry = await this.read(one);
           if (entry) {
             await this.writeTombstone(one, entry, this.reasonOf(one, req), req);
@@ -244,6 +244,14 @@ export default class TwakeTombstone extends DmPlugin {
     // keeps the memberships.
     await this.leaveGroups(dn);
     this.logger.info({ plugin: this.name, event: 'erase', dn, force });
+  }
+
+  /**
+   * Whether a delete of this DN, asked for now, writes a tombstone instead of
+   * reaching the directory: not when it erases one.
+   */
+  keeps(dn: string): boolean {
+    return !this.erasing.has(dn) && this.matches(dn);
   }
 
   /**
