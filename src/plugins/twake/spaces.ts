@@ -43,7 +43,12 @@ import {
   RouteError,
   values,
 } from './groups';
-import { valueOf } from './lifecycleAttributes';
+import {
+  isTombstone,
+  lifecycleAttributes,
+  type LifecycleAttributes,
+  valueOf,
+} from './lifecycleAttributes';
 
 /** From the weakest to the strongest. */
 export const SPACE_ROLES = ['viewer', 'editor', 'admin'] as const;
@@ -178,10 +183,17 @@ function holdersOf(
 export default class TwakeSpaces extends DmPlugin {
   name = 'twakeSpaces';
   roles: Role[] = ['api'];
-  dependencies: Record<string, string> = { twakeGroups: 'core/twake/groups' };
+  dependencies: Record<string, string> = {
+    twakeGroups: 'core/twake/groups',
+    onLdapChange: 'core/ldap/onChange',
+  };
 
   private readonly spaceBase: string;
   private readonly spacePattern: RegExp;
+  private readonly userPattern: RegExp;
+  /** The DNs core/twake/tombstone keeps, as it reads them. */
+  private readonly tombstoned: RegExp[];
+  private readonly lifecycle: LifecycleAttributes;
   private readonly displayName: string;
   readonly roleAttributes: Record<SpaceRole, string>;
   private readonly userRole: string;
@@ -201,6 +213,14 @@ export default class TwakeSpaces extends DmPlugin {
     string,
     DeletedGroup & { op?: number }
   >();
+  /**
+   * The spaces a user being deleted is an admin of, by operation and DN,
+   * read before refint takes the user out of them.
+   */
+  private readonly handing = new Map<
+    number,
+    Map<string, { org: string; ids: string[] }>
+  >();
 
   constructor(server: DM) {
     super(server);
@@ -208,6 +228,11 @@ export default class TwakeSpaces extends DmPlugin {
     if (!this.spaceBase.includes(ORG))
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
     this.spacePattern = branchPattern(this.spaceBase);
+    this.userPattern = branchPattern(this.config.twake_group_user_base!);
+    this.tombstoned = (this.config.twake_tombstone_dn || []).map(
+      pattern => new RegExp(pattern, 'i')
+    );
+    this.lifecycle = lifecycleAttributes(this.config);
     this.displayName =
       this.config.twake_space_display_name_attribute || 'twakeDisplayName';
     this.roleAttributes = {
@@ -218,7 +243,6 @@ export default class TwakeSpaces extends DmPlugin {
     this.userRole = this.config.twake_space_user_role_attribute || '';
     this.exchange = this.config.twake_space_exchange || 'space';
     if (this.config.rabbitmq_url) this.dependencies.rabbitmq = 'core/rabbitmq';
-    if (this.follows) this.dependencies.onLdapChange = 'core/ldap/onChange';
   }
 
   /** Whether user roles are kept or events published. */
@@ -244,20 +268,36 @@ export default class TwakeSpaces extends DmPlugin {
     },
     ldapdeleterequest: async ([dn, req]) => {
       const op = currentOperation();
-      if (this.rabbitmq && op !== undefined)
+      if (op !== undefined)
         for (const one of [dn].flat()) {
-          const deleted = await this.deletedGroup(one);
-          if (deleted) this.unlinking.set(dnKey(one), { ...deleted, op });
+          const org = organizationIn(this.userPattern, one);
+          if (org !== undefined) {
+            const ids = await this.administered(org, one);
+            if (!ids.length) continue;
+            if (!this.handing.has(op)) this.handing.set(op, new Map());
+            this.handing.get(op)!.set(dnKey(one), { org, ids });
+          } else if (this.rabbitmq) {
+            const deleted = await this.deletedGroup(one);
+            if (deleted) this.unlinking.set(dnKey(one), { ...deleted, op });
+          }
         }
       return [dn, req];
     },
-    ldapdeletedone: dn => {
+    ldapdeletedone: (dn, context = {}) => {
+      const op = currentOperation();
+      const handing = op === undefined ? undefined : this.handing.get(op);
       for (const one of [dn].flat()) {
         const deleted = this.unlinking.get(dnKey(one));
         if (deleted) delete deleted.op;
+        const admin = handing?.get(dnKey(one));
+        if (admin)
+          this.queue(one, () =>
+            this.handOver(admin.org, one, admin.ids, context)
+          );
       }
     },
     ldapdeleteend: op => {
+      this.handing.delete(op);
       for (const [key, deleted] of this.unlinking)
         if (deleted.op === op) this.unlinking.delete(key);
     },
@@ -270,6 +310,18 @@ export default class TwakeSpaces extends DmPlugin {
             after as AttributesList | null,
             context
           )
+        );
+      const org = organizationIn(this.userPattern, dn);
+      if (
+        org !== undefined &&
+        this.lifecycle.deleted &&
+        before &&
+        after &&
+        !isTombstone(before as AttributesList, this.lifecycle) &&
+        isTombstone(after as AttributesList, this.lifecycle)
+      )
+        this.queue(dn, async () =>
+          this.handOver(org, dn, await this.administered(org, dn), context)
         );
     },
   };
@@ -748,6 +800,87 @@ export default class TwakeSpaces extends DmPlugin {
     if (!this.rabbitmq) return;
     if (deleted) this.unlinked(deleted, context);
     await this.announce(org, moved, context);
+  }
+
+  /**
+   * The spaces a user is an admin of. Not read for a delete
+   * core/twake/tombstone turns into a tombstone, whose hand-over follows it,
+   * or for the erase of a tombstone, handed over already.
+   */
+  private async administered(org: string, dn: string): Promise<string[]> {
+    if (
+      this.server.loadedPlugins.twakeTombstone &&
+      this.tombstoned.some(pattern => pattern.test(dn))
+    )
+      return [];
+    try {
+      const filter = `(${this.roleAttributes.admin}=${escapeLdapFilter(dn)})`;
+      return (await this.spaces(org, filter)).map(s => s.id);
+    } catch (err) {
+      // The hand-over is lost, the deletion goes on
+      this.logger.error({
+        plugin: this.name,
+        event: 'handOver',
+        dn,
+        error: String(err),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * A space a deleted user was the last admin of goes to its editors, else
+   * its viewers; one left with no member is deleted.
+   */
+  private async handOver(
+    org: string,
+    dn: string,
+    ids: string[],
+    context: ChangeContext
+  ): Promise<void> {
+    for (const id of ids)
+      try {
+        await this.again(() => this.handOverOnce(org, dn, id, context));
+      } catch (err) {
+        this.logger.error({
+          plugin: this.name,
+          event: 'handOver',
+          space: id,
+          error: String(err),
+        });
+      }
+  }
+
+  private async handOverOnce(
+    org: string,
+    dn: string,
+    id: string,
+    context: ChangeContext
+  ): Promise<void> {
+    const key = dnKey(dn);
+    const [space] = await this.spaces(org, '(objectClass=*)', id);
+    // Linked groups do not count: a space has users of its own
+    const members =
+      space?.holders.filter(h => h.kind === 'member' && dnKey(h.dn) !== key) ??
+      [];
+    if (!space || members.some(h => h.role === 'admin')) return;
+    if (!members.length) {
+      await this.server.ldap.delete(this.spaceDn(org, id), undefined, {
+        context,
+      });
+      return;
+    }
+    const role = members.some(h => h.role === 'editor') ? 'editor' : 'viewer';
+    const promoted = members.filter(h => h.role === role).map(h => h.dn);
+    await this.server.ldap.modify(
+      this.spaceDn(org, id),
+      {
+        delete: { [this.roleAttributes[role]]: promoted },
+        add: { [this.roleAttributes.admin]: promoted },
+      },
+      undefined,
+      { context }
+    );
   }
 
   /** A group about to be deleted, if it is one linked to spaces. */

@@ -544,9 +544,8 @@ See [groups](plugins/integrations/groups.md).
 #### `core/twake/spaces`
 
 Requires `core/twake/groups`, whose options it reads for users, groups and the
-organization entry. With `--twake-space-user-role-attribute` or
-`--rabbitmq-url` it requires `core/ldap/onChange`, and with `--rabbitmq-url`
-`core/rabbitmq`.
+organization entry, and `core/ldap/onChange`; with `--rabbitmq-url`, it
+requires `core/rabbitmq`.
 
 | CLI                                    | Env                                     | Default            | Description                                        |
 | -------------------------------------- | --------------------------------------- | ------------------ | -------------------------------------------------- |

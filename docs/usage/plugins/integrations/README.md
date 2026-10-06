@@ -51,6 +51,6 @@ core/twake/lifecycleEvents
 
 core/twake/spaces
   ├─ requires: core/twake/groups
-  ├─ requires: core/ldap/onChange (with a user role attribute or RabbitMQ)
+  ├─ requires: core/ldap/onChange
   └─ requires: core/rabbitmq (with RabbitMQ)
 ```
