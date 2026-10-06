@@ -20,10 +20,10 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   linked group does not count as an admin. A tombstoned or erased admin is
   not a request, and can leave a space with none.
 - A space holds users and groups of its organization only: any other value is
-  refused with a 400, whichever API writes the space. The one role and the
-  admin are kept by the routes below only; a user or group a direct write, or
-  two requests at once, left under two roles reads with the strongest, and a
-  role change or removal takes it out of all of them.
+  refused with a 400, whichever API writes or moves the space. The one role
+  and the admin are kept by the routes below only; a user or group a direct
+  write, or two requests at once, left under two roles reads with the
+  strongest, and a role change or removal takes it out of all of them.
 - A tombstone (see [tombstone](tombstone.md)) keeps its roles until it is
   erased, and is hidden from the spaces read through these routes, whatever
   the caller may read of the user branch: it never counts as an admin. It

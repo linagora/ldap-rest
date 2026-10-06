@@ -273,6 +273,26 @@ export default class TwakeGroups extends LdapGroups {
       this.checkMembers(dn, changes.replace?.member);
       return [dn, changes, op, req];
     },
+    // A group moved to another organization takes its members along
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      if (
+        this.organizationOf(newDn) !== undefined &&
+        dnKey(parentOf(newDn)) !== dnKey(parentOf(dn))
+      ) {
+        let members: AttributeValue | undefined;
+        try {
+          const { searchEntries } = (await this.ldap.search(
+            { paged: false, scope: 'base', attributes: ['member'] },
+            dn
+          )) as SearchResult;
+          members = searchEntries[0]?.member;
+        } catch (err) {
+          if (extractLdapCode(err) !== 32) throw err;
+        }
+        this.checkMembers(newDn, members);
+      }
+      return [dn, newDn, req];
+    },
     ldapsearchfilter: async ([result, req, opts]) => [
       await this.hideTombstones(result),
       req,

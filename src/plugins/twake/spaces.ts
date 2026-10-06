@@ -273,6 +273,18 @@ export default class TwakeSpaces extends DmPlugin {
           if (set) this.checkHolders(dn, valueOf(set, attribute));
       return [dn, changes, op, req];
     },
+    // A space moved to another organization takes its holders along
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      if (
+        this.organizationOf(newDn) !== undefined &&
+        dnKey(parentOf(newDn)) !== dnKey(parentOf(dn))
+      ) {
+        const entry = await this.entry(dn, Object.values(this.roleAttributes));
+        for (const attribute of Object.values(this.roleAttributes))
+          this.checkHolders(newDn, entry && valueOf(entry, attribute));
+      }
+      return [dn, newDn, req];
+    },
     ldapdeleterequest: async ([dn, req]) => {
       const op = currentOperation();
       if (op !== undefined)
@@ -406,6 +418,24 @@ export default class TwakeSpaces extends DmPlugin {
 
   spaceDn(org: string, id: string): string {
     return `cn=${escapeDnValue(id)},${this.spaceBaseOf(org)}`;
+  }
+
+  /** An entry as it is, read for no one, or nothing for one missing. */
+  private async entry(
+    dn: string,
+    attributes: string[]
+  ): Promise<AttributesList | undefined> {
+    try {
+      return (
+        (await this.server.ldap.search(
+          { paged: false, scope: 'base', attributes },
+          dn
+        )) as SearchResult
+      ).searchEntries[0];
+    } catch (err) {
+      if (extractLdapCode(err) === 32) return undefined;
+      throw err;
+    }
   }
 
   /** A space holds users and groups of its organization, whichever API writes it. */

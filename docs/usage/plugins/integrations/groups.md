@@ -12,7 +12,8 @@ branch per organization. It serves the groups of an organization under
   display name attribute, an optional color and its creation date.
 - A group's members belong to its organization: adding a user of another
   organization, or of no organization, is refused with a 400, whichever API
-  writes the group (REST, SCIM, another plugin). The placeholder
+  writes the group (REST, SCIM, another plugin), and so is moving a group
+  with its members to another organization. The placeholder
   (`--group-dummy-user`) is the one exception.
 - An empty group holds the placeholder, because `groupOfNames` needs a member.
   The placeholder is never listed.

@@ -564,6 +564,20 @@ describe('Twake spaces plugin routes', function () {
     expect(created?.message).to.match(/neither a user nor a group/);
   });
 
+  it('refuses a space moved to another organization with its holders', async () => {
+    const id = await create();
+    let refused: Error | undefined;
+    await dm.ldap
+      .rename(
+        `cn=${id},ou=spaces,${orgDn('acme')}`,
+        `cn=${id},ou=spaces,${orgDn('other')}`
+      )
+      .catch((err: Error) => (refused = err));
+    expect(refused?.message).to.match(
+      /neither a user nor a group of organization other/
+    );
+  });
+
   it('links groups with a role, changes it and unlinks them', async () => {
     const designers = await group('Designers', ['tsp-bob']);
     const writers = await group('Writers', ['tsp-carol']);

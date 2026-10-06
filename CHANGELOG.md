@@ -43,6 +43,8 @@
   member instead of answering 400 `INVALID_SEARCH_QUERY`
 - `core/twake/groups`: a request an authorization plugin refuses answers
   403 `REFUSED` instead of 500 `INTERNAL_ERROR`
+- `core/twake/groups`: moving a group to another organization with its
+  members is refused with a 400, as adding them there is
 - The singular form of an array option holding identifiers splits
   comma-separated values: `--group-class top,groupOfNames,twakeGroup` no
   longer fails group creation with 400 "objectClass has invalid value",

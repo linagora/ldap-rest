@@ -78,6 +78,7 @@ describe('Twake groups plugin', function () {
   afterEach(async () => {
     for (const dn of [
       groupDn('acme', 'team'),
+      groupDn('other', 'team'),
       userDn('acme', 'tg-alice'),
       userDn('acme', 'tg-bob'),
       userDn('other', 'tg-eve'),
@@ -139,6 +140,17 @@ describe('Twake groups plugin', function () {
         .catch(e => (error = e));
       expect(String(error)).to.match(/is not a user of organization acme/);
     }
+  });
+
+  it('refuses a group moved to another organization with its members', async () => {
+    await user('acme', 'tg-alice');
+    await group('acme', 'team', [userDn('acme', 'tg-alice')]);
+    let error: unknown;
+    await dm.ldap
+      .rename(groupDn('acme', 'team'), groupDn('other', 'team'))
+      .catch(e => (error = e));
+    expect(String(error)).to.match(/is not a user of organization other/);
+    expect(await membersOf('acme', 'team')).to.have.length(2);
   });
 
   it('hides a tombstone from member lists, and keeps its membership', async () => {
