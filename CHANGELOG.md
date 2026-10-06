@@ -27,6 +27,13 @@
 - `lsc-plugin`: jackson-databind 2.22.1 → 2.22.3, clearing five advisories
   (CVE-2026-19032, CVE-2026-68497, CVE-2026-83557, CVE-2026-91776,
   CVE-2026-91777)
+- Dependencies: proxy-addr 2.0.7 → 2.0.8, behind Express's `trust proxy`
+  (IP spoofing through an IPv4-mapped IPv6 trusted subnet,
+  GHSA-jqcg-44mw-7w3h), and http-cache-semantics 4.2.0 → 4.3.0 (cross-user
+  cached responses through `max-stale`, GHSA-ch52-4w7c-c8xp); for the build
+  only, source-map-js 1.2.1 → 1.2.2 (GHSA-68fv-2mgg-jv7q) and
+  postcss-selector-parser forced to 7.1.6 (GHSA-rj75-hqrm-r3gf), with
+  unchanged browser bundles
 
 ### Features
 
