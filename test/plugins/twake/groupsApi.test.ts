@@ -196,7 +196,7 @@ describe('Twake groups plugin routes', function () {
     ).to.equal('INVALID_SORT_FIELD');
   });
 
-  it('searches the cn of a group without a display name only', async () => {
+  it('searches the cn of a group that has no display name', async () => {
     const id = await create('Alpha');
     await dm.ldap.add(`cn=Legacy Team,ou=groups,${orgDn('acme')}`, {
       objectClass: ['top', 'groupOfNames'],
