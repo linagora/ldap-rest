@@ -56,11 +56,15 @@ const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle', 'role'];
 
 type Kind = 'member' | 'group';
 
-/** A user (`member`) or group of a space: its RDN value, role and DN. */
+/**
+ * A user (`member`) or group of a space: its RDN value, strongest role and
+ * DN, and every role it is held under.
+ */
 interface Holder {
   kind: Kind;
   name: string;
   role: SpaceRole;
+  roles: SpaceRole[];
   dn: string;
 }
 
@@ -228,7 +232,7 @@ export default class TwakeSpaces extends DmPlugin {
     app.get(
       `${base}/:spaceId`,
       route('getting space', async (req, res, org) => {
-        res.json(this.spaceOf(org, await this.space(org, spaceId(req))));
+        res.json(this.spaceOf(org, await this.space(org, spaceId(req), req)));
       })
     );
     app.patch(
@@ -266,7 +270,7 @@ export default class TwakeSpaces extends DmPlugin {
       `${base}/:spaceId/members`,
       route('listing space members', async (req, res, org) => {
         const p = this.groups.page(req, MEMBER_SORT);
-        const space = await this.space(org, spaceId(req));
+        const space = await this.space(org, spaceId(req), req);
         const members = space.holders.filter(h => h.kind === 'member');
         const roles = new Map(members.map(m => [m.name.toLowerCase(), m.role]));
         res.json({
@@ -276,7 +280,8 @@ export default class TwakeSpaces extends DmPlugin {
             p,
             org,
             members.map(m => m.name),
-            username => ({ role: roles.get(username.toLowerCase()) })
+            username => ({ role: roles.get(username.toLowerCase()) }),
+            req
           )),
         });
       })
@@ -291,7 +296,7 @@ export default class TwakeSpaces extends DmPlugin {
           this.groups.maxPage
         );
         await this.add(req, org, 'member', roleOf(body), () =>
-          this.liveUsers(org, usernames)
+          this.liveUsers(org, usernames, req)
         );
         done(res);
       })
@@ -313,13 +318,14 @@ export default class TwakeSpaces extends DmPlugin {
     app.get(
       `${base}/:spaceId/groups`,
       route('listing space groups', async (req, res, org) => {
-        const space = await this.space(org, spaceId(req));
+        const space = await this.space(org, spaceId(req), req);
         const linked = space.holders.filter(h => h.kind === 'group');
         const names = new Map(
           (
             await this.orgGroups(
               org,
-              linked.map(g => g.name)
+              linked.map(g => g.name),
+              req
             )
           ).map(e => [
             dnKey(e.dn as string),
@@ -342,7 +348,7 @@ export default class TwakeSpaces extends DmPlugin {
         const body = bodyOf(req);
         const ids = namesOf(body.groupIds, 'groupIds', this.groups.maxPage);
         await this.add(req, org, 'group', roleOf(body), () =>
-          this.groupDns(org, ids)
+          this.groupDns(org, ids, req)
         );
         done(res);
       })
@@ -392,24 +398,30 @@ export default class TwakeSpaces extends DmPlugin {
       [dnKey(this.groups.groupBaseOf(org)), 'group'],
     ]);
     const id = read(entry, 'cn') || '';
-    const seen = new Set<string>();
-    const holders: Holder[] = [];
+    const seen = new Map<string, Holder>();
     for (const role of BY_STRENGTH)
       for (const dn of values(valueOf(entry, this.roleAttributes[role]))) {
         const key = dnKey(dn);
         const kind = kinds.get(dnKey(parentOf(dn)));
-        if (!kind || seen.has(key) || hidden.has(key)) continue;
-        seen.add(key);
-        holders.push({ kind, name: rdnValue(dn), role, dn });
+        if (!kind || hidden.has(key)) continue;
+        const held = seen.get(key);
+        if (held) held.roles.push(role);
+        else
+          seen.set(key, { kind, name: rdnValue(dn), role, roles: [role], dn });
       }
-    return { id, name: read(entry, this.displayName) ?? id, holders };
+    return {
+      id,
+      name: read(entry, this.displayName) ?? id,
+      holders: [...seen.values()],
+    };
   }
 
   /** The spaces of the organization matching a filter, or the one of an id. */
   private async spaces(
     org: string,
     filter: string,
-    id?: string
+    id?: string,
+    req?: Request
   ): Promise<SpaceEntry[]> {
     const search = async (): Promise<AttributesList[]> => {
       try {
@@ -425,7 +437,8 @@ export default class TwakeSpaces extends DmPlugin {
                 ...Object.values(this.roleAttributes),
               ],
             },
-            id === undefined ? this.spaceBaseOf(org) : this.spaceDn(org, id)
+            id === undefined ? this.spaceBaseOf(org) : this.spaceDn(org, id),
+            req
           )) as SearchResult
         ).searchEntries;
       } catch (err) {
@@ -435,14 +448,18 @@ export default class TwakeSpaces extends DmPlugin {
     };
     const [entries, tombstones] = await Promise.all([
       search(),
-      this.groups.tombstonesOf(org),
+      this.groups.tombstonesOf(org, req),
     ]);
     const hidden = new Set(tombstones.map(dnKey));
     return entries.map(e => this.entryOf(org, e, hidden));
   }
 
-  private async space(org: string, id: string): Promise<SpaceEntry> {
-    const [space] = await this.spaces(org, '(objectClass=*)', id);
+  private async space(
+    org: string,
+    id: string,
+    req?: Request
+  ): Promise<SpaceEntry> {
+    const [space] = await this.spaces(org, '(objectClass=*)', id, req);
     if (!space) throw notFound('space');
     return space;
   }
@@ -461,14 +478,30 @@ export default class TwakeSpaces extends DmPlugin {
     }
   }
 
+  /**
+   * A change decided on a space read before another request wrote it fails
+   * with LDAP 16 or 20: it is decided again on the space as it is now.
+   */
+  private async again(change: () => Promise<void>): Promise<void> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await change();
+      } catch (err) {
+        const code = extractLdapCode(err);
+        if ((code !== 16 && code !== 20) || attempt >= 2) throw err;
+      }
+    }
+  }
+
   /** The live users of the organization by lowercased name, as DNs, or a 404. */
   private async liveUsers(
     org: string,
-    usernames: string[]
+    usernames: string[],
+    req?: Request
   ): Promise<Map<string, string>> {
     const attribute = this.groups.userAttribute;
     const found = new Map(
-      (await this.groups.users(org, usernames, [attribute])).map(e => [
+      (await this.groups.users(org, usernames, [attribute], req)).map(e => [
         (read(e, attribute) || '').toLowerCase(),
         e.dn as string,
       ])
@@ -478,26 +511,40 @@ export default class TwakeSpaces extends DmPlugin {
     return found;
   }
 
+  /** Groups of the organization by id, read in pages of the size limit. */
   private async orgGroups(
     org: string,
-    ids: string[]
+    ids: string[],
+    req?: Request
   ): Promise<AttributesList[]> {
-    if (ids.length === 0) return [];
     const cn = this.groups.cn;
-    return this.groups.groups(
-      org,
-      `(|${ids.map(id => `(${cn}=${escapeLdapFilter(id)})`).join('')})`,
-      [cn, this.config.twake_group_display_name_attribute || 'twakeDisplayName']
-    );
+    const out: AttributesList[] = [];
+    for (let i = 0; i < ids.length; i += this.groups.maxPage) {
+      const chunk = ids.slice(i, i + this.groups.maxPage);
+      out.push(
+        ...(await this.groups.groups(
+          org,
+          `(|${chunk.map(id => `(${cn}=${escapeLdapFilter(id)})`).join('')})`,
+          [
+            cn,
+            this.config.twake_group_display_name_attribute ||
+              'twakeDisplayName',
+          ],
+          req
+        ))
+      );
+    }
+    return out;
   }
 
   /** The groups of the organization by lowercased id, as DNs, or a 404. */
   private async groupDns(
     org: string,
-    ids: string[]
+    ids: string[],
+    req?: Request
   ): Promise<Map<string, string>> {
     const found = new Map(
-      (await this.orgGroups(org, ids)).map(e => [
+      (await this.orgGroups(org, ids, req)).map(e => [
         (read(e, this.groups.cn) || '').toLowerCase(),
         e.dn as string,
       ])
@@ -514,7 +561,17 @@ export default class TwakeSpaces extends DmPlugin {
     role: SpaceRole,
     resolve: () => Promise<Map<string, string>>
   ): Promise<void> {
-    const space = await this.space(org, req.params.spaceId as string);
+    await this.again(() => this.addOnce(req, org, kind, role, resolve));
+  }
+
+  private async addOnce(
+    req: Request,
+    org: string,
+    kind: Kind,
+    role: SpaceRole,
+    resolve: () => Promise<Map<string, string>>
+  ): Promise<void> {
+    const space = await this.space(org, req.params.spaceId as string, req);
     const found = await resolve();
     const held = new Map(
       space.holders
@@ -555,7 +612,16 @@ export default class TwakeSpaces extends DmPlugin {
     kind: Kind,
     role?: SpaceRole
   ): Promise<void> {
-    const space = await this.space(org, req.params.spaceId as string);
+    await this.again(() => this.changeOnce(req, org, kind, role));
+  }
+
+  private async changeOnce(
+    req: Request,
+    org: string,
+    kind: Kind,
+    role?: SpaceRole
+  ): Promise<void> {
+    const space = await this.space(org, req.params.spaceId as string, req);
     const name = (
       kind === 'member' ? req.params.userId : req.params.groupId
     ) as string;
@@ -563,16 +629,27 @@ export default class TwakeSpaces extends DmPlugin {
       h => h.kind === kind && h.name.toLowerCase() === name.toLowerCase()
     );
     if (!held) throw notFound(kind);
-    if (held.role === role) return;
-    const demoted = kind === 'member' && held.role === 'admin';
+    if (held.roles.length === 1 && held.role === role) return;
+    const demoted =
+      kind === 'member' && held.role === 'admin' && role !== 'admin';
     if (demoted && !space.holders.some(h => h !== held && isAdmin(h)))
       throw lastAdmin();
-    const from = { [this.roleAttributes[held.role]]: held.dn };
-    const to = role ? { [this.roleAttributes[role]]: held.dn } : undefined;
+    const from = Object.fromEntries(
+      held.roles
+        .filter(r => r !== role)
+        .map(r => [this.roleAttributes[r], held.dn])
+    );
+    const to =
+      role && !held.roles.includes(role)
+        ? { [this.roleAttributes[role]]: held.dn }
+        : undefined;
     await this.write(org, space.id, { delete: from, add: to }, req);
     // Two admins removed at once both pass the check above: the one that
     // finds no admin left takes its change back.
-    if (demoted && !(await this.space(org, space.id)).holders.some(isAdmin)) {
+    if (
+      demoted &&
+      !(await this.space(org, space.id, req)).holders.some(isAdmin)
+    ) {
       await this.write(org, space.id, { add: from, delete: to }, req);
       throw lastAdmin();
     }
@@ -592,11 +669,14 @@ export default class TwakeSpaces extends DmPlugin {
     if (user !== undefined) {
       if (typeof user !== 'string' || !user)
         throw invalid('user must be a username');
-      const [dn] = (await this.liveUsers(org, [user])).values();
+      const [dn] = (await this.liveUsers(org, [user], req)).values();
       const groups = (
-        await this.groups.groups(org, `(member=${escapeLdapFilter(dn)})`, [
-          this.groups.cn,
-        ])
+        await this.groups.groups(
+          org,
+          `(member=${escapeLdapFilter(dn)})`,
+          [this.groups.cn],
+          req
+        )
       ).map(e => dnKey(e.dn as string));
       const holders = [dn, ...groups]
         .flatMap(holder =>
@@ -611,7 +691,7 @@ export default class TwakeSpaces extends DmPlugin {
         space.holders.find(h => own.has(dnKey(h.dn)))?.role;
     }
     const spaces = this.groups.sorted(
-      (await this.spaces(org, filter)).map(s => ({
+      (await this.spaces(org, filter, undefined, req)).map(s => ({
         ...this.spaceOf(org, s),
         ...(roleIn && { role: roleIn(s) }),
       })),
@@ -648,11 +728,13 @@ export default class TwakeSpaces extends DmPlugin {
     const [users, groupDns] = await Promise.all([
       this.liveUsers(
         org,
-        members.map(m => m.name)
+        members.map(m => m.name),
+        req
       ),
       this.groupDns(
         org,
-        groups.map(g => g.name)
+        groups.map(g => g.name),
+        req
       ),
     ]);
     const id = randomUUID();
@@ -673,6 +755,6 @@ export default class TwakeSpaces extends DmPlugin {
         ];
       }
     await this.server.ldap.add(this.spaceDn(org, id), entry, req);
-    res.status(201).json(this.spaceOf(org, await this.space(org, id)));
+    res.status(201).json(this.spaceOf(org, await this.space(org, id, req)));
   }
 }

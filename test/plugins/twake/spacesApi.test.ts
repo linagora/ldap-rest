@@ -1,9 +1,23 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
+import DmPlugin from '../../../src/abstract/plugin';
 import { DM } from '../../../src/bin';
+import type { Hooks } from '../../../src/hooks';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
+
+/** The bases of the searches made for a request. */
+class ReadSpy extends DmPlugin {
+  name = 'tspReadSpy';
+  bases = new Set<string>();
+  hooks: Hooks = {
+    ldapsearchrequest: ([base, opts, req]) => {
+      if (req) this.bases.add(base.toLowerCase());
+      return [base, opts, req];
+    },
+  };
+}
 
 const ORGS = `ou=tsp-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = (org: string): string => `ou=${org},${ORGS}`;
@@ -14,6 +28,7 @@ const userDn = (uid: string, org = 'acme'): string =>
 describe('Twake spaces plugin routes', function () {
   let dm: DM;
   let api: supertest.Agent;
+  let spy: ReadSpy;
   const route = (org = 'acme'): string => `/api/v1/organizations/${org}/spaces`;
   const groupRoute = `/api/v1/organizations/acme/groups`;
 
@@ -75,10 +90,11 @@ describe('Twake spaces plugin routes', function () {
       group_class: ['top', 'groupOfNames'],
       group_schema: 'static/schemas/twake/organizationGroups.json',
       twake_space_base: `ou=spaces,ou={org},${ORGS}`,
-      // groupOfNames attributes, so the test needs no Twake schema
-      twake_space_class: ['top', 'groupOfNames'],
+      // Standard attributes, so the test needs no Twake schema, and none
+      // required, as in twakeSpace: a space may be left without an admin
+      twake_space_class: ['top', 'organizationalRole', 'extensibleObject'],
       twake_space_display_name_attribute: 'O',
-      twake_space_admin_attribute: 'member',
+      twake_space_admin_attribute: 'roleOccupant',
       twake_space_editor_attribute: 'owner',
       twake_space_viewer_attribute: 'seeAlso',
     });
@@ -86,6 +102,8 @@ describe('Twake spaces plugin routes', function () {
     const groups = new TwakeGroups(dm);
     await dm.registerPlugin('core/twake/groups', groups);
     await dm.registerPlugin('core/twake/spaces', new TwakeSpaces(dm));
+    spy = new ReadSpy(dm);
+    await dm.registerPlugin('tspReadSpy', spy);
     for (let tries = 0; !groups.schema; tries++) {
       if (tries === 200) throw new Error('the group schema did not load');
       await new Promise(r => setTimeout(r, 10));
@@ -392,15 +410,63 @@ describe('Twake spaces plugin routes', function () {
     ).to.have.length.at.least(1);
   });
 
-  it('reads a user held under two roles once, with the strongest', async () => {
+  it('reads a user held under two roles once, with the strongest, and moves both', async () => {
     const id = await create();
-    await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn('acme')}`, {
-      add: { seeAlso: userDn('tsp-alice') },
-    });
+    const dn = `cn=${id},ou=spaces,${orgDn('acme')}`;
+    const members = `${route()}/${id}/members`;
+    const listed = async (): Promise<unknown> =>
+      (await api.get(`${route()}/${id}`)).body.members;
+    await dm.ldap.modify(dn, { add: { seeAlso: userDn('tsp-alice') } });
+    expect(await listed()).to.deep.equal([
+      { username: 'tsp-alice', role: 'admin' },
+    ]);
+    await api.delete(`${members}/tsp-alice`).expect(409);
+    await api
+      .post(members)
+      .send({ usernames: ['tsp-bob'], role: 'admin' })
+      .expect(200);
+    await api
+      .patch(`${members}/tsp-alice`)
+      .send({ role: 'viewer' })
+      .expect(200);
+    await dm.ldap.modify(dn, { add: { owner: userDn('tsp-alice') } });
+    expect(await listed()).to.deep.equal([
+      { username: 'tsp-bob', role: 'admin' },
+      { username: 'tsp-alice', role: 'editor' },
+    ]);
+    await api.delete(`${members}/tsp-alice`).expect(200);
+    expect(await listed()).to.deep.equal([
+      { username: 'tsp-bob', role: 'admin' },
+    ]);
+  });
+
+  it('settles concurrent writes of one member', async () => {
+    const id = await create();
+    const members = `${route()}/${id}/members`;
+    const twice = (send: () => supertest.Test): Promise<supertest.Response[]> =>
+      Promise.all([send(), send()]);
+
+    const added = await twice(() =>
+      api.post(members).send({ usernames: ['tsp-bob'], role: 'viewer' })
+    );
+    expect(added.map(r => r.status)).to.deep.equal([200, 200]);
+
+    const removed = await twice(() => api.delete(`${members}/tsp-bob`));
+    expect(removed.map(r => r.status).sort()).to.deep.equal([200, 404]);
+    expect(removed.find(r => r.status === 404)!.body.code).to.equal(
+      'MEMBER_NOT_FOUND'
+    );
+
+    // Both may land, the user then held under two roles
+    await Promise.all(
+      ['admin', 'viewer'].map(role =>
+        api.post(members).send({ usernames: ['tsp-bob'], role })
+      )
+    );
+    await api.delete(`${members}/tsp-bob`).expect(200);
     expect((await api.get(`${route()}/${id}`)).body.members).to.deep.equal([
       { username: 'tsp-alice', role: 'admin' },
     ]);
-    await api.delete(`${route()}/${id}/members/tsp-alice`).expect(409);
   });
 
   it('caps the names of one request', async () => {
@@ -443,9 +509,9 @@ describe('Twake spaces plugin routes', function () {
     let created: Error | undefined;
     await dm.ldap
       .add(`cn=x,ou=spaces,${orgDn('acme')}`, {
-        objectClass: ['top', 'groupOfNames'],
+        objectClass: ['top', 'organizationalRole'],
         cn: 'x',
-        member: userDn('tsp-eve', 'other'),
+        roleOccupant: userDn('tsp-eve', 'other'),
       })
       .catch((err: Error) => (created = err));
     expect(created?.message).to.match(/neither a user nor a group/);
@@ -501,6 +567,25 @@ describe('Twake spaces plugin routes', function () {
           .expect(404)
       ).body.code
     ).to.equal('GROUP_NOT_FOUND');
+  });
+
+  it('reads with the request, for the authorization plugins to judge', async () => {
+    const designers = await group('Designers', ['tsp-bob']);
+    const id = await create(undefined, undefined, [
+      { id: designers, role: 'viewer' },
+    ]);
+    spy.bases.clear();
+    await api.get(`${route()}/${id}/members`).expect(200);
+    await api.get(`${route()}/${id}/groups`).expect(200);
+    await api.get(`${route()}?user=tsp-bob`).expect(200);
+    expect([...spy.bases]).to.include.members(
+      [
+        `cn=${id},ou=spaces,${orgDn('acme')}`,
+        `ou=spaces,${orgDn('acme')}`,
+        `ou=groups,${orgDn('acme')}`,
+        users('acme'),
+      ].map(dn => dn.toLowerCase())
+    );
   });
 
   it("lists a user's spaces with the highest of their roles", async () => {

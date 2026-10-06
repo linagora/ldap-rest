@@ -372,7 +372,7 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  async tombstonesOf(org: string): Promise<string[]> {
+  async tombstonesOf(org: string, req?: Request): Promise<string[]> {
     const { deleted, deletedValue } = this.attrs;
     if (!deleted) return [];
     try {
@@ -383,7 +383,8 @@ export default class TwakeGroups extends LdapGroups {
           filter: `(${deleted}=${escapeLdapFilter(deletedValue)})`,
           attributes: ['dn'],
         },
-        this.userBaseOf(org)
+        this.userBaseOf(org),
+        req
       )) as SearchResult;
       return searchEntries.map(e => e.dn);
     } catch (err) {
@@ -582,7 +583,8 @@ export default class TwakeGroups extends LdapGroups {
   async groups(
     org: string,
     filter: string,
-    attributes?: string[]
+    attributes?: string[],
+    req?: Request
   ): Promise<AttributesList[]> {
     try {
       const { searchEntries } = (await this.ldap.search(
@@ -592,7 +594,8 @@ export default class TwakeGroups extends LdapGroups {
           filter,
           ...(attributes && { attributes }),
         },
-        this.groupBaseOf(org)
+        this.groupBaseOf(org),
+        req
       )) as SearchResult;
       return searchEntries;
     } catch (err) {
@@ -758,7 +761,8 @@ export default class TwakeGroups extends LdapGroups {
     p: Page,
     org: string,
     names: string[],
-    extra: (username: string) => Record<string, unknown> = () => ({})
+    extra: (username: string) => Record<string, unknown> = () => ({}),
+    req?: Request
   ): Promise<{
     members: Record<string, unknown>[];
     pagination: Record<string, number | boolean>;
@@ -766,7 +770,7 @@ export default class TwakeGroups extends LdapGroups {
     const usernames = [
       ...new Map(names.map(u => [u.toLowerCase(), u])).values(),
     ];
-    const profiles = await this.profiles(org, usernames);
+    const profiles = await this.profiles(org, usernames, req);
     let members = usernames.map(u => ({
       ...(profiles.get(u.toLowerCase()) ?? { uid: u }),
       ...extra(u),
@@ -801,7 +805,8 @@ export default class TwakeGroups extends LdapGroups {
   async users(
     org: string,
     usernames: string[],
-    attributes: string[]
+    attributes: string[],
+    req?: Request
   ): Promise<AttributesList[]> {
     const { deleted, deletedValue } = this.attrs;
     const live = deleted
@@ -816,7 +821,8 @@ export default class TwakeGroups extends LdapGroups {
       try {
         const { searchEntries } = (await this.ldap.search(
           { paged: false, scope: 'one', filter, attributes },
-          this.userBaseOf(org)
+          this.userBaseOf(org),
+          req
         )) as SearchResult;
         out.push(...searchEntries);
       } catch (err) {
@@ -828,7 +834,8 @@ export default class TwakeGroups extends LdapGroups {
 
   async profiles(
     org: string,
-    usernames: string[]
+    usernames: string[],
+    req?: Request
   ): Promise<Map<string, Record<string, unknown>>> {
     const attributes = [
       ...new Set([
@@ -838,7 +845,7 @@ export default class TwakeGroups extends LdapGroups {
       ]),
     ];
     const byName = new Map<string, Record<string, unknown>>();
-    for (const entry of await this.users(org, usernames, attributes)) {
+    for (const entry of await this.users(org, usernames, attributes, req)) {
       const name = read(entry, this.userAttribute);
       if (!name) continue;
       const profile: Record<string, unknown> = {};
