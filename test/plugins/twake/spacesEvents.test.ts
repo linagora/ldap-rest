@@ -13,6 +13,8 @@ const orgDn = `ou=acme,${ORGS}`;
 const users = `ou=users,${orgDn}`;
 const userDn = (uid: string): string => `uid=${uid},${users}`;
 const UIDS = ['tse-alice', 'tse-bob', 'tse-carol'];
+// A multi-valued attribute of inetOrgPerson, so the test needs no Twake schema
+const ROLE = 'carLicense';
 
 interface Published {
   exchange: string;
@@ -48,7 +50,11 @@ class StubRabbitMq {
   }
 }
 
-describe('Twake spaces: events', function () {
+/**
+ * Without the role attribute, the roles a change moved are worked out with
+ * it undone; with it, they are the values the user entry held.
+ */
+const suite = (role: string) => (): void => {
   let dm: DM;
   let api: supertest.Agent;
   let rabbit: StubRabbitMq;
@@ -165,6 +171,7 @@ describe('Twake spaces: events', function () {
       twake_space_editor_attribute: 'owner',
       twake_space_viewer_attribute: 'seeAlso',
       rabbitmq_url: 'amqp://stub',
+      twake_space_user_role_attribute: role,
     });
     await dm.ready;
     rabbit = new StubRabbitMq();
@@ -513,4 +520,7 @@ describe('Twake spaces: events', function () {
       spaces.logger.error = error;
     }
   });
-});
+};
+
+describe('Twake spaces: events', suite(''));
+describe('Twake spaces: events, with the user role attribute', suite(ROLE));
