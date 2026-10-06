@@ -17,9 +17,10 @@
 - `core/twake/spaces`: `--twake-space-user-role-attribute` keeps each user's
   role in every space, linked groups included, on their entry as
   `<space id>:<role>`
-- `core/twake/spaces`: with RabbitMQ, every change of a space, its members
-  and its linked groups is published on the `--twake-space-exchange` topic
-  exchange (default `space`) as `twake.space.*` events
+- `core/twake/spaces`: with RabbitMQ, every write of a space and every
+  change of its members' roles is published on the `--twake-space-exchange`
+  topic exchange (default `space`) as `twake.space.*` events; the server does
+  not start when the broker cannot be reached
 
 ### Fixes
 

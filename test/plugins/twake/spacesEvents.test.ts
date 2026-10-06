@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import type { Request } from 'express';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
@@ -17,20 +18,33 @@ interface Published {
   exchange: string;
   routingKey: string;
   message: Record<string, unknown>;
+  messageId?: string;
 }
 
 class StubRabbitMq {
   name = 'rabbitmq';
   published: Published[] = [];
+  client: object | null = {};
   isAvailable(): boolean {
     return true;
+  }
+  async getRawClient(): Promise<object | null> {
+    return this.client;
   }
   async publish(
     exchange: string,
     routingKey: string,
-    message: Record<string, unknown>
+    message: Record<string, unknown>,
+    options?: { messageId?: string }
   ): Promise<void> {
-    this.published.push({ exchange, routingKey, message });
+    // Silent without a client, like RabbitMq.publish
+    if (!this.client) return;
+    this.published.push({
+      exchange,
+      routingKey,
+      message,
+      messageId: options?.messageId,
+    });
   }
 }
 
@@ -87,14 +101,17 @@ describe('Twake spaces: events', function () {
     });
     // Lets any extra event of the same writes land, so it fails the comparison
     await quiet();
-    const out = rabbit.published.map(({ exchange, routingKey, message }) => {
-      expect(exchange).to.equal('space');
-      expect(message.timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
-      // No authentication here: the actor is there, unknown
-      expect(message).to.have.property('actor', undefined);
-      const { timestamp: _, actor: __, ...rest } = message;
-      return [routingKey, rest] as [string, Record<string, unknown>];
-    });
+    const out = rabbit.published.map(
+      ({ exchange, routingKey, message, messageId }) => {
+        expect(exchange).to.equal('space');
+        expect(messageId).to.match(/^[0-9a-f-]{36}$/);
+        expect(message.timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
+        // No authentication here: the actor is there, unknown
+        expect(message).to.have.property('actor', undefined);
+        const { timestamp: _, actor: __, ...rest } = message;
+        return [routingKey, rest] as [string, Record<string, unknown>];
+      }
+    );
     rabbit.published = [];
     return out;
   };
@@ -373,7 +390,7 @@ describe('Twake spaces: events', function () {
       ]);
   });
 
-  it('publishes nothing for a deleted member', async () => {
+  it('publishes nothing for a tombstoned member', async () => {
     const id = await create([
       { username: 'tse-alice', role: 'admin' },
       { username: 'tse-bob', role: 'editor' },
@@ -385,7 +402,87 @@ describe('Twake spaces: events', function () {
     await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn}`, {
       delete: { owner: userDn('tse-bob') },
     });
-    await new Promise(r => setTimeout(r, 300));
+    await quiet();
     expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('publishes nothing for an erased member', async () => {
+    // A viewer: refint does not watch seeAlso here, so the dead DN stays
+    const id = await create([
+      { username: 'tse-alice', role: 'admin' },
+      { username: 'tse-bob', role: 'viewer' },
+    ]);
+    await events(1);
+    await dm.ldap.delete(userDn('tse-bob'));
+    await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn}`, {
+      delete: { seeAlso: userDn('tse-bob') },
+    });
+    await quiet();
+    expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('unlinks a deleted group once, when its dead DN leaves later', async () => {
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await events(1);
+    const dn = `cn=${designers},ou=groups,${orgDn}`;
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    expect((await events(2)).map(([key]) => key)).to.have.members([
+      'twake.space.group.unlinked',
+      'twake.space.member.removed',
+    ]);
+    await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn}`, {
+      delete: { seeAlso: dn },
+    });
+    await quiet();
+    expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('carries who made the write', async () => {
+    const id = await create();
+    await events(1);
+    const req = { user: 'jdoe', headers: {} } as unknown as Request;
+    await dm.ldap
+      .forRequest(req)
+      .modify(`cn=${id},ou=spaces,${orgDn}`, { replace: { O: 'Retro' } });
+    await quiet();
+    expect(
+      rabbit.published.map(p => [p.routingKey, p.message.actor])
+    ).to.deep.equal([['twake.space.updated', 'jdoe']]);
+    rabbit.published = [];
+  });
+
+  it('logs the events a broker gone drops, and starts with no broker', async () => {
+    const id = await create();
+    await events(1);
+    const failed: unknown[] = [];
+    const { error } = spaces.logger;
+    spaces.logger.error = ((m: unknown) => {
+      failed.push(m);
+      return spaces.logger;
+    }) as typeof error;
+    rabbit.client = null;
+    try {
+      await api.patch(`${route}/${id}`).send({ name: 'Retro' }).expect(200);
+      await quiet();
+      expect(failed).to.deep.include.members([
+        {
+          plugin: 'twakeSpaces',
+          exchange: 'space',
+          routingKey: 'twake.space.updated',
+          messageId: (failed[0] as { messageId: string }).messageId,
+          result: 'no broker',
+        },
+      ]);
+      let refused: Error | undefined;
+      await dm
+        .registerPlugin('core/twake/spaces', new TwakeSpaces(dm), 'spacesLate')
+        .catch((err: Error) => (refused = err));
+      expect(refused?.message).to.match(/RabbitMQ at --rabbitmq-url cannot be/);
+      expect(dm.loadedPlugins).not.to.have.property('spacesLate');
+    } finally {
+      rabbit.client = {};
+      spaces.logger.error = error;
+    }
   });
 });

@@ -275,10 +275,17 @@ export default class TwakeSpaces extends DmPlugin {
   };
 
   /**
+   * core/rabbitmq connects lazily and hands back no client when it cannot:
+   * every event would then be lost, so the server does not start.
+   *
    * core/ldap/trash moves a deleted group away instead of deleting it:
    * nothing follows the move, and its members would keep the roles it gave.
    */
-  assertComposition(): void {
+  async assertComposition(): Promise<void> {
+    if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
+      throw new Error(
+        `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
+      );
     if (!this.userRole || !this.server.loadedPlugins.trash) return;
     const branch = parseDn(this.config.twake_group_base || '').reverse();
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
@@ -925,8 +932,10 @@ export default class TwakeSpaces extends DmPlugin {
             groups: [groupOf(group)],
           });
         }
+        // A group gone was announced unlinked when it was deleted
         for (const group of linkedBefore.values())
-          publish('group.unlinked', { groups: [groupOf(group)] });
+          if (names.has(dnKey(group.dn)))
+            publish('group.unlinked', { groups: [groupOf(group)] });
       }
     }
 
@@ -1012,11 +1021,10 @@ export default class TwakeSpaces extends DmPlugin {
     );
   }
 
-  private get rabbitmq(): RabbitMq | undefined {
-    const rabbitmq = this.server.loadedPlugins.rabbitmq as unknown as
-      | RabbitMq
-      | undefined;
-    return rabbitmq?.isAvailable() ? rabbitmq : undefined;
+  private get rabbitmq(): RabbitMq | null {
+    return this.config.rabbitmq_url
+      ? this.requirePlugin<RabbitMq>('rabbitmq')
+      : null;
   }
 
   private async publish(
@@ -1031,6 +1039,11 @@ export default class TwakeSpaces extends DmPlugin {
       messageId: randomUUID(),
     };
     try {
+      // core/rabbitmq drops a message silently when it has no client
+      if (!(await rabbitmq.getRawClient())) {
+        this.logger.error({ ...log, result: 'no broker' });
+        return;
+      }
       await rabbitmq.publish(log.exchange, log.routingKey, message, {
         messageId: log.messageId,
       });

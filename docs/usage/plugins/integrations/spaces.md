@@ -40,8 +40,8 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   the values it held when it was deleted. The plugin refuses to start when
   core/ldap/trash watches the group branches: a group it moves away is never
   followed.
-- With `--rabbitmq-url`, every change of a space is published as an event,
-  see below.
+- With `--rabbitmq-url`, every write of a space and every change of a
+  member's role is published as an event, see below.
 
 ## Events
 
@@ -81,9 +81,23 @@ the write, when known) and `timestamp`. A member is described as above, its
   group linked, unlinked or given another role, a user joining or leaving a
   linked group. `member.removed` gives the role the user held.
 - `group.linked`, `group.role.changed`, `group.unlinked`: `groups`, the one
-  group. A deleted group is unlinked from each of its spaces.
+  group, with its name when the event is published. A deleted group is
+  unlinked from each of its spaces once, whether refint or a later write
+  takes its DN out of them. Renaming a linked group publishes nothing.
 
 A user who is deleted or becomes a tombstone publishes no member event.
+
+The server does not start when the broker cannot be reached. An event the
+broker drops later is logged with `result: "no broker"` and not sent again.
+
+Member events compare each moved user's roles before and after a change:
+
+- With `--twake-space-user-role-attribute`, the roles before are the values
+  on the user's entry, so changes made close together announce each role
+  once, in whatever order they are followed.
+- Without it, the roles before are worked out from the directory with the
+  change undone. Two changes followed late may announce a role twice, or
+  not at all. Consumers that need an exact copy resync from the routes.
 
 ## Routes
 
