@@ -635,7 +635,8 @@ export default class TwakeSpaces extends DmPlugin {
     org: string,
     filter: string,
     id?: string,
-    req?: Request
+    req?: Request,
+    hidden?: Set<string>
   ): Promise<SpaceEntry[]> {
     const search = async (): Promise<AttributesList[]> => {
       try {
@@ -660,8 +661,11 @@ export default class TwakeSpaces extends DmPlugin {
         throw err;
       }
     };
-    const [entries, hidden] = await Promise.all([search(), this.hidden(org)]);
-    return entries.map(e => this.entryOf(org, e, hidden));
+    const [entries, tombstones] = await Promise.all([
+      search(),
+      hidden ?? this.hidden(org),
+    ]);
+    return entries.map(e => this.entryOf(org, e, tombstones));
   }
 
   /**
@@ -783,7 +787,14 @@ export default class TwakeSpaces extends DmPlugin {
       const [was, is] = [before, after].map(e =>
         e ? this.entryOf(org!, e, new Set()) : undefined
       );
-      const holders = [was, is].flatMap(s => s?.holders ?? []);
+      // The holders this write gave another role, or none: the members of a
+      // linked group move with the group's own changes, followed as well
+      const roles = [was, is].map(
+        s => new Map(s?.holders.map(h => [dnKey(h.dn), h.role]))
+      );
+      const holders = [was, is]
+        .flatMap(s => s?.holders ?? [])
+        .filter(h => roles[0].get(dnKey(h.dn)) !== roles[1].get(dnKey(h.dn)));
       const groups = new Set(
         holders.filter(h => h.kind === 'group').map(h => h.name)
       );
@@ -978,10 +989,10 @@ export default class TwakeSpaces extends DmPlugin {
       // A tombstone keeps the values it held
       if (hidden.has(key)) continue;
       try {
-        const after = await this.rolesOf(org, dn);
+        const after = await this.rolesOf(org, dn, hidden);
         const before = this.userRole
           ? await this.writeRoles(dn, after)
-          : await this.rolesOf(org, dn, undo);
+          : await this.rolesOf(org, dn, hidden, undo);
         if (before) moved.push({ dn, before, after });
       } catch (err) {
         this.logger.error({
@@ -1247,9 +1258,14 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   /** A user's roles, in the directory as it is or with a change undone. */
-  private async rolesOf(org: string, dn: string, undo?: Undo): Promise<Roles> {
+  private async rolesOf(
+    org: string,
+    dn: string,
+    hidden: Set<string>,
+    undo?: Undo
+  ): Promise<Roles> {
     const { filter, roleIn } = await this.userIn(org, dn, undefined, undo);
-    let spaces = await this.spaces(org, filter);
+    let spaces = await this.spaces(org, filter, undefined, undefined, hidden);
     if (undo && 'id' in undo) {
       const id = undo.id.toLowerCase();
       spaces = spaces.filter(s => s.id.toLowerCase() !== id);
