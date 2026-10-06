@@ -372,7 +372,11 @@ export default class TwakeGroups extends LdapGroups {
     };
   }
 
-  async tombstonesOf(org: string, req?: Request): Promise<string[]> {
+  /**
+   * Read without a request: hiding a tombstone is integrity, not data, and
+   * must not depend on what the caller may see.
+   */
+  async tombstonesOf(org: string): Promise<string[]> {
     const { deleted, deletedValue } = this.attrs;
     if (!deleted) return [];
     try {
@@ -383,8 +387,7 @@ export default class TwakeGroups extends LdapGroups {
           filter: `(${deleted}=${escapeLdapFilter(deletedValue)})`,
           attributes: ['dn'],
         },
-        this.userBaseOf(org),
-        req
+        this.userBaseOf(org)
       )) as SearchResult;
       return searchEntries.map(e => e.dn);
     } catch (err) {

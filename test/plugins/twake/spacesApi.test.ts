@@ -8,13 +8,24 @@ import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import TwakeSpaces from '../../../src/plugins/twake/spaces';
 
-/** The bases of the searches made for a request. */
+/**
+ * The bases of the searches made for a request, and what an authorization
+ * plugin filtering them leaves out.
+ */
 class ReadSpy extends DmPlugin {
   name = 'tspReadSpy';
   bases = new Set<string>();
+  /** A filter of the entries the caller cannot see. */
+  unseen?: string;
   hooks: Hooks = {
     ldapsearchrequest: ([base, opts, req]) => {
-      if (req) this.bases.add(base.toLowerCase());
+      if (!req) return [base, opts, req];
+      this.bases.add(base.toLowerCase());
+      if (this.unseen)
+        opts = {
+          ...opts,
+          filter: `(&${String(opts.filter || '(objectClass=*)')}(!${this.unseen}))`,
+        };
       return [base, opts, req];
     },
   };
@@ -492,6 +503,22 @@ describe('Twake spaces plugin routes', function () {
     expect(
       listed.body.members.map((m: { uid: string }) => m.uid)
     ).to.deep.equal(['tsp-alice']);
+  });
+
+  it('keeps an admin whatever tombstones the caller can see', async () => {
+    const id = await create();
+    await dm.ldap.modify(`cn=${id},ou=spaces,${orgDn('acme')}`, {
+      add: { roleOccupant: userDn('tsp-gone') },
+    });
+    spy.unseen = '(uid=tsp-gone)';
+    try {
+      const res = await api
+        .delete(`${route()}/${id}/members/tsp-alice`)
+        .expect(409);
+      expect(res.body.code).to.equal('LAST_ADMIN');
+    } finally {
+      delete spy.unseen;
+    }
   });
 
   it('refuses a direct write of a user or group of another organization', async () => {

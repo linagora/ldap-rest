@@ -647,15 +647,16 @@ export default class TwakeSpaces extends DmPlugin {
         throw err;
       }
     };
-    const [entries, hidden] = await Promise.all([
-      search(),
-      this.hidden(org, req),
-    ]);
+    const [entries, hidden] = await Promise.all([search(), this.hidden(org)]);
     return entries.map(e => this.entryOf(org, e, hidden));
   }
 
-  private async hidden(org: string, req?: Request): Promise<Set<string>> {
-    return new Set((await this.groups.tombstonesOf(org, req)).map(dnKey));
+  /**
+   * Whoever asks: a tombstone outside the caller's branches would otherwise
+   * count as a member, and as an admin.
+   */
+  private async hidden(org: string): Promise<Set<string>> {
+    return new Set((await this.groups.tombstonesOf(org)).map(dnKey));
   }
 
   /** A filter for the spaces holding any of these DNs, whatever the role. */

@@ -25,8 +25,9 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   two requests at once, left under two roles reads with the strongest, and a
   role change or removal takes it out of all of them.
 - A tombstone (see [tombstone](tombstone.md)) keeps its roles until it is
-  erased, and is hidden from the spaces read through these routes. It cannot
-  be added.
+  erased, and is hidden from the spaces read through these routes, whatever
+  the caller may read of the user branch: it never counts as an admin. It
+  cannot be added.
 - An erased user or group leaves its spaces through the directory: enable the
   `refint` overlay on the three role attributes.
 - When a user who is erased or becomes a tombstone was the last admin among
