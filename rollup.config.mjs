@@ -7,7 +7,7 @@ import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import { sortPackageJson } from 'sort-package-json';
 import { writeFileSync } from 'fs';
-import fg from 'fast-glob';
+import { glob } from 'tinyglobby';
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
 
@@ -65,26 +65,26 @@ const external = id => {
 };
 
 async function getPluginEntries() {
-  return (await fg('src/plugins/**/*.ts'))
+  return (await glob('src/plugins/**/*.ts'))
     .map(file => file.replace(/^src\/plugins\//, ''))
     .sort();
 }
 
 async function getAbstractEntries() {
-  return (await fg('src/abstract/**/*.ts'))
+  return (await glob('src/abstract/**/*.ts'))
     .map(file => file.replace(/^src\/abstract\//, ''))
     .sort();
 }
 
 async function getSpecs() {
-  return (await fg('static/schemas/**/*.json'))
+  return (await glob('static/schemas/**/*.json'))
     .map(file => file.replace(/^static\/schemas\//, ''))
     .sort();
 }
 
 async function getBrowserLibraries() {
   return (
-    await fg('src/browser/**/*.ts', {
+    await glob('src/browser/**/*.ts', {
       ignore: ['**/*.test.ts', '**/*.css'],
     })
   )

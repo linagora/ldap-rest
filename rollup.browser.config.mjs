@@ -3,11 +3,11 @@ import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import postcss from 'rollup-plugin-postcss';
-import fg from 'fast-glob';
+import { glob } from 'tinyglobby';
 
 async function getBrowserLibraries() {
   return (
-    await fg('src/browser/**/*.ts', {
+    await glob('src/browser/**/*.ts', {
       ignore: ['**/*.test.ts', '**/*.css'],
     })
   ).sort();
