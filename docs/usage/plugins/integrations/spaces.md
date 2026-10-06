@@ -49,8 +49,8 @@ organization, each with a role in it: `viewer`, `editor` or `admin`.
   together end the same whatever order they are followed in. Values not
   ending in `:viewer`, `:editor` or `:admin` are left alone. A tombstone keeps
   the values it held when it was deleted. The plugin refuses to start when
-  core/ldap/trash watches the group branches: a group it moves away is never
-  followed.
+  core/ldap/trash watches the group or space branches: a group or space it
+  moves away is never followed.
 - With `--rabbitmq-url`, every write of a space and every change of a
   member's role is published as an event, see below.
 

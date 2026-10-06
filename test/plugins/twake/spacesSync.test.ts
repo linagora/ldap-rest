@@ -350,11 +350,17 @@ describe('Twake spaces: user roles', function () {
     await expectRoles('tss-bob', [`${id}:editor`]);
   });
 
-  it('refuses core/ldap/trash on the organization groups', async () => {
+  it('refuses core/ldap/trash on the organization groups and spaces', async () => {
     const plugin = new TwakeSpaces(dm);
     dm.loadedPlugins.trash = plugin;
     try {
-      for (const watched of ['', ORGS, `ou=groups,${orgDn}`]) {
+      for (const watched of [
+        '',
+        ORGS,
+        `ou=groups,${orgDn}`,
+        `ou=spaces,${orgDn}`,
+        `${users};ou=spaces,${orgDn}`,
+      ]) {
         dm.config.trash_watched_bases = watched;
         const refused = await plugin.assertComposition().then(
           () => undefined,

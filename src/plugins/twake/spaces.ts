@@ -335,8 +335,8 @@ export default class TwakeSpaces extends DmPlugin {
    * core/rabbitmq connects lazily and hands back no client when it cannot:
    * every event would then be lost, so the server does not start.
    *
-   * core/ldap/trash moves a deleted group away instead of deleting it:
-   * nothing follows the move, and its members would keep the roles it gave.
+   * core/ldap/trash moves a deleted group or space away instead of deleting
+   * it: nothing follows the move, and users would keep the roles it gave.
    */
   async assertComposition(): Promise<void> {
     if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
@@ -344,28 +344,36 @@ export default class TwakeSpaces extends DmPlugin {
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
       );
     if (!this.userRole || !this.server.loadedPlugins.trash) return;
-    const branch = parseDn(this.config.twake_group_base || '').reverse();
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
-    // A watched base above a group branch, or in one, holds groups
-    const holdsGroups = (base: string): boolean =>
-      parseDn(base)
-        .reverse()
-        .slice(0, branch.length)
-        .every((rdn, i) =>
-          branch[i].includes(ORG)
-            ? type(rdn) === type(branch[i])
-            : dnKey(rdn) === dnKey(branch[i])
-        );
+    // A watched base above a branch, or in one, holds its entries
+    const holds = (pattern: string) => {
+      const branch = parseDn(pattern).reverse();
+      return (base: string): boolean =>
+        parseDn(base)
+          .reverse()
+          .slice(0, branch.length)
+          .every((rdn, i) =>
+            branch[i].includes(ORG)
+              ? type(rdn) === type(branch[i])
+              : dnKey(rdn) === dnKey(branch[i])
+          );
+    };
+    const branches = [this.config.twake_group_base || '', this.spaceBase].map(
+      holds
+    );
     const watched = String(this.config.trash_watched_bases || '')
       .split(';')
       .map(base => base.trim())
       .filter(Boolean);
-    if (watched.length === 0 || watched.some(holdsGroups))
+    if (
+      watched.length === 0 ||
+      watched.some(base => branches.some(held => held(base)))
+    )
       throw new Error(
-        `${this.name}: core/ldap/trash watches the organization groups, and ` +
-          `their members would keep the space roles of a deleted group. ` +
-          `Leave the group branches out of --trash-watched-bases, or unset ` +
-          `--twake-space-user-role-attribute`
+        `${this.name}: core/ldap/trash watches the organization groups or ` +
+          `spaces, and users would keep the space roles of a deleted one. ` +
+          `Leave the group and space branches out of --trash-watched-bases, ` +
+          `or unset --twake-space-user-role-attribute`
       );
   }
 
