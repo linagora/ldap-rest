@@ -442,17 +442,24 @@ export interface Config {
 const configArgs: ConfigTemplate = [
   // Global options
   ['--port', 'DM_PORT', 8081, 'number'],
-  ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins'],
+  ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins', true],
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
-  ['--mail-domain', 'DM_MAIL_DOMAIN', [], 'array', '--mail-domains'],
+  ['--mail-domain', 'DM_MAIL_DOMAIN', [], 'array', '--mail-domains', true],
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],
   ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=com'],
   ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
-  ['--ldap-url', 'DM_LDAP_URL', ['ldap://localhost'], 'array', '--ldap-urls'],
+  [
+    '--ldap-url',
+    'DM_LDAP_URL',
+    ['ldap://localhost'],
+    'array',
+    '--ldap-urls',
+    true,
+  ],
   ['--ldap-user-main-attribute', 'DM_LDAP_USER_ATTRIBUTE', 'uid'],
   ['--ldap-cache-max', 'DM_LDAP_CACHE_MAX', 1000, 'number'],
   // 0 means "do not cache", and it is the default: the base-scope search
@@ -489,6 +496,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'twakeAccount', 'twakeWhitePages'],
     'array',
     '--user-classes',
+    true,
   ],
 
   // Plugins options
@@ -501,6 +509,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'organizationalUnit', 'twakeDepartment'],
     'array',
     '--ldap-organization-classes',
+    true,
   ],
   [
     '--ldap-organization-link-attribute',
@@ -590,6 +599,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'groupOfNames'],
     'array',
     '--group-classes',
+    true,
   ],
   [
     '--group-allow-unexistent-members',
@@ -626,6 +636,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'inetOrgPerson'],
     'array',
     '--external-branch-classes',
+    true,
   ],
 
   // static
@@ -654,6 +665,7 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--ldap-raw-hidden-attributes',
+    true,
   ],
   ['--ldap-raw-show-secrets', 'DM_LDAP_RAW_SHOW_SECRETS', false, 'boolean'],
   ['--ldap-raw-max-results', 'DM_LDAP_RAW_MAX_RESULTS', 200, 'number'],
@@ -885,12 +897,21 @@ const configArgs: ConfigTemplate = [
     'DM_TWAKE_TOMBSTONE_REASON_HEADER',
     'x-deletion-reason',
   ],
-  ['--twake-tombstone-reasons', 'DM_TWAKE_TOMBSTONE_REASONS', [], 'array'],
+  [
+    '--twake-tombstone-reasons',
+    'DM_TWAKE_TOMBSTONE_REASONS',
+    [],
+    'array',
+    null,
+    true,
+  ],
   [
     '--twake-tombstone-clear-attributes',
     'DM_TWAKE_TOMBSTONE_CLEAR_ATTRIBUTES',
     [],
     'array',
+    null,
+    true,
   ],
   [
     '--twake-tombstone-erase-min-age',
@@ -1010,6 +1031,7 @@ const configArgs: ConfigTemplate = [
     ['objectClass', 'cn', 'sn', 'givenName', 'displayName', 'description'],
     'array',
     '--applicative-account-attributes',
+    true,
   ],
   [
     '--ldap-operational-attribute',
@@ -1029,6 +1051,7 @@ const configArgs: ConfigTemplate = [
     ],
     'array',
     '--ldap-operational-attributes',
+    true,
   ],
 
   // Trash plugin
@@ -1103,7 +1126,7 @@ const configArgs: ConfigTemplate = [
   // what every plugin did before the option existed. Meant for a plugin's
   // own overrides (`{"authz_for":["oidc"]}`), so a branch model written for
   // administrators does not judge a machine token it cannot name.
-  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array'],
+  ['--authz-for', 'DM_AUTHZ_FOR', [], 'array', null, true],
   // Two plugins judging the LDAP operations of the same requests compose as
   // an AND: the first refusal wins. The server refuses to start on that
   // unless this says the AND is meant.
@@ -1204,7 +1227,14 @@ const configArgs: ConfigTemplate = [
   ['--crowdsec-cache-ttl', 'DM_CROWDSEC_CACHE_TTL', 60, 'number'],
 
   // Trusted proxy plugin
-  ['--trusted-proxy', 'DM_TRUSTED_PROXIES', [], 'array', '--trusted-proxies'],
+  [
+    '--trusted-proxy',
+    'DM_TRUSTED_PROXIES',
+    [],
+    'array',
+    '--trusted-proxies',
+    true,
+  ],
   ['--trusted-proxy-auth-header', 'DM_TRUSTED_PROXY_AUTH_HEADER', 'Auth-User'],
 
   // Password Policy plugin
@@ -1249,6 +1279,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
     'array',
     '--scim-user-object-classes',
+    true,
   ],
   ['--scim-user-rdn-attribute', 'DM_SCIM_USER_RDN_ATTRIBUTE', 'uid'],
   [
@@ -1263,6 +1294,7 @@ const configArgs: ConfigTemplate = [
     ['top', 'groupOfNames'],
     'array',
     '--scim-group-object-classes',
+    true,
   ],
   ['--scim-group-rdn-attribute', 'DM_SCIM_GROUP_RDN_ATTRIBUTE', 'cn'],
   [

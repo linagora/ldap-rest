@@ -26,6 +26,7 @@ export type ConfigEntry = [
   ), // default value
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
+  boolean?, // for array type, whether the singular form splits on commas
 ];
 
 export class ConfigParser {
@@ -83,7 +84,7 @@ export class ConfigParser {
           value = parseInt(cliValue as string);
         } else if (entry[3] === 'array') {
           value = (fromDefault ? [] : (value as string[])).concat(
-            (cliValue as string[]).flatMap(splitCliValue)
+            (cliValue as string[]).flatMap(v => splitCliValue(v, entry[5]))
           );
           fromDefault = false;
         } else if (entry[3] === 'json') {
@@ -181,10 +182,10 @@ export class ConfigParser {
   }
 }
 
-// DNs and DN patterns carry commas of their own
-function splitCliValue(value: string | undefined): string[] {
+// Only identifiers split: DNs and secrets may carry commas of their own
+function splitCliValue(value: string | undefined, split?: boolean): string[] {
   if (value === undefined) return [];
-  if (value.includes('=')) return [value];
+  if (!split) return [value];
   return value
     .split(',')
     .map(v => v.trim())

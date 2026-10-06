@@ -65,13 +65,26 @@ Some options accept multiple values (e.g., `--plugin`, `--auth-token`, `--ldap-u
 ldap-rest --plugin core/auth/token --plugin core/ldap/flatGeneric,core/ldap/groups
 ```
 
-A value containing `=`, such as a DN or a DN pattern, is taken whole: repeat
-the option for each one.
+Only options holding identifiers split on commas: `--plugin`, `--mail-domain`,
+`--ldap-url`, the object class options (`--user-class`, `--group-class`,
+`--ldap-organization-class`, `--external-branch-class`,
+`--scim-user-object-class`, `--scim-group-object-class`), the attribute
+options (`--ldap-raw-hidden-attribute`, `--applicative-account-attribute`,
+`--ldap-operational-attribute`, `--twake-tombstone-clear-attributes`),
+`--twake-tombstone-reasons`, `--authz-for` and `--trusted-proxy`. Any other
+option takes each value whole, so a DN or a secret keeps its commas.
 
 **Via CLI - use plural form with comma-separated values:**
 
 ```bash
 ldap-rest --plugins core/auth/token,core/ldap/flatGeneric,core/ldap/groups
+```
+
+The plural form splits on commas and spaces whatever the option holds. Give a
+DN, or any value containing a comma, with the repeated singular option:
+
+```bash
+ldap-rest --ldap-raw-base ou=users,dc=example,dc=com --ldap-raw-base ou=groups,dc=example,dc=com
 ```
 
 **Via environment variable - use `;` or `,` as separator:**
