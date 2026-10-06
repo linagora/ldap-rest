@@ -788,16 +788,17 @@ export default class TwakeSpaces extends DmPlugin {
         holders.filter(h => h.kind === 'group').map(h => h.name)
       );
       const linked = await this.orgGroups(org, [...groups], ['member']);
+      const id = (is ?? was)!.id;
       const moved = await this.settle(
         org,
         [
           ...holders.filter(h => h.kind === 'member').map(h => h.dn),
           ...linked.flatMap(e => values(e.member)),
         ],
-        { id: (is ?? was)!.id, space: was }
+        { id, space: was }
       );
       if (this.rabbitmq)
-        await this.announce(org, moved, context, { was, is, linked });
+        await this.announce(org, moved, context, [id], { was, is, linked });
       return;
     }
     org = this.groups.organizationOf(dn);
@@ -818,7 +819,16 @@ export default class TwakeSpaces extends DmPlugin {
     );
     if (!this.rabbitmq) return;
     if (deleted) this.unlinked(dn, deleted, context);
-    await this.announce(org, moved, context);
+    const linking = [
+      ...(deleted?.spaces ?? []),
+      ...(await this.spaces(org, this.holding([dn]))),
+    ];
+    await this.announce(
+      org,
+      moved,
+      context,
+      linking.map(s => s.id)
+    );
   }
 
   /**
@@ -1023,11 +1033,18 @@ export default class TwakeSpaces extends DmPlugin {
   /**
    * The events of a followed change: the space write itself, then each
    * moved user's roles, except in a space created or deleted by it.
+   *
+   * A role may have moved in a space the change did not touch, by another
+   * change not followed yet. Without the role attribute, that change
+   * announces it. With it, this follow wrote the value, so that change
+   * will find nothing to announce: the role goes out here, without an
+   * actor, as this change's is not the one that moved it.
    */
   private async announce(
     org: string,
     moved: Moved[],
     context: ChangeContext,
+    touched: string[],
     space?: {
       was?: SpaceEntry;
       is?: SpaceEntry;
@@ -1112,16 +1129,19 @@ export default class TwakeSpaces extends DmPlugin {
       }
     }
 
+    const own = new Set(touched.map(id => id.toLowerCase()));
     const changes = moved.flatMap(({ dn, before, after }) =>
       [...new Set([...before.keys(), ...after.keys()])].flatMap(id => {
         const [was, is] = [before.get(id), after.get(id)];
         if (was === is || whole.has(id.toLowerCase())) return [];
+        const caught = !own.has(id.toLowerCase());
+        if (caught && !this.userRole) return [];
         const event = !was
           ? 'member.added'
           : !is
             ? 'member.removed'
             : 'member.role.changed';
-        return [{ dn, id, event, role: (is ?? was)! }];
+        return [{ dn, id, event, role: (is ?? was)!, caught }];
       })
     );
     if (!changes.length) return;
@@ -1130,10 +1150,10 @@ export default class TwakeSpaces extends DmPlugin {
       org,
       changes.map(c => c.dn)
     );
-    for (const { dn, id, event, role } of changes) {
+    for (const { dn, id, event, role, caught } of changes) {
       const profile = profiles.get(dnKey(dn));
       if (profile)
-        this.publishEvent(org, id, event, context, {
+        this.publishEvent(org, id, event, caught ? {} : context, {
           members: [{ ...profile, role }],
         });
     }

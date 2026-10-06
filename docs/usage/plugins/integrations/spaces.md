@@ -83,6 +83,13 @@ Every event carries `organizationId`, `id` (the space), `actor` (who made
 the write, when known) and `timestamp`. A member is described as above, its
 `uuid` the user's `entryUUID`; a group is `{ id, name, role }`.
 
+Writes made close together blur the actor: the member events of two writes
+of one space or group followed together may go out under the first one's.
+With `--twake-space-user-role-attribute`, the follow of a write may find a
+role another write moved in another space, not followed yet: it publishes
+that event with no actor, as the later follow finds nothing left to
+announce.
+
 - `created`: `name`, `members` (every user in the space with their resolved
   role, linked groups' members included) and `groups`.
 - `updated`: the changed `name`.

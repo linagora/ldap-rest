@@ -155,15 +155,15 @@ const suite = (role: string) => (): void => {
   before(async () => {
     dm = new DM();
     Object.assign(dm.config, {
-      twake_group_base: `ou=groups,ou={org},${ORGS}`,
-      twake_group_user_base: `ou=users,ou={org},${ORGS}`,
-      twake_group_display_name_attribute: 'o',
-      twake_group_color_attribute: 'businessCategory',
-      twake_group_created_at_attribute: 'ou',
+      twake_designersDnbase: `ou=groups,ou={org},${ORGS}`,
+      twake_designersDnuser_base: `ou=users,ou={org},${ORGS}`,
+      twake_designersDndisplay_name_attribute: 'o',
+      twake_designersDncolor_attribute: 'businessCategory',
+      twake_designersDncreated_at_attribute: 'ou',
       twake_lifecycle_deleted_attribute: 'employeeType',
       twake_lifecycle_deleted_value: 'deleted',
-      group_class: ['top', 'groupOfNames'],
-      group_schema: 'static/schemas/twake/organizationGroups.json',
+      designersDnclass: ['top', 'groupOfNames'],
+      designersDnschema: 'static/schemas/twake/organizationGroups.json',
       twake_space_base: `ou=spaces,ou={org},${ORGS}`,
       twake_space_class: ['top', 'groupOfNames'],
       twake_space_display_name_attribute: 'O',
@@ -452,6 +452,77 @@ const suite = (role: string) => (): void => {
     });
     await quiet();
     expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('announces a role two changes followed late moved once, with the role attribute', async function () {
+    if (!role) return this.skip();
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create();
+    await events(1);
+    const release = hold();
+    await api
+      .post(`${route}/${id}/groups`)
+      .send({ groupIds: [designers], role: 'viewer' })
+      .expect(200);
+    await api
+      .post(`${groupRoute}/${designers}/members`)
+      .send({ usernames: ['tse-carol'] })
+      .expect(200);
+    release();
+    const at = { organizationId: 'acme', id };
+    expect(await events(3)).to.deep.equal([
+      [
+        'twake.space.group.linked',
+        {
+          ...at,
+          groups: [{ id: designers, name: 'Designers', role: 'viewer' }],
+        },
+      ],
+      [
+        'twake.space.member.added',
+        { ...at, members: [member('tse-bob', 'viewer')] },
+      ],
+      [
+        'twake.space.member.added',
+        { ...at, members: [member('tse-carol', 'viewer')] },
+      ],
+    ]);
+  });
+
+  it('carries the actor of the write that moved a role, or none', async () => {
+    const designers = await group('Designers', ['tse-carol']);
+    const linked = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    const other = await create();
+    await events(2);
+    const as = (user: string): Request =>
+      ({ user, headers: {} }) as unknown as Request;
+    const release = hold();
+    // alice makes carol an editor of a space through her group, while eve
+    // adds carol to another one
+    const designersDn = `cn=${designers},ou=groups,${orgDn}`;
+    await dm.ldap
+      .forRequest(as('alice'))
+      .modify(`cn=${linked},ou=spaces,${orgDn}`, {
+        delete: { seeAlso: designersDn },
+        add: { owner: designersDn },
+      });
+    await dm.ldap
+      .forRequest(as('eve'))
+      .modify(`cn=${other},ou=spaces,${orgDn}`, {
+        add: { seeAlso: userDn('tse-carol') },
+      });
+    release();
+    await quiet();
+    expect(
+      rabbit.published.map(p => [p.routingKey, p.message.id, p.message.actor])
+    ).to.deep.equal([
+      ['twake.space.group.role.changed', linked, 'alice'],
+      ['twake.space.member.role.changed', linked, 'alice'],
+      // With the role attribute, alice's follow writes carol's role in the
+      // other space first, and cannot say who gave it
+      ['twake.space.member.added', other, role ? undefined : 'eve'],
+    ]);
+    rabbit.published = [];
   });
 
   it('unlinks a group unlinked, then deleted before the unlink is followed', async () => {
