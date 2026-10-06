@@ -252,6 +252,27 @@ describe('Twake spaces: user roles', function () {
     await expectRoles('tss-bob', []);
   });
 
+  it('drops the roles of a deleted group refint already took out of its space', async () => {
+    // The test directory runs refint on owner, the editor attribute here. It
+    // writes after the delete answers, before or after the follower reads.
+    const designers = await group('Designers', ['tss-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'editor' }]);
+    await expectRoles('tss-bob', [`${id}:editor`]);
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    await expectRoles('tss-bob', []);
+    await waitFor(
+      async () => {
+        const { searchEntries } = (await dm.ldap.search(
+          { paged: false, scope: 'base', attributes: ['owner'] },
+          `cn=${id},ou=spaces,${orgDn}`
+        )) as { searchEntries: { owner?: string[] }[] };
+        return !searchEntries[0].owner?.length;
+      },
+      { what: 'refint to take the group out of the space' }
+    );
+    await expectRoles('tss-bob', []);
+  });
+
   for (const order of ['leave, then unlink', 'unlink, then leave'])
     it(`revokes a role whose group is left and unlinked before either is followed (${order})`, async () => {
       const designers = await group('Designers', ['tss-bob', 'tss-dave']);
