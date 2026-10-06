@@ -558,7 +558,7 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   /** Every route answers 404 for a missing organization, 410 for a deleted one. */
-  private async checkOrganization(org: string): Promise<void> {
+  async checkOrganization(org: string): Promise<void> {
     if (!this.orgPattern) return;
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';

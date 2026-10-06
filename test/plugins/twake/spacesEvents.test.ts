@@ -27,10 +27,28 @@ interface Published {
   messageId?: string;
 }
 
+type Handler = (message: Record<string, unknown>) => Promise<void>;
+
 class StubRabbitMq {
   name = 'rabbitmq';
   published: Published[] = [];
   client: object | null = {};
+  subscribed: {
+    exchange: string;
+    routingKey: string;
+    queue: string;
+    handler: Handler;
+    options?: { queueArguments?: Record<string, unknown> };
+  }[] = [];
+  async subscribe(
+    exchange: string,
+    routingKey: string,
+    queue: string,
+    handler: Handler,
+    options?: { queueArguments?: Record<string, unknown> }
+  ): Promise<void> {
+    this.subscribed.push({ exchange, routingKey, queue, handler, options });
+  }
   isAvailable(): boolean {
     return true;
   }
@@ -187,6 +205,8 @@ const suite = (role: string) => (): void => {
       twake_space_user_role_attribute: role,
       twake_group_organization_dn: `ou={org},${ORGS}`,
       twake_instance_organization_domain_attribute: DOMAIN_ATTRIBUTE,
+      // An attribute of organizationalUnit
+      twake_group_organization_status_attribute: 'st',
     });
     await dm.ready;
     raw = new DM();
@@ -803,6 +823,192 @@ const suite = (role: string) => (): void => {
       rabbit.client = {};
       spaces.logger.error = error;
     }
+  });
+
+  describe('sync', () => {
+    const SYNC = 'twake.space.sync.requested';
+    const requested = { timestamp: '2026-10-07T02:00:00.000Z' };
+    const sync = (message: Record<string, unknown>): Promise<void> => {
+      const [subscription] = rabbit.subscribed.filter(
+        s => s.routingKey === SYNC
+      );
+      return subscription.handler({ ...requested, ...message });
+    };
+    const byUsername = (members: unknown): unknown =>
+      (members as { username: string }[]).sort((a, b) =>
+        a.username.localeCompare(b.username)
+      );
+    /** The events a sync published, with no actor, as `events` gives them. */
+    const snapshot = async (): Promise<[string, Record<string, unknown>][]> => {
+      await quiet();
+      const out = rabbit.published.map(({ routingKey, message }) => {
+        expect(message).not.to.have.property('actor');
+        expect(message.timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
+        const { timestamp: _, ...rest } = message;
+        if (rest.organizationId === 'acme') delete rest.organizationDomain;
+        return [routingKey, rest] as [string, Record<string, unknown>];
+      });
+      rabbit.published = [];
+      return out;
+    };
+
+    it('consumes sync requests from its own queue', () => {
+      expect(
+        rabbit.subscribed
+          .filter(s => s.routingKey === SYNC)
+          .map(({ handler: _, ...s }) => s)
+      ).to.deep.equal([
+        {
+          exchange: 'space',
+          routingKey: SYNC,
+          queue: 'twake.space.sync.requested.ldap-rest',
+          options: {
+            queueArguments: { 'x-single-active-consumer': true },
+          },
+        },
+      ]);
+    });
+
+    it('publishes every space of an organization, then their ids', async () => {
+      const designers = await group('Designers', ['tse-bob', 'tse-carol']);
+      const design = await create(
+        [
+          { username: 'tse-alice', role: 'admin' },
+          { username: 'tse-bob', role: 'editor' },
+        ],
+        [{ id: designers, role: 'viewer' }]
+      );
+      const retro = await create();
+      await events(2);
+      await sync({ organizationId: 'acme' });
+      const published = rabbit.published;
+      rabbit.published = [];
+      expect(published.map(p => p.routingKey)).to.deep.equal([
+        'twake.space.synced',
+        'twake.space.synced',
+        'twake.space.sync.completed',
+      ]);
+      const [timestamp] = published.map(p => p.message.timestamp);
+      expect(timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
+      for (const { message } of published) {
+        expect(message).to.include({
+          organizationId: 'acme',
+          organizationDomain: DOMAIN,
+          timestamp,
+        });
+        expect(message).not.to.have.property('actor');
+      }
+      const synced = new Map(
+        published
+          .slice(0, 2)
+          .map(({ message }) => [
+            message.id as string,
+            { ...message, members: byUsername(message.members) },
+          ])
+      );
+      const common = { organizationId: 'acme', organizationDomain: DOMAIN };
+      expect(synced.get(design)).to.deep.equal({
+        ...common,
+        id: design,
+        name: 'Design Sprint',
+        members: [
+          member('tse-alice', 'admin'),
+          member('tse-bob', 'editor'),
+          member('tse-carol', 'viewer'),
+        ],
+        groups: [{ id: designers, name: 'Designers', role: 'viewer' }],
+        timestamp,
+      });
+      expect(synced.get(retro)).to.deep.equal({
+        ...common,
+        id: retro,
+        name: 'Design Sprint',
+        members: [member('tse-alice', 'admin')],
+        groups: [],
+        timestamp,
+      });
+      const completed = published[2].message;
+      expect((completed.spaceIds as string[]).sort()).to.deep.equal(
+        [design, retro].sort()
+      );
+      expect(Object.keys(completed).sort()).to.deep.equal(
+        ['organizationId', 'organizationDomain', 'spaceIds', 'timestamp'].sort()
+      );
+    });
+
+    it('publishes one space, and a deletion for one gone', async () => {
+      const id = await create();
+      await create([{ username: 'tse-bob', role: 'admin' }]);
+      await events(2);
+      await sync({ organizationId: 'acme', id });
+      expect(await snapshot()).to.deep.equal([
+        [
+          'twake.space.synced',
+          {
+            organizationId: 'acme',
+            id,
+            name: 'Design Sprint',
+            members: [member('tse-alice', 'admin')],
+            groups: [],
+          },
+        ],
+      ]);
+      const gone = '3b9e2c71-5d4a-4f0e-9c8b-1a2d6e7f8091';
+      await sync({ organizationId: 'acme', id: gone });
+      expect(await snapshot()).to.deep.equal([
+        ['twake.space.deleted', { organizationId: 'acme', id: gone }],
+      ]);
+    });
+
+    it('completes an organization with no space', async () => {
+      await sync({ organizationId: 'beta' });
+      expect(await snapshot()).to.deep.equal([
+        [
+          'twake.space.sync.completed',
+          { organizationId: 'beta', spaceIds: [] },
+        ],
+      ]);
+    });
+
+    it('asks a sync of each organization for every organization', async () => {
+      await sync({});
+      const published = rabbit.published;
+      rabbit.published = [];
+      expect(published.every(p => p.routingKey === SYNC)).to.equal(true);
+      expect(published.map(p => p.message.organizationId).sort()).to.deep.equal(
+        ['acme', 'beta']
+      );
+      for (const { exchange, message } of published) {
+        expect(exchange).to.equal('space');
+        expect(message.timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
+      }
+    });
+
+    it('skips a deleted organization', async () => {
+      await dm.ldap.modify(betaDn, { replace: { st: 'deleted' } });
+      try {
+        await sync({ organizationId: 'beta' });
+        await quiet();
+        expect(rabbit.published).to.deep.equal([]);
+      } finally {
+        await dm.ldap.modify(betaDn, { delete: { st: 'deleted' } });
+      }
+    });
+
+    it('refuses a request it cannot read', async () => {
+      for (const message of [
+        { id: 'x' },
+        { organizationId: 42 },
+        { organizationId: 'acme', id: '' },
+      ]) {
+        let refused: Error | undefined;
+        await sync(message).catch((err: Error) => (refused = err));
+        expect(refused?.message, JSON.stringify(message)).to.match(
+          /sync request/
+        );
+      }
+      expect(rabbit.published).to.deep.equal([]);
+    });
   });
 };
 

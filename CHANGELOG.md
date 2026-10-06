@@ -9,6 +9,11 @@
   `--twake-instance-organization-domain-attribute` (default `twakeDomain`),
   [docs](docs/usage/plugins/integrations/spaces.md#events),
   [notes](docs/usage/upgrading.md#space-events-need-the-organization-domain-attribute)
+- `twake/spaces`: space sync. On `twake.space.sync.requested`, consumed
+  from `--twake-space-sync-queue`, the plugin publishes the whole of a space,
+  an organization or every organization as `twake.space.synced`, then
+  `twake.space.sync.completed`,
+  [docs](docs/usage/plugins/integrations/spaces.md#sync)
 
 ### Fixes
 

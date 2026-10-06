@@ -31,6 +31,7 @@ class StubRabbitMq {
   ): Promise<void> {
     this.published.push({ routingKey, message });
   }
+  async subscribe(): Promise<void> {}
 }
 
 describe('Twake spaces: last admin deleted', function () {
