@@ -108,7 +108,8 @@ announce.
 A user who is deleted or becomes a tombstone publishes no member event.
 
 The server does not start when the broker cannot be reached. An event the
-broker drops later is logged with `result: "no broker"` and not sent again.
+broker cannot take once the server runs is logged with `result: "error"` and
+not sent again.
 
 Member events compare each moved user's roles before and after a change:
 

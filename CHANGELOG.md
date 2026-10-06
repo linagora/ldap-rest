@@ -24,11 +24,14 @@
   [spaces](docs/usage/plugins/integrations/spaces.md)
 - `core/twake/spaces`: `--twake-space-user-role-attribute` keeps each user's
   role in every space, linked groups included, on their entry as
-  `<space id>:<role>`
+  `<space id>:<role>`; the server does not start when core/ldap/trash
+  watches the group or space branches
 - `core/twake/spaces`: with RabbitMQ, every write of a space and every
   change of its members' roles is published on the `--twake-space-exchange`
   topic exchange (default `space`) as `twake.space.*` events; the server does
-  not start when the broker cannot be reached
+  not start when the broker cannot be reached. Without
+  `--twake-space-user-role-attribute`, changes made close together may
+  announce a member's role twice, or not at all
 - `core/twake/spaces`: when a deleted user was a space's last admin, its
   editors, or else its viewers, become admins; a space left with no user of
   its own is deleted. `core/twake/spaces` now always loads
