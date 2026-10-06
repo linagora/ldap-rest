@@ -17,6 +17,20 @@ type ConfigResultValue =
   | Record<string, AttributeValue>
   | undefined;
 
+// What an array option holds, which tells how its values split:
+//  - identifiers (classes, attributes, plugins...): the singular form splits
+//    on commas; the environment variable and the plural form split on `;` if
+//    the value has one, else on `,`, and on spaces
+//  - dns: a DN holds commas and spaces, so the singular form never splits and
+//    the environment variable and the plural form split on `;` only
+//  - phrases (an HMAC id:secret:Display Name, a TOTP secret:name[:digits]): the
+//    singular form never splits; the environment variable and the plural form
+//    split on `;` if the value has one, else on `,`, and on newlines, never on
+//    spaces
+//  - anything else (tokens, paths, rules): as phrases for the singular form,
+//    as identifiers for the environment variable and the plural form
+export type ArrayKind = 'identifiers' | 'dns' | 'phrases';
+
 export type ConfigEntry = [
   string, // arg
   string, // env value
@@ -26,7 +40,7 @@ export type ConfigEntry = [
   ), // default value
   ('string' | 'number' | 'boolean' | 'array' | 'json' | null | undefined)?, // type
   (string | null | undefined)?, // for array type, the plural form of cliArg (e.g. --plugin / --plugins)
-  boolean?, // for array type, whether the singular form splits on commas: never for DNs or secrets, which may contain some
+  ArrayKind?, // for array type, what the values hold: see ArrayKind
 ];
 
 export class ConfigParser {
@@ -48,18 +62,30 @@ export class ConfigParser {
       // Override with env value if exists
       if (entry[1] !== undefined) {
         const envValue = process.env[entry[1]];
-        if (envValue !== undefined) {
+        // An empty value, or an array one without any item, is unset: a
+        // compose file expands an unset `${VAR:-}` to one, and it would
+        // replace the default with nothing (or NaN for a number)
+        const items =
+          entry[3] === 'array' && envValue !== undefined
+            ? splitValue(envValue, entry[5], 'plural')
+            : [];
+        const unset =
+          envValue === undefined ||
+          (entry[3] === 'array' && items.length === 0) ||
+          ((entry[3] === 'number' || entry[3] === 'json') &&
+            envValue.trim() === '');
+        if (!unset) {
           fromDefault = false;
           if (entry[3] === 'boolean') {
             value = envValue.toLowerCase() === 'true';
           } else if (entry[3] === 'number') {
             value = parseInt(envValue);
+            if (Number.isNaN(value))
+              throw new Error(
+                `Error in environment variable ${entry[1]}: "${envValue}" is not a number`
+              );
           } else if (entry[3] === 'array') {
-            const sep = envValue.indexOf(';') > 0 ? ';' : ',';
-            value = envValue
-              .split(new RegExp(`[${sep}\\s]+`))
-              .map(v => v.trim())
-              .filter(v => v.length > 0);
+            value = items;
           } else if (entry[3] === 'json') {
             try {
               value = JSON.parse(envValue) as Record<string, AttributeValue>;
@@ -85,7 +111,7 @@ export class ConfigParser {
         } else if (entry[3] === 'array') {
           value = (fromDefault ? [] : (value as string[])).concat(
             (cliValue as string[]).flatMap(v =>
-              splitCliValue(entry[0], v, entry[5] ? /,/ : undefined)
+              splitCliValue(entry[0], v, entry[5], 'singular')
             )
           );
           fromDefault = false;
@@ -109,7 +135,7 @@ export class ConfigParser {
       if (entry[3] === 'array' && entry[4] && cliArgs.has(entry[4])) {
         const cliValue = cliArgs.get(entry[4]) as string | undefined;
         value = (fromDefault ? [] : (value as string[])).concat(
-          splitCliValue(entry[4], cliValue, /[,\s]+/)
+          splitCliValue(entry[4], cliValue, entry[5], 'plural')
         );
         cliArgs.delete(entry[4]);
       }
@@ -141,7 +167,19 @@ export class ConfigParser {
         if (configEntry && configEntry[3] === 'boolean') {
           args.set(arg, true);
         } else if (configEntry && configEntry[3] === 'number') {
-          args.set(arg, parseInt(argv[i + 1]));
+          if (!argv[i + 1]?.trim())
+            throw new Error(
+              `Error in command line: ${arg} has an empty value. Leave it ` +
+                'out to keep the default'
+            );
+          const number = parseInt(argv[i + 1]);
+          if (Number.isNaN(number))
+            throw new Error(
+              `Error in command line: ${arg} takes a number, got ` +
+                `"${argv[i + 1]}"`
+            );
+          args.set(arg, number);
+          i++; // The value may start with `-`, as -1 does
         } else if (configEntry && configEntry[3] === 'array') {
           const tmp = args.get(arg) || [];
           const nextArg = argv[i + 1];
@@ -151,8 +189,8 @@ export class ConfigParser {
           // skipped in silence: `--authz-for oidc authToken` read as
           // `["oidc"]`, a population smaller than the command line says —
           // and for an authorization scope, requests of `authToken` nobody
-          // judges. The environment variable and the plural form split on
-          // spaces; the singular does not, so it refuses.
+          // judges. The plural form takes several values, so does not refuse;
+          // the singular takes one, so it refuses.
           const stray = argv[i + 2];
           if (stray !== undefined && !stray.startsWith('-'))
             throw new Error(
@@ -184,21 +222,38 @@ export class ConfigParser {
   }
 }
 
+// The separator depends on what the option holds and on where the value
+// comes from, see ArrayKind. Items are trimmed and empty ones dropped
+function splitValue(
+  value: string,
+  kind: ArrayKind | undefined,
+  form: 'singular' | 'plural'
+): string[] {
+  let separator: RegExp | undefined;
+  if (form === 'singular') {
+    if (kind === 'identifiers') separator = /,/;
+  } else if (kind === 'dns') separator = /;/;
+  else {
+    const spaces = kind === 'phrases' ? '\\r\\n' : '\\s';
+    separator = new RegExp(`[${value.includes(';') ? ';' : ','}${spaces}]+`);
+  }
+  return separator
+    ? value
+        .split(separator)
+        .map(v => v.trim())
+        .filter(v => v.length > 0)
+    : [value.trim()].filter(v => v.length > 0);
+}
+
 // An unset variable expands to an empty value, which would replace the
 // default with nothing
 function splitCliValue(
   arg: string,
   value: string | undefined,
-  separator?: RegExp
+  kind: ArrayKind | undefined,
+  form: 'singular' | 'plural'
 ): string[] {
-  let values: string[] = [];
-  if (value?.trim())
-    values = separator
-      ? value
-          .split(separator)
-          .map(v => v.trim())
-          .filter(v => v.length > 0)
-      : [value];
+  const values = value === undefined ? [] : splitValue(value, kind, form);
   if (values.length === 0)
     throw new Error(
       `Error in command line: ${arg} has an empty value. Leave it out to ` +

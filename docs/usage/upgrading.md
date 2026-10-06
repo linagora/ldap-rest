@@ -6,6 +6,50 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Array options read from the environment are split by kind of option
+
+**Who is affected:** a deployment that sets an array option through its
+`DM_*` variable (or its plural CLI form, where it has one) with a DN or an
+HMAC name, or that sets one, or a number, to an empty value.
+
+- An option holding DNs (`DM_LDAP_RAW_BASE`, `DM_JAMES_MAILING_LIST_BRANCHES`,
+  `DM_TWAKE_TOMBSTONE_DN`, `DM_TWAKE_TOMBSTONE_GROUP_BASES`,
+  `DM_TWAKE_INSTANCE_DN`, and the plural CLI forms `--ldap-raw-bases` and
+  `--james-mailing-list-branches`) splits on `;` only: a DN
+  such as `DM_LDAP_RAW_BASE="ou=My Unit,dc=example,dc=com"` is no longer cut
+  on its spaces and commas. Separate several DNs with `;`, as already
+  documented.
+- `DM_AUTH_HMAC`, `DM_AUTH_TOTP` and their plural CLI forms no longer split on
+  spaces: the name of `id:secret:Registration Service` stays whole, and a TOTP
+  name may hold spaces. Separate entries with `,`, `;` or newlines. A
+  space-separated HMAC list is now read as a single entry, and the services
+  after the first cannot authenticate (their requests get 401); a
+  space-separated TOTP list stops the server.
+- `core/auth/hmac` and `core/auth/totp` stop the server on an entry that cannot
+  be right instead of skipping it with a warning: an HMAC entry with an empty
+  id, secret or name or fewer than 3 fields, a TOTP entry with an empty secret
+  or name, more than 3 fields, a secret that is not Base32 or digits that are
+  not an integer from 6 to 10. This
+  includes a TOTP entry such as `secret:name:abc`, which used to register a
+  user whose code was the string `NaN`.
+- Other options (tokens, paths, rules...) still split on `;` or `,` and on
+  spaces. Their plural CLI form now gives `;` priority over `,`, as the
+  environment variable does: `--auth-tokens 'a;b,c'` is `a` and `b,c`, it used
+  to be `a`, `b` and `c`.
+- `--authz-dynamic-bypass` and `--twake-space-class` now split on commas when
+  given with their singular CLI form, as the other options holding
+  identifiers do.
+- A variable that is empty, only holds whitespace or only holds separators
+  (`DM_GROUP_CLASSES=`, `DM_GROUP_CLASSES=,`) keeps the default instead of
+  giving an empty list, which was a silent misconfiguration (a server without
+  object class, for instance): `DM_LDAP_OPERATIONAL_ATTRIBUTES=` used to give
+  `[]` and now gives the default, the safe value. There is no way to set an
+  empty list, from the environment, for an option whose default is not empty.
+  An empty number or JSON value (`DM_PORT=`) keeps its default instead of
+  giving `NaN` or stopping the server. A number option whose value is not a
+  number (`DM_PORT=abc`, `--port ''`, `--port --log-level debug`) stops the
+  server instead of giving `NaN`. Booleans and strings are unchanged.
+
 ### An array option on the command line replaces its default
 
 **Who is affected:** a deployment that gives, on the command line, an array

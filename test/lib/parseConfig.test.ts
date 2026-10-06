@@ -3,11 +3,16 @@ import { ConfigParser } from '../../src/lib/parseConfig';
 import configArgs from '../../src/config/args';
 
 describe('ConfigParser', () => {
+  // test/setup.ts sets some DM_* variables for the whole run: give each test
+  // the environment it found
+  let savedEnv: NodeJS.ProcessEnv;
+  beforeEach(() => {
+    savedEnv = { ...process.env };
+  });
   afterEach(() => {
-    delete process.env.DM_LLNG_INI;
-    delete process.env.DM_PORT;
-    delete process.env.DM_PLUGINS;
-    delete process.env.DM_GROUP_CLASSES;
+    for (const key of Object.keys(process.env))
+      if (!(key in savedEnv)) delete process.env[key];
+    Object.assign(process.env, savedEnv);
   });
 
   it('should use default values when no env or cli args', () => {
@@ -64,6 +69,211 @@ describe('ConfigParser', () => {
     const result = parser.parse(['node', 'script.js']);
     expect(result).to.have.property('plugin').that.is.an('array');
     expect(result.plugin).to.deep.equal(['a', 'b', 'c', 'd']);
+  });
+
+  describe('array options from the environment', () => {
+    const parse = () =>
+      new ConfigParser(configArgs).parse(['node', 'script.js']);
+
+    // The defaults are those of the code, not of the test setup
+    beforeEach(() => {
+      for (const key of Object.keys(process.env))
+        if (key.startsWith('DM_')) delete process.env[key];
+    });
+
+    it('should keep the default for an empty variable', () => {
+      const expected = parse().group_class;
+      expect(expected).to.not.deep.equal([]);
+      process.env.DM_GROUP_CLASSES = '';
+      expect(parse().group_class).to.deep.equal(expected);
+    });
+
+    it('should keep the default for a whitespace-only variable', () => {
+      const expected = parse().group_class;
+      process.env.DM_GROUP_CLASSES = ' \t ';
+      expect(parse().group_class).to.deep.equal(expected);
+    });
+
+    it('should give nothing for an empty variable without default', () => {
+      process.env.DM_LDAP_RAW_BASE = '';
+      expect(parse().ldap_raw_base).to.deep.equal([]);
+    });
+
+    it('should split identifiers on commas and spaces', () => {
+      process.env.DM_USER_CLASSES = 'top, a  b,c';
+      expect(parse().user_class).to.deep.equal(['top', 'a', 'b', 'c']);
+    });
+
+    it('should split identifiers on semicolons and spaces', () => {
+      process.env.DM_USER_CLASSES = 'top;a,b c';
+      expect(parse().user_class).to.deep.equal(['top', 'a,b', 'c']);
+    });
+
+    it('should split on semicolons a value starting with one', () => {
+      process.env.DM_USER_CLASSES = ';top;a,b';
+      expect(parse().user_class).to.deep.equal(['top', 'a,b']);
+      process.env.DM_LDAP_RAW_BASE = ';ou=a b,dc=x; ou=c,dc=y;';
+      expect(parse().ldap_raw_base).to.deep.equal(['ou=a b,dc=x', 'ou=c,dc=y']);
+    });
+
+    it('should keep the spaces of a DN split on semicolons', () => {
+      process.env.DM_LDAP_RAW_BASE = 'ou=My Unit,dc=x;ou=b,dc=y';
+      expect(parse().ldap_raw_base).to.deep.equal([
+        'ou=My Unit,dc=x',
+        'ou=b,dc=y',
+      ]);
+    });
+
+    it('should keep a single DN without semicolon whole', () => {
+      process.env.DM_LDAP_RAW_BASE = ' ou=My Unit,dc=x ';
+      expect(parse().ldap_raw_base).to.deep.equal(['ou=My Unit,dc=x']);
+    });
+
+    it('should split phrases on newlines', () => {
+      process.env.DM_AUTH_HMAC = 'a:s:A B\nc:t:D E\r\nf:u:G';
+      expect(parse().auth_hmac).to.deep.equal(['a:s:A B', 'c:t:D E', 'f:u:G']);
+      process.env.DM_AUTH_TOTP =
+        'JBSWY3DPEHPK3PXP:John Doe:6\nHXDMVJECJJWSRB3H:b';
+      expect(parse().auth_totp).to.deep.equal([
+        'JBSWY3DPEHPK3PXP:John Doe:6',
+        'HXDMVJECJJWSRB3H:b',
+      ]);
+    });
+
+    it('should split tokens on spaces and commas', () => {
+      process.env.DM_AUTH_TOKENS = 't1 t2';
+      expect(parse().auth_token).to.deep.equal(['t1', 't2']);
+      process.env.DM_AUTH_TOKENS = 'tok1,tok2, tok3:admin,';
+      expect(parse().auth_token).to.deep.equal(['tok1', 'tok2', 'tok3:admin']);
+    });
+
+    it('should split padded base64 tokens on commas', () => {
+      process.env.DM_AUTH_TOKENS = 'YWJj=,ZGVm=';
+      expect(parse().auth_token).to.deep.equal(['YWJj=', 'ZGVm=']);
+    });
+
+    it('should keep the spaces of an HMAC name', () => {
+      process.env.DM_AUTH_HMAC =
+        'id:secret:Registration Service,id2:s2:Other Name';
+      expect(parse().auth_hmac).to.deep.equal([
+        'id:secret:Registration Service',
+        'id2:s2:Other Name',
+      ]);
+      process.env.DM_AUTH_HMAC = 'id:s:A B;id2:s2:C,D';
+      expect(parse().auth_hmac).to.deep.equal(['id:s:A B', 'id2:s2:C,D']);
+    });
+
+    it('should keep the default for a value without any item', () => {
+      const group = parse().group_class;
+      const url = parse().ldap_url;
+      process.env.DM_GROUP_CLASSES = ',';
+      process.env.DM_LDAP_URL = ';';
+      process.env.DM_LDAP_RAW_BASE = ' ; ';
+      const result = parse();
+      expect(result.group_class).to.deep.equal(group);
+      expect(result.ldap_url).to.deep.equal(url);
+      expect(result.ldap_raw_base).to.deep.equal([]);
+    });
+
+    it('should keep the default for an empty number', () => {
+      process.env.DM_PORT = '';
+      expect(parse().port).to.equal(8081);
+      process.env.DM_PORT = ' ';
+      expect(parse().port).to.equal(8081);
+    });
+
+    it('should keep the default for an empty JSON value', () => {
+      const entry = configArgs.find(e => e[3] === 'json');
+      expect(entry).to.not.equal(undefined);
+      const dflt = new ConfigParser(configArgs).parse(['node', 'script.js']);
+      const key = entry![0].replace(/^--/, '').replace(/-/g, '_');
+      process.env[entry![1]] = '  ';
+      const result = parse();
+      expect(result[key as keyof typeof result]).to.deep.equal(
+        dflt[key as keyof typeof dflt]
+      );
+    });
+
+    it('should keep what follows a negative number on the command line', () => {
+      const result = new ConfigParser(configArgs).parse([
+        'node',
+        'script.js',
+        '--ldap-cache-max',
+        '-1',
+        '--plugin',
+        'core/x',
+      ]);
+      expect(result.ldap_cache_max).to.equal(-1);
+      expect(result.plugin).to.deep.equal(['core/x']);
+    });
+
+    it('should refuse a value that is not a number', () => {
+      process.env.DM_PORT = 'abc';
+      expect(parse).to.throw(/DM_PORT/);
+      delete process.env.DM_PORT;
+      const cli =
+        (...args: string[]) =>
+        () =>
+          new ConfigParser(configArgs).parse(['node', 'script.js', ...args]);
+      expect(cli('--port', '--log-level', 'debug')).to.throw(/--port/);
+      expect(cli('--port', 'abc')).to.throw(/--port/);
+      expect(cli('--port', '90')().port).to.equal(90);
+    });
+
+    it('should trim a single value alike for every form', () => {
+      const cli = (...args: string[]) =>
+        new ConfigParser(configArgs).parse(['node', 'script.js', ...args]);
+      expect(cli('--ldap-raw-base', ' ou=a ').ldap_raw_base).to.deep.equal([
+        'ou=a',
+      ]);
+      expect(cli('--ldap-raw-bases', ' ou=a ').ldap_raw_base).to.deep.equal([
+        'ou=a',
+      ]);
+    });
+
+    it('should refuse an empty number on the command line', () => {
+      expect(() =>
+        new ConfigParser(configArgs).parse(['node', 'script.js', '--port', ''])
+      ).to.throw(/--port has an empty value/);
+    });
+
+    it('should split the plural form like the environment variable', () => {
+      const plural = (name: string, value: string) =>
+        new ConfigParser(configArgs).parse(['node', 'script.js', name, value]);
+      expect(
+        plural('--ldap-raw-bases', 'ou=My Unit,dc=x;ou=b,dc=y').ldap_raw_base
+      ).to.deep.equal(['ou=My Unit,dc=x', 'ou=b,dc=y']);
+      expect(
+        plural('--ldap-raw-bases', 'ou=My Unit,dc=x').ldap_raw_base
+      ).to.deep.equal(['ou=My Unit,dc=x']);
+      expect(plural('--auth-hmacs', 'a:b:C D,e:f:G H').auth_hmac).to.deep.equal(
+        ['a:b:C D', 'e:f:G H']
+      );
+      expect(plural('--auth-tokens', 'a;b,c').auth_token).to.deep.equal([
+        'a',
+        'b,c',
+      ]);
+      expect(plural('--auth-tokens', 't1 t2,t3').auth_token).to.deep.equal([
+        't1',
+        't2',
+        't3',
+      ]);
+      expect(plural('--user-classes', 'a b,c').user_class).to.deep.equal([
+        'a',
+        'b',
+        'c',
+      ]);
+    });
+
+    it('should split --authz-dynamic-bypass on commas on the CLI', () => {
+      const result = new ConfigParser(configArgs).parse([
+        'node',
+        'script.js',
+        '--authz-dynamic-bypass',
+        'a,b',
+      ]);
+      expect(result.authz_dynamic_bypass).to.deep.equal(['a', 'b']);
+    });
   });
 
   it('should parse array from CLI argument', () => {

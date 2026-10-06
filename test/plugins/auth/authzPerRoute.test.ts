@@ -287,7 +287,7 @@ describe('AuthzPerRoute', () => {
 
   describe('parseEntry — trim and validation', () => {
     // These tests inject entries directly into dm.config to bypass the env-var
-    // parser (which splits on whitespace). This simulates CLI usage where the
+    // parser (which splits on commas and whitespace). This simulates CLI usage where the
     // shell preserves spaces inside quoted arguments, e.g.:
     //   --authz-per-route " user :*"
 

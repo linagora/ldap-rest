@@ -45,32 +45,27 @@ export default class AuthTotp extends AuthBase {
     if (totpConfig && Array.isArray(totpConfig)) {
       totpConfig.forEach((entry, index) => {
         const parts = entry.split(':');
-        if (parts.length >= 2) {
-          // Format: "secret:name" or "secret:name:digits"
-          const secret = parts[0].trim();
-          const name = parts[1].trim();
-          const digits = parts[2] ? parseInt(parts[2].trim(), 10) : 6;
-
-          if (!this.isValidBase32(secret)) {
-            this.logger.warn(
-              `Invalid Base32 secret for TOTP user "${name}" (index ${index})`
-            );
-            return;
-          }
-
-          if (digits < 6 || digits > 10) {
-            this.logger.warn(
-              `Invalid digits count for TOTP user "${name}": ${digits} (must be 6-10)`
-            );
-            return;
-          }
-
-          this.totpUsers.push({ name, secret, digits });
-        } else {
-          this.logger.warn(
-            `Invalid TOTP config format at index ${index}: expected "secret:name[:digits]"`
+        // Format: "secret:name" or "secret:name:digits"
+        const [secret, name, digitsField] = parts.map(p => p.trim());
+        const digits = digitsField === undefined ? 6 : Number(digitsField);
+        const fail = (why: string): never => {
+          throw new Error(
+            `Invalid --auth-totp entry at index ${index}: ${why}; entries ` +
+              'are separated by `,`, `;` or newlines'
           );
-        }
+        };
+        if (parts.length < 2 || parts.length > 3 || !secret || !name)
+          fail('expected "secret:name[:digits]"');
+        if (!this.isValidBase32(secret)) fail('the secret is not Base32');
+        if (
+          digitsField === '' ||
+          !Number.isInteger(digits) ||
+          digits < 6 ||
+          digits > 10
+        )
+          fail('digits must be an integer from 6 to 10');
+
+        this.totpUsers.push({ name, secret, digits });
       });
     }
 

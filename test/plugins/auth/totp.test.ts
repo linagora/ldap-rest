@@ -238,31 +238,52 @@ describe('AuthTotp', () => {
   });
 
   describe('Invalid configuration', () => {
-    it('should handle invalid Base32 secret gracefully', async () => {
+    it('should refuse an invalid Base32 secret', async () => {
       process.env.DM_AUTH_TOTP = 'INVALID!!!:admin:6';
       const dm = new DM();
       await dm.ready;
-      const p = new AuthTotp(dm);
-      // Plugin should initialize but log warning
-      expect(p).to.not.be.null;
+      expect(() => new AuthTotp(dm)).to.throw(/--auth-totp.*not Base32/);
     });
 
-    it('should handle invalid digits count', async () => {
+    it('should refuse an invalid digits count', async () => {
       process.env.DM_AUTH_TOTP = 'JBSWY3DPEHPK3PXP:admin:3';
       const dm = new DM();
       await dm.ready;
-      const p = new AuthTotp(dm);
-      // Plugin should initialize but log warning
-      expect(p).to.not.be.null;
+      expect(() => new AuthTotp(dm)).to.throw(/--auth-totp.*from 6 to 10/);
     });
 
     it('should handle malformed config', async () => {
       process.env.DM_AUTH_TOTP = 'onlyonesegment';
       const dm = new DM();
       await dm.ready;
-      const p = new AuthTotp(dm);
-      // Plugin should initialize but log warning
-      expect(p).to.not.be.null;
+      expect(() => new AuthTotp(dm)).to.throw(/--auth-totp.*separated by/);
+    });
+
+    it('should refuse an entry that cannot be right', () => {
+      const build = (entry: string) =>
+        new AuthTotp({
+          config: { auth_totp: [entry] },
+          logger: { warn: () => {}, info: () => {} },
+        } as unknown as DM);
+      for (const entry of [
+        'JBSWY3DPEHPK3PXP:admin:6:extra',
+        'JBSWY3DPEHPK3PXP:admin:abc',
+        'JBSWY3DPEHPK3PXP:admin:',
+        'JBSWY3DPEHPK3PXP:admin:6.5',
+        ':admin:6',
+        'JBSWY3DPEHPK3PXP: :6',
+        'JBSWY3DPEHPK3PXP:admin:3',
+        'JBSWY3DPEHPK3PXP:admin:11',
+        'INVALID!!!:admin:6',
+        // A space-separated list, merged by the environment parser
+        'JBSWY3DPEHPK3PXP:alice HXDMVJECJJWSRB3H:bob',
+        'JBSWY3DPEHPK3PXP:a:6 HXDMVJECJJWSRB3H:b:8',
+      ])
+        expect(() => build(entry)).to.throw(
+          /--auth-totp.*separated by `,`, `;` or newlines/
+        );
+      expect(() => build('JBSWY3DPEHPK3PXP:admin:6')).to.not.throw();
+      expect(() => build('JBSWY3DPEHPK3PXP:John Doe:6')).to.not.throw();
     });
   });
 

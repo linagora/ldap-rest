@@ -9,6 +9,18 @@
   `--user-class top,twakeAccount,twakeWhitePages,twakeExtra`, and
   `--ldap-url` no longer keeps `ldap://localhost` next to the URL given,
   [notes](docs/usage/upgrading.md#an-array-option-on-the-command-line-replaces-its-default)
+- An array option holding DNs (`--ldap-raw-base`,
+  `--james-mailing-list-branch`, `--twake-tombstone-dn`,
+  `--twake-tombstone-group-bases`, `--twake-instance-dn`) splits on `;` only
+  from the environment and in its plural CLI form where it has one, and
+  `--auth-hmac` and `--auth-totp` no longer split on spaces, but on newlines (a
+  list separated by spaces is one entry: later HMAC services get 401, a TOTP
+  list stops the server); `core/auth/hmac` and
+  `core/auth/totp` stop the server on an entry that cannot be right; the
+  plural CLI form of the other options gives `;` priority over `,`; an empty variable, or one holding only separators, keeps
+  the default instead of giving `[]` (no empty list is possible for an option
+  with a default),
+  [notes](docs/usage/upgrading.md#array-options-read-from-the-environment-are-split-by-kind-of-option)
 
 ### Security
 
@@ -36,6 +48,19 @@
 
 ### Fixes
 
+- `core/auth/totp`: an entry whose digits field is not an integer from 6 to
+  10 (`secret:name:abc`), or whose secret is not Base32, stops the server; it used to register a user whose
+  code was the string `NaN`, so `Bearer NaN` authenticated
+- Array options read from the environment: an empty variable
+  (`DM_GROUP_CLASSES=`) keeps the default instead of replacing it with
+  nothing, and so does an empty number or JSON value (`DM_PORT=`, formerly
+  `NaN`), while a number that is not one (`DM_PORT=abc`, `--port ''`) stops
+  the server;
+  `DM_LDAP_RAW_BASE="ou=My Unit,dc=x;ou=b,dc=y"` and an HMAC name with spaces
+  are no longer cut; a value starting with `;` is split on `;`;
+  `--authz-dynamic-bypass` and `--twake-space-class` split on commas in their
+  singular CLI form
+  ([#284](https://github.com/linagora/ldap-rest/issues/284))
 - `core/twake/groups`: an empty `search` (`?search=`) lists every group or
   member instead of answering 400 `INVALID_SEARCH_QUERY`
 - The singular form of an array option holding identifiers splits
