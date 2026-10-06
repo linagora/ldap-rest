@@ -94,7 +94,9 @@ the write, when known) and `timestamp`. A member is described as above, its
 - `group.linked`, `group.role.changed`, `group.unlinked`: `groups`, the one
   group, with its name when the event is published. A deleted group is
   unlinked from each of its spaces once, whether refint or a later write
-  takes its DN out of them. Renaming a linked group publishes nothing.
+  takes its DN out of them; one unlinked, then deleted before the unlink is
+  followed, is unlinked too, under its id for a name. Renaming a linked group
+  publishes nothing.
 
 A user who is deleted or becomes a tombstone publishes no member event.
 

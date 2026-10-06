@@ -92,6 +92,15 @@ describe('Twake spaces: events', function () {
     } while (following !== queues.following);
   };
 
+  /** Hold back the following of changes until the returned call. */
+  const hold = (): (() => void) => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const queue = spaces as unknown as { following: Promise<void> };
+    queue.following = queue.following.then(() => gate);
+    return release;
+  };
+
   /** The events published once `count` have come, without timestamp and actor. */
   const events = async (
     count: number
@@ -436,6 +445,25 @@ describe('Twake spaces: events', function () {
     });
     await quiet();
     expect(rabbit.published).to.deep.equal([]);
+  });
+
+  it('unlinks a group unlinked, then deleted before the unlink is followed', async () => {
+    const designers = await group('Designers', ['tse-bob']);
+    const id = await create(undefined, [{ id: designers, role: 'viewer' }]);
+    await events(1);
+    const release = hold();
+    await api.delete(`${route}/${id}/groups/${designers}`).expect(200);
+    await api.delete(`${groupRoute}/${designers}`).expect(200);
+    release();
+    await quiet();
+    expect(
+      rabbit.published
+        .filter(p => p.routingKey === 'twake.space.group.unlinked')
+        .map(p => [p.message.id, p.message.groups])
+    ).to.deep.equal([
+      [id, [{ id: designers, name: designers, role: 'viewer' }]],
+    ]);
+    rabbit.published = [];
   });
 
   it('carries who made the write', async () => {

@@ -213,6 +213,11 @@ export default class TwakeSpaces extends DmPlugin {
     DeletedGroup & { op?: number }
   >();
   /**
+   * The groups a deletion announced unlinked, by space DN key, until a write
+   * of the space takes their DN out of it, or finds it gone already.
+   */
+  private readonly announced = new Map<string, Set<string>>();
+  /**
    * The spaces a user being deleted is an admin of, by operation and DN,
    * read before refint takes the user out of them.
    */
@@ -812,7 +817,7 @@ export default class TwakeSpaces extends DmPlugin {
       { group: dn, members: wasKeys, spaces: deleted?.spaces }
     );
     if (!this.rabbitmq) return;
-    if (deleted) this.unlinked(deleted, context);
+    if (deleted) this.unlinked(dn, deleted, context);
     await this.announce(org, moved, context);
   }
 
@@ -923,12 +928,20 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   /** The spaces a deleted group left. */
-  private unlinked(deleted: DeletedGroup, context: ChangeContext): void {
+  private unlinked(
+    dn: string,
+    deleted: DeletedGroup,
+    context: ChangeContext
+  ): void {
     const { org, id: group, name, spaces } = deleted;
-    for (const { id, role } of spaces)
+    for (const { id, role } of spaces) {
+      const key = dnKey(this.spaceDn(org, id));
+      if (!this.announced.has(key)) this.announced.set(key, new Set());
+      this.announced.get(key)!.add(dnKey(dn));
       this.publishEvent(org, id, 'group.unlinked', context, {
         groups: [{ id: group, name, role }],
       });
+    }
   }
 
   /**
@@ -1040,6 +1053,9 @@ export default class TwakeSpaces extends DmPlugin {
       });
       const publish = (event: string, fields?: Record<string, unknown>): void =>
         this.publishEvent(org, id, event, context, fields);
+      const key = dnKey(this.spaceDn(org, id));
+      const announced = this.announced.get(key) ?? new Set<string>();
+      this.announced.delete(key);
       if (!was || !is) {
         whole.add(id.toLowerCase());
         if (!is) publish('deleted');
@@ -1074,10 +1090,25 @@ export default class TwakeSpaces extends DmPlugin {
             groups: [groupOf(group)],
           });
         }
-        // A group gone was announced unlinked when it was deleted
+        // A group deleted is announced unlinked by its deletion, from the
+        // spaces it was in then: already, or once the deletion that landed
+        // is followed. One unlinked first, then deleted, is announced here.
+        const byDeletion = (dn: string): boolean => {
+          if (announced.delete(dnKey(dn))) return true;
+          const deleted = this.unlinking.get(dnKey(dn));
+          return Boolean(
+            deleted &&
+            deleted.op === undefined &&
+            deleted.spaces.some(s => s.id.toLowerCase() === id.toLowerCase())
+          );
+        };
         for (const group of linkedBefore.values())
-          if (names.has(dnKey(group.dn)))
+          if (!byDeletion(group.dn))
             publish('group.unlinked', { groups: [groupOf(group)] });
+        // The DNs this write leaves in the space are still awaited
+        const left = new Set(is.holders.map(h => dnKey(h.dn)));
+        const awaited = [...announced].filter(g => left.has(g));
+        if (awaited.length) this.announced.set(key, new Set(awaited));
       }
     }
 
