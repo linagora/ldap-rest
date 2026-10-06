@@ -33,6 +33,12 @@ export class UnauthorizedError extends HttpError {
   }
 }
 
+/**
+ * What a client is told of an authorization refusal: the message the plugin
+ * threw names the branch, which the caller may not know of.
+ */
+export const AUTHZ_REFUSED = 'Token does not have permission on this branch';
+
 export class ForbiddenError extends HttpError {
   constructor(message = 'Forbidden') {
     super(message, 403);

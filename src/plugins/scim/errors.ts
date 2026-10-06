@@ -6,7 +6,7 @@
  */
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import { HttpError } from '../../lib/errors';
+import { AUTHZ_REFUSED, HttpError } from '../../lib/errors';
 // Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
 // it too. Imported and re-exported, so this module stays the one SCIM reads
 // it from.
@@ -82,9 +82,7 @@ export function scimErrorFromException(
   // intermediate callers wrap the error. Strip the marker before emitting
   // a client-facing message so the internal token never leaks.
   const sanitize = (s: string): string =>
-    /\[authz-forbidden\]/.test(s)
-      ? 'Token does not have permission on this branch'
-      : s;
+    /\[authz-forbidden\]/.test(s) ? AUTHZ_REFUSED : s;
   const body = (
     status: number,
     detail: string,
@@ -105,7 +103,7 @@ export function scimErrorFromException(
   const message = err instanceof Error ? err.message : String(err);
   // Wrapped authz-forbidden (no HttpError instance but marker is in the msg)
   if (/\[authz-forbidden\]/.test(message)) {
-    return body(403, 'Token does not have permission on this branch');
+    return body(403, AUTHZ_REFUSED);
   }
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) return body(404, 'Resource not found');

@@ -176,7 +176,7 @@ export const hookOwner = (
  * The marker as well as the status: plugins wrap a hook's error into a plain
  * `Error` on the way up, which keeps the message and drops the status.
  */
-const isRefusal = (err: unknown): boolean =>
+export const isRefusal = (err: unknown): boolean =>
   (err as { statusCode?: number })?.statusCode === 403 ||
   /\[authz-forbidden\]/.test(String((err as Error)?.message ?? ''));
 
