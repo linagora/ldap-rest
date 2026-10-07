@@ -1,28 +1,36 @@
 # Changelog
 
-## Unreleased
+## v0.16.0 (2026-10-07)
+
+### Breaking Changes
+
+- `twake/spaces`: with `--rabbitmq-url` and `--twake-group-organization-dn`,
+  the server does not start when the directory schema does not define the
+  organization domain attribute,
+  [notes](docs/usage/upgrading.md#space-events-need-the-organization-domain-attribute)
+
+### Security
+
+- Build: fast-glob is replaced with tinyglobby, which drops braces and its
+  unpatched advisory GHSA-vfj7-8cjw-p6xm
 
 ### Features
 
-- `twake/spaces`: every space event carries `organizationDomain`, the
-  organization's domain, read from
+- `twake/spaces`: space events carry `organizationDomain`, read from
   `--twake-instance-organization-domain-attribute` (default `twakeDomain`),
-  [docs](docs/usage/plugins/integrations/spaces.md#events),
-  [notes](docs/usage/upgrading.md#space-events-need-the-organization-domain-attribute)
-- `twake/spaces`: space sync. On `twake.space.sync.requested`, consumed
-  from `--twake-space-sync-queue`, the plugin publishes the whole of a space,
-  an organization or every organization as `twake.space.synced`, then
+  [docs](docs/usage/plugins/integrations/spaces.md#events)
+- `twake/spaces`: space sync. On `twake.space.sync.requested`, read from
+  `--twake-space-sync-queue`, the plugin publishes a space, an organization or
+  every organization as `twake.space.synced`, then
   `twake.space.sync.completed`,
   [docs](docs/usage/plugins/integrations/spaces.md#sync)
 
 ### Fixes
 
-- `twake/groups`: the group search also matches the `cn` of a group without
-  a display name, which the API answers as its `displayName`
-  ([#289](https://github.com/linagora/ldap-rest/issues/289))
+- `twake/groups`: the search also matches the `cn` of a group without a
+  display name ([#289](https://github.com/linagora/ldap-rest/issues/289))
 - `ldap/organizations`: the subnode search also matches the user's display
-  name (`--display-name-attribute`), so a full name finds the user
-  ([#290](https://github.com/linagora/ldap-rest/issues/290))
+  name ([#290](https://github.com/linagora/ldap-rest/issues/290))
 
 ## v0.15.0 (2026-10-06)
 
