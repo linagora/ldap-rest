@@ -993,7 +993,9 @@ export default class James extends TwakePlugin {
         const body = (await getRes.json()) as Identity[] | Identity;
         // Chosen again here rather than trusted: a server ignoring
         // `default` would list the server-set identity too, and updating
-        // that one is what brought the duplicate back
+        // that one is what brought the duplicate back. `!== false`, not
+        // `=== true`: an identity without the field is not taken for the
+        // server-set one, else every name change would create another
         defaultIdentity = (Array.isArray(body) ? body : [body])
           .filter(i => i && i.id && i.mayDelete !== false)
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
