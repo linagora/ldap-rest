@@ -862,9 +862,7 @@ const suite = (role: string) => (): void => {
           exchange: 'space',
           routingKey: SYNC,
           queue: 'twake.space.sync.requested.ldap-rest',
-          options: {
-            queueArguments: { 'x-single-active-consumer': true },
-          },
+          options: undefined,
         },
       ]);
     });
@@ -1016,15 +1014,31 @@ const suite = (role: string) => (): void => {
       }
     });
 
-    it('skips a deleted organization', async () => {
-      await dm.ldap.modify(betaDn, { replace: { st: 'deleted' } });
+    it('lists no space for a deleted organization', async () => {
+      const id = await create();
+      await events(1);
+      await dm.ldap.modify(orgDn, { replace: { st: 'deleted' } });
       try {
-        await sync({ organizationId: 'beta' });
-        await quiet();
-        expect(rabbit.published).to.deep.equal([]);
+        await sync({ organizationId: 'acme' });
+        expect(await snapshot()).to.deep.equal([
+          [
+            'twake.space.sync.completed',
+            { organizationId: 'acme', spaceIds: [] },
+          ],
+        ]);
+        await sync({ organizationId: 'acme', id });
+        expect(await snapshot()).to.deep.equal([
+          ['twake.space.deleted', { organizationId: 'acme', id }],
+        ]);
       } finally {
-        await dm.ldap.modify(betaDn, { delete: { st: 'deleted' } });
+        await dm.ldap.modify(orgDn, { delete: { st: 'deleted' } });
       }
+    });
+
+    it('skips a missing organization', async () => {
+      await sync({ organizationId: 'tse-nowhere' });
+      await quiet();
+      expect(rabbit.published).to.deep.equal([]);
     });
 
     it('refuses a request it cannot read', async () => {

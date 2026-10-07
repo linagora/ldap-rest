@@ -682,9 +682,7 @@ export default class TwakeSpaces extends DmPlugin {
       this.exchange,
       SYNC_REQUESTED,
       this.config.twake_space_sync_queue || `${SYNC_REQUESTED}.ldap-rest`,
-      message => this.onSyncRequested(message),
-      // One replica answers a request, so the events of a space go out in order
-      { queueArguments: { 'x-single-active-consumer': true } }
+      message => this.onSyncRequested(message)
     );
   }
 
@@ -1408,6 +1406,7 @@ export default class TwakeSpaces extends DmPlugin {
         );
       return;
     }
+    let deleted = false;
     try {
       await this.groups.checkOrganization(org as string);
     } catch (err) {
@@ -1418,9 +1417,11 @@ export default class TwakeSpaces extends DmPlugin {
         organization: org,
         result: err.code,
       });
-      return;
+      // A deleted organization has no space left for the apps
+      if (err.status !== 410) return;
+      deleted = true;
     }
-    await this.sync(org as string, id as string | undefined);
+    await this.sync(org as string, id as string | undefined, deleted);
   }
 
   /** The entries where `--twake-space-base` puts an organization. */
@@ -1454,9 +1455,13 @@ export default class TwakeSpaces extends DmPlugin {
    * is newer. Fails once they are all out if one was not sent, so the
    * request is retried.
    */
-  private async sync(org: string, id?: string): Promise<void> {
+  private async sync(
+    org: string,
+    id: string | undefined,
+    deleted: boolean
+  ): Promise<void> {
     const timestamp = new Date().toISOString();
-    const spaces = await this.spaces(org, '(objectClass=*)', id);
+    const spaces = deleted ? [] : await this.spaces(org, '(objectClass=*)', id);
     const sent: Promise<void>[] = [];
     if (id !== undefined && !spaces.length)
       sent.push(this.enqueue(org, 'deleted', { id }, timestamp));

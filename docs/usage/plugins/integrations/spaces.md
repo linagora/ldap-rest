@@ -148,10 +148,13 @@ An app that follows the events binds `twake.space.*`, `twake.space.member.#`,
 `twake.space.sync.requested`.
 
 The plugin consumes these requests from the `--twake-space-sync-queue`
-quorum queue, with a dead letter queue `<queue>.dlq` and a single active
-consumer. A request it cannot read goes to the dead letter queue. A missing
-or deleted organization is skipped. A sync whose events the broker does not
-take fails, and its request is retried, then goes to the dead letter queue.
+quorum queue, with a dead letter queue `<queue>.dlq`. Every replica consumes
+it, several requests at once, so the events of two syncs of one organization
+may interleave: their timestamps order them. A request it cannot read goes
+to the dead letter queue. A missing organization is skipped. A deleted one
+has no space left: its `sync.completed` lists none, and a space asked is
+`deleted`. A sync whose events the broker does not take fails, and its
+request is retried, then goes to the dead letter queue.
 
 The events of a sync carry no `actor`. They all carry the time just before
 the spaces were read, so, with synchronized clocks, the event of a write
