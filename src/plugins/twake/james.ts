@@ -923,7 +923,43 @@ export default class James extends TwakePlugin {
     return signature;
   }
 
+  /**
+   * Name the user's default identity after the directory.
+   *
+   * The default identity is Twake Mail's: the deletable one with the lowest
+   * sortOrder (`GET /users/{mail}/identities?default=true`). It is updated
+   * when there is one and created otherwise. The server-set identity
+   * (mayDelete false, named after the address) is never touched: a PUT on it
+   * makes Twake Mail add, a few seconds later, a deletable identity named
+   * "givenName sn", so the user ended up with two identities for one
+   * address, one of them named after neither the directory's display name
+   * nor the address.
+   *
+   * Calls for one address run one after the other: an add triggers this twice
+   * (ldapadddone, then the display name "change" onChange publishes), and two
+   * concurrent first calls would both find no default and both create one.
+   */
   async updateJamesIdentity(
+    dn: string,
+    mail: string,
+    displayName: string
+  ): Promise<void> {
+    const previous = this.identityQueue.get(mail) ?? Promise.resolve();
+    const current = previous.then(() =>
+      this.doUpdateJamesIdentity(dn, mail, displayName)
+    );
+    this.identityQueue.set(mail, current);
+    try {
+      await current;
+    } finally {
+      if (this.identityQueue.get(mail) === current)
+        this.identityQueue.delete(mail);
+    }
+  }
+
+  private identityQueue: Map<string, Promise<void>> = new Map();
+
+  private async doUpdateJamesIdentity(
     dn: string,
     mail: string,
     displayName: string
@@ -938,84 +974,76 @@ export default class James extends TwakePlugin {
     };
 
     try {
-      // Step 1: Get user identities
+      // Step 1: the default identity, if the user has one
       const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
       const getRes = await this.requestLimit(() =>
-        fetch(identitiesUrl, {
+        fetch(`${identitiesUrl}?default=true`, {
           method: 'GET',
           headers: this.createHeaders(),
         })
       );
-      if (!getRes.ok) {
+      let defaultIdentity: { id: string; email: string } | undefined;
+      if (getRes.ok) {
+        const body = (await getRes.json()) as
+          | Array<{ id: string; email: string }>
+          | { id: string; email: string };
+        defaultIdentity = Array.isArray(body) ? body[0] : body;
+      } else if (getRes.status !== 404) {
         this.logger.error({
           ...log,
-          step: 'get_identities',
+          step: 'get_default_identity',
           http_status: getRes.status,
           http_status_text: getRes.statusText,
         });
         return;
       }
 
-      const identities = (await getRes.json()) as Array<{
-        id: string;
-        name: string;
-        email: string;
-      }>;
-
-      // Step 2: Find default identity (first one or the one matching the email)
-      const defaultIdentity =
-        identities.find(id => id.email === mail) || identities[0];
-
-      if (!defaultIdentity) {
-        this.logger.warn({
-          ...log,
-          step: 'find_identity',
-          message: 'No identity found for user',
-        });
-        return;
-      }
-
-      // Step 3: Generate signature if template is configured
+      // Step 2: Generate signature if template is configured
       const htmlSignature = await this.generateSignature(dn);
 
-      // Step 4: Update identity name and signature
-      const updateUrl = `${this.webadminUrl}/users/${mail}/identities/${defaultIdentity.id}`;
-
-      const updatePayload: {
-        id: string;
+      // Step 3: update it, or create it
+      const payload: {
+        id?: string;
         email: string;
         name: string;
+        sortOrder?: number;
         htmlSignature?: string;
-      } = {
-        id: defaultIdentity.id,
-        email: defaultIdentity.email,
-        name: displayName,
-      };
+      } = defaultIdentity?.id
+        ? {
+            id: defaultIdentity.id,
+            email: defaultIdentity.email,
+            name: displayName,
+          }
+        : { email: mail, name: displayName, sortOrder: 0 };
+      if (htmlSignature) payload.htmlSignature = htmlSignature;
 
-      if (htmlSignature) {
-        updatePayload.htmlSignature = htmlSignature;
-      }
-
-      const updateRes = await this.requestLimit(() =>
-        fetch(updateUrl, {
-          method: 'PUT',
-          headers: this.createHeaders('application/json'),
-          body: JSON.stringify(updatePayload),
-        })
+      const step = defaultIdentity?.id ? 'update_identity' : 'create_identity';
+      const res = await this.requestLimit(() =>
+        fetch(
+          defaultIdentity?.id
+            ? `${identitiesUrl}/${defaultIdentity.id}`
+            : identitiesUrl,
+          {
+            method: defaultIdentity?.id ? 'PUT' : 'POST',
+            headers: this.createHeaders('application/json'),
+            body: JSON.stringify(payload),
+          }
+        )
       );
 
-      if (!updateRes.ok) {
+      if (!res.ok) {
         this.logger.error({
           ...log,
-          step: 'update_identity',
-          http_status: updateRes.status,
-          http_status_text: updateRes.statusText,
+          step,
+          http_status: res.status,
+          http_status_text: res.statusText,
         });
       } else {
         this.logger.info({
           ...log,
+          step,
           result: 'success',
-          http_status: updateRes.status,
+          http_status: res.status,
         });
       }
     } catch (err) {

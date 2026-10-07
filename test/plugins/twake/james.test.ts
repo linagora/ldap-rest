@@ -64,6 +64,7 @@ describe('James Plugin', () => {
       .reply(204)
       // Identity - testmail@test.org
       .get('/users/testmail@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'testmail-identity-id',
@@ -75,6 +76,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - quotauser@test.org (created in quota test)
       .get('/users/quotauser@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'quotauser-identity-id',
@@ -86,6 +88,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - aliasuser@test.org (created in alias tests)
       .get('/users/aliasuser@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'aliasuser-identity-id',
@@ -97,6 +100,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - primary@test.org (created in mail change test)
       .get('/users/primary@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'primary-identity-id',
@@ -108,6 +112,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - newprimary@test.org (after mail change)
       .get('/users/newprimary@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'newprimary-identity-id',
@@ -119,6 +124,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - t@t.org (after mail change in basic test)
       .get('/users/t@t.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 't-identity-id',
@@ -130,6 +136,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - forward@test.org (created in forward tests)
       .get('/users/forward@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'forward-identity-id',
@@ -141,6 +148,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - delegate@test.org (created in delegation tests)
       .get('/users/delegate@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'delegate-identity-id',
@@ -152,6 +160,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - assistant@test.org (created in delegation tests)
       .get('/users/assistant@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'assistant-identity-id',
@@ -163,6 +172,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - assistant1@test.org (created in delegation tests)
       .get('/users/assistant1@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'assistant1-identity-id',
@@ -174,6 +184,7 @@ describe('James Plugin', () => {
       .reply(200, { success: true })
       // Identity - assistant2@test.org (created in delegation tests)
       .get('/users/assistant2@test.org/identities')
+      .query({ default: 'true' })
       .reply(200, [
         {
           id: 'assistant2-identity-id',
@@ -399,6 +410,7 @@ describe('James Plugin', () => {
         )
         .reply(200, { success: true })
         .get('/users/noalias@test.org/identities')
+        .query({ default: 'true' })
         .reply(200, [
           {
             id: 'noalias-identity-id',
@@ -409,6 +421,7 @@ describe('James Plugin', () => {
         .put('/users/noalias@test.org/identities/noalias-identity-id')
         .reply(200, { success: true })
         .get('/users/newalias@test.org/identities')
+        .query({ default: 'true' })
         .reply(200, [
           {
             id: 'newalias-identity-id',
@@ -468,6 +481,7 @@ describe('James Plugin', () => {
         )
         .reply(200, { success: true })
         .get('/users/noalias@test.org/identities')
+        .query({ default: 'true' })
         .reply(200, [
           {
             id: 'noalias-identity-id',
@@ -478,6 +492,7 @@ describe('James Plugin', () => {
         .put('/users/noalias@test.org/identities/noalias-identity-id')
         .reply(200, { success: true })
         .get('/users/newalias@test.org/identities')
+        .query({ default: 'true' })
         .reply(200, [
           {
             id: 'newalias-identity-id',
@@ -966,6 +981,7 @@ describe('James Plugin', () => {
       )
         .persist()
         .get('/users/signature@test.org/identities')
+        .query({ default: 'true' })
         .reply(200, [
           {
             id: 'signature-identity-id',
@@ -1134,6 +1150,104 @@ describe('James Plugin', () => {
 
       expect(res.body).to.have.property('error');
       expect(res.body.error).to.match(/not found/i);
+    });
+  });
+
+  describe('updateJamesIdentity', () => {
+    const url = () =>
+      process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000';
+    const dn = () => `uid=identityuser,${process.env.DM_LDAP_BASE}`;
+    let template: unknown;
+    beforeEach(() => {
+      template = james.config.james_signature_template;
+      james.config.james_signature_template = '';
+    });
+    afterEach(() => {
+      james.config.james_signature_template = template as string;
+    });
+
+    it('updates the default identity, never the server-set one', async () => {
+      const identityScope = nock(url())
+        .get('/users/id1@test.org/identities')
+        .query({ default: 'true' })
+        .reply(200, [
+          {
+            id: 'custom-id',
+            name: 'Old',
+            email: 'id1@test.org',
+            mayDelete: true,
+          },
+        ])
+        .put('/users/id1@test.org/identities/custom-id', body => {
+          expect(body).to.deep.equal({
+            id: 'custom-id',
+            email: 'id1@test.org',
+            name: 'Jane Doe',
+          });
+          return true;
+        })
+        .reply(204);
+
+      await james.updateJamesIdentity(dn(), 'id1@test.org', 'Jane Doe');
+      expect(identityScope.isDone()).to.be.true;
+    });
+
+    it('creates the default identity when there is none', async () => {
+      // A PUT on the server-set identity makes Twake Mail add a second,
+      // deletable one named "givenName sn": create the default instead
+      const identityScope = nock(url())
+        .get('/users/id2@test.org/identities')
+        .query({ default: 'true' })
+        .reply(404, { statusCode: 404, type: 'notFound' })
+        .post('/users/id2@test.org/identities', body => {
+          expect(body).to.deep.equal({
+            email: 'id2@test.org',
+            name: 'Jane Doe',
+            sortOrder: 0,
+          });
+          return true;
+        })
+        .reply(201, { id: 'new-id' });
+
+      await james.updateJamesIdentity(dn(), 'id2@test.org', 'Jane Doe');
+      expect(identityScope.isDone()).to.be.true;
+    });
+
+    it('creates one identity when called twice at once', async () => {
+      // An add fires both ldapadddone and the display name change
+      let created = false;
+      const identityScope = nock(url())
+        .get('/users/id3@test.org/identities')
+        .query({ default: 'true' })
+        .times(2)
+        .reply(() =>
+          created
+            ? [200, [{ id: 'new-id', name: 'Jane Doe', email: 'id3@test.org' }]]
+            : [404, { statusCode: 404 }]
+        )
+        .post('/users/id3@test.org/identities')
+        .reply(() => {
+          created = true;
+          return [201, { id: 'new-id' }];
+        })
+        .put('/users/id3@test.org/identities/new-id')
+        .reply(204);
+
+      await Promise.all([
+        james.updateJamesIdentity(dn(), 'id3@test.org', 'Jane Doe'),
+        james.updateJamesIdentity(dn(), 'id3@test.org', 'Jane Doe'),
+      ]);
+      expect(identityScope.isDone()).to.be.true;
+    });
+
+    it('gives up on an unexpected answer', async () => {
+      const identityScope = nock(url())
+        .get('/users/id4@test.org/identities')
+        .query({ default: 'true' })
+        .reply(500);
+
+      await james.updateJamesIdentity(dn(), 'id4@test.org', 'Jane Doe');
+      expect(identityScope.isDone()).to.be.true;
     });
   });
 

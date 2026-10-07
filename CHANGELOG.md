@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/james`: the display name goes to the user's default identity, which
+  is created when the user has none. The plugin updated the server-set
+  identity instead, and Twake Mail answered that by adding a second identity
+  for the same address, named "givenName sn",
+  [docs](docs/usage/plugins/integrations/james-mail.md#display-name-and-identity)
+- `ldap/onChange`: a change of the display name attribute alone
+  (`--display-name-attribute`, `displayName` by default) fires
+  `onLdapDisplayNameChange`; only `cn`, `givenName` and `sn` were watched
+
 ## v0.16.0 (2026-10-07)
 
 ### Breaking Changes

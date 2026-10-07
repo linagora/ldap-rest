@@ -50,8 +50,12 @@ describe('James Branch Validation', () => {
       .persist()
       // Mock identity sync
       .get(/\/users\/.*@test\.org\/identities$/)
+      .query({ default: 'true' })
       .reply(200, uri => {
-        const email = uri.replace('/users/', '').replace('/identities', '');
+        const email = uri
+          .replace(/\?.*$/, '')
+          .replace('/users/', '')
+          .replace('/identities', '');
         return [
           {
             id: `${email}-identity-id`,
@@ -447,8 +451,12 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
       .persist()
       // Mock identity sync
       .get(/\/users\/.*@test\.org\/identities$/)
+      .query({ default: 'true' })
       .reply(200, uri => {
-        const email = uri.replace('/users/', '').replace('/identities', '');
+        const email = uri
+          .replace(/\?.*$/, '')
+          .replace('/users/', '')
+          .replace('/identities', '');
         return [
           {
             id: `${email}-identity-id`,
