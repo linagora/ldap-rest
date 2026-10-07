@@ -5,8 +5,8 @@
 ### Features
 
 - `twake/spaces`: every space event carries `organizationDomain`, the
-  organization's domain, read with the new
-  `--twake-space-organization-domain-attribute` (default `twakeDomain`). With
+  organization's domain, read from
+  `--twake-instance-organization-domain-attribute` (default `twakeDomain`). With
   `--rabbitmq-url` and `--twake-group-organization-dn`, the server does not
   start when the directory schema does not define that attribute,
   [docs](docs/usage/plugins/integrations/spaces.md#events)

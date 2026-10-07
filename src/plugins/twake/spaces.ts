@@ -260,7 +260,7 @@ export default class TwakeSpaces extends DmPlugin {
     this.userRole = this.config.twake_space_user_role_attribute || '';
     this.exchange = this.config.twake_space_exchange || 'space';
     this.domainAttribute =
-      this.config.twake_space_organization_domain_attribute || 'twakeDomain';
+      this.config.twake_instance_organization_domain_attribute || 'twakeDomain';
     if (this.config.twake_group_organization_dn)
       this.orgPattern = branchPattern(this.config.twake_group_organization_dn);
     if (this.config.rabbitmq_url) this.dependencies.rabbitmq = 'core/rabbitmq';
@@ -415,7 +415,7 @@ export default class TwakeSpaces extends DmPlugin {
       )
     )
       throw new Error(
-        `${this.name}: the directory schema defines no ${this.domainAttribute}; load a schema that does, or set --twake-space-organization-domain-attribute`
+        `${this.name}: the directory schema defines no ${this.domainAttribute}; load a schema that does, or set --twake-instance-organization-domain-attribute`
       );
     if (!this.follows || !this.server.loadedPlugins.trash) return;
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();

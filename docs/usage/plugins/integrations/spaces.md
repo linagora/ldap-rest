@@ -92,7 +92,8 @@ the write, when known) and `timestamp`. A member is described as above, its
 
 `organizationDomain` is the organization's domain, read on its entry
 (`--twake-group-organization-dn`) from
-`--twake-space-organization-domain-attribute`, and kept until the entry
+`--twake-instance-organization-domain-attribute` (default `twakeDomain`),
+the option `twake/instances` reads too, and kept until the entry
 changes. It is left out when `--twake-group-organization-dn` is empty or the
 entry has no such value. The server does not start when the directory schema
 does not define that attribute.
@@ -218,8 +219,6 @@ organization's users, groups and organization entry.
   Unset, no user entry is written.
 - `--twake-space-exchange` (default `space`): the topic exchange of the
   events, published only when `--rabbitmq-url` is set.
-- `--twake-space-organization-domain-attribute` (default `twakeDomain`): the
-  attribute of the organization entry holding its domain, for the events.
 
 ## Dependencies
 

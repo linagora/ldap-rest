@@ -186,7 +186,7 @@ const suite = (role: string) => (): void => {
       rabbitmq_url: 'amqp://stub',
       twake_space_user_role_attribute: role,
       twake_group_organization_dn: `ou={org},${ORGS}`,
-      twake_space_organization_domain_attribute: DOMAIN_ATTRIBUTE,
+      twake_instance_organization_domain_attribute: DOMAIN_ATTRIBUTE,
     });
     await dm.ready;
     raw = new DM();
@@ -344,7 +344,8 @@ const suite = (role: string) => (): void => {
   });
 
   it('refuses a domain attribute the schema does not define', async () => {
-    dm.config.twake_space_organization_domain_attribute = 'tseNoSuchAttribute';
+    dm.config.twake_instance_organization_domain_attribute =
+      'tseNoSuchAttribute';
     try {
       const refused = await new TwakeSpaces(dm).assertComposition().then(
         () => undefined,
@@ -352,7 +353,7 @@ const suite = (role: string) => (): void => {
       );
       expect(refused?.message).to.match(/tseNoSuchAttribute/);
     } finally {
-      dm.config.twake_space_organization_domain_attribute = DOMAIN_ATTRIBUTE;
+      dm.config.twake_instance_organization_domain_attribute = DOMAIN_ATTRIBUTE;
     }
   });
 
