@@ -828,12 +828,12 @@ const suite = (role: string) => (): void => {
   describe('sync', () => {
     const SYNC = 'twake.space.sync.requested';
     const requested = { timestamp: '2026-10-07T02:00:00.000Z' };
-    const sync = (message: Record<string, unknown>): Promise<void> => {
-      const [subscription] = rabbit.subscribed.filter(
-        s => s.routingKey === SYNC
-      );
-      return subscription.handler({ ...requested, ...message });
-    };
+    const handle = (message: unknown): Promise<void> =>
+      rabbit.subscribed
+        .filter(s => s.routingKey === SYNC)[0]
+        .handler(message as Record<string, unknown>);
+    const sync = (message: Record<string, unknown>): Promise<void> =>
+      handle({ ...requested, ...message });
     const byUsername = (members: unknown): unknown =>
       (members as { username: string }[]).sort((a, b) =>
         a.username.localeCompare(b.username)
@@ -978,9 +978,41 @@ const suite = (role: string) => (): void => {
       expect(published.map(p => p.message.organizationId).sort()).to.deep.equal(
         ['acme', 'beta']
       );
-      for (const { exchange, message } of published) {
+      for (const { exchange, message, messageId } of published) {
         expect(exchange).to.equal('space');
         expect(message.timestamp).to.match(/^\d{4}-\d\d-\d\dT/);
+        expect(messageId).to.match(/^[0-9a-f-]{36}$/);
+      }
+      expect(new Set(published.map(p => p.messageId)).size).to.equal(2);
+    });
+
+    it('fails a sync whose events the broker refuses, so it is retried', async () => {
+      await create();
+      await create([{ username: 'tse-bob', role: 'admin' }]);
+      await events(2);
+      const { publish } = rabbit;
+      let refusals = 1;
+      rabbit.publish = async (...args) => {
+        if (args[1] === 'twake.space.synced' && refusals-- > 0)
+          throw new Error('refused');
+        return publish.apply(rabbit, args);
+      };
+      try {
+        let refused: Error | undefined;
+        await sync({ organizationId: 'acme' }).catch(
+          (err: Error) => (refused = err)
+        );
+        expect(refused?.message).to.match(/refused/);
+        rabbit.published = [];
+        await sync({ organizationId: 'acme' });
+        expect(rabbit.published.map(p => p.routingKey)).to.deep.equal([
+          'twake.space.synced',
+          'twake.space.synced',
+          'twake.space.sync.completed',
+        ]);
+      } finally {
+        rabbit.publish = publish;
+        rabbit.published = [];
       }
     });
 
@@ -997,12 +1029,15 @@ const suite = (role: string) => (): void => {
 
     it('refuses a request it cannot read', async () => {
       for (const message of [
+        [],
+        'acme',
+        null,
         { id: 'x' },
         { organizationId: 42 },
         { organizationId: 'acme', id: '' },
       ]) {
         let refused: Error | undefined;
-        await sync(message).catch((err: Error) => (refused = err));
+        await handle(message).catch((err: Error) => (refused = err));
         expect(refused?.message, JSON.stringify(message)).to.match(
           /sync request/
         );

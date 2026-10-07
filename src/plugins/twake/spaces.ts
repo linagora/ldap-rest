@@ -1346,7 +1346,8 @@ export default class TwakeSpaces extends DmPlugin {
     context: ChangeContext,
     fields: Record<string, unknown> = {}
   ): void {
-    this.enqueue(
+    // The event of a write is logged, not sent again
+    void this.enqueue(
       org,
       event,
       { id, ...fields, actor: context.actor },
@@ -1359,11 +1360,11 @@ export default class TwakeSpaces extends DmPlugin {
     event: string,
     fields: Record<string, unknown>,
     timestamp: string
-  ): void {
+  ): Promise<void> {
     const rabbitmq = this.rabbitmq;
-    if (!rabbitmq) return;
+    if (!rabbitmq) return Promise.resolve();
     // A broker that is down holds up the events, not the role writes
-    this.publishing = this.publishing.then(async () =>
+    const sent = this.publishing.then(async () =>
       this.publish(rabbitmq, event, {
         organizationId: org,
         ...(await this.domainOf(org)),
@@ -1371,12 +1372,16 @@ export default class TwakeSpaces extends DmPlugin {
         timestamp,
       })
     );
+    // Also marks a failure handled, for the events of a write
+    this.publishing = sent.catch(() => undefined);
+    return sent;
   }
 
   /**
    * Every organization is asked in a request of its own, through the queue:
-   * a quorum queue drops a consumer that holds a message more than 30
-   * minutes.
+   * the broker closes the channel of a consumer that holds a message longer
+   * than its consumer_timeout (30 minutes by default), and delivers every
+   * message in flight on it again.
    */
   private async onSyncRequested(
     message: Record<string, unknown>
@@ -1394,14 +1399,8 @@ export default class TwakeSpaces extends DmPlugin {
     if (!valid(org) || !valid(id) || (org === undefined && id !== undefined))
       throw malformed();
     if (org === undefined) {
-      const rabbitmq = this.rabbitmq!;
-      // core/rabbitmq drops a message silently when it has no client. Thrown,
-      // so the request is retried: asking an organization twice syncs it
-      // twice, not asking it leaves it unsynced
-      if (!(await rabbitmq.getRawClient()))
-        throw new Error(`${this.name}: no broker to ask the organizations`);
       for (const one of await this.organizations())
-        await rabbitmq.publish(
+        await this.rabbitmq!.publish(
           this.exchange,
           SYNC_REQUESTED,
           { organizationId: one, timestamp: new Date().toISOString() },
@@ -1422,7 +1421,6 @@ export default class TwakeSpaces extends DmPlugin {
       return;
     }
     await this.sync(org as string, id as string | undefined);
-    await this.publishing;
   }
 
   /** The entries where `--twake-space-base` puts an organization. */
@@ -1453,24 +1451,32 @@ export default class TwakeSpaces extends DmPlugin {
 
   /**
    * The events bear the time before the read, so an event of a later write
-   * is newer.
+   * is newer. Fails once they are all out if one was not sent, so the
+   * request is retried.
    */
   private async sync(org: string, id?: string): Promise<void> {
     const timestamp = new Date().toISOString();
     const spaces = await this.spaces(org, '(objectClass=*)', id);
-    if (id !== undefined && !spaces.length) {
-      this.enqueue(org, 'deleted', { id }, timestamp);
-      return;
-    }
+    const sent: Promise<void>[] = [];
+    if (id !== undefined && !spaces.length)
+      sent.push(this.enqueue(org, 'deleted', { id }, timestamp));
     for (const space of spaces)
-      this.enqueue(org, 'synced', await this.whole(org, space), timestamp);
-    if (id === undefined)
-      this.enqueue(
-        org,
-        'sync.completed',
-        { spaceIds: spaces.map(s => s.id) },
-        timestamp
+      sent.push(
+        this.enqueue(org, 'synced', await this.whole(org, space), timestamp)
       );
+    if (id === undefined)
+      sent.push(
+        this.enqueue(
+          org,
+          'sync.completed',
+          { spaceIds: spaces.map(s => s.id) },
+          timestamp
+        )
+      );
+    const failed = (await Promise.allSettled(sent)).find(
+      r => r.status === 'rejected'
+    );
+    if (failed) throw failed.reason;
   }
 
   /** A space as `twake.space.created` gives it. */
@@ -1571,19 +1577,20 @@ export default class TwakeSpaces extends DmPlugin {
       routingKey: `twake.space.${event}`,
       messageId: randomUUID(),
     };
+    // core/rabbitmq drops a message silently when it has no client
+    if (!(await rabbitmq.getRawClient())) {
+      this.logger.error({ ...log, result: 'no broker' });
+      throw new Error(`${this.name}: no broker for ${log.routingKey}`);
+    }
     try {
-      // core/rabbitmq drops a message silently when it has no client
-      if (!(await rabbitmq.getRawClient())) {
-        this.logger.error({ ...log, result: 'no broker' });
-        return;
-      }
       await rabbitmq.publish(log.exchange, log.routingKey, message, {
         messageId: log.messageId,
       });
-      this.logger.info({ ...log, result: 'published' });
     } catch (err) {
       this.logger.error({ ...log, result: 'error', error: String(err) });
+      throw err;
     }
+    this.logger.info({ ...log, result: 'published' });
   }
 
   /** A user's roles, in the directory as it is or with a change undone. */

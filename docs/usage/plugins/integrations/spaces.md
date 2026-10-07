@@ -142,20 +142,27 @@ An app repairs its copy of the spaces by publishing
   `--twake-space-base`, published on the exchange, so every organization is
   synced as above.
 
+A request reaches every queue bound to its key, `twake.space.#` included.
+An app that follows the events binds `twake.space.*`, `twake.space.member.#`,
+`twake.space.group.#` and `twake.space.sync.completed`, or ignores
+`twake.space.sync.requested`.
+
 The plugin consumes these requests from the `--twake-space-sync-queue`
 quorum queue, with a dead letter queue `<queue>.dlq` and a single active
 consumer. A request it cannot read goes to the dead letter queue. A missing
-or deleted organization is skipped.
+or deleted organization is skipped. A sync whose events the broker does not
+take fails, and its request is retried, then goes to the dead letter queue.
 
 The events of a sync carry no `actor`. They all carry the time just before
-the spaces were read, so the event of a write followed after that is newer.
+the spaces were read, so, with synchronized clocks, the event of a write
+followed after that is newer.
 An app that applies only events newer than the last one keeps the right
 state, and keeps a space created after a `sync.completed` that does not list
 it.
 
 The server does not start when the broker cannot be reached. An event the
-broker cannot take once the server runs is logged with `result: "error"` and
-not sent again.
+broker cannot take once the server runs is logged with `result: "error"`;
+the event of a write is not sent again.
 
 Member events compare each moved user's roles before and after a change:
 
