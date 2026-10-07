@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Space events need the organization domain attribute
+
+**Who is affected:** a deployment of `core/twake/spaces` with `--rabbitmq-url`
+and `--twake-group-organization-dn`.
+
+The space events now carry the organization's domain, read from
+`--twake-instance-organization-domain-attribute` (default `twakeDomain`). The
+server does not start when the directory schema does not define that
+attribute: load a schema that does, or point the option at one it defines.
+
 ## To 0.15.0
 
 ### A DN option read from the environment splits on `;` only
