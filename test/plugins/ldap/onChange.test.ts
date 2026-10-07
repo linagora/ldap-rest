@@ -67,6 +67,53 @@ describe('onChange', () => {
     });
   });
 
+  describe('reconstructDisplayName', () => {
+    const name = (
+      attrs: Record<string, string | string[]> | null,
+      config: Record<string, unknown> = {}
+    ): string | null =>
+      OnLdapChange.prototype.reconstructDisplayName.call(
+        { config } as unknown as OnLdapChange,
+        attrs && ({ dn: 'uid=x,dc=example,dc=com', ...attrs } as Entry)
+      );
+
+    it('takes displayName before cn, as the James plugin does', () => {
+      expect(
+        name({ displayName: 'Jane Doe', cn: 'jdoe', givenName: 'J', sn: 'D' })
+      ).to.equal('Jane Doe');
+    });
+
+    it('sees a change of displayName alone', () => {
+      const before = name({ displayName: 'admin', cn: 'admin' });
+      const after = name({ displayName: 'Admin TOSK', cn: 'admin' });
+      expect(before).to.not.equal(after);
+    });
+
+    it('follows display_name_attribute', () => {
+      expect(
+        name(
+          { displayName: 'ignored', preferredName: 'Jane', cn: 'jdoe' },
+          { display_name_attribute: 'preferredName' }
+        )
+      ).to.equal('Jane');
+    });
+
+    it('matches the attribute whatever its case', () => {
+      expect(name({ displayname: ['Jane Doe'], cn: 'jdoe' })).to.equal(
+        'Jane Doe'
+      );
+    });
+
+    it('falls back to cn, then givenName and sn', () => {
+      expect(name({ cn: 'jdoe', givenName: 'Jane', sn: 'Doe' })).to.equal(
+        'jdoe'
+      );
+      expect(name({ givenName: 'Jane', sn: 'Doe' })).to.equal('Jane Doe');
+      expect(name({ mail: 'x@y.z' })).to.equal(null);
+      expect(name(null)).to.equal(null);
+    });
+  });
+
   describe('hooks', () => {
     let dm: DM;
     let onChange: OnLdapChange;

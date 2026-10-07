@@ -146,6 +146,34 @@ When a user's quota changes:
    5000000000
    ```
 
+### Display Name and Identity
+
+When a user is added, or their display name changes, the plugin names their
+default identity in Twake Mail after the directory. The name is the first one
+found in `--display-name-attribute` (`displayName` by default), `cn`, then
+`givenName` and `sn`. The optional signature is `--james-signature-template`.
+
+1. **James plugin** reads the default identity, the deletable one with the
+   lowest `sortOrder`:
+
+   ```http
+   GET /users/jdoe@company.com/identities?default=true
+   ```
+
+2. It updates that identity, or creates it when the user has none (404):
+
+   ```http
+   PUT /users/jdoe@company.com/identities/{id}
+   POST /users/jdoe@company.com/identities
+   {"email": "jdoe@company.com", "name": "John Doe", "sortOrder": 0}
+   ```
+
+The server-set identity, which James derives from the address and which
+cannot be deleted, is left alone: an update of it makes Twake Mail add a
+second identity for the same address, named "givenName sn". Calls for one
+address run one after the other, so that the two hooks an add fires create a
+single identity.
+
 ### Email Aliases Management
 
 The plugin automatically manages email aliases stored in LDAP and syncs them to James.

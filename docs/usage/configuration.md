@@ -267,7 +267,7 @@ Monitors LDAP modifications and triggers hooks for attribute changes. No configu
 - `onLdapQuotaChange` - Quota attribute changes
 - `onLdapAliasChange` - Alias attribute changes
 - `onLdapForwardChange` - Forward attribute changes
-- `onLdapDisplayNameChange` - Display name changes (cn, givenName, sn)
+- `onLdapDisplayNameChange` - Display name changes (`--display-name-attribute`, else cn, else givenName and sn)
 
 #### `core/ldap/departmentSync`
 
