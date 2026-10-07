@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Features
+
+- `twake/spaces`: every space event carries `organizationDomain`, the
+  organization's domain, read from
+  `--twake-instance-organization-domain-attribute` (default `twakeDomain`),
+  [docs](docs/usage/plugins/integrations/spaces.md#events),
+  [notes](docs/usage/upgrading.md#space-events-need-the-organization-domain-attribute)
+
 ### Fixes
 
 - `twake/groups`: the group search also matches the `cn` of a group without

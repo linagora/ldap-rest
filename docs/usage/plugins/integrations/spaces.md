@@ -69,6 +69,7 @@ every write, whichever API makes it, shortly after it.
 ```json
 {
   "organizationId": "acme",
+  "organizationDomain": "acme.com",
   "id": "3b9e2c71-5d4a-4f0e-9c8b-1a2d6e7f8091",
   "members": [
     {
@@ -88,6 +89,16 @@ every write, whichever API makes it, shortly after it.
 Every event carries `organizationId`, `id` (the space), `actor` (who made
 the write, when known) and `timestamp`. A member is described as above, its
 `uuid` the user's `entryUUID`; a group is `{ id, name, role }`.
+
+`organizationDomain` is the organization's domain, read on its entry
+(`--twake-group-organization-dn`) from
+`--twake-instance-organization-domain-attribute` (default `twakeDomain`), the
+option `twake/instances` reads too. It is kept until the entry is changed
+through this server: another replica, or a write made straight to the
+directory, keeps the old domain until restart. It is left out when
+`--twake-group-organization-dn` is empty or the entry has no such value. The
+server does not start when the directory schema does not define that
+attribute.
 
 Writes made close together blur the actor: the member events of two writes
 of one space or group followed together may go out under the first one's.

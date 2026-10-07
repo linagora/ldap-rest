@@ -606,7 +606,8 @@ See [groups](plugins/integrations/groups.md).
 
 Requires `core/twake/groups`, whose options it reads for users, groups and the
 organization entry, and `core/ldap/onChange`; with `--rabbitmq-url`, it
-requires `core/rabbitmq`.
+requires `core/rabbitmq` and reads the organization domain from
+`--twake-instance-organization-domain-attribute`.
 
 | CLI                                    | Env                                     | Default            | Description                                        |
 | -------------------------------------- | --------------------------------------- | ------------------ | -------------------------------------------------- |

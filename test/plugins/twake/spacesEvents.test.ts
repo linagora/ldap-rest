@@ -13,6 +13,10 @@ const orgDn = `ou=acme,${ORGS}`;
 const users = `ou=users,${orgDn}`;
 const userDn = (uid: string): string => `uid=${uid},${users}`;
 const UIDS = ['tse-alice', 'tse-bob', 'tse-carol'];
+const DOMAIN = 'acme.example.org';
+// An attribute of organizationalUnit, so the test needs no Twake schema
+const DOMAIN_ATTRIBUTE = 'description';
+const betaDn = `ou=beta,${ORGS}`;
 // A multi-valued attribute of inetOrgPerson, so the test needs no Twake schema
 const ROLE = 'carLicense';
 
@@ -109,7 +113,10 @@ const suite = (role: string) => (): void => {
     return release;
   };
 
-  /** The events published once `count` have come, without timestamp and actor. */
+  /**
+   * The events published once `count` have come, without timestamp, actor
+   * and the domain of acme.
+   */
   const events = async (
     count: number
   ): Promise<[string, Record<string, unknown>][]> => {
@@ -126,6 +133,10 @@ const suite = (role: string) => (): void => {
         // No authentication here: the actor is there, unknown
         expect(message).to.have.property('actor', undefined);
         const { timestamp: _, actor: __, ...rest } = message;
+        if (rest.organizationId === 'acme') {
+          expect(rest.organizationDomain).to.equal(DOMAIN);
+          delete rest.organizationDomain;
+        }
         return [routingKey, rest] as [string, Record<string, unknown>];
       }
     );
@@ -174,6 +185,8 @@ const suite = (role: string) => (): void => {
       twake_space_viewer_attribute: 'seeAlso',
       rabbitmq_url: 'amqp://stub',
       twake_space_user_role_attribute: role,
+      twake_group_organization_dn: `ou={org},${ORGS}`,
+      twake_instance_organization_domain_attribute: DOMAIN_ATTRIBUTE,
     });
     await dm.ready;
     raw = new DM();
@@ -197,8 +210,15 @@ const suite = (role: string) => (): void => {
       users,
       `ou=groups,${orgDn}`,
       `ou=spaces,${orgDn}`,
+      betaDn,
+      `ou=users,${betaDn}`,
+      `ou=groups,${betaDn}`,
+      `ou=spaces,${betaDn}`,
     ])
       await ou(dn);
+    await dm.ldap.modify(orgDn, {
+      replace: { [DOMAIN_ATTRIBUTE]: DOMAIN },
+    });
   });
 
   beforeEach(async () => {
@@ -238,6 +258,10 @@ const suite = (role: string) => (): void => {
       `ou=groups,${orgDn}`,
       `ou=spaces,${orgDn}`,
       orgDn,
+      `ou=users,${betaDn}`,
+      `ou=groups,${betaDn}`,
+      `ou=spaces,${betaDn}`,
+      betaDn,
       ORGS,
     ])
       await dm.ldap.delete(dn).catch(() => undefined);
@@ -269,6 +293,68 @@ const suite = (role: string) => (): void => {
         },
       ],
     ]);
+  });
+
+  it('publishes no domain for an organization without one', async () => {
+    const dan = `uid=tse-dan,ou=users,${betaDn}`;
+    await dm.ldap.add(dan, {
+      objectClass: ['top', 'inetOrgPerson', 'organizationalPerson', 'person'],
+      cn: 'tse-dan',
+      sn: 'Doe',
+      uid: 'tse-dan',
+    });
+    try {
+      const res = await api
+        .post('/api/v1/organizations/beta/spaces')
+        .send({
+          name: 'Beta',
+          members: [{ username: 'tse-dan', role: 'admin' }],
+        })
+        .expect(201);
+      const [[key, message]] = await events(1);
+      expect(key).to.equal('twake.space.created');
+      expect(message).to.include({ organizationId: 'beta', id: res.body.id });
+      expect(message).not.to.have.property('organizationDomain');
+      await api
+        .delete(`/api/v1/organizations/beta/spaces/${res.body.id}`)
+        .expect(200);
+      await events(1);
+    } finally {
+      await dm.ldap.delete(dan).catch(() => undefined);
+    }
+  });
+
+  it('follows a change of the organization domain', async () => {
+    const id = await create();
+    await events(1);
+    await dm.ldap.modify(orgDn, {
+      replace: { [DOMAIN_ATTRIBUTE]: 'acme.example.net' },
+    });
+    try {
+      await api.patch(`${route}/${id}`).send({ name: 'Retro' }).expect(200);
+      await quiet();
+      expect(
+        rabbit.published.map(p => p.message.organizationDomain)
+      ).to.deep.equal(['acme.example.net']);
+    } finally {
+      rabbit.published = [];
+      await dm.ldap.modify(orgDn, { replace: { [DOMAIN_ATTRIBUTE]: DOMAIN } });
+      await quiet();
+    }
+  });
+
+  it('refuses a domain attribute the schema does not define', async () => {
+    dm.config.twake_instance_organization_domain_attribute =
+      'tseNoSuchAttribute';
+    try {
+      const refused = await new TwakeSpaces(dm).assertComposition().then(
+        () => undefined,
+        (err: Error) => err
+      );
+      expect(refused?.message).to.match(/tseNoSuchAttribute/);
+    } finally {
+      dm.config.twake_instance_organization_domain_attribute = DOMAIN_ATTRIBUTE;
+    }
   });
 
   it('publishes a rename and a deletion', async () => {
