@@ -1170,12 +1170,29 @@ describe('James Plugin', () => {
       const identityScope = nock(url())
         .get('/users/id1@test.org/identities')
         .query({ default: 'true' })
+        // As a server ignoring `default` would answer: everything, the
+        // server-set identity first
         .reply(200, [
+          {
+            id: 'server-set-id',
+            name: 'id1@test.org',
+            email: 'id1@test.org',
+            mayDelete: false,
+            sortOrder: 100,
+          },
+          {
+            id: 'other-id',
+            name: 'Other',
+            email: 'id1@test.org',
+            mayDelete: true,
+            sortOrder: 5,
+          },
           {
             id: 'custom-id',
             name: 'Old',
             email: 'id1@test.org',
             mayDelete: true,
+            sortOrder: 0,
           },
         ])
         .put('/users/id1@test.org/identities/custom-id', body => {
@@ -1210,6 +1227,26 @@ describe('James Plugin', () => {
         .reply(201, { id: 'new-id' });
 
       await james.updateJamesIdentity(dn(), 'id2@test.org', 'Jane Doe');
+      expect(identityScope.isDone()).to.be.true;
+    });
+
+    it('creates the default identity when only the server-set one comes back', async () => {
+      const identityScope = nock(url())
+        .get('/users/id5@test.org/identities')
+        .query({ default: 'true' })
+        .reply(200, [
+          {
+            id: 'server-set-id',
+            name: 'id5@test.org',
+            email: 'id5@test.org',
+            mayDelete: false,
+            sortOrder: 100,
+          },
+        ])
+        .post('/users/id5@test.org/identities')
+        .reply(201, { id: 'new-id' });
+
+      await james.updateJamesIdentity(dn(), 'id5@test.org', 'Jane Doe');
       expect(identityScope.isDone()).to.be.true;
     });
 

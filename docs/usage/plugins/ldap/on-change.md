@@ -36,15 +36,15 @@ A write no request is behind, such as a scheduled task's, gets `{}`. The LDAP
 
 The other hooks are derived from it:
 
-| Hook                      | Fires when                                                 | Parameters                             |
-| ------------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| `onLdapChange`            | any attribute changed                                      | `(dn, changes)`                        |
-| `onLdapMailChange`        | `--mail-attribute` changed                                 | `(dn, oldMail, newMail)`               |
-| `onLdapQuotaChange`       | `--quota-attribute` changed                                | `(dn, mail, oldQuota, newQuota)`       |
-| `onLdapAliasChange`       | `--alias-attribute` changed                                | `(dn, mail, oldAliases, newAliases)`   |
-| `onLdapForwardChange`     | `--forward-attribute` changed                              | `(dn, mail, oldForwards, newForwards)` |
-| `onLdapDriveQuotaChange`  | `--drive-quota-attribute` changed                          | `(dn, oldQuota, newQuota)`             |
-| `onLdapDisplayNameChange` | the name built from `cn`, or `givenName` and `sn`, changed | `(dn, oldName, newName)`               |
+| Hook                      | Fires when                                                                              | Parameters                             |
+| ------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------- |
+| `onLdapChange`            | any attribute changed                                                                   | `(dn, changes)`                        |
+| `onLdapMailChange`        | `--mail-attribute` changed                                                              | `(dn, oldMail, newMail)`               |
+| `onLdapQuotaChange`       | `--quota-attribute` changed                                                             | `(dn, mail, oldQuota, newQuota)`       |
+| `onLdapAliasChange`       | `--alias-attribute` changed                                                             | `(dn, mail, oldAliases, newAliases)`   |
+| `onLdapForwardChange`     | `--forward-attribute` changed                                                           | `(dn, mail, oldForwards, newForwards)` |
+| `onLdapDriveQuotaChange`  | `--drive-quota-attribute` changed                                                       | `(dn, oldQuota, newQuota)`             |
+| `onLdapDisplayNameChange` | the name from `--display-name-attribute`, else `cn`, else `givenName` and `sn`, changed | `(dn, oldName, newName)`               |
 
 `changes` maps each attribute that changed to `[oldValues, newValues]`, the
 full values on each side, `null` where the attribute is absent:

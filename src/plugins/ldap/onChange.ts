@@ -400,11 +400,13 @@ class OnLdapChange extends DmPlugin {
   }
 
   /**
-   * The name the James plugin gives an identity, so that a change is seen
-   * wherever that name comes from: the display name attribute first, then
-   * cn, then givenName + sn (`getDisplayNameFromAttributes` in
-   * plugins/twake/james.ts). Reading cn first, as this did, missed a change
-   * of displayName alone, the attribute the console and the schemas edit.
+   * The name the James plugin gives an identity, in the same order: the
+   * display name attribute, then cn, then givenName + sn
+   * (`getDisplayNameFromAttributes` in plugins/twake/james.ts). Reading cn
+   * first, as this did, missed a change of displayName alone, the attribute
+   * the console and the schemas edit. The James plugin's last resort, the
+   * mail, is left out: a mail change already has its own hook, and an entry
+   * without any name would turn every mail change into a name change.
    * @param entry - The entry, before or after the change
    * @returns The display name or null
    */

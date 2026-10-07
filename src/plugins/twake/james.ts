@@ -982,12 +982,21 @@ export default class James extends TwakePlugin {
           headers: this.createHeaders(),
         })
       );
-      let defaultIdentity: { id: string; email: string } | undefined;
+      type Identity = {
+        id: string;
+        email: string;
+        mayDelete?: boolean;
+        sortOrder?: number;
+      };
+      let defaultIdentity: Identity | undefined;
       if (getRes.ok) {
-        const body = (await getRes.json()) as
-          | Array<{ id: string; email: string }>
-          | { id: string; email: string };
-        defaultIdentity = Array.isArray(body) ? body[0] : body;
+        const body = (await getRes.json()) as Identity[] | Identity;
+        // Chosen again here rather than trusted: a server ignoring
+        // `default` would list the server-set identity too, and updating
+        // that one is what brought the duplicate back
+        defaultIdentity = (Array.isArray(body) ? body : [body])
+          .filter(i => i && i.id && i.mayDelete !== false)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
       } else if (getRes.status !== 404) {
         this.logger.error({
           ...log,

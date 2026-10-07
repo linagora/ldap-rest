@@ -213,9 +213,9 @@ export default class Calendar extends TwakePlugin {
      *
      * A single hook is used (rather than onLdapMailChange /
      * onLdapDisplayNameChange) so the sync is driven by the *configured* mail,
-     * first name and last name attributes — the display-name hook only fires on
-     * the hard-coded cn/givenName/sn attributes, which would silently ignore a
-     * non-default firstname/lastname attribute.
+     * first name and last name attributes — the display-name hook follows one
+     * name (the display name attribute, else cn, else givenName and sn), which
+     * would silently ignore a non-default firstname/lastname attribute.
      */
     onLdapChange: async (dn: string, changes: ChangesToNotify) => {
       const mailChange = changes[this.mailAttr];
