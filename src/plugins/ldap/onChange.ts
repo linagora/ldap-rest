@@ -400,24 +400,37 @@ class OnLdapChange extends DmPlugin {
   }
 
   /**
-   * Reconstruct display name from cn, givenName, and sn attributes
+   * The name the James plugin gives an identity, so that a change is seen
+   * wherever that name comes from: the display name attribute first, then
+   * cn, then givenName + sn (`getDisplayNameFromAttributes` in
+   * plugins/twake/james.ts). Reading cn first, as this did, missed a change
+   * of displayName alone, the attribute the console and the schemas edit.
    * @param entry - The entry, before or after the change
-   * @returns The reconstructed display name or null
+   * @returns The display name or null
    */
   reconstructDisplayName(entry: Entry | null): string | null {
     const getValue = (attr: string): string | null => {
-      const value = entry?.[attr];
+      if (!entry) return null;
+      // Attribute names are case-insensitive, and the server answers them
+      // as its schema spells them
+      const key = Object.keys(entry).find(
+        k => k.toLowerCase() === attr.toLowerCase()
+      );
+      const value = key === undefined ? undefined : entry[key];
       if (!value) return null;
       if (Array.isArray(value))
         return value.length > 0 ? String(value[0]) : null;
       return String(value);
     };
 
-    // Try cn first
+    const displayName = getValue(
+      (this.config.display_name_attribute as string) || 'displayName'
+    );
+    if (displayName) return displayName;
+
     const cn = getValue('cn');
     if (cn) return cn;
 
-    // Try givenName + sn
     const givenName = getValue('givenName');
     const sn = getValue('sn');
     if (givenName || sn) {
