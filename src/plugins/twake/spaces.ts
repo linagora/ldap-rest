@@ -66,6 +66,8 @@ const isRole = (role: unknown): role is SpaceRole =>
 
 const BY_STRENGTH = [...SPACE_ROLES].reverse();
 
+const SYNC_REQUESTED = 'twake.space.sync.requested';
+
 const SPACE_SORT = ['name'];
 const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle', 'role'];
 
@@ -518,7 +520,7 @@ export default class TwakeSpaces extends DmPlugin {
     return values(held).find(h => !branches.includes(dnKey(parentOf(h))));
   }
 
-  api(app: Express): void {
+  async api(app: Express): Promise<void> {
     const base = `${this.config.api_prefix}/v1/organizations/:id/spaces`;
     const route = (
       context: string,
@@ -675,6 +677,12 @@ export default class TwakeSpaces extends DmPlugin {
         await this.change(req, org, 'group');
         done(res);
       })
+    );
+    await this.rabbitmq?.subscribe(
+      this.exchange,
+      SYNC_REQUESTED,
+      this.config.twake_space_sync_queue || `${SYNC_REQUESTED}.ldap-rest`,
+      message => this.onSyncRequested(message)
     );
   }
 
@@ -1336,20 +1344,196 @@ export default class TwakeSpaces extends DmPlugin {
     context: ChangeContext,
     fields: Record<string, unknown> = {}
   ): void {
+    // The event of a write is logged, not sent again
+    void this.enqueue(
+      org,
+      event,
+      { id, ...fields, actor: context.actor },
+      new Date().toISOString()
+    );
+  }
+
+  private enqueue(
+    org: string,
+    event: string,
+    fields: Record<string, unknown>,
+    timestamp: string
+  ): Promise<void> {
     const rabbitmq = this.rabbitmq;
-    if (!rabbitmq) return;
-    const timestamp = new Date().toISOString();
+    if (!rabbitmq) return Promise.resolve();
     // A broker that is down holds up the events, not the role writes
-    this.publishing = this.publishing.then(async () =>
+    const sent = this.publishing.then(async () =>
       this.publish(rabbitmq, event, {
         organizationId: org,
         ...(await this.domainOf(org)),
-        id,
         ...fields,
-        actor: context.actor,
         timestamp,
       })
     );
+    // Also marks a failure handled, for the events of a write
+    this.publishing = sent.catch(() => undefined);
+    return sent;
+  }
+
+  /**
+   * Every organization is asked in a request of its own, through the queue:
+   * the broker closes the channel of a consumer that holds a message longer
+   * than its consumer_timeout (30 minutes by default), and delivers every
+   * message in flight on it again.
+   */
+  private async onSyncRequested(
+    message: Record<string, unknown>
+  ): Promise<void> {
+    const malformed = (): Error =>
+      new Error(
+        `${this.name}: malformed sync request ${JSON.stringify(message)}`
+      );
+    // A JSON array or scalar would otherwise read as {}, a sync of everything
+    if (typeof message !== 'object' || !message || Array.isArray(message))
+      throw malformed();
+    const { organizationId: org, id } = message;
+    const valid = (v: unknown): boolean =>
+      v === undefined || (typeof v === 'string' && v.length > 0);
+    if (!valid(org) || !valid(id) || (org === undefined && id !== undefined))
+      throw malformed();
+    if (org === undefined) {
+      for (const one of await this.organizations())
+        await this.rabbitmq!.publish(
+          this.exchange,
+          SYNC_REQUESTED,
+          { organizationId: one, timestamp: new Date().toISOString() },
+          { messageId: randomUUID() }
+        );
+      return;
+    }
+    let deleted = false;
+    try {
+      await this.groups.checkOrganization(org as string);
+    } catch (err) {
+      if (!(err instanceof RouteError)) throw err;
+      this.logger.info({
+        plugin: this.name,
+        event: 'sync',
+        organization: org,
+        result: err.code,
+      });
+      // A deleted organization has no space left for the apps
+      if (err.status !== 410) return;
+      deleted = true;
+    }
+    await this.sync(org as string, id as string | undefined, deleted);
+  }
+
+  /** The entries where `--twake-space-base` puts an organization. */
+  private async organizations(): Promise<string[]> {
+    const rdns = parseDn(this.spaceBase);
+    const at = rdns.findIndex(rdn => rdn.includes(ORG));
+    const below = rdns.slice(0, at);
+    const out: string[] = [];
+    const pages = (await this.server.ldap.search(
+      {
+        paged: { pageSize: 500 },
+        scope: 'one',
+        filter: '(objectClass=*)',
+        attributes: ['dn'],
+      },
+      rdns.slice(at + 1).join(',')
+    )) as AsyncGenerator<SearchResult>;
+    for await (const page of pages)
+      for (const { dn } of page.searchEntries) {
+        const org = organizationIn(
+          this.spacePattern,
+          ['cn=x', ...below, dn].join(',')
+        );
+        if (org !== undefined) out.push(org);
+      }
+    return out;
+  }
+
+  /**
+   * The events bear the time before the read, so an event of a later write
+   * is newer. Fails once they are all out if one was not sent, so the
+   * request is retried.
+   */
+  private async sync(
+    org: string,
+    id: string | undefined,
+    deleted: boolean
+  ): Promise<void> {
+    const timestamp = new Date().toISOString();
+    const spaces = deleted ? [] : await this.spaces(org, '(objectClass=*)', id);
+    const sent: Promise<void>[] = [];
+    if (id !== undefined && !spaces.length)
+      sent.push(this.enqueue(org, 'deleted', { id }, timestamp));
+    for (const space of spaces)
+      sent.push(
+        this.enqueue(org, 'synced', await this.whole(org, space), timestamp)
+      );
+    if (id === undefined)
+      sent.push(
+        this.enqueue(
+          org,
+          'sync.completed',
+          { spaceIds: spaces.map(s => s.id) },
+          timestamp
+        )
+      );
+    const failed = (await Promise.allSettled(sent)).find(
+      r => r.status === 'rejected'
+    );
+    if (failed) throw failed.reason;
+  }
+
+  /** A space as `twake.space.created` gives it. */
+  private async whole(
+    org: string,
+    space: SpaceEntry
+  ): Promise<Record<string, unknown>> {
+    const users = dnKey(this.groups.userBaseOf(org));
+    const linked = await this.orgGroups(
+      org,
+      space.holders.filter(h => h.kind === 'group').map(h => h.name),
+      ['member']
+    );
+    const names = new Map(
+      linked.map(e => [
+        dnKey(e.dn as string),
+        {
+          name: read(e, this.groupName) || rdnValue(e.dn as string),
+          members: values(e.member),
+        },
+      ])
+    );
+    // Holders come strongest first, so a user's first role is the strongest
+    const roles = new Map<string, { dn: string; role: SpaceRole }>();
+    const hold = (dn: string, role: SpaceRole): void => {
+      if (!roles.has(dnKey(dn))) roles.set(dnKey(dn), { dn, role });
+    };
+    for (const h of space.holders)
+      if (h.kind === 'member') hold(h.dn, h.role);
+      else
+        for (const dn of names.get(dnKey(h.dn))?.members ?? [])
+          if (dnKey(parentOf(dn)) === users) hold(dn, h.role);
+    const members = [...roles.values()];
+    const profiles = await this.profiles(
+      org,
+      members.map(m => m.dn)
+    );
+    return {
+      id: space.id,
+      name: space.name,
+      members: members.flatMap(({ dn, role }) => {
+        const profile = profiles.get(dnKey(dn));
+        return profile ? [{ ...profile, role }] : [];
+      }),
+      groups: space.holders
+        .filter(h => h.kind === 'group')
+        .map(h => ({
+          id: h.name,
+          name: names.get(dnKey(h.dn))?.name ?? h.name,
+          role: h.role,
+        })),
+    };
   }
 
   /** Kept once found, until the organization entry changes. */
@@ -1398,19 +1582,20 @@ export default class TwakeSpaces extends DmPlugin {
       routingKey: `twake.space.${event}`,
       messageId: randomUUID(),
     };
+    // core/rabbitmq drops a message silently when it has no client
+    if (!(await rabbitmq.getRawClient())) {
+      this.logger.error({ ...log, result: 'no broker' });
+      throw new Error(`${this.name}: no broker for ${log.routingKey}`);
+    }
     try {
-      // core/rabbitmq drops a message silently when it has no client
-      if (!(await rabbitmq.getRawClient())) {
-        this.logger.error({ ...log, result: 'no broker' });
-        return;
-      }
       await rabbitmq.publish(log.exchange, log.routingKey, message, {
         messageId: log.messageId,
       });
-      this.logger.info({ ...log, result: 'published' });
     } catch (err) {
       this.logger.error({ ...log, result: 'error', error: String(err) });
+      throw err;
     }
+    this.logger.info({ ...log, result: 'published' });
   }
 
   /** A user's roles, in the directory as it is or with a change undone. */

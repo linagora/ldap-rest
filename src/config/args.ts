@@ -311,6 +311,7 @@ export interface Config {
   twake_space_viewer_attribute?: string;
   twake_space_user_role_attribute?: string;
   twake_space_exchange?: string;
+  twake_space_sync_queue?: string;
   twake_instance_dn?: string[];
   twake_instance_skip_attribute?: string;
   twake_instance_skip_value?: string;
@@ -945,6 +946,11 @@ const configArgs: ConfigTemplate = [
     '',
   ],
   ['--twake-space-exchange', 'DM_TWAKE_SPACE_EXCHANGE', 'space'],
+  [
+    '--twake-space-sync-queue',
+    'DM_TWAKE_SPACE_SYNC_QUEUE',
+    'twake.space.sync.requested.ldap-rest',
+  ],
   // twake/tombstone plugin
   ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array', null, 'dns'],
   [
