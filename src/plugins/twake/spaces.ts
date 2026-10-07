@@ -23,7 +23,12 @@ import type {
   SearchResult,
 } from '../../lib/ldapActions';
 import { currentOperation } from '../../lib/operation';
-import { escapeDnValue, escapeLdapFilter, parseDn } from '../../lib/utils';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  parseDn,
+  unescapeDnValue,
+} from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 
 import type TwakeGroups from './groups';
@@ -199,6 +204,7 @@ export default class TwakeSpaces extends DmPlugin {
   private readonly userRole: string;
   private readonly exchange: string;
   private readonly domainAttribute: string;
+  private readonly orgPattern?: RegExp;
   private readonly domains = new Map<string, string>();
   /**
    * Changes are followed one at a time, each from the directory as it is
@@ -255,6 +261,8 @@ export default class TwakeSpaces extends DmPlugin {
     this.exchange = this.config.twake_space_exchange || 'space';
     this.domainAttribute =
       this.config.twake_space_organization_domain_attribute || 'twakeDomain';
+    if (this.config.twake_group_organization_dn)
+      this.orgPattern = branchPattern(this.config.twake_group_organization_dn);
     if (this.config.rabbitmq_url) this.dependencies.rabbitmq = 'core/rabbitmq';
   }
 
@@ -352,6 +360,13 @@ export default class TwakeSpaces extends DmPlugin {
         }
     },
     onLdapEntryChange: (dn, before, after, context) => {
+      const changed = this.orgPattern?.exec(parseDn(dn).join(','))?.groups;
+      // On the publishing chain, so a read of the domain already running
+      // cannot put the old one back
+      if (changed && this.rabbitmq)
+        this.publishing = this.publishing.then(() => {
+          this.domains.delete(unescapeDnValue(changed.org).toLowerCase());
+        });
       if (this.follows)
         this.queue(dn, () =>
           this.follow(
@@ -380,6 +395,9 @@ export default class TwakeSpaces extends DmPlugin {
    * core/rabbitmq connects lazily and hands back no client when it cannot:
    * every event would then be lost, so the server does not start.
    *
+   * The organization domain is only read, and a search for an attribute the
+   * schema does not define finds none: every event would go out without it.
+   *
    * core/ldap/trash moves a deleted group or space away instead of deleting
    * it: nothing follows the move, so users would keep the roles it gave,
    * and no event would say it went.
@@ -388,6 +406,16 @@ export default class TwakeSpaces extends DmPlugin {
     if (this.config.rabbitmq_url && !(await this.rabbitmq?.getRawClient()))
       throw new Error(
         `${this.name}: RabbitMQ at --rabbitmq-url cannot be reached`
+      );
+    if (
+      this.config.rabbitmq_url &&
+      this.orgPattern &&
+      !(await this.server.ldap.schemaIndex()).getAttributeType(
+        this.domainAttribute
+      )
+    )
+      throw new Error(
+        `${this.name}: the directory schema defines no ${this.domainAttribute}; load a schema that does, or set --twake-space-organization-domain-attribute`
       );
     if (!this.follows || !this.server.loadedPlugins.trash) return;
     const type = (rdn: string): string => rdn.split('=')[0].toLowerCase();
@@ -1324,7 +1352,7 @@ export default class TwakeSpaces extends DmPlugin {
     );
   }
 
-  /** Kept once found: an organization does not change its domain. */
+  /** Kept once found, until the organization entry changes. */
   private async domainOf(
     org: string
   ): Promise<{ organizationDomain?: string }> {

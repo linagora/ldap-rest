@@ -324,6 +324,38 @@ const suite = (role: string) => (): void => {
     }
   });
 
+  it('follows a change of the organization domain', async () => {
+    const id = await create();
+    await events(1);
+    await dm.ldap.modify(orgDn, {
+      replace: { [DOMAIN_ATTRIBUTE]: 'acme.example.net' },
+    });
+    try {
+      await api.patch(`${route}/${id}`).send({ name: 'Retro' }).expect(200);
+      await quiet();
+      expect(
+        rabbit.published.map(p => p.message.organizationDomain)
+      ).to.deep.equal(['acme.example.net']);
+    } finally {
+      rabbit.published = [];
+      await dm.ldap.modify(orgDn, { replace: { [DOMAIN_ATTRIBUTE]: DOMAIN } });
+      await quiet();
+    }
+  });
+
+  it('refuses a domain attribute the schema does not define', async () => {
+    dm.config.twake_space_organization_domain_attribute = 'tseNoSuchAttribute';
+    try {
+      const refused = await new TwakeSpaces(dm).assertComposition().then(
+        () => undefined,
+        (err: Error) => err
+      );
+      expect(refused?.message).to.match(/tseNoSuchAttribute/);
+    } finally {
+      dm.config.twake_space_organization_domain_attribute = DOMAIN_ATTRIBUTE;
+    }
+  });
+
   it('publishes a rename and a deletion', async () => {
     const id = await create();
     await events(1);
