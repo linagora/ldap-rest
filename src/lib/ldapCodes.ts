@@ -53,3 +53,34 @@ export function extractLdapCode(err: unknown): number | undefined {
     return 65;
   return undefined;
 }
+
+/**
+ * Result codes by which the directory refuses a write for what it asks
+ * (RFC 4511 appendix A): an attribute or class its schema does not define or
+ * allow there, a value it cannot match or whose syntax is wrong, a broken
+ * constraint, a DN it cannot name. The request is at fault, not the server.
+ *
+ * attributeOrValueExists (20) is not here: on a modify it says what the
+ * entry already holds rather than what the request asks, and `ldapActions`
+ * maps it per operation.
+ */
+const SCHEMA_REFUSALS: ReadonlySet<number> = new Set([
+  17, // undefinedAttributeType
+  18, // inappropriateMatching
+  19, // constraintViolation
+  21, // invalidAttributeSyntax
+  34, // invalidDNSyntax
+  64, // namingViolation
+  65, // objectClassViolation
+  67, // notAllowedOnRDN
+  69, // objectClassModsProhibited
+]);
+
+/**
+ * Whether an LDAP result code means the directory refused the request for
+ * its content, see {@link SCHEMA_REFUSALS}.
+ *
+ * @param code LDAP result code, as {@link extractLdapCode} reads it
+ */
+export const isSchemaRefusal = (code: number | undefined): boolean =>
+  code !== undefined && SCHEMA_REFUSALS.has(code);

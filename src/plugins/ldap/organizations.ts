@@ -36,6 +36,7 @@ import {
   BadRequestError,
   NotFoundError,
   ConflictError,
+  HttpError,
 } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import type { Schema } from '../../config/schema';
@@ -1484,6 +1485,7 @@ export default class LdapOrganizations extends DmPlugin {
       await this.server.ldap.rename(dn, newDn, req);
       this.logger.info(`Moved organization from ${dn} to ${newDn}`);
     } catch (err) {
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to move organization: ${err}`);
     }

@@ -10,7 +10,7 @@ import { AUTHZ_REFUSED, HttpError } from '../../lib/errors';
 // Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
 // it too. Imported and re-exported, so this module stays the one SCIM reads
 // it from.
-import { extractLdapCode } from '../../lib/ldapCodes';
+import { extractLdapCode, isSchemaRefusal } from '../../lib/ldapCodes';
 
 export { extractLdapCode };
 
@@ -98,7 +98,12 @@ export function scimErrorFromException(
     return body(err.statusCode, sanitize(err.message), err.scimType);
   }
   if (err instanceof HttpError) {
-    return body(err.statusCode, sanitize(err.message));
+    // `ldapActions` answers a schema refusal with a 400 of its own
+    const scimType =
+      err.statusCode === 400 && isSchemaRefusal(extractLdapCode(err))
+        ? 'invalidValue'
+        : undefined;
+    return body(err.statusCode, sanitize(err.message), scimType);
   }
   const message = err instanceof Error ? err.message : String(err);
   // Wrapped authz-forbidden (no HttpError instance but marker is in the msg)
@@ -108,13 +113,12 @@ export function scimErrorFromException(
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) return body(404, 'Resource not found');
   if (ldapCode === 68) return body(409, sanitize(message), 'uniqueness');
-  // undefinedAttributeType (17) and objectClassViolation (65): the request
-  // named something the directory's schema does not allow here. That is the
-  // client's or the operator's doing, not a server fault, so it is a 400
-  // rather than a bare 500 — but which of the two, and which flag to reach
-  // for, depends on the route. The caller that knows adds that; this stays
-  // generic, having only the error to go on.
-  if (ldapCode === 17 || ldapCode === 65) {
+  // The request named something the directory's schema does not allow here.
+  // That is the client's or the operator's doing, not a server fault, so it
+  // is a 400 rather than a bare 500 — but which of the two, and which flag to
+  // reach for, depends on the route. The caller that knows adds that; this
+  // stays generic, having only the error to go on.
+  if (isSchemaRefusal(ldapCode)) {
     return body(
       400,
       `The directory rejected this write against its schema: ${sanitize(

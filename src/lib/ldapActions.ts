@@ -23,7 +23,8 @@ import {
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
-import { ConflictError, NotFoundError } from './errors';
+import { BadRequestError, ConflictError, NotFoundError } from './errors';
+import { isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
 
 // Typescript interface
@@ -208,6 +209,32 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
 });
 
 /**
+ * A 400 for a write the directory refused for what it asks, carrying the
+ * LDAP code for callers that map it themselves.
+ *
+ * The client is told the directory's diagnostic, which names the attribute
+ * at fault ("mailQuota: attribute type undefined"), not the value sent.
+ */
+function ldapRefusal(dn: string, code: number, error: unknown): Error {
+  const refusal = new BadRequestError(
+    `The directory refused this write to ${dn}: ${String(error)}`
+  );
+  (refusal as { code?: number }).code = code;
+  return refusal;
+}
+
+/**
+ * Wrap a write failure, turning a refusal of the request's content (see
+ * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
+ * tells it to check logs it cannot read.
+ */
+function ldapWriteError(context: string, dn: string, error: unknown): Error {
+  const wrapped = ldapError(context, error);
+  const code = (wrapped as { code?: number }).code;
+  return isSchemaRefusal(code) ? ldapRefusal(dn, code!, error) : wrapped;
+}
+
+/**
  * Wrap an add failure, turning entryAlreadyExists (68) into a 409.
  *
  * Every creation route ends here, so this is the one place that knows a
@@ -223,26 +250,32 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
  * idempotent applicative-account creation) keep working unchanged.
  */
 function ldapAddError(dn: string, error: unknown): Error {
-  const wrapped = ldapError('LDAP add error', error);
-  if ((wrapped as { code?: number }).code !== 68) return wrapped;
-  const conflict = new ConflictError(`Entry ${dn} already exists`);
-  (conflict as { code?: number }).code = 68;
-  return conflict;
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (code === 68) {
+    const conflict = new ConflictError(`Entry ${dn} already exists`);
+    (conflict as { code?: number }).code = 68;
+    return conflict;
+  }
+  // attributeOrValueExists, on an add: the request names a value twice
+  if (code === 20) return ldapRefusal(dn, code, error);
+  return ldapWriteError('LDAP add error', dn, error);
 }
 
 /**
- * Wrap a modify failure, turning objectClassViolation (65) into a 409: the
- * entry is not of a kind that can hold what was written, typically one
- * created by another tool without a class its schema declares. The code is
+ * Wrap a modify failure, turning objectClassViolation (65) and
+ * attributeOrValueExists (20) into a 409: the entry is not of a kind that can
+ * hold what was written, typically one created by another tool without a
+ * class its schema declares, or already holds the value added. The code is
  * carried over for callers that map it themselves.
  */
 function ldapModifyError(dn: string, error: unknown): Error {
-  const wrapped = ldapError('LDAP modify error', error);
-  if ((wrapped as { code?: number }).code !== 65) return wrapped;
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (code !== 65 && code !== 20)
+    return ldapWriteError('LDAP modify error', dn, error);
   const conflict = new ConflictError(
     `Entry ${dn} cannot hold this change: ${String(error)}`
   );
-  (conflict as { code?: number }).code = 65;
+  (conflict as { code?: number }).code = code;
   return conflict;
 }
 
@@ -1480,7 +1513,7 @@ class ldapActions {
       );
       return true;
     } catch (error) {
-      throw ldapError(`LDAP rename error`, error);
+      throw ldapWriteError('LDAP rename error', dn, error);
     } finally {
       this.releaseConnection(pooled);
     }
@@ -1537,7 +1570,7 @@ class ldapActions {
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
     } catch (error) {
-      throw ldapError(`LDAP move error`, error);
+      throw ldapWriteError('LDAP move error', dn, error);
     } finally {
       this.releaseConnection(pooled);
     }
