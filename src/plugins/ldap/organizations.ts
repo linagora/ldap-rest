@@ -374,6 +374,71 @@ export default class LdapOrganizations extends DmPlugin {
 
     /**
      * @openapi
+     * summary: Search organizations across a subtree
+     * description: |
+     *   Searches the organizations under `:dn`, at any depth, and `:dn`
+     *   itself. Unlike `/subnodes/search`, which only looks at the direct
+     *   children and mixes in the linked users and groups, this answers
+     *   organizations only: it is the call behind a department picker over
+     *   a tree too wide to list.
+     *
+     *   `q` is matched against `ou`, `description` and, when
+     *   `ldap_organization_path_attribute` is set, the path attribute, so a
+     *   query such as `Government / lin` finds a department by its path.
+     *
+     *   At most `ldap_organization_max_subnodes` (default 50) organizations
+     *   are returned. A partial answer ends with a sentinel entry at
+     *   `more-organizations-<dn>` carrying `_isMoreIndicator: "true"`, which
+     *   a client must drop before treating the rest as organizations, and
+     *   which says why the answer is partial:
+     *
+     *   - more organizations matched than the cap: it carries
+     *     `_totalCount` and `_displayedCount`, and a narrower query helps;
+     *   - the directory refused to list them all: it carries
+     *     `_displayedCount` alone — nothing counted the rest — and the fix
+     *     is the size limit of the account ldap-rest binds as.
+     * parameters:
+     *   - in: query
+     *     name: q
+     *     required: true
+     *     schema: { type: string }
+     *     description: Search query matched against name, description and path.
+     *     example: lin
+     * responses:
+     *   '200':
+     *     description: Matching organizations.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: ou=linagora.com,ou=Government,ou=organization,dc=example,dc=com
+     *             ou: linagora.com
+     *   '400':
+     *     description: Query parameter `q` missing.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Search organizations in a whole subtree
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/search`,
+      asyncHandler(async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn as string);
+        const query = req.query.q as string;
+        if (!query)
+          throw new BadRequestError('query parameter "q" is required');
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(
+            await this.searchOrganisationTree(dn, query, req)
+          )
+        );
+      })
+    );
+
+    /**
+     * @openapi
      * summary: Create organization
      * description: |
      *   Creates a new organizational unit. The `ou` field becomes the RDN.
@@ -1002,6 +1067,36 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   /**
+   * The last row of a partial list, saying that it is one.
+   *
+   * Every list this plugin cuts ends with the same shape, whichever limit
+   * cut it; only the DN, the text and the counts differ. `total` is set
+   * when the rest was counted — ldap-rest's own cap — and left out when the
+   * directory refused to list it, since nothing counted it then.
+   *
+   * @param dn DN of the row, distinct per kind of list: one answer can carry
+   *           two of them
+   * @param label what the row reads as
+   * @param displayed how many entries the list kept
+   * @param total how many there were, when known
+   */
+  private static moreIndicator(
+    dn: string,
+    label: string,
+    displayed: number,
+    total?: number
+  ): AttributesList {
+    return {
+      dn,
+      cn: [label],
+      objectClass: ['moreIndicator'],
+      _isMoreIndicator: 'true',
+      ...(total === undefined ? {} : { _totalCount: total.toString() }),
+      _displayedCount: displayed.toString(),
+    };
+  }
+
+  /**
    * The child organizations of a node, and what to do when the directory
    * will not list them all.
    *
@@ -1085,15 +1180,13 @@ export default class LdapOrganizations extends DmPlugin {
     );
     return [
       ...shown,
-      {
-        // Distinct from the row the attached entries add: one answer can
-        // carry both, and two rows sharing a DN is not a list.
-        dn: `more-organizations-${dn}`,
-        cn: ['... more organizations than the directory will list'],
-        objectClass: ['moreIndicator'],
-        _isMoreIndicator: 'true',
-        _displayedCount: shown.length.toString(),
-      },
+      // Distinct from the row the attached entries add: one answer can
+      // carry both, and two rows sharing a DN is not a list.
+      LdapOrganizations.moreIndicator(
+        `more-organizations-${dn}`,
+        '... more organizations than the directory will list',
+        shown.length
+      ),
     ];
   }
 
@@ -1152,18 +1245,14 @@ export default class LdapOrganizations extends DmPlugin {
           'one answer. Raise the size limit for the account ldap-rest binds ' +
           'as (olcLimits, or olcSizeLimit) to count them all.'
       );
+      const shown = bounded.searchEntries.slice(0, cap);
       return [
-        ...bounded.searchEntries.slice(0, cap),
-        {
-          dn: `more-${dn}`,
-          cn: ['... more elements than the directory will list'],
-          objectClass: ['moreIndicator'],
-          _isMoreIndicator: 'true',
-          _displayedCount: Math.min(
-            bounded.searchEntries.length,
-            cap
-          ).toString(),
-        },
+        ...shown,
+        LdapOrganizations.moreIndicator(
+          `more-${dn}`,
+          '... more elements than the directory will list',
+          shown.length
+        ),
       ];
     }
 
@@ -1173,14 +1262,12 @@ export default class LdapOrganizations extends DmPlugin {
     if (totalCount <= cap) return kept;
     return [
       ...kept,
-      {
-        dn: `more-${dn}`,
-        cn: [`... ${totalCount - cap} more elements`],
-        objectClass: ['moreIndicator'],
-        _isMoreIndicator: 'true',
-        _totalCount: totalCount.toString(),
-        _displayedCount: cap.toString(),
-      },
+      LdapOrganizations.moreIndicator(
+        `more-${dn}`,
+        `... ${totalCount - cap} more ${totalCount - cap === 1 ? 'element' : 'elements'}`,
+        cap,
+        totalCount
+      ),
     ];
   }
 
@@ -1457,6 +1544,107 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   /**
+   * The organizations of a whole subtree that match a query.
+   *
+   * `searchOrganisationSubnodes` looks one level down, which is no help when
+   * the tree is a top organization, one country node and a thousand
+   * departments below it: a department picker needs the match wherever it
+   * sits. The search runs with scope `sub`, so `dn` itself is a candidate
+   * too, and the path attribute is matched next to the name so that a query
+   * written as a path finds its department.
+   *
+   * The answer is bounded like the children listing is, and read the same
+   * way. The search first goes out without a `sizeLimit`: ldapts swallows a
+   * `sizeLimitExceeded` from a request that carried one, so a bounded first
+   * attempt would let a directory whose own limit sits below the cap answer
+   * a partial list that passes for whole. Unbounded, the refusal raises
+   * (code 4), and only then is a bounded search sent, whose answer is
+   * partial by construction. When the directory does list everything, the
+   * cap is ldap-rest's own, and the rest is counted.
+   *
+   * The two cuts end the list with different rows, because they call for
+   * different fixes: a narrower query for the cap, the size limit of the
+   * bind account for the refusal.
+   *
+   * @param dn organization to search under, itself included
+   * @param query what to look for in a name, a description or a path
+   * @param req incoming request, forwarded to the authorization hooks
+   * @returns the matching organizations, followed by a `moreIndicator` row
+   *          when some were left out
+   */
+  async searchOrganisationTree(
+    dn: string,
+    query: string,
+    req?: Request
+  ): Promise<AttributesList[]> {
+    const cap = this.config.ldap_organization_max_subnodes || 50;
+    const attrs = this.pathAttr
+      ? `ou,description,${this.pathAttr}`
+      : 'ou,description';
+    const filter = `(&(objectClass=organizationalUnit)${substringSearchFilter(query, attrs)})`;
+
+    // Only `cap` entries are kept; the rest of a broad match is counted, not
+    // held, as `linkedEntities` does.
+    const kept: AttributesList[] = [];
+    let total = 0;
+    try {
+      const pages = (await this.server.ldap.search(
+        { paged: true, scope: 'sub', filter },
+        dn,
+        req
+      )) as AsyncGenerator<SearchResult>;
+      // As for the children, the refusal comes from the walk.
+      for await (const page of pages) {
+        total += page.searchEntries.length;
+        const remaining = cap - kept.length;
+        if (remaining > 0) kept.push(...page.searchEntries.slice(0, remaining));
+      }
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) {
+        this.server.logger.debug(`No organizations under ${dn}: no such node`);
+        return [];
+      }
+      if (code !== 4) throw err;
+
+      const bounded = (await this.server.ldap.search(
+        { paged: false, scope: 'sub', filter, sizeLimit: cap + 1 },
+        dn,
+        req
+      )) as SearchResult;
+      const shown = bounded.searchEntries.slice(0, cap);
+      this.warnSizeLimit(
+        `search:${dn}`,
+        `A search under ${dn} matched more organizations than the directory ` +
+          `will list in one answer, so ${shown.length} are returned and the ` +
+          'rest are hidden. Raise the size limit for the account ldap-rest ' +
+          'binds as (olcLimits, or olcSizeLimit) to search them all.'
+      );
+      return [
+        ...shown,
+        LdapOrganizations.moreIndicator(
+          `more-organizations-${dn}`,
+          '... more organizations than the directory will list',
+          shown.length
+        ),
+      ];
+    }
+
+    if (total <= cap) return kept;
+    const rest = total - cap;
+    return [
+      ...kept,
+      LdapOrganizations.moreIndicator(
+        `more-organizations-${dn}`,
+        `... ${rest} more ${rest === 1 ? 'organization' : 'organizations'}, ` +
+          'narrow the search',
+        cap,
+        total
+      ),
+    ];
+  }
+
+  /**
    * Provide configuration for config API
    */
   getConfigApiData(): Record<string, unknown> {
@@ -1495,6 +1683,7 @@ export default class LdapOrganizations extends DmPlugin {
         get: `${apiPrefix}/v1/ldap/organizations/:dn`,
         getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
         searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
+        search: `${apiPrefix}/v1/ldap/organizations/:dn/search`,
         create: `${apiPrefix}/v1/ldap/organizations`,
         update: `${apiPrefix}/v1/ldap/organizations/:dn`,
         move: `${apiPrefix}/v1/ldap/organizations/:dn/move`,

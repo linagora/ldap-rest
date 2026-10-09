@@ -230,7 +230,8 @@ curl -H "Accept: application/json" \
         "getTop": "/api/v1/ldap/organizations",
         "get": "/api/v1/ldap/organizations/:dn",
         "getSubnodes": "/api/v1/ldap/organizations/:dn/subnodes",
-        "searchSubnodes": "/api/v1/ldap/organizations/:dn/subnodes/search"
+        "searchSubnodes": "/api/v1/ldap/organizations/:dn/subnodes/search",
+        "search": "/api/v1/ldap/organizations/:dn/search"
       }
     }
   }
@@ -386,6 +387,65 @@ curl -H "Accept: application/json" \
   }
 ]
 ```
+
+### Search Organizations in a Subtree
+
+Search the organizations under a node, at any depth, the node itself included.
+Where the subnodes search only looks at the direct children and adds the linked
+users and groups, this one answers organizations only, which makes it the call
+behind a department autocomplete over a wide tree.
+
+**Endpoint:** `GET /api/v1/ldap/organizations/:dn/search?q=query`
+
+**Parameters:**
+
+- `:dn` - URL-encoded Distinguished Name of the node to search under
+- `q` - Search query (required), matched against `ou`, `description` and, when
+  `--ldap-organization-path-attribute` is set, the path attribute, so
+  `Government / lin` matches by path
+
+**Limit:** at most `--ldap-organization-max-subnodes` (default 50)
+organizations are returned. A partial answer ends with a `moreIndicator` entry
+at `more-organizations-<dn>` (`_isMoreIndicator: "true"`, `_displayedCount`
+holding the number of organizations kept), which a client must drop before
+using the rest. It says which limit cut the answer:
+
+- **the cap**: more organizations matched than it allows. The entry also
+  carries `_totalCount`, and a narrower query is the way to the rest.
+- **the directory**: it refused to list every match in one answer. There is no
+  `_totalCount`, since nothing counted the rest, and ldap-rest logs a warning:
+  the fix is the size limit of the account ldap-rest binds as (`olcLimits`, or
+  `olcSizeLimit`).
+
+**Example Request:**
+
+```bash
+curl -H "Accept: application/json" \
+     "http://localhost:8081/api/v1/ldap/organizations/ou%3Dorganization%2Cdc%3Dexample%2Cdc%3Dcom/search?q=lin"
+```
+
+**Example Response:**
+
+```json
+[
+  {
+    "dn": "ou=linagora.com,ou=Government,ou=organization,dc=example,dc=com",
+    "objectClass": ["organizationalUnit", "top"],
+    "ou": "linagora.com"
+  },
+  {
+    "dn": "more-organizations-ou=organization,dc=example,dc=com",
+    "cn": ["... 73 more organizations, narrow the search"],
+    "objectClass": ["moreIndicator"],
+    "_isMoreIndicator": "true",
+    "_totalCount": "123",
+    "_displayedCount": "50"
+  }
+]
+```
+
+The `search` entry of the `endpoints` advertised by the config API tells a
+client that the server has this route.
 
 ### Create Organization
 
