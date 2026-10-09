@@ -20,7 +20,7 @@ The `twake/james` plugin automatically synchronizes email address and quota chan
 --plugin twake/james \
 --ldap-flat-schema ./static/schemas/twake/users.json \
 --mail-attribute mail \
---quota-attribute mailQuota \
+--quota-attribute mailQuotaSize \
 --james-webadmin-url http://james:8000 \
 --james-webadmin-token "your-admin-token"
 ```
@@ -37,7 +37,7 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--james-webadmin-url`: James WebAdmin API base URL (required)
 - `--james-webadmin-token`: Bearer token for James WebAdmin authentication (optional)
 - `--mail-attribute`: LDAP attribute for email (default: `mail`)
-- `--quota-attribute`: LDAP attribute for quota (default: `mailQuota`)
+- `--quota-attribute`: LDAP attribute for quota (default: `mailQuotaSize`)
 - `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
 - `--james-mailbox-type-attribute`: LDAP attribute for mailbox type (default: `twakeMailboxType`)
 
@@ -130,7 +130,7 @@ When a user's quota changes:
    PUT /api/v1/ldap/users/jdoe
    {
      "replace": {
-       "mailQuota": "5000000000"
+       "mailQuotaSize": "5000000000"
      }
    }
    ```
@@ -646,7 +646,7 @@ Alternative authentication methods (Basic Auth, JWT) can be configured via rever
 --plugin twake/james \
 --ldap-flat-schema ./schemas/twake/users.json \
 --mail-attribute mail \
---quota-attribute mailQuota \
+--quota-attribute mailQuotaSize \
 --james-webadmin-url http://james:8000
 ```
 
@@ -663,7 +663,7 @@ Alternative authentication methods (Basic Auth, JWT) can be configured via rever
 --ldap-flat-schema ./schemas/twake/users.json \
 --ldap-flat-schema ./schemas/twake/positions.json \
 --mail-attribute mail \
---quota-attribute mailQuota \
+--quota-attribute mailQuotaSize \
 --james-webadmin-url http://james:8000 \
 --james-webadmin-token "james-admin-token" \
 --static-path ./static \
@@ -770,7 +770,7 @@ curl http://james:8000/users/john.doe@company.com
 curl -X PUT http://localhost:8081/api/v1/ldap/users/jdoe \
   -H "Authorization: Bearer admin-token" \
   -H "Content-Type: application/json" \
-  -d '{"replace": {"mailQuota": "5000000000"}}'
+  -d '{"replace": {"mailQuotaSize": "5000000000"}}'
 
 # Verify in James
 curl http://james:8000/quota/users/jdoe@company.com/size
@@ -780,12 +780,12 @@ curl http://james:8000/quota/users/jdoe@company.com/size
 
 Quota values are in **bytes**:
 
-| Size      | Bytes       | Example                      |
-| --------- | ----------- | ---------------------------- |
-| 1 GB      | 1000000000  | `"mailQuota": "1000000000"`  |
-| 5 GB      | 5000000000  | `"mailQuota": "5000000000"`  |
-| 10 GB     | 10000000000 | `"mailQuota": "10000000000"` |
-| Unlimited | -1          | `"mailQuota": "-1"`          |
+| Size      | Bytes       | Example                          |
+| --------- | ----------- | -------------------------------- |
+| 1 GB      | 1000000000  | `"mailQuotaSize": "1000000000"`  |
+| 5 GB      | 5000000000  | `"mailQuotaSize": "5000000000"`  |
+| 10 GB     | 10000000000 | `"mailQuotaSize": "10000000000"` |
+| Unlimited | -1          | `"mailQuotaSize": "-1"`          |
 
 ## Synchronization Scenarios
 
@@ -941,7 +941,7 @@ hooks: {
 
    ```bash
    --mail-attribute mail
-   --quota-attribute mailQuota
+   --quota-attribute mailQuotaSize
    ```
 
 3. Enable debug logging:

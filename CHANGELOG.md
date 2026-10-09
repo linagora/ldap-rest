@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `--quota-attribute` (`DM_QUOTA_ATTRIBUTE`) defaults to `mailQuotaSize`, the
+  quota attribute of the Twake schemas, instead of `mailQuota`: `twake/james`
+  now pushes to Twake Mail the quota the console edits. A deployment whose
+  quota lives in `mailQuota` must now set `DM_QUOTA_ATTRIBUTE=mailQuota`; one
+  that already sets the option keeps its value,
+  [notes](docs/usage/upgrading.md#the-quota-attribute-defaults-to-mailquotasize)
+
 ### Fixes
 
 - Twake schemas: the user schema no longer offers `mailQuota`, which the

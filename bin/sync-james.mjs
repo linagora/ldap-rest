@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Sync utility to verify and fix consistency between LDAP and James
- * Ensures James quotas match LDAP mailQuota values and that James aliases
+ * Ensures James quotas match LDAP quota values (--quota-attribute) and that James aliases
  * match the LDAP alias attribute (catch-up in case the event-based sync failed)
  * @author Generated with Claude Code
  */
@@ -22,7 +22,7 @@ Usage: sync-james [options]
 Synchronizes James with LDAP. LDAP is considered the source of truth.
 
 For every user it reconciles:
-  - the mailbox quota (James quota <- LDAP mailQuota)
+  - the mailbox quota (James quota <- LDAP --quota-attribute)
   - the mail aliases (James aliases <- LDAP alias attribute)
 
 The alias reconciliation is a catch-up mechanism: it repairs aliases that
@@ -40,7 +40,7 @@ Environment variables:
   DM_JAMES_WEBADMIN_TOKEN  James WebAdmin authentication token
   DM_LDAP_BASE             LDAP search base
   DM_MAIL_ATTRIBUTE        Mail attribute name (default: mail)
-  DM_QUOTA_ATTRIBUTE       Quota attribute name (default: mailQuota)
+  DM_QUOTA_ATTRIBUTE       Quota attribute name (default: mailQuotaSize)
   DM_ALIAS_ATTRIBUTE       Alias attribute name (default: mailAlternateAddress)
 `);
   process.exit(0);
@@ -78,7 +78,7 @@ async function syncJames() {
   await dm.ready;
 
   const mailAttr = dm.config.mail_attribute || 'mail';
-  const quotaAttr = dm.config.quota_attribute || 'mailQuota';
+  const quotaAttr = dm.config.quota_attribute || 'mailQuotaSize';
   const aliasAttr = dm.config.alias_attribute || 'mailAlternateAddress';
   const jamesUrl = dm.config.james_webadmin_url;
   const jamesToken = dm.config.james_webadmin_token;

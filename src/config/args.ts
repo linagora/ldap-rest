@@ -499,7 +499,7 @@ const configArgs: ConfigTemplate = [
 
   // Special attributes
   ['--mail-attribute', 'DM_MAIL_ATTRIBUTE', 'mail'],
-  ['--quota-attribute', 'DM_QUOTA_ATTRIBUTE', 'mailQuota'],
+  ['--quota-attribute', 'DM_QUOTA_ATTRIBUTE', 'mailQuotaSize'],
   ['--delegation-attribute', 'DM_DELEGATION_ATTRIBUTE', 'twakeDelegatedUsers'],
   ['--alias-attribute', 'DM_ALIAS_ATTRIBUTE', 'mailAlternateAddress'],
   ['--forward-attribute', 'DM_FORWARD_ATTRIBUTE', 'mailForwardingAddress'],

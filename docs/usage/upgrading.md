@@ -4,6 +4,20 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### The quota attribute defaults to `mailQuotaSize`
+
+**Who is affected:** a deployment that loads `twake/james` or
+`core/ldap/onChange`, or runs `bin/sync-james.mjs`, without setting
+`--quota-attribute` (`DM_QUOTA_ATTRIBUTE`).
+
+The default is now `mailQuotaSize`, the attribute the Twake schemas define,
+instead of `mailQuota`. A directory that holds the quota in `mailQuota` must
+set `DM_QUOTA_ATTRIBUTE=mailQuota` (or `--quota-attribute mailQuota`):
+without it, quota changes are no longer sent to the mail server. A deployment
+that already sets the option is unchanged.
+
 ## To 0.16.0
 
 ### Space events need the organization domain attribute

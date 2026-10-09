@@ -8,7 +8,7 @@ LDAP-Rest, and hooks for the attributes other plugins follow.
 ```bash
 --plugin core/ldap/onChange \
 --mail-attribute mail \
---quota-attribute mailQuota
+--quota-attribute mailQuotaSize
 ```
 
 ## Hooks
