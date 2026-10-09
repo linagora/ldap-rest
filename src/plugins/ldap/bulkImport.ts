@@ -186,7 +186,9 @@ export default class LdapBulkImport extends DmPlugin {
       }
 
       try {
-        const schema = loadSchemaFile<BulkImportSchema>(schemaPath);
+        const schema = loadSchemaFile<BulkImportSchema>(schemaPath, {
+          config: this.config,
+        });
 
         this.resources.set(resourceName, {
           name: resourceName,

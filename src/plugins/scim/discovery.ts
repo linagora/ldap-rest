@@ -195,7 +195,9 @@ export class ScimDiscovery {
   ): SchemaDefinition | undefined {
     const filepath = path.join(this.schemaDir, filename);
     try {
-      const parsed = loadSchemaFile<Partial<SchemaDefinition>>(filepath);
+      const parsed = loadSchemaFile<Partial<SchemaDefinition>>(filepath, {
+        config: this.config,
+      });
       return {
         schemas: [SCHEMA_SCHEMA],
         id: urn,

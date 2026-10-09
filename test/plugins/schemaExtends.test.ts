@@ -12,6 +12,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../src/bin';
 import ConfigApi from '../../src/plugins/configApi';
+import LdapBulkImport from '../../src/plugins/ldap/bulkImport';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import Static from '../../src/plugins/static';
@@ -193,6 +194,33 @@ describe('Schemas extending another', () => {
       await waitFor(() => !!groups.schema, { what: 'group schema' });
       expect(groups.schema?.attributes).to.not.have.property('description');
       expect(groups.schema?.attributes).to.have.property('member');
+    });
+
+    it('replaces the placeholders of a bulk import schema chain', async () => {
+      // the bulk import reads its own top-level `base`, inherited here
+      fs.writeFileSync(
+        join(dir, 'bulk-base.json'),
+        JSON.stringify({
+          extends: 'ldap-rest:twake/users.json',
+          base: 'ou=users,__LDAP_BASE__',
+        })
+      );
+      const bulkFile = join(dir, 'bulk-users.json');
+      fs.writeFileSync(
+        bulkFile,
+        JSON.stringify({ extends: 'bulk-base.json', mainAttribute: 'uid' })
+      );
+      const dm = new DM();
+      await dm.ready;
+      dm.config.bulk_import_schemas = `users:${bulkFile}`;
+      const bulk = new LdapBulkImport(dm);
+      const resources = bulk.getConfigApiData().resources as {
+        base: string;
+        mainAttribute: string;
+      }[];
+      expect(resources).to.have.length(1);
+      expect(resources[0].base).to.equal(`ou=users,${dm.config.ldap_base}`);
+      expect(resources[0].mainAttribute).to.equal('uid');
     });
   });
 });
