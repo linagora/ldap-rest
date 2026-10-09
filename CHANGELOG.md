@@ -19,8 +19,9 @@
 - A write the directory refuses for its content (an attribute its schema
   does not define, a value of the wrong syntax, a missing mandatory
   attribute, a naming rule) answers 400 with the directory's diagnostic
-  instead of 500; a modify adding a value the entry already holds answers
-  409, [docs](docs/client-development/api/rest-api.md#400-bad-request)
+  instead of 500; a modify adding a value the entry already holds, and a
+  rename or a move onto a DN already taken, answer 409,
+  [docs](docs/client-development/api/rest-api.md#400-bad-request)
 
 ## v0.16.2 (2026-10-09)
 

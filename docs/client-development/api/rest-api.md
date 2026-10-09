@@ -1160,8 +1160,10 @@ All errors return a JSON object with an error message:
 
 **Refused by the directory schema** — an attribute the directory does not
 define, a value of the wrong syntax, a missing mandatory attribute, a broken
-constraint or naming rule (LDAP result codes 17, 18, 19, 21, 34, 64, 65 on a
-creation or a rename, 67, 69). Nothing of the write is applied:
+constraint or naming rule. Nothing of the write is applied. These are the LDAP
+result codes 17, 18, 19, 21, 34, 64, 67 and 69 on any write, 65 on a creation,
+a rename or a move, and 20 (a value given twice) on a creation; a rename or a
+move names both DNs:
 
 ```json
 {
@@ -1223,8 +1225,12 @@ creation or a rename, 67, 69). Nothing of the write is applied:
 }
 ```
 
+A rename or a move onto a DN already taken answers the same way, naming that
+DN (LDAP result code 68).
+
 **Entry that cannot hold a change** — a modify adding an attribute the
-classes of the entry do not allow, or a value it already holds:
+classes of the entry do not allow, or a value it already holds (LDAP result
+codes 65 and 20 on a modify):
 
 ```json
 {

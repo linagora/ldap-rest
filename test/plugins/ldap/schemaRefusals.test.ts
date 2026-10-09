@@ -209,4 +209,95 @@ describe('Writes the directory refuses for their content', function () {
       expect(res.code).to.equal(32);
     });
   });
+
+  describe('on a rename or a move', () => {
+    beforeEach(async () => {
+      await server.ldap.add(dnOf('refused-bob'), {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'refused-bob',
+        cn: 'Bob',
+        sn: 'Refused',
+      });
+    });
+
+    it('should answer 409 naming the new DN when it is taken', async () => {
+      for (const write of [
+        () => server.ldap.rename(dnOf('refused-alice'), dnOf('refused-bob')),
+        () => server.ldap.move(dnOf('refused-alice'), dnOf('refused-bob')),
+      ]) {
+        const res = await outcome(write());
+        expect(res).to.include({ status: 409, code: 68 });
+        expect(res.message).to.include(dnOf('refused-bob'));
+      }
+    });
+
+    it('should answer 400 naming both DNs when the new one is refused', async () => {
+      // dc is not an attribute inetOrgPerson allows
+      const target = `dc=refused-alice,ou=users,${base}`;
+      for (const write of [
+        () => server.ldap.rename(dnOf('refused-alice'), target),
+        () => server.ldap.move(dnOf('refused-alice'), target),
+      ]) {
+        const res = await outcome(write());
+        expect(res.status).to.equal(400);
+        expect(isSchemaRefusal(res.code), String(res.code)).to.be.true;
+        expect(res.message).to.include(dnOf('refused-alice'));
+        expect(res.message).to.include(target);
+      }
+    });
+  });
+
+  describe('a driver error carrying its code in its text only', () => {
+    const ldap = (): Record<string, unknown> =>
+      server.ldap as unknown as Record<string, unknown>;
+    let saved: Record<string, unknown>;
+
+    /** Every write the directory receives fails with `message`. */
+    const failWith = (message: string): void => {
+      const fail = (): Promise<never> => Promise.reject(new Error(message));
+      ldap().acquireConnection = () =>
+        Promise.resolve({
+          client: { add: fail, modify: fail, modifyDN: fail },
+        });
+      ldap().releaseConnection = () => undefined;
+    };
+
+    beforeEach(() => {
+      saved = {
+        acquireConnection: ldap().acquireConnection,
+        releaseConnection: ldap().releaseConnection,
+      };
+    });
+
+    afterEach(() => Object.assign(ldap(), saved));
+
+    it('should still answer 400 to a schema refusal', async () => {
+      failWith(
+        'UndefinedTypeError: noSuchQuota: attribute type undefined Code: 0x11'
+      );
+      const res = await outcome(
+        server.ldap.modify(dnOf('refused-alice'), {
+          replace: { noSuchQuota: '1' },
+        })
+      );
+      expect(res).to.include({ status: 400, code: 17 });
+    });
+
+    it('should still answer 409 to a taken DN', async () => {
+      failWith('AlreadyExistsError: Entry Already Exists Code: 0x44');
+      const res = await outcome(
+        server.ldap.rename(dnOf('refused-alice'), dnOf('refused-bob'))
+      );
+      expect(res).to.include({ status: 409, code: 68 });
+    });
+
+    it('should leave an unknown failure without a status', async () => {
+      failWith('socket hang up');
+      const res = await outcome(
+        server.ldap.modify(dnOf('refused-alice'), { replace: { cn: 'x' } })
+      );
+      expect(res.status).to.equal(500);
+      expect(res.code).to.be.undefined;
+    });
+  });
 });
