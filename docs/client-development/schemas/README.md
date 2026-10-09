@@ -1065,7 +1065,7 @@ later fixes of the base schema, which a copy would miss:
 ```json
 {
   "extends": "/app/node_modules/ldap-rest/static/schemas/twake/users.json",
-  "attributes": { "mailQuota": null }
+  "attributes": { "personalTitle": null }
 }
 ```
 
@@ -1102,7 +1102,7 @@ Removing an attribute and changing only the French label of another:
 {
   "extends": "ldap-rest:twake/users.json",
   "attributes": {
-    "mailQuota": null,
+    "personalTitle": null,
     "cn": { "label": { "fr": "Nom complet" } }
   }
 }

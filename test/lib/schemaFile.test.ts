@@ -156,12 +156,17 @@ describe('lib/schemaFile', () => {
     it('merges a shipped schema named with "ldap-rest:"', () => {
       const file = write('users.json', {
         extends: 'ldap-rest:twake/users.json',
-        attributes: { mailQuota: null, cn: { label: { fr: 'Nom' } } },
+        attributes: { personalTitle: null, cn: { label: { fr: 'Nom' } } },
       });
       const schema = loadSchemaFile<TestSchema>(file);
       expect(schema.entity?.name).to.equal('twakeUser');
-      expect(schema.attributes).to.not.have.property('mailQuota');
-      expect(schema.attributes).to.have.property('mailQuotaSize');
+      expect(
+        loadSchemaFile<TestSchema>(
+          join(shippedSchemasPath, 'twake', 'users.json')
+        ).attributes
+      ).to.have.property('personalTitle');
+      expect(schema.attributes).to.not.have.property('personalTitle');
+      expect(schema.attributes).to.have.property('title');
       expect(schema.attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom',

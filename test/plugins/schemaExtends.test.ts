@@ -11,6 +11,7 @@ import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../src/bin';
+import { loadSchemaFile, shippedSchemasPath } from '../../src/lib/schemaFile';
 import ConfigApi from '../../src/plugins/configApi';
 import LdapBulkImport from '../../src/plugins/ldap/bulkImport';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
@@ -25,6 +26,18 @@ describe('Schemas extending another', () => {
   let dir: string;
   let usersFile: string;
 
+  before(() => {
+    // what the tests remove and patch must be in the base to prove anything
+    const shipped = loadSchemaFile<{ attributes: Attributes }>(
+      join(shippedSchemasPath, 'twake', 'users.json')
+    );
+    expect(shipped.attributes).to.have.property('personalTitle');
+    expect(shipped.attributes.cn.label).to.deep.equal({
+      en: 'Common name',
+      fr: "Nom d'annuaire",
+    });
+  });
+
   beforeEach(() => {
     dir = fs.mkdtempSync(join(os.tmpdir(), 'schemaExtends-'));
     fs.mkdirSync(join(dir, 'schemas'));
@@ -34,7 +47,7 @@ describe('Schemas extending another', () => {
       JSON.stringify({
         extends: 'ldap-rest:twake/users.json',
         attributes: {
-          mailQuota: null,
+          personalTitle: null,
           cn: { label: { fr: 'Nom complet' } },
         },
       })
@@ -69,7 +82,7 @@ describe('Schemas extending another', () => {
       expect(res.body).to.not.have.property('extends');
       expect(res.body.entity.base).to.equal('ou=users,dc=example,dc=com');
       const attributes = res.body.attributes as Attributes;
-      expect(attributes).to.not.have.property('mailQuota');
+      expect(attributes).to.not.have.property('personalTitle');
       expect(attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom complet',
@@ -88,7 +101,7 @@ describe('Schemas extending another', () => {
       const request = supertest(dm.app);
       const res = await request.get('/static/schemas/twake/users.json');
       expect(res.status).to.equal(200);
-      expect(res.body.attributes).to.not.have.property('mailQuota');
+      expect(res.body.attributes).to.not.have.property('personalTitle');
       // the other shipped schemas are still served from the static directory
       const groups = await request.get('/static/schemas/twake/groups.json');
       expect(groups.status).to.equal(200);
@@ -112,7 +125,7 @@ describe('Schemas extending another', () => {
       expect(res.status).to.equal(200);
       expect(res.body.strict).to.equal(false);
       expect(res.body.entity.name).to.equal('twakeUser');
-      expect(res.body.attributes).to.not.have.property('mailQuota');
+      expect(res.body.attributes).to.not.have.property('personalTitle');
 
       const missing = await request.get('/static/schemas/a/b/missing.json');
       expect(missing.status).to.equal(404);
@@ -249,8 +262,8 @@ describe('Schemas extending another', () => {
 
       expect(flat.instances).to.have.length(1);
       const attributes = flat.instances[0].schema?.attributes;
-      expect(attributes).to.not.have.property('mailQuota');
-      expect(attributes).to.have.property('mailQuotaSize');
+      expect(attributes).to.not.have.property('personalTitle');
+      expect(attributes).to.have.property('title');
       expect(flat.instances[0].base).to.equal(
         `ou=users,${dm.config.ldap_base}`
       );
@@ -266,7 +279,7 @@ describe('Schemas extending another', () => {
           schemaUrl: string;
         }[]
       )[0];
-      expect(resource.schema.attributes).to.not.have.property('mailQuota');
+      expect(resource.schema.attributes).to.not.have.property('personalTitle');
       expect(resource.schema.attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom complet',
