@@ -10,6 +10,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import type { Config } from '../bin';
+import configArgs from '../config/args';
 
 import { transformSchemas } from './utils';
 
@@ -208,17 +209,31 @@ export function schemaUrl(config: Config, file: string): string | undefined {
   return `/${config.static_name || 'static'}${file.substring(index)}`;
 }
 
+const schemaOptions: [keyof Config, string][] = [
+  ['group_schema', '--group-schema'],
+  ['organization_schema', '--organization-schema'],
+  ['ldap_flat_schema', '--ldap-flat-schema'],
+];
+
 /**
  * The schema files the configuration names, those the plugins advertise a
- * {@link schemaUrl} for
+ * {@link schemaUrl} for. A value left at its default is not one: the
+ * default `--group-schema` lies in the package, and a `--static-path` of
+ * the deployment's own keeps serving its file at that URL.
  *
  * @param config server configuration
  * @returns their paths, as configured
  */
 export function configuredSchemaFiles(config: Config): string[] {
-  return [
-    config.group_schema,
-    config.organization_schema,
-    ...(config.ldap_flat_schema || []),
-  ].filter((file): file is string => !!file);
+  const files: string[] = [];
+  for (const [key, option] of schemaOptions) {
+    const defaults = [configArgs.find(entry => entry[0] === option)?.[2]]
+      .flat()
+      .filter((file): file is string => typeof file === 'string' && !!file)
+      .map(file => resolve(file));
+    for (const file of [config[key]].flat())
+      if (typeof file === 'string' && file && !defaults.includes(resolve(file)))
+        files.push(file);
+  }
+  return files;
 }

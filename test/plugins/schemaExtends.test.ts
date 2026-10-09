@@ -118,6 +118,25 @@ describe('Schemas extending another', () => {
       expect(missing.status).to.equal(404);
     });
 
+    it('leaves the URL of a default schema option to the static directory', async () => {
+      fs.mkdirSync(join(dir, 'schemas', 'twake'));
+      fs.writeFileSync(
+        join(dir, 'schemas', 'twake', 'groups.json'),
+        JSON.stringify({ entity: { name: 'operatorGroup' }, attributes: {} })
+      );
+      const dm = new DM();
+      await dm.ready;
+      expect(dm.config.group_schema).to.match(/static\/schemas\/twake\/groups/);
+      dm.config.static_path = dir;
+      await dm.registerPlugin('static', new Static(dm));
+
+      const res = await supertest(dm.app).get(
+        '/static/schemas/twake/groups.json'
+      );
+      expect(res.status).to.equal(200);
+      expect(res.body.entity.name).to.equal('operatorGroup');
+    });
+
     it('serves a configured file whose URL needs percent-encoding', async () => {
       fs.mkdirSync(join(dir, 'schemas', 'users rest'));
       const spaced = join(dir, 'schemas', 'users rest', 'users.json');

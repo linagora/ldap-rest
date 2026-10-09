@@ -6,6 +6,7 @@ import { expect } from 'chai';
 
 import type { Config } from '../../src/bin';
 import {
+  configuredSchemaFiles,
   loadSchemaFile,
   loadSchemaFileAsync,
   mergeSchema,
@@ -266,6 +267,21 @@ describe('lib/schemaFile', () => {
         err = e as Error;
       }
       expect(err?.message).to.match(/"extends" loop/);
+    });
+  });
+
+  describe('configuredSchemaFiles', () => {
+    it('lists the schema options, but those left at their default', () => {
+      expect(
+        configuredSchemaFiles({
+          group_schema: join(shippedSchemasPath, 'twake', 'groups.json'),
+          organization_schema: '/etc/ldap-rest/schemas/organizations.json',
+          ldap_flat_schema: ['/etc/ldap-rest/schemas/users.json'],
+        } as Config)
+      ).to.deep.equal([
+        '/etc/ldap-rest/schemas/organizations.json',
+        '/etc/ldap-rest/schemas/users.json',
+      ]);
     });
   });
 

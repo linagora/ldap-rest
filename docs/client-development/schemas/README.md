@@ -1132,7 +1132,9 @@ entity its merged schema inline (`schema`) and, with `core/static`, a
 `core/static` serves a configured schema file at that URL even when it is
 outside `--static-path`, and before a shipped schema of the same URL:
 `/etc/ldap-rest/schemas/twake/users.json` is what
-`/static/schemas/twake/users.json` returns. A file outside any `schemas`
+`/static/schemas/twake/users.json` returns. An option left at its default
+does not count: without `--group-schema`, a `--static-path` of your own
+still serves its `schemas/twake/groups.json`. A file outside any `schemas`
 directory has no `schemaUrl`; its schema is still inline.
 
 ---
