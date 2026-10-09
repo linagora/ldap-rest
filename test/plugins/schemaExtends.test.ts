@@ -118,6 +118,59 @@ describe('Schemas extending another', () => {
       expect(missing.status).to.equal(404);
     });
 
+    it('serves a configured file whose URL needs percent-encoding', async () => {
+      fs.mkdirSync(join(dir, 'schemas', 'users rest'));
+      const spaced = join(dir, 'schemas', 'users rest', 'users.json');
+      fs.renameSync(usersFile, spaced);
+      const dm = new DM();
+      await dm.ready;
+      dm.config.ldap_flat_schema = [spaced];
+      await dm.registerPlugin('static', new Static(dm));
+
+      // without the table, `:dir/:name` would refuse the space with a 400
+      const res = await supertest(dm.app).get(
+        '/static/schemas/users%20rest/users.json'
+      );
+      expect(res.status).to.equal(200);
+      expect(res.body.entity.name).to.equal('twakeUser');
+    });
+
+    it('accepts dotted names and refuses malformed ones at any depth', async () => {
+      const deep = join(dir, 'schemas', 'a', 'b');
+      fs.mkdirSync(deep, { recursive: true });
+      fs.writeFileSync(
+        join(dir, 'schemas', 'my.users.json'),
+        JSON.stringify({ extends: 'users.json', strict: false })
+      );
+      fs.writeFileSync(join(deep, 'notes.txt'), 'plain');
+      const dm = new DM();
+      await dm.ready;
+      dm.config.static_path = dir;
+      await dm.registerPlugin('static', new Static(dm));
+      const request = supertest(dm.app);
+
+      const dotted = await request.get('/static/schemas/my.users.json');
+      expect(dotted.status).to.equal(200);
+      expect(dotted.body.strict).to.equal(false);
+      expect(dotted.body.entity.name).to.equal('twakeUser');
+
+      for (const url of [
+        '/static/schemas/a..json',
+        '/static/schemas/a/.json',
+        '/static/schemas/a/b/c%20d.json',
+        '/static/schemas/a/b%20c/d/e.json',
+        '/static/schemas/a/b/..%2F..%2F..%2Fpackage.json',
+      ]) {
+        const res = await request.get(url);
+        expect(res.status, url).to.equal(400);
+      }
+
+      // not a schema: left to the static files
+      const text = await request.get('/static/schemas/a/b/notes.txt');
+      expect(text.status).to.equal(200);
+      expect(text.text).to.equal('plain');
+    });
+
     it('answers 500 when the base is missing', async () => {
       fs.writeFileSync(
         join(dir, 'schemas', 'broken.json'),

@@ -33,6 +33,11 @@
 - `core/static`: a schema file configured outside `--static-path` is served at
   the `schemaUrl` the configuration API gives for it, instead of the shipped
   schema of that URL or a 404
+- `core/static`: a schema two directories deep or more
+  (`schemas/twake/nomenclature/`), or with a dot in its name
+  (`my.schema.json`), is served with its placeholders replaced instead of as
+  a raw file, and a file under `schemas/` that is not JSON is served instead
+  of refused
 
 ## v0.16.2 (2026-10-09)
 
