@@ -1,5 +1,3 @@
-import fs from 'fs';
-
 import type { SearchResult } from 'ldapts';
 import type { Express, Request, Response } from 'express';
 
@@ -29,7 +27,6 @@ import {
   normalizeDn,
   rdnValue,
   substringSearchFilter,
-  transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
 import {
@@ -39,6 +36,10 @@ import {
   HttpError,
 } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import {
+  loadSchemaFileAsync,
+  schemaUrl as schemaFileUrl,
+} from '../../lib/schemaFile';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
@@ -161,25 +162,17 @@ export default class LdapOrganizations extends DmPlugin {
 
     // Load organization schema if provided
     if (this.config.organization_schema) {
-      fs.readFile(this.config.organization_schema, (err, data) => {
-        if (err) {
+      const file = this.config.organization_schema;
+      loadSchemaFileAsync<Schema>(file, { config: this.config })
+        .then(schema => {
+          this.schema = schema;
+          this.logger.debug('Organization schema loaded');
+        })
+        .catch(err =>
           this.logger.error(
-            `Failed to load organization schema from ${this.config.organization_schema}: ${err}`
-          );
-        } else {
-          try {
-            this.schema = JSON.parse(
-              transformSchemas(data.toString(), this.config)
-            ) as Schema;
-            this.logger.debug('Organization schema loaded');
-          } catch (e) {
-            this.logger.error(
-              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-              `Failed to parse organization schema: ${e}`
-            );
-          }
-        }
-      });
+            `Failed to load organization schema from ${file}: ${err}`
+          )
+        );
     }
   }
 
@@ -1653,19 +1646,10 @@ export default class LdapOrganizations extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     // Generate schema URL if static plugin is loaded
-    let schemaUrl: string | undefined;
-    if (
-      this.server.loadedPlugins['static'] &&
-      this.config.organization_schema
-    ) {
-      const staticName = this.config.static_name || 'static';
-      const schemasIndex = this.config.organization_schema.indexOf('/schemas/');
-      if (schemasIndex !== -1) {
-        const relativePath =
-          this.config.organization_schema.substring(schemasIndex);
-        schemaUrl = `/${staticName}${relativePath}`;
-      }
-    }
+    const schemaUrl =
+      this.server.loadedPlugins['static'] && this.config.organization_schema
+        ? schemaFileUrl(this.config, this.config.organization_schema)
+        : undefined;
 
     return {
       enabled: true,

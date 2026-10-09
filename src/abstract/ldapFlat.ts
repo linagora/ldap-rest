@@ -7,8 +7,6 @@
  * - modify entries
  * - validate with schema
  */
-import fs from 'fs';
-
 import type { Express, Request, Response } from 'express';
 
 import type { DM } from '../bin';
@@ -41,7 +39,6 @@ import {
   launchHooksChained,
   normalizeDn,
   substringSearchFilter,
-  transformSchemas,
   validateDnValue,
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
@@ -60,6 +57,7 @@ import {
   UnprocessableEntityError,
 } from '../lib/errors';
 import { extractLdapCode } from '../lib/ldapCodes';
+import { loadSchemaFile } from '../lib/schemaFile';
 
 import DmPlugin from './plugin';
 
@@ -376,8 +374,9 @@ export default abstract class LdapFlat extends DmPlugin {
 
     if (config.schemaPath) {
       try {
-        const data = fs.readFileSync(config.schemaPath, 'utf8');
-        this.schema = JSON.parse(transformSchemas(data, this.config)) as Schema;
+        this.schema = loadSchemaFile<Schema>(config.schemaPath, {
+          config: this.config,
+        });
         this.logger.info(
           `${this.singularName} schema loaded from ${config.schemaPath}`
         );

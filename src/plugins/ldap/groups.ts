@@ -7,8 +7,6 @@
  * - add/delete members of groups
  * - detect user deletion to remove them from groups (hook)
  */
-import fs from 'fs';
-
 import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
@@ -30,6 +28,10 @@ import {
 } from '../../lib/expressFormatedResponses';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import {
+  loadSchemaFileAsync,
+  schemaUrl as schemaFileUrl,
+} from '../../lib/schemaFile';
+import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
@@ -38,7 +40,6 @@ import {
   launchHooksChained,
   organizationLink,
   substringSearchFilter,
-  transformSchemas,
   validateDnValue,
 } from '../../lib/utils';
 import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
@@ -153,27 +154,15 @@ export default class LdapGroups extends DmPlugin {
         (this.config.group_class as string[]) || []
       );
     if (this.config.group_schema) {
-      fs.readFile(this.config.group_schema, (err, data) => {
-        if (err) {
-          this.logger.error(
-            `Failed to load group schema from ${this.config.group_schema}: ${err}`
-          );
-        } else {
-          try {
-            this.schema = this.adaptSchema(
-              JSON.parse(
-                transformSchemas(data.toString(), this.config)
-              ) as Schema
-            );
-            this.logger.debug('Group schema loaded');
-          } catch (e) {
-            this.logger.error(
-              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-              `Failed to parse ${this.config.schemas_path}/group.json: ${e}`
-            );
-          }
-        }
-      });
+      const file = this.config.group_schema;
+      loadSchemaFileAsync<Schema>(file, { config: this.config })
+        .then(schema => {
+          this.schema = this.adaptSchema(schema);
+          this.logger.debug('Group schema loaded');
+        })
+        .catch(err =>
+          this.logger.error(`Failed to load group schema from ${file}: ${err}`)
+        );
     }
   }
 
@@ -1278,15 +1267,10 @@ export default class LdapGroups extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     // Generate schema URL if static plugin is loaded
-    let schemaUrl: string | undefined;
-    if (this.server.loadedPlugins['static'] && this.config.group_schema) {
-      const staticName = this.config.static_name || 'static';
-      const schemasIndex = this.config.group_schema.indexOf('/schemas/');
-      if (schemasIndex !== -1) {
-        const relativePath = this.config.group_schema.substring(schemasIndex);
-        schemaUrl = `/${staticName}${relativePath}`;
-      }
-    }
+    const schemaUrl =
+      this.server.loadedPlugins['static'] && this.config.group_schema
+        ? schemaFileUrl(this.config, this.config.group_schema)
+        : undefined;
 
     return {
       enabled: true,
