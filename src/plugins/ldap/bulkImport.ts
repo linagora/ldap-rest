@@ -4,8 +4,6 @@
  * @author LDAP-Rest Team
  */
 
-import fs from 'fs';
-
 import type { Express, Request, Response } from 'express';
 import type { SearchResult } from 'ldapts';
 import multer from 'multer';
@@ -15,6 +13,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses';
+import { loadSchemaFile } from '../../lib/schemaFile';
 import { escapeDnValue, validateDnValue } from '../../lib/utils';
 
 interface BulkImportSchema {
@@ -187,8 +186,7 @@ export default class LdapBulkImport extends DmPlugin {
       }
 
       try {
-        const schemaContent = fs.readFileSync(schemaPath, 'utf-8');
-        const schema = JSON.parse(schemaContent) as BulkImportSchema;
+        const schema = loadSchemaFile<BulkImportSchema>(schemaPath);
 
         this.resources.set(resourceName, {
           name: resourceName,

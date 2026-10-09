@@ -156,6 +156,10 @@ to keep the default.
 | `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                |
 | `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                        |
 
+A schema file named by an option may extend another one, shipped or not, and
+hold only the differences:
+[extending a schema](../client-development/schemas/README.md#extending-a-schema).
+
 ## LDAP Connection
 
 | CLI                          | Plural           | Env                      | Default                            | Description                                 |

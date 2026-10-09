@@ -5,14 +5,15 @@
  * Generic plugin to manage LDAP flat entities from schema files
  * Automatically creates sub-plugins based on schema metadata
  */
-import fs from 'fs';
-
 import type { Express } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
-import { transformSchemas } from '../../lib/utils';
+import {
+  loadSchemaFile,
+  schemaUrl as schemaFileUrl,
+} from '../../lib/schemaFile';
 import type { LocalizedText, Schema } from '../../config/schema';
 import type { AttributesList } from '../../lib/ldapActions';
 
@@ -162,10 +163,9 @@ export default class LdapFlatGeneric extends DmPlugin {
     // Load each schema and create an instance
     schemas.forEach(schemaPath => {
       try {
-        const schemaData = fs.readFileSync(schemaPath, 'utf8');
-        const schema = JSON.parse(
-          transformSchemas(schemaData, this.config)
-        ) as EnrichedSchema;
+        const schema = loadSchemaFile<EnrichedSchema>(schemaPath, {
+          config: this.config,
+        });
 
         if (!schema.entity) {
           throw new Error(
@@ -256,19 +256,13 @@ export default class LdapFlatGeneric extends DmPlugin {
    */
   getConfigApiData(): Record<string, unknown> {
     const apiPrefix = this.config.api_prefix || '/api';
-    const staticName = this.config.static_name || 'static';
 
     const flatResources = this.instances.map((instance, index) => {
       // Generate schema URL if static plugin is loaded
-      let schemaUrl: string | undefined;
-      if (this.server.loadedPlugins['static'] && this.schemaPaths[index]) {
-        const schemaPath = this.schemaPaths[index];
-        const schemasIndex = schemaPath.indexOf('/schemas/');
-        if (schemasIndex !== -1) {
-          const relativePath = schemaPath.substring(schemasIndex);
-          schemaUrl = `/${staticName}${relativePath}`;
-        }
-      }
+      const schemaUrl =
+        this.server.loadedPlugins['static'] && this.schemaPaths[index]
+          ? schemaFileUrl(this.config, this.schemaPaths[index])
+          : undefined;
 
       return {
         name: instance.name.replace('ldapFlat:', ''),

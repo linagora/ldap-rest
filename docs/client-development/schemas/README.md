@@ -13,6 +13,7 @@ LDAP-Rest uses JSON schemas to define LDAP entity structure, validation rules, a
 - [Semantic Roles](#semantic-roles)
 - [Validation Rules](#validation-rules)
 - [Predefined Schemas](#predefined-schemas)
+- [Extending a Schema](#extending-a-schema)
 
 ---
 
@@ -1052,6 +1053,87 @@ npx ldap-rest \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./path/to/custom-users.json
 ```
+
+---
+
+## Extending a Schema
+
+To change a few points of a schema, shipped or not, write a file holding only
+the differences and naming the schema it `extends`. The deployment keeps the
+later fixes of the base schema, which a copy would miss:
+
+```json
+{
+  "extends": "/app/node_modules/ldap-rest/static/schemas/twake/users.json",
+  "attributes": { "mailQuota": null }
+}
+```
+
+Point the option at this file as at any schema:
+`DM_LDAP_FLAT_SCHEMA=/etc/ldap-rest/schemas/users.json`.
+
+### Naming the Base
+
+`extends` takes:
+
+- `ldap-rest:<path>`: a schema shipped with LDAP-Rest, `<path>` being relative
+  to its `static/schemas` directory, wherever the package is installed and
+  whatever `--schemas-path` says: `"extends": "ldap-rest:twake/users.json"`
+- an absolute path
+- any other path, relative to the directory of the extending file:
+  `"extends": "../base/users.json"`
+
+The base may extend another file in turn. A loop (`a.json` extends `b.json`,
+which extends `a.json`) is an error.
+
+### Merge Rules
+
+The extending file is applied on its base:
+
+- objects are merged key by key, at every depth; the extending file wins
+- `null` deletes the key
+- arrays and other values replace those of the base: an `objectClass` list
+  must be written whole
+- `extends` itself is not part of the result
+
+Removing an attribute and changing only the French label of another:
+
+```json
+{
+  "extends": "ldap-rest:twake/users.json",
+  "attributes": {
+    "mailQuota": null,
+    "cn": { "label": { "fr": "Nom complet" } }
+  }
+}
+```
+
+An attribute added by the extending file comes after the inherited ones, and
+so does its field in the forms built from the schema.
+
+The `__ldap_base__` style placeholders are replaced in each file of the chain
+before the merge: inherited values get them, and `extends` may hold one.
+`{ldap_base}` in `entity.base` is resolved on the merged schema.
+
+### Where It Applies
+
+Every schema file is read this way: `--ldap-flat-schema`, `--group-schema`,
+`--organization-schema`, `--bulk-import-schemas`, the SCIM schemas of
+`--schemas-path`, and the schemas `core/static` serves. A file whose base is
+missing or invalid is not loaded, as an unreadable file; `core/static` answers
+it with a 500.
+
+### Served Schemas
+
+`core/static` serves the merged schema. The configuration API gives each
+entity its merged schema inline (`schema`) and, with `core/static`, a
+`schemaUrl` made of the file path from its first `schemas` directory:
+`/etc/ldap-rest/schemas/users.json` gets `/static/schemas/users.json`.
+`core/static` serves a configured schema file at that URL even when it is
+outside `--static-path`, and before a shipped schema of the same URL:
+`/etc/ldap-rest/schemas/twake/users.json` is what
+`/static/schemas/twake/users.json` returns. A file outside any `schemas`
+directory has no `schemaUrl`; its schema is still inline.
 
 ---
 

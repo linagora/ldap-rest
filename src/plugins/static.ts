@@ -4,7 +4,10 @@
  *
  * This plugin serves static files from a specified directory.
  * It provides access to JSON schemas if stored in a "schemas" subdirectory
- * and modify them on-the-fly to replace __FOO_BAR__ by --foo-bar value.
+ * and modify them on-the-fly to replace __FOO_BAR__ by --foo-bar value and
+ * to merge the schemas they extend. The schema files of the configuration
+ * are served at the URL the plugins advertise for them, even when they are
+ * outside of that directory.
  *
  * This permits to share the same schemas between server and JS embedded in web pages.
  * @author Xavier Guimard <xguimard@linagora.com>
@@ -12,12 +15,16 @@
 import fs from 'fs';
 import { join, resolve } from 'path';
 
-import type { Express } from 'express';
+import type { Express, Response } from 'express';
 import express from 'express';
 
 import DmPlugin, { type Role } from '../abstract/plugin';
-import { notFound } from '../lib/expressFormatedResponses';
-import { transformSchemas } from '../lib/utils';
+import { notFound, serverError } from '../lib/expressFormatedResponses';
+import {
+  configuredSchemaFiles,
+  loadSchemaFileAsync,
+  schemaUrl,
+} from '../lib/schemaFile';
 
 /**
  * @openapi-component
@@ -32,7 +39,8 @@ import { transformSchemas } from '../lib/utils';
  *     The server replaces `__FOO_BAR__` placeholders on the fly with the
  *     value of the corresponding `--foo-bar` CLI option so that a single
  *     schema file can be shared between server-side validation and
- *     client-side rendering.
+ *     client-side rendering. A schema that `extends` another is served
+ *     merged with it.
  *   additionalProperties: true
  *   example:
  *     entity:
@@ -67,6 +75,13 @@ export default class Static extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Bad directory ${rep}: ${e}`);
     }
+    const configured = this.configuredSchemas(rep);
+    if (configured.size)
+      app.get(`/${this.config.static_name}/schemas/*path`, (req, res, next) => {
+        const file = configured.get(req.path);
+        if (!file) return next();
+        this.sendSchema(file, res);
+      });
     /**
      * @openapi
      * summary: Get JSON schema by name
@@ -113,13 +128,7 @@ export default class Static extends DmPlugin {
       if (!schemaPath.startsWith(schemasDir + '/')) {
         return res.status(403).send('Access denied');
       }
-      fs.readFile(schemaPath, (err, data) => {
-        if (err) {
-          return notFound(res, 'Schema not found');
-        }
-        const str = transformSchemas(data, this.config);
-        res.type('json').send(str);
-      });
+      this.sendSchema(schemaPath, res);
     });
     /**
      * @openapi
@@ -173,15 +182,50 @@ export default class Static extends DmPlugin {
       if (!schemaPath.startsWith(schemasDir + '/')) {
         return res.status(403).send('Access denied');
       }
-      fs.readFile(schemaPath, (err, data) => {
-        if (err) {
-          return notFound(res, 'Schema not found');
-        }
-        const str = transformSchemas(data, this.config);
-        res.type('json').send(str);
-      });
+      this.sendSchema(schemaPath, res);
+    });
+    app.get(`/${this.config.static_name}/schemas/*path`, (req, res, next) => {
+      const segments = req.params.path as unknown as string[];
+      const name = segments[segments.length - 1];
+      if (
+        !/^[\w-]+\.json$/.test(name) ||
+        !segments.slice(0, -1).every(dir => /^[\w-]+$/.test(dir))
+      )
+        return next();
+      this.sendSchema(join(rep, 'schemas', ...segments), res);
     });
     app.use(`/${this.config.static_name}`, express.static(rep));
+  }
+
+  /**
+   * Schema files of the configuration that their URL would not reach under
+   * the static directory, by URL
+   */
+  private configuredSchemas(rep: string): Map<string, string> {
+    const byUrl = new Map<string, string>();
+    for (const file of configuredSchemaFiles(this.config)) {
+      const url = schemaUrl(this.config, file);
+      if (!url) continue;
+      const underStatic = join(rep, url.substring(url.indexOf('/schemas/')));
+      if (resolve(underStatic) === resolve(file)) continue;
+      const other = byUrl.get(url);
+      if (other && resolve(other) !== resolve(file))
+        this.logger.warn(
+          `${file} is not served: ${other} already has its URL ${url}`
+        );
+      else byUrl.set(url, file);
+    }
+    return byUrl;
+  }
+
+  private sendSchema(file: string, res: Response): void {
+    loadSchemaFileAsync(file, { config: this.config }).then(
+      schema => res.type('json').send(JSON.stringify(schema)),
+      (err: Error & { code?: string }) => {
+        if (err.code) return notFound(res, 'Schema not found');
+        serverError(res, err);
+      }
+    );
   }
 
   /**

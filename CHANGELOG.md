@@ -11,6 +11,14 @@
   that already sets the option keeps its value,
   [notes](docs/usage/upgrading.md#the-quota-attribute-defaults-to-mailquotasize)
 
+### Features
+
+- Schemas: a schema file can `extends` another one, shipped
+  (`"extends": "ldap-rest:twake/users.json"`) or not, and hold only its
+  differences; `null` removes a key, such as an attribute. Applies to every
+  schema option, and `core/static` serves the merged schema,
+  [docs](docs/client-development/schemas/README.md#extending-a-schema)
+
 ### Fixes
 
 - Twake schemas: the user schema no longer offers `mailQuota`, which the
@@ -22,6 +30,9 @@
   instead of 500; a modify adding a value the entry already holds, and a
   rename or a move onto a DN already taken, answer 409,
   [docs](docs/client-development/api/rest-api.md#400-bad-request)
+- `core/static`: a schema file configured outside `--static-path` is served at
+  the `schemaUrl` the configuration API gives for it, instead of the shipped
+  schema of that URL or a 404
 
 ## v0.16.2 (2026-10-09)
 

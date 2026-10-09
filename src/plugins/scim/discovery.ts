@@ -7,11 +7,11 @@
  *   GET /ResourceTypes (and /ResourceTypes/User, /ResourceTypes/Group)
  *   GET /Schemas       (and /Schemas/{urn})
  */
-import fs from 'fs';
 import path from 'path';
 
 import type { Config } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
+import { loadSchemaFile } from '../../lib/schemaFile';
 
 import {
   type ResourceTypeDefinition,
@@ -195,8 +195,7 @@ export class ScimDiscovery {
   ): SchemaDefinition | undefined {
     const filepath = path.join(this.schemaDir, filename);
     try {
-      const content = fs.readFileSync(filepath, 'utf8');
-      const parsed = JSON.parse(content) as Partial<SchemaDefinition>;
+      const parsed = loadSchemaFile<Partial<SchemaDefinition>>(filepath);
       return {
         schemas: [SCHEMA_SCHEMA],
         id: urn,
