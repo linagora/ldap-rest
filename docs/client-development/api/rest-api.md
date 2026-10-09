@@ -401,14 +401,21 @@ behind a department autocomplete over a wide tree.
 
 - `:dn` - URL-encoded Distinguished Name of the node to search under
 - `q` - Search query (required), matched against `ou`, `description` and, when
-  `ldap_organization_path_attribute` is set, the path attribute, so
+  `--ldap-organization-path-attribute` is set, the path attribute, so
   `Government / lin` matches by path
 
-**Limit:** at most `ldap_organization_max_subnodes` (default 50) organizations
-are returned. When there are more, or when the directory refuses to list them
-all, the last row is a `moreIndicator` entry (`_isMoreIndicator: "true"`,
-`_displayedCount` holding the number of organizations kept). A client must drop
-it before using the rest, and may ask for a narrower query.
+**Limit:** at most `--ldap-organization-max-subnodes` (default 50)
+organizations are returned. A partial answer ends with a `moreIndicator` entry
+at `more-organizations-<dn>` (`_isMoreIndicator: "true"`, `_displayedCount`
+holding the number of organizations kept), which a client must drop before
+using the rest. It says which limit cut the answer:
+
+- **the cap**: more organizations matched than it allows. The entry also
+  carries `_totalCount`, and a narrower query is the way to the rest.
+- **the directory**: it refused to list every match in one answer. There is no
+  `_totalCount`, since nothing counted the rest, and ldap-rest logs a warning:
+  the fix is the size limit of the account ldap-rest binds as (`olcLimits`, or
+  `olcSizeLimit`).
 
 **Example Request:**
 
@@ -428,9 +435,10 @@ curl -H "Accept: application/json" \
   },
   {
     "dn": "more-organizations-ou=organization,dc=example,dc=com",
-    "cn": ["... more organizations than the directory will list"],
+    "cn": ["... 73 more organizations, narrow the search"],
     "objectClass": ["moreIndicator"],
     "_isMoreIndicator": "true",
+    "_totalCount": "123",
     "_displayedCount": "50"
   }
 ]

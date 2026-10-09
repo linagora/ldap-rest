@@ -387,10 +387,16 @@ export default class LdapOrganizations extends DmPlugin {
      *   query such as `Government / lin` finds a department by its path.
      *
      *   At most `ldap_organization_max_subnodes` (default 50) organizations
-     *   are returned. When there are more, or when the directory refuses to
-     *   list them all, a last row carrying `_isMoreIndicator` says the
-     *   answer is partial: a client must drop it before treating the rest as
-     *   organizations, and ask for a narrower query.
+     *   are returned. A partial answer ends with a sentinel entry at
+     *   `more-organizations-<dn>` carrying `_isMoreIndicator: "true"`, which
+     *   a client must drop before treating the rest as organizations, and
+     *   which says why the answer is partial:
+     *
+     *   - more organizations matched than the cap: it carries
+     *     `_totalCount` and `_displayedCount`, and a narrower query helps;
+     *   - the directory refused to list them all: it carries
+     *     `_displayedCount` alone — nothing counted the rest — and the fix
+     *     is the size limit of the account ldap-rest binds as.
      * parameters:
      *   - in: query
      *     name: q
@@ -1061,6 +1067,36 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   /**
+   * The last row of a partial list, saying that it is one.
+   *
+   * Every list this plugin cuts ends with the same shape, whichever limit
+   * cut it; only the DN, the text and the counts differ. `total` is set
+   * when the rest was counted — ldap-rest's own cap — and left out when the
+   * directory refused to list it, since nothing counted it then.
+   *
+   * @param dn DN of the row, distinct per kind of list: one answer can carry
+   *           two of them
+   * @param label what the row reads as
+   * @param displayed how many entries the list kept
+   * @param total how many there were, when known
+   */
+  private static moreIndicator(
+    dn: string,
+    label: string,
+    displayed: number,
+    total?: number
+  ): AttributesList {
+    return {
+      dn,
+      cn: [label],
+      objectClass: ['moreIndicator'],
+      _isMoreIndicator: 'true',
+      ...(total === undefined ? {} : { _totalCount: total.toString() }),
+      _displayedCount: displayed.toString(),
+    };
+  }
+
+  /**
    * The child organizations of a node, and what to do when the directory
    * will not list them all.
    *
@@ -1144,15 +1180,13 @@ export default class LdapOrganizations extends DmPlugin {
     );
     return [
       ...shown,
-      {
-        // Distinct from the row the attached entries add: one answer can
-        // carry both, and two rows sharing a DN is not a list.
-        dn: `more-organizations-${dn}`,
-        cn: ['... more organizations than the directory will list'],
-        objectClass: ['moreIndicator'],
-        _isMoreIndicator: 'true',
-        _displayedCount: shown.length.toString(),
-      },
+      // Distinct from the row the attached entries add: one answer can
+      // carry both, and two rows sharing a DN is not a list.
+      LdapOrganizations.moreIndicator(
+        `more-organizations-${dn}`,
+        '... more organizations than the directory will list',
+        shown.length
+      ),
     ];
   }
 
@@ -1211,18 +1245,14 @@ export default class LdapOrganizations extends DmPlugin {
           'one answer. Raise the size limit for the account ldap-rest binds ' +
           'as (olcLimits, or olcSizeLimit) to count them all.'
       );
+      const shown = bounded.searchEntries.slice(0, cap);
       return [
-        ...bounded.searchEntries.slice(0, cap),
-        {
-          dn: `more-${dn}`,
-          cn: ['... more elements than the directory will list'],
-          objectClass: ['moreIndicator'],
-          _isMoreIndicator: 'true',
-          _displayedCount: Math.min(
-            bounded.searchEntries.length,
-            cap
-          ).toString(),
-        },
+        ...shown,
+        LdapOrganizations.moreIndicator(
+          `more-${dn}`,
+          '... more elements than the directory will list',
+          shown.length
+        ),
       ];
     }
 
@@ -1232,14 +1262,12 @@ export default class LdapOrganizations extends DmPlugin {
     if (totalCount <= cap) return kept;
     return [
       ...kept,
-      {
-        dn: `more-${dn}`,
-        cn: [`... ${totalCount - cap} more elements`],
-        objectClass: ['moreIndicator'],
-        _isMoreIndicator: 'true',
-        _totalCount: totalCount.toString(),
-        _displayedCount: cap.toString(),
-      },
+      LdapOrganizations.moreIndicator(
+        `more-${dn}`,
+        `... ${totalCount - cap} more elements`,
+        cap,
+        totalCount
+      ),
     ];
   }
 
@@ -1525,13 +1553,18 @@ export default class LdapOrganizations extends DmPlugin {
    * too, and the path attribute is matched next to the name so that a query
    * written as a path finds its department.
    *
-   * The answer is bounded like the children listing is, and for the same
-   * reason: the directory may refuse a long answer (`sizeLimitExceeded`),
-   * and ldapts raises that only for a request that carried no `sizeLimit`
-   * of its own. Asking for one more than the cap gives both things at once,
-   * a refusal that cannot happen and a way to tell that entries were left
-   * out. A refusal that happens anyway is read as the same partial answer.
-   * The search is not paged: a paged walk would only end on the refusal.
+   * The answer is bounded like the children listing is, and read the same
+   * way. The search first goes out without a `sizeLimit`: ldapts swallows a
+   * `sizeLimitExceeded` from a request that carried one, so a bounded first
+   * attempt would let a directory whose own limit sits below the cap answer
+   * a partial list that passes for whole. Unbounded, the refusal raises
+   * (code 4), and only then is a bounded search sent, whose answer is
+   * partial by construction. When the directory does list everything, the
+   * cap is ldap-rest's own, and the rest is counted.
+   *
+   * The two cuts end the list with different rows, because they call for
+   * different fixes: a narrower query for the cap, the size limit of the
+   * bind account for the refusal.
    *
    * @param dn organization to search under, itself included
    * @param query what to look for in a name, a description or a path
@@ -1550,15 +1583,15 @@ export default class LdapOrganizations extends DmPlugin {
       : 'ou,description';
     const filter = `(&(objectClass=organizationalUnit)${substringSearchFilter(query, attrs)})`;
 
-    let found: AttributesList[] = [];
-    let partial = false;
+    const found: AttributesList[] = [];
     try {
-      const res = (await this.server.ldap.search(
-        { paged: false, scope: 'sub', filter, sizeLimit: cap + 1 },
+      const pages = (await this.server.ldap.search(
+        { paged: true, scope: 'sub', filter },
         dn,
         req
-      )) as SearchResult;
-      found = res.searchEntries;
+      )) as AsyncGenerator<SearchResult>;
+      // As for the children, the refusal comes from the walk.
+      for await (const page of pages) found.push(...page.searchEntries);
     } catch (err) {
       const code = extractLdapCode(err);
       if (code === 32) {
@@ -1566,23 +1599,39 @@ export default class LdapOrganizations extends DmPlugin {
         return [];
       }
       if (code !== 4) throw err;
-      partial = true;
-    }
-    if (found.length > cap) {
-      found = found.slice(0, cap);
-      partial = true;
-    }
-    if (!partial) return found;
 
+      const bounded = (await this.server.ldap.search(
+        { paged: false, scope: 'sub', filter, sizeLimit: cap + 1 },
+        dn,
+        req
+      )) as SearchResult;
+      const shown = bounded.searchEntries.slice(0, cap);
+      this.warnSizeLimit(
+        `search:${dn}`,
+        `A search under ${dn} matched more organizations than the directory ` +
+          `will list in one answer, so ${shown.length} are returned and the ` +
+          'rest are hidden. Raise the size limit for the account ldap-rest ' +
+          'binds as (olcLimits, or olcSizeLimit) to search them all.'
+      );
+      return [
+        ...shown,
+        LdapOrganizations.moreIndicator(
+          `more-organizations-${dn}`,
+          '... more organizations than the directory will list',
+          shown.length
+        ),
+      ];
+    }
+
+    if (found.length <= cap) return found;
     return [
-      ...found,
-      {
-        dn: `more-organizations-${dn}`,
-        cn: ['... more organizations than the directory will list'],
-        objectClass: ['moreIndicator'],
-        _isMoreIndicator: 'true',
-        _displayedCount: found.length.toString(),
-      },
+      ...found.slice(0, cap),
+      LdapOrganizations.moreIndicator(
+        `more-organizations-${dn}`,
+        `... ${found.length - cap} more organizations, narrow the search`,
+        cap,
+        found.length
+      ),
     ];
   }
 

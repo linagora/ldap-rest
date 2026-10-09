@@ -6,10 +6,11 @@
  * search. The route under test answers organizations at any depth, bounded.
  *
  * The directory is real for what it matches — depth, the base itself, the
- * path attribute — and stubbed for what it cannot be asked to do: the suite
- * binds as the root DN, which OpenLDAP exempts from its size limit, so the
- * cap is checked on the request the plugin sends and the refusal is raised
- * by hand.
+ * path attribute — and modelled for what it cannot be asked to do: the suite
+ * binds as the root DN, which OpenLDAP exempts from its size limit. The model
+ * answers the way ldapts does, which is the point of it: a search carrying a
+ * `sizeLimit` that the directory cuts shorter comes back as a plain short
+ * list, the refusal swallowed, while a search carrying none raises it.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -23,8 +24,31 @@ import {
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
 
+interface Options {
+  scope?: string;
+  paged?: unknown;
+  sizeLimit?: number;
+}
+
+const ldapError = (code: number, message: string): Error =>
+  Object.assign(new Error(message), { code });
+
 const asResult = (entries: AttributesList[]): SearchResult =>
   ({ searchEntries: entries, searchReferences: [] }) as unknown as SearchResult;
+
+const pageOf = (entries: AttributesList[]): AsyncGenerator<SearchResult> =>
+  (async function* () {
+    yield asResult(entries);
+  })() as AsyncGenerator<SearchResult>;
+
+/** A refusal raised from the walk, where a paged search actually fails */
+const refusingPages = (err: Error): AsyncGenerator<SearchResult> =>
+  (async function* () {
+    await Promise.resolve();
+    throw err;
+    // eslint-disable-next-line no-unreachable
+    yield asResult([]);
+  })() as AsyncGenerator<SearchResult>;
 
 describe('Organization subtree search', function () {
   before(function () {
@@ -127,48 +151,95 @@ describe('Organization subtree search', function () {
     expect(names(res)).to.include(grandChildDn.toLowerCase());
   });
 
-  it('should keep the cap and say the answer is partial', async () => {
-    const cap = (server.config.ldap_organization_max_subnodes as number) || 50;
-    let asked: { scope?: string; sizeLimit?: number } = {};
-    server.ldap.search = ((options: typeof asked) => {
-      asked = options;
+  /**
+   * A directory holding `matches` matching organizations under `top`, that
+   * lists at most `limit` of them in one answer, answered as ldapts would.
+   */
+  const directory = (matches: number, limit = Infinity): Options[] => {
+    const asked: Options[] = [];
+    const all = Array.from({ length: matches }, (_, i) => ({
+      dn: `ou=o${i},${top}`,
+      ou: [`o${i}`],
+    }));
+    server.ldap.search = ((options: Options) => {
+      asked.push(options);
+      if (!options.sizeLimit)
+        return Promise.resolve(
+          matches > limit
+            ? refusingPages(ldapError(4, 'Size Limit Exceeded'))
+            : pageOf(all)
+        );
       return Promise.resolve(
-        asResult(
-          Array.from({ length: cap + 1 }, (_, i) => ({
-            dn: `ou=o${i},${top}`,
-            ou: [`o${i}`],
-          }))
-        )
+        asResult(all.slice(0, Math.min(options.sizeLimit, limit)))
       );
     }) as unknown as typeof server.ldap.search;
+    return asked;
+  };
+
+  const cap = (): number =>
+    (server.config.ldap_organization_max_subnodes as number) || 50;
+
+  it('should keep the cap, and count what it left out', async () => {
+    const asked = directory(cap() + 5);
     const res = await plugin.searchOrganisationTree(top, 'o');
-    expect(asked.scope).to.equal('sub');
-    expect(asked.sizeLimit).to.equal(cap + 1);
-    expect(res).to.have.length(cap + 1);
-    const last = res[cap];
+    expect(asked).to.have.length(1);
+    expect(asked[0].scope).to.equal('sub');
+    expect(asked[0].sizeLimit, 'unbounded, so a refusal raises').to.equal(
+      undefined
+    );
+    expect(res).to.have.length(cap() + 1);
+    const last = res[cap()];
     expect(last.dn).to.equal(`more-organizations-${top}`);
     expect(last._isMoreIndicator).to.equal('true');
-    expect(last._displayedCount).to.equal(String(cap));
+    expect(last._displayedCount).to.equal(String(cap()));
+    expect(last._totalCount).to.equal(String(cap() + 5));
+    // The directory listed everything: the cut is ours, not its limit.
+    expect(String(last.cn)).to.match(/5 more organizations/);
+    expect(String(last.cn)).to.not.match(/directory/);
   });
 
-  it('should read a refusal as a partial answer, and nothing else as one', async () => {
-    server.ldap.search = (() =>
-      Promise.reject(
-        Object.assign(new Error('Size Limit Exceeded'), { code: 4 })
-      )) as unknown as typeof server.ldap.search;
+  it('should answer a full list without a sentinel', async () => {
+    directory(cap());
     const res = await plugin.searchOrganisationTree(top, 'o');
-    expect(res).to.have.length(1);
-    expect(res[0]._isMoreIndicator).to.equal('true');
+    expect(res).to.have.length(cap());
+    expect(res.some(r => r._isMoreIndicator)).to.equal(false);
+  });
 
+  it('should not let a directory limit below the cap pass for a whole answer', async () => {
+    // The bind account hardened below the cap: ldapts would hand a bounded
+    // first search back as `cap - 1` rows and no sign of the rest.
+    const warned: string[] = [];
+    const realWarn = server.logger.warn.bind(server.logger);
+    server.logger.warn = ((message: string) => {
+      warned.push(String(message));
+      return server.logger;
+    }) as unknown as typeof server.logger.warn;
+    try {
+      const asked = directory(500, cap() - 1);
+      const res = await plugin.searchOrganisationTree(top, 'o');
+      expect(asked.map(o => o.sizeLimit)).to.deep.equal([undefined, cap() + 1]);
+      expect(res).to.have.length(cap());
+      const last = res[cap() - 1];
+      expect(last._isMoreIndicator).to.equal('true');
+      expect(last._displayedCount).to.equal(String(cap() - 1));
+      expect(last._totalCount, 'nothing counted the rest').to.equal(undefined);
+      expect(String(last.cn)).to.match(/directory will list/);
+      expect(warned.some(m => m.includes(top))).to.equal(true);
+    } finally {
+      server.logger.warn = realWarn;
+    }
+  });
+
+  it('should answer a missing node with nothing, and raise anything else', async () => {
     server.ldap.search = (() =>
-      Promise.reject(
-        Object.assign(new Error('No Such Object'), { code: 32 })
+      Promise.resolve(
+        refusingPages(ldapError(32, 'No Such Object'))
       )) as unknown as typeof server.ldap.search;
     expect(await plugin.searchOrganisationTree(top, 'o')).to.deep.equal([]);
 
     server.ldap.search = (() =>
-      Promise.reject(
-        Object.assign(new Error('Busy'), { code: 51 })
+      Promise.resolve(
+        refusingPages(ldapError(51, 'Busy'))
       )) as unknown as typeof server.ldap.search;
     let failed = false;
     try {
