@@ -118,6 +118,34 @@ describe('Schemas extending another', () => {
       expect(missing.status).to.equal(404);
     });
 
+    it('serves the first of two configured files on one URL, and warns', async () => {
+      fs.mkdirSync(join(dir, 'other', 'schemas'), { recursive: true });
+      const second = join(dir, 'other', 'schemas', 'users.json');
+      fs.writeFileSync(
+        second,
+        JSON.stringify({ entity: { name: 'second' }, attributes: {} })
+      );
+      const dm = new DM();
+      await dm.ready;
+      dm.config.ldap_flat_schema = [usersFile, second];
+      const warnings: string[] = [];
+      const logger = dm.logger as unknown as { warn: unknown };
+      const original = logger.warn;
+      logger.warn = (message: unknown) => warnings.push(String(message));
+      try {
+        await dm.registerPlugin('static', new Static(dm));
+      } finally {
+        logger.warn = original;
+      }
+
+      expect(warnings).to.deep.equal([
+        `${second} is not served: ${usersFile} already has its URL /static/schemas/users.json`,
+      ]);
+      const res = await supertest(dm.app).get('/static/schemas/users.json');
+      expect(res.status).to.equal(200);
+      expect(res.body.entity.name).to.equal('twakeUser');
+    });
+
     it('leaves the URL of a default schema option to the static directory', async () => {
       fs.mkdirSync(join(dir, 'schemas', 'twake'));
       fs.writeFileSync(

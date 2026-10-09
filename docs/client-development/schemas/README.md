@@ -1134,8 +1134,10 @@ outside `--static-path`, and before a shipped schema of the same URL:
 `/etc/ldap-rest/schemas/twake/users.json` is what
 `/static/schemas/twake/users.json` returns. An option left at its default
 does not count: without `--group-schema`, a `--static-path` of your own
-still serves its `schemas/twake/groups.json`. A file outside any `schemas`
-directory has no `schemaUrl`; its schema is still inline.
+still serves its `schemas/twake/groups.json`. If two configured files get
+the same URL, the first one is served there and a warning names the other.
+A file outside any `schemas` directory has no `schemaUrl`; its schema is
+still inline.
 
 ---
 
