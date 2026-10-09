@@ -230,7 +230,8 @@ curl -H "Accept: application/json" \
         "getTop": "/api/v1/ldap/organizations",
         "get": "/api/v1/ldap/organizations/:dn",
         "getSubnodes": "/api/v1/ldap/organizations/:dn/subnodes",
-        "searchSubnodes": "/api/v1/ldap/organizations/:dn/subnodes/search"
+        "searchSubnodes": "/api/v1/ldap/organizations/:dn/subnodes/search",
+        "search": "/api/v1/ldap/organizations/:dn/search"
       }
     }
   }
@@ -386,6 +387,57 @@ curl -H "Accept: application/json" \
   }
 ]
 ```
+
+### Search Organizations in a Subtree
+
+Search the organizations under a node, at any depth, the node itself included.
+Where the subnodes search only looks at the direct children and adds the linked
+users and groups, this one answers organizations only, which makes it the call
+behind a department autocomplete over a wide tree.
+
+**Endpoint:** `GET /api/v1/ldap/organizations/:dn/search?q=query`
+
+**Parameters:**
+
+- `:dn` - URL-encoded Distinguished Name of the node to search under
+- `q` - Search query (required), matched against `ou`, `description` and, when
+  `ldap_organization_path_attribute` is set, the path attribute, so
+  `Government / lin` matches by path
+
+**Limit:** at most `ldap_organization_max_subnodes` (default 50) organizations
+are returned. When there are more, or when the directory refuses to list them
+all, the last row is a `moreIndicator` entry (`_isMoreIndicator: "true"`,
+`_displayedCount` holding the number of organizations kept). A client must drop
+it before using the rest, and may ask for a narrower query.
+
+**Example Request:**
+
+```bash
+curl -H "Accept: application/json" \
+     "http://localhost:8081/api/v1/ldap/organizations/ou%3Dorganization%2Cdc%3Dexample%2Cdc%3Dcom/search?q=lin"
+```
+
+**Example Response:**
+
+```json
+[
+  {
+    "dn": "ou=linagora.com,ou=Government,ou=organization,dc=example,dc=com",
+    "objectClass": ["organizationalUnit", "top"],
+    "ou": "linagora.com"
+  },
+  {
+    "dn": "more-organizations-ou=organization,dc=example,dc=com",
+    "cn": ["... more organizations than the directory will list"],
+    "objectClass": ["moreIndicator"],
+    "_isMoreIndicator": "true",
+    "_displayedCount": "50"
+  }
+]
+```
+
+The `search` entry of the `endpoints` advertised by the config API tells a
+client that the server has this route.
 
 ### Create Organization
 

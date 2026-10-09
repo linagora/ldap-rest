@@ -48,6 +48,7 @@ DELETE /api/v1/ldap/groups/{cn}            # Delete group
 GET    /api/v1/ldap/organizations/top                    # Root organization
 GET    /api/v1/ldap/organizations/{dn}/subnodes         # Sub-organizations
 GET    /api/v1/ldap/organizations/{dn}/subnodes/search  # Search
+GET    /api/v1/ldap/organizations/{dn}/search           # Search the whole subtree
 POST   /api/v1/ldap/organizations                       # Create
 PUT    /api/v1/ldap/organizations/{dn}                  # Modify
 POST   /api/v1/ldap/organizations/{dn}/move             # Move

@@ -374,6 +374,65 @@ export default class LdapOrganizations extends DmPlugin {
 
     /**
      * @openapi
+     * summary: Search organizations across a subtree
+     * description: |
+     *   Searches the organizations under `:dn`, at any depth, and `:dn`
+     *   itself. Unlike `/subnodes/search`, which only looks at the direct
+     *   children and mixes in the linked users and groups, this answers
+     *   organizations only: it is the call behind a department picker over
+     *   a tree too wide to list.
+     *
+     *   `q` is matched against `ou`, `description` and, when
+     *   `ldap_organization_path_attribute` is set, the path attribute, so a
+     *   query such as `Government / lin` finds a department by its path.
+     *
+     *   At most `ldap_organization_max_subnodes` (default 50) organizations
+     *   are returned. When there are more, or when the directory refuses to
+     *   list them all, a last row carrying `_isMoreIndicator` says the
+     *   answer is partial: a client must drop it before treating the rest as
+     *   organizations, and ask for a narrower query.
+     * parameters:
+     *   - in: query
+     *     name: q
+     *     required: true
+     *     schema: { type: string }
+     *     description: Search query matched against name, description and path.
+     *     example: lin
+     * responses:
+     *   '200':
+     *     description: Matching organizations.
+     *     content:
+     *       application/json:
+     *         schema:
+     *           type: array
+     *           items: { $ref: '#/components/schemas/OrgSummary' }
+     *         example:
+     *           - dn: ou=linagora.com,ou=Government,ou=organization,dc=example,dc=com
+     *             ou: linagora.com
+     *   '400':
+     *     description: Query parameter `q` missing.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     */
+    // Search organizations in a whole subtree
+    app.get(
+      `${this.config.api_prefix}/v1/ldap/organizations/:dn/search`,
+      asyncHandler(async (req, res) => {
+        const dn = decodeURIComponent(req.params.dn as string);
+        const query = req.query.q as string;
+        if (!query)
+          throw new BadRequestError('query parameter "q" is required');
+        await tryMethodData(res, async () =>
+          this.hideNeverReturn(
+            await this.searchOrganisationTree(dn, query, req)
+          )
+        );
+      })
+    );
+
+    /**
+     * @openapi
      * summary: Create organization
      * description: |
      *   Creates a new organizational unit. The `ou` field becomes the RDN.
@@ -1457,6 +1516,77 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   /**
+   * The organizations of a whole subtree that match a query.
+   *
+   * `searchOrganisationSubnodes` looks one level down, which is no help when
+   * the tree is a top organization, one country node and a thousand
+   * departments below it: a department picker needs the match wherever it
+   * sits. The search runs with scope `sub`, so `dn` itself is a candidate
+   * too, and the path attribute is matched next to the name so that a query
+   * written as a path finds its department.
+   *
+   * The answer is bounded like the children listing is, and for the same
+   * reason: the directory may refuse a long answer (`sizeLimitExceeded`),
+   * and ldapts raises that only for a request that carried no `sizeLimit`
+   * of its own. Asking for one more than the cap gives both things at once,
+   * a refusal that cannot happen and a way to tell that entries were left
+   * out. A refusal that happens anyway is read as the same partial answer.
+   * The search is not paged: a paged walk would only end on the refusal.
+   *
+   * @param dn organization to search under, itself included
+   * @param query what to look for in a name, a description or a path
+   * @param req incoming request, forwarded to the authorization hooks
+   * @returns the matching organizations, followed by a `moreIndicator` row
+   *          when some were left out
+   */
+  async searchOrganisationTree(
+    dn: string,
+    query: string,
+    req?: Request
+  ): Promise<AttributesList[]> {
+    const cap = this.config.ldap_organization_max_subnodes || 50;
+    const attrs = this.pathAttr
+      ? `ou,description,${this.pathAttr}`
+      : 'ou,description';
+    const filter = `(&(objectClass=organizationalUnit)${substringSearchFilter(query, attrs)})`;
+
+    let found: AttributesList[] = [];
+    let partial = false;
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'sub', filter, sizeLimit: cap + 1 },
+        dn,
+        req
+      )) as SearchResult;
+      found = res.searchEntries;
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) {
+        this.server.logger.debug(`No organizations under ${dn}: no such node`);
+        return [];
+      }
+      if (code !== 4) throw err;
+      partial = true;
+    }
+    if (found.length > cap) {
+      found = found.slice(0, cap);
+      partial = true;
+    }
+    if (!partial) return found;
+
+    return [
+      ...found,
+      {
+        dn: `more-organizations-${dn}`,
+        cn: ['... more organizations than the directory will list'],
+        objectClass: ['moreIndicator'],
+        _isMoreIndicator: 'true',
+        _displayedCount: found.length.toString(),
+      },
+    ];
+  }
+
+  /**
    * Provide configuration for config API
    */
   getConfigApiData(): Record<string, unknown> {
@@ -1495,6 +1625,7 @@ export default class LdapOrganizations extends DmPlugin {
         get: `${apiPrefix}/v1/ldap/organizations/:dn`,
         getSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes`,
         searchSubnodes: `${apiPrefix}/v1/ldap/organizations/:dn/subnodes/search`,
+        search: `${apiPrefix}/v1/ldap/organizations/:dn/search`,
         create: `${apiPrefix}/v1/ldap/organizations`,
         update: `${apiPrefix}/v1/ldap/organizations/:dn`,
         move: `${apiPrefix}/v1/ldap/organizations/:dn/move`,

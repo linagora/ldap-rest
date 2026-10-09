@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `ldap/organizations`: `GET /api/v1/ldap/organizations/:dn/search?q=` searches
+  the organizations of a whole subtree, at any depth, by name, description and
+  path, for a department autocomplete over a wide tree. Bounded by
+  `ldap_organization_max_subnodes`, with a `moreIndicator` row when the answer
+  is partial. Advertised as `endpoints.search` by the config API,
+  [docs](docs/client-development/api/rest-api.md#search-organizations-in-a-subtree)
+
 ## v0.16.1 (2026-10-07)
 
 ### Fixes
