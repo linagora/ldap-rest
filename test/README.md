@@ -41,6 +41,10 @@ export DM_TEST_POSTGRES_URL=postgres://postgres:pw@localhost:5432/postgres
 export DM_TEST_VALKEY_URL=redis://localhost:6379
 ```
 
+The embedded LDAP server runs `osixia/openldap:1.5.0`, or the image named by
+`DM_TEST_LDAP_IMAGE` (the CI pulls it from `mirror.gcr.io`, Docker Hub limiting
+anonymous pulls).
+
 ## Documentation
 
 See [Testing with Embedded LDAP](../docs/testing-with-embedded-ldap.md) for complete documentation.
