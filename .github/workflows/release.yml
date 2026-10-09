@@ -45,8 +45,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      # From mirror.gcr.io, as in test.yml: Docker Hub limits anonymous pulls
       - name: Run tests
         run: npm test
+        env:
+          DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
 
   # Build and push the amd64 image (fast, runs first).
   docker-amd64:
