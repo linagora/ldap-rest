@@ -24,9 +24,15 @@ jobs:
       matrix:
         node-version: [20.x, 22.x, 24.x, 26.x]
 
+    # Docker Hub limits anonymous pulls per address, and the runners share
+    # theirs: every test job failed at "Initialize containers" with
+    # toomanyrequests. The images come from mirror.gcr.io, Google's public
+    # cache of Docker Hub, which needs no credentials (a pull request from a
+    # fork has none). The LDAP image the suite starts itself too, through
+    # DM_TEST_LDAP_IMAGE below.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -35,7 +41,7 @@ jobs:
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s
           --health-retries 10
       valkey:
-        image: valkey/valkey:8-alpine
+        image: mirror.gcr.io/valkey/valkey:8-alpine
         ports:
           - 6379:6379
         options: >-
@@ -82,6 +88,7 @@ jobs:
         env:
           DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
           DM_TEST_VALKEY_URL: redis://localhost:6379
+          DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
 
   lsc-plugin-test:
     runs-on: ubuntu-latest

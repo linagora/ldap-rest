@@ -215,11 +215,14 @@ export class LdapTestServer {
       `-e LDAP_REMOVE_CONFIG_AFTER_SETUP=true`,
     ].join(' ');
 
-    // Start container (without volume mount to avoid permission issues)
+    // Start container (without volume mount to avoid permission issues).
+    // DM_TEST_LDAP_IMAGE names the same image elsewhere: the CI pulls it
+    // from a mirror, Docker Hub limiting anonymous pulls.
+    const image = process.env.DM_TEST_LDAP_IMAGE || 'osixia/openldap:1.5.0';
     const cmd = `docker run -d --name ${this.containerName} \
       -p ${this.port}:389 \
       ${env} \
-      osixia/openldap:1.5.0`;
+      ${image}`;
 
     try {
       execSync(cmd, { stdio: 'pipe' });
