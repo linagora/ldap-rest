@@ -171,16 +171,6 @@
         "fr": "Autres boîtes"
       }
     },
-    "mailQuota": {
-      "type": "number",
-      "required": false,
-      "role": "emailQuota",
-      "group": "Mailbox Settings",
-      "label": {
-        "en": "Mail quota",
-        "fr": "Quota"
-      }
-    },
     "mailQuotaSize": {
       "type": "number",
       "required": false,

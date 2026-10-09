@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Twake schemas: the user schema no longer offers `mailQuota`, which the
+  Twake directory schema does not define: a value typed there made the
+  directory refuse the whole change. The mailbox quota is `mailQuotaSize`
+
 ## v0.16.2 (2026-10-09)
 
 ### Features
