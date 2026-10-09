@@ -192,7 +192,12 @@ export default class Static extends DmPlugin {
         !segments.slice(0, -1).every(dir => /^[\w-]+$/.test(dir))
       )
         return next();
-      this.sendSchema(join(rep, 'schemas', ...segments), res);
+      const schemaPath = resolve(join(rep, 'schemas', ...segments));
+      const schemasDir = resolve(join(rep, 'schemas'));
+      // The segments cannot climb out (no dot outside the name), but the
+      // resolved path is checked as on the routes above all the same
+      if (!schemaPath.startsWith(schemasDir + '/')) return next();
+      this.sendSchema(schemaPath, res);
     });
     app.use(`/${this.config.static_name}`, express.static(rep));
   }
