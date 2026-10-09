@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `--quota-attribute` (`DM_QUOTA_ATTRIBUTE`) defaults to `mailQuotaSize`, the
+  quota attribute of the Twake schemas, instead of `mailQuota`: `twake/james`
+  now pushes to Twake Mail the quota the console edits. A deployment whose
+  quota lives in `mailQuota` must now set `DM_QUOTA_ATTRIBUTE=mailQuota`; one
+  that already sets the option keeps its value,
+  [notes](docs/usage/upgrading.md#the-quota-attribute-defaults-to-mailquotasize)
+
+### Fixes
+
+- Twake schemas: the user schema no longer offers `mailQuota`, which the
+  Twake directory schema does not define: a value typed there made the
+  directory refuse the whole change. The mailbox quota is `mailQuotaSize`
+- A write the directory refuses for its content (an attribute its schema
+  does not define, a value of the wrong syntax, a missing mandatory
+  attribute, a naming rule) answers 400 with the directory's diagnostic
+  instead of 500; a modify adding a value the entry already holds, and a
+  rename or a move onto a DN already taken, answer 409,
+  [docs](docs/client-development/api/rest-api.md#400-bad-request)
+
 ## v0.16.2 (2026-10-09)
 
 ### Features

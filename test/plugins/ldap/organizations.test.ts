@@ -898,6 +898,47 @@ describe('LDAP Organizations Plugin', function () {
         expect(movedOrg).to.have.property('ou', 'child');
       });
 
+      it('should return 409 when the target holds an organization of that name', async () => {
+        await plugin.server.ldap.add(`ou=child,${targetOrgDn}`, {
+          objectClass: ['organizationalUnit', 'twakeDepartment', 'top'],
+          ou: 'child',
+        });
+        const res = await request
+          .post(
+            `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+          )
+          .type('json')
+          .send({ targetOrgDn });
+        expect(res.status, JSON.stringify(res.body)).to.equal(409);
+        expect(res.body.error).to.include(`ou=child,${targetOrgDn}`);
+      });
+
+      it('should return 400 when the directory refuses the move', async () => {
+        // A hook naming the entry by an attribute its classes do not allow
+        const hooks = (server.hooks.ldaprenamerequest ??= []);
+        const rename = ([dn, newDn, req]: [string, string, unknown]) => [
+          dn,
+          newDn.replace(/^ou=/, 'uid='),
+          req,
+        ];
+        hooks.push(rename);
+        try {
+          const res = await request
+            .post(
+              `/api/v1/ldap/organizations/${encodeURIComponent(childOrgDn)}/move`
+            )
+            .type('json')
+            .send({ targetOrgDn });
+          expect(res.status, JSON.stringify(res.body)).to.equal(400);
+          expect(res.body.error).to.include(`uid=child,${targetOrgDn}`);
+        } finally {
+          hooks.splice(hooks.indexOf(rename), 1);
+        }
+        // Still where it was
+        const org = await plugin.getOrganisationByDn(childOrgDn);
+        expect(org).to.have.property('ou', 'child');
+      });
+
       it('should return error when targetOrgDn is missing', async () => {
         const res = await request
           .post(

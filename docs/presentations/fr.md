@@ -148,7 +148,7 @@ James WebAdmin: POST /users/alice@.../rename/alice.smith@...
 ## 2. Mise à jour de quota
 
 ```
-LDAP: mailQuota = 1000000000 → 5000000000 (1GB → 5GB)
+LDAP: mailQuotaSize = 1000000000 → 5000000000 (1GB → 5GB)
   ↓ onChange détecte le changement
   ↓ Hook onLdapQuotaChange déclenché
   ↓
@@ -584,7 +584,7 @@ npx ldap-rest \
   --james-webadmin-url http://james:8000 \
   --james-webadmin-token "admin-token" \
   --mail-attribute mail \
-  --quota-attribute mailQuota \
+  --quota-attribute mailQuotaSize \
   --alias-attribute mailAlternateAddress
 ```
 

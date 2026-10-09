@@ -192,7 +192,7 @@ at `0` otherwise.
 | CLI                        | Env                         | Default                 | Description            |
 | -------------------------- | --------------------------- | ----------------------- | ---------------------- |
 | `--mail-attribute`         | `DM_MAIL_ATTRIBUTE`         | `mail`                  | Email attribute        |
-| `--quota-attribute`        | `DM_QUOTA_ATTRIBUTE`        | `mailQuota`             | Quota attribute        |
+| `--quota-attribute`        | `DM_QUOTA_ATTRIBUTE`        | `mailQuotaSize`         | Quota attribute        |
 | `--delegation-attribute`   | `DM_DELEGATION_ATTRIBUTE`   | `twakeDelegatedUsers`   | Delegation attribute   |
 | `--alias-attribute`        | `DM_ALIAS_ATTRIBUTE`        | `mailAlternateAddress`  | Email alias attribute  |
 | `--forward-attribute`      | `DM_FORWARD_ATTRIBUTE`      | `mailForwardingAddress` | Forward attribute      |

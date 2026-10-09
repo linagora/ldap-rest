@@ -323,6 +323,28 @@ describe('James Plugin', () => {
       });
       expect(res).to.be.true;
     });
+
+    it('should follow mailQuotaSize without --quota-attribute', async () => {
+      const quotaScope = nock(
+        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+      )
+        .put('/quota/users/testmail@test.org/size', '200000000')
+        .reply(204);
+      expect(
+        await dm.ldap.add(testDN, {
+          objectClass: ['top', 'twakeAccount'],
+          uid: 'testusermail',
+          mail: 'testmail@test.org',
+        })
+      ).to.be.true;
+      expect(
+        await dm.ldap.modify(testDN, {
+          replace: { mailQuotaSize: '200000000' },
+        })
+      ).to.be.true;
+      await waitFor(() => quotaScope.isDone());
+      expect(quotaScope.isDone()).to.be.true;
+    });
   });
 
   describe('Alias management', () => {

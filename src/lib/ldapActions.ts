@@ -23,7 +23,8 @@ import {
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
-import { ConflictError, NotFoundError } from './errors';
+import { BadRequestError, ConflictError, NotFoundError } from './errors';
+import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
 
 // Typescript interface
@@ -116,13 +117,18 @@ const PERMISSIVE_MODIFY = '1.2.840.113556.1.4.1413';
  * entryAlreadyExists, or a schema refusal from a server fault — recoverable
  * only by matching the driver's wording, which no driver promises to keep.
  * `Error.cause` would be the idiomatic home for it, but it is not in this
- * project's `lib` target; the code itself is what callers read.
+ * project's `lib` target; the code itself is what callers read, as
+ * `extractLdapCode` finds it, message patterns included.
  */
 function ldapError(context: string, error: unknown): Error {
   const wrapped = new Error(`${context}: ${String(error)}`);
-  const code = (error as { code?: unknown } | null | undefined)?.code;
-  if (typeof code === 'number') (wrapped as { code?: number }).code = code;
-  return wrapped;
+  const code = extractLdapCode(error);
+  return code === undefined ? wrapped : withCode(wrapped, code);
+}
+
+function withCode<T extends Error>(err: T, code: number): T {
+  (err as { code?: number }).code = code;
+  return err;
 }
 
 /**
@@ -208,6 +214,29 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
 });
 
 /**
+ * A 400 for a write the directory refused for what it asks, carrying the
+ * LDAP code for callers that map it themselves.
+ *
+ * The client is told the directory's diagnostic, which names the attribute
+ * at fault ("mailQuota: attribute type undefined"), not the value sent.
+ */
+function ldapRefusal(what: string, code: number, error: unknown): Error {
+  return withCode(new BadRequestError(`${what}: ${String(error)}`), code);
+}
+
+/**
+ * Wrap a write failure, turning a refusal of the request's content (see
+ * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
+ * tells it to check logs it cannot read.
+ */
+function ldapWriteError(context: string, dn: string, error: unknown): Error {
+  const code = extractLdapCode(error);
+  return isSchemaRefusal(code)
+    ? ldapRefusal(`The directory refused this write to ${dn}`, code!, error)
+    : ldapError(context, error);
+}
+
+/**
  * Wrap an add failure, turning entryAlreadyExists (68) into a 409.
  *
  * Every creation route ends here, so this is the one place that knows a
@@ -223,27 +252,57 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
  * idempotent applicative-account creation) keep working unchanged.
  */
 function ldapAddError(dn: string, error: unknown): Error {
-  const wrapped = ldapError('LDAP add error', error);
-  if ((wrapped as { code?: number }).code !== 68) return wrapped;
-  const conflict = new ConflictError(`Entry ${dn} already exists`);
-  (conflict as { code?: number }).code = 68;
-  return conflict;
+  const code = extractLdapCode(error);
+  if (code === 68)
+    return withCode(new ConflictError(`Entry ${dn} already exists`), code);
+  // attributeOrValueExists, on an add: the request names a value twice
+  if (code === 20)
+    return ldapRefusal(
+      `The directory refused this write to ${dn}`,
+      code,
+      error
+    );
+  return ldapWriteError('LDAP add error', dn, error);
 }
 
 /**
- * Wrap a modify failure, turning objectClassViolation (65) into a 409: the
- * entry is not of a kind that can hold what was written, typically one
- * created by another tool without a class its schema declares. The code is
+ * Wrap a modify failure, turning objectClassViolation (65) and
+ * attributeOrValueExists (20) into a 409: the entry is not of a kind that can
+ * hold what was written, typically one created by another tool without a
+ * class its schema declares, or already holds the value added. The code is
  * carried over for callers that map it themselves.
  */
 function ldapModifyError(dn: string, error: unknown): Error {
-  const wrapped = ldapError('LDAP modify error', error);
-  if ((wrapped as { code?: number }).code !== 65) return wrapped;
-  const conflict = new ConflictError(
-    `Entry ${dn} cannot hold this change: ${String(error)}`
+  const code = extractLdapCode(error);
+  if (code !== 65 && code !== 20)
+    return ldapWriteError('LDAP modify error', dn, error);
+  return withCode(
+    new ConflictError(`Entry ${dn} cannot hold this change: ${String(error)}`),
+    code
   );
-  (conflict as { code?: number }).code = 65;
-  return conflict;
+}
+
+/**
+ * Wrap a rename or move failure: a new DN already taken (68) is a 409, as on
+ * an add, and a refusal of the request's content a 400 naming both DNs, the
+ * new one being what the directory usually refused.
+ */
+function ldapRenameError(
+  context: string,
+  dn: string,
+  newDn: string,
+  error: unknown
+): Error {
+  const code = extractLdapCode(error);
+  if (code === 68)
+    return withCode(new ConflictError(`Entry ${newDn} already exists`), code);
+  return isSchemaRefusal(code)
+    ? ldapRefusal(
+        `The directory refused to rename ${dn} to ${newDn}`,
+        code!,
+        error
+      )
+    : ldapError(context, error);
 }
 
 class ldapActions {
@@ -1480,7 +1539,7 @@ class ldapActions {
       );
       return true;
     } catch (error) {
-      throw ldapError(`LDAP rename error`, error);
+      throw ldapRenameError('LDAP rename error', dn, newRdn, error);
     } finally {
       this.releaseConnection(pooled);
     }
@@ -1537,7 +1596,7 @@ class ldapActions {
       this.logger.debug(`LDAP move: ${dn} -> ${newDn}`);
       return true;
     } catch (error) {
-      throw ldapError(`LDAP move error`, error);
+      throw ldapRenameError('LDAP move error', dn, newDn, error);
     } finally {
       this.releaseConnection(pooled);
     }

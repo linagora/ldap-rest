@@ -115,6 +115,16 @@ describe('Twake schemas', () => {
     });
   });
 
+  describe('mailbox quota', () => {
+    it('should offer mailQuotaSize only: the Twake schema has no mailQuota', () => {
+      // A value typed in a field the directory schema does not define makes
+      // OpenLDAP refuse the whole modify.
+      expect(users.attributes).to.not.have.property('mailQuota');
+      expect(roleAttribute(users, 'emailQuota')).to.be.undefined;
+      expect(roleAttribute(users, 'emailQuotaSize')).to.equal('mailQuotaSize');
+    });
+  });
+
   describe('organization names', () => {
     it('should accept the names real directories carry', () => {
       const pattern = new RegExp(organizations.attributes.ou.test as string);

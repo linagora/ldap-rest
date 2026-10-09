@@ -85,7 +85,7 @@ export default class James extends TwakePlugin {
     );
 
     // Initialize James-specific configuration attributes
-    this.quotaAttr = (this.config.quota_attribute as string) || 'mailQuotaSize';
+    this.quotaAttr = this.config.quota_attribute as string;
     this.aliasAttr =
       (this.config.alias_attribute as string) || 'mailAlternateAddress';
     this.mailboxTypeAttr =
