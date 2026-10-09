@@ -165,7 +165,11 @@ describe('Schemas extending another', () => {
         join(dir, 'schemas', 'twake', 'groups.json'),
         JSON.stringify({ entity: { name: 'operatorGroup' }, attributes: {} })
       );
+      // configured nothing, whatever another suite left in the environment
+      const saved = process.env.DM_GROUP_SCHEMA;
+      delete process.env.DM_GROUP_SCHEMA;
       const dm = new DM();
+      if (saved !== undefined) process.env.DM_GROUP_SCHEMA = saved;
       await dm.ready;
       expect(dm.config.group_schema).to.match(/static\/schemas\/twake\/groups/);
       dm.config.static_path = dir;
