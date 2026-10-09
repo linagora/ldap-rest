@@ -1264,7 +1264,7 @@ export default class LdapOrganizations extends DmPlugin {
       ...kept,
       LdapOrganizations.moreIndicator(
         `more-${dn}`,
-        `... ${totalCount - cap} more elements`,
+        `... ${totalCount - cap} more ${totalCount - cap === 1 ? 'element' : 'elements'}`,
         cap,
         totalCount
       ),
@@ -1583,7 +1583,10 @@ export default class LdapOrganizations extends DmPlugin {
       : 'ou,description';
     const filter = `(&(objectClass=organizationalUnit)${substringSearchFilter(query, attrs)})`;
 
-    const found: AttributesList[] = [];
+    // Only `cap` entries are kept; the rest of a broad match is counted, not
+    // held, as `linkedEntities` does.
+    const kept: AttributesList[] = [];
+    let total = 0;
     try {
       const pages = (await this.server.ldap.search(
         { paged: true, scope: 'sub', filter },
@@ -1591,7 +1594,11 @@ export default class LdapOrganizations extends DmPlugin {
         req
       )) as AsyncGenerator<SearchResult>;
       // As for the children, the refusal comes from the walk.
-      for await (const page of pages) found.push(...page.searchEntries);
+      for await (const page of pages) {
+        total += page.searchEntries.length;
+        const remaining = cap - kept.length;
+        if (remaining > 0) kept.push(...page.searchEntries.slice(0, remaining));
+      }
     } catch (err) {
       const code = extractLdapCode(err);
       if (code === 32) {
@@ -1623,14 +1630,16 @@ export default class LdapOrganizations extends DmPlugin {
       ];
     }
 
-    if (found.length <= cap) return found;
+    if (total <= cap) return kept;
+    const rest = total - cap;
     return [
-      ...found.slice(0, cap),
+      ...kept,
       LdapOrganizations.moreIndicator(
         `more-organizations-${dn}`,
-        `... ${found.length - cap} more organizations, narrow the search`,
+        `... ${rest} more ${rest === 1 ? 'organization' : 'organizations'}, ` +
+          'narrow the search',
         cap,
-        found.length
+        total
       ),
     ];
   }

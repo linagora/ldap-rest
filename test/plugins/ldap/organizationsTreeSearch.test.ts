@@ -198,6 +198,12 @@ describe('Organization subtree search', function () {
     expect(String(last.cn)).to.not.match(/directory/);
   });
 
+  it('should count a single excess organization in the singular', async () => {
+    directory(cap() + 1);
+    const res = await plugin.searchOrganisationTree(top, 'o');
+    expect(String(res[cap()].cn)).to.match(/\.\.\. 1 more organization,/);
+  });
+
   it('should answer a full list without a sentinel', async () => {
     directory(cap());
     const res = await plugin.searchOrganisationTree(top, 'o');
