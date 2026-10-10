@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/james`: a mail rename, a quota, an alias, a forward, a delegation or
+  an identity that James refuses because it does not know the user yet — its
+  LDAP replica lagging behind the write — is retried instead of lost:
+  `--james-retry-attempts` (5) attempts, `--james-retry-delay` (1000 ms)
+  apart and growing,
+  [docs](docs/usage/plugins/integrations/james-mail.md#replication-lag)
+
 ## v0.17.0 (2026-10-09)
 
 ### Breaking Changes
