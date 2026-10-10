@@ -41,7 +41,7 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
 - `--james-mailbox-type-attribute`: LDAP attribute for mailbox type (default: `twakeMailboxType`)
 - `--james-retry-attempts`: attempts in all of a call about a user James may not see yet (default: `5`), see [Replication lag](#replication-lag)
-- `--james-retry-delay`: base delay between those attempts, in ms (default: `1000`)
+- `--james-retry-delay`: base delay between those attempts, in ms (default: `1000`); the total wait is delay × n(n−1)/2 for n attempts
 
 ## How It Works
 
@@ -721,9 +721,17 @@ The calls that need James to know the user are therefore retried on 400 and
 and the identity. Each failed attempt logs a warning
 (`"result": "retry"`, with the attempt number); the error is logged when the
 last attempt fails. With the defaults, 5 attempts, the waits are 1, 2, 3 and
-4 seconds: `--james-retry-delay` times the number of attempts made, 10
-seconds in all. `--james-retry-attempts 1` disables the retries. Other
+4 seconds: `--james-retry-delay` times the number of attempts made, so
+`--james-retry-delay` × n(n−1)/2 in all for n attempts: 10 seconds with the
+defaults, 190 seconds with 20 attempts. `--james-retry-attempts 1` disables
+the retries. Other
 failures, such as 401 or 500, are not retried, nor are deletions.
+
+The group calls are not retried: James does not look the members up in its
+users repository there. Address groups (`/address/groups`) accept any valid
+address, and the member routes of a TMail team mailbox do not check the user;
+their only 404 is a missing team mailbox, which is avoided by creating it
+before adding the members.
 
 The retries run in the background, after the LDAP write has answered; a
 call waiting for its next attempt does not take a slot of

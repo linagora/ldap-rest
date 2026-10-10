@@ -20,7 +20,11 @@
 - A plugin module given twice to `--plugin`, or both given to `--plugin` and
   needed by another plugin (`core/ldap/groups` with `core/twake/james`), is
   loaded once, without the warning "not registered: the name … is already
-  taken"; a different module claiming a taken name still warns
+  taken"; a different module claiming a taken name still warns. A load that
+  failed is not remembered: loading the module again tries again
+- `twake/james`: a team mailbox is created before its members are added, not
+  alongside them: TMail answers 404 to a member added to a team mailbox not
+  there yet, and the member was lost
 
 ## v0.17.0 (2026-10-09)
 

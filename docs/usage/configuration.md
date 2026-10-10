@@ -465,6 +465,8 @@ whichever of the two names it selects. A value other than `req.user` or
 | `--james-mailbox-type-attribute` |                                 | `DM_JAMES_MAILBOX_TYPE_ATTRIBUTE` | `twakeMailboxType`      | Mailbox type attribute      |
 | `--ldap-concurrency`             |                                 | `DM_LDAP_CONCURRENCY`             | `10`                    | LDAP operations concurrency |
 
+The wait before each retry grows with the attempt, so the total wait is `--james-retry-delay` × n(n−1)/2 for n attempts: 10 s with the defaults, 190 s with 20 attempts.
+
 #### `core/twake/calendar`
 
 Formerly `core/twake/calendarResources`, still accepted as a deprecated alias.
