@@ -254,6 +254,17 @@ describe('Server internals', () => {
       await dm.ready;
       const missing = '../../test/__plugins__/missing/index.js';
 
+      // Count the real imports: a cached rejection would fail twice too
+      const internals = dm as unknown as {
+        importPlugin: (...args: unknown[]) => Promise<boolean>;
+      };
+      const importPlugin = internals.importPlugin.bind(dm);
+      let imports = 0;
+      internals.importPlugin = (...args: unknown[]) => {
+        imports++;
+        return importPlugin(...args);
+      };
+
       let failures = 0;
       for (let i = 0; i < 2; i++) {
         try {
@@ -263,6 +274,7 @@ describe('Server internals', () => {
         }
       }
       expect(failures).to.equal(2);
+      expect(imports).to.equal(2);
 
       // Name taken by another module: refused, then free again
       expect(

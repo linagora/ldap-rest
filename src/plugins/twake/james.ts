@@ -381,7 +381,9 @@ export default class James extends TwakePlugin {
 
           // Only process if user has aliases
           if (aliases.length > 0) {
-            // Delete old aliases and create new ones in parallel
+            // Delete old aliases and create new ones in parallel. The
+            // DELETE needs no retry: James's rename does not move aliases,
+            // and the route answers 204 whether the mapping exists or not
             await Promise.all([
               ...aliases.map(alias =>
                 this.callWebAdminApi(
