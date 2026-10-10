@@ -961,15 +961,23 @@ export default class LdapOrganizations extends DmPlugin {
     dn: string,
     req?: Request
   ): Promise<AttributesList> {
-    const org = await this.server.ldap.search(
-      {
-        paged: false,
-        scope: 'base',
-        filter: '(objectClass=organizationalUnit)',
-      },
-      dn,
-      req
-    );
+    let org;
+    try {
+      org = await this.server.ldap.search(
+        {
+          paged: false,
+          scope: 'base',
+          filter: '(objectClass=organizationalUnit)',
+        },
+        dn,
+        req
+      );
+    } catch (err) {
+      // A base search of a DN that is not there fails with noSuchObject
+      if (extractLdapCode(err) === 32)
+        throw new NotFoundError(`Organization ${dn} not found`);
+      throw err;
+    }
     if ((org as SearchResult).searchEntries.length !== 1)
       throw new NotFoundError(`Organization ${dn} not found`);
     return (org as SearchResult).searchEntries[0];

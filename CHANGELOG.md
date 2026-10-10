@@ -15,6 +15,8 @@
   `twake/james` called `PUT /quota/users/null/size` and
   `DELETE /address/aliases/null/…`. A deleted user's James data stays as it
   is, [docs](docs/usage/plugins/ldap/on-change.md#hooks)
+- `ldap/organizations`: `GET /api/v1/ldap/organizations/:dn` of an
+  organization that does not exist answers 404 instead of 500
 
 ## v0.17.0 (2026-10-09)
 
