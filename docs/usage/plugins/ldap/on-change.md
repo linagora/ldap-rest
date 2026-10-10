@@ -46,6 +46,12 @@ The other hooks are derived from it:
 | `onLdapDriveQuotaChange`  | `--drive-quota-attribute` changed                                                       | `(dn, oldQuota, newQuota)`             |
 | `onLdapDisplayNameChange` | the name from `--display-name-attribute`, else `cn`, else `givenName` and `sn`, changed | `(dn, oldName, newName)`               |
 
+A delete fires `onLdapChange` and `onLdapMailChange`, whose `newMail` is
+`null`, and none of the others: the entry has nothing left to apply, and the
+services fed by these hooks keep the data of a deleted user. The hooks given a
+`mail` fire only while the entry has one: a write removing the mail attribute
+does not fire them.
+
 `changes` maps each attribute that changed to `[oldValues, newValues]`, the
 full values on each side, `null` where the attribute is absent:
 

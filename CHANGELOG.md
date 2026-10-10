@@ -10,6 +10,11 @@
   `--james-retry-attempts` (5) attempts, `--james-retry-delay` (1000 ms)
   apart and growing,
   [docs](docs/usage/plugins/integrations/james-mail.md#replication-lag)
+- `ldap/onChange`: deleting a user no longer fires the quota, alias, forward,
+  display name and drive quota hooks, and no hook is given a `"null"` mail:
+  `twake/james` called `PUT /quota/users/null/size` and
+  `DELETE /address/aliases/null/…`. A deleted user's James data stays as it
+  is, [docs](docs/usage/plugins/ldap/on-change.md#hooks)
 
 ## v0.17.0 (2026-10-09)
 

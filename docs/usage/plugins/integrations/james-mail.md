@@ -897,7 +897,7 @@ James deletes the entire address group.
 
 1. **One-way sync**: LDAP → James only. James changes don't sync back to LDAP.
 2. **No account creation**: Plugin doesn't create James accounts, only updates existing ones.
-3. **No user deletion**: Plugin doesn't delete James accounts when LDAP users are deleted.
+3. **No user deletion**: deleting an LDAP user leaves its James data (mailboxes, quota, aliases) as it is; purging it is left to James.
 4. **Synchronous**: James API calls block LDAP response. Slow James = slow LDAP.
 5. **No send restrictions**: James doesn't enforce list type restrictions (open/member/owner-only). These are metadata in LDAP only.
 
