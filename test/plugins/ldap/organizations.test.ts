@@ -3,6 +3,7 @@ import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import { DM } from '../../../src/bin';
 import supertest from 'supertest';
 import type { SearchResult } from 'ldapts';
+import { NotFoundError } from '../../../src/lib/errors';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -151,14 +152,15 @@ describe('LDAP Organizations Plugin', function () {
       expect(org).to.have.property('ou');
     });
 
-    it('should throw error for non-existent organization', async () => {
+    it('should throw a NotFoundError for non-existent organization', async () => {
       try {
         await plugin.getOrganisationByDn(
           `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`
         );
         expect.fail('Should have thrown error');
       } catch (e) {
-        expect((e as Error).message).to.match(/not found|Code: 0x20/);
+        expect(e).to.be.instanceOf(NotFoundError);
+        expect((e as Error).message).to.match(/not found/);
       }
     });
   });
@@ -645,14 +647,14 @@ describe('LDAP Organizations Plugin', function () {
         expect(res.body).to.have.property('ou');
       });
 
-      it('should return error for non-existent organization', async () => {
+      it('should return 404 for non-existent organization', async () => {
+        const dn = `ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`;
         const res = await request
-          .get(
-            `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`
-          )
+          .get(`/api/v1/ldap/organizations/${encodeURIComponent(dn)}`)
           .set('Accept', 'application/json');
 
-        expect(res.status).to.equal(500);
+        expect(res.status).to.equal(404);
+        expect(res.body.error).to.equal(`Organization ${dn} not found`);
       });
     });
 

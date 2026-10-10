@@ -178,7 +178,9 @@ export interface Hooks {
    * `onLdapEntryChange` gives the entry as the directory held it before and
    * after an add, a modify, a rename or a delete; the other hooks are derived
    * from it. `before` is null on an add, `after` on a delete, and on a rename
-   * their `dn` differ. A write that changed nothing fires none of them.
+   * their `dn` differ. A write that changed nothing fires none of them. A
+   * delete fires `onLdapEntryChange`, `onLdapChange` and `onLdapMailChange`
+   * only, and the hooks given a `mail` fire only while the entry has one.
    */
   onLdapEntryChange?: (
     dn: string,

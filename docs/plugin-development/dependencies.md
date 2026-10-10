@@ -18,6 +18,12 @@ dependencies = {
 };
 ```
 
+A dependency is loaded when the plugin registers, unless a plugin of that
+name already is. A module requested again under the same name and without
+overrides — a dependency also given to `--plugin`, or an entry listed twice —
+is loaded once: the second request waits for the first. Only an entry with
+overrides builds a second instance, and it needs a name of its own.
+
 ### Hook Dependencies
 
 **Hook Providers**: Plugins that implement hooks (via `hooks: Hooks = { ... }`)

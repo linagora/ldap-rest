@@ -24,6 +24,10 @@ export abstract class TwakePlugin extends DmPlugin {
   protected webadminUrl: string;
   protected webadminToken: string;
   protected requestLimit: ReturnType<typeof pLimit>;
+  // Attempts in all, and base delay in ms, of the calls given statuses to
+  // retry on; a subclass that wants retries sets them
+  protected retryAttempts = 1;
+  protected retryDelay = 0;
 
   // Cached LDAP attribute names (commonly used across Twake plugins)
   protected mailAttr: string;
@@ -103,6 +107,8 @@ export abstract class TwakePlugin extends DmPlugin {
    * @param dn LDAP DN for logging
    * @param body Request body (string or null)
    * @param fields Additional fields for logging
+   * @param retryOn HTTP statuses worth another attempt, up to
+   *   `retryAttempts` in all; none by default
    */
   protected async callWebAdminApi(
     hookname: string,
@@ -110,59 +116,71 @@ export abstract class TwakePlugin extends DmPlugin {
     method: string,
     dn: string,
     body: string | null,
-    fields: object
+    fields: object,
+    retryOn: readonly number[] = []
   ): Promise<void> {
-    return this.requestLimit(async () => {
-      const log = {
-        plugin: this.name,
-        event: hookname,
-        result: 'error',
-        dn,
-        ...fields,
+    const log = {
+      plugin: this.name,
+      event: hookname,
+      result: 'error',
+      dn,
+      ...fields,
+    };
+    const opts: {
+      method: string;
+      body?: string | null;
+      headers: {
+        'Content-Type'?: string;
+        Authorization?: string;
       };
+    } = {
+      method,
+      headers: this.createHeaders(body ? 'application/json' : undefined),
+    };
 
+    if (body) {
+      opts.body = body;
+    }
+
+    for (let attempt = 1; ; attempt++) {
       try {
-        const opts: {
-          method: string;
-          body?: string | null;
-          headers: {
-            'Content-Type'?: string;
-            Authorization?: string;
-          };
-        } = {
-          method,
-          headers: this.createHeaders(body ? 'application/json' : undefined),
-        };
+        // The limiter holds a slot for the request only: a call waiting to
+        // be retried must not keep the others from running
+        const res = await this.requestLimit(() => fetch(url, opts));
 
-        if (body) {
-          opts.body = body;
-        }
-
-        const res = await fetch(url, opts);
-
-        if (!res.ok) {
-          // Allow subclasses to customize error handling
-          if (this.shouldIgnoreError(res.status, hookname)) {
-            this.logger.debug({
-              ...log,
-              result: 'ignored',
-              http_status: res.status,
-              http_status_text: res.statusText,
-              url,
-            });
-          } else {
-            this.logger.error({
-              ...log,
-              http_status: res.status,
-              http_status_text: res.statusText,
-              url,
-            });
-          }
-        } else {
+        if (res.ok) {
           this.logger.info({
             ...log,
             result: 'success',
             http_status: res.status,
+            url,
+          });
+        } else if (this.shouldRetry(res.status, retryOn, attempt)) {
+          this.logger.warn({
+            ...log,
+            result: 'retry',
+            attempt,
+            http_status: res.status,
+            http_status_text: res.statusText,
+            url,
+          });
+          await this.waitBeforeRetry(attempt);
+          continue;
+        } else if (this.shouldIgnoreError(res.status, hookname)) {
+          // Allow subclasses to customize error handling
+          this.logger.debug({
+            ...log,
+            result: 'ignored',
+            http_status: res.status,
+            http_status_text: res.statusText,
+            url,
+          });
+        } else {
+          this.logger.error({
+            ...log,
+            ...(attempt > 1 ? { attempts: attempt } : {}),
+            http_status: res.status,
+            http_status_text: res.statusText,
             url,
           });
         }
@@ -173,7 +191,33 @@ export abstract class TwakePlugin extends DmPlugin {
           url,
         });
       }
-    });
+      return;
+    }
+  }
+
+  /**
+   * Whether a failed call is worth another attempt
+   * @param statusCode HTTP status code of the failure
+   * @param retryOn HTTP statuses the call retries on
+   * @param attempt Number of the attempt that failed, from 1
+   */
+  protected shouldRetry(
+    statusCode: number,
+    retryOn: readonly number[],
+    attempt: number
+  ): boolean {
+    return attempt < this.retryAttempts && retryOn.includes(statusCode);
+  }
+
+  /**
+   * Wait before the attempt following `attempt`: `retryDelay` times the
+   * number of attempts made, so that the waits grow linearly
+   * @param attempt Number of the attempt that failed, from 1
+   */
+  protected waitBeforeRetry(attempt: number): Promise<void> {
+    return new Promise(resolve =>
+      setTimeout(resolve, this.retryDelay * attempt)
+    );
   }
 
   /**

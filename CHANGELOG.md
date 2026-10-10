@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/james`: a mail rename, a quota, an alias, a forward, a delegation or
+  an identity that James refuses because it does not know the user yet — its
+  LDAP replica lagging behind the write — is retried instead of lost:
+  `--james-retry-attempts` (5) attempts, `--james-retry-delay` (1000 ms)
+  apart and growing,
+  [docs](docs/usage/plugins/integrations/james-mail.md#replication-lag)
+- `ldap/onChange`: deleting a user no longer fires the quota, alias, forward,
+  display name and drive quota hooks, and no hook is given a `"null"` mail:
+  `twake/james` called `PUT /quota/users/null/size` and
+  `DELETE /address/aliases/null/…`. A deleted user's James data stays as it
+  is, [docs](docs/usage/plugins/ldap/on-change.md#hooks)
+- `ldap/organizations`: `GET /api/v1/ldap/organizations/:dn` of an
+  organization that does not exist answers 404 instead of 500
+- A plugin module given twice to `--plugin`, or both given to `--plugin` and
+  needed by another plugin (`core/ldap/groups` with `core/twake/james`), is
+  loaded once, without the warning "not registered: the name … is already
+  taken"; a different module claiming a taken name still warns. A load that
+  failed is not remembered: loading the module again tries again
+- `twake/james`: a team mailbox is created before its members are added, not
+  alongside them: TMail answers 404 to a member added to a team mailbox not
+  there yet, and the member was lost
+
 ## v0.17.0 (2026-10-09)
 
 ### Breaking Changes

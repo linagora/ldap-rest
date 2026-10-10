@@ -250,7 +250,13 @@ class OnLdapChange extends DmPlugin {
     after: Entry | null
   ): void {
     void launchHooks(this.server.hooks.onLdapChange, dn, changes);
+    // A deleted entry has no value left to apply anywhere, and a subscriber
+    // reading it back would find nothing. Of the attribute hooks, only the
+    // mail one fires: it says the address is gone, and appAccountsConsistency
+    // removes the accounts derived from it on that
+    const deleted = after === null;
     for (const [configParam, hookName] of Object.entries(events)) {
+      if (deleted && hookName !== 'onLdapMailChange') continue;
       if (
         this.config[configParam] &&
         changes[this.config[configParam] as string]
@@ -295,7 +301,7 @@ class OnLdapChange extends DmPlugin {
     }
     const oldDisplayName = this.reconstructDisplayName(before);
     const newDisplayName = this.reconstructDisplayName(after);
-    if (oldDisplayName !== newDisplayName) {
+    if (!deleted && oldDisplayName !== newDisplayName) {
       void launchHooks(
         this.server.hooks.onLdapDisplayNameChange,
         dn,
@@ -340,11 +346,16 @@ class OnLdapChange extends DmPlugin {
     const mailChange = changes[mailAttr];
 
     let mail: string;
-    if (mailChange) {
+    if (mailChange?.[1]) {
       // Mail is changing, use new mail
       mail = Array.isArray(mailChange[1])
         ? String(mailChange[1][0])
         : String(mailChange[1]);
+    } else if (mailChange) {
+      this.logger.debug(
+        `${dn} lost its mail, skipping ${hookName} notification`
+      );
+      return;
     } else if (after?.[mailAttr]) {
       const mailValue = after[mailAttr];
       mail = Array.isArray(mailValue)

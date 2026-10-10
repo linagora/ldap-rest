@@ -6,7 +6,7 @@ import HelloWorld from '../src/plugins/demo/helloworld';
 import RateLimit from '../src/plugins/auth/rateLimit';
 import AuthBase from '../src/lib/auth/base';
 import AuthToken from '../src/plugins/auth/token';
-import type { Role } from '../src/abstract/plugin';
+import DmPlugin, { type Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 import { jsonBodyParser } from '../src/lib/rawBody';
 
@@ -201,6 +201,119 @@ describe('Server internals', () => {
       expect(
         await dm.registerPlugin('core/demo/otherPath', new HelloWorld(dm))
       ).to.equal(false);
+    });
+  });
+
+  describe('one plugin module requested twice', () => {
+    const hello = '../../test/__plugins__/hello/index.js';
+    const routes = (dm: DM, path: string): number => {
+      const internal = dm.app as unknown as {
+        router?: { stack: Array<{ route?: { path?: string } }> };
+        _router?: { stack: Array<{ route?: { path?: string } }> };
+      };
+      return ((internal.router ?? internal._router)?.stack || []).filter(
+        layer => layer.route?.path === path
+      ).length;
+    };
+
+    it('should load a module listed twice once, without a warning', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const warnings = captureLogs(dm, 'warn');
+
+      expect(
+        await Promise.all([dm.loadPlugin(hello), dm.loadPlugin(hello)])
+      ).to.eql([true, true]);
+      expect(await dm.loadPlugin(hello)).to.equal(true);
+
+      expect(warnings.filter(w => w.includes('not registered'))).to.eql([]);
+      expect(routes(dm, '/hellopath')).to.equal(1);
+    });
+
+    it('should load a dependency also configured once, without a warning', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const warnings = captureLogs(dm, 'warn');
+
+      // As james and its dependency groups, both configured: the plugin
+      // needing it registers while the configured one is still loading
+      class NeedsHello extends DmPlugin {
+        name = 'needsHello';
+        dependencies = { hellopath: hello };
+      }
+      const configured = dm.loadPlugin(hello);
+      const dependent = dm.registerPlugin('needsHello', new NeedsHello(dm));
+      expect(await Promise.all([configured, dependent])).to.eql([true, true]);
+
+      expect(warnings.filter(w => w.includes('not registered'))).to.eql([]);
+      expect(routes(dm, '/hellopath')).to.equal(1);
+    });
+
+    it('should try again a load that failed', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const missing = '../../test/__plugins__/missing/index.js';
+
+      // Count the real imports: a cached rejection would fail twice too
+      const internals = dm as unknown as {
+        importPlugin: (...args: unknown[]) => Promise<boolean>;
+      };
+      const importPlugin = internals.importPlugin.bind(dm);
+      let imports = 0;
+      internals.importPlugin = (...args: unknown[]) => {
+        imports++;
+        return importPlugin(...args);
+      };
+
+      let failures = 0;
+      for (let i = 0; i < 2; i++) {
+        try {
+          await dm.loadPlugin(missing);
+        } catch {
+          failures++;
+        }
+      }
+      expect(failures).to.equal(2);
+      expect(imports).to.equal(2);
+
+      // Name taken by another module: refused, then free again
+      expect(
+        await dm.registerPlugin('x', new HelloWorld(dm), 'hellopath')
+      ).to.equal(true);
+      expect(await dm.loadPlugin(hello)).to.equal(false);
+      delete (dm as unknown as { loadedPlugins: Record<string, unknown> })
+        .loadedPlugins.hellopath;
+      expect(await dm.loadPlugin(hello)).to.equal(true);
+    });
+
+    it('should still warn when another module claims the name', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const warnings = captureLogs(dm, 'warn');
+
+      expect(await dm.loadPlugin(hello)).to.equal(true);
+      expect(
+        await dm.loadPlugin('../../dist/plugins/demo/helloworld.js:hellopath')
+      ).to.equal(false);
+
+      expect(
+        warnings.filter(w => w.includes('"hellopath" is already taken'))
+      ).to.have.length(1);
+    });
+
+    it('should still warn when the second one has its own configuration', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const warnings = captureLogs(dm, 'warn');
+
+      expect(await dm.loadPlugin(hello)).to.equal(true);
+      expect(await dm.loadPlugin(`${hello}::{"api_prefix":"/other"}`)).to.equal(
+        false
+      );
+
+      expect(
+        warnings.filter(w => w.includes('"hellopath" is already taken'))
+      ).to.have.length(1);
     });
   });
 
