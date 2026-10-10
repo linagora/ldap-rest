@@ -17,6 +17,10 @@
   is, [docs](docs/usage/plugins/ldap/on-change.md#hooks)
 - `ldap/organizations`: `GET /api/v1/ldap/organizations/:dn` of an
   organization that does not exist answers 404 instead of 500
+- A plugin module given twice to `--plugin`, or both given to `--plugin` and
+  needed by another plugin (`core/ldap/groups` with `core/twake/james`), is
+  loaded once, without the warning "not registered: the name … is already
+  taken"; a different module claiming a taken name still warns
 
 ## v0.17.0 (2026-10-09)
 

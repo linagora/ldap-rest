@@ -107,6 +107,15 @@ export class DM {
    */
   private _composed: boolean = false;
   private _errorMiddleware?: express.ErrorRequestHandler;
+  /**
+   * The loads of `--plugin` entries without overrides, keyed by resolved
+   * module and name. Regular plugins load in parallel and load their own
+   * dependencies, so one module is often asked for twice: in the
+   * configuration and by a plugin depending on it, or listed twice. The
+   * second request waits for the first rather than building an instance
+   * whose name is taken. A Map, so that `withConfig` views share it.
+   */
+  private readonly pluginLoads = new Map<string, Promise<boolean>>();
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -645,6 +654,24 @@ export class DM {
     } else {
       name = undefined;
     }
+    const key = overrides
+      ? undefined
+      : `${this.resolveModule(pluginName)}\0${name ?? ''}`;
+    const pending = key === undefined ? undefined : this.pluginLoads.get(key);
+    if (pending) {
+      this.logger.debug(`Plugin ${pluginName} already loaded, skipping`);
+      return pending;
+    }
+    const load = this.importPlugin(pluginName, name, overrides);
+    if (key !== undefined) this.pluginLoads.set(key, load);
+    return load;
+  }
+
+  private importPlugin(
+    pluginName: string,
+    name: string | undefined,
+    overrides: Config | undefined
+  ): Promise<boolean> {
     this.logger.debug(`Loading plugin ${pluginName}`);
     // `core/x` is rewritten; anything else is handed to `import()` as
     // written. `resolveModule` would answer the same file for a relative
