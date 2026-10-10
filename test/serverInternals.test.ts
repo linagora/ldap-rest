@@ -249,6 +249,31 @@ describe('Server internals', () => {
       expect(routes(dm, '/hellopath')).to.equal(1);
     });
 
+    it('should try again a load that failed', async () => {
+      const dm = new DM();
+      await dm.ready;
+      const missing = '../../test/__plugins__/missing/index.js';
+
+      let failures = 0;
+      for (let i = 0; i < 2; i++) {
+        try {
+          await dm.loadPlugin(missing);
+        } catch {
+          failures++;
+        }
+      }
+      expect(failures).to.equal(2);
+
+      // Name taken by another module: refused, then free again
+      expect(
+        await dm.registerPlugin('x', new HelloWorld(dm), 'hellopath')
+      ).to.equal(true);
+      expect(await dm.loadPlugin(hello)).to.equal(false);
+      delete (dm as unknown as { loadedPlugins: Record<string, unknown> })
+        .loadedPlugins.hellopath;
+      expect(await dm.loadPlugin(hello)).to.equal(true);
+    });
+
     it('should still warn when another module claims the name', async () => {
       const dm = new DM();
       await dm.ready;

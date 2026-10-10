@@ -663,7 +663,14 @@ export class DM {
       return pending;
     }
     const load = this.importPlugin(pluginName, name, overrides);
-    if (key !== undefined) this.pluginLoads.set(key, load);
+    if (key !== undefined) {
+      this.pluginLoads.set(key, load);
+      // A failed load is not worth remembering: a later one tries again
+      const forget = (): void => {
+        if (this.pluginLoads.get(key) === load) this.pluginLoads.delete(key);
+      };
+      load.then(ok => ok || forget(), forget);
+    }
     return load;
   }
 
