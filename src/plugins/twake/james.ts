@@ -1284,22 +1284,19 @@ export default class James extends TwakePlugin {
     // Get email addresses for all members
     const memberMails = await this.getMemberEmails(memberList);
 
-    // Create team mailbox and add members (parallelize)
-    const operations: Promise<void>[] = [];
-
-    // Create the team mailbox itself
-    operations.push(
-      this.callWebAdminApi(
-        'ldapgroupadddone:teamMailbox:create',
-        `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
-        'PUT',
-        dn,
-        null,
-        { domain, teamMailbox: mailStr }
-      )
+    // Create the team mailbox first: TMail answers 404 to an addMember
+    // for a team mailbox that does not exist yet
+    await this.callWebAdminApi(
+      'ldapgroupadddone:teamMailbox:create',
+      `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
+      'PUT',
+      dn,
+      null,
+      { domain, teamMailbox: mailStr }
     );
 
-    // Add each member
+    // Then add each member (parallelize)
+    const operations: Promise<void>[] = [];
     for (const memberMail of memberMails) {
       operations.push(
         this.callWebAdminApi(
