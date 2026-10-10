@@ -114,6 +114,109 @@ describe('onChange', () => {
     });
   });
 
+  describe('notify', () => {
+    const dn = 'uid=x,dc=example,dc=com';
+    const config = {
+      mail_attribute: 'mail',
+      quota_attribute: 'mailQuotaSize',
+      alias_attribute: 'mailAlternateAddress',
+      forward_attribute: 'mailForwardingAddress',
+      display_name_attribute: 'displayName',
+      drive_quota_attribute: 'twakeDriveQuota',
+    };
+    const derived = [
+      'onLdapChange',
+      'onLdapMailChange',
+      'onLdapQuotaChange',
+      'onLdapAliasChange',
+      'onLdapForwardChange',
+      'onLdapDisplayNameChange',
+      'onLdapDriveQuotaChange',
+    ];
+    const entry = (attrs: Record<string, string | string[]>): Entry => ({
+      dn,
+      ...attrs,
+    });
+    const user = entry({
+      objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+      uid: 'x',
+      displayName: 'Jane Doe',
+      mail: 'x@test.org',
+      mailQuotaSize: '1000',
+      mailAlternateAddress: 'alias@test.org',
+      mailForwardingAddress: 'fwd@test.org',
+      twakeDriveQuota: '2000',
+    });
+    // The hooks onChange fires, by name, with their arguments
+    const fired = (
+      before: Entry | null,
+      after: Entry | null
+    ): Record<string, unknown[]> => {
+      const calls: Record<string, unknown[]> = {};
+      const fake = {
+        config,
+        logger: { debug: () => {}, warn: () => {}, error: () => {} },
+        server: {
+          hooks: Object.fromEntries(
+            derived.map(name => [
+              name,
+              [(...args: unknown[]) => (calls[name] = args)],
+            ])
+          ),
+        },
+      };
+      const self = Object.assign(Object.create(OnLdapChange.prototype), fake);
+      OnLdapChange.prototype.notify.call(
+        self,
+        dn,
+        diffEntries(before, after),
+        before,
+        after
+      );
+      return calls;
+    };
+
+    it('fires every attribute hook on an add', () => {
+      const calls = fired(null, user);
+      expect(Object.keys(calls).sort()).to.eql([...derived].sort());
+      expect(calls.onLdapQuotaChange).to.eql([dn, 'x@test.org', 0, 1000]);
+    });
+
+    it('fires only onLdapChange and the mail hook on a delete', () => {
+      // A deleted user's data stays in James and Drive: no hook may push a
+      // "change" to null, nor look up an entry that is gone
+      const calls = fired(user, null);
+      expect(Object.keys(calls).sort()).to.eql([
+        'onLdapChange',
+        'onLdapMailChange',
+      ]);
+      expect(calls.onLdapMailChange).to.eql([dn, 'x@test.org', null]);
+    });
+
+    it('never names a mail that was removed', () => {
+      const calls = fired(
+        user,
+        entry({
+          objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+          uid: 'x',
+          displayName: 'Jane Doe',
+        })
+      );
+      expect(calls).to.not.have.property('onLdapQuotaChange');
+      expect(calls).to.not.have.property('onLdapAliasChange');
+      expect(calls).to.not.have.property('onLdapForwardChange');
+      expect(calls.onLdapMailChange).to.eql([dn, 'x@test.org', null]);
+    });
+
+    it('gives the new mail when it changes with the quota', () => {
+      const calls = fired(
+        user,
+        entry({ ...user, mail: 'y@test.org', mailQuotaSize: '3000' })
+      );
+      expect(calls.onLdapQuotaChange).to.eql([dn, 'y@test.org', 1000, 3000]);
+    });
+  });
+
   describe('hooks', () => {
     let dm: DM;
     let onChange: OnLdapChange;

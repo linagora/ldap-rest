@@ -15,6 +15,14 @@ import { wantJson } from '../../lib/expressFormatedResponses';
 import { escapeLdapFilter, isDummyMemberDn } from '../../lib/utils';
 
 /**
+ * What James WebAdmin answers about a user missing from its users
+ * repository. Read through LDAP, that repository can lag behind the write
+ * that created or renamed the user, so a call about that user is retried on
+ * these, see docs/usage/plugins/integrations/james-mail.md#replication-lag
+ */
+const USER_NOT_SEEN_YET = [400, 404] as const;
+
+/**
  * OpenAPI schemas specific to the James integration.
  *
  * @openapi-component
@@ -94,6 +102,14 @@ export default class James extends TwakePlugin {
     this.initDelay =
       typeof this.config.james_init_delay === 'number'
         ? this.config.james_init_delay
+        : 1000;
+    this.retryAttempts =
+      typeof this.config.james_retry_attempts === 'number'
+        ? Math.max(1, this.config.james_retry_attempts)
+        : 5;
+    this.retryDelay =
+      typeof this.config.james_retry_delay === 'number'
+        ? Math.max(0, this.config.james_retry_delay)
         : 1000;
   }
 
@@ -274,7 +290,8 @@ export default class James extends TwakePlugin {
             'PUT',
             dn,
             quotaNum.toString(),
-            { mail: mailStr, quota: quotaNum }
+            { mail: mailStr, quota: quotaNum },
+            USER_NOT_SEEN_YET
           );
         }
       }
@@ -290,7 +307,8 @@ export default class James extends TwakePlugin {
               'PUT',
               dn,
               null,
-              { mail: mailStr, alias }
+              { mail: mailStr, alias },
+              USER_NOT_SEEN_YET
             )
           )
         );
@@ -345,7 +363,8 @@ export default class James extends TwakePlugin {
         'POST',
         dn,
         null,
-        { oldmail: oldmailStr, newmail: newmailStr }
+        { oldmail: oldmailStr, newmail: newmailStr },
+        USER_NOT_SEEN_YET
       );
 
       // Get current aliases from LDAP and recreate them for the new mail
@@ -381,7 +400,8 @@ export default class James extends TwakePlugin {
                   'PUT',
                   dn,
                   null,
-                  { newmail: newmailStr, alias }
+                  { newmail: newmailStr, alias },
+                  USER_NOT_SEEN_YET
                 )
               ),
             ]);
@@ -427,7 +447,8 @@ export default class James extends TwakePlugin {
             'PUT',
             dn,
             null,
-            { mail, alias, action: 'add' }
+            { mail, alias, action: 'add' },
+            USER_NOT_SEEN_YET
           )
         ),
       ]);
@@ -444,7 +465,8 @@ export default class James extends TwakePlugin {
         'PUT',
         dn,
         newQuota.toString(),
-        { oldQuota, newQuota }
+        { oldQuota, newQuota },
+        USER_NOT_SEEN_YET
       );
     },
     onLdapForwardChange: async (
@@ -486,7 +508,8 @@ export default class James extends TwakePlugin {
             'PUT',
             dn,
             null,
-            { mail, forward, domain, action: 'add' }
+            { mail, forward, domain, action: 'add' },
+            USER_NOT_SEEN_YET
           )
         ),
       ]);
@@ -973,94 +996,129 @@ export default class James extends TwakePlugin {
       displayName,
     };
 
-    try {
-      // Step 1: the default identity, if the user has one
-      const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
-      const getRes = await this.requestLimit(() =>
-        fetch(`${identitiesUrl}?default=true`, {
-          method: 'GET',
-          headers: this.createHeaders(),
-        })
-      );
-      type Identity = {
-        id: string;
-        email: string;
-        mayDelete?: boolean;
-        sortOrder?: number;
-      };
-      let defaultIdentity: Identity | undefined;
-      if (getRes.ok) {
-        const body = (await getRes.json()) as Identity[] | Identity;
-        // Chosen again here rather than trusted: a server ignoring
-        // `default` would list the server-set identity too, and updating
-        // that one is what brought the duplicate back. `!== false`, not
-        // `=== true`: an identity without the field is not taken for the
-        // server-set one, else every name change would create another
-        defaultIdentity = (Array.isArray(body) ? body : [body])
-          .filter(i => i && i.id && i.mayDelete !== false)
-          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
-      } else if (getRes.status !== 404) {
-        this.logger.error({
-          ...log,
-          step: 'get_default_identity',
-          http_status: getRes.status,
-          http_status_text: getRes.statusText,
-        });
-        return;
-      }
-
-      // Step 2: Generate signature if template is configured
-      const htmlSignature = await this.generateSignature(dn);
-
-      // Step 3: update it, or create it
-      const payload: {
-        id?: string;
-        email: string;
-        name: string;
-        sortOrder?: number;
-        htmlSignature?: string;
-      } = defaultIdentity?.id
-        ? {
-            id: defaultIdentity.id,
-            email: defaultIdentity.email,
-            name: displayName,
+    // The read and the write are retried together: James answers the read
+    // of a user it does not know yet 404, the same as "no identity", and
+    // only the write tells the two apart
+    for (let attempt = 1; ; attempt++) {
+      try {
+        // Step 1: the default identity, if the user has one
+        const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
+        const getRes = await this.requestLimit(() =>
+          fetch(`${identitiesUrl}?default=true`, {
+            method: 'GET',
+            headers: this.createHeaders(),
+          })
+        );
+        type Identity = {
+          id: string;
+          email: string;
+          mayDelete?: boolean;
+          sortOrder?: number;
+        };
+        let defaultIdentity: Identity | undefined;
+        if (getRes.ok) {
+          const body = (await getRes.json()) as Identity[] | Identity;
+          // Chosen again here rather than trusted: a server ignoring
+          // `default` would list the server-set identity too, and updating
+          // that one is what brought the duplicate back. `!== false`, not
+          // `=== true`: an identity without the field is not taken for the
+          // server-set one, else every name change would create another
+          defaultIdentity = (Array.isArray(body) ? body : [body])
+            .filter(i => i && i.id && i.mayDelete !== false)
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
+        } else if (getRes.status !== 404) {
+          const step = 'get_default_identity';
+          if (this.shouldRetry(getRes.status, USER_NOT_SEEN_YET, attempt)) {
+            await this.warnAndWait(log, step, attempt, getRes);
+            continue;
           }
-        : { email: mail, name: displayName, sortOrder: 0 };
-      if (htmlSignature) payload.htmlSignature = htmlSignature;
+          this.logger.error({
+            ...log,
+            step,
+            ...(attempt > 1 ? { attempts: attempt } : {}),
+            http_status: getRes.status,
+            http_status_text: getRes.statusText,
+          });
+          return;
+        }
 
-      const step = defaultIdentity?.id ? 'update_identity' : 'create_identity';
-      const res = await this.requestLimit(() =>
-        fetch(
-          defaultIdentity?.id
-            ? `${identitiesUrl}/${defaultIdentity.id}`
-            : identitiesUrl,
-          {
-            method: defaultIdentity?.id ? 'PUT' : 'POST',
-            headers: this.createHeaders('application/json'),
-            body: JSON.stringify(payload),
-          }
-        )
-      );
+        // Step 2: Generate signature if template is configured
+        const htmlSignature = await this.generateSignature(dn);
 
-      if (!res.ok) {
-        this.logger.error({
-          ...log,
-          step,
-          http_status: res.status,
-          http_status_text: res.statusText,
-        });
-      } else {
-        this.logger.info({
-          ...log,
-          step,
-          result: 'success',
-          http_status: res.status,
-        });
+        // Step 3: update it, or create it
+        const payload: {
+          id?: string;
+          email: string;
+          name: string;
+          sortOrder?: number;
+          htmlSignature?: string;
+        } = defaultIdentity?.id
+          ? {
+              id: defaultIdentity.id,
+              email: defaultIdentity.email,
+              name: displayName,
+            }
+          : { email: mail, name: displayName, sortOrder: 0 };
+        if (htmlSignature) payload.htmlSignature = htmlSignature;
+
+        const step = defaultIdentity?.id
+          ? 'update_identity'
+          : 'create_identity';
+        const res = await this.requestLimit(() =>
+          fetch(
+            defaultIdentity?.id
+              ? `${identitiesUrl}/${defaultIdentity.id}`
+              : identitiesUrl,
+            {
+              method: defaultIdentity?.id ? 'PUT' : 'POST',
+              headers: this.createHeaders('application/json'),
+              body: JSON.stringify(payload),
+            }
+          )
+        );
+
+        if (res.ok) {
+          this.logger.info({
+            ...log,
+            step,
+            result: 'success',
+            http_status: res.status,
+          });
+        } else if (this.shouldRetry(res.status, USER_NOT_SEEN_YET, attempt)) {
+          await this.warnAndWait(log, step, attempt, res);
+          continue;
+        } else {
+          this.logger.error({
+            ...log,
+            step,
+            ...(attempt > 1 ? { attempts: attempt } : {}),
+            http_status: res.status,
+            http_status_text: res.statusText,
+          });
+        }
+      } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        this.logger.error({ ...log, error: `${err}` });
       }
-    } catch (err) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.error({ ...log, error: `${err}` });
+      return;
     }
+  }
+
+  private async warnAndWait(
+    log: object,
+    step: string,
+    attempt: number,
+    res: { status: number; statusText: string }
+  ): Promise<void> {
+    this.logger.warn({
+      ...log,
+      step,
+      result: 'retry',
+      attempt,
+      http_status: res.status,
+      http_status_text: res.statusText,
+    });
+    await this.waitBeforeRetry(attempt);
   }
 
   /**
@@ -1495,7 +1553,8 @@ export default class James extends TwakePlugin {
             'PUT',
             dn,
             null,
-            { userMail, delegateEmail, delegateDN, action: 'add' }
+            { userMail, delegateEmail, delegateDN, action: 'add' },
+            USER_NOT_SEEN_YET
           )
         );
       }

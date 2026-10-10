@@ -111,6 +111,14 @@ describe('GET APIs for individual entities', function () {
       expect(res.status).to.equal(404);
       expect(res.body).to.have.property('error');
     });
+
+    it('should return 404 for a non-existent group DN', async () => {
+      const dn = `cn=nonexistent-group,ou=nonexistent,${process.env.DM_LDAP_BASE}`;
+      const res = await request.get(
+        `/api/v1/ldap/groups/${encodeURIComponent(dn)}`
+      );
+      expect(res.status).to.equal(404);
+    });
   });
 
   describe('Organizations GET and subnodes', function () {
@@ -139,11 +147,19 @@ describe('GET APIs for individual entities', function () {
       // Should contain users, groups, or sub-organizations with link attribute
     });
 
-    it('should return error for non-existent organization', async () => {
-      const fakeDn = 'ou=nonexistent,dc=example,dc=com';
+    it('should return 404 for non-existent organization', async () => {
+      const fakeDn = `ou=nonexistent,${process.env.DM_LDAP_BASE}`;
       const encodedDn = encodeURIComponent(fakeDn);
       const res = await request.get(`/api/v1/ldap/organizations/${encodedDn}`);
-      expect(res.status).to.equal(500);
+      expect(res.status).to.equal(404);
+      expect(res.body.error).to.include('not found');
+    });
+
+    it('should return 404 for an organization whose parent does not exist', async () => {
+      const fakeDn = `ou=child,ou=nonexistent,${process.env.DM_LDAP_BASE}`;
+      const encodedDn = encodeURIComponent(fakeDn);
+      const res = await request.get(`/api/v1/ldap/organizations/${encodedDn}`);
+      expect(res.status).to.equal(404);
     });
   });
 });

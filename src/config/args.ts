@@ -234,6 +234,8 @@ export interface Config {
   ldap_concurrency?: number;
   james_concurrency?: number;
   james_init_delay?: number;
+  james_retry_attempts?: number;
+  james_retry_delay?: number;
   james_mailing_list_branch?: string[];
   james_mailbox_type_attribute?: string;
 
@@ -712,6 +714,8 @@ const configArgs: ConfigTemplate = [
   ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
   ['--james-concurrency', 'DM_JAMES_CONCURRENCY', 10, 'number'],
   ['--james-init-delay', 'DM_JAMES_INIT_DELAY', 1000, 'number'],
+  ['--james-retry-attempts', 'DM_JAMES_RETRY_ATTEMPTS', 5, 'number'],
+  ['--james-retry-delay', 'DM_JAMES_RETRY_DELAY', 1000, 'number'],
   [
     '--james-mailing-list-branch',
     'DM_JAMES_MAILING_LIST_BRANCHES',

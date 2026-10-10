@@ -459,6 +459,8 @@ whichever of the two names it selects. A value other than `req.user` or
 | `--james-signature-template`     |                                 | `DM_JAMES_SIGNATURE_TEMPLATE`     |                         | Email signature template    |
 | `--james-concurrency`            |                                 | `DM_JAMES_CONCURRENCY`            | `10`                    | James API concurrency       |
 | `--james-init-delay`             |                                 | `DM_JAMES_INIT_DELAY`             | `1000`                  | Init delay (ms)             |
+| `--james-retry-attempts`         |                                 | `DM_JAMES_RETRY_ATTEMPTS`         | `5`                     | Attempts per user call      |
+| `--james-retry-delay`            |                                 | `DM_JAMES_RETRY_DELAY`            | `1000`                  | Base retry delay (ms)       |
 | `--james-mailing-list-branch`    | `--james-mailing-list-branches` | `DM_JAMES_MAILING_LIST_BRANCHES`  | `[]`                    | Mailing list branches       |
 | `--james-mailbox-type-attribute` |                                 | `DM_JAMES_MAILBOX_TYPE_ATTRIBUTE` | `twakeMailboxType`      | Mailbox type attribute      |
 | `--ldap-concurrency`             |                                 | `DM_LDAP_CONCURRENCY`             | `10`                    | LDAP operations concurrency |

@@ -40,6 +40,8 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--quota-attribute`: LDAP attribute for quota (default: `mailQuotaSize`)
 - `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
 - `--james-mailbox-type-attribute`: LDAP attribute for mailbox type (default: `twakeMailboxType`)
+- `--james-retry-attempts`: attempts in all of a call about a user James may not see yet (default: `5`), see [Replication lag](#replication-lag)
+- `--james-retry-delay`: base delay between those attempts, in ms (default: `1000`)
 
 ## How It Works
 
@@ -707,6 +709,26 @@ The plugin logs all operations:
 
 ## Error Handling
 
+### Replication lag
+
+James reads its users from LDAP, and may read them from a replica that has
+not received the latest write yet: for up to a few seconds after a user is
+created or renamed, James does not know the new address. A call about that
+address fails meanwhile, with 400 (rename) or 404 (quota, alias, identity).
+
+The calls that need James to know the user are therefore retried on 400 and
+404: the rename, the quota, an alias or a forward added, a delegation added,
+and the identity. Each failed attempt logs a warning
+(`"result": "retry"`, with the attempt number); the error is logged when the
+last attempt fails. With the defaults, 5 attempts, the waits are 1, 2, 3 and
+4 seconds: `--james-retry-delay` times the number of attempts made, 10
+seconds in all. `--james-retry-attempts 1` disables the retries. Other
+failures, such as 401 or 500, are not retried, nor are deletions.
+
+The retries run in the background, after the LDAP write has answered; a
+call waiting for its next attempt does not take a slot of
+`--james-concurrency`.
+
 ### Non-Existent User
 
 If mail account doesn't exist in James:
@@ -875,7 +897,7 @@ James deletes the entire address group.
 
 1. **One-way sync**: LDAP → James only. James changes don't sync back to LDAP.
 2. **No account creation**: Plugin doesn't create James accounts, only updates existing ones.
-3. **No user deletion**: Plugin doesn't delete James accounts when LDAP users are deleted.
+3. **No user deletion**: deleting an LDAP user leaves its James data (mailboxes, quota, aliases) as it is; purging it is left to James.
 4. **Synchronous**: James API calls block LDAP response. Slow James = slow LDAP.
 5. **No send restrictions**: James doesn't enforce list type restrictions (open/member/owner-only). These are metadata in LDAP only.
 
