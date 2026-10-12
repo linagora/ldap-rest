@@ -161,7 +161,7 @@ describe('Translated hints in refusals', function () {
     const dn = `cn=hint-modify,${process.env.DM_LDAP_GROUP_BASE || `ou=groups,${base}`}`;
     await server.ldap.delete(dn).catch(() => undefined);
     await server.ldap.add(dn, {
-      objectClass: ['top', 'groupOfNames', 'twakeGroup'],
+      objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
       cn: 'hint-modify',
       member: userDn,
     });

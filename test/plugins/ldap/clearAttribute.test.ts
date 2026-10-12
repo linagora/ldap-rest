@@ -64,7 +64,7 @@ describe('Empty value lists', function () {
       description: 'to clear',
     });
     await server.ldap.add(groupDn, {
-      objectClass: ['top', 'groupOfNames', 'twakeGroup'],
+      objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
       cn: 'clear-group',
       member: server.config.group_dummy_user as string,
       description: 'to clear',
