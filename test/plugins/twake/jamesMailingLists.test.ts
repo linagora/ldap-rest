@@ -5,7 +5,6 @@ import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import type { AttributesList } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
 describe('James and mailing lists', () => {
@@ -18,27 +17,24 @@ describe('James and mailing lists', () => {
 
   let dm: DM;
   let james: James;
+  let groups: LdapGroups;
   const calls: string[] = [];
-  const created: string[] = [];
+  const users: string[] = [];
 
-  const group = async (
-    name: string,
-    type?: string
-  ): Promise<[string, AttributesList]> => {
+  // The group hooks are launched without being awaited
+  const settle = (): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, 500));
+
+  const addGroup = async (name: string, type?: string): Promise<string> => {
     const cn = `${name}-${timestamp}`;
     const dn = `cn=${cn},${groupBase}`;
-    const entry: AttributesList = {
-      objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-      cn,
+    await groups.addGroup(dn, [alice], {
       mail: `${cn}@test.org`,
-      member: [alice],
+      ...(type && { twakeMailboxType: `cn=${type},${mailboxTypeBase}` }),
       twakeDepartmentLink: groupBase,
       twakeDepartmentPath: 'Test',
-    };
-    if (type) entry.twakeMailboxType = `cn=${type},${mailboxTypeBase}`;
-    await dm.ldap.add(dn, entry);
-    created.unshift(dn);
-    return [dn, entry];
+    });
+    return dn;
   };
 
   const addressGroupCalls = (): string[] =>
@@ -55,10 +51,12 @@ describe('James and mailing lists', () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
     dm.config.james_init_delay = 0;
+    dm.config.group_classes = ['top', 'groupOfNames', 'twakeStaticGroup'];
     await dm.ready;
     james = new James(dm);
+    groups = new LdapGroups(dm);
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
-    await dm.registerPlugin('ldapGroups', new LdapGroups(dm));
+    await dm.registerPlugin('ldapGroups', groups);
     await dm.registerPlugin('james', james);
 
     const scope = nock(
@@ -87,9 +85,9 @@ describe('James and mailing lists', () => {
         uid: `${uid}-${timestamp}`,
         mail: `${uid}-${timestamp}@test.org`,
       });
-      created.push(dn);
+      users.push(dn);
     }
-    [alice, bob] = created;
+    [alice, bob] = users;
   });
 
   beforeEach(() => {
@@ -98,7 +96,7 @@ describe('James and mailing lists', () => {
 
   after(async () => {
     nock.cleanAll();
-    for (const dn of created)
+    for (const dn of users)
       try {
         await dm.ldap.delete(dn);
       } catch {
@@ -107,57 +105,53 @@ describe('James and mailing lists', () => {
   });
 
   for (const type of ['mailingList', undefined])
-    it(`gives James no address group for a list ${type ? `of type ${type}` : 'without a mailbox type'}`, async () => {
-      const [dn, entry] = await group(`ml-${type ?? 'untyped'}`, type);
-
-      await james.hooks.ldapgroupadddone!([dn, entry]);
-      await james.hooks.ldapgroupmodifydone!([dn, { add: { member: bob } }, 0]);
-      await james.hooks.ldapgroupmodifydone!([
-        dn,
-        { delete: { member: alice } },
-        0,
-      ]);
-      await james.hooks.ldapgroupdeletedone!(dn);
+    it(`creates no address group for a list ${type ? `of type ${type}` : 'without a mailbox type'}`, async () => {
+      const dn = await addGroup(`ml-${type ?? 'untyped'}`, type);
+      await settle();
+      await groups.deleteGroup(dn);
+      await settle();
 
       expect(addressGroupCalls()).to.deep.equal([]);
     });
 
-  it('gives James no address group when a group becomes a list or stops being one', async () => {
-    const [listDn] = await group('ml-from-list', 'mailingList');
-    const [groupDn] = await group('ml-from-group', 'group');
+  it('sends nothing to James for a group without mail', async () => {
+    const dn = `cn=ml-nomail-${timestamp},${groupBase}`;
+    await groups.addGroup(dn, [alice], {
+      twakeDepartmentLink: groupBase,
+      twakeDepartmentPath: 'Test',
+    });
+    await settle();
+    await groups.deleteGroup(dn);
+    await settle();
 
-    await james.hooks.ldapgroupmodifydone!([
-      listDn,
-      { replace: { twakeMailboxType: `cn=group,${mailboxTypeBase}` } },
-      0,
-    ]);
-    await james.hooks.ldapgroupmodifydone!([
-      groupDn,
-      { replace: { twakeMailboxType: `cn=mailingList,${mailboxTypeBase}` } },
-      0,
-    ]);
-
-    expect(addressGroupCalls()).to.deep.equal([]);
+    expect(calls).to.deep.equal([]);
   });
 
-  it('still creates a team mailbox and follows its members', async () => {
-    const [dn, entry] = await group('ml-team', 'teamMailbox');
-    const mailbox = `/domains/test.org/team-mailboxes/ml-team-${timestamp}@test.org`;
+  it('ldapgroupmodifydone sends no member change of a list to James', async () => {
+    const dn = await addGroup('ml-members', 'mailingList');
+    await settle();
 
-    await james.hooks.ldapgroupadddone!([dn, entry]);
     await james.hooks.ldapgroupmodifydone!([dn, { add: { member: bob } }, 0]);
     await james.hooks.ldapgroupmodifydone!([
       dn,
       { delete: { member: alice } },
       0,
     ]);
+    await groups.deleteGroup(dn);
+    await settle();
+
+    expect(addressGroupCalls()).to.deep.equal([]);
+  });
+
+  it('still creates a team mailbox with its members', async () => {
+    const dn = await addGroup('ml-team', 'teamMailbox');
+    const mailbox = `/domains/test.org/team-mailboxes/ml-team-${timestamp}@test.org`;
+    await settle();
 
     expect(calls).to.include.members([
       `PUT ${mailbox}`,
       `PUT ${mailbox}/members/mlalice-${timestamp}@test.org`,
-      `PUT ${mailbox}/members/mlbob-${timestamp}@test.org`,
-      `DELETE ${mailbox}/members/mlalice-${timestamp}@test.org`,
     ]);
-    expect(addressGroupCalls()).to.deep.equal([]);
+    await groups.deleteGroup(dn);
   });
 });

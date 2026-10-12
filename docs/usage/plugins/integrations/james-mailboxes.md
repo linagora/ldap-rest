@@ -315,10 +315,11 @@ npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
   - Reject transition to team mailbox inside mailing list branch
   - Allow team mailboxes anywhere when restrictions disabled
 
-- **jamesMailingLists.test.ts** (4 tests):
-  - No address group for a mailing list, typed or not: creation, member changes, deletion
-  - No address group when a group becomes a mailing list or stops being one
-  - A team mailbox is still created and follows its members
+- **jamesMailingLists.test.ts** (5 tests):
+  - No address group for a mailing list, typed or not, created then deleted
+  - No James call for a group without mail
+  - No address group when `ldapgroupmodifydone` reports member changes of a list
+  - A team mailbox is still created with its members
 
 ## References
 

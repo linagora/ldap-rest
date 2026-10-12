@@ -115,7 +115,6 @@ export default class MyPlugin extends DmPlugin {
 - 📧 **Synchronisation automatique LDAP → James**
 - 🔄 **Changement d'adresse mail** - Renommage compte + données
 - 💾 **Gestion des quotas** - Mise à jour automatique
-- 👥 **Listes de diffusion** - Groupes LDAP → Address Groups
 - 📨 **Alias mail** - mailAlternateAddress → James aliases
 - 🎯 **WebAdmin API** - Communication via REST
 
@@ -156,33 +155,6 @@ James WebAdmin: PUT /quota/users/alice@.../size
   → Quota mis à jour immédiatement
   ✅ COHÉRENCE GARANTIE
 ```
-
-<!-- end_slide -->
-
-# Plugin James - Cohérence des listes
-
-## Groupes LDAP → James Address Groups
-
-```bash
-# Création d'un groupe avec attribut mail
-POST /api/v1/ldap/groups
-{
-  "cn": "engineering",
-  "mail": "engineering@company.com",
-  "member": ["uid=alice,...", "uid=bob,..."]
-}
-```
-
-### Cohérence automatique des listes
-
-1. ✅ **Création** → Groupe créé dans James + membres ajoutés
-2. ✅ **Ajout membre** → Membre ajouté à la liste James
-3. ✅ **Retrait membre** → Membre retiré de la liste James
-4. ✅ **Suppression groupe** → Liste supprimée dans James
-
-### Garantie
-
-**LDAP est la source de vérité, James reste synchronisé**
 
 <!-- end_slide -->
 

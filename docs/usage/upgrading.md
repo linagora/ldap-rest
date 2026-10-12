@@ -16,8 +16,8 @@ decision or a configuration change appear here; see the
 from LDAP with its `LDAPMailingList` mailet: without it, a mail sent to a
 list address is no longer delivered to its members.
 
-The address groups already created for these lists stay in James, and are no
-longer updated. Delete them: `GET /address/groups` lists the address groups,
+The address groups already created for these lists stay in James. Delete
+them: `GET /address/groups` lists the address groups,
 `DELETE /address/groups/{group}` deletes one.
 
 `--james-mailing-list-branches` now only keeps team mailboxes out of these
