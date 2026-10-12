@@ -12,7 +12,11 @@ import type {
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { escapeLdapFilter, isDummyMemberDn } from '../../lib/utils';
+import {
+  escapeLdapFilter,
+  isDummyMemberDn,
+  normalizeDn,
+} from '../../lib/utils';
 
 /**
  * What James WebAdmin answers about a user missing from its users
@@ -69,6 +73,20 @@ const USER_NOT_SEEN_YET = [400, 404] as const;
  *       used: 524288000
  *       max: 2147483648
  */
+const members = (entry: AttributesList | null): string[] => {
+  const value = entry?.member;
+  if (value === undefined) return [];
+  return (Array.isArray(value) ? value : [value]).map(String);
+};
+
+const memberKey = (dn: string): string => {
+  try {
+    return normalizeDn(dn);
+  } catch {
+    return dn.toLowerCase();
+  }
+};
+
 export default class James extends TwakePlugin {
   name = 'james';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -571,176 +589,110 @@ export default class James extends TwakePlugin {
 
     // Only team mailboxes are synchronized: Twake Mail reads mailing lists
     // from LDAP, see docs/usage/plugins/integrations/james-mailboxes.md#mailing-lists
-    ldapgroupadddone: async (args: [string, AttributesList]) => {
-      const [dn, attributes] = args;
-      const mail = attributes.mail as string | string[] | undefined;
-      if (!mail || this.getMailboxType(attributes) !== 'teamMailbox') return;
-      if (this.inMailingListBranch(dn, 'ldapgroupadddone')) return;
-      const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
-      await this.createTeamMailbox(dn, attributes, mailStr);
-    },
-
-    ldapgroupmodifydone: async (
-      args: [
-        string,
-        {
-          add?: AttributesList;
-          replace?: AttributesList;
-          delete?: string[] | AttributesList;
-        },
-        number,
-      ]
-    ) => {
-      const [dn, changes] = args;
-
-      // Check if mailboxType is being changed
-      if (
-        changes.replace?.[this.mailboxTypeAttr] ||
-        changes.add?.[this.mailboxTypeAttr]
-      ) {
-        await this.handleMailboxTypeTransition(dn, changes);
-        return; // Transition handles everything including members
-      }
-
-      if ((await this.getGroupMailboxType(dn)) !== 'teamMailbox') return;
-      const groupMail = await this.getGroupMail(dn);
-      const domain = groupMail && this.extractMailDomain(groupMail);
-      if (!groupMail || !domain) return;
-
-      // Handle member additions and deletions in parallel
-      const operations: Promise<void>[] = [];
-
-      if (changes.add?.member) {
-        const addMember = changes.add.member as string | string[];
-        const membersToAdd = Array.isArray(addMember) ? addMember : [addMember];
-        const memberMails = await this.getMemberEmails(membersToAdd);
-
-        operations.push(
-          ...memberMails.map(memberMail =>
-            this.callWebAdminApi(
-              'ldapgroupmodifydone:teamMailbox',
-              `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
-              'PUT',
-              dn,
-              null,
-              { domain, groupMail, memberMail, action: 'add' }
-            )
-          )
-        );
-      }
-
-      if (this.isAttributesList(changes.delete)) {
-        const deleteMember = changes.delete.member as
-          | string
-          | string[]
-          | undefined;
-        if (deleteMember) {
-          const membersToDelete = Array.isArray(deleteMember)
-            ? deleteMember
-            : [deleteMember];
-          const memberMails = await this.getMemberEmails(membersToDelete);
-
-          operations.push(
-            ...memberMails.map(memberMail =>
-              this.callWebAdminApi(
-                'ldapgroupmodifydone:teamMailbox',
-                `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
-                'DELETE',
-                dn,
-                null,
-                { domain, groupMail, memberMail, action: 'delete' }
-              )
-            )
-          );
-        }
-      }
-
-      await Promise.all(operations);
-    },
-
-    ldapgroupdeletedone: async (dn: string) => {
-      const groupMail = await this.getGroupMail(dn);
-      if (!groupMail) return;
-      // For team mailboxes, remove all members but preserve the mailbox
-      if ((await this.getGroupMailboxType(dn)) === 'teamMailbox')
-        await this.removeAllTeamMailboxMembers(dn, groupMail);
-    },
+    onLdapEntryChange: (_dn, before, after) =>
+      this.followTeamMailbox(
+        before as AttributesList | null,
+        after as AttributesList | null
+      ),
   };
 
   /**
-   * Handle mailbox type transitions when twakeMailboxType changes
+   * The address of the team mailbox an entry stands for, and whether it is
+   * refused for lying in a mailing list branch.
    */
-  private async handleMailboxTypeTransition(
-    dn: string,
-    changes: {
-      add?: AttributesList;
-      replace?: AttributesList;
-      delete?: string[] | AttributesList;
-    }
-  ): Promise<void> {
-    // Get current group attributes
-    const attributes = await this.ldapGetAttributes(dn, [
-      'mail',
-      'member',
-      this.mailboxTypeAttr,
-    ]);
+  private teamMailboxOf(
+    entry: AttributesList | null
+  ): { mail: string; refused: boolean } | null {
+    if (!entry || this.getMailboxType(entry) !== 'teamMailbox') return null;
+    const mail = this.attributeToString(entry.mail);
+    if (!mail) return null;
+    const dn = String(entry.dn);
+    const branches = this.config.james_mailing_list_branch || [];
+    return {
+      mail,
+      refused: branches.some(
+        branch => dn === branch || dn.endsWith(',' + branch)
+      ),
+    };
+  }
 
-    if (!attributes) {
+  /**
+   * Bring James from the team mailbox an entry was to the one it is. A
+   * mailbox the entry no longer stands for is kept, emptied of its members.
+   */
+  private async followTeamMailbox(
+    before: AttributesList | null,
+    after: AttributesList | null
+  ): Promise<void> {
+    const was = this.teamMailboxOf(before);
+    const is = this.teamMailboxOf(after);
+    if (!was && !is) return;
+    const dn = String((after ?? before)!.dn);
+    if (is?.refused && !was?.refused)
       this.logger.error({
         plugin: this.name,
-        event: 'handleMailboxTypeTransition',
+        event: 'teamMailbox',
         dn,
-        error: 'Could not fetch group attributes',
+        error: `Team mailbox cannot be in mailing list branches: ${(this.config.james_mailing_list_branch || []).join(', ')}`,
       });
-      return;
+    const old = was && !was.refused ? was.mail : null;
+    const mail = is && !is.refused ? is.mail : null;
+    if (!old && !mail) return;
+
+    // One group at a time: two writes close together would otherwise race
+    // to James, a member removed by the second added back by the first
+    const key = memberKey(dn);
+    const previous = this.teamMailboxQueue.get(key) ?? Promise.resolve();
+    const follow = async (): Promise<void> => {
+      if (old && mail && old.toLowerCase() === mail.toLowerCase()) {
+        const gone = new Map(members(before).map(m => [memberKey(m), m]));
+        const added: string[] = [];
+        for (const member of members(after))
+          if (!gone.delete(memberKey(member))) added.push(member);
+        await Promise.all([
+          this.teamMailboxMembers(dn, mail, 'PUT', added),
+          this.teamMailboxMembers(dn, mail, 'DELETE', [...gone.values()]),
+        ]);
+        return;
+      }
+      if (old)
+        await this.teamMailboxMembers(dn, old, 'DELETE', members(before));
+      if (mail) await this.createTeamMailbox(dn, after!, mail);
+    };
+    // A failed step does not hold back the next one
+    const current = previous.then(follow, follow);
+    this.teamMailboxQueue.set(key, current);
+    try {
+      await current;
+    } finally {
+      if (this.teamMailboxQueue.get(key) === current)
+        this.teamMailboxQueue.delete(key);
     }
-    const mail = attributes.mail;
-    if (!mail) {
-      this.logger.debug(
-        `Group ${dn} has no mail attribute, skipping mailbox type transition`
-      );
-      return;
-    }
+  }
 
-    const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+  private teamMailboxQueue: Map<string, Promise<void>> = new Map();
 
-    // Determine old and new mailbox types
-    const newMailboxTypeDn =
-      changes.replace?.[this.mailboxTypeAttr] ||
-      changes.add?.[this.mailboxTypeAttr];
-    const newMailboxTypeStr = Array.isArray(newMailboxTypeDn)
-      ? String(newMailboxTypeDn[0])
-      : String(newMailboxTypeDn);
-
-    const newType = this.getMailboxType({
-      [this.mailboxTypeAttr]: newMailboxTypeStr,
-    });
-    const oldType = this.getMailboxType(attributes);
-
-    this.logger.info({
-      plugin: this.name,
-      event: 'handleMailboxTypeTransition',
-      dn,
-      mail: mailStr,
-      oldType: oldType || 'none',
-      newType: newType || 'none',
-    });
-
-    // Handle transition based on old and new types
-    if (oldType === newType) {
-      // No actual change
-      return;
-    }
-
-    // Remove all members but preserve the mailbox
-    if (oldType === 'teamMailbox')
-      await this.removeAllTeamMailboxMembers(dn, mailStr);
-
-    if (
-      newType === 'teamMailbox' &&
-      !this.inMailingListBranch(dn, 'handleMailboxTypeTransition')
-    )
-      await this.createTeamMailbox(dn, attributes, mailStr);
+  private async teamMailboxMembers(
+    dn: string,
+    mail: string,
+    method: 'PUT' | 'DELETE',
+    memberDns: string[]
+  ): Promise<void> {
+    const domain = this.extractMailDomain(mail);
+    if (!domain || !memberDns.length) return;
+    const memberMails = await this.getMemberEmails(memberDns);
+    await Promise.all(
+      memberMails.map(memberMail =>
+        this.callWebAdminApi(
+          `teamMailbox:${method === 'PUT' ? 'addMember' : 'removeMember'}`,
+          `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mail}/members/${memberMail}`,
+          method,
+          dn,
+          null,
+          { domain, teamMailbox: mail, memberMail }
+        )
+      )
+    );
   }
 
   /**
@@ -1059,17 +1011,6 @@ export default class James extends TwakePlugin {
   }
 
   /**
-   * Type guard to check if delete operation is an AttributesList
-   */
-  private isAttributesList(
-    value: string[] | AttributesList | undefined
-  ): value is AttributesList {
-    return (
-      value !== undefined && typeof value === 'object' && !Array.isArray(value)
-    );
-  }
-
-  /**
    * Extract mailbox type from group attributes
    * Returns: 'group', 'mailingList', 'teamMailbox', or null if not set
    */
@@ -1096,24 +1037,6 @@ export default class James extends TwakePlugin {
   }
 
   /**
-   * Whether dn lies in a mailing list branch, where a team mailbox is
-   * refused: the refusal is logged.
-   */
-  private inMailingListBranch(dn: string, event: string): boolean {
-    const branches = this.config.james_mailing_list_branch || [];
-    if (!branches.some(branch => dn === branch || dn.endsWith(',' + branch)))
-      return false;
-    this.logger.error({
-      plugin: this.name,
-      event,
-      dn,
-      mailboxType: 'teamMailbox',
-      error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
-    });
-    return true;
-  }
-
-  /**
    * Create a team mailbox in James
    */
   private async createTeamMailbox(
@@ -1133,136 +1056,17 @@ export default class James extends TwakePlugin {
       return;
     }
 
-    const members = (attributes.member as string | string[] | undefined) || [];
-    const memberList: string[] = Array.isArray(members) ? members : [members];
-
-    this.logger.debug(
-      `Creating team mailbox ${mailStr} in James with ${memberList.length} members`
-    );
-
-    // Get email addresses for all members
-    const memberMails = await this.getMemberEmails(memberList);
-
     // Create the team mailbox first: TMail answers 404 to an addMember
     // for a team mailbox that does not exist yet
     await this.callWebAdminApi(
-      'ldapgroupadddone:teamMailbox:create',
+      'teamMailbox:create',
       `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
       'PUT',
       dn,
       null,
       { domain, teamMailbox: mailStr }
     );
-
-    // Then add each member (parallelize)
-    const operations: Promise<void>[] = [];
-    for (const memberMail of memberMails) {
-      operations.push(
-        this.callWebAdminApi(
-          'ldapgroupadddone:teamMailbox:addMember',
-          `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
-          'PUT',
-          dn,
-          null,
-          { domain, teamMailbox: mailStr, memberMail }
-        )
-      );
-    }
-
-    await Promise.all(operations);
-  }
-
-  /**
-   * Delete a team mailbox from James
-   */
-  private async deleteTeamMailbox(dn: string, mailStr: string): Promise<void> {
-    const domain = this.extractMailDomain(mailStr);
-    if (!domain) {
-      this.logger.error({
-        plugin: this.name,
-        event: 'deleteTeamMailbox',
-        dn,
-        mail: mailStr,
-        error: 'Cannot extract domain from mail address',
-      });
-      return;
-    }
-
-    await this.callWebAdminApi(
-      'ldapgroupdeletedone:teamMailbox',
-      `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
-      'DELETE',
-      dn,
-      null,
-      { domain, teamMailbox: mailStr }
-    );
-  }
-
-  /**
-   * Remove all members from a team mailbox (without deleting it)
-   * This preserves the mailbox for potential future use
-   */
-  private async removeAllTeamMailboxMembers(
-    dn: string,
-    mailStr: string
-  ): Promise<void> {
-    const domain = this.extractMailDomain(mailStr);
-    if (!domain) {
-      this.logger.error({
-        plugin: this.name,
-        event: 'removeAllTeamMailboxMembers',
-        dn,
-        mail: mailStr,
-        error: 'Cannot extract domain from mail address',
-      });
-      return;
-    }
-
-    // Get current members from LDAP
-    try {
-      const result = (await this.server.ldap.search(
-        { paged: false, scope: 'base', attributes: ['member'] },
-        dn
-      )) as SearchResult;
-
-      if (result.searchEntries && result.searchEntries.length > 0) {
-        const members =
-          (result.searchEntries[0].member as string | string[] | undefined) ||
-          [];
-        const memberList: string[] = Array.isArray(members)
-          ? members
-          : [members];
-        const memberMails = await this.getMemberEmails(memberList);
-
-        // Remove each member
-        await Promise.all(
-          memberMails.map(memberMail =>
-            this.callWebAdminApi(
-              'removeAllTeamMailboxMembers',
-              `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}/members/${memberMail}`,
-              'DELETE',
-              dn,
-              null,
-              { domain, teamMailbox: mailStr, memberMail }
-            )
-          )
-        );
-
-        this.logger.info({
-          plugin: this.name,
-          event: 'removeAllTeamMailboxMembers',
-          dn,
-          teamMailbox: mailStr,
-          membersRemoved: memberMails.length,
-          message: 'All members removed from team mailbox (mailbox preserved)',
-        });
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `Failed to remove members from team mailbox ${mailStr}: ${errorMsg}`
-      );
-    }
+    await this.teamMailboxMembers(dn, mailStr, 'PUT', members(attributes));
   }
 
   /**

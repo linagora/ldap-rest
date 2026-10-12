@@ -200,9 +200,7 @@ overrides builds a second instance, and it needs a name of its own.
   - `onLdapForwardChange` - Syncs forwarding
   - `onLdapChange` - General LDAP change handling
   - `onLdapDisplayNameChange` - Syncs display name
-  - `ldapgroupadddone` - After group added
-  - `ldapgroupmodifydone` - After group modified
-  - `ldapgroupdeletedone` - After group deleted
+  - `onLdapEntryChange` - Follows team mailboxes
 - **Consumes Hooks**: (Hooks provided by `onLdapChange`)
 - **Notes**: Synchronizes LDAP users/groups with Apache James mail server
 

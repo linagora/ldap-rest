@@ -12,6 +12,11 @@
 
 ### Fixes
 
+- `twake/james`: a team mailbox follows its group. Members added or removed
+  (the `/members` routes included), a type change, a new address and the
+  deletion of the group reach James; until now only the creation did. A
+  deleted group leaves its mailbox in James with no member,
+  [docs](docs/usage/plugins/integrations/james-mailboxes.md#following-the-group)
 - `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any
   entry under the base, as `member` does, instead of only the direct children
   of the base; a group owned by an account could not be saved
