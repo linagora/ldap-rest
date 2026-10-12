@@ -1,60 +1,41 @@
 # Changelog
 
-## Unreleased
+## v0.18.0 (2026-10-12)
 
 ### Breaking Changes
 
-- `twake/james` no longer copies mailing lists to James address groups,
-  which could not restrict senders: Twake Mail reads the lists from LDAP with
-  its `LDAPMailingList` mailet. The address groups already created stay in
-  James and must be deleted,
+- `twake/james` no longer copies mailing lists to James address groups: Twake
+  Mail reads them from LDAP with its `LDAPMailingList` mailet. The address
+  groups already created must be deleted,
   [notes](docs/usage/upgrading.md#mailing-lists-are-no-longer-copied-to-james)
-- Twake schemas: field hints and form section names (`hint`, `group`) are in
-  English and French, as maps keyed by language tag like `label`; any schema
-  may now write them so. The server quotes the English hint in its refusals. A
-  client reading them as plain strings must be upgraded,
+- Twake schemas: `hint` and `group` are maps keyed by language tag, like
+  `label`, and any schema may write them so. A client reading them as strings
+  must be upgraded,
   [notes](docs/usage/upgrading.md#the-twake-schemas-translate-their-hints-and-form-sections),
   [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 
 ### Fixes
 
-- A refused attribute is named the same way on every route,
-  `Attribute "x" …`: required, not allowed, a DN pointer outside its branches
-  or to no entry, and `Invalid value for attribute "x"` followed by the
-  English `hint` when the schema has one. The group and organization routes,
-  and the pointer checks of every route, said `Field x …` or
-  `Missing required field x`; groups echoed the refused value instead of the
-  hint
-- `ldap/groups`: a modify with a value of the wrong type answers 400 instead
-  of 500
-- An empty list clears an attribute on a replace, on the group and
-  organization routes too (organizations answered `must be a single value`).
-  On an add or a creation it answers 400 `Attribute "x" has no value` on every
-  route, instead of a 500
-- `twake/james`: a group with a `mail` is no longer handled as a user: no
-  JMAP identity, quota, alias, forward or delegation is set for its address,
-  and a new address is no longer sent to James as an account rename,
-  [docs](docs/usage/plugins/integrations/james-mail.md#groups)
-- `twake/james`: a team mailbox follows its group. Members added or removed
-  (the `/members` routes included), a type change, a new address and the
-  deletion of the group reach James; until now only the creation did. A
-  deleted group leaves its mailbox in James with no member,
-  [docs](docs/usage/plugins/integrations/james-mailboxes.md#following-the-group)
-- `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any
-  entry under the base, as `member` does, instead of only the direct children
-  of the base; a group owned by an account could not be saved
-- `ldap/groups`: adding a member, or creating a group with one, that does not
-  exist answers 400 naming it instead of 500 "check logs",
+- A refused attribute is reported as `Attribute "x" …` on every route, with
+  the English `hint` of the schema for an invalid value
+- `ldap/groups`: a value of the wrong type, or a member that does not exist,
+  answers 400 instead of 500,
   [docs](docs/client-development/api/rest-api.md#add-group-member)
-- Twake nomenclature schemas (account states, delivery modes, list types,
-  group types, titles): `cn` and `description` carry English and French
-  labels; a console headed their lists "Cn"
-- `twake/nomenclature/twakeDomain.json`: `associatedDomain` also has the
-  `displayName` role, so a client can name a mail domain `example.com` rather
-  than by its identifier `example`
+- An empty list clears an attribute on a replace, on every route; on an add or
+  a creation it answers 400 instead of 500
+- `twake/james`: a group with a `mail` is no longer handled as a user,
+  [docs](docs/usage/plugins/integrations/james-mail.md#groups)
+- `twake/james`: a team mailbox follows its group (members, type, address,
+  deletion), not only its creation,
+  [docs](docs/usage/plugins/integrations/james-mailboxes.md#following-the-group)
+- `twake/groups.json`, `standard/groups.json`: a group's `owner` may be any
+  entry under the base, as `member` may
+- Twake nomenclature schemas: `cn` and `description` have English and French
+  labels
+- `twake/nomenclature/twakeDomain.json`: a mail domain can be named by its
+  `associatedDomain`
 - Flat entities: reading one entry returns the operational attributes its
-  schema declares, such as the `memberOf` of a Twake account, when the
-  directory computes them,
+  schema declares, such as `memberOf`,
   [docs](docs/usage/plugins/ldap/flat-generic.md#attributes-a-client-may-not-send)
 
 ## v0.17.1 (2026-10-10)
