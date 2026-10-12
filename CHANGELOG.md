@@ -9,9 +9,9 @@
 
 ### Fixes
 
-- `twake/james`: team mailboxes are created in TMail, which names them by the
-  local part of the address, which the plugin sent whole. An address TMail
-  cannot name a team mailbox after, such as one with a dot, is logged,
+- `twake/james`: team mailboxes are created in TMail: the plugin sent the
+  whole address where TMail expects its local part. An address TMail cannot
+  name a team mailbox after, such as one with a dot, is logged,
   [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes)
 
 ## v0.18.0 (2026-10-12)
