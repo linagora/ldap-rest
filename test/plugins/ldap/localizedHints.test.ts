@@ -15,6 +15,7 @@ import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
+import { waitFor } from '../../helpers/waitFor';
 
 describe('localizedText', () => {
   it('should read a plain string as the text itself', () => {
@@ -63,8 +64,9 @@ describe('Translated hints in refusals', function () {
     );
     const organizations = new LdapOrganizations(server);
     await server.registerPlugin('ldapOrganizations', organizations);
-    for (let i = 0; i < 50 && !organizations.schema; i++)
-      await new Promise(r => setTimeout(r, 100));
+    await waitFor(() => Boolean(organizations.schema), {
+      what: 'the organizations schema',
+    });
     server.setupErrorMiddleware();
     request = supertest(server.app);
 
