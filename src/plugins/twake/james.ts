@@ -369,7 +369,7 @@ export default class James extends TwakePlugin {
       await this.dropStaleForwards(
         dn,
         newmailStr,
-        this.getAliases(entry?.[this.forwardAttr])
+        this.ownForwards(entry?.[this.forwardAttr])
       );
 
       // Rename the mailbox
@@ -503,6 +503,9 @@ export default class James extends TwakePlugin {
       oldForwards: string[],
       newForwards: string[]
     ) => {
+      // Users set their forwards in Twake Mail, see
+      // docs/usage/plugins/integrations/james-mail.md#forwards
+      if (!this.config.james_sync_forwards) return;
       if (await this.isGroupDn(dn)) return;
       const domain = this.extractMailDomain(mail);
       if (!domain) {
@@ -687,7 +690,7 @@ export default class James extends TwakePlugin {
       this.dropStaleForwards(
         dn,
         mailStr,
-        this.getAliases(attributes[this.forwardAttr])
+        this.ownForwards(attributes[this.forwardAttr])
       ),
       ...aliasList.map(alias => this.dropStaleForwards(dn, alias, [])),
     ]);
@@ -1076,9 +1079,23 @@ export default class James extends TwakePlugin {
   }
 
   /**
+   * The forwards the directory gives an entry, those James is to keep on its
+   * address: none unless the directory owns forwards
+   * (`--james-sync-forwards`).
+   */
+  private ownForwards(value: AttributesList[string] | undefined): string[] {
+    return this.config.james_sync_forwards ? this.getAliases(value) : [];
+  }
+
+  /**
    * Remove the forwards James holds from an address an entry takes, but
    * those in `keep`: the entry's own. A rename leaves one from the old
    * address to the new, and its next owner would not get its mail.
+   *
+   * Runs whether forwards are synced or not: Twake Mail keeps a user's
+   * forwards under their own address, and none can have been set yet on an
+   * address the account is only now taking. The rename calls this before
+   * James moves the user's forwards to the new address.
    */
   private async dropStaleForwards(
     dn: string,

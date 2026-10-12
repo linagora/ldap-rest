@@ -4,6 +4,24 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Forwards are no longer copied to Twake Mail
+
+**Who is affected:** a deployment that loads `twake/james` and stores
+forwards in `--forward-attribute` (`mailForwardingAddress` by default).
+
+`twake/james` no longer applies the changes of that attribute to Twake Mail's
+forwards: users set them in Twake Mail. The forwards already in Twake Mail
+stay as they are, except those left on an address an account takes, removed
+as before,
+[details](plugins/integrations/james-mail.md#forwards-left-on-an-address).
+
+To keep the directory as the owner of the forwards, set
+`--james-sync-forwards` (`DM_JAMES_SYNC_FORWARDS=true`); it then overwrites
+what users set in Twake Mail,
+[details](plugins/integrations/james-mail.md#forwards).
+
 ## To 0.18.0
 
 ### Mailing lists are no longer copied to James

@@ -554,6 +554,28 @@ describe('James Plugin', () => {
   });
 
   describe('Forward management', () => {
+    // Each test has a server of its own
+    beforeEach(() => {
+      james.config.james_sync_forwards = true;
+    });
+
+    it('should leave the forwards to Twake Mail without --james-sync-forwards', async () => {
+      james.config.james_sync_forwards = false;
+      // An address no other test uses: the interceptor is left unused
+      const forwardScope = nock(
+        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+      )
+        .put('/address/forwards/nosync@test.org/targets/manager@test.org')
+        .reply(204);
+      await james.hooks.onLdapForwardChange!(
+        testDNForwards,
+        'nosync@test.org',
+        [],
+        ['manager@test.org']
+      );
+      expect(forwardScope.isDone()).to.be.false;
+    });
+
     it('should add forwards when mailForwardingAddress is added', async () => {
       const forwardScope1 = nock(
         process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
