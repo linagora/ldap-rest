@@ -1,21 +1,25 @@
 /**
  * A replace with an empty list clears an attribute, as LDAP itself reads it.
  * The organization and group routes validate each value against the schema:
- * an empty list is no value, refused only for a required attribute.
+ * an empty list is no value, refused only for a required attribute. On an
+ * add or a creation it adds nothing, and the directory answers a protocol
+ * error: it is refused as the client's fault.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapGroups from '../../../src/plugins/ldap/groups';
+import { BadRequestError } from '../../../src/lib/errors';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 
-describe('Clearing an attribute with an empty replace', function () {
+describe('Empty value lists', function () {
   let server: DM;
   let request: ReturnType<typeof supertest>;
   let orgDn: string;
@@ -36,6 +40,11 @@ describe('Clearing an attribute with an empty replace', function () {
     server.config.organization_schema =
       './static/schemas/twake/organizations.json';
     server.config.group_schema = './static/schemas/twake/groups.json';
+    // Fills the organization path a creation needs
+    await server.registerPlugin(
+      'ldapEnterpriseRules',
+      new LdapEnterpriseRules(server)
+    );
     const organizations = new LdapOrganizations(server);
     const groups = new LdapGroups(server);
     await server.registerPlugin('ldapOrganizations', organizations);
@@ -63,7 +72,12 @@ describe('Clearing an attribute with an empty replace', function () {
   });
 
   after(async () => {
-    for (const dn of [groupDn, orgDn])
+    for (const dn of [
+      groupDn,
+      `cn=clear-new-group,${groupDn.replace(/^[^,]+,/, '')}`,
+      `ou=ClearChild,${orgDn}`,
+      orgDn,
+    ])
       await server?.ldap.delete(dn).catch(() => undefined);
   });
 
@@ -92,6 +106,42 @@ describe('Clearing an attribute with an empty replace', function () {
       .send({ replace: { description: [] } });
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
     expect((await description(groupDn)) ?? []).to.deep.equal([]);
+  });
+
+  it('refuses an empty list on an add, on every route', async () => {
+    const org = await request
+      .put(`/api/v1/ldap/organizations/${encodeURIComponent(orgDn)}`)
+      .type('json')
+      .send({ add: { description: [] } });
+    expect(org.status, JSON.stringify(org.body)).to.equal(400);
+    expect(org.body.error).to.equal('Attribute "description" has no value');
+    let refused: unknown;
+    await server.ldap
+      .modify(orgDn, { add: { description: [] } })
+      .catch(err => (refused = err));
+    expect(refused).to.be.instanceOf(BadRequestError);
+  });
+
+  it('refuses an empty list on a creation, on every route', async () => {
+    let refused: unknown;
+    await server.ldap
+      .add(`cn=clear-new-group,${groupDn.replace(/^[^,]+,/, '')}`, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'clear-new-group',
+        member: server.config.group_dummy_user as string,
+        description: [],
+      })
+      .catch(err => (refused = err));
+    expect(refused).to.be.instanceOf(BadRequestError);
+    expect((refused as Error).message).to.equal(
+      'Attribute "description" has no value'
+    );
+    const org = await request
+      .post('/api/v1/ldap/organizations')
+      .type('json')
+      .send({ ou: 'ClearChild', parentDn: orgDn, description: [] });
+    expect(org.status, JSON.stringify(org.body)).to.equal(400);
+    expect(org.body.error).to.equal('Attribute "description" has no value');
   });
 
   it('still refuses to clear a required attribute', async () => {

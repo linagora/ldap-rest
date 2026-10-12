@@ -1234,7 +1234,8 @@ export default class LdapGroups extends DmPlugin {
         throw new BadRequestError(`Attribute "${field}" is not allowed`);
       return true;
     }
-    // An empty list clears the attribute, as a replace with no value does
+    // An empty list is no value: a replace clears the attribute with it, and
+    // ldapActions refuses it on an add or a creation
     if (
       value === null ||
       value === undefined ||
