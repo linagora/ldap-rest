@@ -31,6 +31,9 @@
   organization routes too (organizations answered `must be a single value`).
   On an add or a creation it answers 400 `Attribute "x" has no value` on every
   route, instead of a 500
+- `twake/james`: a group with a `mail` is no longer handled as a user: no
+  JMAP identity is created for its address, and a new address is no longer
+  sent to James as an account rename
 - `twake/james`: a team mailbox follows its group. Members added or removed
   (the `/members` routes included), a type change, a new address and the
   deletion of the group reach James; until now only the creation did. A
