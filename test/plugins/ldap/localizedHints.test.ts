@@ -69,7 +69,6 @@ describe('Translated hints in refusals', function () {
       what: 'the organizations schema',
     });
     server.config.group_schema = './static/schemas/twake/groups.json';
-    server.config.group_classes = ['top', 'groupOfNames', 'twakeStaticGroup'];
     const groups = new LdapGroups(server);
     await server.registerPlugin('ldapGroups', groups);
     await waitFor(() => Boolean(groups.schema), {

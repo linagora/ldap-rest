@@ -1324,7 +1324,6 @@ export default class LdapOrganizations extends DmPlugin {
     return true;
   }
 
-  /** See {@link invalidValueMessage}. */
   invalidValueMessage(field: string): string {
     return invalidValueMessage(field, this.schema?.attributes[field]);
   }

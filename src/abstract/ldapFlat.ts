@@ -590,7 +590,6 @@ export default abstract class LdapFlat extends DmPlugin {
     }
   }
 
-  /** See {@link invalidValueMessage}. */
   protected invalidValueMessage(field: string): string {
     return invalidValueMessage(field, this.schema?.attributes[field]);
   }
