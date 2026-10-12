@@ -1,42 +1,34 @@
 # Changelog
 
-## Unreleased
+## v0.19.0 (2026-10-12)
 
 ### Breaking Changes
 
-- `twake/james` no longer copies `--forward-attribute` to Twake Mail's
-  forwards, which users set there; `--james-sync-forwards` brings it back,
+- `twake/james` no longer copies `--forward-attribute` to Twake Mail
+  forwards, a user setting; `--james-sync-forwards` restores it,
   [notes](docs/usage/upgrading.md#forwards-are-no-longer-copied-to-twake-mail)
 
 ### Features
 
-- Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
+- Twake schemas: Mongolian (`mn`) texts,
   [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 - `ldap/externalUsersInGroups`: `/api/v1/config` publishes the external
-  members branch and the managed domains, so a client can add a member from
-  its address,
-  [docs](docs/usage/plugins/ldap/external-users.md#config-api)
+  members branch, [docs](docs/usage/plugins/ldap/external-users.md#config-api)
 
 ### Fixes
 
-- `ldap/externalUsersInGroups`: an escaped address (`mail=a\+b@…`) is stored
-  unescaped, a managed domain is refused whatever its case, and only the
-  direct children of the branch are external members. The member DN is
-  compared as a DN: the attribute name and the branch may be written in any
-  case
-- `twake/james`: a renamed account gets its default identity back, with the
-  signatures of the old one, instead of keeping only the server-set identity,
-  [docs](docs/usage/plugins/integrations/james-mail.md#mail-address-changes)
-- `twake/james`: an address that becomes an account's mail or alias loses the
-  forwards James left there, such as the one a rename leaves to the renamed
-  account,
-  [docs](docs/usage/plugins/integrations/james-mail.md#forwards-left-on-an-address)
-- `twake/james`: an entry that gains a mail by a modify gets its quota,
-  aliases and identity in James, as an entry added with one
-- `twake/james`: team mailboxes are created in TMail: the plugin sent the
-  whole address where TMail expects its local part. An address TMail cannot
-  name a team mailbox after, such as one with a dot, is logged,
+- `ldap/externalUsersInGroups`: an escaped address is stored unescaped,
+  member DNs and managed domains are compared case-insensitively, and only
+  direct children of the branch count
+- `twake/james`: team mailboxes are created, named by the local part of their
+  address,
   [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes)
+- `twake/james`: a renamed account keeps its default identity and signatures,
+  [docs](docs/usage/plugins/integrations/james-mail.md#mail-address-changes)
+- `twake/james`: an address an account takes loses the forwards a former owner
+  left, [docs](docs/usage/plugins/integrations/james-mail.md#forwards-left-on-an-address)
+- `twake/james`: a mail added to an existing entry is provisioned as at
+  creation
 
 ## v0.18.0 (2026-10-12)
 
