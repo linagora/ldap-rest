@@ -94,6 +94,7 @@ describe('James and groups', () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
     dm.config.james_init_delay = 0;
+    dm.config.group_class = ['top', 'groupOfNames', 'twakeStaticGroup'];
     await dm.ready;
     groups = new LdapGroups(dm);
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
