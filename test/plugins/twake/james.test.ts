@@ -467,11 +467,10 @@ describe('James Plugin', () => {
         });
         expect(res).to.be.true;
 
-        // Wait for rename
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        // Verify the rename endpoint was called
-        expect(renameScope.isDone()).to.be.false; // nock persist mode
+        // The rename, then the identity put back on the new address
+        await waitFor(() => renameScope.isDone(), {
+          what: 'the rename and the identity of the new address',
+        });
       } finally {
         // Cleanup
         try {
@@ -538,11 +537,10 @@ describe('James Plugin', () => {
         });
         expect(res).to.be.true;
 
-        // Wait for rename
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Verify the rename endpoint was called
-        expect(renameScope.isDone()).to.be.false; // nock persist mode
+        // The rename, then the identity put back on the new address
+        await waitFor(() => renameScope.isDone(), {
+          what: 'the rename and the identity of the new address',
+        });
       } finally {
         // Cleanup
         try {
