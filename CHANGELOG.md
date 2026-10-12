@@ -18,10 +18,16 @@
 
 ### Fixes
 
-- `ldap/groups`, `ldap/organizations`: a value the schema refuses is answered
-  as on the other routes, `Invalid value for attribute "x"` followed by the
-  English `hint` when the schema has one, instead of
-  `Field x has invalid value …` or `Invalid value for field x`
+- A refused attribute is named the same way on every route:
+  `Attribute "x" is required`, `Attribute "x" is not allowed`,
+  `Invalid value for attribute "x"` followed by the English `hint` when the
+  schema has one. The group and organization routes said `Field x …` or
+  `Missing required field x`, and groups echoed the refused value instead of
+  the hint
+- `ldap/groups`: a modify with a value of the wrong type answers 400 instead
+  of 500
+- `ldap/organizations`: a replace with an empty list clears an attribute, as
+  on the other routes, instead of answering `must be a single value`
 - `twake/james`: a team mailbox follows its group. Members added or removed
   (the `/members` routes included), a type change, a new address and the
   deletion of the group reach James; until now only the creation did. A

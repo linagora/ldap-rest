@@ -487,7 +487,9 @@ export async function checkDnValues(
   const mustExist = single || attr.items?.type === 'pointer';
   if (!mustExist && !branches?.length) return;
   if (single && typeof value !== 'string')
-    throw new BadRequestError(`Field ${field} must be a string (DN pointer)`);
+    throw new BadRequestError(
+      `Attribute "${field}" must be a string (DN pointer)`
+    );
 
   const dns = (Array.isArray(value) ? value : [value]).map(item =>
     String(item)
@@ -495,7 +497,7 @@ export async function checkDnValues(
   for (const dn of dns) {
     if (branches?.length && !branches.some(branch => isDnInBranch(dn, branch)))
       throw new BadRequestError(
-        `Field ${field} must point to a DN within allowed branches: ${branches.join(', ')}`
+        `Attribute "${field}" must point to a DN within allowed branches: ${branches.join(', ')}`
       );
     let exists = false;
     if (mustExist) {
@@ -506,7 +508,7 @@ export async function checkDnValues(
       }
       if (!exists)
         throw new BadRequestError(
-          `Field ${field} points to invalid or non-existent DN: ${dn}`
+          `Attribute "${field}" points to invalid or non-existent DN: ${dn}`
         );
     }
   }

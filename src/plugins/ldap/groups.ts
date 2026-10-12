@@ -1184,7 +1184,8 @@ export default class LdapGroups extends DmPlugin {
       entry,
       this.server.loadedPlugins
     );
-    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
+    if (missing)
+      throw new BadRequestError(`Attribute "${missing}" is required`);
     return true;
   }
 
@@ -1196,12 +1197,18 @@ export default class LdapGroups extends DmPlugin {
     );
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
-        await this._validateOneChange(field, value);
+        if (!(await this._validateOneChange(field, value)))
+          throw new BadRequestError(
+            invalidValueMessage(field, this.schema.attributes[field])
+          );
       }
     }
     if (changes.replace) {
       for (const [field, value] of Object.entries(changes.replace)) {
-        await this._validateOneChange(field, value);
+        if (!(await this._validateOneChange(field, value)))
+          throw new BadRequestError(
+            invalidValueMessage(field, this.schema.attributes[field])
+          );
       }
     }
     if (changes.delete && changes.delete instanceof Object) {
@@ -1224,17 +1231,22 @@ export default class LdapGroups extends DmPlugin {
     const test = this.schema.attributes[field];
     if (!test) {
       if (this.schema.strict)
-        throw new BadRequestError(`Field ${field} is not allowed`);
+        throw new BadRequestError(`Attribute "${field}" is not allowed`);
       return true;
     }
-    if (value === null || value === undefined) {
+    // An empty list clears the attribute, as a replace with no value does
+    if (
+      value === null ||
+      value === undefined ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       if (test.required)
-        throw new BadRequestError(`Field ${field} is required`);
+        throw new BadRequestError(`Attribute "${field}" is required`);
       return true;
     }
     if (test.type === 'array') {
       if (!Array.isArray(value))
-        throw new BadRequestError(`Field ${field} must be an array`);
+        throw new BadRequestError(`Attribute "${field}" must be an array`);
       if (!test.items)
         throw new Error(`Schema error: no item for array ${field}`);
       if (test.items.type === 'array')
@@ -1247,7 +1259,7 @@ export default class LdapGroups extends DmPlugin {
         for (const v of value)
           if (typeof v !== test.items.type)
             throw new BadRequestError(
-              `Field ${field} must be of type ${test.items.type}`
+              `Attribute "${field}" must be of type ${test.items.type}`
             );
     } else if (test.type !== 'pointer' && typeof value !== test.type) {
       return false;
