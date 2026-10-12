@@ -194,4 +194,32 @@ describe('James Plugin - rename leftovers', () => {
       seen('PUT /address/aliases/jr-old@test.org/sources/jr-alias2@test.org')
     );
   });
+
+  it('treats a mail gained by a modify as the add does', async () => {
+    await dm.ldap.add(dn, {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'jamesrenamed',
+      cn: 'Jane Renamed',
+      sn: 'Renamed',
+      displayName: 'Jane Renamed',
+    });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    calls = [];
+    james['/address/forwards/jr-gained@test.org'] = [
+      200,
+      [{ mailAddress: 'gone@test.org' }],
+    ];
+
+    await dm.ldap.modify(dn, { add: { mail: 'jr-gained@test.org' } });
+    await waitFor(
+      () => seen('POST /users/jr-gained@test.org/identities') >= 0,
+      { what: 'the identity of the gained address' }
+    );
+    expect(
+      seen('DELETE /address/forwards/jr-gained@test.org/targets/gone@test.org')
+    ).to.be.at.least(0);
+    expect(calls.map(c => c.call).filter(c => c.includes('/rename/'))).to.eql(
+      []
+    );
+  });
 });

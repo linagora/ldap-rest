@@ -99,8 +99,8 @@ When a user's mail attribute changes:
 #### Forwards Left on an Address
 
 The forward a rename leaves outlives the account. When an address becomes the
-`mail` or an alias of an account, at its creation, a rename or an alias add,
-the plugin removes the forwards James holds from it, except the entry's own
+`mail` or an alias of an account, at its creation, a rename, a mail added to
+an existing entry or an alias add, the plugin removes the forwards James holds from it, except the entry's own
 (`--forward-attribute`):
 
 ```http
@@ -814,9 +814,10 @@ Quota values are in **bytes**:
 
 ### Scenario 1: User Creation
 
-1. Create user in LDAP with mail attribute
-2. James plugin does nothing (user doesn't exist in James yet)
-3. Create mail account in James manually or via provisioning script
+1. Create user in LDAP with mail attribute: James reads its users from LDAP
+2. James plugin sets the quota, the aliases and the default identity, after
+   dropping the [forwards left](#forwards-left-on-an-address) on its addresses
+3. A mail added later to an existing entry is handled the same way
 4. Future mail/quota changes are synced automatically
 
 ### Scenario 2: Mail Address Change

@@ -316,73 +316,8 @@ export default class James extends TwakePlugin {
   }
 
   hooks: Hooks = {
-    ldapadddone: async (args: [string, AttributesList]) => {
-      const [dn, attributes] = args;
-
-      const mail = attributes[this.mailAttr];
-      const quota = attributes[this.quotaAttr];
-      const aliases = attributes[this.aliasAttr];
-
-      if (!mail || isGroup(attributes.objectClass)) return;
-
-      const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
-
-      // Wait for James to create the user (configurable delay)
-      if (this.initDelay > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.initDelay));
-      }
-
-      // Initialize quota if present
-      if (quota) {
-        const quotaNum = Array.isArray(quota)
-          ? Number(quota[0])
-          : Number(quota);
-        if (!isNaN(quotaNum) && quotaNum > 0) {
-          await this.callWebAdminApi(
-            'ldapadddone:quota',
-            `${this.webadminUrl}/quota/users/${mailStr}/size`,
-            'PUT',
-            dn,
-            quotaNum.toString(),
-            { mail: mailStr, quota: quotaNum },
-            USER_NOT_SEEN_YET
-          );
-        }
-      }
-
-      const aliasList = this.getAliases(aliases);
-      await Promise.all([
-        this.dropStaleForwards(
-          dn,
-          mailStr,
-          this.getAliases(attributes[this.forwardAttr])
-        ),
-        ...aliasList.map(alias => this.dropStaleForwards(dn, alias, [])),
-      ]);
-
-      // Create aliases if present (parallelize API calls)
-      if (aliasList.length > 0) {
-        await Promise.all(
-          aliasList.map(alias =>
-            this.callWebAdminApi(
-              'ldapadddone:alias',
-              `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
-              'PUT',
-              dn,
-              null,
-              { mail: mailStr, alias },
-              USER_NOT_SEEN_YET
-            )
-          )
-        );
-      }
-
-      // Initialize James identity
-      const displayName = this.getDisplayNameFromAttributes(attributes);
-      if (displayName) {
-        await this.updateJamesIdentity(dn, mailStr, displayName);
-      }
-    },
+    ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
+      this.provisionAccount(dn, attributes),
     onLdapMailChange: async (
       dn: string,
       oldmail: AttributeValue | null,
@@ -400,8 +335,8 @@ export default class James extends TwakePlugin {
           : String(newmail)
         : null;
 
-      // Skip if oldmail is empty/null (this is an add, not a change)
-      // The mailbox will be created by ldapadddone
+      // A mail gained, at an add or later, is provisioned from
+      // ldapadddone or onLdapEntryChange
       if (!oldmailStr) {
         this.logger.debug(
           `Skipping mail rename for ${dn}: oldmail is empty (mail attribute was added, not changed)`
@@ -450,14 +385,17 @@ export default class James extends TwakePlugin {
 
       // Get current aliases from LDAP and recreate them for the new mail
       try {
-        const entry = (await this.server.ldap.search(
+        const aliasesEntry = (await this.server.ldap.search(
           { paged: false, scope: 'base', attributes: [this.aliasAttr] },
           dn
         )) as SearchResult;
 
-        if (entry.searchEntries && entry.searchEntries.length > 0) {
+        if (
+          aliasesEntry.searchEntries &&
+          aliasesEntry.searchEntries.length > 0
+        ) {
           const aliases = this.getAliases(
-            entry.searchEntries[0][this.aliasAttr]
+            aliasesEntry.searchEntries[0][this.aliasAttr]
           );
 
           // Only process if user has aliases
@@ -662,11 +600,15 @@ export default class James extends TwakePlugin {
 
     // Only team mailboxes are synchronized: Twake Mail reads mailing lists
     // from LDAP, see docs/usage/plugins/integrations/james-mailboxes.md#mailing-lists
-    onLdapEntryChange: (_dn, before, after) =>
-      this.followTeamMailbox(
+    onLdapEntryChange: async (dn, before, after) => {
+      // ldapadddone provisions an entry added with its mail
+      if (before && after && !before[this.mailAttr] && after[this.mailAttr])
+        await this.provisionAccount(dn, after as AttributesList);
+      await this.followTeamMailbox(
         before as AttributesList | null,
         after as AttributesList | null
-      ),
+      );
+    },
   };
 
   /**
@@ -687,6 +629,78 @@ export default class James extends TwakePlugin {
         branch => dn === branch || dn.endsWith(',' + branch)
       ),
     };
+  }
+
+  /**
+   * Give James what an account holds: quota, aliases and identity, after
+   * dropping the forwards left on its addresses. Runs when an entry is
+   * added with a mail, or gains one.
+   */
+  private async provisionAccount(
+    dn: string,
+    attributes: AttributesList
+  ): Promise<void> {
+    const mail = attributes[this.mailAttr];
+    const quota = attributes[this.quotaAttr];
+    const aliases = attributes[this.aliasAttr];
+
+    if (!mail || isGroup(attributes.objectClass)) return;
+
+    const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+
+    // Wait for James to create the user (configurable delay)
+    if (this.initDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, this.initDelay));
+    }
+
+    // Initialize quota if present
+    if (quota) {
+      const quotaNum = Array.isArray(quota) ? Number(quota[0]) : Number(quota);
+      if (!isNaN(quotaNum) && quotaNum > 0) {
+        await this.callWebAdminApi(
+          'ldapadddone:quota',
+          `${this.webadminUrl}/quota/users/${mailStr}/size`,
+          'PUT',
+          dn,
+          quotaNum.toString(),
+          { mail: mailStr, quota: quotaNum },
+          USER_NOT_SEEN_YET
+        );
+      }
+    }
+
+    const aliasList = this.getAliases(aliases);
+    await Promise.all([
+      this.dropStaleForwards(
+        dn,
+        mailStr,
+        this.getAliases(attributes[this.forwardAttr])
+      ),
+      ...aliasList.map(alias => this.dropStaleForwards(dn, alias, [])),
+    ]);
+
+    // Create aliases if present (parallelize API calls)
+    if (aliasList.length > 0) {
+      await Promise.all(
+        aliasList.map(alias =>
+          this.callWebAdminApi(
+            'ldapadddone:alias',
+            `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
+            'PUT',
+            dn,
+            null,
+            { mail: mailStr, alias },
+            USER_NOT_SEEN_YET
+          )
+        )
+      );
+    }
+
+    // Initialize James identity
+    const displayName = this.getDisplayNameFromAttributes(attributes);
+    if (displayName) {
+      await this.updateJamesIdentity(dn, mailStr, displayName);
+    }
   }
 
   /**
@@ -1052,8 +1066,21 @@ export default class James extends TwakePlugin {
           headers: this.createHeaders(),
         })
       );
-      // 404: no forward
-      if (!res.ok) return;
+      if (!res.ok) {
+        // 404: no forward
+        if (res.status !== 404)
+          this.logger.warn({
+            plugin: this.name,
+            event: 'dropStaleForward',
+            result: 'error',
+            dn,
+            address,
+            step: 'list_forwards',
+            http_status: res.status,
+            http_status_text: res.statusText,
+          });
+        return;
+      }
       const kept = keep.map(k => k.toLowerCase());
       targets = ((await res.json()) as { mailAddress: string }[])
         .map(t => t.mailAddress)
