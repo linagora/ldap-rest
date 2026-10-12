@@ -44,6 +44,7 @@ import {
 import type { Schema } from '../config/schema';
 import {
   checkDnValues,
+  localizedText,
   missingRequiredAttribute,
   modifiedAttributeNames,
   neverReturnAttributes,
@@ -423,6 +424,18 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
+   * Attributes to ask for when reading one entry. `*` brings the user
+   * attributes only: an operational one the schema declares, such as
+   * `memberOf`, comes back only when named. A name the directory does not
+   * define is ignored by it.
+   *
+   * @returns attribute list
+   */
+  protected entryAttributes(): string[] {
+    return ['*', ...Object.keys(this.schema?.attributes ?? {})];
+  }
+
+  /**
    * Remove the `neverReturn` attributes from an entry about to be serialised.
    * LDAP attribute names are case-insensitive and may carry options
    * (`userPassword;binary`), so both are normalised before comparison.
@@ -583,14 +596,15 @@ export default abstract class LdapFlat extends DmPlugin {
    * When the schema carries a `hint`, the message says what a valid value
    * looks like instead of only that this one was not. The hint lives next to
    * the pattern so the two cannot drift apart, and so a client can show it
-   * under the field *before* the user gets it wrong.
+   * under the field *before* the user gets it wrong. Its English text is
+   * quoted, the language of every other API message.
    *
    * @param field attribute name
    * @returns message for a `BadRequestError`
    */
   protected invalidValueMessage(field: string): string {
     const attr = this.schema?.attributes[field];
-    const hint = attr?.hint || attr?.items?.hint;
+    const hint = localizedText(attr?.hint || attr?.items?.hint);
     return hint
       ? `Invalid value for attribute "${field}": ${hint}`
       : `Invalid value for attribute "${field}"`;
@@ -1106,7 +1120,7 @@ export default abstract class LdapFlat extends DmPlugin {
     try {
       const dn = this.resolveDn(id);
       const result = (await this.ldap.search(
-        { paged: false, scope: 'base' },
+        { paged: false, scope: 'base', attributes: this.entryAttributes() },
         dn,
         req
       )) as SearchResult;

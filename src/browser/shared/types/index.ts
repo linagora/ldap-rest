@@ -3,6 +3,12 @@
  * @module browser/shared/types
  */
 
+/**
+ * Text of a schema in one language (a plain string) or several (a map keyed
+ * by language tag), see `localizedText`
+ */
+export type LocalizedText = string | Record<string, string>;
+
 export interface EditorConfig {
   ldapBase?: string;
   features?: {
@@ -31,13 +37,14 @@ export interface SchemaAttribute {
   type: 'string' | 'number' | 'integer' | 'array' | 'pointer';
   required?: boolean;
   fixed?: boolean;
+  role?: string | string[];
   default?: unknown;
   branch?: string[];
   items?: {
     type: string;
     branch?: string[];
   };
-  group?: string;
+  group?: LocalizedText;
 }
 
 export interface PointerOption {

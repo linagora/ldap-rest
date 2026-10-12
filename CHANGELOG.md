@@ -9,6 +9,12 @@
   its `LDAPMailingList` mailet. The address groups already created stay in
   James and must be deleted,
   [notes](docs/usage/upgrading.md#mailing-lists-are-no-longer-copied-to-james)
+- Twake schemas: field hints and form section names (`hint`, `group`) are in
+  English and French, as maps keyed by language tag like `label`; any schema
+  may now write them so. The server quotes the English hint in its refusals. A
+  client reading them as plain strings must be upgraded,
+  [notes](docs/usage/upgrading.md#the-twake-schemas-translate-their-hints-and-form-sections),
+  [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 
 ### Fixes
 
@@ -20,6 +26,19 @@
 - `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any
   entry under the base, as `member` does, instead of only the direct children
   of the base; a group owned by an account could not be saved
+- `ldap/groups`: adding a member, or creating a group with one, that does not
+  exist answers 400 naming it instead of 500 "check logs",
+  [docs](docs/client-development/api/rest-api.md#add-group-member)
+- Twake nomenclature schemas (account states, delivery modes, list types,
+  group types, titles): `cn` and `description` carry English and French
+  labels; a console headed their lists "Cn"
+- `twake/nomenclature/twakeDomain.json`: `associatedDomain` also has the
+  `displayName` role, so a client can name a mail domain `example.com` rather
+  than by its identifier `example`
+- Flat entities: reading one entry returns the operational attributes its
+  schema declares, such as the `memberOf` of a Twake account, when the
+  directory computes them,
+  [docs](docs/usage/plugins/ldap/flat-generic.md#attributes-a-client-may-not-send)
 
 ## v0.17.1 (2026-10-10)
 

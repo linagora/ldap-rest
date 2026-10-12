@@ -25,7 +25,10 @@
       "type": "string",
       "searchable": true,
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 ()&/,.'’_-]{0,254}$",
-      "hint": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
+      "hint": {
+        "en": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
+        "fr": "Lettres, chiffres, espaces et ( ) & / , . ' - _, en commençant par une lettre ou un chiffre"
+      },
       "required": true,
       "unique": true,
       "role": "identifier",

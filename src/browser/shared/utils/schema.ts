@@ -3,7 +3,7 @@
  * @module browser/shared/utils/schema
  */
 
-import type { PointerOption } from '../types';
+import type { LocalizedText, PointerOption, SchemaAttribute } from '../types';
 
 /**
  * Cache for pointer options to avoid repeated API calls
@@ -148,4 +148,40 @@ export async function loadSchema<T = unknown>(
     return (await response.json()) as T;
   }
   return schemaSource;
+}
+
+/**
+ * Tell whether an attribute carries a role: a schema names one, or several.
+ *
+ * @param attr attribute definition
+ * @param role role to look for
+ * @returns true when the attribute declares that role
+ */
+export function hasRole(
+  attr: Pick<SchemaAttribute, 'role'> | undefined,
+  role: string
+): boolean {
+  const roles = attr?.role;
+  return Array.isArray(roles) ? roles.includes(role) : roles === role;
+}
+
+/**
+ * Pick the text of a {@link LocalizedText} for a language: the exact tag,
+ * then its primary language, then English, then whatever the map holds.
+ *
+ * The editors are written in English, so English is the default.
+ *
+ * @param text plain string or map keyed by language tag
+ * @param language tag to look for
+ * @returns the text, or undefined when there is none
+ */
+export function localizedText(
+  text: LocalizedText | undefined,
+  language = 'en'
+): string | undefined {
+  if (text === undefined || text === null) return undefined;
+  if (typeof text === 'string') return text || undefined;
+  const primary = language.split('-')[0].toLowerCase();
+  for (const key of [language, primary, 'en']) if (text[key]) return text[key];
+  return Object.values(text).find(Boolean);
 }

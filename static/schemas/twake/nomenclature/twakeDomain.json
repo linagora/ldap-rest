@@ -29,7 +29,10 @@
     "dc": {
       "type": "string",
       "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$",
-      "hint": "A single domain label: letters, digits and hyphens, e.g. example",
+      "hint": {
+        "en": "A single domain label: letters, digits and hyphens, e.g. example",
+        "fr": "Un seul élément de nom de domaine : lettres, chiffres et tirets, par ex. example"
+      },
       "required": true,
       "role": "identifier",
       "label": {
@@ -40,9 +43,12 @@
     "associatedDomain": {
       "type": "string",
       "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$|^\\*$",
-      "hint": "A fully qualified domain name (example.org), or * to allow every domain",
+      "hint": {
+        "en": "A fully qualified domain name (example.org), or * to allow every domain",
+        "fr": "Un nom de domaine complet (example.org), ou * pour autoriser tous les domaines"
+      },
       "required": true,
-      "role": "domainName",
+      "role": ["domainName", "displayName"],
       "label": {
         "en": "Mail domain",
         "fr": "Domaine de messagerie"

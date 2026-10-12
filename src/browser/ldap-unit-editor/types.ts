@@ -2,6 +2,8 @@
  * TypeScript types for LDAP Unit Editor
  */
 
+import type { LocalizedText } from '../shared/types';
+
 export interface UnitEditorOptions {
   containerId: string;
   apiBaseUrl?: string;
@@ -50,7 +52,7 @@ export interface SchemaAttribute {
     type: string;
     branch?: string[];
   };
-  group?: string;
+  group?: LocalizedText;
 }
 
 export interface LdapUnit {

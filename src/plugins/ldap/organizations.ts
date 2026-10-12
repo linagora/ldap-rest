@@ -44,6 +44,7 @@ import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
   checkDnValues,
+  localizedText,
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
@@ -1326,14 +1327,14 @@ export default class LdapOrganizations extends DmPlugin {
   /**
    * Build the rejection message for a value that failed its schema `test`,
    * quoting the `hint` when the schema carries one so the answer says what a
-   * valid value looks like.
+   * valid value looks like, in English as every other API message.
    *
    * @param field attribute name
    * @returns message for a `BadRequestError`
    */
   invalidValueMessage(field: string): string {
     const attr = this.schema?.attributes[field];
-    const hint = attr?.hint || attr?.items?.hint;
+    const hint = localizedText(attr?.hint || attr?.items?.hint);
     return hint
       ? `Invalid value for field ${field}: ${hint}`
       : `Invalid value for field ${field}`;

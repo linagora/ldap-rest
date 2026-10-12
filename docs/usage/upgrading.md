@@ -23,6 +23,17 @@ them: `GET /address/groups` lists the address groups,
 `--james-mailing-list-branches` now only keeps team mailboxes out of these
 branches.
 
+### The Twake schemas translate their hints and form sections
+
+**Who is affected:** a deployment serving the shipped Twake schemas
+(`twake/*.json`, or a schema extending one) to a client that reads `hint` or
+`group` as a plain string.
+
+These are now maps keyed by language tag, as `label` already was:
+`{ "en": "Mailbox Settings", "fr": "Paramètres de messagerie" }`. Such a client
+shows them as `[object Object]`, or not at all: upgrade it along with the
+server.
+
 ## To 0.17.0
 
 ### The quota attribute defaults to `mailQuotaSize`

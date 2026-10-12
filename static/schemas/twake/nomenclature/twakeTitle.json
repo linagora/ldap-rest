@@ -63,11 +63,19 @@
     "cn": {
       "type": "string",
       "test": "^[a-zA-Z][a-zA-Z0-9 .]+$",
-      "required": true
+      "required": true,
+      "label": {
+        "en": "Name",
+        "fr": "Nom"
+      }
     },
     "description": {
       "type": "string",
-      "required": false
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description"
+      }
     }
   }
 }

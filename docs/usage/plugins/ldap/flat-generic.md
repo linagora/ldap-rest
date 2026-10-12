@@ -141,9 +141,10 @@ Fixed attributes:
 
 ### Naming things, in the reader's language
 
-`label` is what a client shows instead of the attribute name, and `entity.label`
-/ `entity.singularLabel` are what it calls the collection and one of its
-entries. Each may be a plain string, or a map keyed by language tag:
+`label` is what a client shows instead of the attribute name, `group` the form
+section it shows the attribute in, and `entity.label` / `entity.singularLabel`
+are what it calls the collection and one of its entries. Each, and `hint`
+below, may be a plain string, or a map keyed by language tag:
 
 ```json
 {
@@ -159,6 +160,11 @@ entries. Each may be a plain string, or a map keyed by language tag:
       "type": "pointer",
       "role": "organizationLink",
       "label": { "en": "Department", "fr": "Organisation" }
+    },
+    "mailQuotaSize": {
+      "type": "string",
+      "group": { "en": "Mailbox Settings", "fr": "Paramètres de messagerie" },
+      "label": { "en": "Mailbox size", "fr": "Taille de boîte" }
     }
   }
 }
@@ -202,14 +208,19 @@ type, before they get it wrong:
   "telephoneNumber": {
     "type": "string",
     "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
-    "hint": "Expected pattern (+99) 999 9999"
+    "hint": {
+      "en": "Expected pattern (+99) 999 9999",
+      "fr": "Format attendu : (+99) 999 9999"
+    }
   }
 }
 ```
 
 The hint travels with the schema, so a client shows it under the field and the
 server repeats it when it rejects a value — the pattern and its explanation
-cannot drift apart, and neither is hardcoded in the interface.
+cannot drift apart, and neither is hardcoded in the interface. A translated
+hint is picked like a label; the server's messages are in English, so it
+quotes the English text.
 
 ### Attributes a client may not send
 
@@ -220,6 +231,13 @@ cannot drift apart, and neither is hardcoded in the interface.
 
 Both restrict the **request body** only: the core and its plugins still write
 these attributes.
+
+The read of one entry (`GET /api/v1/ldap/{resource}/{id}`) asks the directory
+for every attribute the schema declares besides the usual ones, so an
+operational attribute such as `memberOf` is returned when the directory
+computes it — with OpenLDAP, when the `memberof` overlay is configured for the
+group class and member attribute in use (`groupOfNames` and `member` for the
+Twake schemas). Lists return the usual attributes only.
 
 ### Attributes a client never receives
 

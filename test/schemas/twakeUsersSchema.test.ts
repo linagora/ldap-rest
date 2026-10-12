@@ -25,10 +25,19 @@ describe('Twake schemas', () => {
     groups = read('twake/groups.json');
     organizations = read('twake/organizations.json');
     domains = read('twake/nomenclature/twakeDomain.json');
-    // The nomenclature schemas reach a reader through the same selects and
-    // the same cards; leaving them out of the check left two attributes
-    // showing their own name in English.
-    labelled = [users, groups, organizations, domains];
+    // The nomenclature schemas reach a reader through the same selects, lists
+    // and cards.
+    labelled = [
+      users,
+      groups,
+      organizations,
+      ...fs
+        .readdirSync(
+          path.join(__dirname, '../../static/schemas/twake/nomenclature')
+        )
+        .filter(file => file.endsWith('.json'))
+        .map(file => read(`twake/nomenclature/${file}`)),
+    ];
   });
 
   describe('semantic roles', () => {
@@ -229,6 +238,27 @@ describe('Twake schemas', () => {
         }
       }
       expect(missing).to.deep.equal([]);
+    });
+
+    it('should translate the hints and form sections, as the labels', () => {
+      const dir = path.join(__dirname, '../../static/schemas');
+      const files = fs
+        .readdirSync(path.join(dir, 'twake'), { recursive: true })
+        .map(String)
+        .filter(file => file.endsWith('.json'));
+      const untranslated: string[] = [];
+      for (const file of files) {
+        const schema = read(`twake/${file}`);
+        for (const [name, attr] of Object.entries(schema.attributes))
+          for (const [key, text] of [
+            ['hint', attr.hint],
+            ['items.hint', attr.items?.hint],
+            ['group', attr.group],
+          ] as [string, LocalizedText | undefined][])
+            if (text && (typeof text === 'string' || !text.en || !text.fr))
+              untranslated.push(`${file}: ${name}.${key}`);
+      }
+      expect(untranslated).to.deep.equal([]);
     });
   });
 });

@@ -273,6 +273,45 @@ describe('Browser Resource API Client', () => {
       expect(result[0].label).to.equal('User One');
     });
 
+    it('should label by a displayName role listed among several', async () => {
+      const branch = 'ou=domains,${LDAP_BASE}';
+      nock(baseUrl)
+        .get('/api/v1/config')
+        .reply(200, {
+          features: {
+            ldapFlatGeneric: {
+              flatResources: [
+                {
+                  base: branch,
+                  mainAttribute: 'dc',
+                  schemaUrl: '/static/schemas/domains.json',
+                  endpoints: { list: '/api/v1/ldap/domains' },
+                },
+              ],
+            },
+          },
+        });
+      nock(baseUrl)
+        .get('/static/schemas/domains.json')
+        .reply(200, {
+          attributes: {
+            associatedDomain: { role: ['domainName', 'displayName'] },
+          },
+        });
+      nock(baseUrl)
+        .get('/api/v1/ldap/domains')
+        .reply(200, [
+          {
+            dn: `dc=example,${branch}`,
+            dc: 'example',
+            associatedDomain: 'example.com',
+          },
+        ]);
+
+      const result = await client.getPointerOptions(branch);
+      expect(result.map(option => option.label)).to.deep.equal(['example.com']);
+    });
+
     it('should handle missing config gracefully', async () => {
       const branch = 'ou=unknown,${LDAP_BASE}';
       const mockConfig = {

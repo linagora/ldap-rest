@@ -56,7 +56,7 @@ import type {
   SchemaAttribute,
   UniqueConstraint,
 } from '../../config/schema';
-import { hasRole, roleAttribute } from '../../config/schema';
+import { hasRole, localizedText, roleAttribute } from '../../config/schema';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -173,6 +173,19 @@ function asDn(value: string): string {
   } catch {
     return value;
   }
+}
+
+/**
+ * Refusal of a value, quoting the English text of the attribute's `hint`, the
+ * language of every other API message.
+ *
+ * @param name attribute name
+ * @param attr its schema definition
+ * @returns message for a `BadRequestError`
+ */
+function invalidValueMessage(name: string, attr: SchemaAttribute): string {
+  const hint = localizedText(attr.hint);
+  return `Invalid value for attribute "${name}"${hint ? `: ${hint}` : ''}`;
 }
 
 /**
@@ -621,9 +634,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
             ? list.map(v => String(parseByteSize(v)))
             : String(parseByteSize(list[0]));
         } catch {
-          throw new BadRequestError(
-            `Invalid value for attribute "${name}"${attr.hint ? `: ${attr.hint}` : ''}`
-          );
+          throw new BadRequestError(invalidValueMessage(name, attr));
         }
       }
     }
@@ -905,9 +916,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     for (const value of values) {
       const date = parseDirectoryDate(value);
       if (!date) {
-        throw new BadRequestError(
-          `Invalid value for attribute "${name}"${attr.hint ? `: ${attr.hint}` : ''}`
-        );
+        throw new BadRequestError(invalidValueMessage(name, attr));
       }
       if (date.getTime() < startOfToday) {
         throw new BadRequestError(

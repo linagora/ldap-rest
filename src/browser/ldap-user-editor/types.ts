@@ -2,6 +2,8 @@
  * LDAP User Editor - Type definitions
  */
 
+import type { LocalizedText } from '../shared/types';
+
 export interface EditorOptions {
   containerId: string;
   apiBaseUrl?: string;
@@ -18,13 +20,13 @@ export interface SchemaAttribute {
   type: string;
   required?: boolean;
   fixed?: boolean;
-  role?: string;
+  role?: string | string[];
   test?: string;
   branch?: string[];
   items?: SchemaAttribute;
   default?: unknown;
   ui?: 'select' | 'search'; // For pointer fields: select (load all) or search (autocomplete)
-  group?: string; // Group name for organizing fields in the UI
+  group?: LocalizedText;
 }
 
 export interface Schema {
