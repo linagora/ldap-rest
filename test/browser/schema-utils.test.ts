@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 
-import { localizedText as serverText } from '../../src/config/schema';
+import {
+  hasRole as serverHasRole,
+  localizedText as serverText,
+  type SchemaAttribute,
+} from '../../src/config/schema';
 import {
   hasRole,
   localizedText as browserText,
@@ -16,6 +20,22 @@ describe('Browser schema utils', () => {
       expect(hasRole({}, 'displayName')).to.be.false;
       expect(hasRole(undefined, 'displayName')).to.be.false;
     });
+
+    // A copy of the server's, for the same reason as localizedText below
+    for (const role of [
+      undefined,
+      'displayName',
+      'identifier',
+      ['domainName', 'displayName'],
+      ['domainName'],
+      [],
+    ])
+      it(`agrees with the server for ${JSON.stringify(role)}`, () => {
+        const attr = { type: 'string', role } as SchemaAttribute;
+        expect(hasRole(attr, 'displayName')).to.equal(
+          serverHasRole(attr, 'displayName')
+        );
+      });
   });
 
   // The browser build cannot import the server's module: the two copies

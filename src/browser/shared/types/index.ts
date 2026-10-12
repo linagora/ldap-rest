@@ -37,6 +37,7 @@ export interface SchemaAttribute {
   type: 'string' | 'number' | 'integer' | 'array' | 'pointer';
   required?: boolean;
   fixed?: boolean;
+  role?: string | string[];
   default?: unknown;
   branch?: string[];
   items?: {

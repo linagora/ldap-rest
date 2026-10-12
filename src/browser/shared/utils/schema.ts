@@ -3,7 +3,7 @@
  * @module browser/shared/utils/schema
  */
 
-import type { LocalizedText, PointerOption } from '../types';
+import type { LocalizedText, PointerOption, SchemaAttribute } from '../types';
 
 /**
  * Cache for pointer options to avoid repeated API calls
@@ -158,7 +158,7 @@ export async function loadSchema<T = unknown>(
  * @returns true when the attribute declares that role
  */
 export function hasRole(
-  attr: { role?: string | string[] } | undefined,
+  attr: Pick<SchemaAttribute, 'role'> | undefined,
   role: string
 ): boolean {
   const roles = attr?.role;
