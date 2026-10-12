@@ -37,7 +37,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[a-zA-Z]+=[a-zA-Z][a-zA-Z0-9-]*,__LDAP_BASE__$"
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$"
       },
       "required": false
     },

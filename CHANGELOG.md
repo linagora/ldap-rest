@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any
+  entry under the base, as `member` does, instead of only the direct children
+  of the base; a group owned by an account could not be saved
+
 ## v0.17.1 (2026-10-10)
 
 ### Fixes
