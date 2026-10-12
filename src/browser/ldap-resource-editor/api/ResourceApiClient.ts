@@ -10,6 +10,7 @@ import type {
   ResourceType,
 } from '../types';
 import { CacheManager } from '../cache/CacheManager';
+import { hasRole } from '../../shared/utils/schema';
 
 export class ResourceApiClient {
   private baseUrl: string;
@@ -246,7 +247,7 @@ export class ResourceApiClient {
           try {
             const schema = await this.getSchema(resource.schemaUrl);
             const displayField = Object.entries(schema.attributes).find(
-              ([, attr]) => attr.role === 'displayName'
+              ([, attr]) => hasRole(attr, 'displayName')
             );
             if (displayField) {
               displayNameField = displayField[0];

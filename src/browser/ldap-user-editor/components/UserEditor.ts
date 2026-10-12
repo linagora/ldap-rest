@@ -6,7 +6,7 @@ import type { LdapUser, Schema, SchemaAttribute } from '../types';
 import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
 import { MoveUserModal } from './MoveUserModal';
-import { localizedText } from '../../shared/utils/schema';
+import { hasRole, localizedText } from '../../shared/utils/schema';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -133,8 +133,8 @@ export class UserEditor {
   private getFieldByRole(role: string): string {
     if (!this.schema || !this.user) return '';
 
-    const field = Object.entries(this.schema.attributes).find(
-      ([, attr]) => attr.role === role
+    const field = Object.entries(this.schema.attributes).find(([, attr]) =>
+      hasRole(attr, role)
     );
 
     if (!field) return '';
@@ -254,12 +254,15 @@ export class UserEditor {
     }
 
     // Hide organizationLink and organizationPath fields - use Move button instead
-    if (attr.role === 'organizationLink' || attr.role === 'organizationPath') {
+    if (
+      hasRole(attr, 'organizationLink') ||
+      hasRole(attr, 'organizationPath')
+    ) {
       return '';
     }
 
     // Show identifier fields as disabled
-    if (attr.role === 'identifier') {
+    if (hasRole(attr, 'identifier')) {
       return this.renderIdentifierField(fieldName);
     }
 
@@ -593,7 +596,7 @@ export class UserEditor {
 
     // Find the organizationLink field to get current organization
     const orgLinkField = Object.entries(this.schema.attributes).find(
-      ([, attr]) => attr.role === 'organizationLink'
+      ([, attr]) => hasRole(attr, 'organizationLink')
     );
 
     if (!orgLinkField) {

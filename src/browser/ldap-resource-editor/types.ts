@@ -25,7 +25,7 @@ export interface SchemaAttribute {
   type: string;
   required?: boolean;
   fixed?: boolean;
-  role?: string;
+  role?: string | string[];
   test?: string;
   branch?: string[];
   items?: SchemaAttribute;

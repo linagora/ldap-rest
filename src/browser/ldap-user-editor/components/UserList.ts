@@ -5,6 +5,7 @@
 
 import type { LdapUser, Schema, Config } from '../types';
 import type { UserApiClient } from '../api/UserApiClient';
+import { hasRole } from '../../shared/utils/schema';
 
 export class UserList {
   private container: HTMLElement;
@@ -133,8 +134,8 @@ export class UserList {
   private getFieldNameByRole(role: string): string | null {
     if (!this.schema) return null;
 
-    const field = Object.entries(this.schema.attributes).find(
-      ([, attr]) => attr.role === role
+    const field = Object.entries(this.schema.attributes).find(([, attr]) =>
+      hasRole(attr, role)
     );
 
     return field ? field[0] : null;

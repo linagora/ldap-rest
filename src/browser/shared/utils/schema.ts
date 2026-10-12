@@ -151,6 +151,21 @@ export async function loadSchema<T = unknown>(
 }
 
 /**
+ * Tell whether an attribute carries a role: a schema names one, or several.
+ *
+ * @param attr attribute definition
+ * @param role role to look for
+ * @returns true when the attribute declares that role
+ */
+export function hasRole(
+  attr: { role?: string | string[] } | undefined,
+  role: string
+): boolean {
+  const roles = attr?.role;
+  return Array.isArray(roles) ? roles.includes(role) : roles === role;
+}
+
+/**
  * Pick the text of a {@link LocalizedText} for a language: the exact tag,
  * then its primary language, then English, then whatever the map holds.
  *
