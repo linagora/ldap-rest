@@ -32,6 +32,10 @@
 - Twake nomenclature schemas (account states, delivery modes, list types,
   group types, titles): `cn` and `description` carry English and French
   labels; a console headed their lists "Cn"
+- Flat entities: reading one entry returns the operational attributes its
+  schema declares, such as the `memberOf` of a Twake account, when the
+  directory computes them,
+  [docs](docs/usage/plugins/ldap/flat-generic.md#attributes-a-client-may-not-send)
 
 ## v0.17.1 (2026-10-10)
 

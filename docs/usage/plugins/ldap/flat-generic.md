@@ -232,6 +232,13 @@ quotes the English text.
 Both restrict the **request body** only: the core and its plugins still write
 these attributes.
 
+The read of one entry (`GET /api/v1/ldap/{resource}/{id}`) asks the directory
+for every attribute the schema declares besides the usual ones, so an
+operational attribute such as `memberOf` is returned when the directory
+computes it — with OpenLDAP, when the `memberof` overlay is configured for the
+group class and member attribute in use (`groupOfNames` and `member` for the
+Twake schemas). Lists return the usual attributes only.
+
 ### Attributes a client never receives
 
 `neverReturn` strips an attribute from every API answer while leaving it

@@ -424,6 +424,18 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
+   * Attributes to ask for when reading one entry. `*` brings the user
+   * attributes only: an operational one the schema declares, such as
+   * `memberOf`, comes back only when named. A name the directory does not
+   * define is ignored by it.
+   *
+   * @returns attribute list
+   */
+  protected entryAttributes(): string[] {
+    return ['*', ...Object.keys(this.schema?.attributes ?? {})];
+  }
+
+  /**
    * Remove the `neverReturn` attributes from an entry about to be serialised.
    * LDAP attribute names are case-insensitive and may carry options
    * (`userPassword;binary`), so both are normalised before comparison.
@@ -1108,7 +1120,7 @@ export default abstract class LdapFlat extends DmPlugin {
     try {
       const dn = this.resolveDn(id);
       const result = (await this.ldap.search(
-        { paged: false, scope: 'base' },
+        { paged: false, scope: 'base', attributes: this.entryAttributes() },
         dn,
         req
       )) as SearchResult;
