@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import type { Schema } from '../../src/config/schema';
+import { roleAttribute } from '../../src/config/schema';
 
 /**
  * A nomenclature schema file, typed with the entity fields this test reads
@@ -96,6 +97,14 @@ describe('Twake nomenclature schemas', () => {
       });
     });
   }
+
+  it('names a domain by its domain name, having no valueLabels', () => {
+    // `dc=example` is what a pointer to the domain holds; `example.com` is
+    // what a reader knows it by.
+    const schema = readSchema('twakeDomain.json');
+    expect(roleAttribute(schema, 'displayName')).to.equal('associatedDomain');
+    expect(roleAttribute(schema, 'domainName')).to.equal('associatedDomain');
+  });
 
   it('carries valueLabels for every nomenclature enumerating fixed states', () => {
     const missing = enumerating.filter(

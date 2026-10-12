@@ -32,6 +32,9 @@
 - Twake nomenclature schemas (account states, delivery modes, list types,
   group types, titles): `cn` and `description` carry English and French
   labels; a console headed their lists "Cn"
+- `twake/nomenclature/twakeDomain.json`: `associatedDomain` also has the
+  `displayName` role, so a client can name a mail domain `example.com` rather
+  than by its identifier `example`
 - Flat entities: reading one entry returns the operational attributes its
   schema declares, such as the `memberOf` of a Twake account, when the
   directory computes them,

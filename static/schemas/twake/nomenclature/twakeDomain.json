@@ -48,7 +48,7 @@
         "fr": "Un nom de domaine complet (example.org), ou * pour autoriser tous les domaines"
       },
       "required": true,
-      "role": "domainName",
+      "role": ["domainName", "displayName"],
       "label": {
         "en": "Mail domain",
         "fr": "Domaine de messagerie"
