@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `twake/james` no longer copies `--forward-attribute` to Twake Mail's
+  forwards, which users set there; `--james-sync-forwards` brings it back,
+  [notes](docs/usage/upgrading.md#forwards-are-no-longer-copied-to-twake-mail)
+
 ### Features
 
 - Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
@@ -18,9 +24,6 @@
   direct children of the branch are external members. The member DN is
   compared as a DN: the attribute name and the branch may be written in any
   case
-
-### Fixes
-
 - `twake/james`: a renamed account gets its default identity back, with the
   signatures of the old one, instead of keeping only the server-set identity,
   [docs](docs/usage/plugins/integrations/james-mail.md#mail-address-changes)
@@ -30,9 +33,6 @@
   [docs](docs/usage/plugins/integrations/james-mail.md#forwards-left-on-an-address)
 - `twake/james`: an entry that gains a mail by a modify gets its quota,
   aliases and identity in James, as an entry added with one
-
-### Fixes
-
 - `twake/james`: team mailboxes are created in TMail: the plugin sent the
   whole address where TMail expects its local part. An address TMail cannot
   name a team mailbox after, such as one with a dot, is logged,

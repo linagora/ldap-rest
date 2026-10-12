@@ -503,6 +503,9 @@ export default class James extends TwakePlugin {
       oldForwards: string[],
       newForwards: string[]
     ) => {
+      // Users set their forwards in Twake Mail, see
+      // docs/usage/plugins/integrations/james-mail.md#forwards
+      if (!this.config.james_sync_forwards) return;
       if (await this.isGroupDn(dn)) return;
       const domain = this.extractMailDomain(mail);
       if (!domain) {

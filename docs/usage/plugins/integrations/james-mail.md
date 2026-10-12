@@ -39,6 +39,8 @@ DM_JAMES_WEBADMIN_TOKEN="your-admin-token"
 - `--mail-attribute`: LDAP attribute for email (default: `mail`)
 - `--quota-attribute`: LDAP attribute for quota (default: `mailQuotaSize`)
 - `--alias-attribute`: LDAP attribute for email aliases (default: `mailAlternateAddress`)
+- `--forward-attribute`: LDAP attribute for forwards (default: `mailForwardingAddress`)
+- `--james-sync-forwards`: copy that attribute to Twake Mail's forwards (default: `false`), see [Forwards](#forwards)
 - `--james-mailbox-type-attribute`: LDAP attribute for mailbox type (default: `twakeMailboxType`)
 - `--james-retry-attempts`: attempts in all of a call about a user James may not see yet (default: `5`), see [Replication lag](#replication-lag)
 - `--james-retry-delay`: base delay between those attempts, in ms (default: `1000`); the total wait is delay × n(n−1)/2 for n attempts
@@ -135,6 +137,25 @@ When a user's quota changes:
 
    5000000000
    ```
+
+### Forwards
+
+Forwards are a setting of the user in Twake Mail, beside "keep a copy in my
+mailbox", and Twake Mail Admin can change them too. The plugin leaves them
+alone by default.
+
+With `--james-sync-forwards`, the directory owns them: each change of
+`--forward-attribute` is applied to Twake Mail, and overwrites what the user
+set there.
+
+```http
+PUT /address/forwards/jdoe@company.com/targets/john@partner.com
+DELETE /address/forwards/jdoe@company.com/targets/old@partner.com
+```
+
+Only the change is applied: a forward the user added in Twake Mail stays
+until the directory names it and removes it, and the directory is never told
+about the forwards set in Twake Mail.
 
 ### Display Name and Identity
 
