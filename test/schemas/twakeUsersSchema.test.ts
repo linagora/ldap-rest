@@ -25,10 +25,19 @@ describe('Twake schemas', () => {
     groups = read('twake/groups.json');
     organizations = read('twake/organizations.json');
     domains = read('twake/nomenclature/twakeDomain.json');
-    // The nomenclature schemas reach a reader through the same selects and
-    // the same cards; leaving them out of the check left two attributes
-    // showing their own name in English.
-    labelled = [users, groups, organizations, domains];
+    // The nomenclature schemas reach a reader through the same selects, lists
+    // and cards.
+    labelled = [
+      users,
+      groups,
+      organizations,
+      ...fs
+        .readdirSync(
+          path.join(__dirname, '../../static/schemas/twake/nomenclature')
+        )
+        .filter(file => file.endsWith('.json'))
+        .map(file => read(`twake/nomenclature/${file}`)),
+    ];
   });
 
   describe('semantic roles', () => {

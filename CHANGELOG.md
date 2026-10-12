@@ -23,6 +23,9 @@
 - `ldap/groups`: adding a member, or creating a group with one, that does not
   exist answers 400 naming it instead of 500 "check logs",
   [docs](docs/client-development/api/rest-api.md#add-group-member)
+- Twake nomenclature schemas (account states, delivery modes, list types,
+  group types, titles): `cn` and `description` carry English and French
+  labels; a console headed their lists "Cn"
 
 ## v0.17.1 (2026-10-10)
 
