@@ -103,7 +103,8 @@ When a user's mail attribute changes:
 The forward a rename leaves outlives the account. When an address becomes the
 `mail` or an alias of an account, at its creation, a rename, a mail added to
 an existing entry or an alias add, the plugin removes the forwards James holds
-from it, except the entry's own (`--forward-attribute`):
+from it, except the entry's own when the directory owns forwards
+(`--forward-attribute`, with `--james-sync-forwards`):
 
 ```http
 GET /address/forwards/old@company.com
@@ -141,8 +142,11 @@ When a user's quota changes:
 ### Forwards
 
 Forwards are a setting of the user in Twake Mail, beside "keep a copy in my
-mailbox", and Twake Mail Admin can change them too. The plugin leaves them
-alone by default.
+mailbox", and Twake Mail Admin can change them too. By default the plugin
+does not copy `--forward-attribute` to them. It still removes the
+[forwards left](#forwards-left-on-an-address) on an address an account takes:
+Twake Mail keeps a user's forwards under their own address, and none can have
+been set on an address the account is only now taking.
 
 With `--james-sync-forwards`, the directory owns them: each change of
 `--forward-attribute` is applied to Twake Mail, and overwrites what the user

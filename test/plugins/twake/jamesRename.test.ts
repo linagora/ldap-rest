@@ -49,6 +49,7 @@ describe('James Plugin - rename leftovers', () => {
     await dm?.ldap.delete(dn).catch(() => undefined);
     calls = [];
     james = {};
+    if (dm) dm.config.james_sync_forwards = false;
   });
 
   after(async () => {
@@ -112,6 +113,8 @@ describe('James Plugin - rename leftovers', () => {
   });
 
   it('drops the forwards a former owner left on the address an account takes', async () => {
+    // The entry's own forward is kept when the directory owns forwards
+    dm.config.james_sync_forwards = true;
     await dm.ldap.add(dn, entry);
     await waitFor(
       () => calls.filter(c => c.call.startsWith('POST /users/')).length >= 1,
@@ -141,6 +144,7 @@ describe('James Plugin - rename leftovers', () => {
   });
 
   it('drops them on an add, and on an alias before it is added', async () => {
+    dm.config.james_sync_forwards = true;
     james['/address/forwards/jr-old@test.org'] = [
       200,
       [{ mailAddress: 'gone@test.org' }, { mailAddress: 'jr-own@test.org' }],
@@ -221,5 +225,49 @@ describe('James Plugin - rename leftovers', () => {
     expect(calls.map(c => c.call).filter(c => c.includes('/rename/'))).to.eql(
       []
     );
+  });
+
+  it('leaves the forwards of the user to Twake Mail by default', async () => {
+    await dm.ldap.add(dn, entry);
+    await waitFor(
+      () => calls.filter(c => c.call.startsWith('POST /users/')).length >= 1,
+      { what: 'the identity of the add' }
+    );
+    await new Promise(resolve => setTimeout(resolve, 200));
+    calls = [];
+    // Set by the user in Twake Mail, on the address they hold
+    james['/address/forwards/jr-old@test.org'] = [
+      200,
+      [{ mailAddress: 'mine@partner.org' }],
+    ];
+    james['/address/forwards/jr-new@test.org'] = [
+      200,
+      [
+        { mailAddress: 'someone-else@test.org' },
+        { mailAddress: 'jr-own@test.org' },
+      ],
+    ];
+
+    await dm.ldap.modify(dn, {
+      replace: {
+        mail: 'jr-new@test.org',
+        mailForwardingAddress: ['jr-own@test.org', 'other@test.org'],
+      },
+    });
+    await waitFor(() => seen('POST /users/jr-new@test.org/identities') >= 0, {
+      what: 'the end of the rename',
+    });
+
+    const forwards = calls
+      .map(c => c.call)
+      .filter(c => c.includes('/address/forwards/'));
+    // The address taken loses all it held, what the attribute names
+    // included; the user's own address and its forwards are not touched,
+    // and the attribute is not copied
+    expect(forwards.sort()).to.deep.equal([
+      'DELETE /address/forwards/jr-new@test.org/targets/jr-own@test.org',
+      'DELETE /address/forwards/jr-new@test.org/targets/someone-else@test.org',
+      'GET /address/forwards/jr-new@test.org',
+    ]);
   });
 });
