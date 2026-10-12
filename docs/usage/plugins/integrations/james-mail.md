@@ -100,8 +100,8 @@ When a user's mail attribute changes:
 
 The forward a rename leaves outlives the account. When an address becomes the
 `mail` or an alias of an account, at its creation, a rename, a mail added to
-an existing entry or an alias add, the plugin removes the forwards James holds from it, except the entry's own
-(`--forward-attribute`):
+an existing entry or an alias add, the plugin removes the forwards James holds
+from it, except the entry's own (`--forward-attribute`):
 
 ```http
 GET /address/forwards/old@company.com
@@ -138,9 +138,9 @@ When a user's quota changes:
 
 ### Display Name and Identity
 
-When a user is added, renamed, or their display name changes, the plugin names their
-default identity in Twake Mail after the directory. The name is the first one
-found in `--display-name-attribute` (`displayName` by default), `cn`, then
+When a user is added, renamed, or their display name changes, the plugin names
+their default identity in Twake Mail after the directory. The name is the first
+one found in `--display-name-attribute` (`displayName` by default), `cn`, then
 `givenName` and `sn`. The optional signature is `--james-signature-template`.
 
 1. **James plugin** reads the default identity, the deletable one with the

@@ -96,6 +96,38 @@ describe('James Plugin - replication lag', () => {
     ).to.be.true;
   });
 
+  it('takes an alias that already exists for done, whatever call puts it', async () => {
+    // The add puts its aliases as `ldapadddone:alias`, the alias hook as
+    // `onLdapAliasChange-add`: a modify adding a mail and an alias runs both
+    const scope = nock(url)
+      .put('/address/aliases/lag@test.org/sources/alias@test.org')
+      .reply(409, { message: 'Alias already exists' });
+
+    await (
+      james as unknown as {
+        callWebAdminApi: (
+          hookname: string,
+          url: string,
+          method: string,
+          dn: string,
+          body: null,
+          fields: object
+        ) => Promise<void>;
+      }
+    ).callWebAdminApi(
+      'ldapadddone:alias',
+      `${url}/address/aliases/lag@test.org/sources/alias@test.org`,
+      'PUT',
+      dn,
+      null,
+      {}
+    );
+
+    expect(scope.isDone()).to.be.true;
+    expect(at('error')).to.have.length(0);
+    expect(at('debug').map(l => l.entry.result)).to.deep.equal(['ignored']);
+  });
+
   it('gives up after the last attempt, and only then logs an error', async () => {
     const scope = nock(url)
       .put('/quota/users/lag@test.org/size', '1000')
