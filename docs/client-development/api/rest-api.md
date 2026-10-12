@@ -1156,7 +1156,7 @@ All errors return a JSON object with an error message:
 
 ```json
 {
-  "error": "Invalid value for attribute \"uid\": must match ^[a-zA-Z0-9._-]{1,255}$"
+  "error": "Invalid value for attribute \"uid\""
 }
 ```
 

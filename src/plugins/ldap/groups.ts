@@ -47,6 +47,7 @@ import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
   checkDnValues,
+  invalidValueMessage,
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
@@ -1165,7 +1166,9 @@ export default class LdapGroups extends DmPlugin {
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(`Invalid value for field ${field}`);
+        throw new BadRequestError(
+          invalidValueMessage(field, this.schema.attributes[field])
+        );
       }
     }
     // Check required fields. A `generated` attribute is exempt, as it is on
@@ -1262,9 +1265,7 @@ export default class LdapGroups extends DmPlugin {
       return result.searchEntries.length > 0;
     });
     if (!matchesPattern(test, value))
-      throw new BadRequestError(
-        `Field ${field} has invalid value ${String(value)}`
-      );
+      throw new BadRequestError(invalidValueMessage(field, test));
     return true;
   }
 
