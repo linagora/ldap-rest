@@ -46,7 +46,7 @@ describe('James and groups', () => {
 
   const user = (name: string): string => `${name}-${timestamp}@test.org`;
   const mailbox = (name: string): string =>
-    `/domains/test.org/team-mailboxes/${name}-${timestamp}@test.org`;
+    `/domains/test.org/team-mailboxes/${name}-${timestamp}`;
 
   const addressGroupCalls = (): string[] =>
     calls.filter(call => call.includes('/address/groups'));

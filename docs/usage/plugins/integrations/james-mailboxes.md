@@ -97,8 +97,8 @@ await dm.ldap.add('cn=sales-team,ou=groups,dc=example,dc=com', {
 
 This will:
 
-1. Create the team mailbox via `PUT /domains/example.com/team-mailboxes/sales@example.com`
-2. Add each member via `PUT /domains/example.com/team-mailboxes/sales@example.com/members/{member-email}`
+1. Create the team mailbox via `PUT /domains/example.com/team-mailboxes/sales`
+2. Add each member via `PUT /domains/example.com/team-mailboxes/sales/members/{member-email}`
 
 ### Creating a Mailing List
 
@@ -159,9 +159,16 @@ address cannot be read.
 
 ### Team Mailboxes
 
-- **Create**: `PUT /domains/{domain}/team-mailboxes/{teamMailbox}`
-- **Add member**: `PUT /domains/{domain}/team-mailboxes/{teamMailbox}/members/{memberEmail}`
-- **Delete member**: `DELETE /domains/{domain}/team-mailboxes/{teamMailbox}/members/{memberEmail}`
+- **Create**: `PUT /domains/{domain}/team-mailboxes/{name}`
+- **Add member**: `PUT /domains/{domain}/team-mailboxes/{name}/members/{memberEmail}`
+- **Delete member**: `DELETE /domains/{domain}/team-mailboxes/{name}/members/{memberEmail}`
+
+TMail names a team mailbox by the local part of its address, `{name}@{domain}`,
+and accepts only letters, digits, `#`, `-` and `_` in it, up to 255 characters.
+A group whose address has any other character, such as a dot, gets no team
+mailbox: the plugin logs an error once, when the group comes to have such an
+address, and does not call TMail. The name is lower-cased, so a change of case
+of the address keeps the same team mailbox.
 
 ## Validation Rules
 
@@ -220,7 +227,7 @@ await dm.ldap.modify('cn=sales,ou=groups,dc=example,dc=com', {
 
 **What happens:**
 
-1. Creates the team mailbox (`PUT /domains/{domain}/team-mailboxes/{mail}`)
+1. Creates the team mailbox (`PUT /domains/{domain}/team-mailboxes/{name}`)
 2. Adds all current members to the team mailbox
 
 #### teamMailbox → mailingList
@@ -236,7 +243,7 @@ await dm.ldap.modify('cn=sales,ou=groups,dc=example,dc=com', {
 
 **What happens:**
 
-1. Removes all members from the team mailbox (`DELETE /domains/{domain}/team-mailboxes/{mail}/members/{member}`)
+1. Removes all members from the team mailbox (`DELETE /domains/{domain}/team-mailboxes/{name}/members/{member}`)
 2. **Preserves the team mailbox** (does NOT delete it - can be recovered later)
 
 #### group → mailingList or teamMailbox

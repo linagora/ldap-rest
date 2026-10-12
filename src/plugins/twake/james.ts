@@ -612,23 +612,36 @@ export default class James extends TwakePlugin {
   };
 
   /**
-   * The address of the team mailbox an entry stands for, and whether it is
-   * refused for lying in a mailing list branch.
+   * The address of the team mailbox an entry stands for, and why it is
+   * refused, if it is: it lies in a mailing list branch, or TMail cannot
+   * name a team mailbox after its address.
    */
   private teamMailboxOf(
     entry: AttributesList | null
-  ): { mail: string; refused: boolean } | null {
+  ): { mail: string; refused: string | null } | null {
     if (!entry || this.getMailboxType(entry) !== 'teamMailbox') return null;
     const mail = this.attributeToString(entry.mail);
     if (!mail) return null;
     const dn = String(entry.dn);
     const branches = this.config.james_mailing_list_branch || [];
-    return {
-      mail,
-      refused: branches.some(
-        branch => dn === branch || dn.endsWith(',' + branch)
-      ),
-    };
+    if (branches.some(branch => dn === branch || dn.endsWith(',' + branch)))
+      return {
+        mail,
+        refused: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
+      };
+    // TMail names a team mailbox by the local part, and refuses any other
+    // character in it
+    const at = mail.lastIndexOf('@');
+    if (
+      !/^[#a-zA-Z0-9_-]{1,255}$/.test(mail.slice(0, at)) ||
+      !this.extractMailDomain(mail)
+    )
+      return {
+        mail,
+        refused:
+          'A team mailbox address is a name of letters, digits, #, - and _ at a domain',
+      };
+    return { mail, refused: null };
   }
 
   /**
@@ -715,12 +728,14 @@ export default class James extends TwakePlugin {
     const is = this.teamMailboxOf(after);
     if (!was && !is) return;
     const dn = String((after ?? before)!.dn);
-    if (is?.refused && !was?.refused)
+    // Once, when the entry comes to be refused, not at each of its changes
+    if (is?.refused && is.refused !== was?.refused)
       this.logger.error({
         plugin: this.name,
         event: 'teamMailbox',
         dn,
-        error: `Team mailbox cannot be in mailing list branches: ${(this.config.james_mailing_list_branch || []).join(', ')}`,
+        mail: is.mail,
+        error: is.refused,
       });
     const old = was && !was.refused ? was.mail : null;
     const mail = is && !is.refused ? is.mail : null;
@@ -759,24 +774,36 @@ export default class James extends TwakePlugin {
 
   private teamMailboxQueue: Map<string, Promise<void>> = new Map();
 
+  /**
+   * The WebAdmin path of the team mailbox at an address
+   * {@link teamMailboxOf} accepted: TMail names it by the local part, under
+   * its domain. Lower-cased, so that a change of case only, which keeps the
+   * mailbox, keeps its path.
+   */
+  private teamMailboxUrl(mail: string): string {
+    const lower = mail.toLowerCase();
+    const at = lower.lastIndexOf('@');
+    return `${this.webadminUrl}/domains/${lower.slice(at + 1)}/team-mailboxes/${encodeURIComponent(lower.slice(0, at))}`;
+  }
+
   private async teamMailboxMembers(
     dn: string,
     mail: string,
     method: 'PUT' | 'DELETE',
     memberDns: string[]
   ): Promise<void> {
-    const domain = this.extractMailDomain(mail);
-    if (!domain || !memberDns.length) return;
+    if (!memberDns.length) return;
+    const url = this.teamMailboxUrl(mail);
     const memberMails = await this.getMemberEmails(memberDns);
     await Promise.all(
       memberMails.map(memberMail =>
         this.callWebAdminApi(
           `teamMailbox:${method === 'PUT' ? 'addMember' : 'removeMember'}`,
-          `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mail}/members/${memberMail}`,
+          `${url}/members/${memberMail}`,
           method,
           dn,
           null,
-          { domain, teamMailbox: mail, memberMail }
+          { teamMailbox: mail, memberMail }
         )
       )
     );
@@ -1210,28 +1237,13 @@ export default class James extends TwakePlugin {
     attributes: AttributesList,
     mailStr: string
   ): Promise<void> {
-    const domain = this.extractMailDomain(mailStr);
-    if (!domain) {
-      this.logger.error({
-        plugin: this.name,
-        event: 'createTeamMailbox',
-        dn,
-        mail: mailStr,
-        error: 'Cannot extract domain from mail address',
-      });
-      return;
-    }
+    const url = this.teamMailboxUrl(mailStr);
 
     // Create the team mailbox first: TMail answers 404 to an addMember
     // for a team mailbox that does not exist yet
-    await this.callWebAdminApi(
-      'teamMailbox:create',
-      `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
-      'PUT',
-      dn,
-      null,
-      { domain, teamMailbox: mailStr }
-    );
+    await this.callWebAdminApi('teamMailbox:create', url, 'PUT', dn, null, {
+      teamMailbox: mailStr,
+    });
     await this.teamMailboxMembers(dn, mailStr, 'PUT', members(attributes));
   }
 
