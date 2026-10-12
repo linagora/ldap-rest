@@ -52,6 +52,18 @@ Mailing lists are not synchronized: Twake Mail reads them from LDAP, see
 `twakeMailboxType` is `teamMailbox` become James team mailboxes, see
 [James Team Mailboxes](james-mailboxes.md).
 
+### Groups
+
+James has accounts for users only. An entry whose classes include
+`groupOfNames`, `groupOfUniqueNames` or `groupOfURLs` is a group: the plugin
+creates no identity, quota, alias, forward or delegation for its address, and
+does not rename it in James when its `mail` changes. Its address is a mailing
+list or a team mailbox, as above.
+
+A deployment whose groups (`--group-class`) carry none of these classes has
+its groups handled as users. So is an entry whose classes cannot be read when
+the change is followed.
+
 ### Mail Address Changes
 
 When a user's mail attribute changes:

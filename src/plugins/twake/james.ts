@@ -480,12 +480,13 @@ export default class James extends TwakePlugin {
         ),
       ]);
     },
-    onLdapQuotaChange: (
+    onLdapQuotaChange: async (
       dn: string,
       mail: string,
       oldQuota: number,
       newQuota: number
     ) => {
+      if (await this.isGroupDn(dn)) return;
       return this.callWebAdminApi(
         'onLdapQuotaChange',
         `${this.webadminUrl}/quota/users/${mail}/size`,
@@ -502,6 +503,7 @@ export default class James extends TwakePlugin {
       oldForwards: string[],
       newForwards: string[]
     ) => {
+      if (await this.isGroupDn(dn)) return;
       const domain = this.extractMailDomain(mail);
       if (!domain) {
         this.logger.error(
@@ -545,7 +547,8 @@ export default class James extends TwakePlugin {
     onLdapChange: async (dn: string, changes: ChangesToNotify) => {
       if (
         this.config.delegation_attribute &&
-        changes[this.config.delegation_attribute]
+        changes[this.config.delegation_attribute] &&
+        !(await this.isGroupDn(dn))
       ) {
         await this._handleDelegationChange(dn, changes);
       }
