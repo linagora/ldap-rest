@@ -18,6 +18,10 @@
 
 ### Fixes
 
+- `ldap/groups`, `ldap/organizations`: a value the schema refuses is answered
+  as on the other routes, `Invalid value for attribute "x"` followed by the
+  English `hint` when the schema has one, instead of
+  `Field x has invalid value …` or `Invalid value for field x`
 - `twake/james`: a team mailbox follows its group. Members added or removed
   (the `/members` routes included), a type change, a new address and the
   deletion of the group reach James; until now only the creation did. A

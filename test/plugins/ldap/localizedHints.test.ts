@@ -11,6 +11,7 @@ import { localizedText } from '../../../src/config/schema';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import LdapGroups from '../../../src/plugins/ldap/groups';
 import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
@@ -66,6 +67,12 @@ describe('Translated hints in refusals', function () {
     await server.registerPlugin('ldapOrganizations', organizations);
     await waitFor(() => Boolean(organizations.schema), {
       what: 'the organizations schema',
+    });
+    server.config.group_schema = './static/schemas/twake/groups.json';
+    const groups = new LdapGroups(server);
+    await server.registerPlugin('ldapGroups', groups);
+    await waitFor(() => Boolean(groups.schema), {
+      what: 'the groups schema',
     });
     server.setupErrorMiddleware();
     request = supertest(server.app);
@@ -135,7 +142,18 @@ describe('Translated hints in refusals', function () {
       .send({ ou: '-HintChild', parentDn: orgDn });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(res.body.error).to.equal(
-      "Invalid value for field ou: Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit"
+      'Invalid value for attribute "ou": Letters, digits, spaces and ( ) & / , . \' - _, starting with a letter or a digit'
+    );
+  });
+
+  it('should quote it on the group routes', async () => {
+    const res = await request
+      .post('/api/v1/ldap/groups')
+      .type('json')
+      .send({ cn: 'hint-group', mail: 'nope' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.equal(
+      'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'
     );
   });
 });

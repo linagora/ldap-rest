@@ -875,7 +875,7 @@ Ensure all required fields are included:
 
 ```json
 {
-  "error": "Invalid value for attribute \"mail\": must match ^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+  "error": "Invalid value for attribute \"mail\": Expected an email address, e.g. jane.doe@example.org"
 }
 ```
 

@@ -81,6 +81,27 @@ export function localizedText(
   return Object.values(text).find(Boolean);
 }
 
+/**
+ * Refusal of a value that failed its schema `test`, for a `BadRequestError`.
+ *
+ * When the schema carries a `hint`, the message says what a valid value
+ * looks like instead of only that this one was not. The hint lives next to
+ * the pattern so the two cannot drift apart, and so a client can show it
+ * under the field *before* the user gets it wrong. Its English text is
+ * quoted, the language of every other API message.
+ *
+ * @param name attribute name
+ * @param attr its schema definition
+ * @returns the message
+ */
+export function invalidValueMessage(
+  name: string,
+  attr: SchemaAttribute | undefined
+): string {
+  const hint = localizedText(attr?.hint || attr?.items?.hint);
+  return `Invalid value for attribute "${name}"${hint ? `: ${hint}` : ''}`;
+}
+
 /** Roles the core itself looks for. See {@link SchemaRole}. */
 export const CORE_ROLES = [
   'identifier',

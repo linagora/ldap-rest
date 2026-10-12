@@ -56,7 +56,11 @@ import type {
   SchemaAttribute,
   UniqueConstraint,
 } from '../../config/schema';
-import { hasRole, localizedText, roleAttribute } from '../../config/schema';
+import {
+  hasRole,
+  invalidValueMessage,
+  roleAttribute,
+} from '../../config/schema';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -173,19 +177,6 @@ function asDn(value: string): string {
   } catch {
     return value;
   }
-}
-
-/**
- * Refusal of a value, quoting the English text of the attribute's `hint`, the
- * language of every other API message.
- *
- * @param name attribute name
- * @param attr its schema definition
- * @returns message for a `BadRequestError`
- */
-function invalidValueMessage(name: string, attr: SchemaAttribute): string {
-  const hint = localizedText(attr.hint);
-  return `Invalid value for attribute "${name}"${hint ? `: ${hint}` : ''}`;
 }
 
 /**
