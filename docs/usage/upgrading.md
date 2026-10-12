@@ -4,6 +4,25 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Mailing lists are no longer copied to James
+
+**Who is affected:** a deployment that loads `twake/james`.
+
+`twake/james` no longer creates, fills or deletes James address groups
+(`/address/groups`) for mailing lists, the groups with a `mail` whose
+`twakeMailboxType` is `mailingList` or is not set. Twake Mail must read them
+from LDAP with its `LDAPMailingList` mailet: without it, a mail sent to a
+list address is no longer delivered to its members.
+
+The address groups already created for these lists stay in James, and are no
+longer updated. Delete them: `GET /address/groups` lists the address groups,
+`DELETE /address/groups/{group}` deletes one.
+
+`--james-mailing-list-branches` now only keeps team mailboxes out of these
+branches.
+
 ## To 0.17.0
 
 ### The quota attribute defaults to `mailQuotaSize`

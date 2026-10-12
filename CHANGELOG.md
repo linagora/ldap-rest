@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `twake/james` no longer copies mailing lists to James address groups,
+  which could not restrict senders: Twake Mail reads the lists from LDAP with
+  its `LDAPMailingList` mailet. The address groups already created stay in
+  James and must be deleted,
+  [notes](docs/usage/upgrading.md#mailing-lists-are-no-longer-copied-to-james)
+
 ### Fixes
 
 - `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any

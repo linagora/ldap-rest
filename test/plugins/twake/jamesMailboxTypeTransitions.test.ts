@@ -61,13 +61,6 @@ describe('James Mailbox Type Transitions', () => {
       })
       .put(/\/users\/.*@test\.org\/identities\/.*-identity-id$/)
       .reply(200, { success: true })
-      // Mailing list operations
-      .put(/\/address\/groups\/.*@test\.org\/.*@test\.org$/)
-      .reply(204)
-      .delete(/\/address\/groups\/.*@test\.org\/.*@test\.org$/)
-      .reply(204)
-      .delete(/\/address\/groups\/.*@test\.org$/)
-      .reply(204)
       // Team mailbox operations
       .put(/\/domains\/test\.org\/team-mailboxes\/.*@test\.org$/)
       .reply(204)
@@ -197,7 +190,6 @@ describe('James Mailbox Type Transitions', () => {
 
       // Verify transition occurred
       // Team mailbox members should be removed (not deleted)
-      // Mailing list should be created
       expect(scope.isDone()).to.be.false;
     } finally {
       // Cleanup
@@ -308,116 +300,6 @@ describe('James Mailbox Type Transitions', () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       // Verify all members were removed from team mailbox (preserved)
-      expect(scope.isDone()).to.be.false;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
-    }
-  });
-
-  it('should transition from group to mailingList (add mail attribute)', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=transition5-${timestamp},${groupBase}`;
-    const testUserDN = `uid=transuser5-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'Trans User 5',
-        sn: 'User5',
-        uid: `transuser5-${timestamp}`,
-        mail: `transuser5-${timestamp}@test.org`,
-      });
-
-      // Create simple group without mail
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `transition5-${timestamp}`,
-        twakeMailboxType: `cn=group,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: groupBase,
-        twakeDepartmentPath: 'Test',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Add mail and change to mailing list
-      await dm.ldap.modify(testGroupDN, {
-        add: {
-          mail: `transition5-${timestamp}@test.org`,
-        },
-        replace: {
-          twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        },
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Verify mailing list was created
-      expect(scope.isDone()).to.be.false;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
-    }
-  });
-
-  it('should transition from mailingList to group (disable mail functionality)', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=transition6-${timestamp},${groupBase}`;
-    const testUserDN = `uid=transuser6-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'Trans User 6',
-        sn: 'User6',
-        uid: `transuser6-${timestamp}`,
-        mail: `transuser6-${timestamp}@test.org`,
-      });
-
-      // Create mailing list
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `transition6-${timestamp}`,
-        mail: `transition6-${timestamp}@test.org`,
-        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: groupBase,
-        twakeDepartmentPath: 'Test',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Change to simple group
-      await dm.ldap.modify(testGroupDN, {
-        replace: {
-          twakeMailboxType: `cn=group,${mailboxTypeBase}`,
-        },
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Verify mailing list was deleted
       expect(scope.isDone()).to.be.false;
     } finally {
       // Cleanup
