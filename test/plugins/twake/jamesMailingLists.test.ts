@@ -1,329 +1,157 @@
 import nock from 'nock';
+import { expect } from 'chai';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
-import { expect } from 'chai';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
-import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import LdapGroups from '../../../src/plugins/ldap/groups';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 
-describe('James Mailing Lists', () => {
+describe('James and mailing lists', () => {
   const timestamp = Date.now();
   let userBase: string;
   let groupBase: string;
+  let mailboxTypeBase: string;
+  let alice: string;
+  let bob: string;
 
   let dm: DM;
   let james: James;
-  let ldapGroups: LdapGroups;
-  let scope: nock.Scope;
+  let groups: LdapGroups;
+  const calls: string[] = [];
+  const users: string[] = [];
+
+  // The group hooks are launched without being awaited
+  const settle = (): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, 500));
+
+  const addGroup = async (name: string, type?: string): Promise<string> => {
+    const cn = `${name}-${timestamp}`;
+    const dn = `cn=${cn},${groupBase}`;
+    await groups.addGroup(dn, [alice], {
+      mail: `${cn}@test.org`,
+      ...(type && { twakeMailboxType: `cn=${type},${mailboxTypeBase}` }),
+      twakeDepartmentLink: groupBase,
+      twakeDepartmentPath: 'Test',
+    });
+    return dn;
+  };
+
+  const addressGroupCalls = (): string[] =>
+    calls.filter(call => call.includes('/address/groups'));
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
 
-    // Initialize DNs after env vars are set
     userBase = `ou=users,${process.env.DM_LDAP_BASE}`;
     groupBase =
       process.env.DM_LDAP_GROUP_BASE || `ou=groups,${process.env.DM_LDAP_BASE}`;
+    mailboxTypeBase = `ou=twakeMailboxType,ou=nomenclature,${process.env.DM_LDAP_BASE}`;
 
-    // Create DM instance once for all tests
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
-    dm.config.james_init_delay = 0; // No delay in tests
+    dm.config.james_init_delay = 0;
+    dm.config.group_classes = ['top', 'groupOfNames', 'twakeStaticGroup'];
     await dm.ready;
     james = new James(dm);
-    ldapGroups = new LdapGroups(dm);
+    groups = new LdapGroups(dm);
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
-    await dm.registerPlugin('ldapGroups', ldapGroups);
+    await dm.registerPlugin('ldapGroups', groups);
     await dm.registerPlugin('james', james);
 
-    // Mock James API calls for mailing lists
-    scope = nock(process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000')
-      .persist()
-      // Mock identity sync for all emails (uses regex to match dynamic timestamps)
-      .get(/\/users\/.*@test\.org\/identities$/)
-      .query({ default: 'true' })
-      .reply(200, uri => {
-        const email = uri
-          .replace(/\?.*$/, '')
-          .replace('/users/', '')
-          .replace('/identities', '');
-        return [
-          {
-            id: `${email}-identity-id`,
-            name: 'Test User',
-            email: email,
-          },
-        ];
-      })
-      .put(/\/users\/.*@test\.org\/identities\/.*-identity-id$/)
-      .reply(200, { success: true })
-      // Create group members
-      .put(/\/address\/groups\/list.*@test\.org\/member.*@test\.org$/)
-      .reply(204)
-      // Add new member
-      .put(/\/address\/groups\/list.*@test\.org\/newmember.*@test\.org$/)
-      .reply(204)
-      // Delete member
-      .delete(/\/address\/groups\/list.*@test\.org\/member.*@test\.org$/)
-      .reply(204)
-      // Delete entire group
-      .delete(/\/address\/groups\/list.*@test\.org$/)
-      .reply(204);
-  });
+    const scope = nock(
+      process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+    ).persist();
+    for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
+      scope.intercept(/.*/, method).reply(uri => {
+        calls.push(`${method} ${decodeURIComponent(uri)}`);
+        return method === 'GET' ? [200, []] : [204];
+      });
 
-  after(function () {
-    if (scope) {
-      scope.persist(false);
-    }
-    nock.cleanAll();
-  });
-
-  beforeEach(async function () {
-    // Increase timeout for setup
-    this.timeout(10000);
-
-    // Ensure ou=users exists
     try {
       await dm.ldap.add(userBase, {
         objectClass: ['organizationalUnit', 'top'],
         ou: 'users',
       });
-    } catch (err) {
-      // Ignore if already exists
+    } catch {
+      // Already there
     }
+    for (const uid of ['mlalice', 'mlbob']) {
+      const dn = `uid=${uid}-${timestamp},${userBase}`;
+      await dm.ldap.add(dn, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: uid,
+        sn: uid,
+        uid: `${uid}-${timestamp}`,
+        mail: `${uid}-${timestamp}@test.org`,
+      });
+      users.push(dn);
+    }
+    [alice, bob] = users;
   });
 
-  it('should create mailing list in James when group with mail is added', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=mailinglist1-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=mluser1-${timestamp},${userBase}`;
-    const testUser2DN = `uid=mluser2-${timestamp},${userBase}`;
-
-    try {
-      // Create test users
-      await dm.ldap.add(testUser1DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 1',
-        sn: 'User1',
-        uid: `mluser1-${timestamp}`,
-        mail: `member1-${timestamp}@test.org`,
-      });
-
-      await dm.ldap.add(testUser2DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 2',
-        sn: 'User2',
-        uid: `mluser2-${timestamp}`,
-        mail: `member2-${timestamp}@test.org`,
-      });
-
-      const res = await ldapGroups.addGroup(
-        `mailinglist1-${timestamp}`,
-        [testUser1DN, testUser2DN],
-        {
-          mail: `list1-${timestamp}@test.org`,
-          twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-          twakeDepartmentPath: 'Test',
-        }
-      );
-      expect(res).to.be.true;
-    } finally {
-      // Cleanup
-      for (const dn of [testGroupDN, testUser1DN, testUser2DN]) {
-        try {
-          await dm.ldap.delete(dn);
-        } catch (err) {
-          // Ignore
-        }
-      }
-    }
+  beforeEach(() => {
+    calls.length = 0;
   });
 
-  it('should add member to James group when member is added to LDAP group', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=mailinglist2-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=mluser3-${timestamp},${userBase}`;
-    const newUserDN = `uid=mluser4-${timestamp},${userBase}`;
-
-    try {
-      // Create initial user
-      await dm.ldap.add(testUser1DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 3',
-        sn: 'User3',
-        uid: `mluser3-${timestamp}`,
-        mail: `member1-${timestamp}@test.org`,
-      });
-
-      // Create the group
-      await ldapGroups.addGroup(`mailinglist2-${timestamp}`, [testUser1DN], {
-        mail: `list2-${timestamp}@test.org`,
-        twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-        twakeDepartmentPath: 'Test',
-      });
-
-      // Create a new user to add
-      await dm.ldap.add(newUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 4',
-        sn: 'User4',
-        uid: `mluser4-${timestamp}`,
-        mail: `newmember-${timestamp}@test.org`,
-      });
-
-      // Add member to group
-      const res = await ldapGroups.addMember(testGroupDN, newUserDN);
-      expect(res).to.be.true;
-    } finally {
-      // Cleanup
-      for (const dn of [testGroupDN, newUserDN, testUser1DN]) {
-        try {
-          await dm.ldap.delete(dn);
-        } catch (err) {
-          // Ignore
-        }
+  after(async () => {
+    nock.cleanAll();
+    for (const dn of users)
+      try {
+        await dm.ldap.delete(dn);
+      } catch {
+        // Already gone
       }
-    }
   });
 
-  it('should remove member from James group when member is deleted from LDAP group', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=mailinglist3-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=mluser5-${timestamp},${userBase}`;
-    const testUser2DN = `uid=mluser6-${timestamp},${userBase}`;
+  for (const type of ['mailingList', undefined])
+    it(`creates no address group for a list ${type ? `of type ${type}` : 'without a mailbox type'}`, async () => {
+      const dn = await addGroup(`ml-${type ?? 'untyped'}`, type);
+      await settle();
+      await groups.deleteGroup(dn);
+      await settle();
 
-    try {
-      // Create test users
-      await dm.ldap.add(testUser1DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 5',
-        sn: 'User5',
-        uid: `mluser5-${timestamp}`,
-        mail: `member1-${timestamp}@test.org`,
-      });
+      expect(addressGroupCalls()).to.deep.equal([]);
+    });
 
-      await dm.ldap.add(testUser2DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 6',
-        sn: 'User6',
-        uid: `mluser6-${timestamp}`,
-        mail: `member2-${timestamp}@test.org`,
-      });
+  it('sends nothing to James for a group without mail', async () => {
+    const dn = `cn=ml-nomail-${timestamp},${groupBase}`;
+    await groups.addGroup(dn, [alice], {
+      twakeDepartmentLink: groupBase,
+      twakeDepartmentPath: 'Test',
+    });
+    await settle();
+    await groups.deleteGroup(dn);
+    await settle();
 
-      // Create the group with two members
-      await ldapGroups.addGroup(
-        `mailinglist3-${timestamp}`,
-        [testUser1DN, testUser2DN],
-        {
-          mail: `list3-${timestamp}@test.org`,
-          twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-          twakeDepartmentPath: 'Test',
-        }
-      );
-
-      // Remove one member
-      const res = await ldapGroups.deleteMember(testGroupDN, testUser1DN);
-      expect(res).to.be.true;
-    } finally {
-      // Cleanup
-      for (const dn of [testGroupDN, testUser1DN, testUser2DN]) {
-        try {
-          await dm.ldap.delete(dn);
-        } catch (err) {
-          // Ignore
-        }
-      }
-    }
+    expect(calls).to.deep.equal([]);
   });
 
-  it('should delete mailing list from James when group is deleted', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=mailinglist4-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=mluser7-${timestamp},${userBase}`;
+  it('ldapgroupmodifydone sends no member change of a list to James', async () => {
+    const dn = await addGroup('ml-members', 'mailingList');
+    await settle();
 
-    try {
-      // Create test user
-      await dm.ldap.add(testUser1DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 7',
-        sn: 'User7',
-        uid: `mluser7-${timestamp}`,
-        mail: `member1-${timestamp}@test.org`,
-      });
+    await james.hooks.ldapgroupmodifydone!([dn, { add: { member: bob } }, 0]);
+    await james.hooks.ldapgroupmodifydone!([
+      dn,
+      { delete: { member: alice } },
+      0,
+    ]);
+    await groups.deleteGroup(dn);
+    await settle();
 
-      // Create the group
-      await ldapGroups.addGroup(`mailinglist4-${timestamp}`, [testUser1DN], {
-        mail: `list4-${timestamp}@test.org`,
-        twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-        twakeDepartmentPath: 'Test',
-      });
-
-      // Delete the group
-      const res = await ldapGroups.deleteGroup(testGroupDN);
-      expect(res).to.be.true;
-    } finally {
-      // Cleanup
-      for (const dn of [testGroupDN, testUser1DN]) {
-        try {
-          await dm.ldap.delete(dn);
-        } catch (err) {
-          // Ignore
-        }
-      }
-    }
+    expect(addressGroupCalls()).to.deep.equal([]);
   });
 
-  it('should skip groups without mail attribute', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=groupnomail5-${timestamp},${groupBase}`;
-    const testUser1DN = `uid=mluser8-${timestamp},${userBase}`;
+  it('still creates a team mailbox with its members', async () => {
+    const dn = await addGroup('ml-team', 'teamMailbox');
+    const mailbox = `/domains/test.org/team-mailboxes/ml-team-${timestamp}@test.org`;
+    await settle();
 
-    try {
-      // Track if James API was called (it shouldn't be)
-      let jamesApiCalled = false;
-      const tempScope = nock(
-        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
-      )
-        .put(/\/address\/groups\/.*/)
-        .reply(function () {
-          jamesApiCalled = true;
-          return [200, {}];
-        });
-
-      // Create test user
-      await dm.ldap.add(testUser1DN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'ML User 8',
-        sn: 'User8',
-        uid: `mluser8-${timestamp}`,
-        mail: `member1-${timestamp}@test.org`,
-      });
-
-      // Create group without mail attribute
-      const res = await ldapGroups.addGroup(
-        `groupnomail5-${timestamp}`,
-        [testUser1DN],
-        {
-          twakeDepartmentLink: `ou=organization,${process.env.DM_LDAP_BASE}`,
-          twakeDepartmentPath: 'Test',
-        }
-      );
-      expect(res).to.be.true;
-
-      // Verify James API was NOT called
-      expect(jamesApiCalled).to.be.false;
-
-      // Clean up temp nock
-      tempScope.persist(false);
-    } finally {
-      // Cleanup
-      for (const dn of [testGroupDN, testUser1DN]) {
-        try {
-          await dm.ldap.delete(dn);
-        } catch (err) {
-          // Ignore
-        }
-      }
-    }
+    expect(calls).to.include.members([
+      `PUT ${mailbox}`,
+      `PUT ${mailbox}/members/mlalice-${timestamp}@test.org`,
+    ]);
+    await groups.deleteGroup(dn);
   });
 });

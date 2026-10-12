@@ -66,11 +66,6 @@ describe('James Branch Validation', () => {
       })
       .put(/\/users\/.*@test\.org\/identities\/.*-identity-id$/)
       .reply(200, { success: true })
-      // Mailing list operations
-      .put(/\/address\/groups\/.*@test\.org\/.*@test\.org$/)
-      .reply(204)
-      .delete(/\/address\/groups\/.*@test\.org$/)
-      .reply(204)
       // Team mailbox operations
       .put(/\/domains\/test\.org\/team-mailboxes\/.*@test\.org$/)
       .reply(204)
@@ -116,97 +111,6 @@ describe('James Branch Validation', () => {
       });
     } catch (err) {
       // Ignore if already exists
-    }
-  });
-
-  it('should allow mailing list in allowed branch (ou=lists)', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=validlist-${timestamp},${listsBase}`;
-    const testUserDN = `uid=vluser1-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'VL User 1',
-        sn: 'User1',
-        uid: `vluser1-${timestamp}`,
-        mail: `vluser1-${timestamp}@test.org`,
-      });
-
-      // Create mailing list in allowed branch
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `validlist-${timestamp}`,
-        mail: `validlist-${timestamp}@test.org`,
-        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: listsBase,
-        twakeDepartmentPath: 'Lists',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Should succeed - mailing list created
-      expect(true).to.be.true;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
-    }
-  });
-
-  it('should reject mailing list outside allowed branch', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=invalidlist-${timestamp},${teamsBase}`;
-    const testUserDN = `uid=iluser1-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'IL User 1',
-        sn: 'User1',
-        uid: `iluser1-${timestamp}`,
-        mail: `iluser1-${timestamp}@test.org`,
-      });
-
-      // Create mailing list in WRONG branch (should fail validation)
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `invalidlist-${timestamp}`,
-        mail: `invalidlist-${timestamp}@test.org`,
-        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: teamsBase,
-        twakeDepartmentPath: 'Teams',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Mailing list should NOT be created in James (validation failed)
-      // The LDAP entry will exist, but James won't have it
-      expect(true).to.be.true;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
     }
   });
 
@@ -285,60 +189,6 @@ describe('James Branch Validation', () => {
 
       // Team mailbox should NOT be created in James (validation failed)
       // The LDAP entry will exist, but James won't have it
-      expect(true).to.be.true;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
-    }
-  });
-
-  it('should reject transition to mailing list outside allowed branch', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=translist-${timestamp},${teamsBase}`;
-    const testUserDN = `uid=tluser1-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'TL User 1',
-        sn: 'User1',
-        uid: `tluser1-${timestamp}`,
-        mail: `tluser1-${timestamp}@test.org`,
-      });
-
-      // Create simple group
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `translist-${timestamp}`,
-        mail: `translist-${timestamp}@test.org`,
-        twakeMailboxType: `cn=group,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: teamsBase,
-        twakeDepartmentPath: 'Teams',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Try to transition to mailing list (should fail - wrong branch)
-      await dm.ldap.modify(testGroupDN, {
-        replace: {
-          twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        },
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Transition should be rejected
       expect(true).to.be.true;
     } finally {
       // Cleanup
@@ -467,9 +317,6 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
       })
       .put(/\/users\/.*@test\.org\/identities\/.*-identity-id$/)
       .reply(200, { success: true })
-      // Mailing list operations
-      .put(/\/address\/groups\/.*@test\.org\/.*@test\.org$/)
-      .reply(204)
       // Team mailbox operations
       .put(/\/domains\/test\.org\/team-mailboxes\/.*@test\.org$/)
       .reply(204)
@@ -506,51 +353,6 @@ describe('James Branch Validation - Unrestricted Configuration', () => {
       });
     } catch (err) {
       // Ignore if already exists
-    }
-  });
-
-  it('should allow mailing lists anywhere when branch restrictions are disabled', async function () {
-    this.timeout(10000);
-    const testGroupDN = `cn=unrestricted-list-${timestamp},${teamsBase}`;
-    const testUserDN = `uid=unrestuser-${timestamp},${userBase}`;
-
-    try {
-      // Create test user
-      await dm.ldap.add(testUserDN, {
-        objectClass: ['top', 'inetOrgPerson'],
-        cn: 'Unrestricted User',
-        sn: 'User',
-        uid: `unrestuser-${timestamp}`,
-        mail: `unrestuser-${timestamp}@test.org`,
-      });
-
-      // Create mailing list in teams branch (should succeed - no restrictions)
-      await dm.ldap.add(testGroupDN, {
-        objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
-        cn: `unrestricted-list-${timestamp}`,
-        mail: `unrestricted-list-${timestamp}@test.org`,
-        twakeMailboxType: `cn=mailingList,${mailboxTypeBase}`,
-        member: testUserDN,
-        twakeDepartmentLink: teamsBase,
-        twakeDepartmentPath: 'Teams',
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Mailing list should be created successfully
-      expect(true).to.be.true;
-    } finally {
-      // Cleanup
-      try {
-        await dm.ldap.delete(testGroupDN);
-      } catch (err) {
-        // Ignore
-      }
-      try {
-        await dm.ldap.delete(testUserDN);
-      } catch (err) {
-        // Ignore
-      }
     }
   });
 

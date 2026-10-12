@@ -569,53 +569,15 @@ export default class James extends TwakePlugin {
       return this.updateJamesIdentity(dn, mail, displayName);
     },
 
-    // Group/mailing list hooks
+    // Only team mailboxes are synchronized: Twake Mail reads mailing lists
+    // from LDAP, see docs/usage/plugins/integrations/james-mailboxes.md#mailing-lists
     ldapgroupadddone: async (args: [string, AttributesList]) => {
       const [dn, attributes] = args;
       const mail = attributes.mail as string | string[] | undefined;
-
-      // Only handle groups with a mail attribute
-      if (!mail) {
-        this.logger.debug(
-          `Group ${dn} has no mail attribute, skipping James sync`
-        );
-        return;
-      }
-
-      const mailboxType = this.getMailboxType(attributes);
+      if (!mail || this.getMailboxType(attributes) !== 'teamMailbox') return;
+      if (this.inMailingListBranch(dn, 'ldapgroupadddone')) return;
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
-
-      // Dispatch based on mailbox type
-      if (mailboxType === 'teamMailbox') {
-        // Validate team mailbox is NOT in mailing list branches
-        const branches = this.config.james_mailing_list_branch || [];
-        if (branches.length > 0 && this.isInAllowedBranches(dn, branches)) {
-          this.logger.error({
-            plugin: this.name,
-            event: 'ldapgroupadddone',
-            dn,
-            mailboxType: 'teamMailbox',
-            error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
-          });
-          return;
-        }
-        await this.createTeamMailbox(dn, attributes, mailStr);
-      } else if (mailboxType === 'mailingList' || mailboxType === null) {
-        // Validate mailing list is in allowed branches
-        const branches = this.config.james_mailing_list_branch || [];
-        if (branches.length > 0 && !this.isInAllowedBranches(dn, branches)) {
-          this.logger.error({
-            plugin: this.name,
-            event: 'ldapgroupadddone',
-            dn,
-            mailboxType: mailboxType || 'mailingList (default)',
-            error: `Mailing list must be in allowed branches: ${branches.join(', ')}`,
-          });
-          return;
-        }
-        await this.createMailingList(dn, attributes, mailStr);
-      }
-      // If mailboxType === 'group', do nothing (simple group without mailbox)
+      await this.createTeamMailbox(dn, attributes, mailStr);
     },
 
     ldapgroupmodifydone: async (
@@ -640,20 +602,10 @@ export default class James extends TwakePlugin {
         return; // Transition handles everything including members
       }
 
-      // Get the group's mail address and mailbox type
+      if ((await this.getGroupMailboxType(dn)) !== 'teamMailbox') return;
       const groupMail = await this.getGroupMail(dn);
-      if (!groupMail) {
-        this.logger.debug(
-          `Group ${dn} has no mail attribute, skipping James sync`
-        );
-        return;
-      }
-
-      const mailboxType = await this.getGroupMailboxType(dn);
-      const isTeamMailbox = mailboxType === 'teamMailbox';
-
-      // Determine the API endpoint based on mailbox type
-      const domain = isTeamMailbox ? this.extractMailDomain(groupMail) : null;
+      const domain = groupMail && this.extractMailDomain(groupMail);
+      if (!groupMail || !domain) return;
 
       // Handle member additions and deletions in parallel
       const operations: Promise<void>[] = [];
@@ -664,27 +616,16 @@ export default class James extends TwakePlugin {
         const memberMails = await this.getMemberEmails(membersToAdd);
 
         operations.push(
-          ...memberMails.map(memberMail => {
-            if (isTeamMailbox && domain) {
-              return this.callWebAdminApi(
-                'ldapgroupmodifydone:teamMailbox',
-                `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
-                'PUT',
-                dn,
-                null,
-                { domain, groupMail, memberMail, action: 'add' }
-              );
-            } else {
-              return this.callWebAdminApi(
-                'ldapgroupmodifydone:mailingList',
-                `${this.webadminUrl}/address/groups/${groupMail}/${memberMail}`,
-                'PUT',
-                dn,
-                null,
-                { groupMail, memberMail, action: 'add' }
-              );
-            }
-          })
+          ...memberMails.map(memberMail =>
+            this.callWebAdminApi(
+              'ldapgroupmodifydone:teamMailbox',
+              `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
+              'PUT',
+              dn,
+              null,
+              { domain, groupMail, memberMail, action: 'add' }
+            )
+          )
         );
       }
 
@@ -700,27 +641,16 @@ export default class James extends TwakePlugin {
           const memberMails = await this.getMemberEmails(membersToDelete);
 
           operations.push(
-            ...memberMails.map(memberMail => {
-              if (isTeamMailbox && domain) {
-                return this.callWebAdminApi(
-                  'ldapgroupmodifydone:teamMailbox',
-                  `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
-                  'DELETE',
-                  dn,
-                  null,
-                  { domain, groupMail, memberMail, action: 'delete' }
-                );
-              } else {
-                return this.callWebAdminApi(
-                  'ldapgroupmodifydone:mailingList',
-                  `${this.webadminUrl}/address/groups/${groupMail}/${memberMail}`,
-                  'DELETE',
-                  dn,
-                  null,
-                  { groupMail, memberMail, action: 'delete' }
-                );
-              }
-            })
+            ...memberMails.map(memberMail =>
+              this.callWebAdminApi(
+                'ldapgroupmodifydone:teamMailbox',
+                `${this.webadminUrl}/domains/${domain}/team-mailboxes/${groupMail}/members/${memberMail}`,
+                'DELETE',
+                dn,
+                null,
+                { domain, groupMail, memberMail, action: 'delete' }
+              )
+            )
           );
         }
       }
@@ -729,31 +659,11 @@ export default class James extends TwakePlugin {
     },
 
     ldapgroupdeletedone: async (dn: string) => {
-      // Get the group's mail address and mailbox type before deletion
       const groupMail = await this.getGroupMail(dn);
-      if (!groupMail) {
-        this.logger.debug(
-          `Group ${dn} has no mail attribute, skipping James sync`
-        );
-        return;
-      }
-
-      const mailboxType = await this.getGroupMailboxType(dn);
-
-      if (mailboxType === 'teamMailbox') {
-        // For team mailboxes, remove all members but preserve the mailbox
+      if (!groupMail) return;
+      // For team mailboxes, remove all members but preserve the mailbox
+      if ((await this.getGroupMailboxType(dn)) === 'teamMailbox')
         await this.removeAllTeamMailboxMembers(dn, groupMail);
-      } else {
-        // Delete the entire address group from James (mailing list)
-        await this.callWebAdminApi(
-          'ldapgroupdeletedone:mailingList',
-          `${this.webadminUrl}/address/groups/${groupMail}`,
-          'DELETE',
-          dn,
-          null,
-          { groupMail }
-        );
-      }
     },
   };
 
@@ -822,45 +732,15 @@ export default class James extends TwakePlugin {
       return;
     }
 
-    // Cleanup old mailbox type
-    if (oldType === 'mailingList') {
-      await this.deleteMailingList(dn, mailStr);
-    } else if (oldType === 'teamMailbox') {
-      // Remove all members but preserve the mailbox
+    // Remove all members but preserve the mailbox
+    if (oldType === 'teamMailbox')
       await this.removeAllTeamMailboxMembers(dn, mailStr);
-    }
 
-    // Setup new mailbox type with validation
-    if (newType === 'mailingList') {
-      // Validate mailing list is in allowed branches
-      const branches = this.config.james_mailing_list_branch || [];
-      if (branches.length > 0 && !this.isInAllowedBranches(dn, branches)) {
-        this.logger.error({
-          plugin: this.name,
-          event: 'handleMailboxTypeTransition',
-          dn,
-          newType,
-          error: `Mailing list must be in allowed branches: ${branches.join(', ')}`,
-        });
-        return;
-      }
-      await this.createMailingList(dn, attributes, mailStr);
-    } else if (newType === 'teamMailbox') {
-      // Validate team mailbox is NOT in mailing list branches
-      const branches = this.config.james_mailing_list_branch || [];
-      if (branches.length > 0 && this.isInAllowedBranches(dn, branches)) {
-        this.logger.error({
-          plugin: this.name,
-          event: 'handleMailboxTypeTransition',
-          dn,
-          newType,
-          error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
-        });
-        return;
-      }
+    if (
+      newType === 'teamMailbox' &&
+      !this.inMailingListBranch(dn, 'handleMailboxTypeTransition')
+    )
       await this.createTeamMailbox(dn, attributes, mailStr);
-    }
-    // If newType === 'group', nothing to create (simple group)
   }
 
   /**
@@ -1216,44 +1096,21 @@ export default class James extends TwakePlugin {
   }
 
   /**
-   * Validate that a DN is within one of the allowed branches
+   * Whether dn lies in a mailing list branch, where a team mailbox is
+   * refused: the refusal is logged.
    */
-  private isInAllowedBranches(dn: string, branches: string[]): boolean {
-    if (!branches || branches.length === 0) return true; // No restriction
-    return branches.some(branch => dn === branch || dn.endsWith(',' + branch));
-  }
-
-  /**
-   * Create a mailing list in James
-   */
-  private async createMailingList(
-    dn: string,
-    attributes: AttributesList,
-    mailStr: string
-  ): Promise<void> {
-    const members = (attributes.member as string | string[] | undefined) || [];
-    const memberList: string[] = Array.isArray(members) ? members : [members];
-
-    this.logger.debug(
-      `Creating mailing list ${mailStr} in James with ${memberList.length} members`
-    );
-
-    // Get email addresses for all members
-    const memberMails = await this.getMemberEmails(memberList);
-
-    // Add each member to the James address group (parallelize)
-    await Promise.all(
-      memberMails.map(memberMail =>
-        this.callWebAdminApi(
-          'ldapgroupadddone:mailingList',
-          `${this.webadminUrl}/address/groups/${mailStr}/${memberMail}`,
-          'PUT',
-          dn,
-          null,
-          { groupMail: mailStr, memberMail }
-        )
-      )
-    );
+  private inMailingListBranch(dn: string, event: string): boolean {
+    const branches = this.config.james_mailing_list_branch || [];
+    if (!branches.some(branch => dn === branch || dn.endsWith(',' + branch)))
+      return false;
+    this.logger.error({
+      plugin: this.name,
+      event,
+      dn,
+      mailboxType: 'teamMailbox',
+      error: `Team mailbox cannot be in mailing list branches: ${branches.join(', ')}`,
+    });
+    return true;
   }
 
   /**
@@ -1406,20 +1263,6 @@ export default class James extends TwakePlugin {
         `Failed to remove members from team mailbox ${mailStr}: ${errorMsg}`
       );
     }
-  }
-
-  /**
-   * Delete a mailing list from James
-   */
-  private async deleteMailingList(dn: string, mailStr: string): Promise<void> {
-    await this.callWebAdminApi(
-      'deleteMailingList',
-      `${this.webadminUrl}/address/groups/${mailStr}`,
-      'DELETE',
-      dn,
-      null,
-      { groupMail: mailStr }
-    );
   }
 
   /**

@@ -115,7 +115,6 @@ export default class MyPlugin extends DmPlugin {
 - 📧 **Automatic LDAP → James Sync**
 - 🔄 **Mail Address Changes** - Account renaming + data
 - 💾 **Quota Management** - Automatic updates
-- 👥 **Mailing Lists** - LDAP Groups → Address Groups
 - 📨 **Mail Aliases** - mailAlternateAddress → James aliases
 - 🎯 **WebAdmin API** - REST Communication
 
@@ -156,33 +155,6 @@ James WebAdmin: PUT /quota/users/alice@.../size
   → Quota updated immediately
   ✅ CONSISTENCY GUARANTEED
 ```
-
-<!-- end_slide -->
-
-# James Plugin - List Consistency
-
-## LDAP Groups → James Address Groups
-
-```bash
-# Create a group with mail attribute
-POST /api/v1/ldap/groups
-{
-  "cn": "engineering",
-  "mail": "engineering@company.com",
-  "member": ["uid=alice,...", "uid=bob,..."]
-}
-```
-
-### Automatic List Consistency
-
-1. ✅ **Creation** → Group created in James + members added
-2. ✅ **Add Member** → Member added to James list
-3. ✅ **Remove Member** → Member removed from James list
-4. ✅ **Delete Group** → List deleted in James
-
-### Guarantee
-
-**LDAP is the source of truth, James stays synchronized**
 
 <!-- end_slide -->
 
