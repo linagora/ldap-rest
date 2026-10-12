@@ -20,6 +20,9 @@
 - `twake/groups.json`, `standard/groups.json`: a group's `owner` accepts any
   entry under the base, as `member` does, instead of only the direct children
   of the base; a group owned by an account could not be saved
+- `ldap/groups`: adding a member, or creating a group with one, that does not
+  exist answers 400 naming it instead of 500 "check logs",
+  [docs](docs/client-development/api/rest-api.md#add-group-member)
 
 ## v0.17.1 (2026-10-10)
 

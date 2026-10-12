@@ -401,6 +401,34 @@ describe('LdapGroups Plugin', function () {
       });
     });
 
+    it('should answer 400 naming a member that does not exist', async () => {
+      await plugin.addGroup('testgroup');
+      const ghost = `uid=nobody,${process.env.DM_LDAP_BASE}`;
+      let res = await request
+        .post('/api/v1/ldap/groups/testgroup/members')
+        .type('json')
+        .send({ member: [user2, ghost] });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(`Member ${ghost} not found`);
+      expect(
+        (await plugin.searchGroupsByName('testgroup')).testgroup.member
+      ).to.deep.equal([]);
+
+      res = await request
+        .post('/api/v1/ldap/groups')
+        .type('json')
+        .send({ cn: 'testgroupghost', member: [ghost] });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(`Member ${ghost} not found`);
+
+      res = await request
+        .post('/api/v1/ldap/groups/testgroup/members')
+        .type('json')
+        .send({ member: 'nobody' });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal('Member nobody is not a valid DN');
+    });
+
     it('should list via API', async () => {
       let res = await request
         .post('/api/v1/ldap/groups')

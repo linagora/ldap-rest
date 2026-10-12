@@ -1075,6 +1075,16 @@ curl -X POST \
 }
 ```
 
+A member that does not exist answers 400 naming it, and none of the members
+is added (unless `--group-allow-unexistent-members` is set). Group creation
+checks its `member` list the same way:
+
+```json
+{
+  "error": "Member uid=nobody,ou=users,dc=example,dc=com not found"
+}
+```
+
 ### Remove Group Member
 
 Remove a user from a group.

@@ -420,6 +420,8 @@ export default class LdapGroups extends DmPlugin {
      *     content:
      *       application/json:
      *         example: { success: true }
+     *   '400':
+     *     description: A member does not exist or is not a DN; none is added.
      */
     // Add member to group
     app.post(
@@ -1136,6 +1138,11 @@ export default class LdapGroups extends DmPlugin {
             try {
               await this.ldap.search({ paged: false, scope: 'base' }, m);
             } catch (e) {
+              const code = extractLdapCode(e);
+              if (code === 32)
+                throw new BadRequestError(`Member ${m} not found`);
+              if (code === 34)
+                throw new BadRequestError(`Member ${m} is not a valid DN`);
               // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
               throw new Error(`Member ${m} not found: ${e}`);
             }
@@ -1143,6 +1150,7 @@ export default class LdapGroups extends DmPlugin {
         )
       );
     } catch (err) {
+      if (err instanceof HttpError) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to find member(s): ${err}`);
     }
