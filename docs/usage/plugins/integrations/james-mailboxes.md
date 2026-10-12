@@ -136,6 +136,25 @@ await dm.ldap.add('cn=developers,ou=groups,dc=example,dc=com', {
 
 This creates a simple group without any James integration (no mail attribute, no mailbox).
 
+## Following the group
+
+`twake/james` compares a team mailbox group before and after each write made
+through LDAP-Rest, whatever made it: the groups API, its `/members` routes,
+or any other write to the entry.
+
+- A member added or removed is added to or removed from the mailbox.
+- A group created as a team mailbox, or that becomes one, gets the mailbox
+  created with all its members.
+- A group that stops being one (another type, no `mail`, moved into a mailing
+  list branch, or deleted) leaves its mailbox in James with no member. The
+  mailbox is never deleted: it may hold mail.
+- A new `mail` empties the mailbox of the old address and creates the one of
+  the new address.
+
+The writes to one group reach James one after the other. A deleted
+user stays in the team mailboxes it belonged to: once its entry is gone, its
+address cannot be read.
+
 ## API Endpoints Used
 
 ### Team Mailboxes
@@ -143,7 +162,6 @@ This creates a simple group without any James integration (no mail attribute, no
 - **Create**: `PUT /domains/{domain}/team-mailboxes/{teamMailbox}`
 - **Add member**: `PUT /domains/{domain}/team-mailboxes/{teamMailbox}/members/{memberEmail}`
 - **Delete member**: `DELETE /domains/{domain}/team-mailboxes/{teamMailbox}/members/{memberEmail}`
-- **Delete**: `DELETE /domains/{domain}/team-mailboxes/{teamMailbox}`
 
 ## Validation Rules
 
@@ -168,10 +186,8 @@ created anywhere else in the LDAP tree.
 
 - `cn=sales-team,ou=lists,dc=example,dc=com` with `twakeMailboxType=teamMailbox` ❌ (reserved for lists)
 
-**Validation Points:**
-
-- Group creation (`ldapgroupadddone`)
-- Mailbox type transitions (`handleMailboxTypeTransition`)
+**Validation Points:** every write to the group. A team mailbox in these
+branches gets no member either.
 
 **Error Handling:**
 
@@ -287,39 +303,19 @@ ldapmodify -Y EXTERNAL -H ldapi:/// -f docs/examples/twake-mailbox-type-schema-a
 sed 's/{ldap_base}/dc=example,dc=com/g' docs/examples/twake-mailbox-type-nomenclature.ldif | \
   ldapadd -x -D "cn=admin,dc=example,dc=com" -W
 
-# Run team mailbox tests
-npm run test:one test/plugins/twake/jamesTeamMailboxes.test.ts
-
-# Run mailbox type transition tests
-npm run test:one test/plugins/twake/jamesMailboxTypeTransitions.test.ts
+# Run the group tests
+npm run test:one test/plugins/twake/jamesGroups.test.ts
 ```
 
 ### Test Coverage
 
-- **jamesTeamMailboxes.test.ts** (4 tests):
-  - Create team mailbox
-  - Add member to team mailbox
-  - Remove member from team mailbox
-  - Delete team mailbox group (removes members, preserves mailbox)
+**jamesGroups.test.ts** drives the groups API and records every call made to
+James:
 
-- **jamesMailboxTypeTransitions.test.ts** (5 tests):
-  - Transition from mailingList to teamMailbox
-  - Transition from teamMailbox to mailingList
-  - Transition from group to teamMailbox
-  - Transition from teamMailbox to group
-  - Delete group with teamMailbox (removes members only)
-
-- **jamesBranchValidation.test.ts** (4 tests):
-  - Allow team mailbox outside mailing list branch
-  - Reject team mailbox inside mailing list branch
-  - Reject transition to team mailbox inside mailing list branch
-  - Allow team mailboxes anywhere when restrictions disabled
-
-- **jamesMailingLists.test.ts** (5 tests):
-  - No address group for a mailing list, typed or not, created then deleted
-  - No James call for a group without mail
-  - No address group when `ldapgroupmodifydone` reports member changes of a list
-  - A team mailbox is still created with its members
+- Mailing lists, typed or not: no address group, from creation to deletion
+- A group without mail: no call
+- Team mailboxes: creation, the `/members` routes, a `replace` of the
+  members, deletion, type changes, a new address, a mailing list branch
 
 ## References
 
