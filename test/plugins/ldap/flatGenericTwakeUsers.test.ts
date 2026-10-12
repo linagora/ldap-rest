@@ -672,7 +672,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
-        expect(err.message).to.include('points to invalid or non-existent DN');
+        expect(err.message).to.include(
+          'Attribute "twakeAccountStatus" points to invalid or non-existent DN'
+        );
       }
     });
 
@@ -696,7 +698,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         expect.fail('Should have thrown an error');
       } catch (err: any) {
         expect(err.message).to.include(
-          'must point to a DN within allowed branches'
+          'Attribute "twakeAccountStatus" must point to a DN within allowed branches'
         );
       }
     });
@@ -725,7 +727,7 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         expect.fail('Should have thrown an error');
       } catch (err: any) {
         expect(err.message).to.include(
-          'must point to a DN within allowed branches'
+          'Attribute "twakeAccountStatus" must point to a DN within allowed branches'
         );
       }
     });
@@ -768,7 +770,9 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
         });
         expect.fail('Should have thrown an error');
       } catch (err: any) {
-        expect(err.message).to.include('points to invalid or non-existent DN');
+        expect(err.message).to.include(
+          'Attribute "twakeAccountStatus" points to invalid or non-existent DN'
+        );
       } finally {
         await plugin.deleteUser('testuser');
       }

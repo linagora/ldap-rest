@@ -225,6 +225,16 @@ function ldapRefusal(what: string, code: number, error: unknown): Error {
 }
 
 /**
+ * An empty list adds nothing: the directory answers a protocol error, which
+ * reached the client as a 500. A replace with no value is how an attribute
+ * is cleared, and does not come here.
+ */
+function assertHasValue(name: string, value: unknown): void {
+  if (Array.isArray(value) && value.length === 0)
+    throw new BadRequestError(`Attribute "${name}" has no value`);
+}
+
+/**
  * Wrap a write failure, turning a refusal of the request's content (see
  * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
  * tells it to check logs it cannot read.
@@ -1252,6 +1262,7 @@ class ldapActions {
     // Convert to Attribute objects
     const attributes: Attribute[] = [];
     for (const [key, value] of Object.entries(entry)) {
+      assertHasValue(key, value);
       const values = (Array.isArray(value) ? value : [value]) as
         | string[]
         | Buffer[];
@@ -1339,6 +1350,7 @@ class ldapActions {
     );
     if (changes.add) {
       for (const [key, value] of Object.entries(changes.add)) {
+        assertHasValue(key, value);
         ldapChanges.push(
           new Change({
             operation: 'add',

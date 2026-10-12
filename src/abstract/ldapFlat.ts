@@ -1906,7 +1906,7 @@ export default abstract class LdapFlat extends DmPlugin {
     if (attr.type === 'pointer') {
       if (typeof value !== 'string') {
         throw new BadRequestError(
-          `Field ${field} must be a string (DN pointer)`
+          `Attribute "${field}" must be a string (DN pointer)`
         );
       }
 
@@ -1922,7 +1922,7 @@ export default abstract class LdapFlat extends DmPlugin {
         );
         if (!isInBranch) {
           throw new BadRequestError(
-            `Field ${field} must point to a DN within allowed branches: ${attr.branch.join(', ')}`
+            `Attribute "${field}" must point to a DN within allowed branches: ${attr.branch.join(', ')}`
           );
         }
       }
@@ -1944,12 +1944,12 @@ export default abstract class LdapFlat extends DmPlugin {
           result.searchEntries.length === 0
         )
           throw new BadRequestError(
-            `Field ${field} points to non-existent DN: ${dnValue}`
+            `Attribute "${field}" points to non-existent DN: ${dnValue}`
           );
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         throw new BadRequestError(
-          `Field ${field} points to invalid or non-existent DN: ${dnValue}`
+          `Attribute "${field}" points to invalid or non-existent DN: ${dnValue}`
         );
       }
     }

@@ -168,7 +168,7 @@ Shows 4xx and 5xx responses:
 
 ```
 [info] GET /api/v1/ldap/users/notfound 404 12ms
-[info] POST /api/v1/ldap/users 400 8ms {"error":"Missing required field: cn"}
+[info] POST /api/v1/ldap/users 400 8ms {"error":"Attribute \"cn\" is required"}
 [info] GET /api/v1/ldap/users 500 234ms {"error":"LDAP connection timeout"}
 ```
 

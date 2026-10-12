@@ -156,4 +156,37 @@ describe('Translated hints in refusals', function () {
       'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'
     );
   });
+
+  it('should refuse a value of the wrong type on a group modify', async () => {
+    const dn = `cn=hint-modify,${process.env.DM_LDAP_GROUP_BASE || `ou=groups,${base}`}`;
+    await server.ldap.delete(dn).catch(() => undefined);
+    await server.ldap.add(dn, {
+      objectClass: ['top', 'groupOfNames', 'twakeStaticGroup'],
+      cn: 'hint-modify',
+      member: userDn,
+    });
+    try {
+      const res = await request
+        .put('/api/v1/ldap/groups/hint-modify')
+        .type('json')
+        .send({ replace: { mail: 42 } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'
+      );
+    } finally {
+      await server.ldap.delete(dn).catch(() => undefined);
+    }
+  });
+
+  it('should name a missing attribute as the other routes do', async () => {
+    const res = await request
+      .post('/api/v1/ldap/groups')
+      .type('json')
+      .send({ cn: 'hint-missing' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.equal(
+      'Attribute "twakeDepartmentLink" is required'
+    );
+  });
 });

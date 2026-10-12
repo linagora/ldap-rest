@@ -1320,7 +1320,8 @@ export default class LdapOrganizations extends DmPlugin {
       entry,
       this.server.loadedPlugins
     );
-    if (missing) throw new BadRequestError(`Missing required field ${missing}`);
+    if (missing)
+      throw new BadRequestError(`Attribute "${missing}" is required`);
     return true;
   }
 
@@ -1361,12 +1362,18 @@ export default class LdapOrganizations extends DmPlugin {
     const fieldTest = this.schema.attributes[field];
     if (!fieldTest) {
       if (this.schema.strict)
-        throw new BadRequestError(`Field ${field} is not allowed`);
+        throw new BadRequestError(`Attribute "${field}" is not allowed`);
       return true;
     }
-    if (value === null || value === undefined) {
+    // An empty list is no value: a replace clears the attribute with it, and
+    // ldapActions refuses it on an add or a creation
+    if (
+      value === null ||
+      value === undefined ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       if (fieldTest.required)
-        throw new BadRequestError(`Field ${field} is required`);
+        throw new BadRequestError(`Attribute "${field}" is required`);
       return true;
     }
 
@@ -1375,7 +1382,7 @@ export default class LdapOrganizations extends DmPlugin {
     // list refused, with a 500, the string an existing client still sends for
     // an attribute a schema turned into an array (`telephoneNumber`).
     if (fieldTest.type === 'string' && Array.isArray(value))
-      throw new BadRequestError(`Field ${field} must be a single value`);
+      throw new BadRequestError(`Attribute "${field}" must be a single value`);
 
     await checkDnValues(field, fieldTest, value, dn => this.entryExists(dn));
     return matchesPattern(fieldTest, value);
