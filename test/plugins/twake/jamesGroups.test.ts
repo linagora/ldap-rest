@@ -19,6 +19,7 @@ describe('James and groups', () => {
 
   let dm: DM;
   let groups: LdapGroups;
+  let james: James;
   const calls: string[] = [];
   const users: string[] = [];
 
@@ -50,7 +51,7 @@ describe('James and groups', () => {
   const addressGroupCalls = (): string[] =>
     calls.filter(call => call.includes('/address/groups'));
 
-  // The user hooks also see a group's mail (identity, rename)
+  // Leaves out the identities of the users created in before()
   const groupCalls = (): string[] =>
     calls.filter(
       call =>
@@ -93,12 +94,13 @@ describe('James and groups', () => {
     dm = new DM();
     dm.config.delegation_attribute = 'twakeDelegatedUsers';
     dm.config.james_init_delay = 0;
-    dm.config.group_classes = ['top', 'groupOfNames', 'twakeStaticGroup'];
+    dm.config.group_class = ['top', 'groupOfNames', 'twakeStaticGroup'];
     await dm.ready;
     groups = new LdapGroups(dm);
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
     await dm.registerPlugin('ldapGroups', groups);
-    await dm.registerPlugin('james', new James(dm));
+    james = new James(dm);
+    await dm.registerPlugin('james', james);
 
     const scope = nock(
       process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
@@ -260,6 +262,49 @@ describe('James and groups', () => {
       ];
       expect(await reached(expected)).to.deep.equal(expected);
       await deleteTeamMailbox(dn, 'tm-new', 'mlalice');
+    });
+
+    it('makes no user call for the address of a group', async () => {
+      const list = await addGroup('ml-user', 'mailingList');
+      const dn = await addGroup('tm-user', 'teamMailbox');
+      await reached(created('tm-user'));
+      await groups.modifyGroup(dn, {
+        replace: { mail: `tm-renamed-${timestamp}@test.org` },
+      });
+      await reached([
+        ...created('tm-user'),
+        `DELETE ${mailbox('tm-user')}/members/${user('mlalice')}`,
+        ...created('tm-renamed'),
+      ]);
+      await settle();
+
+      expect(
+        calls.filter(
+          call =>
+            call.includes('/users/') &&
+            /(ml-user|tm-user|tm-renamed)-/.test(call)
+        )
+      ).to.deep.equal([]);
+      await groups.deleteGroup(list);
+      await deleteTeamMailbox(dn, 'tm-renamed', 'mlalice');
+    });
+
+    it('leaves a group out of the quota, forward and delegation hooks', async () => {
+      const dn = await addGroup('tm-hooks', 'teamMailbox');
+      await reached(created('tm-hooks'));
+      calls.length = 0;
+      const address = `tm-hooks-${timestamp}@test.org`;
+
+      // The shipped group schemas carry none of these attributes: a raw
+      // write, or a schema extending them, is what would fire the hooks
+      await james.hooks.onLdapQuotaChange!(dn, address, 0, 1024);
+      await james.hooks.onLdapForwardChange!(dn, address, [], [user('mlbob')]);
+      await james.hooks.onLdapChange!(dn, {
+        twakeDelegatedUsers: [[], [bob]],
+      });
+
+      expect(calls).to.deep.equal([]);
+      await deleteTeamMailbox(dn, 'tm-hooks', 'mlalice');
     });
 
     it('creates none in a mailing list branch, nor follows its members', async () => {

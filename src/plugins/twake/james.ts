@@ -87,6 +87,14 @@ const memberKey = (dn: string): string => {
   }
 };
 
+// James has accounts for users only: the address of a group is a list Twake
+// Mail reads from LDAP, or a team mailbox
+const GROUP_CLASSES = ['groupofnames', 'groupofuniquenames', 'groupofurls'];
+const isGroup = (classes: AttributeValue | undefined): boolean =>
+  (Array.isArray(classes) ? classes : classes ? [classes] : []).some(c =>
+    GROUP_CLASSES.includes(String(c).toLowerCase())
+  );
+
 export default class James extends TwakePlugin {
   name = 'james';
   roles: Role[] = ['consistency', 'api'] as const;
@@ -284,10 +292,7 @@ export default class James extends TwakePlugin {
       const quota = attributes[this.quotaAttr];
       const aliases = attributes[this.aliasAttr];
 
-      if (!mail) {
-        // Not a user with mail, skip
-        return;
-      }
+      if (!mail || isGroup(attributes.objectClass)) return;
 
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
@@ -373,6 +378,7 @@ export default class James extends TwakePlugin {
         );
         return;
       }
+      if (await this.isGroupDn(dn)) return;
 
       // Rename the mailbox
       await this.callWebAdminApi(
@@ -438,6 +444,7 @@ export default class James extends TwakePlugin {
       oldAliases: string[],
       newAliases: string[]
     ) => {
+      if (await this.isGroupDn(dn)) return;
       // Normalize aliases
       const oldNormalized = oldAliases.map(a => this.normalizeAlias(a));
       const newNormalized = newAliases.map(a => this.normalizeAlias(a));
@@ -473,12 +480,13 @@ export default class James extends TwakePlugin {
         ),
       ]);
     },
-    onLdapQuotaChange: (
+    onLdapQuotaChange: async (
       dn: string,
       mail: string,
       oldQuota: number,
       newQuota: number
     ) => {
+      if (await this.isGroupDn(dn)) return;
       return this.callWebAdminApi(
         'onLdapQuotaChange',
         `${this.webadminUrl}/quota/users/${mail}/size`,
@@ -495,6 +503,7 @@ export default class James extends TwakePlugin {
       oldForwards: string[],
       newForwards: string[]
     ) => {
+      if (await this.isGroupDn(dn)) return;
       const domain = this.extractMailDomain(mail);
       if (!domain) {
         this.logger.error(
@@ -538,7 +547,8 @@ export default class James extends TwakePlugin {
     onLdapChange: async (dn: string, changes: ChangesToNotify) => {
       if (
         this.config.delegation_attribute &&
-        changes[this.config.delegation_attribute]
+        changes[this.config.delegation_attribute] &&
+        !(await this.isGroupDn(dn))
       ) {
         await this._handleDelegationChange(dn, changes);
       }
@@ -549,13 +559,13 @@ export default class James extends TwakePlugin {
       // oldDisplayName: string | null,
       // newDisplayName: string | null
     ) => {
-      // Get mail and display name attributes using cached ldapGetAttributes
       const attrs = [
         this.mailAttr,
         this.displayNameAttr,
         'cn',
         'givenName',
         'sn',
+        'objectClass',
       ];
 
       const entry = await this.ldapGetAttributes(dn, attrs);
@@ -565,6 +575,7 @@ export default class James extends TwakePlugin {
         );
         return;
       }
+      if (isGroup(entry.objectClass)) return;
 
       const mail = this.attributeToString(entry[this.mailAttr]);
 
@@ -727,6 +738,11 @@ export default class James extends TwakePlugin {
     if (mail) return mail;
 
     return null;
+  }
+
+  private async isGroupDn(dn: string): Promise<boolean> {
+    const entry = await this.ldapGetAttributes(dn, ['objectClass']);
+    return isGroup(entry?.objectClass);
   }
 
   async getMailFromDN(dn: string): Promise<string | null> {
