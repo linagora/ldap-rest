@@ -7,6 +7,13 @@
 - Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
   [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 
+### Fixes
+
+- `twake/james`: team mailboxes are created in TMail, which names them by the
+  local part of the address, which the plugin sent whole. An address TMail
+  cannot name a team mailbox after, such as one with a dot, is logged,
+  [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes)
+
 ## v0.18.0 (2026-10-12)
 
 ### Breaking Changes

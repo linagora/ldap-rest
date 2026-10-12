@@ -683,24 +683,47 @@ export default class James extends TwakePlugin {
 
   private teamMailboxQueue: Map<string, Promise<void>> = new Map();
 
+  /**
+   * The WebAdmin path of the team mailbox at this address: TMail names it
+   * by the local part, under its domain. Null, logged, for an address TMail
+   * cannot name a team mailbox after.
+   */
+  private teamMailboxUrl(dn: string, mail: string): string | null {
+    const at = mail.lastIndexOf('@');
+    const name = mail.slice(0, at);
+    const domain = this.extractMailDomain(mail);
+    if (at > 0 && domain && /^[#a-zA-Z0-9_-]{1,255}$/.test(name))
+      return `${this.webadminUrl}/domains/${domain}/team-mailboxes/${encodeURIComponent(name)}`;
+    this.logger.error({
+      plugin: this.name,
+      event: 'teamMailbox',
+      dn,
+      mail,
+      error:
+        'A team mailbox address is a name of letters, digits, #, - and _ at a domain',
+    });
+    return null;
+  }
+
   private async teamMailboxMembers(
     dn: string,
     mail: string,
     method: 'PUT' | 'DELETE',
     memberDns: string[]
   ): Promise<void> {
-    const domain = this.extractMailDomain(mail);
-    if (!domain || !memberDns.length) return;
+    if (!memberDns.length) return;
+    const url = this.teamMailboxUrl(dn, mail);
+    if (!url) return;
     const memberMails = await this.getMemberEmails(memberDns);
     await Promise.all(
       memberMails.map(memberMail =>
         this.callWebAdminApi(
           `teamMailbox:${method === 'PUT' ? 'addMember' : 'removeMember'}`,
-          `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mail}/members/${memberMail}`,
+          `${url}/members/${memberMail}`,
           method,
           dn,
           null,
-          { domain, teamMailbox: mail, memberMail }
+          { teamMailbox: mail, memberMail }
         )
       )
     );
@@ -1060,28 +1083,14 @@ export default class James extends TwakePlugin {
     attributes: AttributesList,
     mailStr: string
   ): Promise<void> {
-    const domain = this.extractMailDomain(mailStr);
-    if (!domain) {
-      this.logger.error({
-        plugin: this.name,
-        event: 'createTeamMailbox',
-        dn,
-        mail: mailStr,
-        error: 'Cannot extract domain from mail address',
-      });
-      return;
-    }
+    const url = this.teamMailboxUrl(dn, mailStr);
+    if (!url) return;
 
     // Create the team mailbox first: TMail answers 404 to an addMember
     // for a team mailbox that does not exist yet
-    await this.callWebAdminApi(
-      'teamMailbox:create',
-      `${this.webadminUrl}/domains/${domain}/team-mailboxes/${mailStr}`,
-      'PUT',
-      dn,
-      null,
-      { domain, teamMailbox: mailStr }
-    );
+    await this.callWebAdminApi('teamMailbox:create', url, 'PUT', dn, null, {
+      teamMailbox: mailStr,
+    });
     await this.teamMailboxMembers(dn, mailStr, 'PUT', members(attributes));
   }
 
