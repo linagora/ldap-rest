@@ -1,4 +1,6 @@
 import { expect } from 'chai';
+import supertest from 'supertest';
+import ConfigApi from '../../../src/plugins/configApi';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
@@ -12,6 +14,7 @@ process.env.DM_GROUP_SCHEMA = '';
 describe('External users in groups', function () {
   let server: DM;
   let plugin: LdapGroups;
+  let external: ExternalUsersInGroups;
   const user1 = `mail=toto@toto.org,${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
 
   before(async () => {
@@ -19,10 +22,8 @@ describe('External users in groups', function () {
     await server.ready;
     plugin = new LdapGroups(server);
     await server.registerPlugin('ldapGroups', plugin);
-    await server.registerPlugin(
-      'externalUsersInGroups',
-      new ExternalUsersInGroups(server)
-    );
+    external = new ExternalUsersInGroups(server);
+    await server.registerPlugin('externalUsersInGroups', external);
   });
 
   afterEach(async () => {
@@ -116,6 +117,18 @@ describe('External users in groups', function () {
       }
     });
 
+    it('should reject a managed domain written in another case', async () => {
+      const upper = `mail=internal@${managedDomain.toUpperCase()},${process.env.DM_EXTERNAL_MEMBERS_BRANCH}`;
+      try {
+        await plugin.addGroup('testgroup2', [upper]);
+        expect.fail('Should reject managed domain');
+      } catch (e) {
+        expect((e as Error).message).to.match(
+          /Cannot create external user with managed domain/
+        );
+      }
+    });
+
     it('should reject external member with managed domain', async () => {
       try {
         await plugin.addGroup('testgroup2', [managedUser]);
@@ -166,6 +179,85 @@ describe('External users in groups', function () {
           member: [],
         },
       });
+    });
+  });
+
+  describe('Member addresses', function () {
+    const branch = () => process.env.DM_EXTERNAL_MEMBERS_BRANCH as string;
+    const escaped = () => `mail=a\\+b@toto.org,${branch()}`;
+
+    afterEach(async () => {
+      await plugin.deleteGroup('testgroup3').catch(() => undefined);
+      await plugin.ldap.delete(escaped()).catch(() => undefined);
+    });
+
+    it('stores an escaped address unescaped', async () => {
+      await plugin.addGroup('testgroup3', [escaped()]);
+      expect(
+        (
+          (await plugin.ldap.search(
+            { paged: false },
+            escaped()
+          )) as SearchResult
+        ).searchEntries[0]
+      )
+        .to.have.property('mail')
+        .that.equals('a+b@toto.org');
+    });
+
+    it('takes a mail RDN right under the branch, read as a DN', () => {
+      expect(external.externalAddress(`mail=x@y.org,${branch()}`)).to.equal(
+        'x@y.org'
+      );
+      expect(
+        external.externalAddress(`MAIL=x@y.org, ${branch().toUpperCase()}`)
+      ).to.equal('x@y.org');
+      expect(
+        external.externalAddress(`mail=a\\2bb@y.org,${branch()}`)
+      ).to.equal('a+b@y.org');
+      for (const other of [
+        `cn=x,mail=x@y.org,${branch()}`,
+        `uid=x,${branch()}`,
+        `mail=x@y.org+cn=x,${branch()}`,
+        `mail=x@y.org,${process.env.DM_LDAP_BASE}`,
+      ])
+        expect(external.externalAddress(other), other).to.be.null;
+    });
+
+    it('reads no pattern in the branch', () => {
+      const saved = server.config.external_members_branch;
+      // `.` would match the `e` of the member's branch as a regex
+      server.config.external_members_branch = branch().replace(
+        /^ou=external/,
+        'ou=.xternal'
+      );
+      try {
+        expect(external.externalAddress(`mail=x@y.org,${branch()}`)).to.be.null;
+      } finally {
+        server.config.external_members_branch = saved;
+      }
+    });
+  });
+
+  describe('Config API', function () {
+    it('publishes the branch, the RDN attribute and the managed domains', async () => {
+      const saved = server.config.mail_domain;
+      server.config.mail_domain = ['Example.COM'];
+      try {
+        await server.registerPlugin('configApi', new ConfigApi(server));
+        const res = await supertest(server.app)
+          .get('/api/v1/config')
+          .set('Accept', 'application/json');
+        expect(res.status).to.equal(200);
+        expect(res.body.features.externalUsersInGroups).to.deep.equal({
+          enabled: true,
+          branch: process.env.DM_EXTERNAL_MEMBERS_BRANCH,
+          mainAttribute: 'mail',
+          managedDomains: ['example.com'],
+        });
+      } finally {
+        server.config.mail_domain = saved;
+      }
     });
   });
 });
