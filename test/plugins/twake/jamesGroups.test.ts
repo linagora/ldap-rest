@@ -110,7 +110,9 @@ describe('James and groups', () => {
     [alice, bob] = users;
   });
 
-  beforeEach(() => {
+  // The cleanup of the previous test may still be on its way to James
+  beforeEach(async () => {
+    await settle();
     calls.length = 0;
   });
 
