@@ -8,11 +8,13 @@
     "base": "ou=users,__ldap_base__",
     "label": {
       "en": "Users",
-      "fr": "Utilisateurs"
+      "fr": "Utilisateurs",
+      "mn": "Хэрэглэгчид"
     },
     "singularLabel": {
       "en": "user",
-      "fr": "utilisateur"
+      "fr": "utilisateur",
+      "mn": "хэрэглэгч"
     }
   },
   "strict": true,
@@ -43,7 +45,8 @@
       },
       "label": {
         "en": "Identifier",
-        "fr": "Identifiant"
+        "fr": "Identifiant",
+        "mn": "Нэвтрэх нэр"
       }
     },
     "employeeNumber": {
@@ -54,7 +57,8 @@
       "role": "employeeId",
       "label": {
         "en": "Employee ID",
-        "fr": "Matricule"
+        "fr": "Matricule",
+        "mn": "Ажилтны дугаар"
       }
     },
     "cn": {
@@ -63,7 +67,8 @@
       "required": false,
       "label": {
         "en": "Common name",
-        "fr": "Nom d'annuaire"
+        "fr": "Nom d'annuaire",
+        "mn": "Лавлахын нэр"
       }
     },
     "sn": {
@@ -72,7 +77,8 @@
       "required": true,
       "label": {
         "en": "Last name",
-        "fr": "Nom de famille"
+        "fr": "Nom de famille",
+        "mn": "Овог"
       }
     },
     "givenName": {
@@ -81,7 +87,8 @@
       "required": true,
       "label": {
         "en": "First name",
-        "fr": "Prénom"
+        "fr": "Prénom",
+        "mn": "Нэр"
       }
     },
     "displayName": {
@@ -90,7 +97,8 @@
       "required": true,
       "label": {
         "en": "Full name",
-        "fr": "Nom complet"
+        "fr": "Nom complet",
+        "mn": "Бүтэн нэр"
       }
     },
     "personalTitle": {
@@ -99,7 +107,8 @@
       "required": false,
       "label": {
         "en": "Title",
-        "fr": "Civilité"
+        "fr": "Civilité",
+        "mn": "Хандах хэлбэр"
       }
     },
     "title": {
@@ -110,7 +119,8 @@
       "role": "position",
       "label": {
         "en": "Position",
-        "fr": "Poste"
+        "fr": "Poste",
+        "mn": "Албан тушаал"
       }
     },
     "description": {
@@ -118,7 +128,8 @@
       "required": false,
       "label": {
         "en": "Comment",
-        "fr": "Commentaire"
+        "fr": "Commentaire",
+        "mn": "Тэмдэглэл"
       }
     },
     "mail": {
@@ -127,7 +138,8 @@
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
       "hint": {
         "en": "Expected an email address, e.g. jane.doe@example.org",
-        "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org"
+        "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
+        "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
       },
       "required": true,
       "unique": {
@@ -138,7 +150,8 @@
       "role": "primaryEmail",
       "label": {
         "en": "Email",
-        "fr": "Adresse électronique"
+        "fr": "Adresse électronique",
+        "mn": "Имэйл хаяг"
       }
     },
     "mailAlternateAddress": {
@@ -148,7 +161,8 @@
         "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
         "hint": {
           "en": "Expected an email address, e.g. jane.doe@example.org",
-          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org"
+          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
+          "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
         }
       },
       "required": false,
@@ -160,7 +174,8 @@
       "role": "emailAliases",
       "label": {
         "en": "Email aliases",
-        "fr": "Alias"
+        "fr": "Alias",
+        "mn": "Нэмэлт имэйл хаягууд"
       }
     },
     "twakeOtherMailbox": {
@@ -170,17 +185,20 @@
         "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
         "hint": {
           "en": "Expected an email address, e.g. jane.doe@example.org",
-          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org"
+          "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
+          "mn": "Имэйл хаяг оруулна уу, жишээ нь jane.doe@example.org"
         }
       },
       "required": false,
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       },
       "label": {
         "en": "Other mailboxes",
-        "fr": "Autres boîtes"
+        "fr": "Autres boîtes",
+        "mn": "Бусад шуудангийн хайрцаг"
       }
     },
     "mailQuotaSize": {
@@ -190,15 +208,18 @@
       "normalize": "byteSize",
       "hint": {
         "en": "Expected pattern xGB, xMB, xKB or a number of bytes",
-        "fr": "Format attendu : xGB, xMB, xKB ou un nombre d'octets"
+        "fr": "Format attendu : xGB, xMB, xKB ou un nombre d'octets",
+        "mn": "Хэлбэр: xGB, xMB, xKB эсвэл байтын тоо"
       },
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       },
       "label": {
         "en": "Mailbox size",
-        "fr": "Taille de boîte"
+        "fr": "Taille de boîte",
+        "mn": "Шуудангийн хайрцгийн хэмжээ"
       }
     },
     "telephoneNumber": {
@@ -206,7 +227,8 @@
       "required": false,
       "label": {
         "en": "Phone",
-        "fr": "Téléphone"
+        "fr": "Téléphone",
+        "mn": "Утас"
       }
     },
     "mobile": {
@@ -214,7 +236,8 @@
       "required": false,
       "label": {
         "en": "Mobile",
-        "fr": "Mobile"
+        "fr": "Mobile",
+        "mn": "Гар утас"
       }
     },
     "postalAddress": {
@@ -222,7 +245,8 @@
       "required": false,
       "label": {
         "en": "Address",
-        "fr": "Adresse"
+        "fr": "Adresse",
+        "mn": "Хаяг"
       }
     },
     "postalCode": {
@@ -230,7 +254,8 @@
       "required": false,
       "label": {
         "en": "Zip code",
-        "fr": "Code postal"
+        "fr": "Code postal",
+        "mn": "Шуудангийн код"
       }
     },
     "l": {
@@ -238,7 +263,8 @@
       "required": false,
       "label": {
         "en": "Locality",
-        "fr": "Commune"
+        "fr": "Commune",
+        "mn": "Суурин газар"
       }
     },
     "userPassword": {
@@ -248,7 +274,8 @@
       "neverReturn": true,
       "label": {
         "en": "Password",
-        "fr": "Mot de passe"
+        "fr": "Mot de passe",
+        "mn": "Нууц үг"
       }
     },
     "pwdReset": {
@@ -258,7 +285,8 @@
       "neverReturn": true,
       "label": {
         "en": "Password reset required",
-        "fr": "Changement de mot de passe requis"
+        "fr": "Changement de mot de passe requis",
+        "mn": "Нууц үгээ солих шаардлагатай"
       }
     },
     "twakeDepartmentLink": {
@@ -268,7 +296,8 @@
       "role": "organizationLink",
       "label": {
         "en": "Department",
-        "fr": "Organisation"
+        "fr": "Organisation",
+        "mn": "Байгууллага"
       }
     },
     "twakeDepartmentPath": {
@@ -279,7 +308,8 @@
       "role": "organizationPath",
       "label": {
         "en": "Department path",
-        "fr": "Chemin"
+        "fr": "Chemin",
+        "mn": "Зам"
       }
     },
     "twakeAccountStatus": {
@@ -297,7 +327,8 @@
       },
       "label": {
         "en": "Status",
-        "fr": "État"
+        "fr": "État",
+        "mn": "Төлөв"
       }
     },
     "twakeDeliveryMode": {
@@ -313,11 +344,13 @@
       ],
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       },
       "label": {
         "en": "Delivery mode",
-        "fr": "Mode de distribution"
+        "fr": "Mode de distribution",
+        "mn": "Хүргэлтийн горим"
       }
     },
     "twakeDeletionDate": {
@@ -326,11 +359,13 @@
       "role": "accountExpiry",
       "hint": {
         "en": "Expected a date not earlier than today",
-        "fr": "Une date à partir d'aujourd'hui est attendue"
+        "fr": "Une date à partir d'aujourd'hui est attendue",
+        "mn": "Өнөөдөр эсвэл түүнээс хойших огноо оруулна уу"
       },
       "label": {
         "en": "Deletion date",
-        "fr": "Date de suppression"
+        "fr": "Date de suppression",
+        "mn": "Устгах огноо"
       }
     },
     "twakeDelegatedUsers": {
@@ -342,11 +377,13 @@
       "required": false,
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       },
       "label": {
         "en": "Delegates",
-        "fr": "Délégués"
+        "fr": "Délégués",
+        "mn": "Төлөөлөгчид"
       }
     },
     "memberOf": {
@@ -359,7 +396,8 @@
       "role": "groupMemberships",
       "label": {
         "en": "Mailing lists",
-        "fr": "Listes de diffusion"
+        "fr": "Listes de diffusion",
+        "mn": "Имэйл жагсаалтууд"
       }
     }
   }

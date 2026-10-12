@@ -2,11 +2,13 @@
   "entity": {
     "label": {
       "en": "Organizations",
-      "fr": "Organisations"
+      "fr": "Organisations",
+      "mn": "Байгууллагууд"
     },
     "singularLabel": {
       "en": "organization",
-      "fr": "organisation"
+      "fr": "organisation",
+      "mn": "байгууллага"
     }
   },
   "strict": true,
@@ -27,14 +29,16 @@
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 ()&/,.'’_-]{0,254}$",
       "hint": {
         "en": "Letters, digits, spaces and ( ) & / , . ' - _, starting with a letter or a digit",
-        "fr": "Lettres, chiffres, espaces et ( ) & / , . ' - _, en commençant par une lettre ou un chiffre"
+        "fr": "Lettres, chiffres, espaces et ( ) & / , . ' - _, en commençant par une lettre ou un chiffre",
+        "mn": "Үсэг, тоо, зай болон ( ) & / , . ' - _, үсэг эсвэл тоогоор эхэлнэ"
       },
       "required": true,
       "unique": true,
       "role": "identifier",
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -43,7 +47,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     },
     "telephoneNumber": {
@@ -54,7 +59,8 @@
       "required": false,
       "label": {
         "en": "Phone",
-        "fr": "Téléphone"
+        "fr": "Téléphone",
+        "mn": "Утас"
       }
     },
     "facsimileTelephoneNumber": {
@@ -62,7 +68,8 @@
       "required": false,
       "label": {
         "en": "Fax",
-        "fr": "Fax"
+        "fr": "Fax",
+        "mn": "Факс"
       }
     },
     "l": {
@@ -70,7 +77,8 @@
       "required": false,
       "label": {
         "en": "Locality",
-        "fr": "Commune"
+        "fr": "Commune",
+        "mn": "Суурин газар"
       }
     },
     "postalAddress": {
@@ -78,7 +86,8 @@
       "required": false,
       "label": {
         "en": "Address",
-        "fr": "Adresse"
+        "fr": "Adresse",
+        "mn": "Хаяг"
       }
     },
     "twakeDepartmentPath": {
@@ -89,7 +98,8 @@
       "role": "organizationPath",
       "label": {
         "en": "Path",
-        "fr": "Chemin"
+        "fr": "Chemin",
+        "mn": "Зам"
       }
     },
     "twakeManagerLink": {
@@ -102,7 +112,8 @@
       "role": "managers",
       "label": {
         "en": "Managers",
-        "fr": "Responsables"
+        "fr": "Responsables",
+        "mn": "Хариуцагчид"
       }
     },
     "twakeDomainLink": {
@@ -115,7 +126,8 @@
       "role": "domainLink",
       "label": {
         "en": "Mail domains",
-        "fr": "Domaines de messagerie"
+        "fr": "Domaines de messagerie",
+        "mn": "Имэйлийн домэйнууд"
       }
     },
     "twakeLocalAdminLink": {
@@ -128,7 +140,8 @@
       "role": "localAdmins",
       "label": {
         "en": "Local administrators",
-        "fr": "Administrateurs locaux"
+        "fr": "Administrateurs locaux",
+        "mn": "Дотоод администраторууд"
       }
     }
   }

@@ -7,24 +7,29 @@
     "pluralName": "listTypes",
     "label": {
       "en": "List types",
-      "fr": "Types de liste"
+      "fr": "Types de liste",
+      "mn": "Жагсаалтын төрлүүд"
     },
     "singularLabel": {
       "en": "list type",
-      "fr": "type de liste"
+      "fr": "type de liste",
+      "mn": "жагсаалтын төрөл"
     },
     "valueLabels": {
       "openList": {
         "en": "Open to all",
-        "fr": "Ouverte à tous"
+        "fr": "Ouverte à tous",
+        "mn": "Бүх хүнд нээлттэй"
       },
       "memberRestrictedList": {
         "en": "Members only",
-        "fr": "Réservée aux membres"
+        "fr": "Réservée aux membres",
+        "mn": "Зөвхөн гишүүдэд"
       },
       "ownerRestrictedList": {
         "en": "Owners only",
-        "fr": "Réservée aux propriétaires"
+        "fr": "Réservée aux propriétaires",
+        "mn": "Зөвхөн эзэмшигчдэд"
       }
     },
     "base": "ou=twakeListType,ou=nomenclature,{ldap_base}"
@@ -46,7 +51,8 @@
       "required": true,
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -54,7 +60,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

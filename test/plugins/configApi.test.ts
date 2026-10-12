@@ -87,6 +87,7 @@ describe('ConfigApi Plugin', () => {
     expect(resource.schema.entity.valueLabels.normal).to.deep.equal({
       en: 'Normal',
       fr: 'Normale',
+      mn: 'Энгийн',
     });
   });
 

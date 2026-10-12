@@ -187,7 +187,11 @@ describe('Twake schemas', () => {
       for (const schema of labelled)
         for (const [name, attr] of Object.entries(schema.attributes)) {
           if (!attr.label) continue;
-          if (typeof attr.label === 'string' || !attr.label.fr)
+          if (
+            typeof attr.label === 'string' ||
+            !attr.label.fr ||
+            !attr.label.mn
+          )
             untranslated.push(name);
         }
       expect(untranslated).to.deep.equal([]);
@@ -213,7 +217,13 @@ describe('Twake schemas', () => {
             entity?.label && typeof entity.label !== 'string'
               ? (entity.label.en ?? '?')
               : '?';
-          if (!text || typeof text === 'string' || !text.en || !text.fr)
+          if (
+            !text ||
+            typeof text === 'string' ||
+            !text.en ||
+            !text.fr ||
+            !text.mn
+          )
             unnamed.push(`${name}.${key}`);
         }
       }
@@ -255,7 +265,10 @@ describe('Twake schemas', () => {
             ['items.hint', attr.items?.hint],
             ['group', attr.group],
           ] as [string, LocalizedText | undefined][])
-            if (text && (typeof text === 'string' || !text.en || !text.fr))
+            if (
+              text &&
+              (typeof text === 'string' || !text.en || !text.fr || !text.mn)
+            )
               untranslated.push(`${file}: ${name}.${key}`);
       }
       expect(untranslated).to.deep.equal([]);

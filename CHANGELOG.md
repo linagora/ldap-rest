@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
+  [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
+
 ## v0.18.0 (2026-10-12)
 
 ### Breaking Changes

@@ -35,6 +35,7 @@ describe('Schemas extending another', () => {
     expect(shipped.attributes.cn.label).to.deep.equal({
       en: 'Common name',
       fr: "Nom d'annuaire",
+      mn: 'Лавлахын нэр',
     });
   });
 
@@ -86,6 +87,7 @@ describe('Schemas extending another', () => {
       expect(attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom complet',
+        mn: 'Лавлахын нэр',
       });
     });
 
@@ -287,6 +289,7 @@ describe('Schemas extending another', () => {
       expect(resource.schema.attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom complet',
+        mn: 'Лавлахын нэр',
       });
       expect(resource.schemaUrl).to.equal('/static/schemas/users.json');
 
