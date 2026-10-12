@@ -122,7 +122,7 @@ export default class ExternalUsersInGroups extends DmPlugin {
     return {
       enabled: true,
       branch: this.config.external_members_branch,
-      mainAttribute: 'mail',
+      rdnAttribute: 'mail',
       managedDomains: this.managedDomains(),
     };
   }

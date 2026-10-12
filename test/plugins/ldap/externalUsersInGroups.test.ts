@@ -252,7 +252,7 @@ describe('External users in groups', function () {
         expect(res.body.features.externalUsersInGroups).to.deep.equal({
           enabled: true,
           branch: process.env.DM_EXTERNAL_MEMBERS_BRANCH,
-          mainAttribute: 'mail',
+          rdnAttribute: 'mail',
           managedDomains: ['example.com'],
         });
       } finally {

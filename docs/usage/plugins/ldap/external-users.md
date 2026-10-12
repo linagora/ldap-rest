@@ -49,13 +49,13 @@ where to send them:
 "externalUsersInGroups": {
   "enabled": true,
   "branch": "ou=contacts,dc=example,dc=com",
-  "mainAttribute": "mail",
+  "rdnAttribute": "mail",
   "managedDomains": ["example.com"]
 }
 ```
 
 A client turns an address into a member with
-`mainAttribute=<escaped address>,<branch>`, and can refuse a `managedDomains`
+`rdnAttribute=<escaped address>,<branch>`, and can refuse a `managedDomains`
 address before sending it.
 
 ## How It Works

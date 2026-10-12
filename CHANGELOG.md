@@ -15,7 +15,9 @@
 
 - `ldap/externalUsersInGroups`: an escaped address (`mail=a\+b@…`) is stored
   unescaped, a managed domain is refused whatever its case, and only the
-  direct children of the branch are external members
+  direct children of the branch are external members. The member DN is
+  compared as a DN: the attribute name and the branch may be written in any
+  case
 
 ## v0.18.0 (2026-10-12)
 
