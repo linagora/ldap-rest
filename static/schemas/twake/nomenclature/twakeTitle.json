@@ -7,44 +7,54 @@
     "pluralName": "titles",
     "label": {
       "en": "Titles",
-      "fr": "Civilités"
+      "fr": "Civilités",
+      "mn": "Хандах хэлбэрүүд"
     },
     "singularLabel": {
       "en": "title",
-      "fr": "civilité"
+      "fr": "civilité",
+      "mn": "хандах хэлбэр"
     },
     "valueLabels": {
       "Dr": {
         "en": "Dr",
-        "fr": "Dr"
+        "fr": "Dr",
+        "mn": "Др."
       },
       "Mr": {
         "en": "Mr",
-        "fr": "M."
+        "fr": "M.",
+        "mn": "Ноён"
       },
       "Mrs": {
         "en": "Mrs",
-        "fr": "Mme"
+        "fr": "Mme",
+        "mn": "Хатагтай"
       },
       "Miss": {
         "en": "Miss",
-        "fr": "Mlle"
+        "fr": "Mlle",
+        "mn": "Авхай"
       },
       "Ms": {
         "en": "Ms",
-        "fr": "Mme"
+        "fr": "Mme",
+        "mn": "Хатагтай"
       },
       "Prof": {
         "en": "Prof.",
-        "fr": "Pr"
+        "fr": "Pr",
+        "mn": "Проф."
       },
       "Hon": {
         "en": "Hon.",
-        "fr": "Honorable"
+        "fr": "Honorable",
+        "mn": "Эрхэм"
       },
       "Excellence": {
         "en": "Excellency",
-        "fr": "Excellence"
+        "fr": "Excellence",
+        "mn": "Эрхэмсэг"
       }
     },
     "base": "ou=twakeTitle,ou=nomenclature,{ldap_base}"
@@ -66,7 +76,8 @@
       "required": true,
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -74,7 +85,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

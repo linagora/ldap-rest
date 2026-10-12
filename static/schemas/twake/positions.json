@@ -8,11 +8,13 @@
     "base": "ou=positions,{ldap_base}",
     "label": {
       "en": "Positions",
-      "fr": "Postes"
+      "fr": "Postes",
+      "mn": "Албан тушаалууд"
     },
     "singularLabel": {
       "en": "position",
-      "fr": "poste"
+      "fr": "poste",
+      "mn": "албан тушаал"
     }
   },
   "strict": true,
@@ -32,13 +34,15 @@
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 &/,.'’-]*$",
       "hint": {
         "en": "Letters, digits, spaces and & / , . ' -, starting with a letter or a digit",
-        "fr": "Lettres, chiffres, espaces et & / , . ' -, en commençant par une lettre ou un chiffre"
+        "fr": "Lettres, chiffres, espaces et & / , . ' -, en commençant par une lettre ou un chiffre",
+        "mn": "Үсэг, тоо, зай болон & / , . ' -, үсэг эсвэл тоогоор эхэлнэ"
       },
       "required": true,
       "role": "identifier",
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -46,7 +50,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

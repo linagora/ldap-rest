@@ -8,11 +8,13 @@
     "base": "ou=groups,__ldap_base__",
     "label": {
       "en": "Groups",
-      "fr": "Groupes"
+      "fr": "Groupes",
+      "mn": "Бүлгүүд"
     },
     "singularLabel": {
       "en": "group",
-      "fr": "groupe"
+      "fr": "groupe",
+      "mn": "бүлэг"
     }
   },
   "strict": true,
@@ -33,13 +35,15 @@
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
       "hint": {
         "en": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
-        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs"
+        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs",
+        "mn": "Имэйл хаягийн @-ээс өмнөх хэсэг: үсэг, тоо болон ! # $ % & ' * + / = ? ^ _ ` { | } . -, дараалсан цэггүй"
       },
       "required": true,
       "role": "identifier",
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -48,7 +52,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     },
     "mail": {
@@ -57,7 +62,8 @@
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
       "hint": {
         "en": "Expected an email address, e.g. all-staff@lists.example.org",
-        "fr": "Une adresse électronique est attendue, par ex. all-staff@lists.example.org"
+        "fr": "Une adresse électronique est attendue, par ex. all-staff@lists.example.org",
+        "mn": "Имэйл хаяг оруулна уу, жишээ нь all-staff@lists.example.org"
       },
       "required": false,
       "unique": {
@@ -69,7 +75,8 @@
       "role": "primaryEmail",
       "label": {
         "en": "Email",
-        "fr": "Adresse électronique"
+        "fr": "Adresse électronique",
+        "mn": "Имэйл хаяг"
       }
     },
     "businessCategory": {
@@ -79,11 +86,13 @@
       "role": "writePolicy",
       "label": {
         "en": "List type",
-        "fr": "Type de liste"
+        "fr": "Type de liste",
+        "mn": "Жагсаалтын төрөл"
       },
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       }
     },
     "twakeMailboxType": {
@@ -91,13 +100,15 @@
       "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
       "group": {
         "en": "Mailbox Settings",
-        "fr": "Paramètres de messagerie"
+        "fr": "Paramètres de messagerie",
+        "mn": "Шуудангийн хайрцгийн тохиргоо"
       },
       "required": false,
       "role": "mailboxType",
       "label": {
         "en": "Group type",
-        "fr": "Type de groupe"
+        "fr": "Type de groupe",
+        "mn": "Бүлгийн төрөл"
       }
     },
     "member": {
@@ -107,14 +118,16 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu"
+          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },
       "required": false,
       "role": "members",
       "label": {
         "en": "Members",
-        "fr": "Membres"
+        "fr": "Membres",
+        "mn": "Гишүүд"
       }
     },
     "owner": {
@@ -124,14 +137,16 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu"
+          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },
       "required": false,
       "role": "owners",
       "label": {
         "en": "Owners",
-        "fr": "Propriétaires"
+        "fr": "Propriétaires",
+        "mn": "Эзэмшигчид"
       }
     },
     "twakeDepartmentLink": {
@@ -141,7 +156,8 @@
       "role": "organizationLink",
       "label": {
         "en": "Department",
-        "fr": "Organisation"
+        "fr": "Organisation",
+        "mn": "Байгууллага"
       }
     },
     "twakeDepartmentPath": {
@@ -152,7 +168,8 @@
       "role": "organizationPath",
       "label": {
         "en": "Department path",
-        "fr": "Chemin"
+        "fr": "Chemin",
+        "mn": "Зам"
       }
     }
   }

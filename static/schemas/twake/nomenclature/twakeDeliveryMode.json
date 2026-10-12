@@ -7,24 +7,29 @@
     "pluralName": "deliveryModes",
     "label": {
       "en": "Delivery modes",
-      "fr": "Modes de distribution"
+      "fr": "Modes de distribution",
+      "mn": "Хүргэлтийн горимууд"
     },
     "singularLabel": {
       "en": "delivery mode",
-      "fr": "mode de distribution"
+      "fr": "mode de distribution",
+      "mn": "хүргэлтийн горим"
     },
     "valueLabels": {
       "normal": {
         "en": "Normal",
-        "fr": "Normale"
+        "fr": "Normale",
+        "mn": "Энгийн"
       },
       "forward": {
         "en": "Forwarded",
-        "fr": "Transférée"
+        "fr": "Transférée",
+        "mn": "Дамжуулсан"
       },
       "localDelivery": {
         "en": "Forwarded, local copy kept",
-        "fr": "Transférée, copie locale conservée"
+        "fr": "Transférée, copie locale conservée",
+        "mn": "Дамжуулсан, дотоод хуулбарыг хадгалсан"
       }
     },
     "base": "ou=twakeDeliveryMode,ou=nomenclature,{ldap_base}"
@@ -46,7 +51,8 @@
       "required": true,
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -54,7 +60,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

@@ -170,6 +170,7 @@ describe('lib/schemaFile', () => {
       expect(schema.attributes.cn.label).to.deep.equal({
         en: 'Common name',
         fr: 'Nom',
+        mn: 'Лавлахын нэр',
       });
       expect(schema.attributes.cn.type).to.equal('string');
       expect(schema).to.not.have.property('extends');

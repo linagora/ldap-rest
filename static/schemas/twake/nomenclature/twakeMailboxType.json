@@ -7,24 +7,29 @@
     "pluralName": "mailboxTypes",
     "label": {
       "en": "Group types",
-      "fr": "Types de groupe"
+      "fr": "Types de groupe",
+      "mn": "Бүлгийн төрлүүд"
     },
     "singularLabel": {
       "en": "group type",
-      "fr": "type de groupe"
+      "fr": "type de groupe",
+      "mn": "бүлгийн төрөл"
     },
     "valueLabels": {
       "group": {
         "en": "Group",
-        "fr": "Groupe"
+        "fr": "Groupe",
+        "mn": "Бүлэг"
       },
       "mailingList": {
         "en": "Distribution list",
-        "fr": "Liste de diffusion"
+        "fr": "Liste de diffusion",
+        "mn": "Түгээх жагсаалт"
       },
       "teamMailbox": {
         "en": "Shared mailbox",
-        "fr": "Boîte partagée"
+        "fr": "Boîte partagée",
+        "mn": "Хамтын шуудангийн хайрцаг"
       }
     },
     "base": "ou=twakeMailboxType,ou=nomenclature,{ldap_base}"
@@ -46,7 +51,8 @@
       "required": true,
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -54,7 +60,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

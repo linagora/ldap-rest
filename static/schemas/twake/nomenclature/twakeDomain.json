@@ -8,11 +8,13 @@
     "base": "ou=domains,ou=nomenclature,{ldap_base}",
     "label": {
       "en": "Mail domains",
-      "fr": "Domaines de messagerie"
+      "fr": "Domaines de messagerie",
+      "mn": "Имэйлийн домэйнууд"
     },
     "singularLabel": {
       "en": "domain",
-      "fr": "domaine"
+      "fr": "domaine",
+      "mn": "домэйн"
     }
   },
   "strict": true,
@@ -31,13 +33,15 @@
       "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$",
       "hint": {
         "en": "A single domain label: letters, digits and hyphens, e.g. example",
-        "fr": "Un seul élément de nom de domaine : lettres, chiffres et tirets, par ex. example"
+        "fr": "Un seul élément de nom de domaine : lettres, chiffres et tirets, par ex. example",
+        "mn": "Домэйн нэрийн нэг хэсэг: үсэг, тоо болон зураас, жишээ нь example"
       },
       "required": true,
       "role": "identifier",
       "label": {
         "en": "Identifier",
-        "fr": "Identifiant"
+        "fr": "Identifiant",
+        "mn": "Тодорхойлогч"
       }
     },
     "associatedDomain": {
@@ -45,13 +49,15 @@
       "test": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$|^\\*$",
       "hint": {
         "en": "A fully qualified domain name (example.org), or * to allow every domain",
-        "fr": "Un nom de domaine complet (example.org), ou * pour autoriser tous les domaines"
+        "fr": "Un nom de domaine complet (example.org), ou * pour autoriser tous les domaines",
+        "mn": "Бүтэн домэйн нэр (example.org), эсвэл бүх домэйныг зөвшөөрөх бол *"
       },
       "required": true,
       "role": ["domainName", "displayName"],
       "label": {
         "en": "Mail domain",
-        "fr": "Domaine de messagerie"
+        "fr": "Domaine de messagerie",
+        "mn": "Имэйлийн домэйн"
       }
     },
     "description": {
@@ -59,7 +65,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }

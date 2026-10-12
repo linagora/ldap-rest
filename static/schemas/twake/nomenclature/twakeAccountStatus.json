@@ -7,28 +7,34 @@
     "pluralName": "accountStatuses",
     "label": {
       "en": "Account states",
-      "fr": "États de compte"
+      "fr": "États de compte",
+      "mn": "Бүртгэлийн төлөвүүд"
     },
     "singularLabel": {
       "en": "account state",
-      "fr": "état de compte"
+      "fr": "état de compte",
+      "mn": "бүртгэлийн төлөв"
     },
     "valueLabels": {
       "active": {
         "en": "Active",
-        "fr": "Actif"
+        "fr": "Actif",
+        "mn": "Идэвхтэй"
       },
       "disabled": {
         "en": "Disabled",
-        "fr": "Désactivé"
+        "fr": "Désactivé",
+        "mn": "Идэвхгүй"
       },
       "noaccess": {
         "en": "No access",
-        "fr": "Sans accès"
+        "fr": "Sans accès",
+        "mn": "Хандах эрхгүй"
       },
       "todelete": {
         "en": "To delete",
-        "fr": "À supprimer"
+        "fr": "À supprimer",
+        "mn": "Устгах"
       }
     },
     "base": "ou=twakeAccountStatus,ou=nomenclature,{ldap_base}"
@@ -50,7 +56,8 @@
       "required": true,
       "label": {
         "en": "Name",
-        "fr": "Nom"
+        "fr": "Nom",
+        "mn": "Нэр"
       }
     },
     "description": {
@@ -58,7 +65,8 @@
       "required": false,
       "label": {
         "en": "Description",
-        "fr": "Description"
+        "fr": "Description",
+        "mn": "Тайлбар"
       }
     }
   }
