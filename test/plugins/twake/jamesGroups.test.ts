@@ -6,6 +6,7 @@ import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import { waitFor } from '../../helpers/waitFor';
 
 describe('James and groups', () => {
   const timestamp = Date.now();
@@ -21,7 +22,8 @@ describe('James and groups', () => {
   const calls: string[] = [];
   const users: string[] = [];
 
-  // James follows the writes after they have answered
+  // No call can be awaited to show that none is made: a regression would
+  // send it within this delay
   const settle = (): Promise<void> =>
     new Promise(resolve => setTimeout(resolve, 500));
 
@@ -38,7 +40,6 @@ describe('James and groups', () => {
       twakeDepartmentLink: groupBase,
       twakeDepartmentPath: 'Test',
     });
-    await settle();
     return dn;
   };
 
@@ -55,6 +56,30 @@ describe('James and groups', () => {
       call =>
         call.includes('/address/groups') || call.includes('/team-mailboxes')
     );
+
+  // James follows a write after it has answered
+  const reached = async (expected: string[]): Promise<string[]> => {
+    await waitFor(() => groupCalls().length >= expected.length, {
+      what: expected.join(', '),
+    });
+    return groupCalls();
+  };
+
+  // The calls creating a team mailbox with alice in it
+  const created = (name: string): string[] => [
+    `PUT ${mailbox(name)}`,
+    `PUT ${mailbox(name)}/members/${user('mlalice')}`,
+  ];
+
+  const deleteTeamMailbox = async (
+    dn: string,
+    name: string,
+    member: string
+  ) => {
+    calls.length = 0;
+    await groups.deleteGroup(dn);
+    await reached([`DELETE ${mailbox(name)}/members/${user(member)}`]);
+  };
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -110,9 +135,7 @@ describe('James and groups', () => {
     [alice, bob] = users;
   });
 
-  // The cleanup of the previous test may still be on its way to James
-  beforeEach(async () => {
-    await settle();
+  beforeEach(() => {
     calls.length = 0;
   });
 
@@ -152,95 +175,91 @@ describe('James and groups', () => {
       await groups.deleteGroup(dn);
       await settle();
 
-      expect(calls).to.deep.equal([]);
+      expect(groupCalls()).to.deep.equal([]);
     });
   });
 
   describe('team mailboxes', () => {
     it('creates the mailbox, then follows the members API', async () => {
       const dn = await addGroup('tm-members', 'teamMailbox');
-      expect(groupCalls()).to.deep.equal([
-        `PUT ${mailbox('tm-members')}`,
-        `PUT ${mailbox('tm-members')}/members/${user('mlalice')}`,
-      ]);
+      expect(await reached(created('tm-members'))).to.deep.equal(
+        created('tm-members')
+      );
 
       calls.length = 0;
+      const added = `PUT ${mailbox('tm-members')}/members/${user('mlbob')}`;
       await groups.addMember(dn, bob);
-      await settle();
+      await reached([added]);
+      const removed = `DELETE ${mailbox('tm-members')}/members/${user('mlalice')}`;
       await groups.deleteMember(dn, alice);
-      await settle();
-      expect(groupCalls()).to.deep.equal([
-        `PUT ${mailbox('tm-members')}/members/${user('mlbob')}`,
-        `DELETE ${mailbox('tm-members')}/members/${user('mlalice')}`,
-      ]);
-      await groups.deleteGroup(dn);
+      expect(await reached([added, removed])).to.deep.equal([added, removed]);
+      await deleteTeamMailbox(dn, 'tm-members', 'mlbob');
     });
 
     it('follows a replace of the members', async () => {
       const dn = await addGroup('tm-replace', 'teamMailbox');
+      await reached(created('tm-replace'));
       calls.length = 0;
 
       await dm.ldap.modify(dn, { replace: { member: [bob] } });
-      await settle();
-
-      expect(groupCalls()).to.have.members([
+      const expected = [
         `PUT ${mailbox('tm-replace')}/members/${user('mlbob')}`,
         `DELETE ${mailbox('tm-replace')}/members/${user('mlalice')}`,
-      ]);
-      await groups.deleteGroup(dn);
+      ];
+      expect(await reached(expected)).to.have.members(expected);
+      await deleteTeamMailbox(dn, 'tm-replace', 'mlbob');
     });
 
     it('empties the mailbox when the group is deleted, and keeps it', async () => {
       const dn = await addGroup('tm-delete', 'teamMailbox');
+      await reached(created('tm-delete'));
       calls.length = 0;
 
       await groups.deleteGroup(dn);
-      await settle();
-
-      expect(groupCalls()).to.deep.equal([
+      const expected = [
         `DELETE ${mailbox('tm-delete')}/members/${user('mlalice')}`,
-      ]);
+      ];
+      expect(await reached(expected)).to.deep.equal(expected);
     });
 
     it('empties the mailbox when the group stops being one, and creates it back', async () => {
       const dn = await addGroup('tm-type', 'teamMailbox');
+      await reached(created('tm-type'));
       calls.length = 0;
 
       await groups.modifyGroup(dn, {
         replace: { twakeMailboxType: `cn=group,${mailboxTypeBase}` },
       });
-      await settle();
-      expect(groupCalls()).to.deep.equal([
+      const emptied = [
         `DELETE ${mailbox('tm-type')}/members/${user('mlalice')}`,
-      ]);
+      ];
+      expect(await reached(emptied)).to.deep.equal(emptied);
 
       calls.length = 0;
       await groups.modifyGroup(dn, {
         replace: { twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}` },
       });
-      await settle();
-      expect(groupCalls()).to.deep.equal([
-        `PUT ${mailbox('tm-type')}`,
-        `PUT ${mailbox('tm-type')}/members/${user('mlalice')}`,
-      ]);
-      await groups.deleteGroup(dn);
+      expect(await reached(created('tm-type'))).to.deep.equal(
+        created('tm-type')
+      );
+      await deleteTeamMailbox(dn, 'tm-type', 'mlalice');
     });
 
     it('moves the members to the new address of the mailbox', async () => {
       const dn = await addGroup('tm-old', 'teamMailbox');
+      await reached(created('tm-old'));
       calls.length = 0;
 
       await groups.modifyGroup(dn, {
         replace: { mail: `tm-new-${timestamp}@test.org` },
       });
-      await settle();
-
-      expect(groupCalls()).to.deep.equal([
+      const expected = [
         `DELETE ${mailbox('tm-old')}/members/${user('mlalice')}`,
         `PUT ${mailbox('tm-new')}`,
         `PUT ${mailbox('tm-new')}/members/${user('mlalice')}`,
-      ]);
-      await groups.deleteGroup(dn);
+      ];
+      expect(await reached(expected)).to.deep.equal(expected);
+      await deleteTeamMailbox(dn, 'tm-new', 'mlalice');
     });
 
     it('creates none in a mailing list branch, nor follows its members', async () => {
