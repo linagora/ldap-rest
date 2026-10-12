@@ -26,6 +26,34 @@ import {
  */
 const USER_NOT_SEEN_YET = [400, 404] as const;
 
+type Identity = {
+  id: string;
+  email: string;
+  mayDelete?: boolean;
+  sortOrder?: number;
+  htmlSignature?: string;
+  textSignature?: string;
+};
+
+/** Signatures an identity carries over, see {@link Identity} */
+export type Signatures = Pick<Identity, 'htmlSignature' | 'textSignature'>;
+
+/**
+ * Twake Mail's default identity among what `?default=true` answered.
+ *
+ * Chosen again here rather than trusted: a server ignoring `default` would
+ * list the server-set identity too, and updating that one is what brought
+ * the duplicate back. `!== false`, not `=== true`: an identity without the
+ * field is not taken for the server-set one, else every name change would
+ * create another.
+ */
+const pickDefaultIdentity = (
+  body: Identity[] | Identity
+): Identity | undefined =>
+  (Array.isArray(body) ? body : [body])
+    .filter(i => i && i.id && i.mayDelete !== false)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
+
 /**
  * OpenAPI schemas specific to the James integration.
  *
@@ -108,6 +136,7 @@ export default class James extends TwakePlugin {
   private quotaAttr: string;
   private aliasAttr: string;
   private mailboxTypeAttr: string;
+  private forwardAttr: string;
   private initDelay: number;
 
   constructor(server: DM) {
@@ -125,6 +154,8 @@ export default class James extends TwakePlugin {
     this.mailboxTypeAttr =
       (this.config.james_mailbox_type_attribute as string) ||
       'twakeMailboxType';
+    this.forwardAttr =
+      (this.config.forward_attribute as string) || 'mailForwardingAddress';
     this.initDelay =
       typeof this.config.james_init_delay === 'number'
         ? this.config.james_init_delay
@@ -285,64 +316,8 @@ export default class James extends TwakePlugin {
   }
 
   hooks: Hooks = {
-    ldapadddone: async (args: [string, AttributesList]) => {
-      const [dn, attributes] = args;
-
-      const mail = attributes[this.mailAttr];
-      const quota = attributes[this.quotaAttr];
-      const aliases = attributes[this.aliasAttr];
-
-      if (!mail || isGroup(attributes.objectClass)) return;
-
-      const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
-
-      // Wait for James to create the user (configurable delay)
-      if (this.initDelay > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.initDelay));
-      }
-
-      // Initialize quota if present
-      if (quota) {
-        const quotaNum = Array.isArray(quota)
-          ? Number(quota[0])
-          : Number(quota);
-        if (!isNaN(quotaNum) && quotaNum > 0) {
-          await this.callWebAdminApi(
-            'ldapadddone:quota',
-            `${this.webadminUrl}/quota/users/${mailStr}/size`,
-            'PUT',
-            dn,
-            quotaNum.toString(),
-            { mail: mailStr, quota: quotaNum },
-            USER_NOT_SEEN_YET
-          );
-        }
-      }
-
-      // Create aliases if present (parallelize API calls)
-      if (aliases) {
-        const aliasList = this.getAliases(aliases);
-        await Promise.all(
-          aliasList.map(alias =>
-            this.callWebAdminApi(
-              'ldapadddone:alias',
-              `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
-              'PUT',
-              dn,
-              null,
-              { mail: mailStr, alias },
-              USER_NOT_SEEN_YET
-            )
-          )
-        );
-      }
-
-      // Initialize James identity
-      const displayName = this.getDisplayNameFromAttributes(attributes);
-      if (displayName) {
-        await this.updateJamesIdentity(dn, mailStr, displayName);
-      }
-    },
+    ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
+      this.provisionAccount(dn, attributes),
     onLdapMailChange: async (
       dn: string,
       oldmail: AttributeValue | null,
@@ -360,8 +335,8 @@ export default class James extends TwakePlugin {
           : String(newmail)
         : null;
 
-      // Skip if oldmail is empty/null (this is an add, not a change)
-      // The mailbox will be created by ldapadddone
+      // A mail gained, at an add or later, is provisioned from
+      // ldapadddone or onLdapEntryChange
       if (!oldmailStr) {
         this.logger.debug(
           `Skipping mail rename for ${dn}: oldmail is empty (mail attribute was added, not changed)`
@@ -380,6 +355,23 @@ export default class James extends TwakePlugin {
       }
       if (await this.isGroupDn(dn)) return;
 
+      // Read before the rename: James leaves the identities under the old
+      // address, see docs/usage/plugins/integrations/james-mail.md#mail-address-changes
+      const signatures = await this.defaultSignatures(oldmailStr);
+      const entry = await this.ldapGetAttributes(dn, [
+        this.forwardAttr,
+        this.displayNameAttr,
+        'cn',
+        'givenName',
+        'sn',
+        this.mailAttr,
+      ]);
+      await this.dropStaleForwards(
+        dn,
+        newmailStr,
+        this.getAliases(entry?.[this.forwardAttr])
+      );
+
       // Rename the mailbox
       await this.callWebAdminApi(
         'onLdapMailChange',
@@ -393,14 +385,17 @@ export default class James extends TwakePlugin {
 
       // Get current aliases from LDAP and recreate them for the new mail
       try {
-        const entry = (await this.server.ldap.search(
+        const aliasesEntry = (await this.server.ldap.search(
           { paged: false, scope: 'base', attributes: [this.aliasAttr] },
           dn
         )) as SearchResult;
 
-        if (entry.searchEntries && entry.searchEntries.length > 0) {
+        if (
+          aliasesEntry.searchEntries &&
+          aliasesEntry.searchEntries.length > 0
+        ) {
           const aliases = this.getAliases(
-            entry.searchEntries[0][this.aliasAttr]
+            aliasesEntry.searchEntries[0][this.aliasAttr]
           );
 
           // Only process if user has aliases
@@ -437,6 +432,10 @@ export default class James extends TwakePlugin {
         // Silently ignore if user has no aliases attribute
         this.logger.debug('Could not fetch aliases for mail change:', err);
       }
+
+      const displayName = entry && this.getDisplayNameFromAttributes(entry);
+      if (displayName)
+        await this.updateJamesIdentity(dn, newmailStr, displayName, signatures);
     },
     onLdapAliasChange: async (
       dn: string,
@@ -467,8 +466,9 @@ export default class James extends TwakePlugin {
             { mail, alias, action: 'delete' }
           )
         ),
-        ...toAdd.map(alias =>
-          this.callWebAdminApi(
+        ...toAdd.map(async alias => {
+          await this.dropStaleForwards(dn, alias, []);
+          await this.callWebAdminApi(
             'onLdapAliasChange-add',
             `${this.webadminUrl}/address/aliases/${mail}/sources/${alias}`,
             'PUT',
@@ -476,8 +476,8 @@ export default class James extends TwakePlugin {
             null,
             { mail, alias, action: 'add' },
             USER_NOT_SEEN_YET
-          )
-        ),
+          );
+        }),
       ]);
     },
     onLdapQuotaChange: async (
@@ -600,11 +600,15 @@ export default class James extends TwakePlugin {
 
     // Only team mailboxes are synchronized: Twake Mail reads mailing lists
     // from LDAP, see docs/usage/plugins/integrations/james-mailboxes.md#mailing-lists
-    onLdapEntryChange: (_dn, before, after) =>
-      this.followTeamMailbox(
+    onLdapEntryChange: async (dn, before, after) => {
+      // ldapadddone provisions an entry added with its mail
+      if (before && after && !before[this.mailAttr] && after[this.mailAttr])
+        await this.provisionAccount(dn, after as AttributesList);
+      await this.followTeamMailbox(
         before as AttributesList | null,
         after as AttributesList | null
-      ),
+      );
+    },
   };
 
   /**
@@ -625,6 +629,78 @@ export default class James extends TwakePlugin {
         branch => dn === branch || dn.endsWith(',' + branch)
       ),
     };
+  }
+
+  /**
+   * Give James what an account holds: quota, aliases and identity, after
+   * dropping the forwards left on its addresses. Runs when an entry is
+   * added with a mail, or gains one.
+   */
+  private async provisionAccount(
+    dn: string,
+    attributes: AttributesList
+  ): Promise<void> {
+    const mail = attributes[this.mailAttr];
+    const quota = attributes[this.quotaAttr];
+    const aliases = attributes[this.aliasAttr];
+
+    if (!mail || isGroup(attributes.objectClass)) return;
+
+    const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
+
+    // Wait for James to create the user (configurable delay)
+    if (this.initDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, this.initDelay));
+    }
+
+    // Initialize quota if present
+    if (quota) {
+      const quotaNum = Array.isArray(quota) ? Number(quota[0]) : Number(quota);
+      if (!isNaN(quotaNum) && quotaNum > 0) {
+        await this.callWebAdminApi(
+          'ldapadddone:quota',
+          `${this.webadminUrl}/quota/users/${mailStr}/size`,
+          'PUT',
+          dn,
+          quotaNum.toString(),
+          { mail: mailStr, quota: quotaNum },
+          USER_NOT_SEEN_YET
+        );
+      }
+    }
+
+    const aliasList = this.getAliases(aliases);
+    await Promise.all([
+      this.dropStaleForwards(
+        dn,
+        mailStr,
+        this.getAliases(attributes[this.forwardAttr])
+      ),
+      ...aliasList.map(alias => this.dropStaleForwards(dn, alias, [])),
+    ]);
+
+    // Create aliases if present (parallelize API calls)
+    if (aliasList.length > 0) {
+      await Promise.all(
+        aliasList.map(alias =>
+          this.callWebAdminApi(
+            'ldapadddone:alias',
+            `${this.webadminUrl}/address/aliases/${mailStr}/sources/${alias}`,
+            'PUT',
+            dn,
+            null,
+            { mail: mailStr, alias },
+            USER_NOT_SEEN_YET
+          )
+        )
+      );
+    }
+
+    // Initialize James identity
+    const displayName = this.getDisplayNameFromAttributes(attributes);
+    if (displayName) {
+      await this.updateJamesIdentity(dn, mailStr, displayName);
+    }
   }
 
   /**
@@ -811,15 +887,19 @@ export default class James extends TwakePlugin {
    * Calls for one address run one after the other: an add triggers this twice
    * (ldapadddone, then the display name "change" onChange publishes), and two
    * concurrent first calls would both find no default and both create one.
+   *
+   * `signatures` are written when `--james-signature-template` is not set:
+   * those of the identity the user had before a rename.
    */
   async updateJamesIdentity(
     dn: string,
     mail: string,
-    displayName: string
+    displayName: string,
+    signatures: Signatures = {}
   ): Promise<void> {
     const previous = this.identityQueue.get(mail) ?? Promise.resolve();
     const current = previous.then(() =>
-      this.doUpdateJamesIdentity(dn, mail, displayName)
+      this.doUpdateJamesIdentity(dn, mail, displayName, signatures)
     );
     this.identityQueue.set(mail, current);
     try {
@@ -835,7 +915,8 @@ export default class James extends TwakePlugin {
   private async doUpdateJamesIdentity(
     dn: string,
     mail: string,
-    displayName: string
+    displayName: string,
+    signatures: Signatures
   ): Promise<void> {
     const log = {
       plugin: this.name,
@@ -859,23 +940,11 @@ export default class James extends TwakePlugin {
             headers: this.createHeaders(),
           })
         );
-        type Identity = {
-          id: string;
-          email: string;
-          mayDelete?: boolean;
-          sortOrder?: number;
-        };
         let defaultIdentity: Identity | undefined;
         if (getRes.ok) {
-          const body = (await getRes.json()) as Identity[] | Identity;
-          // Chosen again here rather than trusted: a server ignoring
-          // `default` would list the server-set identity too, and updating
-          // that one is what brought the duplicate back. `!== false`, not
-          // `=== true`: an identity without the field is not taken for the
-          // server-set one, else every name change would create another
-          defaultIdentity = (Array.isArray(body) ? body : [body])
-            .filter(i => i && i.id && i.mayDelete !== false)
-            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))[0];
+          defaultIdentity = pickDefaultIdentity(
+            (await getRes.json()) as Identity[] | Identity
+          );
         } else if (getRes.status !== 404) {
           const step = 'get_default_identity';
           if (this.shouldRetry(getRes.status, USER_NOT_SEEN_YET, attempt)) {
@@ -896,20 +965,16 @@ export default class James extends TwakePlugin {
         const htmlSignature = await this.generateSignature(dn);
 
         // Step 3: update it, or create it
-        const payload: {
-          id?: string;
-          email: string;
-          name: string;
-          sortOrder?: number;
-          htmlSignature?: string;
-        } = defaultIdentity?.id
-          ? {
-              id: defaultIdentity.id,
-              email: defaultIdentity.email,
-              name: displayName,
-            }
-          : { email: mail, name: displayName, sortOrder: 0 };
+        const payload: Partial<Identity> & { name: string } =
+          defaultIdentity?.id
+            ? {
+                id: defaultIdentity.id,
+                email: defaultIdentity.email,
+                name: displayName,
+              }
+            : { email: mail, name: displayName, sortOrder: 0 };
         if (htmlSignature) payload.htmlSignature = htmlSignature;
+        else Object.assign(payload, signatures);
 
         const step = defaultIdentity?.id
           ? 'update_identity'
@@ -952,6 +1017,91 @@ export default class James extends TwakePlugin {
       }
       return;
     }
+  }
+
+  /**
+   * The signatures of an address's default identity, none when it has none
+   * or James cannot be read.
+   */
+  private async defaultSignatures(mail: string): Promise<Signatures> {
+    try {
+      const res = await this.requestLimit(() =>
+        fetch(`${this.webadminUrl}/users/${mail}/identities?default=true`, {
+          method: 'GET',
+          headers: this.createHeaders(),
+        })
+      );
+      if (!res.ok) return {};
+      const identity = pickDefaultIdentity(
+        (await res.json()) as Identity[] | Identity
+      );
+      const signatures: Signatures = {};
+      if (identity?.htmlSignature)
+        signatures.htmlSignature = identity.htmlSignature;
+      if (identity?.textSignature)
+        signatures.textSignature = identity.textSignature;
+      return signatures;
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.debug(`Could not read the identities of ${mail}: ${err}`);
+      return {};
+    }
+  }
+
+  /**
+   * Remove the forwards James holds from an address an entry takes, but
+   * those in `keep`: the entry's own. A rename leaves one from the old
+   * address to the new, and its next owner would not get its mail.
+   */
+  private async dropStaleForwards(
+    dn: string,
+    address: string,
+    keep: string[]
+  ): Promise<void> {
+    let targets: string[];
+    try {
+      const res = await this.requestLimit(() =>
+        fetch(`${this.webadminUrl}/address/forwards/${address}`, {
+          method: 'GET',
+          headers: this.createHeaders(),
+        })
+      );
+      if (!res.ok) {
+        // 404: no forward
+        if (res.status !== 404)
+          this.logger.warn({
+            plugin: this.name,
+            event: 'dropStaleForward',
+            result: 'error',
+            dn,
+            address,
+            step: 'list_forwards',
+            http_status: res.status,
+            http_status_text: res.statusText,
+          });
+        return;
+      }
+      const kept = keep.map(k => k.toLowerCase());
+      targets = ((await res.json()) as { mailAddress: string }[])
+        .map(t => t.mailAddress)
+        .filter(t => t && !kept.includes(t.toLowerCase()));
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+      this.logger.debug(`Could not read the forwards of ${address}: ${err}`);
+      return;
+    }
+    await Promise.all(
+      targets.map(target =>
+        this.callWebAdminApi(
+          'dropStaleForward',
+          `${this.webadminUrl}/address/forwards/${address}/targets/${target}`,
+          'DELETE',
+          dn,
+          null,
+          { address, forward: target }
+        )
+      )
+    );
   }
 
   private async warnAndWait(

@@ -87,7 +87,28 @@ When a user's mail attribute changes:
    POST /users/old@company.com/rename/john.doe@company.com?action=rename
    ```
 
-4. **James** renames the mail account and all associated data
+4. **James** renames the mail account and its mailboxes, and adds a forward
+   from the old address to the new one, so that mail sent to the old address
+   still arrives. It leaves the identities under the old address.
+
+5. **James plugin** moves the aliases (see
+   [Aliases and Mail Changes](#aliases-and-mail-changes)) and gives the new
+   address its [default identity](#display-name-and-identity) back, with the
+   signatures of the old one when `--james-signature-template` is not set.
+
+#### Forwards Left on an Address
+
+The forward a rename leaves outlives the account. When an address becomes the
+`mail` or an alias of an account, at its creation, a rename, a mail added to
+an existing entry or an alias add, the plugin removes the forwards James holds
+from it, except the entry's own (`--forward-attribute`):
+
+```http
+GET /address/forwards/old@company.com
+DELETE /address/forwards/old@company.com/targets/john.doe@company.com
+```
+
+Otherwise the new owner of the address would not get its mail.
 
 ### Quota Changes
 
@@ -117,9 +138,9 @@ When a user's quota changes:
 
 ### Display Name and Identity
 
-When a user is added, or their display name changes, the plugin names their
-default identity in Twake Mail after the directory. The name is the first one
-found in `--display-name-attribute` (`displayName` by default), `cn`, then
+When a user is added, renamed, or their display name changes, the plugin names
+their default identity in Twake Mail after the directory. The name is the first
+one found in `--display-name-attribute` (`displayName` by default), `cn`, then
 `givenName` and `sn`. The optional signature is `--james-signature-template`.
 
 1. **James plugin** reads the default identity, the deletable one with the
@@ -226,7 +247,8 @@ When the primary email address changes, all aliases are automatically updated:
    PUT /address/aliases/john.smith@company.com/sources/jdoe@company.com
    ```
 
-   **Note:** James automatically creates an alias from the old address when renaming a user. The plugin attempts to create this alias explicitly, but handles the 409 Conflict response gracefully if it already exists.
+   James forwards the old address to the new one, see
+   [Forwards Left on an Address](#forwards-left-on-an-address).
 
 #### Active Directory Format Support
 
@@ -430,14 +452,19 @@ const signature = await james.generateSignature(
 
 ---
 
-### updateJamesIdentity(dn, mail, displayName)
+### updateJamesIdentity(dn, mail, displayName, signatures?)
 
 Update a user's JMAP identity in James (name and optional signature).
 
 **Signature:**
 
 ```typescript
-async updateJamesIdentity(dn: string, mail: string, displayName: string): Promise<void>
+async updateJamesIdentity(
+  dn: string,
+  mail: string,
+  displayName: string,
+  signatures?: { htmlSignature?: string; textSignature?: string }
+): Promise<void>
 ```
 
 **Parameters:**
@@ -445,6 +472,8 @@ async updateJamesIdentity(dn: string, mail: string, displayName: string): Promis
 - `dn` (string): LDAP Distinguished Name (used for signature generation)
 - `mail` (string): User's email address
 - `displayName` (string): New display name for the identity
+- `signatures` (object, optional): written when `--james-signature-template`
+  is not set
 
 **Example:**
 
@@ -551,6 +580,8 @@ const type = await james.getGroupMailboxType(
 | Remove delegation | `/users/{mail}/authorizedUsers/{delegate}` | DELETE |
 | Add alias         | `/address/aliases/{mail}/sources/{alias}`  | PUT    |
 | Remove alias      | `/address/aliases/{mail}/sources/{alias}`  | DELETE |
+| List forwards     | `/address/forwards/{mail}`                 | GET    |
+| Remove forward    | `/address/forwards/{mail}/targets/{to}`    | DELETE |
 
 ### Authentication
 
@@ -783,9 +814,10 @@ Quota values are in **bytes**:
 
 ### Scenario 1: User Creation
 
-1. Create user in LDAP with mail attribute
-2. James plugin does nothing (user doesn't exist in James yet)
-3. Create mail account in James manually or via provisioning script
+1. Create user in LDAP with mail attribute: James reads its users from LDAP
+2. James plugin sets the quota, the aliases and the default identity, after
+   dropping the [forwards left](#forwards-left-on-an-address) on its addresses
+3. A mail added later to an existing entry is handled the same way
 4. Future mail/quota changes are synced automatically
 
 ### Scenario 2: Mail Address Change

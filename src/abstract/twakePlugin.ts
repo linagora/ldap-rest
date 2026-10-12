@@ -228,7 +228,7 @@ export abstract class TwakePlugin extends DmPlugin {
    */
   protected shouldIgnoreError(statusCode: number, hookname: string): boolean {
     // Default: 409 Conflict is acceptable for some operations (e.g., alias already exists)
-    return statusCode === 409 && hookname.includes('Alias');
+    return statusCode === 409 && /alias/i.test(hookname);
   }
 
   /**

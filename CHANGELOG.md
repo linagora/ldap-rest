@@ -7,6 +7,18 @@
 - Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
   [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 
+### Fixes
+
+- `twake/james`: a renamed account gets its default identity back, with the
+  signatures of the old one, instead of keeping only the server-set identity,
+  [docs](docs/usage/plugins/integrations/james-mail.md#mail-address-changes)
+- `twake/james`: an address that becomes an account's mail or alias loses the
+  forwards James left there, such as the one a rename leaves to the renamed
+  account,
+  [docs](docs/usage/plugins/integrations/james-mail.md#forwards-left-on-an-address)
+- `twake/james`: an entry that gains a mail by a modify gets its quota,
+  aliases and identity in James, as an entry added with one
+
 ## v0.18.0 (2026-10-12)
 
 ### Breaking Changes
