@@ -187,11 +187,7 @@ describe('Twake schemas', () => {
       for (const schema of labelled)
         for (const [name, attr] of Object.entries(schema.attributes)) {
           if (!attr.label) continue;
-          if (
-            typeof attr.label === 'string' ||
-            !attr.label.fr ||
-            !attr.label.mn
-          )
+          if (typeof attr.label === 'string' || !attr.label.fr)
             untranslated.push(name);
         }
       expect(untranslated).to.deep.equal([]);
@@ -217,13 +213,7 @@ describe('Twake schemas', () => {
             entity?.label && typeof entity.label !== 'string'
               ? (entity.label.en ?? '?')
               : '?';
-          if (
-            !text ||
-            typeof text === 'string' ||
-            !text.en ||
-            !text.fr ||
-            !text.mn
-          )
+          if (!text || typeof text === 'string' || !text.en || !text.fr)
             unnamed.push(`${name}.${key}`);
         }
       }
@@ -249,8 +239,11 @@ describe('Twake schemas', () => {
       }
       expect(missing).to.deep.equal([]);
     });
+  });
 
-    it('should translate the hints and form sections, as the labels', () => {
+  describe('translations', () => {
+    it('should give every text a client shows in each shipped language', () => {
+      // Every file, so a schema added later is held to it too
       const dir = path.join(__dirname, '../../static/schemas');
       const files = fs
         .readdirSync(path.join(dir, 'twake'), { recursive: true })
@@ -259,17 +252,37 @@ describe('Twake schemas', () => {
       const untranslated: string[] = [];
       for (const file of files) {
         const schema = read(`twake/${file}`);
+        const entity = (
+          schema as unknown as {
+            entity?: {
+              label?: LocalizedText;
+              singularLabel?: LocalizedText;
+              valueLabels?: Record<string, LocalizedText>;
+            };
+          }
+        ).entity;
+        const texts: [string, LocalizedText | undefined][] = [
+          ['entity.label', entity?.label],
+          ['entity.singularLabel', entity?.singularLabel],
+          ...Object.entries(entity?.valueLabels ?? {}).map(
+            ([value, text]) =>
+              [`entity.valueLabels.${value}`, text] as [string, LocalizedText]
+          ),
+        ];
         for (const [name, attr] of Object.entries(schema.attributes))
-          for (const [key, text] of [
-            ['hint', attr.hint],
-            ['items.hint', attr.items?.hint],
-            ['group', attr.group],
-          ] as [string, LocalizedText | undefined][])
-            if (
-              text &&
-              (typeof text === 'string' || !text.en || !text.fr || !text.mn)
-            )
-              untranslated.push(`${file}: ${name}.${key}`);
+          texts.push(
+            [`${name}.label`, attr.label],
+            [`${name}.hint`, attr.hint],
+            [`${name}.items.hint`, attr.items?.hint],
+            [`${name}.group`, attr.group]
+          );
+        for (const [key, text] of texts)
+          if (
+            text &&
+            (typeof text === 'string' ||
+              ['en', 'fr', 'mn'].some(language => !text[language]))
+          )
+            untranslated.push(`${file}: ${key}`);
       }
       expect(untranslated).to.deep.equal([]);
     });
