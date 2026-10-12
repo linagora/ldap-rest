@@ -9,6 +9,12 @@
   its `LDAPMailingList` mailet. The address groups already created stay in
   James and must be deleted,
   [notes](docs/usage/upgrading.md#mailing-lists-are-no-longer-copied-to-james)
+- Twake schemas: field hints and form section names (`hint`, `group`) are in
+  English and French, as maps keyed by language tag like `label`; any schema
+  may now write them so. The server quotes the English hint in its refusals. A
+  client reading them as plain strings must be upgraded,
+  [notes](docs/usage/upgrading.md#the-twake-schemas-translate-their-hints-and-form-sections),
+  [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
 
 ### Fixes
 

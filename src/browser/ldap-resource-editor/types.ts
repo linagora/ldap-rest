@@ -2,6 +2,8 @@
  * LDAP Resource Editor - Generic Type Definitions
  */
 
+import type { LocalizedText } from '../shared/types';
+
 export type ResourceType = 'users' | 'groups' | 'organizations';
 export type NavigationType = 'flat' | 'tree';
 
@@ -29,7 +31,7 @@ export interface SchemaAttribute {
   items?: SchemaAttribute;
   default?: unknown;
   ui?: 'select' | 'search';
-  group?: string;
+  group?: LocalizedText;
 }
 
 export interface Schema {

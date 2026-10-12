@@ -6,6 +6,7 @@ import type { LdapUser, Schema, SchemaAttribute } from '../types';
 import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
 import { MoveUserModal } from './MoveUserModal';
+import { localizedText } from '../../shared/utils/schema';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -197,11 +198,12 @@ export class UserEditor {
       // Skip objectClass (it's fixed)
       if (fieldName === 'objectClass') continue;
 
-      if (attr.group) {
-        if (!groupedFields[attr.group]) {
-          groupedFields[attr.group] = [];
+      const group = localizedText(attr.group);
+      if (group) {
+        if (!groupedFields[group]) {
+          groupedFields[group] = [];
         }
-        groupedFields[attr.group].push(fieldName);
+        groupedFields[group].push(fieldName);
       } else {
         ungroupedFields.push(fieldName);
       }

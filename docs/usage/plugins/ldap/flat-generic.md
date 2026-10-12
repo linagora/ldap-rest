@@ -141,9 +141,10 @@ Fixed attributes:
 
 ### Naming things, in the reader's language
 
-`label` is what a client shows instead of the attribute name, and `entity.label`
-/ `entity.singularLabel` are what it calls the collection and one of its
-entries. Each may be a plain string, or a map keyed by language tag:
+`label` is what a client shows instead of the attribute name, `group` the form
+section it shows the attribute in, and `entity.label` / `entity.singularLabel`
+are what it calls the collection and one of its entries. Each, and `hint`
+below, may be a plain string, or a map keyed by language tag:
 
 ```json
 {
@@ -159,6 +160,11 @@ entries. Each may be a plain string, or a map keyed by language tag:
       "type": "pointer",
       "role": "organizationLink",
       "label": { "en": "Department", "fr": "Organisation" }
+    },
+    "mailQuotaSize": {
+      "type": "string",
+      "group": { "en": "Mailbox Settings", "fr": "Paramètres de messagerie" },
+      "label": { "en": "Mailbox size", "fr": "Taille de boîte" }
     }
   }
 }
@@ -202,14 +208,19 @@ type, before they get it wrong:
   "telephoneNumber": {
     "type": "string",
     "test": "^\\(\\+99\\)\\s\\d{3}\\s\\d{4}$",
-    "hint": "Expected pattern (+99) 999 9999"
+    "hint": {
+      "en": "Expected pattern (+99) 999 9999",
+      "fr": "Format attendu : (+99) 999 9999"
+    }
   }
 }
 ```
 
 The hint travels with the schema, so a client shows it under the field and the
 server repeats it when it rejects a value — the pattern and its explanation
-cannot drift apart, and neither is hardcoded in the interface.
+cannot drift apart, and neither is hardcoded in the interface. A translated
+hint is picked like a label; the server's messages are in English, so it
+quotes the English text.
 
 ### Attributes a client may not send
 

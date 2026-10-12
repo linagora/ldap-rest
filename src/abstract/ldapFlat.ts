@@ -44,6 +44,7 @@ import {
 import type { Schema } from '../config/schema';
 import {
   checkDnValues,
+  localizedText,
   missingRequiredAttribute,
   modifiedAttributeNames,
   neverReturnAttributes,
@@ -583,14 +584,15 @@ export default abstract class LdapFlat extends DmPlugin {
    * When the schema carries a `hint`, the message says what a valid value
    * looks like instead of only that this one was not. The hint lives next to
    * the pattern so the two cannot drift apart, and so a client can show it
-   * under the field *before* the user gets it wrong.
+   * under the field *before* the user gets it wrong. Its English text is
+   * quoted, the language of every other API message.
    *
    * @param field attribute name
    * @returns message for a `BadRequestError`
    */
   protected invalidValueMessage(field: string): string {
     const attr = this.schema?.attributes[field];
-    const hint = attr?.hint || attr?.items?.hint;
+    const hint = localizedText(attr?.hint || attr?.items?.hint);
     return hint
       ? `Invalid value for attribute "${field}": ${hint}`
       : `Invalid value for attribute "${field}"`;

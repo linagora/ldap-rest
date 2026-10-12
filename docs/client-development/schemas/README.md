@@ -344,9 +344,14 @@ Complete reference for all attribute properties.
 | `test`     | string/regex | String, Array items | Regular expression for validation                                                | `"^[a-zA-Z0-9._-]{1,255}$"`         |
 | `branch`   | string[]     | Pointer             | LDAP branches where referenced entries exist                                     | `["ou=users,dc=example,dc=com"]`    |
 | `ui`       | object       | Pointer             | UI configuration for pointer selection (future feature)                          | `{}`                                |
-| `group`    | string       | All                 | UI grouping for form organization (future feature)                               | `"contact"`                         |
+| `hint`     | text         | String, Array items | What a valid value looks like, shown under the field and quoted in refusals      | `"Expected pattern 999 9999"`       |
+| `group`    | text         | All                 | Form section the attribute is shown in                                           | `"Mailbox Settings"`                |
 | `default`  | any          | All                 | Default value for new entries                                                    | `["top", "person"]`                 |
 | `items`    | object       | Array               | Schema for array element validation                                              | `{"type": "string", "test": "..."}` |
+
+A _text_ is a plain string or a map keyed by language tag,
+`{ "en": "Mailbox Settings", "fr": "Paramètres de messagerie" }`, picked as
+[labels are](../../usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language).
 
 ### Property Details
 

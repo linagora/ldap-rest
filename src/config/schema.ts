@@ -62,6 +62,25 @@ export type SchemaRole = string;
  */
 export type LocalizedText = string | Record<string, string>;
 
+/**
+ * Pick the text of a {@link LocalizedText} for a language: the exact tag,
+ * then its primary language, then English, then whatever the map holds.
+ *
+ * @param text plain string or map keyed by language tag
+ * @param language tag to look for, English when omitted
+ * @returns the text, or undefined when there is none
+ */
+export function localizedText(
+  text: LocalizedText | undefined,
+  language = 'en'
+): string | undefined {
+  if (text === undefined || text === null) return undefined;
+  if (typeof text === 'string') return text || undefined;
+  const primary = language.split('-')[0].toLowerCase();
+  for (const key of [language, primary, 'en']) if (text[key]) return text[key];
+  return Object.values(text).find(Boolean);
+}
+
 /** Roles the core itself looks for. See {@link SchemaRole}. */
 export const CORE_ROLES = [
   'identifier',
@@ -146,7 +165,7 @@ export interface SchemaAttribute {
   items?: {
     type: string;
     test?: string | RegExp;
-    hint?: string;
+    hint?: LocalizedText;
     branch?: string[];
   };
   default?: AttributeValue;
@@ -158,7 +177,7 @@ export interface SchemaAttribute {
    * schema so the pattern and its explanation cannot drift apart, and so a
    * client never has to hardcode either.
    */
-  hint?: string;
+  hint?: LocalizedText;
   branch?: string[];
   fixed?: boolean;
   /** Semantic role(s) — see {@link SchemaRole} */
@@ -241,8 +260,8 @@ export interface SchemaAttribute {
    * under `example.org`. Off by default: the domain must match exactly.
    */
   allowSubdomains?: boolean;
-  /** Grouping hint for a form, e.g. `Mailbox Settings` */
-  group?: string;
+  /** Section of a form the attribute belongs to, e.g. `Mailbox settings` */
+  group?: LocalizedText;
   /** Name a client shows for this attribute, in one or several languages */
   label?: LocalizedText;
 }

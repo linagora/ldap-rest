@@ -29,6 +29,7 @@ import fs from 'fs';
 import { Client } from 'ldapts';
 
 import type { Schema, SchemaAttribute } from '../src/config/schema';
+import { localizedText } from '../src/config/schema';
 // `isDnInBranch` only reads DNs; it brings in the error classes and the
 // response helpers and nothing else, so the script stays a script.
 import { isDnInBranch } from '../src/lib/utils';
@@ -223,7 +224,7 @@ export function auditEntry(
       finding = {
         attribute,
         reason,
-        hint: definition?.hint || definition?.items?.hint,
+        hint: localizedText(definition?.hint || definition?.items?.hint),
         count: 0,
         samples: [],
       };

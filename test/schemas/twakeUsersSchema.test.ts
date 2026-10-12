@@ -239,5 +239,26 @@ describe('Twake schemas', () => {
       }
       expect(missing).to.deep.equal([]);
     });
+
+    it('should translate the hints and form sections, as the labels', () => {
+      const dir = path.join(__dirname, '../../static/schemas');
+      const files = fs
+        .readdirSync(path.join(dir, 'twake'), { recursive: true })
+        .map(String)
+        .filter(file => file.endsWith('.json'));
+      const untranslated: string[] = [];
+      for (const file of files) {
+        const schema = read(`twake/${file}`);
+        for (const [name, attr] of Object.entries(schema.attributes))
+          for (const [key, text] of [
+            ['hint', attr.hint],
+            ['items.hint', attr.items?.hint],
+            ['group', attr.group],
+          ] as [string, LocalizedText | undefined][])
+            if (text && (typeof text === 'string' || !text.en || !text.fr))
+              untranslated.push(`${file}: ${name}.${key}`);
+      }
+      expect(untranslated).to.deep.equal([]);
+    });
   });
 });

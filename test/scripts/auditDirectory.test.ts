@@ -54,7 +54,7 @@ const schema: Schema = {
       items: {
         type: 'string',
         test: '^\\d{3} \\d{4}$',
-        hint: 'Expected 999 9999',
+        hint: { en: 'Expected 999 9999', fr: 'Format attendu : 999 9999' },
       },
     },
     manager: {
@@ -212,6 +212,17 @@ describe('audit-directory', () => {
       expect(findings).to.have.length(1);
       expect(findings[0].attribute).to.equal('mail');
       expect(findings[0].reason).to.equal('does not match');
+    });
+
+    it('should quote the English text of a translated hint', () => {
+      const findings = run([
+        [
+          'uid=a,ou=users,dc=example,dc=com',
+          { cn: 'A', telephoneNumber: ['12 34'] },
+        ],
+      ]);
+      expect(findings).to.have.length(1);
+      expect(findings[0].hint).to.equal('Expected 999 9999');
     });
 
     it('should say nothing about an entry the schema accepts', () => {

@@ -30,7 +30,10 @@
     "cn": {
       "type": "string",
       "test": "^[A-Za-zÀ-ÖØ-öø-ÿ0-9][A-Za-zÀ-ÖØ-öø-ÿ0-9 &/,.'’-]*$",
-      "hint": "Letters, digits, spaces and & / , . ' -, starting with a letter or a digit",
+      "hint": {
+        "en": "Letters, digits, spaces and & / , . ' -, starting with a letter or a digit",
+        "fr": "Lettres, chiffres, espaces et & / , . ' -, en commençant par une lettre ou un chiffre"
+      },
       "required": true,
       "role": "identifier",
       "label": {

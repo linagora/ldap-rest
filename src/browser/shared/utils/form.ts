@@ -5,6 +5,7 @@
 
 import { escapeHtml, toTitleCase } from './dom';
 import type { SchemaAttribute, PointerOption } from '../types';
+import { localizedText } from './schema';
 
 /**
  * Get user-friendly field label from field name
@@ -258,7 +259,7 @@ export function groupSchemaFields(
 
     const category = categorizer
       ? categorizer(fieldName, attribute)
-      : attribute.group || 'default';
+      : localizedText(attribute.group) || 'default';
 
     if (category === null) continue; // Skip this field
 

@@ -31,7 +31,10 @@
       "type": "string",
       "searchable": true,
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
-      "hint": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
+      "hint": {
+        "en": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
+        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs"
+      },
       "required": true,
       "role": "identifier",
       "label": {
@@ -52,7 +55,10 @@
       "type": "string",
       "searchable": true,
       "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "hint": "Expected an email address, e.g. all-staff@lists.example.org",
+      "hint": {
+        "en": "Expected an email address, e.g. all-staff@lists.example.org",
+        "fr": "Une adresse électronique est attendue, par ex. all-staff@lists.example.org"
+      },
       "required": false,
       "unique": {
         "attributes": ["mailAlternateAddress"],
@@ -75,12 +81,18 @@
         "en": "List type",
         "fr": "Type de liste"
       },
-      "group": "Mailbox Settings"
+      "group": {
+        "en": "Mailbox Settings",
+        "fr": "Paramètres de messagerie"
+      }
     },
     "twakeMailboxType": {
       "type": "pointer",
       "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
-      "group": "Mailbox Settings",
+      "group": {
+        "en": "Mailbox Settings",
+        "fr": "Paramètres de messagerie"
+      },
       "required": false,
       "role": "mailboxType",
       "label": {
@@ -93,7 +105,10 @@
       "items": {
         "type": "string",
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
-        "hint": "Expected the DN of an entry of this directory"
+        "hint": {
+          "en": "Expected the DN of an entry of this directory",
+          "fr": "Le DN d'une entrée de cet annuaire est attendu"
+        }
       },
       "required": false,
       "role": "members",
@@ -107,7 +122,10 @@
       "items": {
         "type": "string",
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
-        "hint": "Expected the DN of an entry of this directory"
+        "hint": {
+          "en": "Expected the DN of an entry of this directory",
+          "fr": "Le DN d'une entrée de cet annuaire est attendu"
+        }
       },
       "required": false,
       "role": "owners",
