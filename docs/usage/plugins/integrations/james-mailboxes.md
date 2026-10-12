@@ -166,7 +166,9 @@ address cannot be read.
 TMail names a team mailbox by the local part of its address, `{name}@{domain}`,
 and accepts only letters, digits, `#`, `-` and `_` in it, up to 255 characters.
 A group whose address has any other character, such as a dot, gets no team
-mailbox: the plugin logs an error instead of calling TMail.
+mailbox: the plugin logs an error once, when the group comes to have such an
+address, and does not call TMail. The name is lower-cased, so a change of case
+of the address keeps the same team mailbox.
 
 ## Validation Rules
 

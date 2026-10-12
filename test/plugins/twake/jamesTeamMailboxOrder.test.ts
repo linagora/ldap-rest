@@ -74,28 +74,43 @@ describe('James Plugin - team mailbox creation order', () => {
   describe('name', () => {
     let james: James;
     let errors: unknown[];
-    const create = (address: string) =>
+    const type = 'cn=teamMailbox,ou=twakeMailboxType,dc=example,dc=com';
+    const group = (mail: string, member: string[] = []) => ({
+      dn,
+      objectClass: ['top', 'groupOfNames'],
+      mail,
+      twakeMailboxType: type,
+      member,
+    });
+    const change = (
+      before: ReturnType<typeof group> | null,
+      after: ReturnType<typeof group> | null
+    ) =>
       (
-        james as unknown as {
-          createTeamMailbox: (
-            dn: string,
-            attributes: Record<string, unknown>,
-            mail: string
-          ) => Promise<void>;
-        }
-      ).createTeamMailbox(dn, {}, address);
+        james.hooks.onLdapEntryChange as unknown as (
+          dn: string,
+          before: unknown,
+          after: unknown
+        ) => Promise<void>
+      )(dn, before, after);
 
     beforeEach(async () => {
       const dm = new DM();
       await dm.ready;
       dm.config.james_webadmin_url = url;
       james = new James(dm);
+      (
+        james as unknown as {
+          getMemberEmails: (members: string[]) => Promise<string[]>;
+        }
+      ).getMemberEmails = members =>
+        Promise.resolve(members.map(m => `${m.slice(4, 5)}@test.org`));
       errors = [];
       james.logger = {
         ...james.logger,
         info: () => undefined,
         error: (entry: unknown) => errors.push(entry),
-      } as typeof james.logger;
+      } as unknown as typeof james.logger;
     });
 
     it('names the team mailbox by the local part, escaped', async () => {
@@ -103,15 +118,32 @@ describe('James Plugin - team mailbox creation order', () => {
       const scope = nock(url)
         .put('/domains/test.org/team-mailboxes/%23support')
         .reply(204);
-      await create('#support@test.org');
+      await change(null, group('#support@test.org'));
       expect(scope.isDone()).to.be.true;
       expect(errors).to.deep.equal([]);
     });
 
-    it('refuses an address TMail cannot name a team mailbox after', async () => {
-      // nock lets no request through: a call would fail the test
-      await create('sales.team@test.org');
-      await create('no-domain');
+    it('keeps the name across a change of case of the address', async () => {
+      const scope = nock(url)
+        .put('/domains/test.org/team-mailboxes/sales/members/b@test.org')
+        .reply(204);
+      await change(
+        group('sales@test.org', ['uid=a,ou=users']),
+        group('Sales@Test.org', ['uid=a,ou=users', 'uid=b,ou=users'])
+      );
+      expect(scope.isDone()).to.be.true;
+      expect(errors).to.deep.equal([]);
+    });
+
+    it('refuses an address TMail cannot name a team mailbox after, once', async () => {
+      // nock lets no request through: a call would log an error too
+      const refused = group('sales.team@test.org', ['uid=a,ou=users']);
+      await change(null, refused);
+      await change(
+        refused,
+        group('sales.team@test.org', ['uid=a,ou=users', 'uid=b,ou=users'])
+      );
+      await change(null, group('no-domain'));
       expect(errors).to.have.length(2);
     });
   });
