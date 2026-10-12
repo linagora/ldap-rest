@@ -6,6 +6,18 @@
 
 - Twake schemas: labels, hints and form sections are also in Mongolian (`mn`),
   [docs](docs/usage/plugins/ldap/flat-generic.md#naming-things-in-the-readers-language)
+- `ldap/externalUsersInGroups`: `/api/v1/config` publishes the external
+  members branch and the managed domains, so a client can add a member from
+  its address,
+  [docs](docs/usage/plugins/ldap/external-users.md#config-api)
+
+### Fixes
+
+- `ldap/externalUsersInGroups`: an escaped address (`mail=a\+b@…`) is stored
+  unescaped, a managed domain is refused whatever its case, and only the
+  direct children of the branch are external members. The member DN is
+  compared as a DN: the attribute name and the branch may be written in any
+  case
 
 ### Fixes
 

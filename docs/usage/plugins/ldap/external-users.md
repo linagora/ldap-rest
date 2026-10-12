@@ -33,9 +33,30 @@ This plugin intercepts group member validation and automatically creates missing
 ### Important Notes
 
 - **Dependencies**: This plugin requires the `core/ldap/groups` plugin
-- **DN Format**: External members are in the format `mail={email},{external_members_branch}`
-- **Domain Protection**: External users cannot be created if their mail are in managed domains (configured via `--mail-domain`)
+- **DN Format**: External members are in the format `mail={email},{external_members_branch}`,
+  the address escaped as any DN value (RFC 4514): `mail=a\+b@partner.com,…`
+  creates an entry whose `mail` is `a+b@partner.com`. Only the direct children of the
+  branch are external members.
+- **Domain Protection**: External users cannot be created if their mail are in managed domains (configured via `--mail-domain`, compared case-insensitively)
 - **Automatic Creation**: Users are created automatically when added to a group if they don't exist
+
+### Config API
+
+`GET /api/v1/config` tells a client whether external members are accepted, and
+where to send them:
+
+```json
+"externalUsersInGroups": {
+  "enabled": true,
+  "branch": "ou=contacts,dc=example,dc=com",
+  "rdnAttribute": "mail",
+  "managedDomains": ["example.com"]
+}
+```
+
+A client turns an address into a member with
+`rdnAttribute=<escaped address>,<branch>`, and can refuse a `managedDomains`
+address before sending it.
 
 ## How It Works
 
