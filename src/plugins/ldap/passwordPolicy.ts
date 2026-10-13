@@ -399,7 +399,7 @@ export default class PasswordPolicy extends DmPlugin {
         const userId = Array.isArray(req.params.id)
           ? req.params.id[0]
           : req.params.id;
-        const status = await this.getPasswordStatus(userId);
+        const status = await this.getPasswordStatus(userId, req);
         res.json(status);
       })
     );
@@ -430,7 +430,7 @@ export default class PasswordPolicy extends DmPlugin {
         const userId = Array.isArray(req.params.id)
           ? req.params.id[0]
           : req.params.id;
-        await this.unlockAccount(userId);
+        await this.unlockAccount(userId, req);
         res.json({ success: true, message: 'Account unlocked' });
       })
     );
@@ -478,7 +478,7 @@ export default class PasswordPolicy extends DmPlugin {
           parseInt(req.query.days as string) ||
           (this.config.ppolicy_warn_days as number) ||
           14;
-        const users = await this.findExpiringPasswords(days);
+        const users = await this.findExpiringPasswords(days, req);
         res.json({ warningDays: days, users });
       })
     );
@@ -514,8 +514,8 @@ export default class PasswordPolicy extends DmPlugin {
     // GET /password-policy/locked-accounts
     app.get(
       `${prefix}/password-policy/locked-accounts`,
-      asyncHandler(async (_req: Request, res: Response) => {
-        const accounts = await this.findLockedAccounts();
+      asyncHandler(async (req: Request, res: Response) => {
+        const accounts = await this.findLockedAccounts(req);
         res.json({ accounts });
       })
     );
@@ -567,8 +567,16 @@ export default class PasswordPolicy extends DmPlugin {
 
   /**
    * Get password status for a user
+   *
+   * Every lookup of this plugin carries the request, so an authorization
+   * plugin answers for the caller: without it, a route read as an internal
+   * call, and a delegated administrator could read or unlock any account of
+   * the directory (#325).
    */
-  private async getPasswordStatus(userId: string): Promise<PasswordStatus> {
+  private async getPasswordStatus(
+    userId: string,
+    req?: Request
+  ): Promise<PasswordStatus> {
     const dn = this.resolveUserDn(userId);
 
     try {
@@ -580,7 +588,8 @@ export default class PasswordPolicy extends DmPlugin {
           attributes: ['*', ...PPOLICY_ATTRS],
           paged: false,
         },
-        dn
+        dn,
+        req
       )) as SearchResult;
 
       if (!result.searchEntries || result.searchEntries.length === 0) {
@@ -686,7 +695,7 @@ export default class PasswordPolicy extends DmPlugin {
   /**
    * Unlock a user account by removing pwdAccountLockedTime and pwdFailureTime
    */
-  private async unlockAccount(userId: string): Promise<void> {
+  private async unlockAccount(userId: string, req?: Request): Promise<void> {
     const dn = this.resolveUserDn(userId);
 
     // First check if user exists
@@ -697,7 +706,8 @@ export default class PasswordPolicy extends DmPlugin {
         attributes: ['pwdAccountLockedTime', 'pwdFailureTime'],
         paged: false,
       },
-      dn
+      dn,
+      req
     )) as SearchResult;
 
     if (!result.searchEntries || result.searchEntries.length === 0) {
@@ -716,9 +726,13 @@ export default class PasswordPolicy extends DmPlugin {
     }
 
     if (Object.keys(deleteAttrs).length > 0) {
-      await this.server.ldap.modify(dn, {
-        delete: deleteAttrs,
-      });
+      await this.server.ldap.modify(
+        dn,
+        {
+          delete: deleteAttrs,
+        },
+        req
+      );
       this.logger.info(`Account unlocked: ${dn}`);
     } else {
       this.logger.info(`Account was not locked: ${dn}`);
@@ -728,7 +742,10 @@ export default class PasswordPolicy extends DmPlugin {
   /**
    * Find users with passwords expiring soon
    */
-  private async findExpiringPasswords(days: number): Promise<ExpiringUser[]> {
+  private async findExpiringPasswords(
+    days: number,
+    req?: Request
+  ): Promise<ExpiringUser[]> {
     const policy = await this.readPolicyConfig();
 
     // If no pwdMaxAge, passwords don't expire
@@ -748,7 +765,8 @@ export default class PasswordPolicy extends DmPlugin {
         attributes: ['uid', 'cn', 'displayName', 'mail', 'pwdChangedTime'],
         paged: false,
       },
-      base
+      base,
+      req
     )) as SearchResult;
 
     const now = Date.now();
@@ -785,7 +803,7 @@ export default class PasswordPolicy extends DmPlugin {
   /**
    * Find locked accounts
    */
-  private async findLockedAccounts(): Promise<LockedAccount[]> {
+  private async findLockedAccounts(req?: Request): Promise<LockedAccount[]> {
     const base =
       (this.config.ldap_users_base as string) ||
       (this.config.ldap_base as string);
@@ -804,7 +822,8 @@ export default class PasswordPolicy extends DmPlugin {
         ],
         paged: false,
       },
-      base
+      base,
+      req
     )) as SearchResult;
 
     return result.searchEntries.map(entry => {
