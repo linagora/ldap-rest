@@ -23,6 +23,7 @@ import type {
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import {
@@ -232,6 +233,12 @@ describe('Delegated administration bypasses (#325)', function () {
     await server.registerPlugin(
       'ldapOrganizations',
       new LdapOrganizations(server)
+    );
+    // It fills the path the organization schema requires, as in a Twake
+    // deployment.
+    await server.registerPlugin(
+      'ldapEnterpriseRules',
+      new LdapEnterpriseRules(server)
     );
     server.setupErrorMiddleware();
     request = supertest(server.app);
