@@ -35,6 +35,7 @@ import {
   asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
+  isAuthzRefusal,
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
@@ -440,7 +441,7 @@ export default class LdapGroups extends DmPlugin {
         if (members.some(m => typeof m !== 'string')) {
           throw new BadRequestError('member must be a string or string array');
         }
-        await tryMethod(res, this.addMember.bind(this), cn, body.member);
+        await tryMethod(res, this.addMember.bind(this), cn, body.member, req);
       })
     );
 
@@ -468,7 +469,7 @@ export default class LdapGroups extends DmPlugin {
         if (!cn || !member) {
           throw new BadRequestError('cn and member are required');
         }
-        await tryMethod(res, this.deleteMember.bind(this), cn, member);
+        await tryMethod(res, this.deleteMember.bind(this), cn, member, req);
       })
     );
 
@@ -713,7 +714,7 @@ export default class LdapGroups extends DmPlugin {
       validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }
-    await this.validateMembers(dn, members);
+    await this.validateMembers(dn, members, req);
     await this.validateNewGroup(dn, {
       objectClass: this.config.group_class as string[],
       cn,
@@ -852,7 +853,24 @@ export default class LdapGroups extends DmPlugin {
     return res;
   }
 
-  async addMember(cn: string, member: string | string[]): Promise<boolean> {
+  /**
+   * Add members to a group.
+   *
+   * With `req`, the change is judged as a modification of the group, and
+   * each member must be an entry the caller can read: the routes used to
+   * call this without it, which every authorization plugin reads as an
+   * internal call and lets through — anyone authenticated could join any
+   * group, a team mailbox included (#325).
+   *
+   * @param cn group cn or DN
+   * @param member member DN(s)
+   * @param req the request, to authorize the change against its caller
+   */
+  async addMember(
+    cn: string,
+    member: string | string[],
+    req?: Request
+  ): Promise<boolean> {
     const dn = /,/.test(cn)
       ? cn
       : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
@@ -861,18 +879,34 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupaddmember,
       [cn, member]
     );
-    await this.validateMembers(dn, member);
+    await this.validateMembers(dn, member, req);
     return await this.ldap
-      .modify(dn, {
-        add: { member },
-      })
+      .modify(
+        dn,
+        {
+          add: { member },
+        },
+        req
+      )
       .catch(err => {
         if (err instanceof HttpError) throw err;
         throw new Error(`Failed to add member(s) to ${dn}: ${err}`);
       });
   }
 
-  async deleteMember(cn: string, member: string): Promise<boolean> {
+  /**
+   * Remove a member from a group; with `req`, judged as a modification of
+   * the group, as {@link addMember} is.
+   *
+   * @param cn group cn or DN
+   * @param member member DN
+   * @param req the request, to authorize the change against its caller
+   */
+  async deleteMember(
+    cn: string,
+    member: string,
+    req?: Request
+  ): Promise<boolean> {
     const dn = /,/.test(cn)
       ? cn
       : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
@@ -885,9 +919,13 @@ export default class LdapGroups extends DmPlugin {
     if (this.isDummyMember(member))
       throw new BadRequestError('Cannot delete dummy member from group');
     return await this.ldap
-      .modify(dn, {
-        delete: { member: member },
-      })
+      .modify(
+        dn,
+        {
+          delete: { member: member },
+        },
+        req
+      )
       .catch(err => {
         if (err instanceof HttpError) throw err;
         throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
@@ -1120,25 +1158,47 @@ export default class LdapGroups extends DmPlugin {
    * It calls ldapgroupvalidatemembers hook before validation
    * so that plugins can modify the members list and/or the group DN
    * and/or create missing members on the fly
+   *
+   * With `req`, each member is looked up as the caller sees the directory:
+   * an entry an authorization plugin hides from them is refused as one that
+   * does not exist, so that an administrator cannot put an account of
+   * another branch in a group of theirs. `--group-allow-unexistent-members`
+   * still accepts a member that does not exist, but not one that does and
+   * is hidden — which tells the caller it exists, a smaller leak than the
+   * membership it would otherwise grant.
+   *
    * @param dn Group DN (given to hooks)
    * @param members Array of member DNs to check
+   * @param req the request, whose caller must be able to read each member
    * @returns nothing, throw if error
    */
-  async validateMembers(dn: string, members: string[]): Promise<void> {
+  async validateMembers(
+    dn: string,
+    members: string[],
+    req?: Request
+  ): Promise<void> {
     [dn, members] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatemembers,
       [dn, members]
     );
-    if (this.config.groups_allow_unexistent_members) return;
+    const allowMissing = Boolean(this.config.groups_allow_unexistent_members);
+    if (allowMissing && !req) return;
     if (!members || !members.length) return;
     try {
       // Parallelize member validation with global concurrency limit
       await Promise.all(
         members.map(m =>
           this.server.ldap.queryLimit(async () => {
+            let found: SearchResult;
             try {
-              await this.ldap.search({ paged: false, scope: 'base' }, m);
+              found = (await this.ldap.search(
+                { paged: false, scope: 'base' },
+                m,
+                req
+              )) as SearchResult;
             } catch (e) {
+              if (isAuthzRefusal(e)) throw e;
+              if (allowMissing) return;
               const code = extractLdapCode(e);
               if (code === 32)
                 throw new BadRequestError(`Member ${m} not found`);
@@ -1147,11 +1207,16 @@ export default class LdapGroups extends DmPlugin {
               // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
               throw new Error(`Member ${m} not found: ${e}`);
             }
+            // Filtered out by an authorization plugin: there, but not for
+            // this caller. Only asked of a caller's request, so that an
+            // internal call keeps accepting what it always accepted.
+            if (req && !found.searchEntries?.length)
+              throw new BadRequestError(`Member ${m} not found`);
           })
         )
       );
     } catch (err) {
-      if (err instanceof HttpError) throw err;
+      if (err instanceof HttpError || isAuthzRefusal(err)) throw err;
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to find member(s): ${err}`);
     }
