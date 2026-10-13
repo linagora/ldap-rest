@@ -96,6 +96,27 @@ to the transit branch follows the same rules through
 `POST /api/v1/ldap/groups/:cn/move`; that endpoint does not move a group
 attached to no organization.
 
+### Mail domains
+
+The mail domains an organization's entries may use are those it links in
+`twakeDomainLink` and those every organization above it links
+(`ldap/enterpriseRules`). Creating or changing an organization only asks for
+write on its parent, so the link itself is held to more:
+
+- a domain newly linked to an organization must already be linked by an
+  organization above it, up to the top organization;
+- a caller holding write on the top organization links any domain: they are
+  the one giving each organization its own;
+- a domain the organization already links can be kept, and removing one is
+  judged as any other change.
+
+So the administrator of `ou=Sales` can create `ou=Sales-EU` restricted to
+Sales' domain, but cannot give it another customer's. The attribute is the
+organization schema's `domainLink` role, or
+`--enterprise-domain-link-attribute`; with neither, nothing is checked. The
+rule belongs to the base of the authorization plugins, so `authzPerBranch`
+applies it too.
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:

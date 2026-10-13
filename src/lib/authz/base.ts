@@ -11,6 +11,7 @@ import type { SearchOptions } from 'ldapts';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
+import { roleAttribute, type Schema } from '../../config/schema';
 import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
 import type {
   AttributesList,
@@ -382,6 +383,124 @@ export default abstract class AuthzBase extends DmPlugin {
     );
   }
 
+  /**
+   * The attribute linking an organization to the mail domains its entries
+   * may use: the organization schema's `domainLink` role, or
+   * `--enterprise-domain-link-attribute`, as `enterpriseRules` reads it.
+   *
+   * @returns the attribute name, or undefined when no domain is linked
+   */
+  protected domainLinkAttribute(): string | undefined {
+    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
+      | { schema?: Schema }
+      | undefined;
+    return (
+      roleAttribute(organizations?.schema, 'domainLink') ||
+      this.config.enterprise_domain_link_attribute ||
+      undefined
+    );
+  }
+
+  /**
+   * The values a write gives an attribute, whatever case its name is
+   * spelled in.
+   */
+  private static valuesOf(
+    list: AttributesList | undefined,
+    attr: string
+  ): string[] {
+    if (!list) return [];
+    const key = attr.toLowerCase();
+    const out: string[] = [];
+    for (const [name, value] of Object.entries(list)) {
+      if (name.split(';')[0].toLowerCase() !== key) continue;
+      if (value === undefined || value === null) continue;
+      for (const v of Array.isArray(value) ? value : [value])
+        out.push(String(v));
+    }
+    return out;
+  }
+
+  /**
+   * The values of an attribute on stored entries, read as the server, not
+   * as the caller.
+   */
+  private async storedValues(dn: string, attr: string): Promise<string[]> {
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: [attr] },
+        dn
+      )) as SearchResult;
+      return AuthzBase.valuesOf(res.searchEntries?.[0], attr);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Refuse a delegated administrator a mail domain their branch was not
+   * given.
+   *
+   * The domains an organization's entries may use are those it links and
+   * those every organization above it links (`enterpriseRules`). Writing an
+   * organization only asks for write on its parent, so an administrator
+   * could create a sub-organization of their branch linked to any domain of
+   * the directory — another customer's — and create addresses in it (#325).
+   *
+   * A domain newly linked to an organization must therefore be one an
+   * organization above it already links. Only a caller holding write on the
+   * top organization — who creates the organizations domains are given to —
+   * links another. Removing a link narrows nothing above the caller's own
+   * branch and is judged as any other write.
+   *
+   * @param user the resolved caller
+   * @param req the request, for the refusal's wording
+   * @param dn the organization being written
+   * @param submitted the domain DNs the write gives it
+   * @param attr the domain link attribute
+   * @param creating whether the organization is being created, so holds none
+   */
+  private async guardDomainLinks(
+    user: string,
+    req: DmRequest,
+    dn: string,
+    submitted: string[],
+    attr: string,
+    creating: boolean
+  ): Promise<void> {
+    if (submitted.length === 0) return;
+    const held = new Set(
+      (creating ? [] : await this.storedValues(dn, attr)).map(normalizeDn)
+    );
+    const added = submitted.filter(d => !held.has(normalizeDn(d)));
+    if (added.length === 0) return;
+
+    const top = this.config.ldap_top_organization;
+    const stop = normalizeDn(top || this.server.ldap.base);
+    const inherited = new Set<string>();
+    let cursor = getParentDn(dn);
+    const seen = new Set<string>();
+    while (cursor && !seen.has(normalizeDn(cursor))) {
+      const key = normalizeDn(cursor);
+      seen.add(key);
+      if (key !== stop && !isDnInBranch(cursor, stop)) break;
+      for (const d of await this.storedValues(cursor, attr))
+        inherited.add(normalizeDn(d));
+      if (key === stop) break;
+      const parent = getParentDn(cursor);
+      if (parent === cursor) break;
+      cursor = parent;
+    }
+    const foreign = added.filter(d => !inherited.has(normalizeDn(d)));
+    if (foreign.length === 0) return;
+
+    if (top && (await this.getUserPermissions(user, top)).write) return;
+    throw new Error(
+      `[authz-forbidden] User ${req.user} may not link ${dn} to domain ` +
+        `${foreign[0]}: no organization above it is linked to it`
+    );
+  }
+
   /** Forget what was resolved, for a test that changes the directory. */
   protected clearResolutionCache(): void {
     this.resolutionCache.clear();
@@ -531,6 +650,20 @@ export default abstract class AuthzBase extends DmPlugin {
         }
       }
 
+      const domainAttr = this.domainLinkAttribute();
+      if (domainAttr)
+        await this.guardDomainLinks(
+          user,
+          req!,
+          dn,
+          [
+            ...AuthzBase.valuesOf(changes.add, domainAttr),
+            ...AuthzBase.valuesOf(changes.replace, domainAttr),
+          ],
+          domainAttr,
+          false
+        );
+
       return [dn, changes, opNumber, req];
     },
 
@@ -571,6 +704,17 @@ export default abstract class AuthzBase extends DmPlugin {
           `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
         );
       }
+
+      const domainAttr = this.domainLinkAttribute();
+      if (domainAttr)
+        await this.guardDomainLinks(
+          user,
+          req!,
+          dn,
+          AuthzBase.valuesOf(entry, domainAttr),
+          domainAttr,
+          true
+        );
 
       return [dn, entry, req];
     },
