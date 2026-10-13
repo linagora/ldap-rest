@@ -1,16 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.19.1 (2026-10-13)
 
 ### Fixes
 
 - `ldap/groups`: adding or removing members is authorized as a change to the
-  group, and a member the caller cannot read is refused as missing; any
-  signed-in caller could change any group (#325)
-- `ldap/passwordPolicy`: the per-user routes and the lists are authorized
-  for the caller; any signed-in caller could read or unlock any account
-- authorization plugins: a delegated administrator may only link an
-  organization to mail domains an organization above it already links,
+  group, and a member the caller cannot read is refused (#325)
+- `ldap/passwordPolicy`: the per-user routes and the lists are authorized for
+  the caller
+- authorization plugins: a delegated administrator only links an
+  organization to mail domains an organization above it links,
   [docs](docs/usage/plugins/auth/authz-linid1.md#mail-domains) (#325)
 
 ## v0.19.0 (2026-10-12)
