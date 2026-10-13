@@ -239,6 +239,7 @@ export interface Config {
   james_mailing_list_branch?: string[];
   james_mailbox_type_attribute?: string;
   james_sync_forwards?: boolean;
+  james_team_mailbox_any_domain?: boolean;
 
   // Drive (Cozy) plugin
   twake_drive_webadmin_url?: string;
@@ -731,6 +732,12 @@ const configArgs: ConfigTemplate = [
     'twakeMailboxType',
   ],
   ['--james-sync-forwards', 'DM_JAMES_SYNC_FORWARDS', false, 'boolean'],
+  [
+    '--james-team-mailbox-any-domain',
+    'DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN',
+    false,
+    'boolean',
+  ],
 
   // Drive (Cozy) plugin
   ['--twake-drive-webadmin-url', 'DM_TWAKE_DRIVE_WEBADMIN_URL', ''],

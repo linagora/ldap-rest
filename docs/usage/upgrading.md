@@ -4,6 +4,22 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Team mailboxes keep their members to their domain
+
+**Who is affected:** a deployment that loads `twake/james` and has team
+mailboxes whose members, or some of them, have their address at another
+domain than the mailbox's.
+
+A write that adds such a member, or moves a team mailbox to a domain its
+members are not at, is now refused with a `409`. The team mailboxes already
+holding one stay as they are until their members or their address change,
+[details](plugins/integrations/james-mailboxes.md#members-belong-to-the-mailboxs-domain).
+
+To keep cross-domain team mailboxes, set `--james-team-mailbox-any-domain`
+(`DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN=true`).
+
 ## To 0.19.0
 
 ### Forwards are no longer copied to Twake Mail

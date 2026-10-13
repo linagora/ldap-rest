@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Breaking Changes
+
+- `twake/james`: a team mailbox only takes members whose address is at its
+  domain (linagora/twake-directory-manager#66);
+  `--james-team-mailbox-any-domain` lifts the rule,
+  [notes](docs/usage/upgrading.md#team-mailboxes-keep-their-members-to-their-domain)
+
 ## v0.19.1 (2026-10-13)
 
 ### Fixes

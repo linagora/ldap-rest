@@ -5,6 +5,8 @@ import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
+import { ConflictError } from '../../../src/lib/errors';
+import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
 
@@ -264,6 +266,47 @@ describe('James and groups', () => {
       await deleteTeamMailbox(dn, 'tm-new', 'mlalice');
     });
 
+    it('follows a member under an attribute option', async () => {
+      const dn = await addGroup('tm-option', 'teamMailbox');
+      await reached(created('tm-option'));
+      calls.length = 0;
+
+      await dm.ldap.modify(dn, { add: { 'member;lang-en': bob } });
+      const added = [`PUT ${mailbox('tm-option')}/members/${user('mlbob')}`];
+      expect(await reached(added)).to.deep.equal(added);
+      calls.length = 0;
+      await groups.deleteGroup(dn);
+      const emptied = [
+        `DELETE ${mailbox('tm-option')}/members/${user('mlalice')}`,
+        `DELETE ${mailbox('tm-option')}/members/${user('mlbob')}`,
+      ];
+      expect(await reached(emptied)).to.have.members(emptied);
+    });
+
+    it('reads the address of the mailbox from --mail-attribute', async () => {
+      const name = `tm-attr-${timestamp}`;
+      const mailAttribute = dm.config.mail_attribute;
+      dm.config.mail_attribute = 'twakeMail';
+      const other = new James(dm);
+      dm.config.mail_attribute = mailAttribute;
+
+      await other.hooks.onLdapEntryChange!(
+        `cn=${name},${groupBase}`,
+        null,
+        {
+          dn: `cn=${name},${groupBase}`,
+          objectClass: ['top', 'groupOfNames'],
+          twakeMail: `${name}@test.org`,
+          twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
+          member: [],
+        },
+        {}
+      );
+      expect(await reached([`PUT ${mailbox('tm-attr')}`])).to.deep.equal([
+        `PUT ${mailbox('tm-attr')}`,
+      ]);
+    });
+
     it('makes no user call for the address of a group', async () => {
       const list = await addGroup('ml-user', 'mailingList');
       const dn = await addGroup('tm-user', 'teamMailbox');
@@ -315,6 +358,212 @@ describe('James and groups', () => {
       await settle();
 
       expect(groupCalls()).to.deep.equal([]);
+    });
+  });
+
+  // linagora/twake-directory-manager#66: Twake Mail adds any address to a
+  // team mailbox, so the directory keeps them to its domain.
+  describe('members of another domain', () => {
+    let carol: string;
+
+    const refusal = async (write: Promise<unknown>): Promise<unknown> => {
+      try {
+        await write;
+      } catch (e) {
+        return e;
+      }
+      return undefined;
+    };
+
+    const membersOf = async (dn: string): Promise<string[]> => {
+      const { searchEntries } = (await dm.ldap.search(
+        { paged: false, scope: 'base', attributes: ['member'] },
+        dn
+      )) as SearchResult;
+      const value = searchEntries[0]?.member;
+      return (Array.isArray(value) ? value : [value]).map(String);
+    };
+
+    before(async () => {
+      carol = `uid=mlcarol-${timestamp},${userBase}`;
+      await dm.ldap.add(carol, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'mlcarol',
+        sn: 'mlcarol',
+        uid: `mlcarol-${timestamp}`,
+        mail: `mlcarol-${timestamp}@other.org`,
+      });
+      users.push(carol);
+    });
+
+    afterEach(() => {
+      dm.config.james_team_mailbox_any_domain = false;
+    });
+
+    it('refuses adding one to a team mailbox', async () => {
+      const dn = await addGroup('tm-foreign', 'teamMailbox');
+      await reached(created('tm-foreign'));
+      calls.length = 0;
+
+      const error = await refusal(groups.addMember(dn, carol));
+      expect(error).to.be.instanceOf(ConflictError);
+      expect(String(error)).to.include(`mlcarol-${timestamp}@other.org`);
+      expect(await membersOf(dn)).not.to.include(carol);
+      await settle();
+      expect(groupCalls()).to.deep.equal([]);
+      await deleteTeamMailbox(dn, 'tm-foreign', 'mlalice');
+    });
+
+    it('refuses creating a team mailbox holding one', async () => {
+      const dn = `cn=tm-born-${timestamp},${groupBase}`;
+      const error = await refusal(
+        groups.addGroup(dn, [alice, carol], {
+          mail: `tm-born-${timestamp}@test.org`,
+          twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}`,
+          twakeDepartmentLink: groupBase,
+          twakeDepartmentPath: 'Test',
+        })
+      );
+      expect(error).to.be.instanceOf(ConflictError);
+      await settle();
+      expect(groupCalls()).to.deep.equal([]);
+    });
+
+    it('refuses turning a list holding one into a team mailbox', async () => {
+      const dn = await addGroup('tm-turned', 'mailingList');
+      await groups.addMember(dn, carol);
+
+      const error = await refusal(
+        groups.modifyGroup(dn, {
+          replace: { twakeMailboxType: `cn=teamMailbox,${mailboxTypeBase}` },
+        })
+      );
+      expect(error).to.be.instanceOf(ConflictError);
+      await groups.deleteGroup(dn);
+      await settle();
+      expect(groupCalls()).to.deep.equal([]);
+    });
+
+    it('refuses moving a team mailbox to another domain than its members', async () => {
+      const dn = await addGroup('tm-moved', 'teamMailbox');
+      await reached(created('tm-moved'));
+      calls.length = 0;
+
+      const error = await refusal(
+        groups.modifyGroup(dn, {
+          replace: { mail: `tm-moved-${timestamp}@other.org` },
+        })
+      );
+      expect(error).to.be.instanceOf(ConflictError);
+      // The caller may not be allowed to read the members already there
+      expect(String(error)).not.to.include(user('mlalice'));
+      expect(String(error)).to.include('some of the members it holds');
+      await settle();
+      expect(groupCalls()).to.deep.equal([]);
+      await deleteTeamMailbox(dn, 'tm-moved', 'mlalice');
+    });
+
+    it('refuses one brought by a replace, naming only it', async () => {
+      const dn = await addGroup('tm-replaced', 'teamMailbox');
+      await reached(created('tm-replaced'));
+      calls.length = 0;
+
+      const error = await refusal(
+        dm.ldap.modify(dn, { replace: { member: [alice, carol] } })
+      );
+      expect(error).to.be.instanceOf(ConflictError);
+      expect(String(error)).to.include(`mlcarol-${timestamp}@other.org`);
+      expect(String(error)).not.to.include('members it holds');
+      expect(await membersOf(dn)).not.to.include(carol);
+      await deleteTeamMailbox(dn, 'tm-replaced', 'mlalice');
+    });
+
+    it('refuses one under an attribute option', async () => {
+      const dn = await addGroup('tm-option', 'teamMailbox');
+      await reached(created('tm-option'));
+
+      const error = await refusal(
+        dm.ldap.modify(dn, { add: { member: bob, 'member;lang-en': carol } })
+      );
+      expect(error).to.be.instanceOf(ConflictError);
+      expect(await membersOf(dn)).not.to.include(carol);
+      await deleteTeamMailbox(dn, 'tm-option', 'mlalice');
+    });
+
+    it('applies the changes in the order they are sent', async () => {
+      const dn = await addGroup('tm-order', 'teamMailbox');
+      await reached(created('tm-order'));
+
+      // Added, then deleted: the mailbox never holds it
+      await dm.ldap.modify(dn, {
+        add: { member: carol },
+        delete: { member: carol },
+      });
+      expect(await membersOf(dn)).not.to.include(carol);
+      await deleteTeamMailbox(dn, 'tm-order', 'mlalice');
+    });
+
+    it('lets a write that ends the team mailbox bring one', async () => {
+      const dn = await addGroup('tm-ended', 'teamMailbox');
+      await reached(created('tm-ended'));
+
+      await dm.ldap.modify(dn, {
+        add: { member: carol },
+        delete: ['twakeMailboxType'],
+      });
+      expect(await membersOf(dn)).to.include(carol);
+      calls.length = 0;
+      await groups.deleteGroup(dn);
+      await settle();
+    });
+
+    it('keeps a team mailbox holding one editable', async () => {
+      dm.config.james_team_mailbox_any_domain = true;
+      const dn = await addGroup('tm-legacy', 'teamMailbox');
+      await reached(created('tm-legacy'));
+      await groups.addMember(dn, carol);
+      dm.config.james_team_mailbox_any_domain = false;
+
+      await groups.addMember(dn, bob);
+      await groups.deleteMember(dn, carol);
+      const held = await membersOf(dn);
+      expect(held).to.include(bob);
+      expect(held).not.to.include(carol);
+      calls.length = 0;
+      await groups.deleteGroup(dn);
+      await settle();
+    });
+
+    it('lets a mailing list hold one', async () => {
+      const dn = await addGroup('ml-foreign', 'mailingList');
+      await groups.addMember(dn, carol);
+      expect(await membersOf(dn)).to.include(carol);
+      await groups.deleteGroup(dn);
+    });
+
+    it('lets a team mailbox hold one with --james-team-mailbox-any-domain', async () => {
+      dm.config.james_team_mailbox_any_domain = true;
+      const dn = await addGroup('tm-any', 'teamMailbox');
+      await reached(created('tm-any'));
+      calls.length = 0;
+
+      await groups.addMember(dn, carol);
+      const added = [
+        `PUT ${mailbox('tm-any')}/members/mlcarol-${timestamp}@other.org`,
+      ];
+      expect(await reached(added)).to.deep.equal(added);
+      calls.length = 0;
+      await groups.deleteGroup(dn);
+      await reached([
+        `DELETE ${mailbox('tm-any')}/members/${user('mlalice')}`,
+        `DELETE ${mailbox('tm-any')}/members/mlcarol-${timestamp}@other.org`,
+      ]);
+    });
+
+    it('publishes the setting for the clients', () => {
+      expect(james.getConfigApiData()).to.deep.equal({
+        teamMailboxAnyDomain: false,
+      });
     });
   });
 });
