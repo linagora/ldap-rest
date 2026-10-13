@@ -51,6 +51,9 @@ Add to your ldap-rest configuration:
 
 # Optional: Custom mailbox type attribute (default: twakeMailboxType)
 --james-mailbox-type-attribute "mailboxType"
+
+# Optional: let team mailboxes hold members of any mail domain
+--james-team-mailbox-any-domain
 ```
 
 Or via environment variables:
@@ -58,6 +61,7 @@ Or via environment variables:
 ```bash
 DM_JAMES_MAILING_LIST_BRANCHES="ou=lists,dc=example,dc=com"
 DM_JAMES_MAILBOX_TYPE_ATTRIBUTE="mailboxType"
+DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN=true
 ```
 
 If `james-mailing-list-branches` is empty (default), team mailboxes can be created anywhere.
@@ -151,6 +155,10 @@ or any other write to the entry.
 - A new `mail` empties the mailbox of the old address and creates the one of
   the new address.
 
+The address of the mailbox and of its members is read from `--mail-attribute`
+(`mail` by default), and the members under any spelling of `member`, an
+option such as `member;lang-en` included.
+
 The writes to one group reach James one after the other. A deleted
 user stays in the team mailboxes it belonged to: once its entry is gone, its
 address cannot be read.
@@ -201,6 +209,29 @@ branches gets no member either.
 - Validation failures are logged as errors
 - Group is created in LDAP but the team mailbox is NOT created in James
 - No exception thrown (silent failure with error log)
+
+### Members belong to the mailbox's domain
+
+A team mailbox belongs to one mail domain, and so do its members: the members
+of `sales@example.com` have their address at `example.com`. Twake Mail does
+not check it — its WebAdmin adds any address to a team mailbox — so the
+directory does, on every write:
+
+- adding a member whose `mail` is at another domain is refused;
+- so is creating a team mailbox holding one, turning a group holding one into
+  a team mailbox, or changing the address of a team mailbox to a domain its
+  members are not at.
+
+The refusal is a `409`. It names the addresses of the members the write
+brings, not those the mailbox already holds, which the caller may not be
+allowed to read. A member without an address is not pushed to Twake Mail,
+and is accepted. Mailing lists are not
+concerned: they hold members of any domain, external ones included.
+
+`--james-team-mailbox-any-domain` (`DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN=true`)
+lifts the rule, for a deployment that wants cross-domain team mailboxes.
+`/api/v1/config` publishes it as `features.james.teamMailboxAnyDomain`, so a
+client offers only the members the server accepts.
 
 ### Mailbox Type Defaults
 

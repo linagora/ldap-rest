@@ -7,8 +7,10 @@ import type { DM } from '../../bin';
 import type {
   AttributesList,
   AttributeValue,
+  ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
+import { ConflictError } from '../../lib/errors';
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
@@ -101,10 +103,59 @@ const pickDefaultIdentity = (
  *       used: 524288000
  *       max: 2147483648
  */
-const members = (entry: AttributesList | null): string[] => {
-  const value = entry?.member;
-  if (value === undefined) return [];
-  return (Array.isArray(value) ? value : [value]).map(String);
+const members = (entry: AttributesList | null): string[] =>
+  valuesOf(entry ?? undefined, 'member') ?? [];
+
+/** Whether two attribute names are the same, options and case aside. */
+const sameAttr = (a: string, b: string): boolean =>
+  a.split(';')[0].toLowerCase() === b.split(';')[0].toLowerCase();
+
+const listOf = (value: AttributeValue | undefined): string[] =>
+  value === undefined || value === null
+    ? []
+    : (Array.isArray(value) ? value : [value]).map(String);
+
+/**
+ * The values of an attribute under every spelling of its name: a subtype
+ * such as `member;lang-en` holds values of `member` too. Undefined when no
+ * key names it.
+ */
+const valuesOf = (
+  list: AttributesList | undefined,
+  name: string
+): string[] | undefined => {
+  if (!list) return undefined;
+  const keys = Object.keys(list).filter(key => sameAttr(key, name));
+  return keys.length ? keys.flatMap(key => listOf(list[key])) : undefined;
+};
+
+/**
+ * The values an attribute holds once a modify is applied to the stored
+ * entry, in the order LdapActions sends the changes: adds, replaces, then
+ * deletes.
+ */
+const valuesAfter = (
+  current: AttributesList,
+  changes: ModifyRequest,
+  name: string,
+  key: (value: string) => string
+): string[] => {
+  let values = valuesOf(current, name) ?? [];
+  const added = valuesOf(changes.add, name);
+  if (added) values = [...values, ...added];
+  const replaced = valuesOf(changes.replace, name);
+  if (replaced) values = replaced;
+  const del = changes.delete;
+  if (Array.isArray(del)) {
+    if (del.some(attr => sameAttr(attr, name))) values = [];
+  } else {
+    const gone = valuesOf(del, name);
+    if (gone) {
+      const keys = new Set(gone.map(key));
+      values = keys.size ? values.filter(v => !keys.has(key(v))) : [];
+    }
+  }
+  return values;
 };
 
 const memberKey = (dn: string): string => {
@@ -125,7 +176,7 @@ const isGroup = (classes: AttributeValue | undefined): boolean =>
 
 export default class James extends TwakePlugin {
   name = 'james';
-  roles: Role[] = ['consistency', 'api'] as const;
+  roles: Role[] = ['consistency', 'api', 'configurable'] as const;
 
   dependencies = {
     onLdapChange: 'core/ldap/onChange',
@@ -316,6 +367,21 @@ export default class James extends TwakePlugin {
   }
 
   hooks: Hooks = {
+    ldapaddrequest: async ([dn, entry, req]) => {
+      const domain = this.teamMailboxDomain(
+        valuesOf(entry, this.mailAttr),
+        valuesOf(entry, this.mailboxTypeAttr)
+      );
+      if (domain)
+        await this.assertMembersAt(dn, domain, valuesOf(entry, 'member') ?? []);
+      return req !== undefined
+        ? [dn, entry, req]
+        : ([dn, entry] as [string, AttributesList, Request?]);
+    },
+    ldapmodifyrequest: async ([dn, changes, op, req]) => {
+      await this.guardTeamMailboxChange(dn, changes);
+      return [dn, changes, op, req];
+    },
     ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
       this.provisionAccount(dn, attributes),
     onLdapMailChange: async (
@@ -623,7 +689,7 @@ export default class James extends TwakePlugin {
     entry: AttributesList | null
   ): { mail: string; refused: string | null } | null {
     if (!entry || this.getMailboxType(entry) !== 'teamMailbox') return null;
-    const mail = this.attributeToString(entry.mail);
+    const mail = this.attributeToString(entry[this.mailAttr]);
     if (!mail) return null;
     const dn = String(entry.dn);
     const branches = this.config.james_mailing_list_branch || [];
@@ -776,6 +842,123 @@ export default class James extends TwakePlugin {
   }
 
   private teamMailboxQueue: Map<string, Promise<void>> = new Map();
+
+  /**
+   * Whether a team mailbox may hold members of another mail domain:
+   * `--james-team-mailbox-any-domain`, off by default. A client reads it to
+   * offer only the members the server accepts.
+   */
+  getConfigApiData(): Record<string, unknown> {
+    return {
+      teamMailboxAnyDomain: Boolean(this.config.james_team_mailbox_any_domain),
+    };
+  }
+
+  /**
+   * The mail domain of a team mailbox, lower-cased, from its address and
+   * mailbox type; null for any other entry.
+   */
+  private teamMailboxDomain(
+    mail: AttributeValue | undefined,
+    type: AttributeValue | undefined
+  ): string | null {
+    if (
+      this.config.james_team_mailbox_any_domain ||
+      this.getMailboxType({
+        [this.mailboxTypeAttr]: type,
+      } as AttributesList) !== 'teamMailbox'
+    )
+      return null;
+    const address = this.attributeToString(mail);
+    return address
+      ? this.extractMailDomain(address)?.toLowerCase() || null
+      : null;
+  }
+
+  /**
+   * Refuse a change that leaves a team mailbox with a member of another
+   * mail domain: a member added, or the mailbox moved to another domain —
+   * by its address or by becoming a team mailbox — with the members it
+   * holds.
+   *
+   * Twake Mail does not check it: its WebAdmin adds any address to a team
+   * mailbox, and this plugin pushes every member's. Members without an
+   * address are not pushed, and are left alone.
+   */
+  private async guardTeamMailboxChange(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<void> {
+    if (this.config.james_team_mailbox_any_domain) return;
+    const watched = [this.mailAttr, this.mailboxTypeAttr, 'member'];
+    const touched = [changes.add, changes.replace].some(
+      list =>
+        list &&
+        Object.keys(list).some(name => watched.some(w => sameAttr(name, w)))
+    );
+    if (!touched) return;
+    const current = await this.ldapGetAttributes(dn, watched);
+    if (!current) return;
+    const after = (name: string, key = (v: string) => v.toLowerCase()) =>
+      valuesAfter(current, changes, name, key);
+    const domain = this.teamMailboxDomain(
+      after(this.mailAttr),
+      after(this.mailboxTypeAttr)
+    );
+    if (!domain) return;
+    const held = new Set((valuesOf(current, 'member') ?? []).map(memberKey));
+    const kept = after('member', memberKey);
+    const gained = kept.filter(m => !held.has(memberKey(m)));
+    // The same mailbox: only the members it gains are checked. Elsewhere,
+    // those it keeps go along.
+    const moved =
+      domain !==
+      this.teamMailboxDomain(
+        valuesOf(current, this.mailAttr),
+        valuesOf(current, this.mailboxTypeAttr)
+      );
+    await this.assertMembersAt(
+      dn,
+      domain,
+      gained,
+      moved ? kept.filter(m => held.has(memberKey(m))) : []
+    );
+  }
+
+  /**
+   * Throw when a member holds an address at another domain than the team
+   * mailbox's.
+   *
+   * Only the addresses of the members the write brings are named: the caller
+   * may not be allowed to read those the mailbox already holds.
+   *
+   * @throws ConflictError
+   */
+  private async assertMembersAt(
+    dn: string,
+    domain: string,
+    brought: string[],
+    held: string[] = []
+  ): Promise<void> {
+    const foreign = async (memberDns: string[]): Promise<string[]> =>
+      (await this.getMemberEmails(memberDns)).filter(
+        mail => this.extractMailDomain(mail)?.toLowerCase() !== domain
+      );
+    const [named, unnamed] = await Promise.all([
+      foreign(brought),
+      foreign(held),
+    ]);
+    if (named.length === 0 && unnamed.length === 0) return;
+    const listed = named.length
+      ? `${named.slice(0, 5).join(', ')}${named.length > 5 ? ', …' : ''} ` +
+        `${named.length > 1 ? 'are' : 'is'} not`
+      : '';
+    const others = unnamed.length ? 'some of the members it holds are not' : '';
+    throw new ConflictError(
+      `The members of team mailbox ${dn} must have an address at ${domain}: ` +
+        [listed, others].filter(Boolean).join(', and ')
+    );
+  }
 
   /**
    * The WebAdmin path of the team mailbox at an address
