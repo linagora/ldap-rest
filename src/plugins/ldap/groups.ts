@@ -274,8 +274,10 @@ export default class LdapGroups extends DmPlugin {
             );
           } else if (/=/.test(req.query.match)) {
             // Custom filter syntax - validate strictly to prevent LDAP injection
-            // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
-            if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
+            // Only allow alphanumeric, wildcards, and LDAP filter syntax chars,
+            // plus the `.` `@` `+` `'` found in DNs (uid=john.doe,
+            // mail=a@b, multi-valued RDNs); `\` stays refused
+            if (!/^[\w*=()&|, .@+'-]+$/.test(req.query.match)) {
               throw new BadRequestError(
                 'Invalid match query: contains forbidden characters'
               );
