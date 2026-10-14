@@ -59,7 +59,12 @@ GET /api/v1/ldap/groups
 - `attribute` (optional): Attribute(s) `match` is looked for in, as a
   substring, several separated by commas — the same semantics as the flat
   entity lists. Without it, `match` is either a raw LDAP filter (when it
-  contains `=`) or an exact group name.
+  contains `=`) or an exact group name. A raw filter may only hold letters,
+  digits, `_ * = ( ) & | , space - . @ '`, which covers a DN such as
+  `match=(member=uid=john.doe,ou=users,dc=example,dc=com)` to list the groups
+  of an account. Anything else is refused with 400, notably `\` (it escapes
+  in a filter, so a DN needing escapes cannot be expressed), `+`, `/` and `!`. It is not combined with
+  `attribute`, which builds a substring filter that `member` cannot answer.
 - `attributes` (optional): Comma-separated list of attributes to return
 
 **Example:**

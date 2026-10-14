@@ -274,8 +274,10 @@ export default class LdapGroups extends DmPlugin {
             );
           } else if (/=/.test(req.query.match)) {
             // Custom filter syntax - validate strictly to prevent LDAP injection
-            // Only allow alphanumeric, wildcards, and LDAP filter syntax chars
-            if (!/^[\w*=()&|, -]+$/.test(req.query.match)) {
+            // A client asks for `(member=<DN>)`, and a DN holds `.`, `@` and
+            // `'`. `\` stays refused: it escapes in a filter. The allowed set
+            // is in docs/usage/plugins/ldap/groups.md.
+            if (!/^[\w*=()&|, .@'-]+$/.test(req.query.match)) {
               throw new BadRequestError(
                 'Invalid match query: contains forbidden characters'
               );
