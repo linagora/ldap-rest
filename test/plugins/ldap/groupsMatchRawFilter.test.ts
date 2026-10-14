@@ -18,6 +18,7 @@ describe('Group raw match filter', function () {
   const other = 'rawmatch.other';
   let dn: string;
   let mailDn: string;
+  let quoteDn: string;
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -34,6 +35,7 @@ describe('Group raw match filter', function () {
     // A DN with a dot, and one with an @ (and a dot)
     dn = `uid=rawmatch.john,${process.env.DM_LDAP_BASE}`;
     mailDn = `mail=rawmatch.jane@example.com,${process.env.DM_LDAP_BASE}`;
+    quoteDn = `uid=rawmatch.o'brien,${process.env.DM_LDAP_BASE}`;
     const person = { objectClass: ['top', 'twakeAccount', 'twakeWhitePages'] };
     await server.ldap.add(dn, {
       ...person,
@@ -49,14 +51,21 @@ describe('Group raw match filter', function () {
       sn: 'Doe',
       mail: 'rawmatch.jane@example.com',
     });
-    await plugin.addGroup(named, [dn, mailDn]);
+    await server.ldap.add(quoteDn, {
+      ...person,
+      uid: "rawmatch.o'brien",
+      cn: "O'Brien",
+      sn: "O'Brien",
+      mail: 'rawmatch.obrien@example.com',
+    });
+    await plugin.addGroup(named, [dn, mailDn, quoteDn]);
     await plugin.addGroup(other, []);
   });
 
   after(async () => {
     for (const cn of [named, other])
       await plugin.deleteGroup(cn).catch(() => undefined);
-    for (const d of [dn, mailDn])
+    for (const d of [dn, mailDn, quoteDn])
       await server.ldap.delete(d).catch(() => undefined);
   });
 
@@ -78,6 +87,18 @@ describe('Group raw match filter', function () {
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
     expect(res.body).to.have.property(named);
     expect(res.body).not.to.have.property(other);
+  });
+
+  it('should find the groups of a DN holding an apostrophe', async () => {
+    const res = await get(`(member=${quoteDn})`);
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(res.body).to.have.property(named);
+    expect(res.body).not.to.have.property(other);
+  });
+
+  it('should refuse a +', async () => {
+    const res = await get('(member=uid=a+b)');
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
   });
 
   it('should still refuse a backslash', async () => {
