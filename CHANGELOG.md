@@ -1,11 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.20.1 (2026-10-14)
 
 ### Fixes
 
-- `ldap/groups`: a raw `match` filter accepts `.`, `@` and `'`, so
-  `match=(member=<DN>)` works for a DN like `uid=john.doe,...`
+- `ldap/groups`: a raw `match` filter accepts `.`, `@` and `'`
   (linagora/twake-directory-manager#70)
 
 ## v0.20.0 (2026-10-13)
