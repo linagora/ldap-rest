@@ -485,6 +485,32 @@ describe('Twake instances plugin', function () {
         expect(nock.pendingMocks()).to.deep.equal([]);
       });
 
+      it('asks no organization about an instance at another address than the account’s', async () => {
+        search('in-alice.example.org').reply(200, {
+          items: [
+            {
+              _id: 'taken',
+              fqdn: 'in-alice.example.org',
+              internal_email: 'someone@example.org',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+        let asked = false;
+        nock(CLOUDERY)
+          .get('/api/v2/organizations/in-alice')
+          .optionally()
+          .reply(200, () => {
+            asked = true;
+            return { instance_id: 'taken' };
+          });
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-alice'))))
+        ).to.match(/belongs to another user/);
+        expect(asked).to.equal(false);
+        nock.cleanAll();
+      });
+
       it('finds the account by mail', async () => {
         search('in-alice.example.org').reply(200, { items: [] });
         nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
@@ -1180,6 +1206,243 @@ describe('Twake instances plugin', function () {
         );
         expect(scope.isDone()).to.equal(true);
         expect(rabbit.published).to.deep.equal([]);
+      });
+
+      const PLATFORM_ORG_INSTANCE = {
+        ...ORG_INSTANCE,
+        _id: 'acme1-instance',
+        internal_email: 'acme1@example.org',
+        instantiated_at: '2026-03-13T12:33:17Z',
+      };
+      const clouderyOrg = (instanceId: string, times = 1) =>
+        nock(CLOUDERY)
+          .get('/api/v2/organizations/acme1')
+          .times(times)
+          .reply(200, { ldap_branch: 'acme1', instance_id: instanceId });
+      const addUsersOu = () =>
+        dm.ldap.add(`ou=users,${orgDn}`, {
+          objectClass: ['top', 'organizationalUnit'],
+          ou: 'users',
+        });
+
+      it('announces an organization whose built instance is owned at the platform domain, then its members', async () => {
+        await addUsersOu();
+        search('acme1.example.org')
+          .times(2)
+          .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
+        clouderyOrg('acme1-instance', 2);
+        const asked = search('inerinacme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances', body => body.slug === 'inerinacme1')
+          .reply(202, {});
+        const linked = link('acme1', 'acme1.example.org');
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: ERIN_CREATED.message.internalEmail },
+          rest()
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(linked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        expect(await read(dm, orgDn)).to.have.property('businessCategory');
+
+        await rabbit.handler!(erinWorkplace);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
+      });
+
+      // A member added while the organization's instance was still built
+      const addHeldMember = async () => {
+        await addUsersOu();
+        search('acme1.example.org').reply(200, {
+          items: [{ ...PLATFORM_ORG_INSTANCE, instantiated_at: null }],
+        });
+        clouderyOrg('acme1-instance');
+        search('inerinacme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances')
+          .reply(202, {});
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: ERIN_CREATED.message.internalEmail },
+          rest()
+        );
+        expect(rabbit.published).to.deep.equal([]);
+      };
+
+      it('announces the organization when a caller who may write it makes sure of a member', async () => {
+        await addHeldMember();
+        search('acme1.example.org')
+          .times(2)
+          .reply(200, { items: [PLATFORM_ORG_INSTANCE] });
+        clouderyOrg('acme1-instance', 2);
+        const asked = search('inerinacme1.example.org')
+          .reply(200, { items: [] })
+          .post('/api/v1/instances')
+          .reply(202, {});
+        const linked = link('acme1', 'acme1.example.org');
+        expect(await plugin(dm).ensureInstance(erin, rest())).to.equal(
+          'pending'
+        );
+        expect(asked.isDone()).to.equal(true);
+        expect(linked.isDone()).to.equal(true);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+        expect(await read(dm, orgDn)).to.have.property('businessCategory');
+
+        await rabbit.handler!(erinWorkplace);
+        expect(rabbit.published).to.deep.equal([ORG_CREATED, ERIN_CREATED]);
+      });
+
+      it('keeps the mark the organization’s workplace.created sets while a caller makes sure of a member', async () => {
+        await addHeldMember();
+        search('inerinacme1.example.org')
+          .reply(200, {
+            items: [
+              {
+                fqdn: 'inerinacme1.example.org',
+                internal_email: ERIN_CREATED.message.internalEmail,
+                instantiated_at: null,
+              },
+            ],
+          })
+          .persist();
+        nock(CLOUDERY)
+          .patch('/api/v2/organizations/acme1', {
+            instance_fqdn: 'acme1.example.org',
+          })
+          .reply(200, {})
+          .persist();
+        clouderyOrg('acme1-instance');
+        search('acme1.example.org').reply((_uri, _body, answer) => {
+          rabbit.handler!(orgWorkplace).then(
+            () => answer(null, [200, { items: [PLATFORM_ORG_INSTANCE] }]),
+            (err: Error) => answer(err, [500, {}])
+          );
+        });
+        try {
+          expect(await plugin(dm).ensureInstance(erin, rest())).to.equal(
+            'pending'
+          );
+          expect(rabbit.published).to.deep.equal([ORG_CREATED]);
+          expect(await read(dm, orgDn)).to.have.property('businessCategory');
+        } finally {
+          nock.cleanAll();
+        }
+      });
+
+      const memberOnlyCaller = async (work: (caller: Request) => unknown) => {
+        const memberOnly = (args: unknown[]) => {
+          const req = args[args.length - 1] as Request | undefined;
+          if (args[0] === orgDn && req?.headers?.['x-test'] === 'member-only')
+            throw new ForbiddenError('organization read only');
+          return args;
+        };
+        dm.hooks.ldapmodifyrequest = [
+          ...(dm.hooks.ldapmodifyrequest || []),
+          memberOnly,
+        ];
+        try {
+          await work({
+            user: 'admin',
+            headers: { 'x-test': 'member-only' },
+          } as unknown as Request);
+        } finally {
+          dm.hooks.ldapmodifyrequest = dm.hooks.ldapmodifyrequest!.filter(
+            h => h !== memberOnly
+          );
+          nock.cleanAll();
+        }
+      };
+
+      it('refuses a caller who may not write the organization, and leaves it unannounced', async () => {
+        await addHeldMember();
+        await memberOnlyCaller(async caller => {
+          search('acme1.example.org').reply(200, {
+            items: [PLATFORM_ORG_INSTANCE],
+          });
+          clouderyOrg('acme1-instance');
+          const linked = link('acme1', 'acme1.example.org');
+          expect(
+            await refusal(plugin(dm).ensureInstance(erin, caller))
+          ).to.be.instanceOf(ForbiddenError);
+          expect(linked.isDone()).to.equal(false);
+          expect(rabbit.published).to.deep.equal([]);
+          expect(await read(dm, orgDn)).not.to.have.property(
+            'businessCategory'
+          );
+        });
+      });
+
+      it('does not refuse a caller who may not write the organization while its instance is built', async () => {
+        await addHeldMember();
+        await memberOnlyCaller(async caller => {
+          search('acme1.example.org').reply(200, {
+            items: [{ ...PLATFORM_ORG_INSTANCE, instantiated_at: null }],
+          });
+          clouderyOrg('acme1-instance');
+          search('inerinacme1.example.org').reply(200, {
+            items: [
+              {
+                fqdn: 'inerinacme1.example.org',
+                internal_email: ERIN_CREATED.message.internalEmail,
+                instantiated_at: null,
+              },
+            ],
+          });
+          expect(await plugin(dm).ensureInstance(erin, caller)).to.equal(
+            'pending'
+          );
+          expect(rabbit.published).to.deep.equal([]);
+        });
+      });
+
+      const refusedAsTaken = async () =>
+        String(
+          await refusal(
+            plugin(dm).ensureOrganization({
+              id: 'acme1',
+              name: 'Acme',
+              domain: 'acme.example',
+            })
+          )
+        );
+
+      it('takes no instance without an id for the organization’s, though the organization is linked to none', async () => {
+        const { _id: _ignored, ...withoutId } = PLATFORM_ORG_INSTANCE;
+        search('acme1.example.org').reply(200, { items: [withoutId] });
+        nock(CLOUDERY)
+          .get('/api/v2/organizations/acme1')
+          .optionally()
+          .reply(200, { ldap_branch: 'acme1' });
+        expect(await refusedAsTaken()).to.match(/belongs to another user/);
+        nock.cleanAll();
+      });
+
+      it('takes no instance for the organization’s when the Cloudery has no such organization', async () => {
+        search('acme1.example.org').reply(200, {
+          items: [PLATFORM_ORG_INSTANCE],
+        });
+        nock(CLOUDERY).get('/api/v2/organizations/acme1').reply(404, {});
+        expect(await refusedAsTaken()).to.match(/belongs to another user/);
+      });
+
+      it('takes no personal instance at its address for the organization’s', async () => {
+        await addUsersOu();
+        search('acme1.example.org').reply(200, {
+          items: [{ ...PLATFORM_ORG_INSTANCE, _id: 'someone-else' }],
+        });
+        const looked = clouderyOrg('acme1-instance');
+        const member = search('inerinacme1.example.org').reply(200, {
+          items: [],
+        });
+        await dm.ldap.add(
+          erin,
+          { ...person('in.erin'), mail: ERIN_CREATED.message.internalEmail },
+          rest()
+        );
+        expect(looked.isDone()).to.equal(true);
+        expect(member.isDone()).to.equal(false);
+        expect(rabbit.published).to.deep.equal([]);
+        nock.cleanAll();
       });
     });
   });

@@ -4,6 +4,28 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Members of organizations created before 0.13.0
+
+**Who is affected:** a deployment that loads `twake/instances` with the
+Cloudery and has organizations created before 0.13.0 that got members since.
+
+Those members have neither an address (`twakeWorkspaceUrl`, or
+`--twake-instance-fqdn-attribute`) nor the mark (`twakeCreatedEventAt`, or
+`--twake-instance-sent-attribute`), and adding another member does not
+release them. Once deployed, find them under each organization entry with
+
+```
+(&(uid=*)(mail=*)(!(twakeWorkspaceUrl=*))(!(twakeCreatedEventAt=*)))
+```
+
+and call `POST /api/v1/twake/instances/ensure` with `{ "dn": … }` for each,
+as a caller who may write the organization entry. The first call announces
+the organization. Each call asks for the member's instance, and the member's
+`user.created` follows once it is built,
+[details](plugins/integrations/instances.md#organizations).
+
 ## To 0.20.0
 
 ### Team mailboxes keep their members to their domain

@@ -70,6 +70,8 @@ export default class TwakeInstances extends DmPlugin {
   private readonly offers: string[] = [];
   /** Work on one account, or organization, waits for the work before it */
   private readonly queues = new Map<string, Promise<unknown>>();
+  /** Organizations a member's add is announcing, by lowercased id */
+  private readonly announcing = new Map<string, Promise<unknown>>();
 
   constructor(server: DM) {
     super(server);
@@ -175,6 +177,7 @@ export default class TwakeInstances extends DmPlugin {
           });
         }
       });
+      if (account.orgId) await this.announcing.get(account.orgId.toLowerCase());
     },
     ldapdeletedone: async dns => {
       const provider = this.provider;
@@ -301,11 +304,13 @@ export default class TwakeInstances extends DmPlugin {
     dn: string,
     req?: Request
   ): Promise<'ready' | 'pending'> {
-    return this.serialized(dn, async () => {
+    let orgId: string | undefined;
+    const state = await this.serialized(dn, async () => {
       const entry = await this.read(dn, req);
       if (!entry) throw new NotFoundError(`No entry at ${dn}`);
       const account = this.account(dn, entry);
       if (!account) throw new BadRequestError(`${dn} gets no instance`);
+      orgId = account.orgId;
       if (first(this.value(entry, this.sentAttribute))) return 'ready';
       // A write that changes nothing, so a caller who may read the account
       // but not write it is refused before the provider or the broker hear
@@ -331,6 +336,9 @@ export default class TwakeInstances extends DmPlugin {
       }
       return this.provide(dn, entry, account, req);
     });
+    // Outside the account's queue: the announce releases its members
+    if (orgId) await this.announcing.get(orgId.toLowerCase());
+    return state;
   }
 
   /**
@@ -392,16 +400,19 @@ export default class TwakeInstances extends DmPlugin {
       orgId: org.id,
       orgDomain: org.domain,
       offer: this.config.twake_instance_cloudery_organization_offer,
+      organization: true,
     };
   }
 
   /**
    * The Cloudery builds no member instance for an organization it does not
    * have, so a member asks for a missing one first. The organization is
-   * marked when its own workplace.created arrives. Not serialized on the
-   * organization: its work releases members, which would wait on this one.
+   * marked when its own workplace.created arrives, or announced here when its
+   * instance is already built: on a caller's request, only when that caller
+   * may write the organization. Not serialized on the organization: its work
+   * releases members, which would wait on this one.
    */
-  private async requestOrganization(id: string): Promise<void> {
+  private async requestOrganization(id: string, req?: Request): Promise<void> {
     if (!(this.provider instanceof ClouderyProvider)) return;
     const entry = await this.findOrganization(id);
     if (!entry || first(this.value(entry, this.sentAttribute))) return;
@@ -414,7 +425,30 @@ export default class TwakeInstances extends DmPlugin {
       return;
     }
     const request = this.organizationRequest({ id, name, domain });
-    if (await this.provider.find(request)) return;
+    const found = await this.provider.find(request);
+    if (found) {
+      const key = id.toLowerCase();
+      if (!found.ready || this.announcing.has(key)) return;
+      // The announce writes the organization with this plugin's rights. An
+      // empty modify runs the rights hooks and writes nothing, so it cannot
+      // undo a mark set since the read above
+      if (req) await this.server.ldap.modify(entry.dn as string, {}, req);
+      if (!this.announcing.has(key))
+        this.announcing.set(
+          key,
+          this.ensureOrganization({ id, name, domain })
+            .catch(err => {
+              this.logger.error({
+                plugin: this.name,
+                event: 'organization',
+                id,
+                error: String(err),
+              });
+            })
+            .finally(() => this.announcing.delete(key))
+        );
+      return;
+    }
     await this.provider.createOrganization({ id, name, domain });
     try {
       await this.provider.create(request);
@@ -470,7 +504,7 @@ export default class TwakeInstances extends DmPlugin {
     account: Account,
     req?: Request
   ): Promise<'ready' | 'pending'> {
-    if (account.orgId) await this.requestOrganization(account.orgId);
+    if (account.orgId) await this.requestOrganization(account.orgId, req);
     const found = await this.provider.find(account);
     const fqdn = found
       ? found.ready && found.fqdn

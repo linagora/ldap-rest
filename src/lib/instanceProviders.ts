@@ -20,6 +20,12 @@ export interface InstanceRequest {
   orgId?: string;
   orgDomain?: string;
   offer?: string;
+  /**
+   * An organization's own instance. It may be owned at the platform domain,
+   * as a personal account's is; with the Cloudery, the organization's link
+   * tells them apart
+   */
+  organization?: boolean;
 }
 
 export interface FoundInstance {
@@ -152,6 +158,7 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     if (!res.ok) throw await refused('Cloudery instance search failed', res);
     const { items } = await this.json<{
       items?: {
+        _id?: string;
         fqdn: string;
         internal_email?: string;
         oidc?: string;
@@ -163,13 +170,34 @@ export class ClouderyProvider extends HttpProvider implements InstanceProvider {
     // Only the fields the instance holds are compared
     if (
       (found.internal_email &&
-        found.internal_email.toLowerCase() !== request.email.toLowerCase()) ||
+        found.internal_email.toLowerCase() !== request.email.toLowerCase() &&
+        !(
+          request.organization &&
+          (await this.organizationHolds(request.id, found._id))
+        )) ||
       (found.oidc && found.oidc !== request.id)
     )
       throw new ConflictError(
         `${fqdn} already exists and belongs to another user`
       );
     return { fqdn: found.fqdn, ready: Boolean(found.instantiated_at) };
+  }
+
+  /** Whether the Cloudery holds this instance as the organization's own */
+  private async organizationHolds(
+    id: string,
+    instanceId?: string
+  ): Promise<boolean> {
+    if (!instanceId) return false;
+    const res = await this.call(
+      `${this.url}/api/v2/organizations/${encodeURIComponent(id)}`,
+      { headers: this.headers() }
+    );
+    if (res.status === 404) return false;
+    if (!res.ok)
+      throw await refused('Cloudery organization lookup failed', res);
+    const org = await this.json<{ instance_id?: string | null }>(res);
+    return org.instance_id === instanceId;
   }
 
   async createOrganization(org: {

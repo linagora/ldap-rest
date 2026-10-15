@@ -97,6 +97,15 @@ organization and the organization's instance when the Cloudery has neither,
 so making sure of a member also repairs an organization whose creation
 failed.
 
+An organization created before 0.13.0 has a built instance but was never
+announced, and that instance is owned at the platform domain rather than
+`<id>@<domain>`, as a personal account's is. The plugin takes it as the
+organization's only when the Cloudery organization is linked to it, and
+announces the organization when one of its members is added or made sure of.
+Announcing writes the organization with the plugin's rights, so making sure
+of a member through the API announces it only for a caller who may write the
+organization entry, and is refused with a `403` otherwise.
+
 ## Providers
 
 - `cloudery`: the Cloudery accepts the request and builds the instance
