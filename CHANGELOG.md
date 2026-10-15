@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/instances`: members of an organization created before 0.13.0 get
+  their instance again; the members already held need making sure of,
+  [notes](docs/usage/upgrading.md#members-of-organizations-created-before-0130)
+
 ## v0.20.1 (2026-10-14)
 
 ### Fixes
