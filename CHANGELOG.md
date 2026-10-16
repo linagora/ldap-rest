@@ -26,6 +26,10 @@
 - Entries returned by the API no longer carry the `*`, `+` and `1.1` keys,
   as `"*": []`
   ([#338](https://github.com/linagora/ldap-rest/issues/338))
+- `core/ldap/accountLifecycle`: `POST /{entity}/{id}/password` refuses a
+  password over 256 characters or holding a control character, and a
+  `forceChange` that is not a boolean, which counted as `true`
+  ([#337](https://github.com/linagora/ldap-rest/issues/337))
 
 ## v0.20.2 (2026-10-15)
 
