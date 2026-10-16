@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Entries returned by the API no longer carry a `"*": []` key
+  ([#338](https://github.com/linagora/ldap-rest/issues/338))
+
 ## v0.20.2 (2026-10-15)
 
 ### Fixes

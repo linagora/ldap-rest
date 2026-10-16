@@ -214,6 +214,21 @@ const cloneSearchResult = (result: SearchResult): SearchResult => ({
 });
 
 /**
+ * ldapts gives every requested attribute the entry lacks an empty list, so
+ * the `*`, `+` and `1.1` selectors came back as attributes of their own.
+ */
+const SELECTORS = ['*', '+', '1.1'];
+const dropSelectors = (result: SearchResult): SearchResult => {
+  for (const entry of result.searchEntries)
+    for (const name of SELECTORS) {
+      const value = (entry as Record<string, unknown>)[name];
+      if (Array.isArray(value) && value.length === 0)
+        delete (entry as Record<string, unknown>)[name];
+    }
+  return result;
+};
+
+/**
  * A 400 for a write the directory refused for what it asks, carrying the
  * LDAP code for callers that map it themselves.
  *
@@ -1153,7 +1168,7 @@ class ldapActions {
     try {
       let res = opts.paged
         ? pooled.client.searchPaginated(base, opts)
-        : pooled.client.search(base, opts);
+        : pooled.client.search(base, opts).then(dropSelectors);
       res = (await launchHooksChained(
         this.parent.hooks.ldapsearchresult,
         res
@@ -1216,7 +1231,7 @@ class ldapActions {
   ): AsyncGenerator<SearchResult> {
     try {
       for await (const result of generator) {
-        yield result;
+        yield dropSelectors(result);
       }
     } finally {
       this.releaseConnection(pooled);
