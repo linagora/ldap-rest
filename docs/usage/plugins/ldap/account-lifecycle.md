@@ -101,7 +101,9 @@ Omitting the field is how a generated password is asked for.
 
 A password longer than 256 characters, or holding a control character (a NUL
 byte, a newline…), is refused too: nobody can type it at a login prompt. The
-endpoint applies no minimum length or complexity rule of its own.
+endpoint applies no minimum length or complexity rule of its own. These rules
+belong to this endpoint: a password written as an attribute, through
+`PUT /api/v1/ldap/{pluralName}/{id}` or a creation, is not checked.
 
 `forceChange` (a boolean, true by default) also writes the `passwordReset`-role attribute
 so the directory asks for a new password at next login. For a boolean

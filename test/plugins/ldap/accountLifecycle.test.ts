@@ -218,7 +218,12 @@ describe('Account lifecycle', () => {
 
       it('should refuse a password nobody can type', async () => {
         const before = await read(['userPassword']);
-        for (const password of ['abc\u0000def', 'abc\ndef', 'x'.repeat(257)]) {
+        for (const password of [
+          'abc\u0000def',
+          'abc\ndef',
+          'abc\u0085def',
+          'x'.repeat(257),
+        ]) {
           const res = await request
             .post('/api/v1/ldap/users/lifecycle.user/password')
             .type('json')
@@ -233,6 +238,15 @@ describe('Account lifecycle', () => {
           .post('/api/v1/ldap/users/lifecycle.user/password')
           .type('json')
           .send({ password: 'x'.repeat(256) });
+        expect(res.status, JSON.stringify(res.body)).to.equal(200);
+        expect(res.body).to.have.property('generated', false);
+      });
+
+      it('should count characters, not UTF-16 units', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/password')
+          .type('json')
+          .send({ password: '\u{1F511}'.repeat(256) });
         expect(res.status, JSON.stringify(res.body)).to.equal(200);
       });
 

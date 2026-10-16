@@ -283,12 +283,12 @@ export default class LdapAccountLifecycle extends DmPlugin {
       );
     }
     if (typeof given === 'string') {
-      if (given.length > PASSWORD_MAX_LENGTH)
+      if ([...given].length > PASSWORD_MAX_LENGTH)
         throw new BadRequestError(
           `Field password must be at most ${PASSWORD_MAX_LENGTH} characters`
         );
       // eslint-disable-next-line no-control-regex
-      if (/[\u0000-\u001f\u007f]/.test(given))
+      if (/[\u0000-\u001f\u007f-\u009f]/.test(given))
         throw new BadRequestError(
           'Field password must not contain control characters'
         );
