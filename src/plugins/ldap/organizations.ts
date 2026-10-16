@@ -975,8 +975,9 @@ export default class LdapOrganizations extends DmPlugin {
       );
     } catch (err) {
       // A base search of a DN that is not there fails with noSuchObject
-      if (extractLdapCode(err) === 32)
-        throw new NotFoundError(`Organization ${dn} not found`);
+      const code = extractLdapCode(err);
+      if (code === 32) throw new NotFoundError(`Organization ${dn} not found`);
+      if (code === 34) throw new BadRequestError(`${dn} is not a valid DN`);
       throw err;
     }
     if ((org as SearchResult).searchEntries.length !== 1)

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- A write to an entry or a value the directory does not hold answers 404,
+  and an organization read or a move target that is not a DN answers 400;
+  both answered 500
+  ([#333](https://github.com/linagora/ldap-rest/issues/333),
+  [#334](https://github.com/linagora/ldap-rest/issues/334),
+  [#335](https://github.com/linagora/ldap-rest/issues/335))
+
 ## v0.20.2 (2026-10-15)
 
 ### Fixes

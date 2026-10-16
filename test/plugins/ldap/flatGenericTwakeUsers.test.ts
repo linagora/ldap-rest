@@ -615,13 +615,13 @@ describe('LdapUsersFlat Plugin (via flatGeneric)', function () {
       expect(res.body.error).to.match(/targetOrgDn|Bad content/);
     });
 
-    it('should return 500 when user does not exist', async () => {
+    it('should return 404 when user does not exist', async () => {
       const res = await request
         .post('/api/v1/ldap/users/nonexistent/move')
         .type('json')
         .send({ targetOrgDn: testOrg2Dn });
 
-      expect(res.status).to.equal(500);
+      expect(res.status).to.equal(404);
       expect(res.body).to.have.property('error');
     });
 

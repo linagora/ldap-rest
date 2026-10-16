@@ -201,11 +201,11 @@ describe('Writes the directory refuses for their content', function () {
       expect(res).to.include({ status: 409, code: 68 });
     });
 
-    it('should leave other failures without a status', async () => {
+    it('should answer 404 to a missing entry, keeping its code', async () => {
       const res = await outcome(
         server.ldap.modify(dnOf('refused-nobody'), { replace: { cn: 'x' } })
       );
-      expect(res.status).to.equal(500);
+      expect(res.status).to.equal(404);
       expect(res.code).to.equal(32);
     });
   });
