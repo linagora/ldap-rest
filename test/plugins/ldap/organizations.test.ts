@@ -778,7 +778,7 @@ describe('LDAP Organizations Plugin', function () {
         );
       });
 
-      it('should return error for invalid dn', async () => {
+      it('should return 404 for a missing organization', async () => {
         const res = await request
           .put(
             `/api/v1/ldap/organizations/${encodeURIComponent(`ou=nonexistent,${DM_LDAP_TOP_ORGANIZATION}`)}`
@@ -788,7 +788,7 @@ describe('LDAP Organizations Plugin', function () {
             replace: { description: 'Test' },
           });
 
-        expect(res.status).to.equal(500);
+        expect(res.status).to.equal(404);
       });
     });
 
@@ -824,7 +824,7 @@ describe('LDAP Organizations Plugin', function () {
           )
           .set('Accept', 'application/json');
 
-        expect(res.status).to.equal(500);
+        expect(res.status).to.equal(404);
       });
     });
 
