@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Security
+
+- `core/ldap/accountLifecycle`: `POST /{entity}/{id}/password` and
+  `/status` skipped the branch checks of `authzPerBranch` and `authzLinid1`,
+  so any authenticated caller could reset the password of an account, and
+  read back the generated one, or change its state. They are judged as
+  writes now, like `PUT /{entity}/{id}`
+  ([#339](https://github.com/linagora/ldap-rest/pull/339))
+
 ### Fixes
 
 - Entries returned by the API no longer carry a `"*": []` key
