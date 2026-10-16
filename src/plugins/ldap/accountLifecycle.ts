@@ -46,6 +46,9 @@ interface FlatEntity {
   modifyEntry(id: string, changes: ModifyRequest): Promise<boolean>;
 }
 
+/** Longest password accepted, in characters. */
+const PASSWORD_MAX_LENGTH = 256;
+
 /** Alphabet of generated passwords: unambiguous, no lookalike characters. */
 const PASSWORD_ALPHABET =
   'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%*-_=+';
@@ -176,9 +179,10 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *           password:
          *             type: string
          *             minLength: 1
+         *             maxLength: 256
          *             description: >-
          *               New password; generated when absent. An empty string
-         *               is refused.
+         *               and control characters are refused.
          *           forceChange:
          *             type: boolean
          *             default: true
@@ -190,7 +194,9 @@ export default class LdapAccountLifecycle extends DmPlugin {
          *       application/json:
          *         example: { success: true, generated: true, password: 'xY3…' }
          *   '400':
-         *     description: Empty or non-textual password.
+         *     description: >-
+         *       Empty, non-textual or too long password, a control character
+         *       in it, or a non-boolean forceChange.
          *     content:
          *       application/json:
          *         schema: { $ref: '#/components/schemas/Error' }
@@ -255,7 +261,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     res: Response
   ): Promise<void> {
     const body = jsonBody(req, res) as
-      | { password?: unknown; forceChange?: boolean }
+      | { password?: unknown; forceChange?: unknown }
       | false;
     if (!body) return;
 
@@ -272,6 +278,19 @@ export default class LdapAccountLifecycle extends DmPlugin {
         'Field password must be a non-empty string; omit it to have one generated'
       );
     }
+    if (typeof given === 'string') {
+      if (given.length > PASSWORD_MAX_LENGTH)
+        throw new BadRequestError(
+          `Field password must be at most ${PASSWORD_MAX_LENGTH} characters`
+        );
+      // eslint-disable-next-line no-control-regex
+      if (/[\u0000-\u001f\u007f]/.test(given))
+        throw new BadRequestError(
+          'Field password must not contain control characters'
+        );
+    }
+    if (body.forceChange !== undefined && typeof body.forceChange !== 'boolean')
+      throw new BadRequestError('Field forceChange must be a boolean');
 
     const generated = given === undefined;
     const password = generated ? generatePassword() : given;
