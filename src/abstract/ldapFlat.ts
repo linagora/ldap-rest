@@ -1920,6 +1920,13 @@ export default abstract class LdapFlat extends DmPlugin {
       return true;
     }
     if (!value) return true;
+    // An empty list is no value, as for groups and organizations: a replace
+    // clears the attribute with it
+    if (Array.isArray(value) && value.length === 0) {
+      if (attr.required)
+        throw new BadRequestError(`Attribute "${field}" is required`);
+      return true;
+    }
 
     // Handle pointer type
     if (attr.type === 'pointer') {

@@ -272,10 +272,12 @@ export function groupSchemaFields(
   return groups;
 }
 
-const valueList = (value: unknown): string[] =>
-  value === undefined || value === null || value === ''
-    ? []
-    : (Array.isArray(value) ? value : [value]).map(String).sort();
+const isEmpty = (value: unknown): boolean =>
+  value === undefined || value === null || value === '';
+
+/** The values a field holds, without the empty rows a list field may carry */
+const valueList = (value: unknown): unknown[] =>
+  (Array.isArray(value) ? value : [value]).filter(v => !isEmpty(v));
 
 /**
  * The attributes of `edited` whose value differs from `original`, as the
@@ -294,14 +296,11 @@ export function changedAttributes(
   const replace: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(edited)) {
     if (name === 'dn') continue;
-    const before = valueList(original?.[name]);
     const after = valueList(value);
-    if (
-      before.length === after.length &&
-      before.every((v, i) => v === after[i])
-    )
-      continue;
-    replace[name] = after.length ? value : [];
+    const a = after.map(String).sort();
+    const b = valueList(original?.[name]).map(String).sort();
+    if (a.length === b.length && a.every((v, i) => v === b[i])) continue;
+    replace[name] = Array.isArray(value) ? after : after.length ? value : [];
   }
   return replace;
 }

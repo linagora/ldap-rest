@@ -170,6 +170,28 @@ describe('Write bodies the directory cannot take as they are', function () {
     });
   });
 
+  describe('emptied attributes', () => {
+    it('should clear an optional pointer replaced with no value', async () => {
+      const title = `cn=mr,ou=twakeTitle,ou=nomenclature,${base}`;
+      await server.ldap.modify(alice, { replace: { personalTitle: title } });
+      const res = await request
+        .put('/api/v1/ldap/users/shapes.alice')
+        .send({ replace: { personalTitle: [] } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(await read('personalTitle')).to.deep.equal([]);
+    });
+
+    it('should refuse to clear a required pointer', async () => {
+      const res = await request
+        .put('/api/v1/ldap/users/shapes.alice')
+        .send({ replace: { twakeDepartmentLink: [] } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Attribute "twakeDepartmentLink" is required'
+      );
+    });
+  });
+
   describe('modify bodies', () => {
     for (const body of [
       {},
