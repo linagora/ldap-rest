@@ -46,7 +46,7 @@ interface FlatEntity {
   modifyEntry(
     id: string,
     changes: ModifyRequest,
-    req?: Request
+    req: Request
   ): Promise<boolean>;
 }
 

@@ -41,9 +41,12 @@ describe('Account lifecycle, authorization', function () {
   const NONE = 'lc.none';
   const READER = 'lc.reader';
   const WRITER = 'lc.writer';
+  const ELSEWHERE = 'lc.elsewhere';
   const ALICE = 'authz.lc.alice';
   const ORIGINAL_PASSWORD = 'original-secret';
   let previousConfig: string | undefined;
+  // What the directory stored, which a directory hashing cleartext changes
+  let storedPassword: unknown;
   let previousTtl: string | undefined;
 
   before(function () {
@@ -65,6 +68,9 @@ describe('Account lifecycle, authorization', function () {
       users: {
         [READER]: { [userBranch]: { read: true, write: false, delete: false } },
         [WRITER]: { [userBranch]: { read: true, write: true, delete: true } },
+        [ELSEWHERE]: {
+          [`ou=groups,${base}`]: { read: true, write: true, delete: true },
+        },
       },
       groups: {},
     });
@@ -120,6 +126,7 @@ describe('Account lifecycle, authorization', function () {
       twakeDepartmentPath: 'LcAuthzOrg',
       twakeAccountStatus: active,
     });
+    storedPassword = await read('userPassword');
   });
 
   const read = async (attribute: string): Promise<unknown> => {
@@ -131,7 +138,7 @@ describe('Account lifecycle, authorization', function () {
     return Buffer.isBuffer(value) ? value.toString() : value;
   };
 
-  for (const caller of [NONE, READER]) {
+  for (const caller of [NONE, READER, ELSEWHERE]) {
     it(`should refuse a password reset to ${caller}`, async () => {
       const res = await request
         .post(`/api/v1/ldap/users/${ALICE}/password`)
@@ -139,7 +146,7 @@ describe('Account lifecycle, authorization', function () {
         .type('json')
         .send({ password: 'taken-over' });
       expect(res.status, JSON.stringify(res.body)).to.equal(403);
-      expect(await read('userPassword')).to.equal(ORIGINAL_PASSWORD);
+      expect(await read('userPassword')).to.deep.equal(storedPassword);
     });
 
     it(`should refuse a generated password to ${caller}`, async () => {
@@ -150,7 +157,7 @@ describe('Account lifecycle, authorization', function () {
         .send({});
       expect(res.status, JSON.stringify(res.body)).to.equal(403);
       expect(res.body).not.to.have.property('password');
-      expect(await read('userPassword')).to.equal(ORIGINAL_PASSWORD);
+      expect(await read('userPassword')).to.deep.equal(storedPassword);
     });
 
     it(`should refuse a status change to ${caller}`, async () => {
@@ -171,7 +178,7 @@ describe('Account lifecycle, authorization', function () {
       .type('json')
       .send({ password: 'new-secret' });
     expect(pwd.status, JSON.stringify(pwd.body)).to.equal(200);
-    expect(await read('userPassword')).to.equal('new-secret');
+    expect(await read('userPassword')).not.to.deep.equal(storedPassword);
 
     const status = await request
       .post(`/api/v1/ldap/users/${ALICE}/status`)
