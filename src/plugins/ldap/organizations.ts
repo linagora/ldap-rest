@@ -235,6 +235,11 @@ export default class LdapOrganizations extends DmPlugin {
      *           ou: Engineering
      *           description: Software engineering division
      *           objectClass: [top, organizationalUnit]
+     *   '400':
+     *     description: The DN cannot be parsed.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
      *   '404':
      *     description: Organization not found.
      *     content:
@@ -295,6 +300,11 @@ export default class LdapOrganizations extends DmPlugin {
      *             uid: alice
      *             cn: Alice Smith
      *             objectClass: [top, inetOrgPerson]
+     *   '400':
+     *     description: The DN cannot be parsed.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
      *   '404':
      *     description: Organization not found.
      *     content:
@@ -346,7 +356,7 @@ export default class LdapOrganizations extends DmPlugin {
      *             cn: Alice Smith
      *             mail: alice@example.com
      *   '400':
-     *     description: Query parameter `q` missing.
+     *     description: Query parameter `q` missing, or the DN cannot be parsed.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
@@ -411,7 +421,7 @@ export default class LdapOrganizations extends DmPlugin {
      *           - dn: ou=linagora.com,ou=Government,ou=organization,dc=example,dc=com
      *             ou: linagora.com
      *   '400':
-     *     description: Query parameter `q` missing.
+     *     description: Query parameter `q` missing, or the DN cannot be parsed.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
@@ -975,8 +985,9 @@ export default class LdapOrganizations extends DmPlugin {
       );
     } catch (err) {
       // A base search of a DN that is not there fails with noSuchObject
-      if (extractLdapCode(err) === 32)
-        throw new NotFoundError(`Organization ${dn} not found`);
+      const code = extractLdapCode(err);
+      if (code === 32) throw new NotFoundError(`Organization ${dn} not found`);
+      if (code === 34) throw new BadRequestError(`${dn} is not a valid DN`);
       throw err;
     }
     if ((org as SearchResult).searchEntries.length !== 1)
@@ -1160,6 +1171,7 @@ export default class LdapOrganizations extends DmPlugin {
         this.server.logger.debug(`No sub-OUs for ${dn}: the node holds none`);
         return [];
       }
+      if (code === 34) throw new BadRequestError(`${dn} is not a valid DN`);
       if (code !== 4) throw err;
     }
 
@@ -1492,7 +1504,13 @@ export default class LdapOrganizations extends DmPlugin {
 
   async deleteOrganization(dn: string, req?: Request): Promise<boolean> {
     // Hook will check that organization is empty before deletion
-    return await this.server.ldap.delete(dn, req);
+    try {
+      return await this.server.ldap.delete(dn, req);
+    } catch (err) {
+      if (extractLdapCode(err) === 32)
+        throw new NotFoundError(`Organization ${dn} not found`);
+      throw err;
+    }
   }
 
   /**
@@ -1604,6 +1622,7 @@ export default class LdapOrganizations extends DmPlugin {
         this.server.logger.debug(`No organizations under ${dn}: no such node`);
         return [];
       }
+      if (code === 34) throw new BadRequestError(`${dn} is not a valid DN`);
       if (code !== 4) throw err;
 
       const bounded = (await this.server.ldap.search(

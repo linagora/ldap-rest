@@ -1,9 +1,12 @@
 import { expect } from 'chai';
-import type { Response } from 'express';
+import express, { type Response } from 'express';
+import bodyParser from 'body-parser';
+import supertest from 'supertest';
 import type winston from 'winston';
 
 import {
   getLogger,
+  jsonBody,
   serverError,
   setLogger,
 } from '../../src/lib/expressFormatedResponses';
@@ -79,5 +82,62 @@ describe('serverError', () => {
       status: 404,
       body: { error: 'no such entry' },
     });
+  });
+});
+
+/**
+ * Callers return as soon as `jsonBody` gives `false` or nothing, taking it as
+ * "already answered": a body it hands back undefined leaves the request open.
+ */
+describe('jsonBody', () => {
+  const app = express();
+  app.use(bodyParser.json());
+  app.post('/none', (req, res) => {
+    const body = jsonBody(req, res);
+    if (!body) return;
+    res.json({ got: body });
+  });
+  app.post('/required', (req, res) => {
+    const body = jsonBody(req, res, 'name');
+    if (!body) return;
+    res.json({ got: body });
+  });
+  const request = supertest(app);
+
+  for (const path of ['/none', '/required']) {
+    it(`answers 400 to a text body (${path})`, async () => {
+      const res = await request
+        .post(path)
+        .timeout(2000)
+        .type('text/plain')
+        .send('hello');
+      expect(res.status).to.equal(400);
+      expect(res.body).to.deep.equal({ error: 'Bad content' });
+    });
+
+    it(`answers 400 to a request without a body (${path})`, async () => {
+      const res = await request.post(path).timeout(2000);
+      expect(res.status).to.equal(400);
+    });
+
+    it(`answers 400 to a JSON array (${path})`, async () => {
+      const res = await request.post(path).timeout(2000).send([1, 2]);
+      expect(res.status).to.equal(400);
+    });
+  }
+
+  it('hands back a JSON object without required fields', async () => {
+    const res = await request.post('/none').timeout(2000).send({});
+    expect(res.status).to.equal(200);
+    expect(res.body).to.deep.equal({ got: {} });
+  });
+
+  it('hands back a JSON object carrying the required fields', async () => {
+    const res = await request
+      .post('/required')
+      .timeout(2000)
+      .send({ name: 'x' });
+    expect(res.status).to.equal(200);
+    expect(res.body).to.deep.equal({ got: { name: 'x' } });
   });
 });

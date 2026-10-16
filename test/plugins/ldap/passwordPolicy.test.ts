@@ -110,6 +110,20 @@ describe('PasswordPolicy Plugin', () => {
       expect(response.body).to.have.property('errors');
     });
 
+    it('should answer 400 to a body that is not JSON', async () => {
+      dm.config.ppolicy_validate_complexity = true;
+      const plugin = new PasswordPolicy(dm);
+      dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app)
+        .post('/api/v1/password/validate')
+        .timeout(2000)
+        .type('text/plain')
+        .send('Test123!@#Strong');
+
+      expect(response.status).to.equal(400);
+    });
+
     it('should reject password too short', async () => {
       dm.config.ppolicy_validate_complexity = true;
       dm.config.ppolicy_min_length = 12;

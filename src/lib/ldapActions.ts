@@ -279,11 +279,19 @@ function ldapAddError(dn: string, error: unknown): Error {
  * Wrap a modify failure, turning objectClassViolation (65) and
  * attributeOrValueExists (20) into a 409: the entry is not of a kind that can
  * hold what was written, typically one created by another tool without a
- * class its schema declares, or already holds the value added. The code is
- * carried over for callers that map it themselves.
+ * class its schema declares, or already holds the value added. A missing
+ * entry (32) or value to delete (16) is a 404. The code is carried over for
+ * callers that map it themselves.
  */
 function ldapModifyError(dn: string, error: unknown): Error {
   const code = extractLdapCode(error);
+  if (code === 32)
+    return withCode(new NotFoundError(`Entry ${dn} not found`), code);
+  if (code === 16)
+    return withCode(
+      new NotFoundError(`Entry ${dn} does not hold the value to delete`),
+      code
+    );
   if (code !== 65 && code !== 20)
     return ldapWriteError('LDAP modify error', dn, error);
   return withCode(
@@ -1661,7 +1669,10 @@ class ldapActions {
           // Invalidate cache for this DN
           this.invalidateCache(entry);
         } catch (error) {
-          throw ldapError(`LDAP delete error`, error);
+          const code = extractLdapCode(error);
+          throw code === 32
+            ? withCode(new NotFoundError(`Entry ${entry} not found`), code)
+            : ldapError(`LDAP delete error`, error);
         }
         done.push(
           launchHooks(
