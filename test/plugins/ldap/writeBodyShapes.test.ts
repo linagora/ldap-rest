@@ -11,7 +11,10 @@ import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import type { SearchResult } from '../../../src/lib/ldapActions';
-import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import {
+  skipIfMissingEnvVars,
+  LDAP_ENV_VARS_WITH_ORG,
+} from '../../helpers/env';
 
 describe('Write bodies the directory cannot take as they are', function () {
   let server: DM;
@@ -22,7 +25,7 @@ describe('Write bodies the directory cannot take as they are', function () {
   const created: string[] = [];
 
   before(function () {
-    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
   });
 
   before(async () => {
@@ -55,7 +58,6 @@ describe('Write bodies the directory cannot take as they are', function () {
       employeeNumber: 'SHA0001',
       mobile: '+33600000000',
       twakeDepartmentLink: topOrg,
-      twakeDepartmentPath: 'Top',
       twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${base}`,
     });
   });
