@@ -20,6 +20,7 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
+import { assertModifyRequest } from '../../lib/ldapActions';
 import {
   jsonBody,
   ok,
@@ -677,6 +678,7 @@ export default class LdapGroups extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as postModify | false;
     if (!body) return;
+    assertModifyRequest(body);
     const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
     assertClientMaySet(

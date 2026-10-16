@@ -7,6 +7,7 @@ import { Hooks } from '../../hooks';
 import {
   AttributesList,
   AttributeValue,
+  assertModifyRequest,
   ModifyRequest,
 } from '../../lib/ldapActions';
 import {
@@ -624,6 +625,7 @@ export default class LdapOrganizations extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
+    assertModifyRequest(body);
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
     assertClientMaySet(this.schema, modifiedAttributeNames(body));

@@ -13,6 +13,13 @@
 
 ### Fixes
 
+- A JSON number or boolean in a flat entity's write answers 400 instead of
+  500, except where the schema declares a `number` or a `boolean`: it is
+  written as text, or as `TRUE` / `FALSE`
+  ([#332](https://github.com/linagora/ldap-rest/issues/332))
+- `PUT` on a flat entity, a group or an organization refuses a body with no
+  `add`, `replace` or `delete`, or with other keys; it changed nothing and
+  answered success ([#336](https://github.com/linagora/ldap-rest/issues/336))
 - A write to an entry or a value the directory does not hold answers 404,
   and an organization read or a move target that is not a DN answers 400;
   both answered 500

@@ -90,6 +90,43 @@ export interface ModifyRequest {
   delete?: string[] | AttributesList;
 }
 
+const isPlainObject = (v: unknown): boolean =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Refuse a modify body a client got wrong: any other key was ignored, and a
+ * body carrying none of `add`, `replace` and `delete` answered success
+ * without changing anything.
+ *
+ * @param body parsed request body
+ * @throws BadRequestError naming what is wrong
+ */
+export function assertModifyRequest(
+  body: object
+): asserts body is ModifyRequest {
+  const keys = Object.keys(body);
+  const unknown = keys.filter(k => !['add', 'replace', 'delete'].includes(k));
+  if (unknown.length > 0 || keys.length === 0)
+    throw new BadRequestError(
+      `A modification carries add, replace or delete${unknown.length ? `, not ${unknown.join(', ')}` : ''}`
+    );
+  const { add, replace, delete: del } = body as Record<string, unknown>;
+  for (const [name, part] of [
+    ['add', add],
+    ['replace', replace],
+  ] as const)
+    if (part !== undefined && !isPlainObject(part))
+      throw new BadRequestError(`"${name}" must map attributes to values`);
+  if (
+    del !== undefined &&
+    !isPlainObject(del) &&
+    !(Array.isArray(del) && del.every(v => typeof v === 'string'))
+  )
+    throw new BadRequestError(
+      '"delete" must list attribute names or map attributes to values'
+    );
+}
+
 export interface ModifyOptions {
   /**
    * Send the permissive modify control, not critical: a directory that
