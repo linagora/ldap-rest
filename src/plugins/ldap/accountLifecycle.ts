@@ -43,7 +43,11 @@ interface FlatEntity {
   pluralName: string;
   singularName: string;
   schema?: Schema;
-  modifyEntry(id: string, changes: ModifyRequest): Promise<boolean>;
+  modifyEntry(
+    id: string,
+    changes: ModifyRequest,
+    req: Request
+  ): Promise<boolean>;
 }
 
 /** Longest password accepted, in characters. */
@@ -241,7 +245,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     }
     const value = states[body.state];
     const id = decodeURIComponent(req.params.id as string);
-    await this.modify(entity, id, { replace: { [attribute]: value } });
+    await this.modify(entity, id, { replace: { [attribute]: value } }, req);
     res.json({ success: true, state: body.state });
   }
 
@@ -308,7 +312,7 @@ export default class LdapAccountLifecycle extends DmPlugin {
     }
 
     const id = decodeURIComponent(req.params.id as string);
-    await this.modify(entity, id, { replace });
+    await this.modify(entity, id, { replace }, req);
 
     // The generated password is shown once, here, and nowhere else: the
     // credential attributes are marked `neverReturn` in the schema precisely
@@ -328,14 +332,17 @@ export default class LdapAccountLifecycle extends DmPlugin {
    * @param entity flat entity holding the account
    * @param id identifier or DN of the entry
    * @param changes modification to apply
+   * @param req request this comes from: without it, every authorization
+   *   plugin built on `AuthzBase` skips its branch check
    */
   private async modify(
     entity: FlatEntity,
     id: string,
-    changes: ModifyRequest
+    changes: ModifyRequest,
+    req: Request
   ): Promise<void> {
     try {
-      await entity.modifyEntry(id, changes);
+      await entity.modifyEntry(id, changes, req);
     } catch (err) {
       const code = (err as { code?: number }).code;
       if (code === 32) {
