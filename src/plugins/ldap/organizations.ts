@@ -1316,9 +1316,10 @@ export default class LdapOrganizations extends DmPlugin {
     dn: string,
     entry: AttributesList
   ): Promise<boolean> {
-    // Converts in place: what is validated is what gets written
-    toDirectoryEntry(this.schema, entry);
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryEntry(undefined, entry);
+      return true;
+    }
 
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
@@ -1340,6 +1341,9 @@ export default class LdapOrganizations extends DmPlugin {
     );
     if (missing)
       throw new BadRequestError(`Attribute "${missing}" is required`);
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryEntry(this.schema, entry);
     return true;
   }
 
@@ -1348,9 +1352,10 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    // Converts in place: what is validated is what gets written
-    toDirectoryChanges(this.schema, changes);
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryChanges(undefined, changes);
+      return true;
+    }
 
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
@@ -1368,6 +1373,9 @@ export default class LdapOrganizations extends DmPlugin {
       }
     }
 
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryChanges(this.schema, changes);
     return true;
   }
 
