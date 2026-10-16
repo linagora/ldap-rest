@@ -252,9 +252,6 @@ export default class LdapRaw extends DmPlugin {
     const attributes: Record<string, RawAttribute> = {};
     for (const [name, value] of Object.entries(entry)) {
       if (name === 'dn') continue;
-      // ldapts echoes back every requested attribute, so the `*` and `+`
-      // wildcards come back as empty entries of their own
-      if (name === '*' || name === '+' || name === '1.1') continue;
       if (this.hiddenAttributes.has(name.split(';')[0].toLowerCase())) continue;
 
       const rawValues = Array.isArray(value) ? value : [value];
