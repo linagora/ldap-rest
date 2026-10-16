@@ -36,6 +36,12 @@ gets no instance.
   the publication and the mark sends it again on the next attempt, and two
   replicas handling the same account at once may both send it. Within one
   replica, the work on one account is done one step at a time.
+- An entry another tool created, whose classes do not allow the address or
+  the mark, is given the auxiliary class of `--user-class` that allows it in
+  the same write, as the
+  [repair of entries created by other tools](../ldap/flat-generic.md#entries-created-by-other-tools)
+  does, whether the address comes from `workplace.created` or from making
+  sure of its instance.
 - The server does not start without a reachable broker, and an event that
   cannot be published fails its attempt rather than being marked as sent.
 - With cozy-stack, deleting an account destroys its instance, when that

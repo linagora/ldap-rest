@@ -455,8 +455,9 @@ A missing **structural** class, such as `twakeAccount`, cannot be added to an
 existing entry: the write answers `409`, and the reason is logged once per
 entry. The same applies to groups under `--ldap-group-base` (when it is set)
 with `--group-class`, and to the organization tree with
-`--ldap-organization-class`. Nothing is added when the change names
-`objectClass` itself.
+`--ldap-organization-class`, and to the accounts the Twake instance and
+Cloudery provisioning plugins write, with `--user-class`. Nothing is added
+when the change names `objectClass` itself.
 
 The repair reads the directory schema, kept for
 `--ldap-raw-schema-cache-ttl`, and the entry's classes when a written
