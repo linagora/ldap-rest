@@ -23,6 +23,10 @@
   routes requiring no field (`POST /users`, `PUT /users/{id}`,
   `POST /users/{id}/password`, `PUT /organizations/{dn}`…) it got no answer
   at all ([#331](https://github.com/linagora/ldap-rest/issues/331))
+- `core/ldap/accountLifecycle`: `POST /{entity}/{id}/password` refuses a
+  password over 256 characters or holding a control character, and a
+  `forceChange` that is not a boolean, which counted as `true`
+  ([#337](https://github.com/linagora/ldap-rest/issues/337))
 
 ## v0.20.2 (2026-10-15)
 
