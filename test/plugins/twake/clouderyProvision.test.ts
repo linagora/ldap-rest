@@ -349,6 +349,27 @@ describe('ClouderyProvision plugin', () => {
       expect(rabbit.calls).to.have.length(0);
     });
 
+    it('refuses an instance whose OIDC id is another account’s', async () => {
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, {
+          items: [
+            {
+              _id: 'other-uuid',
+              internal_email: 'john.doe@acme.com',
+              oidc: 'someoneelse',
+            },
+          ],
+        });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
     it('trims whitespace in the email and org id before use', async () => {
       let body: Record<string, unknown> = {};
       const scope = nock(CLOUDERY)

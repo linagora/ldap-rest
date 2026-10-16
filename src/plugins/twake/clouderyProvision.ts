@@ -380,6 +380,15 @@ export default class ClouderyProvision extends DmPlugin {
     const email = ctx.email;
     const orgDomain = emailDomain(email);
     const slug = instanceSlug(userName + ctx.orgId);
+    if (!slug) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        result: 'no_slug',
+      });
+      return;
+    }
     const mobile = this.extractPrimaryPhone(user);
     const phones = this.extractPhones(user);
     const publicName = this.extractPublicName(user) || userName;
@@ -399,9 +408,11 @@ export default class ClouderyProvision extends DmPlugin {
     // Cloudery mint a numbered duplicate (slug2). Fail open: if the lookup
     // errors, fall through to create rather than block provisioning.
     //
-    // Distinct userNames can reduce to one slug (`jane_doe`, `janedoe`): an
-    // instance held by another account is refused, as
-    // `ClouderyProvider.find` refuses it, never handed over.
+    // Reused only when its email and OIDC id, where it carries them, are the
+    // account's, as `ClouderyProvider.find` does: distinct userNames can
+    // reduce to one slug (`jane_doe`, `janedoe`), sharing the OIDC id, and
+    // the email is what tells them apart. A re-import whose mail changed
+    // since is refused too.
     const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
     let existing: ClouderyInstanceSummary | null = null;
     try {

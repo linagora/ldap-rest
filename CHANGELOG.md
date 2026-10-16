@@ -16,7 +16,9 @@
 - `twake/instances`, `twake/clouderyProvision`: a member whose `uid` holds
   characters the Cloudery refuses in a slug, such as `_` or `@`, gets an
   instance; the slug keeps `[a-z0-9-]`. Two `uid`s reducing to the same slug
-  cannot share an instance: the second is refused
+  cannot share an instance: the second is refused. Members already blocked
+  need a call,
+  [notes](docs/usage/upgrading.md#members-whose-uid-the-cloudery-refused-as-a-slug)
   ([#330](https://github.com/linagora/ldap-rest/issues/330))
 
 ## v0.20.2 (2026-10-15)

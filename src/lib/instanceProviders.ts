@@ -11,15 +11,19 @@ import { BadGatewayError, ConflictError, GatewayTimeoutError } from './errors';
 
 /**
  * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`
- * with "Slug is invalid". `-` is kept: an instance already created with one
- * would otherwise change address. Distinct uids can reduce to one slug, so a
- * creation first checks that an instance already there is the account's own.
+ * with "Slug is invalid". `-` is kept, except at either end where no host
+ * name takes it: an instance already created with one would otherwise change
+ * address. Distinct uids can reduce to one slug, so a creation first checks
+ * that an instance already there is the account's own.
  *
  * @param value uid, or the slug template filled in
  * @returns the slug, empty when nothing of `value` is kept
  */
 export const instanceSlug = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-+|-+$/g, '');
 
 export interface InstanceRequest {
   /** Slug of the instance, and its OIDC id unless `oidc` says otherwise */

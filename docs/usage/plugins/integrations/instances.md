@@ -122,14 +122,15 @@ organization entry, and is refused with a `403` otherwise.
   already there is taken only when its email and OIDC id are this account's.
 
 The instance id is `--twake-instance-id`, a template of the account's `uid`
-and the named groups of the matching DN expression, for example
-`{uid}{org}`. It is lowercased and reduced to `[a-z0-9-]`: the Cloudery
-refuses other characters in a slug, such as `_` or `@`, so `jane.doe_stg` gives `janedoestg`. Two `uid`s that reduce
-to the same slug cannot both have an instance: the second is refused, as an
-instance already there that is not its own. A name no expression captures stops the
-server at startup. It is the slug of the instance's address; the OIDC id is
-this slug with the Cloudery, and the `uid` with cozy-stack. `user.created`
-names the account by its `uid` (`twakeId`). A group named `org` is the organization id sent to the provider
+and the named groups of the matching DN expression, for example `{uid}{org}`.
+It is lowercased and reduced to `[a-z0-9-]`: the Cloudery refuses other
+characters in a slug, such as `_` or `@`, so `jane.doe_stg` gives
+`janedoestg`. Two `uid`s that reduce to the same slug cannot both have an
+instance: the second is refused, as an instance already there that is not its
+own. A name no expression captures stops the server at startup. It is the slug
+of the instance's address; the OIDC id is this slug with the Cloudery, and the
+`uid` with cozy-stack. `user.created` names the account by its `uid`
+(`twakeId`). A group named `org` is the organization id sent to the provider
 and in `user.created`, with the mail's domain as its domain; with cozy-stack
 and no such group, `--twake-instance-cozy-org-id` and
 `--twake-instance-cozy-org-domain` stand for them.
