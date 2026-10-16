@@ -197,6 +197,12 @@ export const jsonBody = (
     if (!wantJson(req, res)) return false;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const body = req.body;
+    // Express 5 leaves `req.body` undefined when no parser read the request
+    // (no JSON content type), and callers take `false` as "already answered".
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+      badRequest(res, 'Bad content');
+      return false;
+    }
 
     if (requiredFields.length > 0) {
       for (let i = 0; i < requiredFields.length; i++) {

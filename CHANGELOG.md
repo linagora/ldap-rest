@@ -11,6 +11,13 @@
   writes now, like `PUT /{entity}/{id}`
   ([#339](https://github.com/linagora/ldap-rest/pull/339))
 
+### Fixes
+
+- A write whose body is not a JSON object answers 400 "Bad content"; on the
+  routes requiring no field (`POST /users`, `PUT /users/{id}`,
+  `POST /users/{id}/password`, `PUT /organizations/{dn}`…) it got no answer
+  at all ([#331](https://github.com/linagora/ldap-rest/issues/331))
+
 ## v0.20.2 (2026-10-15)
 
 ### Fixes
