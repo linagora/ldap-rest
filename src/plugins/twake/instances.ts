@@ -521,12 +521,17 @@ export default class TwakeInstances extends DmPlugin {
     fqdn: string,
     req?: Request
   ): Promise<void> {
-    if (first(this.value(entry, this.fqdnAttribute)) !== fqdn)
+    if (first(this.value(entry, this.fqdnAttribute)) !== fqdn) {
+      const classes = await this.accountClasses(entry);
       await this.server.ldap.modify(
         dn,
-        { replace: { [this.fqdnAttribute]: fqdn } },
+        {
+          replace: { [this.fqdnAttribute]: fqdn },
+          ...(classes.length ? { add: { objectClass: classes } } : {}),
+        },
         req
       );
+    }
     if (first(this.value(entry, this.sentAttribute))) return;
     // The Cloudery refuses a member's user.created until its organization is
     // linked; organizationReady sends it then. Only members below the
@@ -568,6 +573,23 @@ export default class TwakeInstances extends DmPlugin {
       { replace: { [this.sentAttribute]: new Date().toISOString() } },
       req
     );
+  }
+
+  /**
+   * The `--user-class` auxiliaries an entry another tool created lacks, when
+   * its classes do not allow the address: without them the write is refused
+   */
+  private async accountClasses(entry: AttributesList): Promise<string[]> {
+    const present = [this.value(entry, 'objectClass') ?? []].flat().map(String);
+    const schema = await this.server.ldap.schemaIndex();
+    const key = (name: string): string =>
+      schema.getAttributeType(name)?.oid ?? name.toLowerCase();
+    const { must, may } = schema.resolveAttributes(present);
+    if ([...must, ...may].some(a => key(a) === key(this.fqdnAttribute)))
+      return [];
+    return schema
+      .missingClasses(this.config.user_class || [], present)
+      .auxiliary.map(oc => oc.names[0] ?? oc.oid);
   }
 
   private async organizationReady(
