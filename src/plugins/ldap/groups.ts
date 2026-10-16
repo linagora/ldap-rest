@@ -756,6 +756,8 @@ export default class LdapGroups extends DmPlugin {
       ...additional,
     };
     if (members.length) (entry.member as string[]).push(...members);
+    // validateNewGroup converted the copy it was handed, not this one
+    toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,
       entry,

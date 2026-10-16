@@ -1409,6 +1409,8 @@ export default abstract class LdapFlat extends DmPlugin {
       [this.mainAttribute]: id,
       ...additional,
     };
+    // validateNewEntry converted the copy it was handed, not this one
+    toDirectoryEntry(this.schema, entry);
 
     // Note: LDAP attribute values with DNs do NOT need escaping
     // ldapts handles this automatically
@@ -1807,7 +1809,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
-    // Converts in place: what is validated is what gets written
+    // Converts in place, so what is checked below is what the directory gets
     toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
