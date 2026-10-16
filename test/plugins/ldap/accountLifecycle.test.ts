@@ -216,6 +216,51 @@ describe('Account lifecycle', () => {
         }
       });
 
+      it('should refuse a password nobody can type', async () => {
+        const before = await read(['userPassword']);
+        for (const password of [
+          'abc\u0000def',
+          'abc\ndef',
+          'abc\u0085def',
+          'x'.repeat(257),
+        ]) {
+          const res = await request
+            .post('/api/v1/ldap/users/lifecycle.user/password')
+            .type('json')
+            .send({ password });
+          expect(res.status, JSON.stringify(res.body)).to.equal(400);
+        }
+        expect(await read(['userPassword'])).to.deep.equal(before);
+      });
+
+      it('should take a password of the longest length accepted', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/password')
+          .type('json')
+          .send({ password: 'x'.repeat(256) });
+        expect(res.status, JSON.stringify(res.body)).to.equal(200);
+        expect(res.body).to.have.property('generated', false);
+      });
+
+      it('should count characters, not UTF-16 units', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/password')
+          .type('json')
+          .send({ password: '\u{1F511}'.repeat(256) });
+        expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      });
+
+      it('should refuse a forceChange that is not a boolean', async () => {
+        for (const forceChange of ['yes', 'false', 0, null]) {
+          const res = await request
+            .post('/api/v1/ldap/users/lifecycle.user/password')
+            .type('json')
+            .send({ forceChange });
+          expect(res.status, JSON.stringify(res.body)).to.equal(400);
+          expect(res.body).not.to.have.property('password');
+        }
+      });
+
       it('should flag the account for a change at next login', async () => {
         await request
           .post('/api/v1/ldap/users/lifecycle.user/password')
