@@ -519,6 +519,7 @@ describe('LdapGroups Plugin', function () {
         expect((e as Error).message).to.match(
           /already in the target organization/
         );
+        expect((e as { statusCode?: number }).statusCode).to.equal(400);
       }
     });
 
@@ -538,6 +539,7 @@ describe('LdapGroups Plugin', function () {
         expect((e as Error).message).to.match(
           /does not have twakeDepartmentLink attribute/
         );
+        expect((e as { statusCode?: number }).statusCode).to.equal(400);
       } finally {
         await plugin.ldap.delete(noDeptGroupDn);
       }
@@ -550,6 +552,35 @@ describe('LdapGroups Plugin', function () {
         expect.fail('Should have thrown error');
       } catch (e) {
         expect((e as Error).message).to.match(/not found/);
+        expect((e as { statusCode?: number }).statusCode).to.equal(404);
+      }
+    });
+
+    it('should answer 404 to the move of a group that does not exist', async () => {
+      try {
+        await plugin.moveGroup('nosuchgroup', org2Dn);
+        expect.fail('Should have thrown error');
+      } catch (e) {
+        expect((e as { statusCode?: number }).statusCode).to.equal(404);
+      }
+    });
+
+    it('should answer 400 to members changed through a modify', async () => {
+      for (const changes of [
+        { replace: { member: ['cn=x'] } },
+        { add: { member: ['cn=x'] } },
+        { delete: { member: ['cn=x'] } },
+        { delete: ['member'] },
+      ]) {
+        try {
+          await plugin.modifyGroup(groupDn, changes);
+          expect.fail('Should have thrown error');
+        } catch (e) {
+          expect(
+            (e as { statusCode?: number }).statusCode,
+            JSON.stringify(changes)
+          ).to.equal(400);
+        }
       }
     });
 
