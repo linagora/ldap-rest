@@ -1688,11 +1688,10 @@ export default abstract class LdapFlat extends DmPlugin {
       if (err instanceof NotFoundError) {
         throw err;
       }
-      if ((err as { code?: number }).code === 32) {
+      const code = extractLdapCode(err);
+      if (code === 32)
         throw new NotFoundError(`Organization ${orgDn} not found`);
-      }
-      if (extractLdapCode(err) === 34)
-        throw new BadRequestError(`${orgDn} is not a valid DN`);
+      if (code === 34) throw new BadRequestError(`${orgDn} is not a valid DN`);
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
     }

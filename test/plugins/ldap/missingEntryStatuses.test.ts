@@ -10,7 +10,10 @@ import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
-import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import {
+  skipIfMissingEnvVars,
+  LDAP_ENV_VARS_WITH_ORG,
+} from '../../helpers/env';
 
 describe('Writes to what the directory does not hold', function () {
   let server: DM;
@@ -35,7 +38,7 @@ describe('Writes to what the directory does not hold', function () {
   };
 
   before(function () {
-    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
   });
 
   before(async () => {
@@ -55,14 +58,6 @@ describe('Writes to what the directory does not hold', function () {
     server.setupErrorMiddleware();
     request = supertest(server.app);
 
-    const created = await request
-      .post('/api/v1/ldap/groups')
-      .send({ cn: 'codes-guild' });
-    expect(created.status, JSON.stringify(created.body)).to.be.oneOf([
-      200, 201,
-    ]);
-    groupDn = `cn=codes-guild,${server.config.ldap_group_base}`;
-
     await server.ldap.delete(alice).catch(() => undefined);
     await server.ldap.add(alice, {
       objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
@@ -74,8 +69,15 @@ describe('Writes to what the directory does not hold', function () {
       mail: 'codes.alice@example.com',
       employeeNumber: 'COD0001',
       twakeDepartmentLink: topOrg,
-      twakeDepartmentPath: 'Top',
       twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${base}`,
+    });
+
+    groupDn = `cn=codes-guild,${server.config.ldap_group_base}`;
+    await server.ldap.delete(groupDn).catch(() => undefined);
+    await server.ldap.add(groupDn, {
+      objectClass: ['top', 'groupOfNames'],
+      cn: 'codes-guild',
+      member: [alice],
     });
   });
 
@@ -124,12 +126,22 @@ describe('Writes to what the directory does not hold', function () {
       expect(res.body.error).to.equal('garbage is not a valid DN');
     });
 
+    for (const path of ['subnodes', 'subnodes/search?q=x', 'search?q=x'])
+      it(`should answer 400 to ${path} under something that is not a DN`, async () => {
+        const res = await request.get(
+          `/api/v1/ldap/organizations/garbage/${path}`
+        );
+        expect(res.status, JSON.stringify(res.body)).to.equal(400);
+        expect(res.body.error).to.equal('garbage is not a valid DN');
+      });
+
     it('should answer 404 to the deletion of a missing organization', async () => {
       const dn = `ou=CodesNope,${topOrg}`;
       const res = await request.delete(
         `/api/v1/ldap/organizations/${encodeURIComponent(dn)}`
       );
       expect(res.status, JSON.stringify(res.body)).to.equal(404);
+      expect(res.body.error).to.equal(`Organization ${dn} not found`);
     });
 
     it('should answer 400 to a move towards something that is not a DN', async () => {
