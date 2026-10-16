@@ -95,7 +95,7 @@ const isPlainObject = (v: unknown): boolean =>
 
 /**
  * Refuse a modify body a client got wrong: any other key was ignored, and a
- * body carrying none of `add`, `replace` and `delete` answered success
+ * body naming no attribute in `add`, `replace` or `delete` answered success
  * without changing anything.
  *
  * @param body parsed request body
@@ -106,9 +106,9 @@ export function assertModifyRequest(
 ): asserts body is ModifyRequest {
   const keys = Object.keys(body);
   const unknown = keys.filter(k => !['add', 'replace', 'delete'].includes(k));
-  if (unknown.length > 0 || keys.length === 0)
+  if (unknown.length > 0)
     throw new BadRequestError(
-      `A modification carries add, replace or delete${unknown.length ? `, not ${unknown.join(', ')}` : ''}`
+      `A modification carries add, replace or delete, not ${unknown.join(', ')}`
     );
   const { add, replace, delete: del } = body as Record<string, unknown>;
   for (const [name, part] of [
@@ -124,6 +124,14 @@ export function assertModifyRequest(
   )
     throw new BadRequestError(
       '"delete" must list attribute names or map attributes to values'
+    );
+  const named = [add, replace, del].reduce<number>(
+    (n, part) => n + (part ? Object.keys(part).length : 0),
+    0
+  );
+  if (named === 0)
+    throw new BadRequestError(
+      'A modification names at least one attribute in add, replace or delete'
     );
 }
 

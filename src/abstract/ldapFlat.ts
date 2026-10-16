@@ -48,6 +48,8 @@ import {
   invalidValueMessage,
   missingRequiredAttribute,
   modifiedAttributeNames,
+  toDirectoryChanges,
+  toDirectoryEntry,
   neverReturnAttributes,
   schemaAttribute,
 } from '../config/schema';
@@ -1805,6 +1807,8 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
     // First, enforce fixed attributes
@@ -1815,8 +1819,7 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
 
-    for (const [field, raw] of Object.entries(entry)) {
-      const value = (entry[field] = this.toDirectoryValue(field, raw));
+    for (const [field, value] of Object.entries(entry)) {
       if (!this.schema.attributes[field]) {
         if (this.schema.strict)
           throw new BadRequestError(
@@ -1857,6 +1860,8 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryChanges(this.schema, changes);
     if (!this.schema) return true;
 
     // Check for fixed attributes in add/replace operations
@@ -1871,8 +1876,7 @@ export default abstract class LdapFlat extends DmPlugin {
     };
 
     if (changes.add) {
-      for (const [field, raw] of Object.entries(changes.add)) {
-        const value = (changes.add[field] = this.toDirectoryValue(field, raw));
+      for (const [field, value] of Object.entries(changes.add)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
           throw new BadRequestError(this.invalidValueMessage(field));
@@ -1880,11 +1884,7 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
     if (changes.replace) {
-      for (const [field, raw] of Object.entries(changes.replace)) {
-        const value = (changes.replace[field] = this.toDirectoryValue(
-          field,
-          raw
-        ));
+      for (const [field, value] of Object.entries(changes.replace)) {
         checkFixed(field, value);
         if (!(await this._validateOneChange(field, value))) {
           throw new BadRequestError(this.invalidValueMessage(field));
@@ -1892,9 +1892,6 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
     if (changes.delete) {
-      if (!Array.isArray(changes.delete))
-        for (const [field, raw] of Object.entries(changes.delete))
-          changes.delete[field] = this.toDirectoryValue(field, raw);
       const deleteFields = Array.isArray(changes.delete)
         ? changes.delete
         : Object.keys(changes.delete);
@@ -1908,49 +1905,6 @@ export default abstract class LdapFlat extends DmPlugin {
       }
     }
     return true;
-  }
-
-  /**
-   * The text the directory stores for a JSON value. ldapts throws on anything
-   * but a string or a Buffer, which reached the client as a 500: a number is
-   * written as text where the schema declares one, a boolean as LDAP's
-   * `TRUE` / `FALSE`, and anything else is refused.
-   *
-   * @param field attribute name
-   * @param value value as the client sent it
-   * @returns the value to write
-   * @throws BadRequestError when the value cannot be written as text
-   */
-  private toDirectoryValue(
-    field: string,
-    value: AttributeValue
-  ): AttributeValue {
-    if (
-      (value as unknown) === null ||
-      typeof value === 'string' ||
-      Buffer.isBuffer(value)
-    )
-      return value;
-    const attr = this.schema?.attributes[field];
-    const asText = (v: unknown, type: string | undefined): string | Buffer => {
-      if (typeof v === 'string' || Buffer.isBuffer(v)) return v;
-      if (
-        typeof v === 'number' &&
-        Number.isFinite(v) &&
-        (type === 'number' || type === 'integer')
-      )
-        return String(v);
-      if (typeof v === 'boolean' && type === 'boolean')
-        return v ? 'TRUE' : 'FALSE';
-      throw new BadRequestError(
-        `Attribute "${field}" must be a string or an array of strings`
-      );
-    };
-    if (Array.isArray(value))
-      return (value as unknown[]).map(v =>
-        asText(v, attr?.items?.type ?? attr?.type)
-      ) as string[] | Buffer[];
-    return asText(value, attr?.type);
   }
 
   async _validateOneChange(

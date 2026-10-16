@@ -49,6 +49,8 @@ import {
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
+  toDirectoryChanges,
+  toDirectoryEntry,
 } from '../../config/schema';
 
 /**
@@ -1314,6 +1316,8 @@ export default class LdapOrganizations extends DmPlugin {
     dn: string,
     entry: AttributesList
   ): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
     // Check each field
@@ -1344,6 +1348,8 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryChanges(this.schema, changes);
     if (!this.schema) return true;
 
     if (changes.add) {

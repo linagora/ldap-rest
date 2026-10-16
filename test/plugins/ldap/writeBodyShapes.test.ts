@@ -46,6 +46,8 @@ describe('Write bodies the directory cannot take as they are', function () {
   });
 
   beforeEach(async () => {
+    const group = `cn=shapes-guild,${server.config.ldap_group_base}`;
+    await server.ldap.delete(group).catch(() => undefined);
     await server.ldap.delete(alice).catch(() => undefined);
     await server.ldap.add(alice, {
       objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
@@ -60,10 +62,20 @@ describe('Write bodies the directory cannot take as they are', function () {
       twakeDepartmentLink: topOrg,
       twakeAccountStatus: `cn=active,ou=twakeAccountStatus,ou=nomenclature,${base}`,
     });
+    await server.ldap.add(group, {
+      objectClass: ['top', 'groupOfNames'],
+      cn: 'shapes-guild',
+      member: [alice],
+      description: 'Shapes',
+    });
   });
 
   after(async () => {
-    for (const dn of [alice, ...created])
+    for (const dn of [
+      `cn=shapes-guild,${server.config.ldap_group_base}`,
+      alice,
+      ...created,
+    ])
       await server.ldap.delete(dn).catch(() => undefined);
   });
 
@@ -122,6 +134,33 @@ describe('Write bodies the directory cannot take as they are', function () {
       expect(await read('mailQuotaSize')).to.equal('1000');
     });
 
+    it('should convert the values a delete names', async () => {
+      await server.ldap.modify(alice, { replace: { mailQuotaSize: '1000' } });
+      const refused = await request
+        .put('/api/v1/ldap/users/shapes.alice')
+        .send({ delete: { mobile: 5 } });
+      expect(refused.status, JSON.stringify(refused.body)).to.equal(400);
+      const res = await request
+        .put('/api/v1/ldap/users/shapes.alice')
+        .send({ delete: { mailQuotaSize: 1000 } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(await read('mailQuotaSize')).to.deep.equal([]);
+    });
+
+    it('should refuse a value that is not text on a group', async () => {
+      const res = await request
+        .put('/api/v1/ldap/groups/shapes-guild')
+        .send({ delete: { description: 42 } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    });
+
+    it('should refuse a value that is not text on an organization', async () => {
+      const res = await request
+        .put(`/api/v1/ldap/organizations/${encodeURIComponent(topOrg)}`)
+        .send({ delete: { description: 42 } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    });
+
     it('should write a boolean as LDAP TRUE where the schema declares one', async () => {
       const res = await request
         .put('/api/v1/ldap/users/shapes.alice')
@@ -140,6 +179,10 @@ describe('Write bodies the directory cannot take as they are', function () {
       { replace: 'x' },
       { add: ['description'] },
       { delete: [1] },
+      { replace: {} },
+      { add: {} },
+      { delete: [] },
+      { delete: {} },
     ]) {
       it(`should refuse ${JSON.stringify(body)} on a user`, async () => {
         const res = await request
@@ -159,14 +202,6 @@ describe('Write bodies the directory cannot take as they are', function () {
     });
 
     it('should refuse a body without a change on a group', async () => {
-      const group = `cn=shapes-guild,${server.config.ldap_group_base}`;
-      await server.ldap.delete(group).catch(() => undefined);
-      await server.ldap.add(group, {
-        objectClass: ['top', 'groupOfNames'],
-        cn: 'shapes-guild',
-        member: [alice],
-      });
-      created.push(group);
       const res = await request
         .put('/api/v1/ldap/groups/shapes-guild')
         .send({ description: 'x' });

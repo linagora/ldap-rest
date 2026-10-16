@@ -53,6 +53,8 @@ import {
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
+  toDirectoryChanges,
+  toDirectoryEntry,
 } from '../../config/schema';
 
 export interface postAdd {
@@ -1229,6 +1231,8 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async validateNewGroup(dn: string, entry: AttributesList): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
     [dn, entry] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatenew,
@@ -1261,6 +1265,8 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryChanges(this.schema, changes);
     if (!this.schema) return true;
     [dn, changes] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatechanges,

@@ -1,4 +1,8 @@
-import type { AttributeValue } from '../lib/ldapActions';
+import type {
+  AttributesList,
+  AttributeValue,
+  ModifyRequest,
+} from '../lib/ldapActions';
 import { BadRequestError } from '../lib/errors';
 import { getCompiledRegex, isDnInBranch } from '../lib/utils';
 
@@ -417,6 +421,83 @@ export function modifiedAttributeNames(body: {
       ? body.delete.map(String)
       : Object.keys(body.delete || {})),
   ];
+}
+
+/**
+ * The text the directory stores for a JSON value. ldapts throws on anything
+ * but a string or a Buffer, which reached the client as a 500: a number is
+ * written as text where the schema declares one, a boolean as LDAP's
+ * `TRUE` / `FALSE`, and anything else is refused.
+ *
+ * @param schema schema of the entry, if any
+ * @param field attribute name
+ * @param value value as the client sent it
+ * @returns the value to write
+ * @throws BadRequestError when the value cannot be written as text
+ */
+export function toDirectoryValue(
+  schema: Schema | undefined,
+  field: string,
+  value: AttributeValue
+): AttributeValue {
+  if (
+    (value as unknown) === null ||
+    typeof value === 'string' ||
+    Buffer.isBuffer(value)
+  )
+    return value;
+  const attr = schema?.attributes[field];
+  const asText = (v: unknown, type: string | undefined): string | Buffer => {
+    if (typeof v === 'string' || Buffer.isBuffer(v)) return v;
+    if (
+      typeof v === 'number' &&
+      Number.isFinite(v) &&
+      (type === 'number' || type === 'integer')
+    )
+      return String(v);
+    if (typeof v === 'boolean' && type === 'boolean')
+      return v ? 'TRUE' : 'FALSE';
+    throw new BadRequestError(
+      `Attribute "${field}" must be a string or an array of strings`
+    );
+  };
+  if (Array.isArray(value))
+    return (value as unknown[]).map(v =>
+      asText(v, attr?.items?.type ?? attr?.type)
+    ) as string[] | Buffer[];
+  return asText(value, attr?.type);
+}
+
+/**
+ * {@link toDirectoryValue} on every value of an entry about to be created,
+ * in place.
+ *
+ * @param schema schema of the entry, if any
+ * @param entry attributes sent by the client
+ */
+export function toDirectoryEntry(
+  schema: Schema | undefined,
+  entry: AttributesList
+): void {
+  for (const [field, value] of Object.entries(entry))
+    entry[field] = toDirectoryValue(schema, field, value);
+}
+
+/**
+ * {@link toDirectoryValue} on every value a modify request carries, in place:
+ * added, replaced, and deleted when `delete` names values.
+ *
+ * @param schema schema of the entry, if any
+ * @param changes modify request
+ */
+export function toDirectoryChanges(
+  schema: Schema | undefined,
+  changes: ModifyRequest
+): void {
+  if (changes.add) toDirectoryEntry(schema, changes.add);
+  if (changes.replace) toDirectoryEntry(schema, changes.replace);
+  if (changes.delete && !Array.isArray(changes.delete))
+    toDirectoryEntry(schema, changes.delete);
 }
 
 /**
