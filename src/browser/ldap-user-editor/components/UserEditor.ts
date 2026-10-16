@@ -7,7 +7,7 @@ import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
 import { MoveUserModal } from './MoveUserModal';
 import { hasRole, localizedText } from '../../shared/utils/schema';
-import { changedAttributes } from '../../shared/utils/form';
+import { changedAttributes, listValues } from '../../shared/utils/form';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -108,6 +108,11 @@ export class UserEditor {
     }
 
     this.formData = { ...this.user };
+    // One value comes as a scalar: as a list, it is shown and kept when a
+    // row is added
+    for (const [name, attr] of Object.entries(this.schema?.attributes ?? {}))
+      if (attr.type === 'array' && this.formData[name] !== undefined)
+        this.formData[name] = listValues(this.formData[name]);
   }
 
   private replacePlaceholders(schema: Schema): void {

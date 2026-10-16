@@ -10,12 +10,11 @@ import type {
   SchemaDefinition,
 } from '../types';
 import { MoveGroupModal } from './MoveGroupModal';
-import { changedAttributes } from '../../shared/utils/form';
-
-const asList = (value: unknown): string[] =>
-  value === undefined || value === null
-    ? []
-    : (Array.isArray(value) ? value : [value]).map(String);
+import {
+  changedAttributes,
+  listChanges,
+  listValues,
+} from '../../shared/utils/form';
 
 export class GroupPropertyEditor {
   private container: HTMLElement;
@@ -245,7 +244,7 @@ export class GroupPropertyEditor {
     const required = attribute.required ? 'required' : '';
 
     if (attribute.type === 'array') {
-      const arrayValue = Array.isArray(value) ? value.join('\n') : '';
+      const arrayValue = listValues(value).join('\n');
 
       // Special handling for member/owner fields with add/delete buttons
       if (fieldName === 'member' || fieldName === 'owner') {
@@ -399,9 +398,9 @@ export class GroupPropertyEditor {
         .slice(0, 10)
         .map((user: Entry) => {
           const label =
-            asList(user.cn)[0] ||
-            asList(user.uid)[0] ||
-            asList(user.mail)[0] ||
+            listValues(user.cn)[0] ||
+            listValues(user.uid)[0] ||
+            listValues(user.mail)[0] ||
             user.dn;
           return `<option value="${this.escapeHtml(user.dn)}">${this.escapeHtml(label)}</option>`;
         })
@@ -508,7 +507,7 @@ export class GroupPropertyEditor {
     );
     // Members have their own routes, which check them; a modify refuses them
     const membersChanged = 'member' in updates;
-    const members = asList(updates.member);
+    const members = listChanges(this.group?.member, updates.member);
     delete updates.member;
 
     try {
@@ -546,11 +545,10 @@ export class GroupPropertyEditor {
       }
 
       if (membersChanged) {
-        const before = asList(this.group?.member);
         // Added first: a groupOfNames is never left without a member
-        const added = members.filter(m => !before.includes(m));
-        if (added.length) await this.api.addMembers(this.groupDn, added);
-        for (const member of before.filter(m => !members.includes(m)))
+        if (members.added.length)
+          await this.api.addMembers(this.groupDn, members.added);
+        for (const member of members.removed)
           await this.api.removeMember(this.groupDn, member);
       }
 

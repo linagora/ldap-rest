@@ -163,23 +163,4 @@ export class GroupApiClient {
       throw new Error(`Failed to rename group: ${error}`);
     }
   }
-
-  async getPointerOptions(
-    branch: string
-  ): Promise<Array<{ dn: string; label: string }>> {
-    const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/search?base=${encodeURIComponent(branch)}&scope=one`
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to load pointer options: ${response.statusText}`);
-    }
-    const entries = await response.json();
-    return entries.map((entry: Entry) => ({
-      dn: entry.dn,
-      label:
-        (entry.cn as string[] | undefined)?.[0] ||
-        (entry.ou as string[] | undefined)?.[0] ||
-        entry.dn,
-    }));
-  }
 }
