@@ -5,6 +5,7 @@
 import type { UnitApiClient } from '../api/UnitApiClient';
 import type { LdapUnit, SchemaDefinition } from '../types';
 import { MoveUnitModal } from './MoveUnitModal';
+import { changedAttributes } from '../../shared/utils/form';
 
 export class UnitPropertyEditor {
   private container: HTMLElement;
@@ -283,7 +284,12 @@ export class UnitPropertyEditor {
     }
 
     try {
-      await this.api.updateUnit(this.unitDn, updates);
+      const replace = changedAttributes(
+        this.unit as unknown as Record<string, unknown>,
+        updates
+      );
+      if (Object.keys(replace).length)
+        await this.api.updateUnit(this.unitDn, replace);
       alert('Organizational unit updated successfully!');
       if (this.saveCallback) {
         this.saveCallback();

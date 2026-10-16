@@ -5,6 +5,7 @@
 import type { GroupApiClient } from '../api/GroupApiClient';
 import type { LdapGroup, SchemaDefinition } from '../types';
 import { MoveGroupModal } from './MoveGroupModal';
+import { changedAttributes } from '../../shared/utils/form';
 
 export class GroupPropertyEditor {
   private container: HTMLElement;
@@ -468,11 +469,11 @@ export class GroupPropertyEditor {
 
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
-    const updates: Record<string, unknown> = {};
+    const edited: Record<string, unknown> = {};
 
     for (const [key, value] of (formData as any).entries()) {
       if (this.schema?.attributes[key]?.type === 'array') {
-        updates[key] = (value as string)
+        edited[key] = (value as string)
           .split('\n')
           .map(v => v.trim())
           .filter(v => v);
@@ -480,11 +481,15 @@ export class GroupPropertyEditor {
         this.schema?.attributes[key]?.type === 'number' ||
         this.schema?.attributes[key]?.type === 'integer'
       ) {
-        updates[key] = Number(value);
+        edited[key] = Number(value);
       } else {
-        updates[key] = value;
+        edited[key] = value;
       }
     }
+    const updates = changedAttributes(
+      this.group as unknown as Record<string, unknown>,
+      edited
+    );
 
     try {
       // Check if cn has changed - if so, use rename API instead
@@ -516,8 +521,7 @@ export class GroupPropertyEditor {
           // cn hasn't changed, just do a normal update
           await this.api.updateGroup(this.groupDn, updates);
         }
-      } else {
-        // No cn change, normal update
+      } else if (Object.keys(updates).length > 0) {
         await this.api.updateGroup(this.groupDn, updates);
       }
 

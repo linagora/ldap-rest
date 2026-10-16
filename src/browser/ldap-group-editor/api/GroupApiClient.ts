@@ -56,13 +56,22 @@ export class GroupApiClient {
     return response.json();
   }
 
-  async updateGroup(dn: string, data: Partial<LdapGroup>): Promise<void> {
+  /**
+   * Replace attributes of an entry.
+   *
+   * @param dn entry to change
+   * @param replace attributes to replace; see `changedAttributes`
+   */
+  async updateGroup(
+    dn: string,
+    replace: Record<string, unknown>
+  ): Promise<void> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ replace }),
       }
     );
     if (!response.ok) {

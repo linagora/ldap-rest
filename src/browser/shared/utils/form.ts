@@ -271,3 +271,37 @@ export function groupSchemaFields(
 
   return groups;
 }
+
+const valueList = (value: unknown): string[] =>
+  value === undefined || value === null || value === ''
+    ? []
+    : (Array.isArray(value) ? value : [value]).map(String).sort();
+
+/**
+ * The attributes of `edited` whose value differs from `original`, as the
+ * `replace` of a modify request: the routes take only `add`, `replace` and
+ * `delete`, and refuse a computed attribute even sent unchanged. One emptied
+ * in the form is replaced with no value, which clears it.
+ *
+ * @param original entry as loaded
+ * @param edited attributes as the form holds them
+ * @returns the attributes to replace, empty when nothing changed
+ */
+export function changedAttributes(
+  original: Record<string, unknown> | null | undefined,
+  edited: Record<string, unknown>
+): Record<string, unknown> {
+  const replace: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(edited)) {
+    if (name === 'dn') continue;
+    const before = valueList(original?.[name]);
+    const after = valueList(value);
+    if (
+      before.length === after.length &&
+      before.every((v, i) => v === after[i])
+    )
+      continue;
+    replace[name] = after.length ? value : [];
+  }
+  return replace;
+}

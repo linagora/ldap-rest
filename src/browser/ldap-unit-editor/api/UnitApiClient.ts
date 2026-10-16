@@ -39,13 +39,22 @@ export class UnitApiClient {
     return response.json();
   }
 
-  async updateUnit(dn: string, data: Partial<LdapUnit>): Promise<void> {
+  /**
+   * Replace attributes of an entry.
+   *
+   * @param dn entry to change
+   * @param replace attributes to replace; see `changedAttributes`
+   */
+  async updateUnit(
+    dn: string,
+    replace: Record<string, unknown>
+  ): Promise<void> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/organizations/${encodeURIComponent(dn)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ replace }),
       }
     );
     if (!response.ok) {
