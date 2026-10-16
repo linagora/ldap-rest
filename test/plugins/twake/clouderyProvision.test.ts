@@ -272,6 +272,83 @@ describe('ClouderyProvision plugin', () => {
       );
     });
 
+    it('reuses an existing instance whose email and OIDC id are the account’s', async () => {
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, {
+          items: [
+            {
+              _id: 'existing-uuid',
+              internal_email: 'John.Doe@acme.com',
+              oidc: 'johndoeacme123',
+            },
+          ],
+        });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(rabbit.calls).to.have.length(1);
+    });
+
+    it('reduces the slug to what the Cloudery takes', async () => {
+      let body: Record<string, unknown> = {};
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'janedoestgacme123.twake.app')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', b => {
+          body = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { id: 'inst-2', fqdn: 'janedoestgacme123.twake.app' });
+
+      await create(
+        {
+          ...user,
+          userName: 'Jane.Doe_stg',
+          emails: [{ value: 'jane@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(body.slug).to.equal('janedoestgacme123');
+      expect(body.oidc).to.equal('janedoestgacme123');
+    });
+
+    it('refuses an instance another account holds under the same slug', async () => {
+      // `john_doe` and `john.doe` reduce to one slug. No POST is registered:
+      // a create attempt fails the test, as handing the instance over would.
+      const scope = nock(CLOUDERY)
+        .get('/api/v2/instances')
+        .query(q => q.fqdn === 'johndoeacme123.twake.app')
+        .reply(200, {
+          items: [
+            {
+              _id: 'johns-uuid',
+              internal_email: 'john.doe@acme.com',
+              oidc: 'johndoeacme123',
+            },
+          ],
+        });
+
+      await create(
+        {
+          ...user,
+          userName: 'john_doe',
+          emails: [{ value: 'john_doe@acme.com', primary: true }],
+        },
+        makeReq('acme123')
+      );
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(0);
+      expect(rabbit.calls).to.have.length(0);
+    });
+
     it('trims whitespace in the email and org id before use', async () => {
       let body: Record<string, unknown> = {};
       const scope = nock(CLOUDERY)

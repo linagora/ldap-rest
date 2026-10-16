@@ -173,6 +173,59 @@ describe('Twake instances plugin', function () {
         await dm.ldap.delete(dnOf(uid)).catch(() => undefined);
     });
 
+    it('reduces the slug to what the Cloudery takes', async () => {
+      let asked: Record<string, unknown> = {};
+      const scope = search('in-janedoestg.example.org')
+        .reply(200, { items: [] })
+        .post('/api/v1/instances', body => {
+          asked = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(202, {});
+      try {
+        await dm.ldap.add(
+          dnOf('in-Jane.Doe_stg'),
+          person('in-Jane.Doe_stg'),
+          rest()
+        );
+        expect(scope.isDone()).to.equal(true);
+        expect(asked).to.include({
+          oidc: 'in-janedoestg',
+          slug: 'in-janedoestg',
+        });
+      } finally {
+        await dm.ldap.delete(dnOf('in-Jane.Doe_stg')).catch(() => undefined);
+      }
+    });
+
+    it('refuses an instance another uid reducing to the same slug holds', async () => {
+      // Asked by the creation, then by the ensure
+      search('in-janedoe.example.org')
+        .times(2)
+        .reply(200, {
+          items: [
+            {
+              _id: 'taken',
+              fqdn: 'in-janedoe.example.org',
+              internal_email: 'in-janedoe@example.org',
+              oidc: 'in-janedoe',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      const create = nock(CLOUDERY).post('/api/v1/instances').reply(202, {});
+      try {
+        await dm.ldap.add(dnOf('in-jane_doe'), person('in-jane_doe'));
+        expect(
+          String(await refusal(plugin(dm).ensureInstance(dnOf('in-jane_doe'))))
+        ).to.match(/belongs to another user/);
+        expect(create.isDone()).to.equal(false);
+      } finally {
+        nock.cleanAll();
+        await dm.ldap.delete(dnOf('in-jane_doe')).catch(() => undefined);
+      }
+    });
+
     it('looks the instance up, asks for it, and waits for its address', async () => {
       let asked: Record<string, unknown> = {};
       const scope = search('in-alice.example.org')
