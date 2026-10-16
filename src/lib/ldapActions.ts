@@ -227,6 +227,11 @@ const dropSelectors = (result: SearchResult): SearchResult => {
     }
   return result;
 };
+async function* dropSelectorsPaged(
+  pages: AsyncGenerator<SearchResult>
+): AsyncGenerator<SearchResult> {
+  for await (const page of pages) yield dropSelectors(page);
+}
 
 /**
  * A 400 for a write the directory refused for what it asks, carrying the
@@ -1167,7 +1172,7 @@ class ldapActions {
     const pooled = await this.acquireConnection();
     try {
       let res = opts.paged
-        ? pooled.client.searchPaginated(base, opts)
+        ? dropSelectorsPaged(pooled.client.searchPaginated(base, opts))
         : pooled.client.search(base, opts).then(dropSelectors);
       res = (await launchHooksChained(
         this.parent.hooks.ldapsearchresult,
@@ -1231,7 +1236,7 @@ class ldapActions {
   ): AsyncGenerator<SearchResult> {
     try {
       for await (const result of generator) {
-        yield dropSelectors(result);
+        yield result;
       }
     } finally {
       this.releaseConnection(pooled);

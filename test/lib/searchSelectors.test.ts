@@ -41,7 +41,7 @@ describe('Attribute selectors in search results', function () {
 
   it('should leave them out of a search', async () => {
     const res = (await server.ldap.search(
-      { paged: false, scope: 'base', attributes: ['*', '+'] },
+      { paged: false, scope: 'base', attributes: ['*', '+', '1.1'] },
       topOrg
     )) as SearchResult;
     expect(res.searchEntries).to.have.length(1);
