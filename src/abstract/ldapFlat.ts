@@ -1592,11 +1592,19 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     // Fetch current entry to get old organization
-    const currentEntry = (await this.ldap.search(
-      { paged: false, scope: 'base', attributes: [linkAttr] },
-      dn,
-      req
-    )) as SearchResult;
+    let currentEntry: SearchResult;
+    try {
+      currentEntry = (await this.ldap.search(
+        { paged: false, scope: 'base', attributes: [linkAttr] },
+        dn,
+        req
+      )) as SearchResult;
+    } catch (err) {
+      // A base search of a DN that is not there fails with noSuchObject
+      if (extractLdapCode(err) === 32)
+        throw new NotFoundError(`Entry ${dn} not found`);
+      throw err;
+    }
 
     if (
       !currentEntry.searchEntries ||
@@ -1680,9 +1688,10 @@ export default abstract class LdapFlat extends DmPlugin {
       if (err instanceof NotFoundError) {
         throw err;
       }
-      if ((err as { code?: number }).code === 32) {
+      const code = extractLdapCode(err);
+      if (code === 32)
         throw new NotFoundError(`Organization ${orgDn} not found`);
-      }
+      if (code === 34) throw new BadRequestError(`${orgDn} is not a valid DN`);
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Failed to fetch organization ${orgDn}: ${err}`);
     }

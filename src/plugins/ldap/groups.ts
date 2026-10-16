@@ -929,6 +929,8 @@ export default class LdapGroups extends DmPlugin {
         req
       )
       .catch(err => {
+        if (extractLdapCode(err) === 16)
+          throw new NotFoundError(`${member} is not a member of ${dn}`);
         if (err instanceof HttpError) throw err;
         throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
       });

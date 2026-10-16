@@ -1183,6 +1183,15 @@ move names both DNs:
 }
 ```
 
+**DN that cannot be parsed** — an organization read or a move target that is
+not a DN (LDAP result code 34):
+
+```json
+{
+  "error": "garbage is not a valid DN"
+}
+```
+
 #### 401 Unauthorized
 
 **Missing Authentication:**
@@ -1224,6 +1233,16 @@ move names both DNs:
 ```json
 {
   "error": "Organization ou=marketing,ou=organization,dc=example,dc=com not found"
+}
+```
+
+**Entry or value the directory does not hold** — a modify or a delete of an
+entry that is not there, or the removal of a value the entry lacks (LDAP
+result codes 32 and 16). Removing a group member that is not one names both:
+
+```json
+{
+  "error": "uid=alice,ou=users,dc=example,dc=com is not a member of cn=backend-guild,ou=groups,dc=example,dc=com"
 }
 ```
 

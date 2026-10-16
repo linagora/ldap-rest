@@ -272,11 +272,10 @@ export default class TwakeInstances extends DmPlugin {
       asyncHandler(async (req, res) => {
         const body = jsonBody(req, res) as
           | { dn?: unknown; mail?: unknown }
-          | undefined
           | false;
-        if (body === false) return;
-        let dn = body?.dn;
-        if (dn === undefined && typeof body?.mail === 'string' && body.mail) {
+        if (!body) return;
+        let dn = body.dn;
+        if (dn === undefined && typeof body.mail === 'string' && body.mail) {
           const found = await this.findByMail(body.mail, req);
           if (!found) throw new NotFoundError(`No account for ${body.mail}`);
           dn = found.dn;

@@ -13,6 +13,16 @@
 
 ### Fixes
 
+- A write to an entry or a value the directory does not hold answers 404,
+  and an organization read or a move target that is not a DN answers 400;
+  both answered 500
+  ([#333](https://github.com/linagora/ldap-rest/issues/333),
+  [#334](https://github.com/linagora/ldap-rest/issues/334),
+  [#335](https://github.com/linagora/ldap-rest/issues/335))
+- A write whose body is not a JSON object answers 400 "Bad content"; on the
+  routes requiring no field (`POST /users`, `PUT /users/{id}`,
+  `POST /users/{id}/password`, `PUT /organizations/{dn}`…) it got no answer
+  at all ([#331](https://github.com/linagora/ldap-rest/issues/331))
 - Entries returned by the API no longer carry the `*`, `+` and `1.1` keys,
   as `"*": []`
   ([#338](https://github.com/linagora/ldap-rest/issues/338))
