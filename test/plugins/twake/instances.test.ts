@@ -763,6 +763,51 @@ describe('Twake instances plugin', function () {
       });
     });
 
+    describe('with an address the entry’s classes do not allow', () => {
+      let dm2: DM;
+      let rabbit2: StubRabbitMq;
+
+      before(async () => {
+        ({ dm: dm2, rabbit: rabbit2 } = await server({
+          ...CLOUDERY_CONFIG,
+          twake_instance_fqdn_attribute: 'twakeCozyDomain',
+        }));
+      });
+
+      afterEach(async () => {
+        await dm2.ldap.delete(dnOf('in-gina')).catch(() => undefined);
+      });
+
+      it('gives an entry another tool created the classes its address needs', async () => {
+        // Written without this plugin, as another tool writes it
+        const other = new DM();
+        await other.ready;
+        await other.ldap.add(dnOf('in-gina'), {
+          objectClass: ['top', 'inetOrgPerson'],
+          cn: 'in-gina',
+          sn: 'in-gina',
+          uid: 'in-gina',
+          mail: 'in-gina@example.org',
+        });
+        await rabbit2.handler!({
+          twakeId: 'in-gina',
+          internalEmail: 'in-gina@example.org',
+          workplaceFqdn: 'in-gina.example.org',
+        });
+        const entry = await read(dm2, dnOf('in-gina'));
+        expect(entry).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        expect(
+          [entry?.objectClass].flat().map(c => String(c).toLowerCase())
+        ).to.include('twakewhitepages');
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+    });
+
     describe('with one offer per DN expression', () => {
       let dm2: DM;
       const orgDn = `ou=acme3,${ORGS}`;
