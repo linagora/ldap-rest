@@ -97,7 +97,6 @@
         processFormData,
         loadPointerOptions,
         replaceSchemaPlaceholders,
-        getOrganizationPath,
       } = window.MiniDmShared;
 
       let editor;
@@ -136,12 +135,6 @@
           throw new Error('No schema available for users');
         }
 
-        // Get organization path for twakeDepartmentPath
-        const orgPath = await getOrganizationPath(
-          currentOrgDn,
-          window.location.origin
-        );
-
         // Replace placeholders in schema branches
         const ldapBase = editor.getConfig().ldapBase;
         userSchema = replaceSchemaPlaceholders(userSchema, {
@@ -170,19 +163,20 @@
           userSchema.attributes
         )) {
           if (attribute.fixed) continue; // Skip fixed fields like 'dn'
+          // The server sets these, and refuses them from a client
+          if (
+            attribute.readOnly ||
+            (attribute.generated &&
+              (fieldName !== userSchema.entity?.mainAttribute ||
+                attribute.generatedFrom))
+          )
+            continue;
           if (fieldName === 'objectClass') continue; // Already handled
 
-          // Auto-fill twakeDepartmentLink and twakeDepartmentPath
+          // The organization is the one selected in the tree
           if (fieldName === 'twakeDepartmentLink') {
             fieldsHtml += `
               <input type="hidden" name="twakeDepartmentLink" value="${escapeHtml(currentOrgDn)}" />
-            `;
-            continue;
-          }
-
-          if (fieldName === 'twakeDepartmentPath') {
-            fieldsHtml += `
-              <input type="hidden" name="twakeDepartmentPath" value="${escapeHtml(orgPath)}" />
             `;
             continue;
           }

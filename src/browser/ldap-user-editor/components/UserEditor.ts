@@ -649,22 +649,24 @@ export class UserEditor {
     try {
       const result = await this.api.moveUser(this.userDn, targetOrgDn);
 
-      if (alertContainer) {
-        alertContainer.innerHTML = `
+      // Update the userDn if it changed
+      if (result.newDn) {
+        this.userDn = result.newDn;
+      }
+
+      // Reload the user data to show updated organization; it renders the
+      // container anew, so the message comes after
+      await this.init();
+
+      const alert = this.container.querySelector('#alert-container');
+      if (alert) {
+        alert.innerHTML = `
           <div class="alert alert-success">
             <span class="material-icons">check_circle</span>
             <div>User moved successfully!</div>
           </div>
         `;
       }
-
-      // Update the userDn if it changed
-      if (result.newDn) {
-        this.userDn = result.newDn;
-      }
-
-      // Reload the user data to show updated organization
-      await this.init();
 
       if (this.onSaved) this.onSaved();
     } catch (error) {
