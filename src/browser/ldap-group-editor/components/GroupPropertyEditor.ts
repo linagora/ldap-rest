@@ -3,7 +3,12 @@
  */
 
 import type { GroupApiClient } from '../api/GroupApiClient';
-import type { LdapGroup, SchemaDefinition } from '../types';
+import type {
+  Entry,
+  LdapGroup,
+  SchemaAttribute,
+  SchemaDefinition,
+} from '../types';
 import { MoveGroupModal } from './MoveGroupModal';
 import { changedAttributes } from '../../shared/utils/form';
 
@@ -50,7 +55,7 @@ export class GroupPropertyEditor {
     console.warn('[GroupPropertyEditor] Config loaded:', config);
 
     // First check in features.ldapGroups (from ldapGroups plugin)
-    const groupsConfig = (config.features as any)?.ldapGroups;
+    const groupsConfig = config.features?.ldapGroups;
     console.warn('[GroupPropertyEditor] Groups config:', groupsConfig);
 
     if (groupsConfig?.schemaUrl) {
@@ -109,7 +114,7 @@ export class GroupPropertyEditor {
       return { entity: { objectClass: [] }, attributes: {} };
     }
 
-    const attributes: Record<string, any> = {};
+    const attributes: Record<string, SchemaAttribute> = {};
 
     // Create schema attributes from the group's actual attributes
     for (const [key, value] of Object.entries(this.group)) {
@@ -177,9 +182,9 @@ export class GroupPropertyEditor {
     let html = '';
 
     // Group fields by category
-    const basicFields: [string, any][] = [];
-    const memberFields: [string, any][] = [];
-    const mailFields: [string, any][] = [];
+    const basicFields: [string, SchemaAttribute][] = [];
+    const memberFields: [string, SchemaAttribute][] = [];
+    const mailFields: [string, SchemaAttribute][] = [];
 
     for (const [fieldName, attribute] of Object.entries(
       this.schema.attributes
@@ -234,7 +239,7 @@ export class GroupPropertyEditor {
     return html;
   }
 
-  private renderField(fieldName: string, attribute: any): string {
+  private renderField(fieldName: string, attribute: SchemaAttribute): string {
     const value = this.group?.[fieldName];
     const label = this.getFieldLabel(fieldName);
     const required = attribute.required ? 'required' : '';
@@ -381,7 +386,9 @@ export class GroupPropertyEditor {
       if (!response.ok) return;
 
       // Keyed by identifier
-      const results = Object.values(await response.json());
+      const results = Object.values(
+        (await response.json()) as Record<string, Entry>
+      );
       const datalist = document.getElementById(
         `${fieldName}-suggestions`
       ) as HTMLDataListElement;
@@ -390,7 +397,7 @@ export class GroupPropertyEditor {
 
       datalist.innerHTML = results
         .slice(0, 10)
-        .map((user: any) => {
+        .map((user: Entry) => {
           const label =
             asList(user.cn)[0] ||
             asList(user.uid)[0] ||
@@ -480,7 +487,7 @@ export class GroupPropertyEditor {
     const formData = new FormData(form);
     const edited: Record<string, unknown> = {};
 
-    for (const [key, value] of (formData as any).entries()) {
+    formData.forEach((value, key) => {
       if (this.schema?.attributes[key]?.type === 'array') {
         edited[key] = (value as string)
           .split('\n')
@@ -494,7 +501,7 @@ export class GroupPropertyEditor {
       } else {
         edited[key] = value;
       }
-    }
+    });
     const updates = changedAttributes(
       this.group as unknown as Record<string, unknown>,
       edited
@@ -561,9 +568,7 @@ export class GroupPropertyEditor {
     if (!this.group) return;
 
     // Get current organization DN from twakeDepartmentLink attribute
-    const currentOrgDn = (this.group as any).twakeDepartmentLink as
-      | string
-      | undefined;
+    const currentOrgDn = this.group.twakeDepartmentLink as string | undefined;
 
     if (!currentOrgDn) {
       alert(

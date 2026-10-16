@@ -2,7 +2,7 @@
  * API Client for LDAP Group operations
  */
 
-import type { Config, LdapGroup } from '../types';
+import type { Config, Entry, LdapGroup } from '../types';
 
 export class GroupApiClient {
   private baseUrl: string;
@@ -38,7 +38,7 @@ export class GroupApiClient {
     }
     const subnodes = await response.json();
     // Filter to keep only groups
-    return subnodes.filter((node: any) => {
+    return subnodes.filter((node: Entry) => {
       const classes = Array.isArray(node.objectClass)
         ? node.objectClass
         : [node.objectClass];
@@ -174,9 +174,12 @@ export class GroupApiClient {
       throw new Error(`Failed to load pointer options: ${response.statusText}`);
     }
     const entries = await response.json();
-    return entries.map((entry: any) => ({
+    return entries.map((entry: Entry) => ({
       dn: entry.dn,
-      label: entry.cn?.[0] || entry.ou?.[0] || entry.dn,
+      label:
+        (entry.cn as string[] | undefined)?.[0] ||
+        (entry.ou as string[] | undefined)?.[0] ||
+        entry.dn,
     }));
   }
 }

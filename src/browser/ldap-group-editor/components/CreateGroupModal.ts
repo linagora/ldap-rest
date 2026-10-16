@@ -131,8 +131,7 @@ export class CreateGroupModal {
       if (!response.ok) return null;
 
       const org = await response.json();
-      const pathAttr = (this.config as any).features?.ldapOrganizations
-        ?.pathAttribute as string | undefined;
+      const pathAttr = this.config.features?.ldapOrganizations?.pathAttribute;
       if (pathAttr && org[pathAttr]) {
         return Array.isArray(org[pathAttr]) ? org[pathAttr][0] : org[pathAttr];
       }
@@ -172,7 +171,7 @@ export class CreateGroupModal {
       // const dn = `cn=${cn},${groupBranch}`;
 
       // Build group data - only send cn, the backend will add objectClass, member, and default attributes
-      const groupData: Record<string, any> = {
+      const groupData: Record<string, unknown> = {
         cn: cn,
       };
 
@@ -186,8 +185,7 @@ export class CreateGroupModal {
       }
 
       // The server computes the organization path from the link
-      const linkAttr = (this.config as any).features?.ldapOrganizations
-        ?.linkAttribute as string | undefined;
+      const linkAttr = this.config.features?.ldapOrganizations?.linkAttribute;
       if (linkAttr) groupData[linkAttr] = this.orgDn;
 
       // Create the group using the proper API

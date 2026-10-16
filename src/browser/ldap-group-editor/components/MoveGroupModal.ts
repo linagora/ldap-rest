@@ -3,6 +3,7 @@
  */
 
 import type { GroupApiClient } from '../api/GroupApiClient';
+import type { Entry } from '../types';
 
 export class MoveGroupModal {
   private api: GroupApiClient;
@@ -162,7 +163,7 @@ export class MoveGroupModal {
         if (!subnodesResponse.ok) throw new Error('Failed to load subnodes');
 
         const subnodes = await subnodesResponse.json();
-        const orgs = subnodes.filter((n: any) => {
+        const orgs = subnodes.filter((n: Entry) => {
           const classes = Array.isArray(n.objectClass)
             ? n.objectClass
             : n.objectClass
