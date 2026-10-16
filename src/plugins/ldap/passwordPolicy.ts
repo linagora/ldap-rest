@@ -19,6 +19,7 @@ import DmPlugin, {
 } from '../../abstract/plugin';
 import type { SearchResult } from '../../lib/ldapActions';
 import { escapeDnValue } from '../../lib/utils';
+import { jsonBody } from '../../lib/expressFormatedResponses';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -556,7 +557,9 @@ export default class PasswordPolicy extends DmPlugin {
         `${prefix}/password/validate`,
         // eslint-disable-next-line @typescript-eslint/require-await
         asyncHandler(async (req: Request, res: Response) => {
-          const { password } = req.body as { password?: string };
+          const body = jsonBody(req, res);
+          if (!body) return;
+          const { password } = body as { password?: string };
           if (!password) throw new BadRequestError('password required');
           const result = this.validateComplexity(password);
           res.json(result);
