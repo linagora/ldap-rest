@@ -91,13 +91,22 @@ export class UserApiClient {
     return this.cachedFetch<LdapUser>(url);
   }
 
-  async updateUser(dn: string, data: Partial<LdapUser>): Promise<LdapUser> {
+  /**
+   * Replace attributes of an entry.
+   *
+   * @param dn entry to change
+   * @param replace attributes to replace; see `changedAttributes`
+   */
+  async updateUser(
+    dn: string,
+    replace: Record<string, unknown>
+  ): Promise<LdapUser> {
     const res = await fetch(
       `${this.getApiBase()}/ldap/users/${encodeURIComponent(dn)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ replace }),
       }
     );
     if (!res.ok) {

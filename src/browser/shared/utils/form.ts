@@ -271,3 +271,36 @@ export function groupSchemaFields(
 
   return groups;
 }
+
+const isEmpty = (value: unknown): boolean =>
+  value === undefined || value === null || value === '';
+
+/** The values a field holds, without the empty rows a list field may carry */
+const valueList = (value: unknown): unknown[] =>
+  (Array.isArray(value) ? value : [value]).filter(v => !isEmpty(v));
+
+/**
+ * The attributes of `edited` whose value differs from `original`, as the
+ * `replace` of a modify request: the routes take only `add`, `replace` and
+ * `delete`, and refuse a computed attribute even sent unchanged. One emptied
+ * in the form is replaced with no value, which clears it.
+ *
+ * @param original entry as loaded
+ * @param edited attributes as the form holds them
+ * @returns the attributes to replace, empty when nothing changed
+ */
+export function changedAttributes(
+  original: Record<string, unknown> | null | undefined,
+  edited: Record<string, unknown>
+): Record<string, unknown> {
+  const replace: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(edited)) {
+    if (name === 'dn') continue;
+    const after = valueList(value);
+    const a = after.map(String).sort();
+    const b = valueList(original?.[name]).map(String).sort();
+    if (a.length === b.length && a.every((v, i) => v === b[i])) continue;
+    replace[name] = Array.isArray(value) ? after : after.length ? value : [];
+  }
+  return replace;
+}

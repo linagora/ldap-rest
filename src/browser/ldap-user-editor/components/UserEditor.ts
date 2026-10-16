@@ -7,6 +7,7 @@ import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
 import { MoveUserModal } from './MoveUserModal';
 import { hasRole, localizedText } from '../../shared/utils/schema';
+import { changedAttributes } from '../../shared/utils/form';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -565,7 +566,12 @@ export class UserEditor {
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      await this.api.updateUser(this.userDn, this.formData);
+      const replace = changedAttributes(
+        this.user as unknown as Record<string, unknown>,
+        this.formData
+      );
+      if (Object.keys(replace).length)
+        await this.api.updateUser(this.userDn, replace);
 
       if (alertContainer) {
         alertContainer.innerHTML = `

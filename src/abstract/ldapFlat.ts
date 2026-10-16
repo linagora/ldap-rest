@@ -19,6 +19,7 @@ import type {
   SearchOptions,
   SearchResult,
 } from '../lib/ldapActions';
+import { assertModifyRequest } from '../lib/ldapActions';
 import {
   created,
   jsonBody,
@@ -47,6 +48,8 @@ import {
   invalidValueMessage,
   missingRequiredAttribute,
   modifiedAttributeNames,
+  toDirectoryChanges,
+  toDirectoryEntry,
   neverReturnAttributes,
   schemaAttribute,
 } from '../config/schema';
@@ -1158,6 +1161,7 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
+    assertModifyRequest(body);
     this.rejectForbiddenInput(modifiedAttributeNames(body));
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.modifyEntry.bind(this), id, body, req);
@@ -1405,6 +1409,8 @@ export default abstract class LdapFlat extends DmPlugin {
       [this.mainAttribute]: id,
       ...additional,
     };
+    // validateNewEntry converted the copy it was handed, not this one
+    toDirectoryEntry(this.schema, entry);
 
     // Note: LDAP attribute values with DNs do NOT need escaping
     // ldapts handles this automatically
@@ -1803,6 +1809,8 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
+    // Converts in place, so what is checked below is what the directory gets
+    toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
     // First, enforce fixed attributes
@@ -1854,6 +1862,8 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
+    // Converts in place: what is validated is what gets written
+    toDirectoryChanges(this.schema, changes);
     if (!this.schema) return true;
 
     // Check for fixed attributes in add/replace operations
@@ -1910,6 +1920,13 @@ export default abstract class LdapFlat extends DmPlugin {
       return true;
     }
     if (!value) return true;
+    // An empty list is no value, as for groups and organizations: a replace
+    // clears the attribute with it
+    if (Array.isArray(value) && value.length === 0) {
+      if (attr.required)
+        throw new BadRequestError(`Attribute "${field}" is required`);
+      return true;
+    }
 
     // Handle pointer type
     if (attr.type === 'pointer') {

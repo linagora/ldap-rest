@@ -20,6 +20,7 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
+import { assertModifyRequest } from '../../lib/ldapActions';
 import {
   jsonBody,
   ok,
@@ -52,6 +53,8 @@ import {
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
+  toDirectoryChanges,
+  toDirectoryEntry,
 } from '../../config/schema';
 
 export interface postAdd {
@@ -677,6 +680,7 @@ export default class LdapGroups extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as postModify | false;
     if (!body) return;
+    assertModifyRequest(body);
     const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
     if (!dn) throw new BadRequestError('cn is required');
     assertClientMaySet(
@@ -752,6 +756,8 @@ export default class LdapGroups extends DmPlugin {
       ...additional,
     };
     if (members.length) (entry.member as string[]).push(...members);
+    // validateNewGroup converted the copy it was handed, not this one
+    toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,
       entry,
@@ -1227,7 +1233,10 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async validateNewGroup(dn: string, entry: AttributesList): Promise<boolean> {
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryEntry(undefined, entry);
+      return true;
+    }
     [dn, entry] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatenew,
       [dn, entry]
@@ -1255,11 +1264,17 @@ export default class LdapGroups extends DmPlugin {
     );
     if (missing)
       throw new BadRequestError(`Attribute "${missing}" is required`);
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryEntry(this.schema, entry);
     return true;
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryChanges(undefined, changes);
+      return true;
+    }
     [dn, changes] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatechanges,
       [dn, changes]
@@ -1287,6 +1302,9 @@ export default class LdapGroups extends DmPlugin {
         await this._validateOneChange(v, null);
       }
     }
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryChanges(this.schema, changes);
     return true;
   }
 

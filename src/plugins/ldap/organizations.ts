@@ -7,6 +7,7 @@ import { Hooks } from '../../hooks';
 import {
   AttributesList,
   AttributeValue,
+  assertModifyRequest,
   ModifyRequest,
 } from '../../lib/ldapActions';
 import {
@@ -48,6 +49,8 @@ import {
   matchesPattern,
   modifiedAttributeNames,
   missingRequiredAttribute,
+  toDirectoryChanges,
+  toDirectoryEntry,
 } from '../../config/schema';
 
 /**
@@ -624,6 +627,7 @@ export default class LdapOrganizations extends DmPlugin {
   async apiModify(req: Request, res: Response): Promise<void> {
     const body = jsonBody(req, res) as ModifyRequest | false;
     if (!body) return;
+    assertModifyRequest(body);
     const dn = decodeURIComponent(req.params.dn as string);
     if (!dn) throw new BadRequestError('dn is required');
     assertClientMaySet(this.schema, modifiedAttributeNames(body));
@@ -1312,7 +1316,10 @@ export default class LdapOrganizations extends DmPlugin {
     dn: string,
     entry: AttributesList
   ): Promise<boolean> {
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryEntry(undefined, entry);
+      return true;
+    }
 
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
@@ -1334,6 +1341,9 @@ export default class LdapOrganizations extends DmPlugin {
     );
     if (missing)
       throw new BadRequestError(`Attribute "${missing}" is required`);
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryEntry(this.schema, entry);
     return true;
   }
 
@@ -1342,7 +1352,10 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    if (!this.schema) return true;
+    if (!this.schema) {
+      toDirectoryChanges(undefined, changes);
+      return true;
+    }
 
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
@@ -1360,6 +1373,9 @@ export default class LdapOrganizations extends DmPlugin {
       }
     }
 
+    // After the checks above, whose refusals quote the schema's hint: this
+    // converts in place what they let through, the value written included
+    toDirectoryChanges(this.schema, changes);
     return true;
   }
 

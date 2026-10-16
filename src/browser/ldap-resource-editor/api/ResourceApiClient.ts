@@ -104,16 +104,22 @@ export class ResourceApiClient {
     return this.cachedFetch<LdapResource>(url);
   }
 
+  /**
+   * Replace attributes of an entry.
+   *
+   * @param dn entry to change
+   * @param replace attributes to replace; see `changedAttributes`
+   */
   async updateResource(
     dn: string,
-    data: Partial<LdapResource>
+    replace: Record<string, unknown>
   ): Promise<LdapResource> {
     const res = await fetch(
       `${this.getResourceEndpoint()}/${encodeURIComponent(dn)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ replace }),
       }
     );
     if (!res.ok) {

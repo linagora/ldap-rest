@@ -76,7 +76,7 @@ describe('Browser Resource API Client', () => {
       const mockResponse = { dn, uid: 'user1', cn: 'Updated Name' };
 
       nock(baseUrl)
-        .put(`/api/v1/ldap/users/${encodeURIComponent(dn)}`, data)
+        .put(`/api/v1/ldap/users/${encodeURIComponent(dn)}`, { replace: data })
         .reply(200, mockResponse);
 
       const result = await client.updateResource(dn, data);

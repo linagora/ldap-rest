@@ -37,6 +37,17 @@
   password over 256 characters or holding a control character, and a
   `forceChange` that is not a boolean, which counted as `true`
   ([#337](https://github.com/linagora/ldap-rest/issues/337))
+- A JSON number or boolean written to a flat entity, a group or an
+  organization answers 400 instead of 500, except where the schema declares
+  a `number` or a `boolean`: it is written as text, or as `TRUE` / `FALSE`
+  ([#332](https://github.com/linagora/ldap-rest/issues/332))
+- `PUT` on a flat entity, a group or an organization refuses a body naming
+  no attribute in `add`, `replace` or `delete`, or carrying other keys; it
+  changed nothing and answered success
+  ([#336](https://github.com/linagora/ldap-rest/issues/336))
+- The bundled user, group and unit editors save what was changed; their
+  saves changed nothing
+  ([#342](https://github.com/linagora/ldap-rest/pull/342))
 
 ## v0.20.2 (2026-10-15)
 
