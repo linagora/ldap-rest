@@ -64,7 +64,7 @@ export class CreateGroupModal {
       <form id="create-group-form" style="display: flex; flex-direction: column; gap: 16px;">
         <div>
           <label for="group-cn" style="display: block; margin-bottom: 4px; font-weight: 500;">Group Name (cn) *</label>
-          <input type="text" id="group-cn" required pattern="[a-zA-Z][a-zA-Z0-9-]{0,254}"
+          <input type="text" id="group-cn" required pattern="[a-zA-Z][a-zA-Z0-9\\-]{0,254}"
             style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
             placeholder="e.g., developers" />
           <small style="color: #666; font-size: 12px;">Must start with a letter, contain only letters, numbers, and hyphens</small>
@@ -131,8 +131,7 @@ export class CreateGroupModal {
       if (!response.ok) return null;
 
       const org = await response.json();
-      const pathAttr = (this.config as any).features?.organizations
-        ?.pathAttribute as string | undefined;
+      const pathAttr = this.config.features?.ldapOrganizations?.pathAttribute;
       if (pathAttr && org[pathAttr]) {
         return Array.isArray(org[pathAttr]) ? org[pathAttr][0] : org[pathAttr];
       }
@@ -171,11 +170,8 @@ export class CreateGroupModal {
       // const groupBranch = this.config.ldap_groups_branch as string;
       // const dn = `cn=${cn},${groupBranch}`;
 
-      // Get organization path for the group
-      const orgPath = await this.getOrgPath(this.orgDn);
-
       // Build group data - only send cn, the backend will add objectClass, member, and default attributes
-      const groupData: Record<string, any> = {
+      const groupData: Record<string, unknown> = {
         cn: cn,
       };
 
@@ -188,20 +184,9 @@ export class CreateGroupModal {
         groupData.description = descInput.value.trim();
       }
 
-      // Add organization link and path (required for twake groups)
-      const linkAttr = (this.config as any).features?.organizations
-        ?.linkAttribute as string | undefined;
-      const pathAttr = (this.config as any).features?.organizations
-        ?.pathAttribute as string | undefined;
-
-      if (linkAttr && pathAttr) {
-        if (!orgPath) {
-          this.showError(errorDiv, 'Failed to get organization path');
-          return;
-        }
-        groupData[linkAttr] = this.orgDn;
-        groupData[pathAttr] = orgPath;
-      }
+      // The server computes the organization path from the link
+      const linkAttr = this.config.features?.ldapOrganizations?.linkAttribute;
+      if (linkAttr) groupData[linkAttr] = this.orgDn;
 
       // Create the group using the proper API
       const response = await fetch(

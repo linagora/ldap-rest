@@ -794,29 +794,31 @@ export default class LdapGroups extends DmPlugin {
     );
     if (changes.add) {
       if (changes.add.member)
-        throw new Error('Use dedicated API to add members');
+        throw new BadRequestError('Use dedicated API to add members');
       if (changes.add[this.cn])
-        throw new Error(`${this.cn} attribute iq unique, cannot add`);
+        throw new BadRequestError(`${this.cn} attribute is unique, cannot add`);
     }
     if (changes.delete) {
       if (changes.delete instanceof Object) {
         if ((changes.delete as AttributesList).member)
-          throw new Error('Use dedicated API to delete members');
+          throw new BadRequestError('Use dedicated API to delete members');
         if ((changes.delete as AttributesList)[this.cn])
-          throw new Error(`Cannot delete ${this.cn} attribute`);
+          throw new BadRequestError(`Cannot delete ${this.cn} attribute`);
       }
       if (Array.isArray(changes.delete)) {
         if (changes.delete.includes('member'))
-          throw new Error('Use dedicated API to delete members');
+          throw new BadRequestError('Use dedicated API to delete members');
         if (changes.delete.includes(this.cn))
-          throw new Error(`Cannot delete ${this.cn} attribute`);
+          throw new BadRequestError(`Cannot delete ${this.cn} attribute`);
       }
     }
     if (changes.replace) {
       if (changes.replace.member)
-        throw new Error('Use dedicated API to replace members');
+        throw new BadRequestError('Use dedicated API to replace members');
       if (changes.replace[this.cn])
-        throw new Error(`Use dedicated API to change ${this.cn} attribute`);
+        throw new BadRequestError(
+          `Use dedicated API to change ${this.cn} attribute`
+        );
     }
 
     await this.validateChanges(dn, changes);
@@ -1006,13 +1008,21 @@ export default class LdapGroups extends DmPlugin {
       : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
 
     // Get current group to check if it has department attributes
-    const currentGroup = (await this.ldap.search(
-      { paged: false, scope: 'base' },
-      dn
-    )) as SearchResult;
+    let currentGroup: SearchResult;
+    try {
+      currentGroup = (await this.ldap.search(
+        { paged: false, scope: 'base' },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      // A base search of a DN that is not there fails with noSuchObject
+      if (extractLdapCode(err) === 32)
+        throw new NotFoundError(`Group ${dn} not found`);
+      throw err;
+    }
 
     if (currentGroup.searchEntries.length === 0) {
-      throw new Error(`Group ${dn} not found`);
+      throw new NotFoundError(`Group ${dn} not found`);
     }
 
     const group = currentGroup.searchEntries[0];
@@ -1020,14 +1030,14 @@ export default class LdapGroups extends DmPlugin {
 
     // Check if group has department link attribute
     if (!currentDeptLink) {
-      throw new Error(
+      throw new BadRequestError(
         `Group ${dn} does not have ${linkAttr} attribute and cannot be moved`
       );
     }
 
     // Prevent moving to the same location
     if (currentDeptLink === targetOrgDn) {
-      throw new Error('Group is already in the target organization');
+      throw new BadRequestError('Group is already in the target organization');
     }
 
     // Verify target organization exists and get its path
@@ -1042,13 +1052,18 @@ export default class LdapGroups extends DmPlugin {
         targetOrgDn
       )) as SearchResult;
     } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32)
+        throw new NotFoundError(`Target organization ${targetOrgDn} not found`);
+      if (code === 34)
+        throw new BadRequestError(`${targetOrgDn} is not a valid DN`);
       throw new Error(
         `Target organization ${targetOrgDn} not found: ${err instanceof Error && err.message ? err.message : String(err)}`
       );
     }
 
     if (targetOrg.searchEntries.length === 0) {
-      throw new Error(`Target organization ${targetOrgDn} not found`);
+      throw new NotFoundError(`Target organization ${targetOrgDn} not found`);
     }
 
     const targetPath = targetOrg.searchEntries[0][pathAttr] as

@@ -7,7 +7,7 @@ import type { UserApiClient } from '../api/UserApiClient';
 import { PointerField } from './PointerField';
 import { MoveUserModal } from './MoveUserModal';
 import { hasRole, localizedText } from '../../shared/utils/schema';
-import { changedAttributes } from '../../shared/utils/form';
+import { changedAttributes, listValues } from '../../shared/utils/form';
 
 export class UserEditor {
   private container: HTMLElement;
@@ -108,6 +108,11 @@ export class UserEditor {
     }
 
     this.formData = { ...this.user };
+    // One value comes as a scalar: as a list, it is shown and kept when a
+    // row is added
+    for (const [name, attr] of Object.entries(this.schema?.attributes ?? {}))
+      if (attr.type === 'array' && this.formData[name] !== undefined)
+        this.formData[name] = listValues(this.formData[name]);
   }
 
   private replacePlaceholders(schema: Schema): void {
@@ -649,22 +654,24 @@ export class UserEditor {
     try {
       const result = await this.api.moveUser(this.userDn, targetOrgDn);
 
-      if (alertContainer) {
-        alertContainer.innerHTML = `
+      // Update the userDn if it changed
+      if (result.newDn) {
+        this.userDn = result.newDn;
+      }
+
+      // Reload the user data to show updated organization; it renders the
+      // container anew, so the message comes after
+      await this.init();
+
+      const alert = this.container.querySelector('#alert-container');
+      if (alert) {
+        alert.innerHTML = `
           <div class="alert alert-success">
             <span class="material-icons">check_circle</span>
             <div>User moved successfully!</div>
           </div>
         `;
       }
-
-      // Update the userDn if it changed
-      if (result.newDn) {
-        this.userDn = result.newDn;
-      }
-
-      // Reload the user data to show updated organization
-      await this.init();
 
       if (this.onSaved) this.onSaved();
     } catch (error) {

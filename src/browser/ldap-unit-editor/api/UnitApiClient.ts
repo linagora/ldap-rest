@@ -98,22 +98,6 @@ export class UnitApiClient {
     }
   }
 
-  async getPointerOptions(
-    branch: string
-  ): Promise<Array<{ dn: string; label: string }>> {
-    const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/search?base=${encodeURIComponent(branch)}&scope=one`
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to load pointer options: ${response.statusText}`);
-    }
-    const entries = await response.json();
-    return entries.map((entry: any) => ({
-      dn: entry.dn,
-      label: entry.cn?.[0] || entry.ou?.[0] || entry.dn,
-    }));
-  }
-
   async moveUnit(
     dn: string,
     targetOrgDn: string

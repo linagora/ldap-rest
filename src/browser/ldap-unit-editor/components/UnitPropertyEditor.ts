@@ -5,7 +5,7 @@
 import type { UnitApiClient } from '../api/UnitApiClient';
 import type { LdapUnit, SchemaDefinition } from '../types';
 import { MoveUnitModal } from './MoveUnitModal';
-import { changedAttributes } from '../../shared/utils/form';
+import { changedAttributes, listValues } from '../../shared/utils/form';
 
 export class UnitPropertyEditor {
   private container: HTMLElement;
@@ -201,7 +201,7 @@ export class UnitPropertyEditor {
     const required = attribute.required ? 'required' : '';
 
     if (attribute.type === 'array') {
-      const arrayValue = Array.isArray(value) ? value.join('\n') : '';
+      const arrayValue = listValues(value).join('\n');
       return `
         <div class="form-group" style="margin-bottom: 16px;">
           <label style="display: block; margin-bottom: 8px; font-weight: 500;">${this.escapeHtml(label)}</label>

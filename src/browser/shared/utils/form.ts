@@ -280,6 +280,35 @@ const valueList = (value: unknown): unknown[] =>
   (Array.isArray(value) ? value : [value]).filter(v => !isEmpty(v));
 
 /**
+ * A value as the list it stands for: the API gives an attribute holding one
+ * value as that value, not as a one-element list.
+ *
+ * @param value attribute value as the API gives it
+ * @returns its values as text
+ */
+export const listValues = (value: unknown): string[] =>
+  valueList(value).map(String);
+
+/**
+ * The values to add and remove to go from `before` to `after`.
+ *
+ * @param before values as loaded
+ * @param after values as edited
+ * @returns what was added, and what was removed
+ */
+export function listChanges(
+  before: unknown,
+  after: unknown
+): { added: string[]; removed: string[] } {
+  const was = listValues(before);
+  const is = listValues(after);
+  return {
+    added: is.filter(v => !was.includes(v)),
+    removed: was.filter(v => !is.includes(v)),
+  };
+}
+
+/**
  * The attributes of `edited` whose value differs from `original`, as the
  * `replace` of a modify request: the routes take only `add`, `replace` and
  * `delete`, and refuse a computed attribute even sent unchanged. One emptied

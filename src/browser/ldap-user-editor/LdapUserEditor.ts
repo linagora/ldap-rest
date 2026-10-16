@@ -120,10 +120,8 @@ export class LdapUserEditor {
           this.userList.refresh();
         }
       },
-      () => {
-        // On user deleted
-        this.deleteUser(dn);
-      }
+      // UserEditor has deleted the entry already
+      () => void this.userDeleted(dn)
     );
 
     try {
@@ -173,28 +171,29 @@ export class LdapUserEditor {
   async deleteUser(dn: string): Promise<void> {
     try {
       await this.api.deleteUser(dn);
-      // Clear current selection if we deleted the selected user
-      if (this.currentUserDn === dn) {
-        this.currentUserDn = null;
-        const editorContainer = document.getElementById(
-          'user-editor-container'
-        );
-        if (editorContainer) {
-          editorContainer.innerHTML = `
-            <div class="empty-state">
-              <span class="material-icons">person_search</span>
-              <p>Select a user from the list to edit</p>
-            </div>
-          `;
-        }
-      }
-      // Refresh the user list
-      if (this.userList) {
-        await this.userList.refresh();
-      }
+      await this.userDeleted(dn);
     } catch (error) {
       this.handleError(error as Error);
       throw error;
+    }
+  }
+
+  /** Clear the selection and refresh the list once `dn` is deleted */
+  private async userDeleted(dn: string): Promise<void> {
+    if (this.currentUserDn === dn) {
+      this.currentUserDn = null;
+      const editorContainer = document.getElementById('user-editor-container');
+      if (editorContainer) {
+        editorContainer.innerHTML = `
+          <div class="empty-state">
+            <span class="material-icons">person_search</span>
+            <p>Select a user from the list to edit</p>
+          </div>
+        `;
+      }
+    }
+    if (this.userList) {
+      await this.userList.refresh();
     }
   }
 

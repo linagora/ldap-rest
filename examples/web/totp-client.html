@@ -417,12 +417,20 @@
         const step = parseInt(stepInput.value);
 
         if (!secret) {
-          showStatus('error', 'Please enter a Base32 secret');
+          showStatus(
+            'status-container',
+            'Please enter a Base32 secret',
+            'error'
+          );
           return;
         }
 
         if (!isValidBase32(secret)) {
-          showStatus('error', 'Invalid Base32 secret (use A-Z and 2-7)');
+          showStatus(
+            'status-container',
+            'Invalid Base32 secret (use A-Z and 2-7)',
+            'error'
+          );
           totpCodeEl.textContent = 'ERROR';
           totpCodeEl.classList.add('expired');
           return;
@@ -445,7 +453,11 @@
             totpCodeEl.classList.add('expired');
           }
         } catch (error) {
-          showStatus('error', `Error generating code: ${error.message}`);
+          showStatus(
+            'status-container',
+            `Error generating code: ${error.message}`,
+            'error'
+          );
           totpCodeEl.textContent = 'ERROR';
           totpCodeEl.classList.add('expired');
         }
@@ -462,7 +474,11 @@
 
       btnGenerate.addEventListener('click', () => {
         startAutoRefresh();
-        showStatus('success', 'TOTP code generated and auto-refresh started');
+        showStatus(
+          'status-container',
+          'TOTP code generated and auto-refresh started',
+          'success'
+        );
       });
 
       btnCopy.addEventListener('click', async () => {
@@ -473,12 +489,20 @@
         ) {
           try {
             await navigator.clipboard.writeText(currentCode);
-            showStatus('success', `Code ${currentCode} copied to clipboard!`);
+            showStatus(
+              'status-container',
+              `Code ${currentCode} copied to clipboard!`,
+              'success'
+            );
           } catch (error) {
-            showStatus('error', 'Failed to copy to clipboard');
+            showStatus(
+              'status-container',
+              'Failed to copy to clipboard',
+              'error'
+            );
           }
         } else {
-          showStatus('error', 'No valid code to copy');
+          showStatus('status-container', 'No valid code to copy', 'error');
         }
       });
 
@@ -489,17 +513,21 @@
         const endpoint = apiEndpoint.value;
 
         if (!secret) {
-          showStatus('error', 'Please enter a Base32 secret first');
+          showStatus(
+            'status-container',
+            'Please enter a Base32 secret first',
+            'error'
+          );
           return;
         }
 
         if (!isValidBase32(secret)) {
-          showStatus('error', 'Invalid Base32 secret');
+          showStatus('status-container', 'Invalid Base32 secret', 'error');
           return;
         }
 
         try {
-          showStatus('info', 'Sending request...');
+          showStatus('status-container', 'Sending request...', 'info');
 
           const client = new TotpAuthClient({ secret, digits, step });
           const response = await client.get(endpoint);
@@ -512,18 +540,27 @@
 
           if (response.ok) {
             showStatus(
-              'success',
-              `API request successful (${response.status})`
+              'status-container',
+              `API request successful (${response.status})`,
+              'success'
             );
           } else {
-            showStatus('warning', `API returned status ${response.status}`);
+            showStatus(
+              'status-container',
+              `API returned status ${response.status}`,
+              'warning'
+            );
             apiResponse.classList.add('error');
           }
         } catch (error) {
           apiResponseContainer.style.display = 'block';
           apiResponse.textContent = `Error: ${error.message}`;
           apiResponse.classList.add('error');
-          showStatus('error', `Request failed: ${error.message}`);
+          showStatus(
+            'status-container',
+            `Request failed: ${error.message}`,
+            'error'
+          );
         }
       });
 

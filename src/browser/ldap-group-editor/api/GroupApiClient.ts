@@ -2,7 +2,7 @@
  * API Client for LDAP Group operations
  */
 
-import type { Config, LdapGroup } from '../types';
+import type { Config, Entry, LdapGroup } from '../types';
 
 export class GroupApiClient {
   private baseUrl: string;
@@ -38,7 +38,7 @@ export class GroupApiClient {
     }
     const subnodes = await response.json();
     // Filter to keep only groups
-    return subnodes.filter((node: any) => {
+    return subnodes.filter((node: Entry) => {
       const classes = Array.isArray(node.objectClass)
         ? node.objectClass
         : [node.objectClass];
@@ -107,6 +107,33 @@ export class GroupApiClient {
     }
   }
 
+  /** Add members through the route that checks them */
+  async addMembers(dn: string, member: string[]): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}/members`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add members: ${error}`);
+    }
+  }
+
+  async removeMember(dn: string, member: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}/members/${encodeURIComponent(member)}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to remove member: ${error}`);
+    }
+  }
+
   async moveGroup(cn: string, targetOrgDn: string): Promise<void> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(cn)}/move`,
@@ -135,21 +162,5 @@ export class GroupApiClient {
       const error = await response.text();
       throw new Error(`Failed to rename group: ${error}`);
     }
-  }
-
-  async getPointerOptions(
-    branch: string
-  ): Promise<Array<{ dn: string; label: string }>> {
-    const response = await fetch(
-      `${this.baseUrl}/api/v1/ldap/search?base=${encodeURIComponent(branch)}&scope=one`
-    );
-    if (!response.ok) {
-      throw new Error(`Failed to load pointer options: ${response.statusText}`);
-    }
-    const entries = await response.json();
-    return entries.map((entry: any) => ({
-      dn: entry.dn,
-      label: entry.cn?.[0] || entry.ou?.[0] || entry.dn,
-    }));
   }
 }

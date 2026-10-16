@@ -22,9 +22,16 @@ export interface Config {
       schemaUrl?: string;
       schema?: SchemaDefinition;
     };
+    ldapOrganizations?: {
+      linkAttribute?: string;
+      pathAttribute?: string;
+    };
   };
   [key: string]: unknown;
 }
+
+/** An entry as the API returns it */
+export type Entry = { dn: string } & Record<string, unknown>;
 
 export interface ResourceConfig {
   name: string;

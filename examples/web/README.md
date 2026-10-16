@@ -116,8 +116,12 @@ npm start -- --plugin core/ldap/raw
    ```bash
    npm start -- \
      --plugin core/auth/totp \
-     --auth-totp "JBSWY3DPEHPK3PXP:admin:6"
+     --auth-totp "JBSWY3DPEHPK3PXP:admin:6" \
+     --auth-path-prefix /api
    ```
+
+   `--auth-path-prefix /api` leaves the example pages themselves reachable
+   without a code.
 
 3. **Open examples in browser:**
    ```

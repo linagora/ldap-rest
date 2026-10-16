@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 
-import { groupSchemaFields } from '../../src/browser/shared/utils/form';
+import {
+  groupSchemaFields,
+  listChanges,
+  listValues,
+} from '../../src/browser/shared/utils/form';
 import type { SchemaAttribute } from '../../src/browser/shared/types';
 
 describe('Browser form utils', () => {
@@ -21,6 +25,34 @@ describe('Browser form utils', () => {
       expect(
         groups.get('Mailbox Settings')!.map(([name]) => name)
       ).to.deep.equal(['mailQuotaSize', 'twakeDeliveryMode', 'description']);
+    });
+  });
+
+  describe('listValues', () => {
+    it('should read one value as a one-element list', () => {
+      expect(listValues('uid=a,dc=x')).to.deep.equal(['uid=a,dc=x']);
+    });
+
+    it('should keep a list, as text, without empty rows', () => {
+      expect(listValues(['a', '', 2, null])).to.deep.equal(['a', '2']);
+    });
+
+    it('should read nothing as an empty list', () => {
+      for (const value of [undefined, null, '', []])
+        expect(listValues(value)).to.deep.equal([]);
+    });
+  });
+
+  describe('listChanges', () => {
+    it('should name what was added and what was removed', () => {
+      expect(listChanges(['a', 'b'], ['b', 'c'])).to.deep.equal({
+        added: ['c'],
+        removed: ['a'],
+      });
+    });
+
+    it('should see no change from one value to the same list', () => {
+      expect(listChanges('a', ['a'])).to.deep.equal({ added: [], removed: [] });
     });
   });
 });

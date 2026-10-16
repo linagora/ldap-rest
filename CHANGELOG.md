@@ -48,6 +48,13 @@
 - The bundled user, group and unit editors save what was changed; their
   saves changed nothing
   ([#342](https://github.com/linagora/ldap-rest/pull/342))
+- `core/ldap/groups`: a member change sent through `PUT`, and a move of a
+  group to its own organization, to a missing one or without a link, answer
+  400 or 404 instead of 500
+  ([#347](https://github.com/linagora/ldap-rest/pull/347))
+- Browser examples: creating a user or a group, editing and searching group
+  members, deleting a user and the TOTP client work again
+  ([#347](https://github.com/linagora/ldap-rest/pull/347))
 
 ## v0.20.2 (2026-10-15)
 
