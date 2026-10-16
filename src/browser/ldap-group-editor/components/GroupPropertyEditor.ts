@@ -7,6 +7,11 @@ import type { LdapGroup, SchemaDefinition } from '../types';
 import { MoveGroupModal } from './MoveGroupModal';
 import { changedAttributes } from '../../shared/utils/form';
 
+const asList = (value: unknown): string[] =>
+  value === undefined || value === null
+    ? []
+    : (Array.isArray(value) ? value : [value]).map(String);
+
 export class GroupPropertyEditor {
   private container: HTMLElement;
   private api: GroupApiClient;
@@ -370,12 +375,13 @@ export class GroupPropertyEditor {
     try {
       // Search for users by CN, UID, or mail
       const response = await fetch(
-        `${this.api['baseUrl']}/api/v1/ldap/search?filter=(|(cn=*${encodeURIComponent(query)}*)(uid=*${encodeURIComponent(query)}*)(mail=*${encodeURIComponent(query)}*))`
+        `${this.api['baseUrl']}/api/v1/ldap/users?match=${encodeURIComponent(query)}&attribute=cn,uid,mail&attributes=cn,uid,mail&limit=10`
       );
 
       if (!response.ok) return;
 
-      const results = await response.json();
+      // Keyed by identifier
+      const results = Object.values(await response.json());
       const datalist = document.getElementById(
         `${fieldName}-suggestions`
       ) as HTMLDataListElement;
@@ -386,7 +392,10 @@ export class GroupPropertyEditor {
         .slice(0, 10)
         .map((user: any) => {
           const label =
-            user.cn?.[0] || user.uid?.[0] || user.mail?.[0] || user.dn;
+            asList(user.cn)[0] ||
+            asList(user.uid)[0] ||
+            asList(user.mail)[0] ||
+            user.dn;
           return `<option value="${this.escapeHtml(user.dn)}">${this.escapeHtml(label)}</option>`;
         })
         .join('');
@@ -490,6 +499,10 @@ export class GroupPropertyEditor {
       this.group as unknown as Record<string, unknown>,
       edited
     );
+    // Members have their own routes, which check them; a modify refuses them
+    const membersChanged = 'member' in updates;
+    const members = asList(updates.member);
+    delete updates.member;
 
     try {
       // Check if cn has changed - if so, use rename API instead
@@ -523,6 +536,15 @@ export class GroupPropertyEditor {
         }
       } else if (Object.keys(updates).length > 0) {
         await this.api.updateGroup(this.groupDn, updates);
+      }
+
+      if (membersChanged) {
+        const before = asList(this.group?.member);
+        // Added first: a groupOfNames is never left without a member
+        const added = members.filter(m => !before.includes(m));
+        if (added.length) await this.api.addMembers(this.groupDn, added);
+        for (const member of before.filter(m => !members.includes(m)))
+          await this.api.removeMember(this.groupDn, member);
       }
 
       alert('Group updated successfully!');

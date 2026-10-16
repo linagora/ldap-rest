@@ -107,6 +107,33 @@ export class GroupApiClient {
     }
   }
 
+  /** Add members through the route that checks them */
+  async addMembers(dn: string, member: string[]): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}/members`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member }),
+      }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add members: ${error}`);
+    }
+  }
+
+  async removeMember(dn: string, member: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(dn)}/members/${encodeURIComponent(member)}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to remove member: ${error}`);
+    }
+  }
+
   async moveGroup(cn: string, targetOrgDn: string): Promise<void> {
     const response = await fetch(
       `${this.baseUrl}/api/v1/ldap/groups/${encodeURIComponent(cn)}/move`,

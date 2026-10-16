@@ -113,6 +113,24 @@ describe('Browser editors, modify bodies', () => {
       expect(scope.isDone()).to.equal(true);
     });
 
+    it('adds and removes group members through the member routes', async () => {
+      const group = 'cn=staff,ou=groups,dc=example,dc=com';
+      const member = 'uid=alice,ou=users,dc=example,dc=com';
+      const scope = nock(baseUrl)
+        .post(`/api/v1/ldap/groups/${encodeURIComponent(group)}/members`, {
+          member: [member],
+        })
+        .reply(200, { success: true })
+        .delete(
+          `/api/v1/ldap/groups/${encodeURIComponent(group)}/members/${encodeURIComponent(member)}`
+        )
+        .reply(200, { success: true });
+      const client = new GroupApiClient(baseUrl);
+      await client.addMembers(group, [member]);
+      await client.removeMember(group, member);
+      expect(scope.isDone()).to.equal(true);
+    });
+
     it('sends a replace for an organizational unit', async () => {
       const dn = 'ou=Sales,dc=example,dc=com';
       const scope = expectReplace(
