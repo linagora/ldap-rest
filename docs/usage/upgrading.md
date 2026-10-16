@@ -4,6 +4,26 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Members whose uid the Cloudery refused as a slug
+
+**Who is affected:** a deployment that loads `twake/instances` with the
+Cloudery, whose members were created through SCIM or the API with a `uid`
+holding characters such as `_` or `@`.
+
+Those members got no instance: the Cloudery refused their slug. Once
+deployed, find them under each organization entry with
+
+```
+(&(uid=*)(mail=*)(!(twakeWorkspaceUrl=*)))
+```
+
+and call `POST /api/v1/twake/instances/ensure` with `{ "dn": … }` for each.
+Two members whose `uid`s reduce to the same slug cannot both have an
+instance: the second call answers `409`,
+[details](plugins/integrations/instances.md#providers).
+
 ## To 0.20.2
 
 ### Members of organizations created before 0.13.0

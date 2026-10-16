@@ -19,6 +19,7 @@ import {
   ClouderyProvider,
   CozyStackProvider,
   type InstanceProvider,
+  instanceSlug,
   type InstanceRequest,
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
@@ -776,8 +777,15 @@ export default class TwakeInstances extends DmPlugin {
       ? email.split('@')[1]
       : (cozy && this.config.twake_instance_cozy_org_domain) || undefined;
     const offer = this.offers[this.patterns.findIndex(p => p.test(dn))];
+    const id = this.id(uid, match);
+    if (!id) {
+      this.logger.warn(
+        `${this.name}: ${dn} gives no instance slug, no instance`
+      );
+      return undefined;
+    }
     return {
-      id: this.id(uid, match),
+      id,
       // cozyProvision's OIDC id, the uid; the Cloudery's is the slug
       ...(cozy ? { oidc: uid } : {}),
       twakeId: uid,
@@ -802,10 +810,12 @@ export default class TwakeInstances extends DmPlugin {
 
   private id(uid: string, match: RegExpExecArray): string {
     const groups: Record<string, string> = { uid, ...match.groups };
-    return (this.config.twake_instance_id || '{uid}')
-      .replace(/\{(\w+)\}/g, (_, name: string) => groups[name] ?? '')
-      .replace(/\./g, '')
-      .toLowerCase();
+    return instanceSlug(
+      (this.config.twake_instance_id || '{uid}').replace(
+        /\{(\w+)\}/g,
+        (_, name: string) => groups[name] ?? ''
+      )
+    );
   }
 
   protected value(entry: AttributesList, attribute: string): unknown {

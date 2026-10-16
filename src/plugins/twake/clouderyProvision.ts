@@ -12,7 +12,7 @@
  * onboarding a new org needs no config change; the org branch is selected by
  * the core `BaseResolver` (also from a header). The operator supplies the email
  * in the SCIM body, `org_domain` is its domain, and `slug` = `oidc` =
- * normalizeNickname(userName) + orgId (dots stripped).
+ * instanceSlug(userName + orgId).
  *
  * Alongside the FQDN, the post-create write stamps two attributes the admin
  * panel reads off the user entry: `twakeOrganizationRole` and (when present)
@@ -30,6 +30,7 @@ import fetch from 'node-fetch';
 import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
+import { instanceSlug } from '../../lib/instanceProviders';
 import { isChildOf } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 import { BaseResolver } from '../scim/baseResolver';
@@ -41,6 +42,13 @@ interface ClouderyInstanceResponse {
   id: string;
   fqdn: string;
   workflow?: string;
+}
+
+/** An instance as the Cloudery's search lists it */
+interface ClouderyInstanceSummary {
+  _id: string;
+  internal_email?: string;
+  oidc?: string;
 }
 
 interface CreateContext {
@@ -371,7 +379,16 @@ export default class ClouderyProvision extends DmPlugin {
 
     const email = ctx.email;
     const orgDomain = emailDomain(email);
-    const slug = normalizeNickname(userName) + ctx.orgId;
+    const slug = instanceSlug(userName + ctx.orgId);
+    if (!slug) {
+      this.logger.error({
+        plugin: this.name,
+        event: 'provision',
+        userName,
+        result: 'no_slug',
+      });
+      return;
+    }
     const mobile = this.extractPrimaryPhone(user);
     const phones = this.extractPhones(user);
     const publicName = this.extractPublicName(user) || userName;
@@ -384,22 +401,22 @@ export default class ClouderyProvision extends DmPlugin {
       slug,
     };
 
-    // Idempotency guard. The instance slug is deterministic
-    // (normalizeNickname(userName) + orgId), so its FQDN is `${slug}.${domain}`.
-    // If an instance for that FQDN already exists (e.g. the user is re-imported
-    // after their LDAP entry was recreated while the Cloudery instance survived),
-    // reuse it. Creating unconditionally makes Cloudery mint a numbered
-    // duplicate (slug2). Fail open: if the lookup errors, fall through to create
-    // rather than block provisioning.
-    // Lowercase to the canonical DNS form. Cloudery stores the instance FQDN
-    // lowercased and `normalizeNickname` does not fold case, so a mixed-case
-    // userName would otherwise make this computed key miss the existing instance
-    // (defeating the guard) and, on the reuse path, persist a non-canonical FQDN
-    // that the later deprovision lookup could not resolve.
+    // Idempotency guard. The slug is deterministic, so its FQDN is
+    // `${slug}.${domain}`. If an instance for that FQDN already exists (e.g.
+    // the user is re-imported after their LDAP entry was recreated while the
+    // Cloudery instance survived), reuse it: creating unconditionally makes
+    // Cloudery mint a numbered duplicate (slug2). Fail open: if the lookup
+    // errors, fall through to create rather than block provisioning.
+    //
+    // Reused only when its email and OIDC id, where it carries them, are the
+    // account's, as `ClouderyProvider.find` does: distinct userNames can
+    // reduce to one slug (`jane_doe`, `janedoe`), sharing the OIDC id, and
+    // the email is what tells them apart. A re-import whose mail changed
+    // since is refused too.
     const expectedFqdn = `${slug}.${this.clouderyDomain}`.toLowerCase();
-    let existingUuid: string | null = null;
+    let existing: ClouderyInstanceSummary | null = null;
     try {
-      existingUuid = await this.findInstanceUuidByFqdn(expectedFqdn);
+      existing = await this.findInstanceByFqdn(expectedFqdn);
     } catch (err) {
       this.logger.warn({
         ...log,
@@ -409,6 +426,21 @@ export default class ClouderyProvision extends DmPlugin {
         error: `${err}`,
       });
     }
+    if (
+      existing &&
+      ((existing.internal_email &&
+        existing.internal_email.toLowerCase() !== email.toLowerCase()) ||
+        (existing.oidc && existing.oidc.toLowerCase() !== slug))
+    ) {
+      this.logger.error({
+        ...log,
+        result: 'slug_taken',
+        fqdn: expectedFqdn,
+        uuid: existing._id,
+      });
+      return;
+    }
+    const existingUuid = existing?._id ?? null;
 
     let fqdn: string;
     if (existingUuid) {
@@ -647,7 +679,7 @@ export default class ClouderyProvision extends DmPlugin {
     let deleted = false;
     try {
       this.logger.info({ ...log, result: 'resolving_uuid' });
-      const uuid = await this.findInstanceUuidByFqdn(ctx.fqdn);
+      const uuid = (await this.findInstanceByFqdn(ctx.fqdn, '_id'))?._id;
       if (uuid) {
         this.logger.info({ ...log, result: 'deleting_instance', uuid });
         await this.deleteInstance(uuid);
@@ -812,15 +844,24 @@ export default class ClouderyProvision extends DmPlugin {
     return false;
   }
 
-  private async findInstanceUuidByFqdn(fqdn: string): Promise<string | null> {
+  /**
+   * The instance at this FQDN, if any.
+   *
+   * @param fqdn instance address
+   * @param only the one field to ask for, when the others are not needed
+   */
+  private async findInstanceByFqdn(
+    fqdn: string,
+    only?: string
+  ): Promise<ClouderyInstanceSummary | null> {
     this.logger.info({
       plugin: this.name,
-      event: 'findInstanceUuidByFqdn',
+      event: 'findInstanceByFqdn',
       fqdn,
     });
     const url = new URL(`${this.managerUrl}/api/v2/instances`);
     url.searchParams.set('fqdn', fqdn);
-    url.searchParams.append('only', '_id');
+    if (only) url.searchParams.set('only', only);
     url.searchParams.set('limit', '1');
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${this.managerToken}` },
@@ -832,7 +873,7 @@ export default class ClouderyProvision extends DmPlugin {
       );
       this.logger.error({
         plugin: this.name,
-        event: 'findInstanceUuidByFqdn',
+        event: 'findInstanceByFqdn',
         fqdn,
         result: 'error',
         http_status: res.status,
@@ -841,16 +882,17 @@ export default class ClouderyProvision extends DmPlugin {
       });
       throw new Error(`Cloudery searchInstances HTTP ${res.status}`);
     }
-    const data = (await res.json()) as { items?: { _id: string }[] };
-    const uuid = data.items && data.items.length > 0 ? data.items[0]._id : null;
+    const data = (await res.json()) as { items?: ClouderyInstanceSummary[] };
+    const found = data.items?.[0] ?? null;
+    const uuid = found?._id;
     this.logger.info({
       plugin: this.name,
-      event: 'findInstanceUuidByFqdn',
+      event: 'findInstanceByFqdn',
       fqdn,
       result: uuid ? 'found' : 'not_found',
       uuid: uuid || undefined,
     });
-    return uuid;
+    return found;
   }
 
   private async deleteInstance(uuid: string): Promise<void> {
@@ -1155,11 +1197,6 @@ export default class ClouderyProvision extends DmPlugin {
     }
     return this.defaultLocale;
   }
-}
-
-/** Strip dots from the nickname to form the slug/oidc identifier. */
-function normalizeNickname(nickname: string): string {
-  return nickname.replace(/\./g, '');
 }
 
 function emailDomain(email: string): string {
