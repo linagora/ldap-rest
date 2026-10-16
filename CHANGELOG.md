@@ -1,60 +1,39 @@
 # Changelog
 
-## Unreleased
+## v0.20.3 (2026-10-16)
 
 ### Security
 
 - `core/ldap/accountLifecycle`: `POST /{entity}/{id}/password` and
-  `/status` skipped the branch checks of `authzPerBranch` and `authzLinid1`,
-  so any authenticated caller could reset the password of an account, and
-  read back the generated one, or change its state. They are judged as
-  writes now, like `PUT /{entity}/{id}`
-  ([#339](https://github.com/linagora/ldap-rest/pull/339))
+  `/status` skipped the branch checks of `authzPerBranch` and `authzLinid1`:
+  any authenticated caller could reset a password, and read the generated
+  one, or change an account's state ([#339](https://github.com/linagora/ldap-rest/pull/339))
 
 ### Fixes
 
-- A write to an entry or a value the directory does not hold answers 404,
-  and an organization read or a move target that is not a DN answers 400;
-  both answered 500
-  ([#333](https://github.com/linagora/ldap-rest/issues/333),
-  [#334](https://github.com/linagora/ldap-rest/issues/334),
-  [#335](https://github.com/linagora/ldap-rest/issues/335))
-- A write whose body is not a JSON object answers 400 "Bad content"; on the
-  routes requiring no field (`POST /users`, `PUT /users/{id}`,
-  `POST /users/{id}/password`, `PUT /organizations/{dn}`…) it got no answer
-  at all ([#331](https://github.com/linagora/ldap-rest/issues/331))
-- `twake/instances`, `twake/clouderyProvision`: a member whose `uid` holds
-  characters the Cloudery refuses in a slug, such as `_` or `@`, gets an
-  instance; the slug keeps `[a-z0-9-]`. Two `uid`s reducing to the same slug
-  cannot share an instance: the second is refused. Members already blocked
-  need a call,
+- Errors that answered 500 answer 400 or 404: a write to a missing entry or
+  value, a DN that is not one, a JSON number or boolean (written as text, or
+  `TRUE` / `FALSE`, where the schema declares a `number` or a `boolean`), a
+  group member change sent through `PUT`, an impossible group move
+  ([#332](https://github.com/linagora/ldap-rest/issues/332), [#333](https://github.com/linagora/ldap-rest/issues/333), [#334](https://github.com/linagora/ldap-rest/issues/334), [#335](https://github.com/linagora/ldap-rest/issues/335),
+  [#347](https://github.com/linagora/ldap-rest/pull/347))
+- A write whose body is not a JSON object answers 400; some routes did not
+  answer at all ([#331](https://github.com/linagora/ldap-rest/issues/331))
+- `PUT` on a flat entity, a group or an organization refuses a body naming no
+  attribute, or holding keys other than `add`, `replace` and `delete`; it
+  changed nothing and answered success ([#336](https://github.com/linagora/ldap-rest/issues/336))
+- `POST /{entity}/{id}/password` refuses a password over 256 characters or
+  holding a control character, and a `forceChange` that is not a boolean
+  ([#337](https://github.com/linagora/ldap-rest/issues/337))
+- `twake/instances`, `twake/clouderyProvision`: members whose `uid` holds
+  characters such as `_` or `@` get an instance; two `uid`s reducing to the
+  same slug cannot share one. Members already blocked need a call,
   [notes](docs/usage/upgrading.md#members-whose-uid-the-cloudery-refused-as-a-slug)
   ([#330](https://github.com/linagora/ldap-rest/issues/330))
-- Entries returned by the API no longer carry the `*`, `+` and `1.1` keys,
-  as `"*": []`
+- Returned entries no longer carry empty `*`, `+` and `1.1` keys
   ([#338](https://github.com/linagora/ldap-rest/issues/338))
-- `core/ldap/accountLifecycle`: `POST /{entity}/{id}/password` refuses a
-  password over 256 characters or holding a control character, and a
-  `forceChange` that is not a boolean, which counted as `true`
-  ([#337](https://github.com/linagora/ldap-rest/issues/337))
-- A JSON number or boolean written to a flat entity, a group or an
-  organization answers 400 instead of 500, except where the schema declares
-  a `number` or a `boolean`: it is written as text, or as `TRUE` / `FALSE`
-  ([#332](https://github.com/linagora/ldap-rest/issues/332))
-- `PUT` on a flat entity, a group or an organization refuses a body naming
-  no attribute in `add`, `replace` or `delete`, or carrying other keys; it
-  changed nothing and answered success
-  ([#336](https://github.com/linagora/ldap-rest/issues/336))
-- The bundled user, group and unit editors save what was changed; their
-  saves changed nothing
-  ([#342](https://github.com/linagora/ldap-rest/pull/342))
-- `core/ldap/groups`: a member change sent through `PUT`, and a move of a
-  group to its own organization, to a missing one or without a link, answer
-  400 or 404 instead of 500
-  ([#347](https://github.com/linagora/ldap-rest/pull/347))
-- Browser examples: creating a user or a group, editing and searching group
-  members, deleting a user and the TOTP client work again
-  ([#347](https://github.com/linagora/ldap-rest/pull/347))
+- The bundled user, group and unit editors save what was changed, and the
+  browser examples work again ([#342](https://github.com/linagora/ldap-rest/pull/342), [#347](https://github.com/linagora/ldap-rest/pull/347))
 
 ## v0.20.2 (2026-10-15)
 
