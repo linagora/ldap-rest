@@ -1493,23 +1493,17 @@ class ldapActions {
       }
     }
     if (ldapChanges.length !== 0) {
-      const repair = await this.classRepair(
-        dn,
-        changes,
-        options.declaredClasses
-      );
-      const repairChange =
-        repair.length > 0
-          ? new Change({
-              operation: 'add',
-              modification: new Attribute({
-                type: 'objectClass',
-                values: repair,
-              }),
-            })
-          : undefined;
-      if (repairChange) ldapChanges.push(repairChange);
-      const pooled = await this.acquireConnection();
+      const controls = options.permissive
+        ? [new Control(PERMISSIVE_MODIFY, { critical: false })]
+        : undefined;
+      const send = async (): Promise<void> => {
+        const pooled = await this.acquireConnection();
+        try {
+          await pooled.client.modify(dn, ldapChanges, controls);
+        } finally {
+          this.releaseConnection(pooled);
+        }
+      };
       try {
         // Dropped before the write is issued as well as after it lands. The
         // directory commits somewhere inside this `await`, and the invalidation
@@ -1519,21 +1513,40 @@ class ldapActions {
         // fails, which is harmless, and `cacheGeneration` keeps a read the write
         // overtook from putting it back.
         this.invalidateCache(dn);
-        const controls = options.permissive
-          ? [new Control(PERMISSIVE_MODIFY, { critical: false })]
-          : undefined;
         try {
-          await pooled.client.modify(dn, ldapChanges, controls);
+          await send();
         } catch (error) {
-          // The repair read the entry before this write: a writer in between
-          // may have given it the class already, and adding it again is
-          // refused (20). What the repair wanted is then there.
-          if (!repairChange || (error as { code?: number })?.code !== 20)
-            throw error;
-          ldapChanges.splice(ldapChanges.indexOf(repairChange), 1);
-          await pooled.client.modify(dn, ldapChanges, controls);
+          // Repaired only once the directory refuses the classes (65), so a
+          // write it takes costs no read. The connection is given back before
+          // the repair reads: holding it meanwhile could exhaust the pool.
+          if ((error as { code?: number })?.code !== 65) throw error;
+          const repair = await this.classRepair(
+            dn,
+            changes,
+            options.declaredClasses
+          );
+          if (repair.length === 0) throw error;
+          const repairChange = new Change({
+            operation: 'add',
+            modification: new Attribute({
+              type: 'objectClass',
+              values: repair,
+            }),
+          });
+          ldapChanges.push(repairChange);
+          // The repair's read may have cached the entry again
+          this.invalidateCache(dn);
+          try {
+            await send();
+          } catch (retry) {
+            // A writer in between may have given it the class already, and
+            // adding it again is refused (20). What the repair wanted is then
+            // there.
+            if ((retry as { code?: number })?.code !== 20) throw retry;
+            ldapChanges.pop();
+            await send();
+          }
         }
-        // Invalidate cache for this DN
         this.invalidateCache(dn);
         done.push(
           launchHooks(
@@ -1548,8 +1561,6 @@ class ldapActions {
           `Changes that failed: ${dn}, ${JSON.stringify(ldapChanges)}`
         );
         throw ldapModifyError(dn, error);
-      } finally {
-        this.releaseConnection(pooled);
       }
     } else {
       // Two different things end up here, and only one of them is routine.
