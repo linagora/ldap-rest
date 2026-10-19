@@ -4,6 +4,26 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Accounts another tool created
+
+**Who is affected:** a deployment that loads `twake/instances` with the
+Cloudery, where another tool creates accounts under `--twake-instance-dn`
+without the classes of `--user-class` (a plain `inetOrgPerson`, say).
+
+Those accounts have an instance but neither its address nor the mark: the
+directory refused the write. Once deployed, find them with
+
+```
+(&(uid=*)(mail=*)(!(twakeWorkspaceUrl=*))(!(twakeCreatedEventAt=*)))
+```
+
+and call `POST /api/v1/twake/instances/ensure` with `{ "dn": … }` for each.
+The call gives the account the class it needs, writes the address and sends
+its `user.created`,
+[details](plugins/integrations/instances.md).
+
 ## To 0.20.3
 
 ### Members whose uid the Cloudery refused as a slug
