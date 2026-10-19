@@ -37,8 +37,8 @@ gets no instance.
   replicas handling the same account at once may both send it. Within one
   replica, the work on one account is done one step at a time.
 - An entry another tool created, whose classes do not allow the address or
-  the mark, is given the auxiliary class of `--user-class` that allows it in
-  the same write, as the
+  the mark, is given the auxiliary class of `--user-class` that allows it,
+  as the
   [repair of entries created by other tools](../ldap/flat-generic.md#entries-created-by-other-tools)
   does, whether the address comes from `workplace.created` or from making
   sure of its instance.

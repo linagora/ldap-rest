@@ -226,14 +226,93 @@ describe('Object class repair on modify', function () {
 
   it('should not fail when a writer gave the entry the class in the meantime', async () => {
     const dm = bare();
-    // What the repair would decide from a read taken before that writer.
-    (dm.ldap as any).classRepair = async (): Promise<string[]> => [
-      'twakeWhitePages',
-    ];
-    await server.ldap.modify(accountDn, {
-      add: { objectClass: 'twakeWhitePages' },
+    (dm.ldap as any).classRepair = async (): Promise<string[]> => {
+      // That writer lands between the repair's read and its write.
+      await server.ldap.modify(accountDn, {
+        add: { objectClass: 'twakeWhitePages' },
+      });
+      return ['twakeWhitePages'];
+    };
+    await dm.ldap.modify(accountDn, {
+      replace: { twakeDepartmentLink: orgDn },
     });
-    await dm.ldap.modify(accountDn, { replace: { description: 'raced' } });
+    expect(await classes(accountDn)).to.include('twakewhitepages');
+  });
+
+  it('should write when a writer gave the entry the class after the refusal', async () => {
+    const dm = bare();
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    const repair = (dm.ldap as any).classRepair.bind(dm.ldap);
+    (dm.ldap as any).classRepair = async (
+      ...args: unknown[]
+    ): Promise<unknown> => {
+      // That writer lands between the refusal and the repair's read.
+      await server.ldap.modify(accountDn, {
+        add: { objectClass: 'twakeWhitePages' },
+      });
+      return repair(...args);
+    };
+    await dm.ldap.modify(accountDn, {
+      replace: { twakeDepartmentLink: orgDn },
+    });
+    const result = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+      accountDn
+    )) as { searchEntries: Record<string, unknown>[] };
+    expect(result.searchEntries[0].twakeDepartmentLink).to.equal(orgDn);
+  });
+
+  it('should answer the refusal, warned once, when the schema cannot be read', async () => {
+    const dm = bare();
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    (dm.ldap as any).schemaIndex = async (): Promise<never> => {
+      throw new Error('cn=Subschema unreadable');
+    };
+    const warned: string[] = [];
+    const warn = dm.logger.warn.bind(dm.logger);
+    (dm.logger as any).warn = (message: string, ...rest: unknown[]) => {
+      warned.push(String(message));
+      return warn(message, ...rest);
+    };
+    for (let i = 0; i < 2; i++)
+      expect(
+        await status(
+          dm.ldap.modify(accountDn, {
+            replace: { twakeDepartmentLink: orgDn },
+          })
+        )
+      ).to.equal(409);
+    expect(
+      warned.filter(message => message.includes('schema could not be read'))
+    ).to.have.length(1);
+  });
+
+  it('should not read an entry whose classes already allow the change', async () => {
+    const dm = bare();
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    await dm.ldap.modify(accountDn, {
+      replace: { twakeDepartmentLink: orgDn },
+    });
+    let reads = 0;
+    const search = dm.ldap.search.bind(dm.ldap);
+    (dm.ldap as any).search = (...args: Parameters<typeof search>) => {
+      reads++;
+      return search(...args);
+    };
+    await dm.ldap.modify(accountDn, { replace: { mobile: '+33600000000' } });
+    expect(reads).to.equal(0);
+  });
+
+  it('should repair with a single connection in the pool', async function () {
+    // A repair waiting for the connection its write holds would wait 30s.
+    this.timeout(10000);
+    const dm = bare();
+    (dm.ldap as any).poolSize = 1;
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    await dm.ldap.modify(accountDn, {
+      replace: { twakeDepartmentLink: orgDn },
+    });
+    expect(await classes(accountDn)).to.include('twakewhitepages');
   });
 
   it('should report an entry it cannot repair once, not on every write', async () => {
