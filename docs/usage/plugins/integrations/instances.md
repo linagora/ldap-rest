@@ -61,7 +61,9 @@ cannot write is refused before the provider or the broker hear of it.
 
 Pending accounts are the entries under the `--twake-instance-dn` branches
 with a mail and no address, for instance
-`(&(mail=*)(!(twakeWorkspaceUrl=*)))`, technical accounts aside.
+`(&(mail=*)(!(twakeWorkspaceUrl=*)))`, technical accounts aside. The route
+can be called for each of them: an account already announced answers
+`ready` and is left as it is.
 
 ## Organizations
 
