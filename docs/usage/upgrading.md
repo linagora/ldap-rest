@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Accounts another tool created
+
+**Who is affected:** a deployment that loads `twake/instances` with the
+Cloudery, where another tool creates accounts under `--twake-instance-dn`
+without the classes of `--user-class` (a plain `inetOrgPerson`, say).
+
+Those accounts have an instance but neither its address nor the mark: the
+directory refused the write. Once deployed,
+[make sure of each pending account](plugins/integrations/instances.md#making-sure-an-account-has-its-instance): the call gives it the class it needs.
+
 ## To 0.20.3
 
 ### Members whose uid the Cloudery refused as a slug
@@ -13,13 +25,8 @@ Cloudery, whose members were created through SCIM or the API with a `uid`
 holding characters such as `_` or `@`.
 
 Those members got no instance: the Cloudery refused their slug. Once
-deployed, find them under each organization entry with
-
-```
-(&(uid=*)(mail=*)(!(twakeWorkspaceUrl=*)))
-```
-
-and call `POST /api/v1/twake/instances/ensure` with `{ "dn": … }` for each.
+deployed,
+[make sure of each pending account](plugins/integrations/instances.md#making-sure-an-account-has-its-instance).
 Two members whose `uid`s reduce to the same slug cannot both have an
 instance: the second call answers `409`,
 [details](plugins/integrations/instances.md#providers).
@@ -31,20 +38,12 @@ instance: the second call answers `409`,
 **Who is affected:** a deployment that loads `twake/instances` with the
 Cloudery and has organizations created before 0.13.0 that got members since.
 
-Those members have neither an address (`twakeWorkspaceUrl`, or
-`--twake-instance-fqdn-attribute`) nor the mark (`twakeCreatedEventAt`, or
-`--twake-instance-sent-attribute`), and adding another member does not
-release them. Once deployed, find them under each organization entry with
-
-```
-(&(uid=*)(mail=*)(!(twakeWorkspaceUrl=*))(!(twakeCreatedEventAt=*)))
-```
-
-and call `POST /api/v1/twake/instances/ensure` with `{ "dn": … }` for each,
+Those members have neither an address nor the mark, and adding another
+member does not release them. Once deployed,
+[make sure of each pending account](plugins/integrations/instances.md#making-sure-an-account-has-its-instance),
 as a caller who may write the organization entry. The first call announces
-the organization. Each call asks for the member's instance, and the member's
-`user.created` follows once it is built,
-[details](plugins/integrations/instances.md#organizations).
+the organization, and each member's `user.created` follows once its instance
+is built, [details](plugins/integrations/instances.md#organizations).
 
 ## To 0.20.0
 

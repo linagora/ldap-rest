@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/instances`, `twake/clouderyProvision`: an account another tool
+  created, whose classes do not allow the instance address, is given the
+  class of `--user-class` that allows it and gets its address and its
+  `user.created`. Accounts already blocked need a call,
+  [notes](docs/usage/upgrading.md#accounts-another-tool-created)
+  ([#348](https://github.com/linagora/ldap-rest/issues/348))
+
 ## v0.20.3 (2026-10-16)
 
 ### Security
