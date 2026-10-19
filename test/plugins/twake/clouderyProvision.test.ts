@@ -33,6 +33,7 @@ class StubRabbitMq {
 interface ModifyCall {
   dn: string;
   changes: Record<string, unknown>;
+  options?: Record<string, unknown>;
 }
 
 /** Minimal stand-in for this.server.ldap used by the plugin. */
@@ -40,8 +41,13 @@ class StubLdap {
   modifyCalls: ModifyCall[] = [];
   // entry returned by a base-scope search keyed by dn
   entries: Record<string, Record<string, unknown>> = {};
-  async modify(dn: string, changes: Record<string, unknown>): Promise<boolean> {
-    this.modifyCalls.push({ dn, changes });
+  async modify(
+    dn: string,
+    changes: Record<string, unknown>,
+    _req?: unknown,
+    options?: Record<string, unknown>
+  ): Promise<boolean> {
+    this.modifyCalls.push({ dn, changes, options });
     return true;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -429,6 +435,27 @@ describe('ClouderyProvision plugin', () => {
         replace: Record<string, unknown>;
       };
       expect(changes.replace.twakeInvited).to.equal('TRUE');
+    });
+
+    it('declares --user-class on the write, for an entry another tool created', async () => {
+      dm.config.user_class = ['top', 'inetOrgPerson', 'twakeAccount'];
+      const scope = nock(CLOUDERY)
+        .post('/api/v1/instances')
+        .reply(200, {
+          id: 'inst-1',
+          fqdn: 'johndoeacme123.twake.app',
+          workflow: 'wf-1',
+        })
+        .get('/api/v1/workflows/wf-1')
+        .reply(200, { status: 'succeeded' });
+
+      await create(user, makeReq('acme123'));
+
+      expect(scope.isDone()).to.equal(true);
+      expect(ldap.modifyCalls).to.have.length(1);
+      expect(ldap.modifyCalls[0].options).to.deep.equal({
+        declaredClasses: ['top', 'inetOrgPerson', 'twakeAccount'],
+      });
     });
 
     it('uses the configured attribute name for the invited flag', async () => {
