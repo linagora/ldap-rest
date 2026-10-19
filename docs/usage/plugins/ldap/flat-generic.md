@@ -459,10 +459,11 @@ with `--group-class`, and to the organization tree with
 Cloudery provisioning plugins write, with `--user-class`. Nothing is added
 when the change names `objectClass` itself.
 
-Only a refused write reads the directory schema, kept for
-`--ldap-raw-schema-cache-ttl`, and the entry's classes: a write the directory
-takes costs nothing more. `DM_LDAP_FLAT_AUTO_REPAIR=false` turns the repair
-off.
+The repair reads the directory schema, kept for
+`--ldap-raw-schema-cache-ttl`, and the entry's classes only for a write the
+directory refuses: a write it takes costs nothing more. That refused write
+shows in the directory's logs (`err=65`) before the one adding the class.
+`DM_LDAP_FLAT_AUTO_REPAIR=false` turns the repair off.
 
 ### Delete Entry
 

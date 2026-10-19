@@ -1519,7 +1519,7 @@ class ldapActions {
           // Repaired only once the directory refuses the classes (65), so a
           // write it takes costs no read. The connection is given back before
           // the repair reads: holding it meanwhile could exhaust the pool.
-          if ((error as { code?: number })?.code !== 65) throw error;
+          if (extractLdapCode(error) !== 65) throw error;
           const repair = await this.classRepair(
             dn,
             changes,
@@ -1542,7 +1542,7 @@ class ldapActions {
             // A writer in between may have given it the class already, and
             // adding it again is refused (20). What the repair wanted is then
             // there.
-            if ((retry as { code?: number })?.code !== 20) throw retry;
+            if (extractLdapCode(retry) !== 20) throw retry;
             ldapChanges.pop();
             await send();
           }

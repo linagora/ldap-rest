@@ -239,6 +239,31 @@ describe('Object class repair on modify', function () {
     expect(await classes(accountDn)).to.include('twakewhitepages');
   });
 
+  it('should answer the refusal, warned once, when the schema cannot be read', async () => {
+    const dm = bare();
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    (dm.ldap as any).schemaIndex = async (): Promise<never> => {
+      throw new Error('cn=Subschema unreadable');
+    };
+    const warned: string[] = [];
+    const warn = dm.logger.warn.bind(dm.logger);
+    (dm.logger as any).warn = (message: string, ...rest: unknown[]) => {
+      warned.push(String(message));
+      return warn(message, ...rest);
+    };
+    for (let i = 0; i < 2; i++)
+      expect(
+        await status(
+          dm.ldap.modify(accountDn, {
+            replace: { twakeDepartmentLink: orgDn },
+          })
+        )
+      ).to.equal(409);
+    expect(
+      warned.filter(message => message.includes('schema could not be read'))
+    ).to.have.length(1);
+  });
+
   it('should not read an entry whose classes already allow the change', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
