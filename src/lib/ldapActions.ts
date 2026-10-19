@@ -925,13 +925,14 @@ class ldapActions {
    * @param dn entry being modified
    * @param changes the modification, after the hooks
    * @param extra classes the writer declares, see {@link ModifyOptions}
-   * @returns names of the classes to add
+   * @returns names of the classes to add, or `allowed` when the entry's
+   * classes take the change as it is
    */
   private async classRepair(
     dn: string,
     changes: ModifyRequest,
     extra: string[] = []
-  ): Promise<string[]> {
+  ): Promise<string[] | 'allowed'> {
     if (this.config.ldap_flat_auto_repair === false) return [];
     const declared = [...this.declaredFor(dn)];
     for (const name of extra)
@@ -1023,7 +1024,7 @@ class ldapActions {
         index.getAttributeType(attribute) &&
         !allowed.has(attributeKey(attribute))
     );
-    if (needed.length === 0) return [];
+    if (needed.length === 0) return 'allowed';
 
     const gone = new Set(deleted.map(attributeKey));
     const held = new Set(
@@ -1525,15 +1526,20 @@ class ldapActions {
             changes,
             options.declaredClasses
           );
-          if (repair.length === 0) throw error;
-          const repairChange = new Change({
-            operation: 'add',
-            modification: new Attribute({
-              type: 'objectClass',
-              values: repair,
-            }),
-          });
-          ldapChanges.push(repairChange);
+          // `allowed`: a writer gave the entry its classes after the refusal,
+          // so the change is sent again as it is
+          if (repair !== 'allowed' && repair.length === 0) throw error;
+          const repairChange =
+            repair === 'allowed'
+              ? undefined
+              : new Change({
+                  operation: 'add',
+                  modification: new Attribute({
+                    type: 'objectClass',
+                    values: repair,
+                  }),
+                });
+          if (repairChange) ldapChanges.push(repairChange);
           // The repair's read may have cached the entry again
           this.invalidateCache(dn);
           try {
@@ -1542,8 +1548,8 @@ class ldapActions {
             // A writer in between may have given it the class already, and
             // adding it again is refused (20). What the repair wanted is then
             // there.
-            if (extractLdapCode(retry) !== 20) throw retry;
-            ldapChanges.pop();
+            if (!repairChange || extractLdapCode(retry) !== 20) throw retry;
+            ldapChanges.splice(ldapChanges.indexOf(repairChange), 1);
             await send();
           }
         }

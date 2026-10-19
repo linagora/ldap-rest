@@ -899,7 +899,7 @@ describe('Twake instances plugin', function () {
         ]);
       });
 
-      it('still writes the address when the schema cannot be read', async () => {
+      it('writes the address without the schema when the entry’s classes allow it', async () => {
         const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain();
         await foreign(['top', 'inetOrgPerson', 'twakeWhitePages']);
         (dm2.ldap as unknown as Record<string, unknown>).schemaIndex =

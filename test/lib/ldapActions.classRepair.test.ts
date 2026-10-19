@@ -239,6 +239,29 @@ describe('Object class repair on modify', function () {
     expect(await classes(accountDn)).to.include('twakewhitepages');
   });
 
+  it('should write when a writer gave the entry the class after the refusal', async () => {
+    const dm = bare();
+    dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
+    const repair = (dm.ldap as any).classRepair.bind(dm.ldap);
+    (dm.ldap as any).classRepair = async (
+      ...args: unknown[]
+    ): Promise<unknown> => {
+      // That writer lands between the refusal and the repair's read.
+      await server.ldap.modify(accountDn, {
+        add: { objectClass: 'twakeWhitePages' },
+      });
+      return repair(...args);
+    };
+    await dm.ldap.modify(accountDn, {
+      replace: { twakeDepartmentLink: orgDn },
+    });
+    const result = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+      accountDn
+    )) as { searchEntries: Record<string, unknown>[] };
+    expect(result.searchEntries[0].twakeDepartmentLink).to.equal(orgDn);
+  });
+
   it('should answer the refusal, warned once, when the schema cannot be read', async () => {
     const dm = bare();
     dm.ldap.declareObjectClasses(usersBase, ['top', 'twakeWhitePages']);
