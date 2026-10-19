@@ -521,11 +521,14 @@ export default class TwakeInstances extends DmPlugin {
     fqdn: string,
     req?: Request
   ): Promise<void> {
+    // An account another tool created may lack the classes these writes need
+    const options = { declaredClasses: this.config.user_class };
     if (first(this.value(entry, this.fqdnAttribute)) !== fqdn)
       await this.server.ldap.modify(
         dn,
         { replace: { [this.fqdnAttribute]: fqdn } },
-        req
+        req,
+        options
       );
     if (first(this.value(entry, this.sentAttribute))) return;
     // The Cloudery refuses a member's user.created until its organization is
@@ -566,7 +569,8 @@ export default class TwakeInstances extends DmPlugin {
     await this.server.ldap.modify(
       dn,
       { replace: { [this.sentAttribute]: new Date().toISOString() } },
-      req
+      req,
+      options
     );
   }
 

@@ -763,6 +763,160 @@ describe('Twake instances plugin', function () {
       });
     });
 
+    describe('with an address the entry’s classes do not allow', () => {
+      const GINA = {
+        twakeId: 'in-gina',
+        internalEmail: 'in-gina@example.org',
+        workplaceFqdn: 'in-gina.example.org',
+      };
+
+      const classesOf = async (dm: DM): Promise<string[]> =>
+        [(await read(dm, dnOf('in-gina')))?.objectClass]
+          .flat()
+          .map(c => String(c).toLowerCase())
+          .sort();
+
+      // Written without this plugin, as another tool writes it
+      const foreign = async (
+        classes: string[],
+        extra: Record<string, string> = {}
+      ): Promise<void> => {
+        const other = new DM();
+        await other.ready;
+        await other.ldap.add(dnOf('in-gina'), {
+          objectClass: classes,
+          cn: 'in-gina',
+          sn: 'in-gina',
+          uid: 'in-gina',
+          mail: 'in-gina@example.org',
+          ...extra,
+        });
+      };
+
+      const withCozyDomain = (config: Record<string, unknown> = {}) =>
+        server({
+          ...CLOUDERY_CONFIG,
+          twake_instance_fqdn_attribute: 'twakeCozyDomain',
+          ...config,
+        });
+
+      afterEach(async () => {
+        await dm.ldap.delete(dnOf('in-gina')).catch(() => undefined);
+      });
+
+      it('gives an entry another tool created the classes its address needs', async () => {
+        const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain();
+        await foreign(['top', 'inetOrgPerson']);
+        await rabbit2.handler!(GINA);
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        expect(await classesOf(dm2)).to.include('twakewhitepages');
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+
+      it('gives them when making sure of its instance', async () => {
+        const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain();
+        await foreign(['top', 'inetOrgPerson']);
+        search('in-gina.example.org').reply(200, {
+          items: [
+            {
+              fqdn: 'in-gina.example.org',
+              instantiated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+        expect(await plugin(dm2).ensureInstance(dnOf('in-gina'))).to.equal(
+          'ready'
+        );
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        expect(await classesOf(dm2)).to.include('twakewhitepages');
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+
+      it('adds no class to an entry whose classes already allow the address', async () => {
+        const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain();
+        await foreign(['top', 'inetOrgPerson', 'twakeWhitePages']);
+        const before = await classesOf(dm2);
+        await rabbit2.handler!(GINA);
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        expect(await classesOf(dm2)).to.deep.equal(before);
+      });
+
+      it('adds only the classes the address needs', async function () {
+        const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain({
+          user_class: [
+            'top',
+            'twakeAccount',
+            'twakeWhitePages',
+            'posixAccount',
+          ],
+        });
+        const index = await dm2.ldap.schemaIndex();
+        if (index.getObjectClass('posixAccount')?.kind !== 'AUXILIARY')
+          return this.skip();
+        await foreign(['top', 'inetOrgPerson']);
+        await rabbit2.handler!(GINA);
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        const classes = await classesOf(dm2);
+        expect(classes).to.include('twakewhitepages');
+        // Its uidNumber, gidNumber and homeDirectory would refuse the write
+        expect(classes).not.to.include('posixaccount');
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+
+      it('gives the classes the sent mark needs, so the account is announced once', async () => {
+        const { dm: dm2, rabbit: rabbit2 } = await server({
+          ...CLOUDERY_CONFIG,
+          twake_instance_sent_attribute: 'twakeCozyDomain',
+        });
+        await foreign(['top', 'inetOrgPerson'], {
+          description: 'in-gina.example.org',
+        });
+        await rabbit2.handler!(GINA);
+        await rabbit2.handler!(GINA);
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain'
+        );
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+
+      it('still writes the address when the schema cannot be read', async () => {
+        const { dm: dm2, rabbit: rabbit2 } = await withCozyDomain();
+        await foreign(['top', 'inetOrgPerson', 'twakeWhitePages']);
+        (dm2.ldap as unknown as Record<string, unknown>).schemaIndex =
+          async () => {
+            throw new Error('cn=Subschema unreadable');
+          };
+        await rabbit2.handler!(GINA);
+        expect(await read(dm2, dnOf('in-gina'))).to.have.property(
+          'twakeCozyDomain',
+          'in-gina.example.org'
+        );
+        expect(rabbit2.published.map(p => p.key)).to.deep.equal([
+          'user.created',
+        ]);
+      });
+    });
+
     describe('with one offer per DN expression', () => {
       let dm2: DM;
       const orgDn = `ou=acme3,${ORGS}`;

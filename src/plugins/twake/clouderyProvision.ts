@@ -526,7 +526,9 @@ export default class ClouderyProvision extends DmPlugin {
         dn,
         hasPhones: phones.length > 0,
       });
-      await this.server.ldap.modify(dn, { replace });
+      await this.server.ldap.modify(dn, { replace }, undefined, {
+        declaredClasses: this.config.user_class,
+      });
       this.logger.info({
         ...log,
         result: 'written_fqdn',

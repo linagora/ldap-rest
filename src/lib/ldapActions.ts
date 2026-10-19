@@ -147,6 +147,13 @@ export interface ModifyOptions {
    * behalf of a request but not authorized as it.
    */
   context?: ChangeContext;
+  /**
+   * Object classes the entry may be given besides those declared for its
+   * branch, for a writer that knows what kind of entry it writes: an account
+   * another tool created may lack the classes the write needs, see
+   * ldapActions.classRepair.
+   */
+  declaredClasses?: string[];
 }
 
 const PERMISSIVE_MODIFY = '1.2.840.113556.1.4.1413';
@@ -904,8 +911,8 @@ class ldapActions {
   /**
    * The auxiliary classes a modify needs added: for each attribute it writes
    * that the entry's classes do not allow, a class declared for its branch
-   * that allows it, provided the entry holds or receives that class's
-   * mandatory attributes once the change is applied.
+   * or by the writer that allows it, provided the entry holds or receives
+   * that class's mandatory attributes once the change is applied.
    *
    * Only what the write needs is added. Entities sharing a branch declare
    * classes that are not all meant for every entry: `shadowAccount` is not
@@ -917,14 +924,19 @@ class ldapActions {
    *
    * @param dn entry being modified
    * @param changes the modification, after the hooks
+   * @param extra classes the writer declares, see {@link ModifyOptions}
    * @returns names of the classes to add
    */
   private async classRepair(
     dn: string,
-    changes: ModifyRequest
+    changes: ModifyRequest,
+    extra: string[] = []
   ): Promise<string[]> {
     if (this.config.ldap_flat_auto_repair === false) return [];
-    const declared = this.declaredFor(dn);
+    const declared = [...this.declaredFor(dn)];
+    for (const name of extra)
+      if (!declared.some(d => d.toLowerCase() === name.toLowerCase()))
+        declared.push(name);
     if (declared.length === 0) return [];
     const deleted = Array.isArray(changes.delete)
       ? changes.delete
@@ -1481,7 +1493,11 @@ class ldapActions {
       }
     }
     if (ldapChanges.length !== 0) {
-      const repair = await this.classRepair(dn, changes);
+      const repair = await this.classRepair(
+        dn,
+        changes,
+        options.declaredClasses
+      );
       const repairChange =
         repair.length > 0
           ? new Change({
