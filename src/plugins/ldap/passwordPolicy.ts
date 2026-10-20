@@ -476,6 +476,7 @@ export default class PasswordPolicy extends DmPlugin {
   >();
   private discoveredDefault: { dn: string | null; time: number } | null = null;
   private warnedAmbiguousDefault = false;
+  private warnedMissingBase = false;
   private lastDefaultPolicy: PpolicyConfig | undefined;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
 
@@ -725,6 +726,11 @@ export default class PasswordPolicy extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/PasswordPolicyEntry' }
      *   '400':
      *     description: Missing `cn`, unknown attribute or wrongly typed value.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: '`--ppolicy-base` does not exist.'
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
@@ -1364,8 +1370,14 @@ export default class PasswordPolicy extends DmPlugin {
       )) as SearchResult;
       return result.searchEntries as RawEntry[];
     } catch (error) {
-      if (extractLdapCode(error) === 32) return [];
-      throw error;
+      if (extractLdapCode(error) !== 32) throw error;
+      if (!this.warnedMissingBase) {
+        this.warnedMissingBase = true;
+        this.logger.warn(
+          `${this.policyBase()} does not exist: no password policy is found there, check --ppolicy-base`
+        );
+      }
+      return [];
     }
   }
 

@@ -345,7 +345,8 @@ curl -X PATCH "http://localhost:8081/api/v1/password-policies/default" \
 **Creating a policy:** `POST` takes `cn` and the attributes to set. The entry
 is created under `--ppolicy-base` as a `person` holding `pwdPolicy`, as in
 the OpenLDAP administrator's guide, applied to `userPassword`. A policy of
-the same name answers `409`.
+the same name answers `409`. `--ppolicy-base` must exist: otherwise creating
+answers `404` and listing finds nothing, with a warning in the log.
 
 **Deleting a policy** is refused (`409`) while it is the default one or an
 entry's `pwdPolicySubentry` names it. The default one is only known through
