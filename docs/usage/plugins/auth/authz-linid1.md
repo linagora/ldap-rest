@@ -117,6 +117,26 @@ organization schema's `domainLink` role, or
 rule belongs to the base of the authorization plugins, so `authzPerBranch`
 applies it too.
 
+### Global branches
+
+What is stored outside the organization tree is reference data: every
+administrator reads it, and nobody writes it, since nobody administers its
+parent. `--authz-global-branches` names branches held instead by the
+administrators of one organization, `--authz-global-organization`, the top
+organization by default, and of the organizations above it:
+
+```bash
+--authz-global-branches "ou=ppolicies,dc=example,dc=com" \
+--authz-global-organization "ou=Headquarters,ou=organization,dc=example,dc=com"
+```
+
+They read, write and delete there; any other administrator is refused, even
+a search started above the branch leaves its entries out. That is how only
+the administrators of the whole directory manage the
+[password policies](../ldap/password-policy.md#managing-policies). A global
+branch is no branch of theirs in `GET /authz/scope`, so it adds nothing to
+the organizations they are offered.
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:

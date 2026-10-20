@@ -204,6 +204,14 @@ export interface Config {
 
   // auth/authzLinid1
   authz_local_admin_attribute?: string;
+  /**
+   * Branches outside the organization tree, such as the password policies,
+   * that only the administrators of `authz_global_organization` read and
+   * write
+   */
+  authz_global_branch?: string[];
+  /** The organization holding the global branches; the top one by default */
+  authz_global_organization?: string;
 
   // auth/rateLimit
   rate_limit_window_ms?: number;
@@ -1288,6 +1296,15 @@ const configArgs: ConfigTemplate = [
     'DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE',
     'twakeLocalAdminLink',
   ],
+  [
+    '--authz-global-branch',
+    'DM_AUTHZ_GLOBAL_BRANCHES',
+    [],
+    'array',
+    '--authz-global-branches',
+    'dns',
+  ],
+  ['--authz-global-organization', 'DM_AUTHZ_GLOBAL_ORGANIZATION', ''],
 
   // Auth OpenID Connect plugin
   ['--oidc-server', 'DM_OIDC_SERVER', ''],

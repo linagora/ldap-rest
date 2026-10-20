@@ -10,7 +10,7 @@ import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import AuthzBase from '../../lib/authz/base';
-import { escapeLdapFilter } from '../../lib/utils';
+import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
@@ -45,6 +45,10 @@ export default class AuthzLinid1 extends AuthzBase {
     return true;
   }
 
+  protected globalBranches(): string[] {
+    return this.config.authz_global_branch ?? [];
+  }
+
   /**
    * Resolve user - for authzLinid1, convert uid to userDn via LDAP
    */
@@ -75,6 +79,15 @@ export default class AuthzLinid1 extends AuthzBase {
     userDn: string,
     branch: string
   ): Promise<BranchPermissions> {
+    // A global branch is held by whoever holds its organization
+    const owner =
+      this.config.authz_global_organization ||
+      this.config.ldap_top_organization;
+    if (this.globalBranches().some(dn => isDnInBranch(branch, dn)))
+      return owner && !isDnInBranch(owner, branch)
+        ? this.getUserPermissions(userDn, owner)
+        : { read: false, write: false, delete: false };
+
     const now = Date.now();
 
     // Check cache

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `core/auth/authzLinid1`: `--authz-global-branches` keeps branches outside
+  the organization tree, such as the password policies, to the
+  administrators of `--authz-global-organization` (the top organization by
+  default), [docs](docs/usage/plugins/auth/authz-linid1.md#global-branches)
+
 ## v0.21.0 (2026-10-20)
 
 ### Breaking Changes

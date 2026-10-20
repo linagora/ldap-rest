@@ -348,6 +348,13 @@ the OpenLDAP administrator's guide, applied to `userPassword`. A policy of
 the same name answers `409`. `--ppolicy-base` must exist: otherwise creating
 answers `404` and listing finds nothing, with a warning in the log.
 
+**Who manages them:** writes go through the authorization plugins like any
+other. With `authzLinid1`, nobody writes outside the organization tree, and
+every administrator reads there: name `--ppolicy-base` in
+`--authz-global-branches` so that only the administrators of the whole
+directory read and change the policies
+([global branches](../auth/authz-linid1.md#global-branches)).
+
 **Deleting a policy** is refused (`409`) while it is the default one or an
 entry's `pwdPolicySubentry` names it. The default one is only known through
 `--ppolicy-default-dn` when there are several: without it, nothing stops
