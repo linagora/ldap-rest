@@ -75,12 +75,17 @@ Twake Mail expands every group of its `mailingLists.baseDn` as a list: a team
 mailbox kept there would deliver twice, to the shared mailbox and to each
 member. The Twake schema `twake/teamMailboxes.json` keeps them apart, as a
 flat entity of their own under `ou=teammailboxes,{ldap_base}`, outside the
-group base whatever it is:
+group base as long as one is set:
 
 ```bash
 DM_LDAP_FLAT_SCHEMA=…,/app/node_modules/ldap-rest/static/schemas/twake/teamMailboxes.json
+DM_LDAP_GROUP_BASE="ou=lists,ou=groups,dc=example,dc=com"
 DM_JAMES_MAILING_LIST_BRANCHES="ou=lists,ou=groups,dc=example,dc=com"
 ```
+
+`--ldap-group-base` has to be set, to the lists branch: left empty, the group
+base is `--ldap-base`, which holds `ou=teammailboxes`, and the groups routes
+list and edit the team mailboxes with the groups schema.
 
 - Create the branch first: nothing creates it, and a team mailbox added
   under a missing one answers `404`.
