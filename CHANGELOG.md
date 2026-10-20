@@ -1,28 +1,31 @@
 # Changelog
 
-## Unreleased
+## v0.21.0 (2026-10-20)
+
+### Breaking Changes
+
+- `core/ldap/passwordPolicy`: with several policies and no
+  `--ppolicy-default-dn`, none is taken as the default; it was the first one
+  found, [notes](docs/usage/upgrading.md#several-password-policies)
 
 ### Features
 
-- `core/ldap/passwordPolicy`: list, create, edit and delete password
-  policies, and assign one to an account, under the new `--ppolicy-base`
+- `core/ldap/passwordPolicy`: list, create, edit, delete and assign password
+  policies, under the new `--ppolicy-base`
   ([docs](docs/usage/plugins/ldap/password-policy.md#managing-policies))
+- Writes no longer read the entry first to repair its object classes: only a
+  write the directory refuses is repaired, and shows as `err=65` in its logs
+  ([details](docs/usage/plugins/ldap/flat-generic.md#entries-created-by-other-tools))
 
 ### Fixes
 
-- `core/ldap/passwordPolicy`: `GET /users/{id}/password-status` failed with a
-  500 on accounts that are not locked, `POST /users/{id}/unlock` answered 404
-  on them, and a policy without `pwdAllowUserChange` was served as `false`
-- `core/ldap/passwordPolicy`: password status and `expiring-soon` judge each
-  account by the policy its `pwdPolicySubentry` names, not by the default
-  one. With several policies and no `--ppolicy-default-dn`, the default is no
-  longer the first one found,
-  [notes](docs/usage/upgrading.md#several-password-policies)
-
+- `core/ldap/passwordPolicy`: password status and `expiring-soon` use each
+  account's own policy (`pwdPolicySubentry`); status no longer fails with a
+  500 on unlocked accounts, nor unlock with a 404; a policy without
+  `pwdAllowUserChange` reads as `true`
 - `twake/instances`, `twake/clouderyProvision`: an account another tool
-  created, whose classes do not allow the instance address, is given the
-  class of `--user-class` that allows it and gets its address and its
-  `user.created`. Accounts already blocked need a call,
+  created without the class its instance address needs gets it, then its
+  address and `user.created`. Accounts already blocked need a call,
   [notes](docs/usage/upgrading.md#accounts-another-tool-created)
   ([#348](https://github.com/linagora/ldap-rest/issues/348))
 
