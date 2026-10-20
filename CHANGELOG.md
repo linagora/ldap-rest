@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.21.3 (2026-10-20)
 
 ### Fixes
 
@@ -8,6 +8,7 @@
   James quota so that the domain or global one applies; it set a 0 byte
   quota, refusing every mail,
   [docs](docs/usage/plugins/integrations/james-mail.md#quota-changes)
+  ([#360](https://github.com/linagora/ldap-rest/pull/360))
 
 ## v0.21.2 (2026-10-20)
 
