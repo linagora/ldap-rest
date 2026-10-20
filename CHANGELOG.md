@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `twake/james`: removing a user's quota, or setting it to `0`, deletes their
+  James quota so that the domain or global one applies; it set a 0 byte
+  quota, refusing every mail,
+  [docs](docs/usage/plugins/integrations/james-mail.md#quota-changes)
+
 ## v0.21.2 (2026-10-20)
 
 ### Features

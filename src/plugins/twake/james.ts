@@ -553,12 +553,15 @@ export default class James extends TwakePlugin {
       newQuota: number
     ) => {
       if (await this.isGroupDn(dn)) return;
+      // James reads a user quota of 0 as a 0 byte mailbox: without one, the
+      // user falls back on the domain or global quota
+      const set = newQuota > 0;
       return this.callWebAdminApi(
         'onLdapQuotaChange',
         `${this.webadminUrl}/quota/users/${mail}/size`,
-        'PUT',
+        set ? 'PUT' : 'DELETE',
         dn,
-        newQuota.toString(),
+        set ? newQuota.toString() : null,
         { oldQuota, newQuota },
         USER_NOT_SEEN_YET
       );

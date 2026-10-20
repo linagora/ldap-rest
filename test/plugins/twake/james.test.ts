@@ -345,6 +345,39 @@ describe('James Plugin', () => {
       await waitFor(() => quotaScope.isDone());
       expect(quotaScope.isDone()).to.be.true;
     });
+
+    it('should drop the user quota when mailQuotaSize is removed or 0', async () => {
+      const quotaScope = nock(
+        process.env.DM_JAMES_WEBADMIN_URL || 'http://localhost:8000'
+      )
+        .delete('/quota/users/testmail@test.org/size')
+        .reply(204)
+        .put('/quota/users/testmail@test.org/size', '300000000')
+        .reply(204)
+        .delete('/quota/users/testmail@test.org/size')
+        .reply(204);
+      expect(
+        await dm.ldap.add(testDN, {
+          objectClass: ['top', 'twakeAccount'],
+          uid: 'testusermail',
+          mail: 'testmail@test.org',
+          mailQuotaSize: '50000000',
+        })
+      ).to.be.true;
+      expect(await dm.ldap.modify(testDN, { delete: ['mailQuotaSize'] })).to.be
+        .true;
+      await waitFor(() => quotaScope.pendingMocks().length === 2);
+      expect(
+        await dm.ldap.modify(testDN, {
+          replace: { mailQuotaSize: '300000000' },
+        })
+      ).to.be.true;
+      await waitFor(() => quotaScope.pendingMocks().length === 1);
+      expect(await dm.ldap.modify(testDN, { replace: { mailQuotaSize: '0' } }))
+        .to.be.true;
+      await waitFor(() => quotaScope.isDone());
+      expect(quotaScope.isDone()).to.be.true;
+    });
   });
 
   describe('Alias management', () => {
