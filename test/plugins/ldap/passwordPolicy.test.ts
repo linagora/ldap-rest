@@ -481,6 +481,11 @@ describe('PasswordPolicy Plugin: policy management', () => {
 
     res = await request
       .patch(`${api}/software`)
+      .send({ dn: (served.dn as string).toUpperCase(), pwdInHistory: 6 });
+    expect(res.status).to.equal(200);
+
+    res = await request
+      .patch(`${api}/software`)
       .send({ pwdAttribute: 'userCertificate' });
     expect(res.status).to.equal(400);
   });
@@ -543,6 +548,10 @@ describe('PasswordPolicy Plugin: policy management', () => {
       .send({ policy: null });
     expect(res.status).to.equal(200);
     expect(res.body.policy).to.equal(null);
+    const again = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: null });
+    expect(again.status).to.equal(200);
 
     const status = await request.get(
       '/api/v1/users/ppolicy.mgmt/password-status'
@@ -576,6 +585,36 @@ describe('PasswordPolicy Plugin: policy management', () => {
       expect((await plugin.readPolicyConfig()).dn).to.equal(undefined);
     } finally {
       dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
+    }
+  });
+
+  it('answers a missing policy base as holding no policy', async () => {
+    dm.config.ppolicy_base = `ou=absent,${policyBase}`;
+    try {
+      const list = await request.get(api);
+      expect(list.status).to.equal(200);
+      expect(list.body.policies).to.deep.equal([]);
+      expect((await request.get(`${api}/default`)).status).to.equal(404);
+      const created = await request.post(api).send({ cn: 'nowhere' });
+      expect(created.status).to.equal(404);
+      expect(created.body.error).to.include('--ppolicy-base');
+    } finally {
+      dm.config.ppolicy_base = policyBase;
+    }
+  });
+
+  it('does not replace a configured default that holds no policy', async () => {
+    dm.config.ppolicy_default_dn = `cn=absent,${policyBase}`;
+    // A base holding exactly one policy, which discovery would adopt
+    dm.config.ppolicy_base = `cn=default,${policyBase}`;
+    try {
+      const plugin = new PasswordPolicy(dm) as unknown as {
+        readPolicyConfig(): Promise<{ dn?: string }>;
+      };
+      expect((await plugin.readPolicyConfig()).dn).to.equal(undefined);
+    } finally {
+      dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
+      dm.config.ppolicy_base = policyBase;
     }
   });
 });

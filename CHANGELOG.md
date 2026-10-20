@@ -16,7 +16,7 @@
 - `core/ldap/passwordPolicy`: password status and `expiring-soon` judge each
   account by the policy its `pwdPolicySubentry` names, not by the default
   one. With several policies and no `--ppolicy-default-dn`, the default is no
-  longer picked at random,
+  longer the first one found,
   [notes](docs/usage/upgrading.md#several-password-policies)
 
 - `twake/instances`, `twake/clouderyProvision`: an account another tool

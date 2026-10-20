@@ -49,6 +49,10 @@ under `--ppolicy-base`; when there are several, it takes none and logs a
 warning, and accounts without `pwdPolicySubentry` are reported without
 expiry.
 
+The bind user must be able to read `pwdPolicySubentry`: hidden by an ACL, it
+reads as absent and every account is judged by the default policy (see
+[Cannot Read Operational Attributes](#cannot-read-operational-attributes)).
+
 ### Optional Complexity Validation
 
 Enable local password complexity validation (for client-side feedback before submitting to LDAP):
@@ -344,7 +348,11 @@ the OpenLDAP administrator's guide, applied to `userPassword`. A policy of
 the same name answers `409`.
 
 **Deleting a policy** is refused (`409`) while it is the default one or an
-entry's `pwdPolicySubentry` names it.
+entry's `pwdPolicySubentry` names it. The default one is only known through
+`--ppolicy-default-dn` when there are several: without it, nothing stops
+deleting the policy slapd applies by default. Looking for the entries that
+name the policy searches the whole of `--ldap-base`; unless
+`pwdPolicySubentry` is indexed, that is a full scan on each delete.
 
 **Assigning a policy:** `PUT /users/{id}/password-policy` with
 `{"policy": "software"}` sets the account's `pwdPolicySubentry`; with
@@ -468,7 +476,7 @@ pwdLockoutDuration: 900
 **Solution:** Ensure the LDAP bind user has permissions to read operational attributes. These require special ACLs in OpenLDAP:
 
 ```
-access to attrs=pwdChangedTime,pwdAccountLockedTime,pwdFailureTime,pwdGraceUseTime,pwdReset
+access to attrs=pwdChangedTime,pwdAccountLockedTime,pwdFailureTime,pwdGraceUseTime,pwdReset,pwdPolicySubentry
     by dn="cn=admin,dc=example,dc=com" read
     by self read
     by * none
@@ -492,6 +500,9 @@ The plugin automatically exports its configuration via the `configApi` plugin. W
         "unlockUser": "/api/v1/users/:id/unlock",
         "getExpiringSoon": "/api/v1/password-policy/expiring-soon",
         "getLockedAccounts": "/api/v1/password-policy/locked-accounts",
+        "listPolicies": "/api/v1/password-policies",
+        "policy": "/api/v1/password-policies/:cn",
+        "assignPolicy": "/api/v1/users/:id/password-policy",
         "validatePassword": "/api/v1/password/validate"
       },
       "config": {

@@ -29,6 +29,7 @@ import {
   validateDnValue,
 } from '../../lib/utils';
 import { jsonBody } from '../../lib/expressFormatedResponses';
+import { extractLdapCode } from '../../lib/ldapCodes';
 
 // ppolicy operational attributes to read
 const PPOLICY_ATTRS = [
@@ -38,22 +39,6 @@ const PPOLICY_ATTRS = [
   'pwdGraceUseTime',
   'pwdReset',
   'pwdPolicySubentry',
-];
-
-// ppolicy configuration attributes
-const PPOLICY_CONFIG_ATTRS = [
-  'pwdMaxAge',
-  'pwdMinAge',
-  'pwdInHistory',
-  'pwdCheckQuality',
-  'pwdMinLength',
-  'pwdMaxFailure',
-  'pwdLockout',
-  'pwdLockoutDuration',
-  'pwdGraceAuthNLimit',
-  'pwdExpireWarning',
-  'pwdMustChange',
-  'pwdAllowUserChange',
 ];
 
 // Policy attributes the API writes, by value type
@@ -123,10 +108,49 @@ const userEntry = (raw: RawEntry): LdapUserEntry => ({
   pwdReset: first(raw.pwdReset),
   pwdPolicySubentry: first(raw.pwdPolicySubentry),
 });
-const policyEntry = (raw: RawEntry): LdapPolicyEntry => ({
-  dn: raw.dn,
-  ...Object.fromEntries(PPOLICY_CONFIG_ATTRS.map(n => [n, first(raw[n])])),
-});
+
+// The policy attributes an entry holds, typed
+const typedPolicy = (raw: RawEntry): Record<string, unknown> => {
+  const typed: Record<string, unknown> = {};
+  for (const name of ALL_POLICY_ATTRS) {
+    const found = values(raw[name]);
+    if (found.length === 0) continue;
+    switch (POLICY_ATTRIBUTE_TYPES[name]) {
+      case 'integer': {
+        const num = parseInt(found[0], 10);
+        if (!isNaN(num)) typed[name] = num;
+        break;
+      }
+      case 'boolean':
+        typed[name] = found[0] === 'TRUE';
+        break;
+      default:
+        typed[name] = found.length === 1 ? found[0] : found;
+    }
+  }
+  return typed;
+};
+
+// The shape GET /password-policy serves, absent booleans read as ppolicy's
+// defaults
+const policyConfig = (raw: RawEntry, dn: string): PpolicyConfig => {
+  const typed = typedPolicy(raw);
+  return {
+    dn,
+    pwdMaxAge: typed.pwdMaxAge as number | undefined,
+    pwdMinAge: typed.pwdMinAge as number | undefined,
+    pwdInHistory: typed.pwdInHistory as number | undefined,
+    pwdCheckQuality: typed.pwdCheckQuality as number | undefined,
+    pwdMinLength: typed.pwdMinLength as number | undefined,
+    pwdMaxFailure: typed.pwdMaxFailure as number | undefined,
+    pwdLockout: typed.pwdLockout === true,
+    pwdLockoutDuration: typed.pwdLockoutDuration as number | undefined,
+    pwdGraceAuthNLimit: typed.pwdGraceAuthNLimit as number | undefined,
+    pwdExpireWarning: typed.pwdExpireWarning as number | undefined,
+    pwdMustChange: typed.pwdMustChange === true,
+    pwdAllowUserChange: typed.pwdAllowUserChange !== false,
+  };
+};
 
 // Special characters for password complexity validation
 const SPECIAL_CHARS_REGEX = /[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/]/;
@@ -207,23 +231,6 @@ interface LdapUserEntry {
   pwdGraceUseTime?: string[];
   pwdReset?: string;
   pwdPolicySubentry?: string;
-}
-
-// LDAP ppolicy configuration entry
-interface LdapPolicyEntry {
-  dn: string;
-  pwdMaxAge?: string;
-  pwdMinAge?: string;
-  pwdInHistory?: string;
-  pwdCheckQuality?: string;
-  pwdMinLength?: string;
-  pwdMaxFailure?: string;
-  pwdLockout?: string;
-  pwdLockoutDuration?: string;
-  pwdGraceAuthNLimit?: string;
-  pwdExpireWarning?: string;
-  pwdMustChange?: string;
-  pwdAllowUserChange?: string;
 }
 
 /**
@@ -398,8 +405,8 @@ interface LdapPolicyEntry {
  *   type: object
  *   description: |
  *     Attributes to set, by name as in `PasswordPolicyEntry`. `null` removes
- *     the attribute. `dn`, `cn`, `isDefault` and the read-only attributes
- *     are accepted only with the value the entry already has.
+ *     the attribute. On `PATCH`, `dn`, `cn`, `isDefault` and the read-only
+ *     attributes are accepted only with the value the entry already has.
  *   additionalProperties: true
  *   example: { pwdMaxAge: 31536000, pwdLockout: true, pwdExpireWarning: null }
  * ExpiringAccount:
@@ -536,6 +543,7 @@ export default class PasswordPolicy extends DmPlugin {
      *           lockedAt: null
      *           failureCount: 0
      *           graceLoginsUsed: 0
+     *           policy: cn=default,ou=policies,dc=example,dc=com
      *   '404':
      *     description: User not found.
      *     content:
@@ -546,9 +554,7 @@ export default class PasswordPolicy extends DmPlugin {
     app.get(
       `${prefix}/users/:id/password-status`,
       asyncHandler(async (req: Request, res: Response) => {
-        const userId = Array.isArray(req.params.id)
-          ? req.params.id[0]
-          : req.params.id;
+        const userId = this.param(req, 'id');
         const status = await this.getPasswordStatus(userId, req);
         res.json(status);
       })
@@ -577,9 +583,7 @@ export default class PasswordPolicy extends DmPlugin {
     app.post(
       `${prefix}/users/:id/unlock`,
       asyncHandler(async (req: Request, res: Response) => {
-        const userId = Array.isArray(req.params.id)
-          ? req.params.id[0]
-          : req.params.id;
+        const userId = this.param(req, 'id');
         await this.unlockAccount(userId, req);
         res.json({ success: true, message: 'Account unlocked' });
       })
@@ -937,7 +941,7 @@ export default class PasswordPolicy extends DmPlugin {
   /**
    * Get password status for a user
    *
-   * Every lookup of this plugin carries the request, so an authorization
+   * Every account lookup and write carries the request, so an authorization
    * plugin answers for the caller: without it, a route read as an internal
    * call, and a delegated administrator could read or unlock any account of
    * the directory (#325).
@@ -1239,12 +1243,10 @@ export default class PasswordPolicy extends DmPlugin {
    * under the policy base
    */
   private async readPolicyConfig(): Promise<PpolicyConfig> {
-    const configured = this.config.ppolicy_default_dn as string;
-    let policy = configured ? await this.readPolicyAt(configured) : null;
-    if (!policy) {
-      const discovered = await this.discoverDefaultDn();
-      if (discovered) policy = await this.readPolicyAt(discovered);
-    }
+    const dn =
+      (this.config.ppolicy_default_dn as string) ||
+      (await this.discoverDefaultDn());
+    const policy = dn ? await this.readPolicyAt(dn) : null;
     this.lastDefaultPolicy = policy ?? {};
     return this.lastDefaultPolicy;
   }
@@ -1299,25 +1301,32 @@ export default class PasswordPolicy extends DmPlugin {
       return cached.policy;
     }
     let policy: PpolicyConfig | null = null;
+    let failure: string | undefined;
     try {
       const result = (await this.server.ldap.search(
         {
           filter: '(objectClass=pwdPolicy)',
           scope: 'base',
-          attributes: PPOLICY_CONFIG_ATTRS,
+          attributes: ALL_POLICY_ATTRS,
           paged: false,
         },
         dn
       )) as SearchResult;
       if (result.searchEntries.length > 0) {
-        policy = this.parsePolicyEntry(
-          policyEntry(result.searchEntries[0] as RawEntry),
-          dn
-        );
+        policy = policyConfig(result.searchEntries[0] as RawEntry, dn);
       }
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      this.logger.warn(`Failed to read ppolicy from ${dn}: ${error}`);
+      failure = String(error);
+    }
+    // A dangling pwdPolicySubentry is the account's business; a default
+    // policy that cannot be read is a configuration error
+    const configured = this.config.ppolicy_default_dn as string;
+    if (!policy && configured && normalizeDn(configured) === key) {
+      this.logger.warn(
+        `--ppolicy-default-dn ${dn} holds no password policy${failure ? `: ${failure}` : ''}`
+      );
+    } else if (failure) {
+      this.logger.debug(`Failed to read ppolicy from ${dn}: ${failure}`);
     }
     this.policyCache.set(key, { policy, time: Date.now() });
     return policy;
@@ -1335,42 +1344,52 @@ export default class PasswordPolicy extends DmPlugin {
   }
 
   /**
+   * The policy entries under the policy base matching `filter`, none when
+   * the base itself is missing
+   */
+  private async searchPolicies(
+    filter: string,
+    req?: Request
+  ): Promise<RawEntry[]> {
+    try {
+      const result = (await this.server.ldap.search(
+        {
+          filter: `(&(objectClass=pwdPolicy)${filter})`,
+          scope: 'sub',
+          attributes: ['objectClass', 'cn', ...ALL_POLICY_ATTRS],
+          paged: false,
+        },
+        this.policyBase(),
+        req
+      )) as SearchResult;
+      return result.searchEntries as RawEntry[];
+    } catch (error) {
+      if (extractLdapCode(error) === 32) return [];
+      throw error;
+    }
+  }
+
+  /**
    * The policy named `cn` under the policy base
    */
   private async findPolicy(cn: string, req?: Request): Promise<RawEntry> {
-    const result = (await this.server.ldap.search(
-      {
-        filter: `(&(objectClass=pwdPolicy)(cn=${escapeLdapFilter(cn)}))`,
-        scope: 'sub',
-        attributes: ['objectClass', 'cn', ...ALL_POLICY_ATTRS],
-        paged: false,
-      },
-      this.policyBase(),
+    const found = await this.searchPolicies(
+      `(cn=${escapeLdapFilter(cn)})`,
       req
-    )) as SearchResult;
-    if (result.searchEntries.length === 0) {
+    );
+    if (found.length === 0) {
       throw new NotFoundError(`No password policy named ${cn}`);
     }
-    if (result.searchEntries.length > 1) {
+    if (found.length > 1) {
       throw new ConflictError(`Several password policies are named ${cn}`);
     }
-    return result.searchEntries[0] as RawEntry;
+    return found[0];
   }
 
   private async listPolicies(req?: Request): Promise<PolicyRecord[]> {
-    const result = (await this.server.ldap.search(
-      {
-        filter: '(objectClass=pwdPolicy)',
-        scope: 'sub',
-        attributes: ['objectClass', 'cn', ...ALL_POLICY_ATTRS],
-        paged: false,
-      },
-      this.policyBase(),
-      req
-    )) as SearchResult;
     const policies: PolicyRecord[] = [];
-    for (const entry of result.searchEntries) {
-      policies.push(await this.toPolicyRecord(entry as RawEntry));
+    for (const entry of await this.searchPolicies('', req)) {
+      policies.push(await this.toPolicyRecord(entry));
     }
     return policies.sort((a, b) => a.cn.localeCompare(b.cn));
   }
@@ -1383,21 +1402,7 @@ export default class PasswordPolicy extends DmPlugin {
       isDefault:
         !!defaultDn && normalizeDn(defaultDn) === normalizeDn(entry.dn),
     };
-    for (const name of ALL_POLICY_ATTRS) {
-      const found = values(entry[name]);
-      if (found.length === 0) continue;
-      switch (POLICY_ATTRIBUTE_TYPES[name]) {
-        case 'integer':
-          record[name] = this.parseNumber(found[0]);
-          break;
-        case 'boolean':
-          record[name] = found[0] === 'TRUE';
-          break;
-        default:
-          record[name] = found.length === 1 ? found[0] : found;
-      }
-    }
-    return record;
+    return { ...record, ...typedPolicy(entry) };
   }
 
   /**
@@ -1472,11 +1477,18 @@ export default class PasswordPolicy extends DmPlugin {
       objectClass.push('pwdPolicyChecker');
     }
 
-    await this.server.ldap.add(
-      `cn=${escapeDnValue(cn)},${this.policyBase()}`,
-      entry,
-      req
-    );
+    try {
+      await this.server.ldap.add(
+        `cn=${escapeDnValue(cn)},${this.policyBase()}`,
+        entry,
+        req
+      );
+    } catch (error) {
+      if (extractLdapCode(error) !== 32) throw error;
+      throw new NotFoundError(
+        `${this.policyBase()} does not exist: create it or change --ppolicy-base`
+      );
+    }
     this.forgetPolicies();
     return this.toPolicyRecord(await this.findPolicy(cn, req));
   }
@@ -1494,12 +1506,13 @@ export default class PasswordPolicy extends DmPlugin {
       if (!isWritablePolicyAttribute(name)) {
         // A client sending back what it was served repeats what it cannot
         // change
-        if (
-          Object.prototype.hasOwnProperty.call(current, name) &&
-          isDeepStrictEqual(current[name], value)
-        ) {
-          continue;
-        }
+        const same =
+          name === 'dn'
+            ? typeof value === 'string' &&
+              normalizeDn(value) === normalizeDn(current.dn)
+            : Object.prototype.hasOwnProperty.call(current, name) &&
+              isDeepStrictEqual(current[name], value);
+        if (same) continue;
         throw new BadRequestError(`${name} cannot be written`);
       }
       if (value !== null) replace[name] = this.policyValue(name, value);
@@ -1556,14 +1569,17 @@ export default class PasswordPolicy extends DmPlugin {
     req?: Request
   ): Promise<{ dn: string; policy: string | null }> {
     const dn = this.resolveUserDn(userId);
-    const user = await this.readUser(dn, userId, ['pwdPolicySubentry'], req);
     if (policy === null) {
-      if (user.pwdPolicySubentry) {
+      // Deleted without reading first: an ACL hiding pwdPolicySubentry
+      // would show it absent while the entry still holds it
+      try {
         await this.server.ldap.modify(
           dn,
           { delete: ['pwdPolicySubentry'] },
           req
         );
+      } catch (error) {
+        if (extractLdapCode(error) !== 16) throw error;
       }
       return { dn, policy: null };
     }
@@ -1579,38 +1595,6 @@ export default class PasswordPolicy extends DmPlugin {
   private param(req: Request, name: string): string {
     const value = req.params[name];
     return Array.isArray(value) ? value[0] : value;
-  }
-
-  /**
-   * Parse ppolicy entry to config object
-   */
-  private parsePolicyEntry(entry: LdapPolicyEntry, dn: string): PpolicyConfig {
-    return {
-      dn,
-      pwdMaxAge: this.parseNumber(entry.pwdMaxAge),
-      pwdMinAge: this.parseNumber(entry.pwdMinAge),
-      pwdInHistory: this.parseNumber(entry.pwdInHistory),
-      pwdCheckQuality: this.parseNumber(entry.pwdCheckQuality),
-      pwdMinLength: this.parseNumber(entry.pwdMinLength),
-      pwdMaxFailure: this.parseNumber(entry.pwdMaxFailure),
-      pwdLockout: entry.pwdLockout === 'TRUE',
-      pwdLockoutDuration: this.parseNumber(entry.pwdLockoutDuration),
-      pwdGraceAuthNLimit: this.parseNumber(entry.pwdGraceAuthNLimit),
-      pwdExpireWarning: this.parseNumber(entry.pwdExpireWarning),
-      pwdMustChange: entry.pwdMustChange === 'TRUE',
-      pwdAllowUserChange:
-        entry.pwdAllowUserChange === undefined ||
-        entry.pwdAllowUserChange === 'TRUE',
-    };
-  }
-
-  /**
-   * Parse number from LDAP attribute value
-   */
-  private parseNumber(value: string | undefined): number | undefined {
-    if (value === undefined) return undefined;
-    const num = parseInt(value, 10);
-    return isNaN(num) ? undefined : num;
   }
 
   /**
