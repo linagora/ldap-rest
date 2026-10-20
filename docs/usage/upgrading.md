@@ -16,6 +16,17 @@ Those accounts have an instance but neither its address nor the mark: the
 directory refused the write. Once deployed,
 [make sure of each pending account](plugins/integrations/instances.md#making-sure-an-account-has-its-instance): the call gives it the class it needs.
 
+### Several password policies
+
+**Who is affected:** a deployment that loads `core/ldap/passwordPolicy`
+without `--ppolicy-default-dn`, whose directory holds several `pwdPolicy`
+entries.
+
+`GET /password-policy` answers `{}` and accounts without
+`pwdPolicySubentry` are reported without expiry, until
+`--ppolicy-default-dn` names the policy slapd's `olcPPolicyDefault` names. A
+warning in the log says so.
+
 ## To 0.20.3
 
 ### Members whose uid the Cloudery refused as a slug

@@ -260,6 +260,22 @@ at `0` otherwise.
 | `--trash-add-metadata`  | `DM_TRASH_ADD_METADATA`  | `true`  | Add deletion metadata       |
 | `--trash-auto-create`   | `DM_TRASH_AUTO_CREATE`   | `true`  | Auto-create trash container |
 
+#### `core/ldap/passwordPolicy`
+
+Policy management, password status and lockouts, see [password policy](plugins/ldap/password-policy.md).
+
+| CLI                             | Env                              | Default       | Description                                                                                 |
+| ------------------------------- | -------------------------------- | ------------- | ------------------------------------------------------------------------------------------- |
+| `--ppolicy-default-dn`          | `DM_PPOLICY_DEFAULT_DN`          |               | Default policy, [needed with several](plugins/ldap/password-policy.md#which-policy-applies) |
+| `--ppolicy-base`                | `DM_PPOLICY_BASE`                | `--ldap-base` | Where policies are looked for and created                                                   |
+| `--ppolicy-warn-days`           | `DM_PPOLICY_WARN_DAYS`           | `14`          | Days before expiration to flag as "expiring soon"                                           |
+| `--ppolicy-validate-complexity` | `DM_PPOLICY_VALIDATE_COMPLEXITY` | `false`       | Enable `POST /password/validate`                                                            |
+| `--ppolicy-min-length`          | `DM_PPOLICY_MIN_LENGTH`          | `12`          | Minimum length checked by `/password/validate`                                              |
+| `--ppolicy-require-uppercase`   | `DM_PPOLICY_REQUIRE_UPPERCASE`   | `true`        | Require an uppercase letter                                                                 |
+| `--ppolicy-require-lowercase`   | `DM_PPOLICY_REQUIRE_LOWERCASE`   | `true`        | Require a lowercase letter                                                                  |
+| `--ppolicy-require-digit`       | `DM_PPOLICY_REQUIRE_DIGIT`       | `true`        | Require a digit                                                                             |
+| `--ppolicy-require-special`     | `DM_PPOLICY_REQUIRE_SPECIAL`     | `true`        | Require a special character                                                                 |
+
 #### `core/ldap/onChange`
 
 Monitors LDAP modifications and triggers hooks for attribute changes. No configuration options - uses [Special Attributes](#special-attributes) settings.

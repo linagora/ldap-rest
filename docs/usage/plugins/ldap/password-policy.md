@@ -1,6 +1,6 @@
 # Password Policy Plugin
 
-The `passwordPolicy` plugin provides a REST API for managing OpenLDAP password policies (ppolicy overlay). It allows administrators to monitor password expiration, manage locked accounts, and optionally validate password complexity.
+The `passwordPolicy` plugin provides a REST API for managing OpenLDAP password policies (ppolicy overlay). It allows administrators to edit the policies, monitor password expiration, manage locked accounts, and optionally validate password complexity.
 
 ## Overview
 
@@ -10,6 +10,7 @@ This plugin acts as an administration interface for OpenLDAP's ppolicy overlay. 
 - Account unlock functionality
 - List users with expiring passwords
 - List locked accounts
+- [Policy management](#managing-policies): list, create, edit, delete, and assign to accounts
 - Optional local password complexity validation
 
 **Note:** ldap-rest is an administration backend. Users authenticate directly against OpenLDAP, not through ldap-rest. This plugin exposes ppolicy attributes via REST API for administrative purposes.
@@ -34,8 +35,19 @@ This plugin acts as an administration interface for OpenLDAP's ppolicy overlay. 
 | Argument               | Environment Variable    | Default       | Description                                       |
 | ---------------------- | ----------------------- | ------------- | ------------------------------------------------- |
 | `--ppolicy-default-dn` | `DM_PPOLICY_DEFAULT_DN` | (auto-detect) | DN of the default password policy entry           |
+| `--ppolicy-base`       | `DM_PPOLICY_BASE`       | `{ldap_base}` | Where policies are looked for and created         |
 | `--ppolicy-warn-days`  | `DM_PPOLICY_WARN_DAYS`  | `14`          | Days before expiration to flag as "expiring soon" |
 | `--ldap-users-base`    | `DM_LDAP_USERS_BASE`    | `{ldap_base}` | Base DN for user searches                         |
+
+### Which policy applies
+
+An account is judged by the policy its `pwdPolicySubentry` names, else by the
+default one, as slapd does. The default policy is set in slapd's
+configuration (`olcPPolicyDefault`), which this server cannot read: give it
+with `--ppolicy-default-dn`. Without it, the plugin takes the only policy
+under `--ppolicy-base`; when there are several, it takes none and logs a
+warning, and accounts without `pwdPolicySubentry` are reported without
+expiry.
 
 ### Optional Complexity Validation
 
@@ -124,7 +136,8 @@ curl "http://localhost:8081/api/v1/users/uid%3Djohn.doe%2Cou%3Dusers%2Cdc%3Dexam
   "isLocked": false,
   "lockedAt": null,
   "failureCount": 0,
-  "graceLoginsUsed": 0
+  "graceLoginsUsed": 0,
+  "policy": "cn=default,ou=policies,dc=example,dc=com"
 }
 ```
 
@@ -279,6 +292,64 @@ POST /api/v1/password/validate
 }
 ```
 
+## Managing policies
+
+```http
+GET    /api/v1/password-policies             # List
+POST   /api/v1/password-policies             # Create
+GET    /api/v1/password-policies/{cn}        # Read
+PATCH  /api/v1/password-policies/{cn}        # Change
+DELETE /api/v1/password-policies/{cn}        # Delete
+PUT    /api/v1/users/{id}/password-policy    # Assign to an account
+```
+
+Policies are found by `cn` under `--ppolicy-base`. A policy is served with
+the attributes it holds, typed: durations and counts as integers, `TRUE` /
+`FALSE` as booleans, and `isDefault` marking the default one:
+
+```json
+{
+  "dn": "cn=software,ou=policies,dc=example,dc=com",
+  "cn": "software",
+  "isDefault": false,
+  "pwdAttribute": "userPassword",
+  "pwdMaxFailure": 10,
+  "pwdLockout": true,
+  "pwdMustChange": false
+}
+```
+
+**Changing a policy:** `PATCH` sets the attributes it names; `null` removes
+one. Sending back what `GET` served is accepted as long as `dn`, `cn`,
+`isDefault` and the read-only attributes keep their value.
+
+```bash
+curl -X PATCH "http://localhost:8081/api/v1/password-policies/default" \
+  -H 'Content-Type: application/json' \
+  -d '{"pwdMaxAge": 31536000, "pwdExpireWarning": null}'
+```
+
+- `pwdAttribute` and `pwdCheckModule` are read-only. Before OpenLDAP 2.6,
+  `pwdCheckModule` is the path of a library slapd loads; set it in slapd.
+- `pwdCheckModuleArg`, the configuration of the quality-check module (ppm,
+  for instance), is a string, usually of several lines. Writing it, or
+  `pwdUseCheckModule`, gives the entry the `pwdPolicyChecker` class. Both
+  need OpenLDAP 2.6; an older directory refuses them with a `400`.
+- An attribute the directory's schema does not know is refused with a `400`
+  naming it.
+
+**Creating a policy:** `POST` takes `cn` and the attributes to set. The entry
+is created under `--ppolicy-base` as a `person` holding `pwdPolicy`, as in
+the OpenLDAP administrator's guide, applied to `userPassword`. A policy of
+the same name answers `409`.
+
+**Deleting a policy** is refused (`409`) while it is the default one or an
+entry's `pwdPolicySubentry` names it.
+
+**Assigning a policy:** `PUT /users/{id}/password-policy` with
+`{"policy": "software"}` sets the account's `pwdPolicySubentry`; with
+`{"policy": null}` the account gets the default policy again.
+
 ## OpenLDAP ppolicy Attributes
 
 The plugin reads these operational attributes from user entries:
@@ -364,7 +435,8 @@ async function validatePassword(password) {
 
 **Problem:** `GET /password-policy` returns `{}`
 
-**Solution:** The ppolicy overlay may not be configured in OpenLDAP, or the ppolicy entry doesn't exist. Configure the overlay and create a pwdPolicy entry:
+**Solution:** With several policies, set `--ppolicy-default-dn` (see
+[Which policy applies](#which-policy-applies)). Otherwise the ppolicy overlay may not be configured in OpenLDAP, or the ppolicy entry doesn't exist. Configure the overlay and create a pwdPolicy entry, through [`POST /password-policies`](#managing-policies) or:
 
 ```ldif
 dn: cn=default,ou=policies,dc=example,dc=com

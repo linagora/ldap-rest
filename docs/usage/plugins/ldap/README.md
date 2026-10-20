@@ -15,7 +15,7 @@ Plugins for LDAP entity management.
 | [on-change](on-change.md)                 | All                      | Change detection                        |
 | [enterprise-rules](enterprise-rules.md)   | All (business rules)     | Uniqueness, Mail domains, Delete guards |
 | [account-lifecycle](account-lifecycle.md) | Accounts                 | Enable/disable, Password reset          |
-| [password-policy](password-policy.md)     | Password management      | Expiration, Lockout, Unlock             |
+| [password-policy](password-policy.md)     | Password management      | Policies, Expiration, Lockout, Unlock   |
 | [raw](raw.md)                             | Whole directory (read)   | Root DSE, Schema, Tree, Raw search      |
 
 ## API Endpoints
@@ -63,6 +63,12 @@ GET    /api/v1/users/{id}/password-status       # Get user password status
 POST   /api/v1/users/{id}/unlock                # Unlock locked account
 GET    /api/v1/password-policy/expiring-soon    # List expiring passwords
 GET    /api/v1/password-policy/locked-accounts  # List locked accounts
+GET    /api/v1/password-policies                # List policies
+POST   /api/v1/password-policies                # Create a policy
+GET    /api/v1/password-policies/{cn}           # Read a policy
+PATCH  /api/v1/password-policies/{cn}           # Change a policy
+DELETE /api/v1/password-policies/{cn}           # Delete a policy
+PUT    /api/v1/users/{id}/password-policy       # Assign a policy
 POST   /api/v1/password/validate                # Validate complexity (optional)
 ```
 
