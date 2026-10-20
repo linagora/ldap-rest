@@ -1,12 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.21.2 (2026-10-20)
 
 ### Features
 
 - Twake schema `twake/teamMailboxes.json`: team mailboxes as an entity of
   their own, in `ou=teammailboxes`, which Twake Mail does not expand as lists,
   [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes-in-a-branch-of-their-own)
+  ([#358](https://github.com/linagora/ldap-rest/pull/358))
 
 ### Fixes
 
