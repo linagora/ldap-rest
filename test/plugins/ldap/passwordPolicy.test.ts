@@ -315,3 +315,306 @@ describe('PasswordPolicy Plugin', () => {
     });
   });
 });
+
+describe('PasswordPolicy Plugin: policy management', () => {
+  let dm: DM;
+  let request: ReturnType<typeof supertest>;
+  let policyBase: string;
+  let userDn: string;
+  const api = '/api/v1/password-policies';
+
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
+  before(async () => {
+    const base = process.env.DM_LDAP_BASE as string;
+    policyBase = `ou=ppolicyMgmt,${base}`;
+    userDn = `uid=ppolicy.mgmt,ou=users,${base}`;
+    dm = new DM();
+    await dm.ready;
+    await dm.ldap.delete(userDn).catch(() => undefined);
+    await dm.ldap.add(policyBase, {
+      objectClass: ['top', 'organizationalUnit'],
+      ou: 'ppolicyMgmt',
+    });
+    await dm.ldap.add(`cn=default,${policyBase}`, {
+      objectClass: ['top', 'person', 'pwdPolicy'],
+      cn: 'default',
+      sn: 'default',
+      pwdAttribute: 'userPassword',
+      pwdMaxAge: '31536000',
+    });
+    dm.config.ppolicy_base = policyBase;
+    dm.config.ldap_users_base = `ou=users,${base}`;
+    dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
+    await dm.registerPlugin('passwordPolicy', new PasswordPolicy(dm));
+    dm.setupErrorMiddleware();
+    request = supertest(dm.app);
+  });
+
+  after(async () => {
+    if (!dm) return;
+    await dm.ldap.delete(userDn).catch(() => undefined);
+    for (const cn of ['default', 'aged', 'software', 'checked'])
+      await dm.ldap.delete(`cn=${cn},${policyBase}`).catch(() => undefined);
+    await dm.ldap.delete(policyBase).catch(() => undefined);
+    await dm.stop();
+  });
+
+  it('creates a policy with typed values', async () => {
+    const res = await request
+      .post(api)
+      .send({ cn: 'aged', pwdMaxAge: 864000, pwdLockout: true });
+    expect(res.status).to.equal(201);
+    expect(res.body).to.deep.include({
+      dn: `cn=aged,${policyBase}`,
+      cn: 'aged',
+      isDefault: false,
+      pwdAttribute: 'userPassword',
+      pwdMaxAge: 864000,
+      pwdLockout: true,
+    });
+    const created = await request.post(api).send({ cn: 'software' });
+    expect(created.status).to.equal(201);
+  });
+
+  it('refuses a second policy of the same name', async () => {
+    const res = await request.post(api).send({ cn: 'aged' });
+    expect(res.status).to.equal(409);
+  });
+
+  it('refuses unknown, read-only and wrongly typed attributes', async () => {
+    for (const body of [
+      { cn: 'bad', description: 'x' },
+      { cn: 'bad', pwdCheckModule: '/tmp/evil.so' },
+      { cn: 'bad', pwdMaxAge: '10' },
+      { cn: 'bad', pwdMaxAge: -1 },
+      { cn: 'bad', pwdLockout: 'TRUE' },
+      { cn: 'bad', pwdCheckQuality: 3 },
+      { pwdMaxAge: 10 },
+    ]) {
+      const res = await request.post(api).send(body);
+      expect(res.status, JSON.stringify(body)).to.equal(400);
+    }
+    expect((await request.get(`${api}/bad`)).status).to.equal(404);
+  });
+
+  it('lists the policies, marking the default one', async () => {
+    const res = await request.get(api);
+    expect(res.status).to.equal(200);
+    const names = (res.body.policies as { cn: string }[]).map(p => p.cn);
+    expect(names).to.deep.equal(['aged', 'default', 'software']);
+    const flags = (res.body.policies as { isDefault: boolean }[]).map(
+      p => p.isDefault
+    );
+    expect(flags).to.deep.equal([false, true, false]);
+  });
+
+  it('reads an attribute the default policy lacks as absent', async () => {
+    const res = await request.get('/api/v1/password-policy');
+    expect(res.status).to.equal(200);
+    expect(res.body).to.include({
+      pwdMaxAge: 31536000,
+      pwdAllowUserChange: true,
+    });
+  });
+
+  it('gives the checker class to a policy given a module argument', async () => {
+    // pwdCheckModuleArg appeared in OpenLDAP 2.6
+    const schema = (await dm.ldap.search(
+      { scope: 'base', attributes: ['attributeTypes'], paged: false },
+      'cn=subschema'
+    )) as unknown as { searchEntries: { attributeTypes?: string[] }[] };
+    const known = (schema.searchEntries[0].attributeTypes || []).some(type =>
+      type.includes("NAME 'pwdCheckModuleArg'")
+    );
+    const arg = 'minQuality 3\nclass-digit 0123456789 0 1 0\n';
+    const res = await request
+      .patch(`${api}/aged`)
+      .send({ pwdCheckModuleArg: arg });
+    if (!known) {
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.include('pwdCheckModuleArg');
+      return;
+    }
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(res.body.pwdCheckModuleArg).to.equal(arg);
+    const entry = (await dm.ldap.search(
+      { scope: 'base', attributes: ['objectClass'], paged: false },
+      `cn=aged,${policyBase}`
+    )) as unknown as { searchEntries: { objectClass: string[] }[] };
+    expect(entry.searchEntries[0].objectClass).to.include('pwdPolicyChecker');
+  });
+
+  it('takes a policy name as a value, not as a filter', async () => {
+    const res = await request.get(`${api}/*`);
+    expect(res.status).to.equal(404);
+  });
+
+  it('sets and removes attributes', async () => {
+    let res = await request
+      .patch(`${api}/software`)
+      .send({ pwdMinLength: 12, pwdMustChange: false });
+    expect(res.status).to.equal(200);
+    expect(res.body).to.deep.include({
+      pwdMinLength: 12,
+      pwdMustChange: false,
+    });
+
+    res = await request.patch(`${api}/software`).send({ pwdMinLength: null });
+    expect(res.status).to.equal(200);
+    expect(res.body).not.to.have.property('pwdMinLength');
+    expect(res.body).to.have.property('pwdMustChange', false);
+  });
+
+  it('accepts back what it served, but no change to a read-only value', async () => {
+    const served = (await request.get(`${api}/software`)).body as Record<
+      string,
+      unknown
+    >;
+    let res = await request
+      .patch(`${api}/software`)
+      .send({ ...served, pwdInHistory: 5 });
+    expect(res.status).to.equal(200);
+    expect(res.body).to.have.property('pwdInHistory', 5);
+
+    res = await request
+      .patch(`${api}/software`)
+      .send({ dn: (served.dn as string).toUpperCase(), pwdInHistory: 6 });
+    expect(res.status).to.equal(200);
+
+    res = await request
+      .patch(`${api}/software`)
+      .send({ pwdAttribute: 'userCertificate' });
+    expect(res.status).to.equal(400);
+  });
+
+  it('applies to each account the policy it names', async () => {
+    await dm.ldap.add(userDn, {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'ppolicy.mgmt',
+      cn: 'Ppolicy Mgmt',
+      sn: 'Mgmt',
+      userPassword: 'Initial-Passw0rd',
+      pwdPolicySubentry: `cn=aged,${policyBase}`,
+    });
+
+    let status = await request.get(
+      '/api/v1/users/ppolicy.mgmt/password-status'
+    );
+    expect(status.status).to.equal(200);
+    expect(status.body.policy).to.equal(`cn=aged,${policyBase}`);
+    expect(status.body.daysUntilExpiration).to.equal(10);
+    expect(status.body.isLocked).to.equal(false);
+    expect(status.body.lockedAt).to.equal(null);
+    expect(
+      (await request.post('/api/v1/users/ppolicy.mgmt/unlock')).status
+    ).to.equal(200);
+
+    let expiring = await request.get(
+      '/api/v1/password-policy/expiring-soon?days=14'
+    );
+    expect(
+      (expiring.body.users as { dn: string }[]).map(u => u.dn.toLowerCase())
+    ).to.include(userDn.toLowerCase());
+
+    const res = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: 'software' });
+    expect(res.status).to.equal(200);
+    expect(res.body.policy).to.equal(`cn=software,${policyBase}`);
+
+    status = await request.get('/api/v1/users/ppolicy.mgmt/password-status');
+    expect(status.body.policy).to.equal(`cn=software,${policyBase}`);
+    expect(status.body.expiresAt).to.equal(null);
+
+    expiring = await request.get(
+      '/api/v1/password-policy/expiring-soon?days=14'
+    );
+    expect(
+      (expiring.body.users as { dn: string }[]).map(u => u.dn.toLowerCase())
+    ).not.to.include(userDn.toLowerCase());
+  });
+
+  it('refuses to delete a policy still applied, or the default one', async () => {
+    expect((await request.delete(`${api}/software`)).status).to.equal(409);
+    expect((await request.delete(`${api}/default`)).status).to.equal(409);
+  });
+
+  it('gives an account back the default policy', async () => {
+    const res = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: null });
+    expect(res.status).to.equal(200);
+    expect(res.body.policy).to.equal(null);
+    const again = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: null });
+    expect(again.status).to.equal(200);
+
+    const status = await request.get(
+      '/api/v1/users/ppolicy.mgmt/password-status'
+    );
+    expect(status.body.policy).to.equal(`cn=default,${policyBase}`);
+    expect(status.body.daysUntilExpiration).to.be.above(360);
+  });
+
+  it('refuses to assign an unknown policy', async () => {
+    const res = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({ policy: 'nope' });
+    expect(res.status).to.equal(404);
+    const missing = await request
+      .put('/api/v1/users/ppolicy.mgmt/password-policy')
+      .send({});
+    expect(missing.status).to.equal(400);
+  });
+
+  it('deletes a policy no longer applied', async () => {
+    expect((await request.delete(`${api}/software`)).status).to.equal(200);
+    expect((await request.get(`${api}/software`)).status).to.equal(404);
+  });
+
+  it('reports no default policy rather than guessing among several', async () => {
+    dm.config.ppolicy_default_dn = '';
+    try {
+      const plugin = new PasswordPolicy(dm) as unknown as {
+        readPolicyConfig(): Promise<{ dn?: string }>;
+      };
+      expect((await plugin.readPolicyConfig()).dn).to.equal(undefined);
+    } finally {
+      dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
+    }
+  });
+
+  it('answers a missing policy base as holding no policy', async () => {
+    dm.config.ppolicy_base = `ou=absent,${policyBase}`;
+    try {
+      const list = await request.get(api);
+      expect(list.status).to.equal(200);
+      expect(list.body.policies).to.deep.equal([]);
+      expect((await request.get(`${api}/default`)).status).to.equal(404);
+      const created = await request.post(api).send({ cn: 'nowhere' });
+      expect(created.status).to.equal(404);
+      expect(created.body.error).to.include('--ppolicy-base');
+    } finally {
+      dm.config.ppolicy_base = policyBase;
+    }
+  });
+
+  it('does not replace a configured default that holds no policy', async () => {
+    dm.config.ppolicy_default_dn = `cn=absent,${policyBase}`;
+    // A base holding exactly one policy, which discovery would adopt
+    dm.config.ppolicy_base = `cn=default,${policyBase}`;
+    try {
+      const plugin = new PasswordPolicy(dm) as unknown as {
+        readPolicyConfig(): Promise<{ dn?: string }>;
+      };
+      expect((await plugin.readPolicyConfig()).dn).to.equal(undefined);
+    } finally {
+      dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
+      dm.config.ppolicy_base = policyBase;
+    }
+  });
+});

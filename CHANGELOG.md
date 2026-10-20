@@ -2,7 +2,22 @@
 
 ## Unreleased
 
+### Features
+
+- `core/ldap/passwordPolicy`: list, create, edit and delete password
+  policies, and assign one to an account, under the new `--ppolicy-base`
+  ([docs](docs/usage/plugins/ldap/password-policy.md#managing-policies))
+
 ### Fixes
+
+- `core/ldap/passwordPolicy`: `GET /users/{id}/password-status` failed with a
+  500 on accounts that are not locked, `POST /users/{id}/unlock` answered 404
+  on them, and a policy without `pwdAllowUserChange` was served as `false`
+- `core/ldap/passwordPolicy`: password status and `expiring-soon` judge each
+  account by the policy its `pwdPolicySubentry` names, not by the default
+  one. With several policies and no `--ppolicy-default-dn`, the default is no
+  longer the first one found,
+  [notes](docs/usage/upgrading.md#several-password-policies)
 
 - `twake/instances`, `twake/clouderyProvision`: an account another tool
   created, whose classes do not allow the instance address, is given the

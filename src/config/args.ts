@@ -387,6 +387,7 @@ export interface Config {
 
   // Password Policy plugin
   ppolicy_default_dn?: string;
+  ppolicy_base?: string;
   ppolicy_warn_days?: number;
   ppolicy_validate_complexity?: boolean;
   ppolicy_min_length?: number;
@@ -1327,6 +1328,7 @@ const configArgs: ConfigTemplate = [
 
   // Password Policy plugin
   ['--ppolicy-default-dn', 'DM_PPOLICY_DEFAULT_DN', ''],
+  ['--ppolicy-base', 'DM_PPOLICY_BASE', ''],
   ['--ppolicy-warn-days', 'DM_PPOLICY_WARN_DAYS', 14, 'number'],
   [
     '--ppolicy-validate-complexity',
