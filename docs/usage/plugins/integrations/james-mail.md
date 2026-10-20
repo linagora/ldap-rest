@@ -139,6 +139,14 @@ When a user's quota changes:
    5000000000
    ```
 
+Removing the quota, or setting it to `0`, deletes the user quota instead:
+James would read `0` as a 0 byte mailbox. The user then gets the domain or
+global quota set in James.
+
+```http
+DELETE /quota/users/jdoe@company.com/size
+```
+
 ### Forwards
 
 Forwards are a setting of the user in Twake Mail, beside "keep a copy in my
