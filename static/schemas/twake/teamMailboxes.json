@@ -1,0 +1,156 @@
+{
+  "entity": {
+    "name": "twakeTeamMailbox",
+    "mainAttribute": "cn",
+    "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
+    "singularName": "teamMailbox",
+    "pluralName": "teamMailboxes",
+    "base": "ou=teammailboxes,ou=groups,__ldap_base__",
+    "label": {
+      "en": "Team mailboxes",
+      "fr": "Boîtes partagées",
+      "mn": "Хамтын шуудангийн хайрцгууд"
+    },
+    "singularLabel": {
+      "en": "team mailbox",
+      "fr": "boîte partagée",
+      "mn": "хамтын шуудангийн хайрцаг"
+    }
+  },
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z][a-zA-Z0-9-]*$"
+      },
+      "default": ["top", "groupOfNames", "twakeStaticGroup"],
+      "required": true,
+      "fixed": true
+    },
+    "cn": {
+      "type": "string",
+      "searchable": true,
+      "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
+      "hint": {
+        "en": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
+        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs",
+        "mn": "Имэйл хаягийн @-ээс өмнөх хэсэг: үсэг, тоо болон ! # $ % & ' * + / = ? ^ _ ` { | } . -, дараалсан цэггүй"
+      },
+      "required": true,
+      "role": "identifier",
+      "label": {
+        "en": "Name",
+        "fr": "Nom",
+        "mn": "Нэр"
+      }
+    },
+    "description": {
+      "type": "string",
+      "searchable": true,
+      "required": false,
+      "label": {
+        "en": "Description",
+        "fr": "Description",
+        "mn": "Тайлбар"
+      }
+    },
+    "mail": {
+      "type": "string",
+      "searchable": true,
+      "test": "^[#a-zA-Z0-9_-]{1,255}@[^@\\s]+\\.[^@\\s]+$",
+      "hint": {
+        "en": "Expected an email address whose name holds only letters, digits, # - and _, e.g. support@example.org",
+        "fr": "Une adresse électronique est attendue, dont le nom ne contient que lettres, chiffres, # - et _, par ex. support@example.org",
+        "mn": "Имэйл хаяг оруулна уу, нэр нь зөвхөн үсэг, тоо, # - болон _ агуулна, жишээ нь support@example.org"
+      },
+      "required": true,
+      "unique": {
+        "attributes": ["mailAlternateAddress"],
+        "branches": ["__LDAP_BASE__"]
+      },
+      "mailDomainScope": "organization",
+      "allowSubdomains": true,
+      "role": "primaryEmail",
+      "label": {
+        "en": "Email",
+        "fr": "Adresse électronique",
+        "mn": "Имэйл хаяг"
+      }
+    },
+    "twakeMailboxType": {
+      "type": "string",
+      "default": "cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__",
+      "fixed": true,
+      "required": true,
+      "role": "mailboxType",
+      "label": {
+        "en": "Mailbox type",
+        "fr": "Type de boîte",
+        "mn": "Хайрцгийн төрөл"
+      }
+    },
+    "member": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
+        "hint": {
+          "en": "Expected the DN of an entry of this directory",
+          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
+        }
+      },
+      "required": true,
+      "role": "members",
+      "label": {
+        "en": "Members",
+        "fr": "Membres",
+        "mn": "Гишүүд"
+      }
+    },
+    "owner": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
+        "hint": {
+          "en": "Expected the DN of an entry of this directory",
+          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
+        }
+      },
+      "required": false,
+      "role": "owners",
+      "label": {
+        "en": "Owners",
+        "fr": "Propriétaires",
+        "mn": "Эзэмшигчид"
+      }
+    },
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "branch": ["__LDAP_BASE__"],
+      "required": true,
+      "role": "organizationLink",
+      "label": {
+        "en": "Department",
+        "fr": "Organisation",
+        "mn": "Байгууллага"
+      }
+    },
+    "twakeDepartmentPath": {
+      "type": "string",
+      "test": "^[^\\r\\n]{1,4096}$",
+      "required": true,
+      "generated": true,
+      "role": "organizationPath",
+      "label": {
+        "en": "Department path",
+        "fr": "Chemin",
+        "mn": "Зам"
+      }
+    }
+  }
+}

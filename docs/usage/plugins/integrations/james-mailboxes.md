@@ -66,6 +66,25 @@ DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN=true
 
 If `james-mailing-list-branches` is empty (default), team mailboxes can be created anywhere.
 
+### Team mailboxes in a branch of their own
+
+Twake Mail expands every group of its `mailingLists.baseDn` as a list: a team
+mailbox kept there would deliver twice, to the shared mailbox and to each
+member. The Twake schema `twake/teamMailboxes.json` keeps them apart, as a
+flat entity of their own under `ou=teammailboxes,ou=groups`:
+
+```bash
+DM_LDAP_FLAT_SCHEMA=…,/app/node_modules/ldap-rest/static/schemas/twake/teamMailboxes.json
+DM_JAMES_MAILING_LIST_BRANCHES="ou=lists,ou=groups,dc=example,dc=com"
+```
+
+Its entries are `twakeStaticGroup`s whose `twakeMailboxType` is fixed to
+`teamMailbox` (a value, so the nomenclature needs no `cn=teamMailbox` row and
+the groups form does not offer it). They need an address TMail accepts and a
+member. The groups keep `--ldap-group-base` on the lists branch, and the
+mailing list branches refuse a team mailbox there. Copy the schema to change
+its branch.
+
 ## Mailing lists
 
 `twake/james` creates nothing in James for a mailing list: a group with a

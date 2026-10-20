@@ -1409,6 +1409,11 @@ export default abstract class LdapFlat extends DmPlugin {
       [this.mainAttribute]: id,
       ...additional,
     };
+    // validateNewEntry forced the fixed values into its copy only; the
+    // classes come from the entity
+    for (const [field, attr] of Object.entries(this.schema?.attributes ?? {}))
+      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
+        entry[field] = attr.default;
     // validateNewEntry converted the copy it was handed, not this one
     toDirectoryEntry(this.schema, entry);
 

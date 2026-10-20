@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Twake schema `twake/teamMailboxes.json`: team mailboxes as an entity of
+  their own, in their own branch, which Twake Mail does not expand as lists,
+  [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes-in-a-branch-of-their-own)
+
+### Fixes
+
+- Flat entities: an attribute the schema marks `fixed` gets its `default` at
+  creation, as documented; it was checked, then not written
+
 ## v0.21.1 (2026-10-20)
 
 ### Security
