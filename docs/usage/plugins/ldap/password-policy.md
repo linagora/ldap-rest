@@ -83,7 +83,9 @@ Enable local password complexity validation (for client-side feedback before sub
 GET /api/v1/password-policy
 ```
 
-Returns the current ppolicy configuration from LDAP.
+Returns the current ppolicy configuration from LDAP. The caller must be
+allowed to read the policy entry: an authorization plugin keeping it from
+them answers `403`, as for [`/password-policies`](#managing-policies).
 
 **Response (200):**
 
@@ -348,6 +350,13 @@ the OpenLDAP administrator's guide, applied to `userPassword`. A policy of
 the same name answers `409`. `--ppolicy-base` must exist: otherwise creating
 answers `404` and listing finds nothing, with a warning in the log.
 
+**Who manages them:** writes go through the authorization plugins like any
+other. With `authzLinid1`, nobody writes outside the organization tree, and
+every administrator reads there: name `--ppolicy-base` in
+`--authz-global-branches` so that only the administrators of the whole
+directory read and change the policies
+([global branches](../auth/authz-linid1.md#global-branches)).
+
 **Deleting a policy** is refused (`409`) while it is the default one or an
 entry's `pwdPolicySubentry` names it. The default one is only known through
 `--ppolicy-default-dn` when there are several: without it, nothing stops
@@ -516,19 +525,15 @@ The plugin automatically exports its configuration via the `configApi` plugin. W
           "requireDigit": true,
           "requireSpecial": true
         }
-      },
-      "ldapPolicy": {
-        "dn": "cn=default,ou=policies,dc=example,dc=com",
-        "pwdMaxAge": 7776000,
-        "pwdMinLength": 12,
-        "pwdLockout": true
       }
     }
   }
 }
 ```
 
-**Note:** The `ldapPolicy` field contains the LDAP ppolicy configuration and is populated after the first request to any passwordPolicy endpoint.
+The policies themselves are not part of it: read them through
+[`GET /password-policy`](#get-password-policy-configuration), which
+authorization plugins judge.
 
 ## See Also
 

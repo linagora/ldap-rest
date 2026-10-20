@@ -127,6 +127,14 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * Branches the broad read of `filtersAttachedEntries` leaves out: there,
+   * only a caller holding the branch reads. None unless a plugin names some.
+   */
+  protected globalBranches(): string[] {
+    return [];
+  }
+
+  /**
    * The branch a write is judged against.
    *
    * An account is stored in the same `ou=users` as everyone else, so its
@@ -754,6 +762,14 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} administers no branch`
           );
         }
+        if (
+          this.globalBranches().some(branch => isDnInBranch(base, branch)) &&
+          !(await this.getUserPermissions(user, base)).read
+        ) {
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have read permission for branch ${base}`
+          );
+        }
         // Granting the broad read also means supplying the means to enforce
         // it. A caller asking only for the fields it displays — the normal
         // client shape, and what SCIM does — would otherwise get entries
@@ -805,12 +821,40 @@ export default abstract class AuthzBase extends DmPlugin {
         opts,
       ];
       if (!this.filtersAttachedEntries()) return pass;
-      const linkAttr = this.config.ldap_organization_link_attribute;
-      if (!linkAttr || this.shouldSkipAuthorization(req)) return pass;
+      if (this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
 
       const user = await this.resolveCaller(req!);
       if (!user) return pass;
+
+      // A search above a global branch, from the root say, would otherwise
+      // bring back what it holds
+      const global = this.globalBranches();
+      if (global.length) {
+        const readable = new Map<string, boolean>();
+        const kept = [];
+        for (const entry of result.searchEntries) {
+          const branch = global.find(dn => isDnInBranch(entry.dn, dn));
+          if (branch !== undefined) {
+            if (!readable.has(branch))
+              readable.set(
+                branch,
+                (await this.getUserPermissions(user, branch)).read === true
+              );
+            if (!readable.get(branch)) {
+              this.logger.debug(
+                `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, in the global branch ${branch}`
+              );
+              continue;
+            }
+          }
+          kept.push(entry);
+        }
+        result.searchEntries = kept;
+      }
+
+      const linkAttr = this.config.ldap_organization_link_attribute;
+      if (!linkAttr) return pass;
       const branches = await this.getAuthorizedBranches(user);
       if (branches.length === 0) return pass;
 
