@@ -841,7 +841,12 @@ export default abstract class AuthzBase extends DmPlugin {
                 branch,
                 (await this.getUserPermissions(user, branch)).read === true
               );
-            if (!readable.get(branch)) continue;
+            if (!readable.get(branch)) {
+              this.logger.debug(
+                `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, in the global branch ${branch}`
+              );
+              continue;
+            }
           }
           kept.push(entry);
         }

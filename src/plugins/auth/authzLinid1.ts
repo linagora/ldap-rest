@@ -32,6 +32,26 @@ export default class AuthzLinid1 extends AuthzBase {
     this.logger.info(
       `AuthzLinid1: Authorization based on ${adminAttr} attribute enabled`
     );
+
+    // Its administrators would be held to it by itself: nobody would
+    // administer it, nor anything under it
+    const owner = this.globalOrganization();
+    const holding =
+      owner && this.globalBranches().find(dn => isDnInBranch(owner, dn));
+    if (holding)
+      throw new Error(
+        `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
+          `global branch ${holding}`
+      );
+  }
+
+  /** The organization holding the global branches */
+  private globalOrganization(): string | undefined {
+    return (
+      this.config.authz_global_organization ||
+      this.config.ldap_top_organization ||
+      undefined
+    );
   }
 
   /**
@@ -80,9 +100,7 @@ export default class AuthzLinid1 extends AuthzBase {
     branch: string
   ): Promise<BranchPermissions> {
     // A global branch is held by whoever holds its organization
-    const owner =
-      this.config.authz_global_organization ||
-      this.config.ldap_top_organization;
+    const owner = this.globalOrganization();
     if (this.globalBranches().some(dn => isDnInBranch(branch, dn)))
       return owner && !isDnInBranch(owner, branch)
         ? this.getUserPermissions(userDn, owner)

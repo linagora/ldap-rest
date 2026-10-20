@@ -508,12 +508,30 @@ export default class PasswordPolicy extends DmPlugin {
      *           pwdAllowUserChange: true
      *           pwdInHistory: 5
      *           pwdGraceAuthNLimit: 0
+     *   '403':
+     *     description: An authorization plugin keeps the policies from the caller.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
      */
     // GET /password-policy - configuration
     app.get(
       `${prefix}/password-policy`,
-      asyncHandler(async (_req: Request, res: Response) => {
+      asyncHandler(async (req: Request, res: Response) => {
         const policy = await this.readPolicyConfig();
+        // Read through this plugin's cache: asked again as the caller, whom
+        // an authorization plugin may keep from the policies
+        if (policy.dn)
+          await this.server.ldap.search(
+            {
+              filter: '(objectClass=*)',
+              scope: 'base',
+              attributes: ['1.1'],
+              paged: false,
+            },
+            policy.dn,
+            req
+          );
         res.json(policy);
       })
     );

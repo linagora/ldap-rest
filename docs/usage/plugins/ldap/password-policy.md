@@ -83,7 +83,9 @@ Enable local password complexity validation (for client-side feedback before sub
 GET /api/v1/password-policy
 ```
 
-Returns the current ppolicy configuration from LDAP.
+Returns the current ppolicy configuration from LDAP. The caller must be
+allowed to read the policy entry: an authorization plugin keeping it from
+them answers `403`, as for [`/password-policies`](#managing-policies).
 
 **Response (200):**
 

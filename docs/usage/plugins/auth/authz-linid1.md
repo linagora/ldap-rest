@@ -137,6 +137,9 @@ the administrators of the whole directory manage the
 branch is no branch of theirs in `GET /authz/scope`, so it adds nothing to
 the organizations they are offered.
 
+`--authz-global-organization` must lie outside the global branches: nobody
+would administer it otherwise, and the server refuses to start.
+
 ## Configuration
 
 No configuration file needed - permissions are read from LDAP. Simply load the plugin:

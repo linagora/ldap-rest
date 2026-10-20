@@ -9,6 +9,11 @@
   administrators of `--authz-global-organization` (the top organization by
   default), [docs](docs/usage/plugins/auth/authz-linid1.md#global-branches)
 
+### Fixes
+
+- `core/ldap/passwordPolicy`: `GET /password-policy` is judged by the
+  authorization plugins, like `/password-policies`; it answered every caller
+
 ## v0.21.0 (2026-10-20)
 
 ### Breaking Changes

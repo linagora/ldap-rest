@@ -33,6 +33,7 @@ describe('AuthzLinid1: global branches', () => {
   let top: string;
   let policyBase: string;
   let orgDn: string;
+  let authz: AuthzLinid1;
   const globalDn = (): string => `uid=ppg.global,ou=users,${base}`;
   const localDn = (): string => `uid=ppg.local,ou=users,${base}`;
   const api = '/api/v1/password-policies';
@@ -94,7 +95,8 @@ describe('AuthzLinid1: global branches', () => {
     dm.config.ppolicy_base = policyBase;
     dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
     await dm.registerPlugin('testAuth', new TestAuthPlugin(dm));
-    await dm.registerPlugin('authzLinid1', new AuthzLinid1(dm));
+    authz = new AuthzLinid1(dm);
+    await dm.registerPlugin('authzLinid1', authz);
     await dm.registerPlugin('passwordPolicy', new PasswordPolicy(dm));
     dm.setupErrorMiddleware();
     request = supertest(dm.app);
@@ -196,6 +198,42 @@ describe('AuthzLinid1: global branches', () => {
       // An administrator above that organization holds them too
       const above = await request.get(api).set('X-Test-User', 'ppg.global');
       expect(above.status).to.equal(200);
+    } finally {
+      dm.config.authz_global_organization = '';
+    }
+  });
+
+  it('keeps the default policy from a local administrator too', async () => {
+    const local = await request
+      .get('/api/v1/password-policy')
+      .set('X-Test-User', 'ppg.local');
+    expect(local.status).to.equal(403);
+    const global = await request
+      .get('/api/v1/password-policy')
+      .set('X-Test-User', 'ppg.global');
+    expect(global.status).to.equal(200);
+    expect(global.body.dn).to.equal(`cn=default,${policyBase}`);
+  });
+
+  it('leaves a global branch out of the branches a caller administers', async () => {
+    expect(await authz.getAuthorizedBranches(globalDn())).to.deep.equal([top]);
+  });
+
+  it('still lets a local administrator write in their organization', async () => {
+    const as = { user: 'ppg.local', headers: {} } as unknown as DmRequest;
+    const sub = `ou=PPG Sub,${orgDn}`;
+    await dm.ldap.add(
+      sub,
+      { objectClass: ['top', 'organizationalUnit'], ou: 'PPG Sub' },
+      as
+    );
+    await dm.ldap.delete(sub, as);
+  });
+
+  it('refuses to start with the global organization in a global branch', () => {
+    dm.config.authz_global_organization = `ou=inside,${policyBase}`;
+    try {
+      expect(() => new AuthzLinid1(dm)).to.throw(/lies in the global branch/);
     } finally {
       dm.config.authz_global_organization = '';
     }
