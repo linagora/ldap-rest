@@ -7,6 +7,7 @@ import configTemplate from '../../src/config/args';
 import { DM } from '../../src/bin';
 import type { ChangeContext } from '../../src/lib/changeContext';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
+import { NotFoundError } from '../../src/lib/errors';
 
 let ldapActions: LdapActions;
 
@@ -198,6 +199,22 @@ describe('ldapActions', function () {
           expect.fail('Expected error not thrown');
         } catch (err) {
           expect(err).to.have.property('message');
+        }
+      });
+
+      it('says which branch is missing when adding under it', async () => {
+        const parent = `ou=nowhere,${process.env.DM_LDAP_BASE}`;
+        try {
+          await ldapActions.add(`uid=nobody,${parent}`, {
+            objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
+            cn: 'Nobody',
+            sn: 'Nobody',
+            uid: 'nobody',
+          });
+          expect.fail('Expected error not thrown');
+        } catch (err) {
+          expect(err).to.be.instanceOf(NotFoundError);
+          expect((err as Error).message).to.equal(`${parent} does not exist`);
         }
       });
 

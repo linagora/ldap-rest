@@ -16,6 +16,7 @@ import { type DM } from '../bin';
 
 import {
   escapeDnValue,
+  getParentDn,
   isDnInBranch,
   launchHooks,
   launchHooksChained,
@@ -337,6 +338,12 @@ function ldapAddError(dn: string, error: unknown): Error {
   const code = extractLdapCode(error);
   if (code === 68)
     return withCode(new ConflictError(`Entry ${dn} already exists`), code);
+  // The branch it goes in: a flat entity's base nothing created yet
+  if (code === 32)
+    return withCode(
+      new NotFoundError(`${getParentDn(dn)} does not exist`),
+      code
+    );
   // attributeOrValueExists, on an add: the request names a value twice
   if (code === 20)
     return ldapRefusal(

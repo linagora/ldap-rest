@@ -5,7 +5,7 @@
     "objectClass": ["top", "groupOfNames", "twakeStaticGroup"],
     "singularName": "teamMailbox",
     "pluralName": "teamMailboxes",
-    "base": "ou=teammailboxes,ou=groups,__ldap_base__",
+    "base": "ou=teammailboxes,__ldap_base__",
     "label": {
       "en": "Team mailboxes",
       "fr": "Boîtes partagées",
@@ -32,11 +32,11 @@
     "cn": {
       "type": "string",
       "searchable": true,
-      "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
+      "test": "^[#a-zA-Z0-9_-]{1,64}$",
       "hint": {
-        "en": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
-        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs",
-        "mn": "Имэйл хаягийн @-ээс өмнөх хэсэг: үсэг, тоо болон ! # $ % & ' * + / = ? ^ _ ` { | } . -, дараалсан цэггүй"
+        "en": "Letters, digits, # - and _, as the name of its address",
+        "fr": "Lettres, chiffres, # - et _, comme le nom de son adresse",
+        "mn": "Үсэг, тоо, # - болон _, хаягийн нэрийн адил"
       },
       "required": true,
       "role": "identifier",

@@ -32,7 +32,7 @@ describe('Twake team mailbox schema', () => {
 
   before(async () => {
     base = process.env.DM_LDAP_BASE as string;
-    branch = `ou=teammailboxes,ou=groups,${base}`;
+    branch = `ou=teammailboxes,${base}`;
     alice = `uid=tmalice-${timestamp},ou=users,${base}`;
     org = `ou=TM Org ${timestamp},ou=organization,${base}`;
     process.env.DM_LDAP_FLAT_SCHEMA =

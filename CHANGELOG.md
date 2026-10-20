@@ -5,13 +5,15 @@
 ### Features
 
 - Twake schema `twake/teamMailboxes.json`: team mailboxes as an entity of
-  their own, in their own branch, which Twake Mail does not expand as lists,
+  their own, in `ou=teammailboxes`, which Twake Mail does not expand as lists,
   [docs](docs/usage/plugins/integrations/james-mailboxes.md#team-mailboxes-in-a-branch-of-their-own)
 
 ### Fixes
 
 - Flat entities: an attribute the schema marks `fixed` gets its `default` at
   creation, as documented; it was checked, then not written
+- Creating an entry in a branch that does not exist answers `404`, naming
+  the branch; it was a `500`
 
 ## v0.21.1 (2026-10-20)
 

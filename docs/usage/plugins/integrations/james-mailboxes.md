@@ -41,6 +41,9 @@ This creates three nomenclature entries:
 - `cn=mailingList,ou=twakeMailboxType,ou=nomenclature,{ldap_base}`
 - `cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,{ldap_base}`
 
+With [team mailboxes in a branch of their own](#team-mailboxes-in-a-branch-of-their-own),
+leave the last one out.
+
 ### LDAP-Rest Configuration
 
 Add to your ldap-rest configuration:
@@ -71,19 +74,36 @@ If `james-mailing-list-branches` is empty (default), team mailboxes can be creat
 Twake Mail expands every group of its `mailingLists.baseDn` as a list: a team
 mailbox kept there would deliver twice, to the shared mailbox and to each
 member. The Twake schema `twake/teamMailboxes.json` keeps them apart, as a
-flat entity of their own under `ou=teammailboxes,ou=groups`:
+flat entity of their own under `ou=teammailboxes,{ldap_base}`, outside the
+group base whatever it is:
 
 ```bash
 DM_LDAP_FLAT_SCHEMA=…,/app/node_modules/ldap-rest/static/schemas/twake/teamMailboxes.json
 DM_JAMES_MAILING_LIST_BRANCHES="ou=lists,ou=groups,dc=example,dc=com"
 ```
 
-Its entries are `twakeStaticGroup`s whose `twakeMailboxType` is fixed to
-`teamMailbox` (a value, so the nomenclature needs no `cn=teamMailbox` row and
-the groups form does not offer it). They need an address TMail accepts and a
-member. The groups keep `--ldap-group-base` on the lists branch, and the
-mailing list branches refuse a team mailbox there. Copy the schema to change
-its branch.
+- Create the branch first: nothing creates it, and a team mailbox added
+  under a missing one answers `404`.
+
+  ```ldif
+  dn: ou=teammailboxes,dc=example,dc=com
+  objectClass: organizationalUnit
+  ou: teammailboxes
+  ```
+
+- Its entries are `twakeStaticGroup`s whose `twakeMailboxType` is fixed to
+  `teamMailbox`, as a value. Leave `cn=teamMailbox` out of the nomenclature
+  (see [Nomenclature Setup](#nomenclature-setup)): the groups form then offers
+  only groups and mailing lists, and a team mailbox has one place to be
+  created in.
+- A team mailbox needs an address TMail accepts (letters, digits, `#`, `-`
+  and `_` before the `@`) and a member.
+- `--james-mailing-list-branches` on the lists branch refuses a team mailbox
+  created there by another way.
+
+To keep them elsewhere, copy the schema and change its `base`, outside
+`--ldap-group-base`: the groups routes list and edit every group under it,
+with the groups schema, where the mailbox type can be changed.
 
 ## Mailing lists
 
@@ -101,6 +121,11 @@ members-only list.
 ## Usage
 
 ### Creating a Team Mailbox
+
+Where Twake Mail reads mailing lists from the groups branch, create team
+mailboxes [in a branch of their own](#team-mailboxes-in-a-branch-of-their-own)
+instead: the example below, a team mailbox among the groups, only suits a
+deployment whose groups branch holds no mailing list.
 
 ```javascript
 await dm.ldap.add('cn=sales-team,ou=groups,dc=example,dc=com', {
@@ -261,6 +286,11 @@ client offers only the members the server accepts.
 ## Mailbox Type Transitions
 
 You can transition groups between different mailbox types by modifying the `twakeMailboxType` attribute. The system automatically handles the cleanup of the old type and setup of the new type.
+
+These transitions keep the group where it is. With
+[team mailboxes in a branch of their own](#team-mailboxes-in-a-branch-of-their-own),
+a mailing list does not become a team mailbox: create the team mailbox, then
+delete the list.
 
 ### Supported Transitions
 
