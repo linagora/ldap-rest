@@ -108,7 +108,8 @@ way:
   `;` is split on `;` too.
 - Options holding DNs or DN expressions (`--ldap-raw-base`,
   `--james-mailing-list-branch`, `--twake-tombstone-dn`,
-  `--twake-tombstone-group-bases`, `--twake-instance-dn`): split on `;` only,
+  `--twake-tombstone-group-bases`, `--twake-instance-dn`,
+  `--authz-global-branches`): split on `;` only,
   never on `,` nor spaces, as a DN holds both.
   `DM_LDAP_RAW_BASE="ou=My Unit,dc=example,dc=com"` is one DN; separate
   several DNs with `;`.
