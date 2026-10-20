@@ -12,7 +12,9 @@
 ### Fixes
 
 - `core/ldap/passwordPolicy`: `GET /password-policy` is judged by the
-  authorization plugins, like `/password-policies`; it answered every caller
+  authorization plugins, like `/password-policies`; it answered every caller.
+  `GET /config` no longer carries the default policy (`ldapPolicy`), which
+  it served every caller: read `GET /password-policy` instead
 
 ## v0.21.0 (2026-10-20)
 

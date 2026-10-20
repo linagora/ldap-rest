@@ -34,6 +34,7 @@ describe('AuthzLinid1: global branches', () => {
   let policyBase: string;
   let orgDn: string;
   let authz: AuthzLinid1;
+  let policies: PasswordPolicy;
   const globalDn = (): string => `uid=ppg.global,ou=users,${base}`;
   const localDn = (): string => `uid=ppg.local,ou=users,${base}`;
   const api = '/api/v1/password-policies';
@@ -97,14 +98,15 @@ describe('AuthzLinid1: global branches', () => {
     await dm.registerPlugin('testAuth', new TestAuthPlugin(dm));
     authz = new AuthzLinid1(dm);
     await dm.registerPlugin('authzLinid1', authz);
-    await dm.registerPlugin('passwordPolicy', new PasswordPolicy(dm));
+    policies = new PasswordPolicy(dm);
+    await dm.registerPlugin('passwordPolicy', policies);
     dm.setupErrorMiddleware();
     request = supertest(dm.app);
   });
 
   after(async () => {
     if (!dm) return;
-    for (const cn of ['default', 'extra'])
+    for (const cn of ['default', 'extra', 'vanishing'])
       await dm.ldap.delete(`cn=${cn},${policyBase}`).catch(() => undefined);
     await dm.ldap.delete(policyBase).catch(() => undefined);
     await dm.ldap
@@ -236,6 +238,39 @@ describe('AuthzLinid1: global branches', () => {
       expect(() => new AuthzLinid1(dm)).to.throw(/lies in the global branch/);
     } finally {
       dm.config.authz_global_organization = '';
+    }
+  });
+
+  it('serves no policy in the configuration every caller reads', async () => {
+    // A local administrator's own status call resolves the default policy
+    await request
+      .get(`/api/v1/users/${encodeURIComponent(localDn())}/password-status`)
+      .set('X-Test-User', 'ppg.local');
+    expect(policies.getConfigApiData()).not.to.have.property('ldapPolicy');
+  });
+
+  it('answers no policy for one deleted since it was read', async () => {
+    const dn = `cn=vanishing,${policyBase}`;
+    await dm.ldap.add(dn, {
+      objectClass: ['top', 'person', 'pwdPolicy'],
+      cn: 'vanishing',
+      sn: 'vanishing',
+      pwdAttribute: 'userPassword',
+    });
+    dm.config.ppolicy_default_dn = dn;
+    try {
+      const read = await request
+        .get('/api/v1/password-policy')
+        .set('X-Test-User', 'ppg.global');
+      expect(read.body.dn).to.equal(dn);
+      await dm.ldap.delete(dn);
+      const gone = await request
+        .get('/api/v1/password-policy')
+        .set('X-Test-User', 'ppg.global');
+      expect(gone.status).to.equal(200);
+      expect(gone.body).to.deep.equal({});
+    } finally {
+      dm.config.ppolicy_default_dn = `cn=default,${policyBase}`;
     }
   });
 });

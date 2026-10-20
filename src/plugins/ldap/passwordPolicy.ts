@@ -477,7 +477,6 @@ export default class PasswordPolicy extends DmPlugin {
   private discoveredDefault: { dn: string | null; time: number } | null = null;
   private warnedAmbiguousDefault = false;
   private warnedMissingBase = false;
-  private lastDefaultPolicy: PpolicyConfig | undefined;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
 
   api(app: Express): void {
@@ -521,17 +520,26 @@ export default class PasswordPolicy extends DmPlugin {
         const policy = await this.readPolicyConfig();
         // Read through this plugin's cache: asked again as the caller, whom
         // an authorization plugin may keep from the policies
-        if (policy.dn)
-          await this.server.ldap.search(
-            {
-              filter: '(objectClass=*)',
-              scope: 'base',
-              attributes: ['1.1'],
-              paged: false,
-            },
-            policy.dn,
-            req
-          );
+        if (policy.dn) {
+          try {
+            await this.server.ldap.search(
+              {
+                filter: '(objectClass=*)',
+                scope: 'base',
+                attributes: ['1.1'],
+                paged: false,
+              },
+              policy.dn,
+              req
+            );
+          } catch (error) {
+            // Deleted since it was cached
+            if (extractLdapCode(error) !== 32) throw error;
+            this.forgetPolicies();
+            res.json({});
+            return;
+          }
+        }
         res.json(policy);
       })
     );
@@ -1271,8 +1279,7 @@ export default class PasswordPolicy extends DmPlugin {
       (this.config.ppolicy_default_dn as string) ||
       (await this.discoverDefaultDn());
     const policy = dn ? await this.readPolicyAt(dn) : null;
-    this.lastDefaultPolicy = policy ?? {};
-    return this.lastDefaultPolicy;
+    return policy ?? {};
   }
 
   /**
@@ -1720,8 +1727,6 @@ export default class PasswordPolicy extends DmPlugin {
           },
         }),
       },
-      // Include cached LDAP ppolicy if available
-      ldapPolicy: this.lastDefaultPolicy,
     };
   }
 }

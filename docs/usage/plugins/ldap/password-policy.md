@@ -525,19 +525,15 @@ The plugin automatically exports its configuration via the `configApi` plugin. W
           "requireDigit": true,
           "requireSpecial": true
         }
-      },
-      "ldapPolicy": {
-        "dn": "cn=default,ou=policies,dc=example,dc=com",
-        "pwdMaxAge": 7776000,
-        "pwdMinLength": 12,
-        "pwdLockout": true
       }
     }
   }
 }
 ```
 
-**Note:** The `ldapPolicy` field contains the LDAP ppolicy configuration and is populated after the first request to any passwordPolicy endpoint.
+The policies themselves are not part of it: read them through
+[`GET /password-policy`](#get-password-policy-configuration), which
+authorization plugins judge.
 
 ## See Also
 
