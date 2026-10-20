@@ -680,6 +680,10 @@
       "import": "./static/schemas/twake/positions.json",
       "require": "./static/schemas/twake/positions.json"
     },
+    "./schema-twake-teammailboxes": {
+      "import": "./static/schemas/twake/teamMailboxes.json",
+      "require": "./static/schemas/twake/teamMailboxes.json"
+    },
     "./schema-twake-users": {
       "import": "./static/schemas/twake/users.json",
       "require": "./static/schemas/twake/users.json"
