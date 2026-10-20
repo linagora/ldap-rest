@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## v0.21.1 (2026-10-20)
+
+### Security
+
+- `core/ldap/passwordPolicy`: `GET /password-policy` and `GET /config`
+  served the default policy to every caller, whatever the authorization
+  plugins allow. The first is now judged like `/password-policies`; the
+  second no longer carries it (`ldapPolicy`)
+  ([#356](https://github.com/linagora/ldap-rest/pull/356))
 
 ### Features
 
@@ -8,13 +16,6 @@
   the organization tree, such as the password policies, to the
   administrators of `--authz-global-organization` (the top organization by
   default), [docs](docs/usage/plugins/auth/authz-linid1.md#global-branches)
-
-### Fixes
-
-- `core/ldap/passwordPolicy`: `GET /password-policy` is judged by the
-  authorization plugins, like `/password-policies`; it answered every caller.
-  `GET /config` no longer carries the default policy (`ldapPolicy`), which
-  it served every caller: read `GET /password-policy` instead
 
 ## v0.21.0 (2026-10-20)
 
