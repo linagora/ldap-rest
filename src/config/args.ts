@@ -210,6 +210,12 @@ export interface Config {
    * write
    */
   authz_global_branch?: string[];
+  /**
+   * Branches outside the organization tree, such as the mail domains, that
+   * every administrator reads and only the administrators of
+   * `authz_global_organization` write and delete in
+   */
+  authz_global_write_branch?: string[];
   /** The organization holding the global branches; the top one by default */
   authz_global_organization?: string;
 
@@ -1302,6 +1308,14 @@ const configArgs: ConfigTemplate = [
     [],
     'array',
     '--authz-global-branches',
+    'dns',
+  ],
+  [
+    '--authz-global-write-branch',
+    'DM_AUTHZ_GLOBAL_WRITE_BRANCHES',
+    [],
+    'array',
+    '--authz-global-write-branches',
     'dns',
   ],
   ['--authz-global-organization', 'DM_AUTHZ_GLOBAL_ORGANIZATION', ''],

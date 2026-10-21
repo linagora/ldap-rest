@@ -43,6 +43,26 @@ export default class AuthzLinid1 extends AuthzBase {
         `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
           `global branch ${holding}`
       );
+    const writeHolding =
+      owner && this.globalWriteBranches().find(dn => isDnInBranch(owner, dn));
+    if (writeHolding)
+      throw new Error(
+        `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
+          `global write branch ${writeHolding}`
+      );
+    // One branch under two rules: the global one, checked first, would
+    // hide a write branch it holds from the administrators meant to read
+    // it, and a global branch inside a write branch would read as one
+    for (const write of this.globalWriteBranches()) {
+      const global = this.globalBranches().find(
+        dn => isDnInBranch(write, dn) || isDnInBranch(dn, write)
+      );
+      if (global)
+        throw new Error(
+          `AuthzLinid1: the global branch ${global} and the global write ` +
+            `branch ${write} overlap`
+        );
+    }
   }
 
   /** The organization holding the global branches */
@@ -67,6 +87,31 @@ export default class AuthzLinid1 extends AuthzBase {
 
   protected globalBranches(): string[] {
     return this.config.authz_global_branch ?? [];
+  }
+
+  /**
+   * Branches written and deleted in by the holders of the global
+   * organization only, and read as the rest of the reference data is: the
+   * mail domains, which every administrator needs to read and none but the
+   * administrators of the whole directory should add or remove. Unlike
+   * {@link globalBranches}, the base class's read checks do not know them: a
+   * search there is filtered no more than in any other branch outside the
+   * tree.
+   */
+  private globalWriteBranches(): string[] {
+    return this.config.authz_global_write_branch ?? [];
+  }
+
+  private isGlobalWrite(branch: string): boolean {
+    return this.globalWriteBranches().some(dn => isDnInBranch(branch, dn));
+  }
+
+  /**
+   * Taking an entry out of a global write branch removes it from there: it
+   * asks what a delete asks, not the read every administrator holds
+   */
+  protected sourcePermission(branch: string): keyof BranchPermissions {
+    return this.isGlobalWrite(branch) ? 'delete' : 'read';
   }
 
   /**
@@ -105,7 +150,31 @@ export default class AuthzLinid1 extends AuthzBase {
       return owner && !isDnInBranch(owner, branch)
         ? this.getUserPermissions(userDn, owner)
         : { read: false, write: false, delete: false };
+    // A global write branch is written by whoever holds that organization,
+    // and read by every administrator, as the rest of the reference data
+    if (this.isGlobalWrite(branch)) {
+      const held =
+        owner && !isDnInBranch(owner, branch)
+          ? await this.getUserPermissions(userDn, owner)
+          : { read: false, write: false, delete: false };
+      return {
+        read:
+          held.read || (await this.getAuthorizedBranches(userDn)).length > 0,
+        write: held.write,
+        delete: held.delete,
+      };
+    }
+    return this.ownPermissions(userDn, branch);
+  }
 
+  /**
+   * A user's permissions on a branch from the organizations naming them,
+   * the global branches aside
+   */
+  private async ownPermissions(
+    userDn: string,
+    branch: string
+  ): Promise<BranchPermissions> {
     const now = Date.now();
 
     // Check cache

@@ -137,8 +137,34 @@ the administrators of the whole directory manage the
 branch is no branch of theirs in `GET /authz/scope`, so it adds nothing to
 the organizations they are offered.
 
-`--authz-global-organization` must lie outside the global branches: nobody
-would administer it otherwise, and the server refuses to start.
+`--authz-global-write-branches` names branches whose writes and deletes are
+held the same way, while reading them stays as for the rest of the reference
+data: every administrator reads there. Password policies are for the
+administrators of the whole directory alone, and are a global branch; the
+[mail domains](../integrations/james-mail.md#mail-domains) are read by every
+administrator, whose forms offer them, and only added or deleted by those of
+the whole directory, so they are a global write branch:
+
+```bash
+--authz-global-branches "ou=ppolicies,dc=example,dc=com" \
+--authz-global-write-branches "ou=domains,ou=nomenclature,dc=example,dc=com"
+```
+
+There, the administrators of `--authz-global-organization` and above add,
+change, rename and delete, at any depth, and `GET /authz/scope` offers them
+to create the entity whose base it is; any other administrator reads, lists
+and searches, and is refused every write with `403`. Taking an entry out of
+the branch, by a move or a rename, asks for the delete permission there, not
+the read every administrator holds: a local administrator cannot move a
+domain into their own organization and delete it from there. Several
+branches are separated by `;`.
+
+`--authz-global-organization` must lie outside the global branches and the
+global write branches: nobody would administer it otherwise. A global
+branch and a global write branch may not be the same, nor lie one in the
+other: the global branch would hide the write branch it holds from the
+administrators meant to read it. In either case the server refuses to
+start.
 
 ## Configuration
 
