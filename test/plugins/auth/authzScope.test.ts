@@ -96,6 +96,7 @@ describe('Authorization scope endpoint', () => {
       .set('Accept', 'application/json');
     expect(res.status).to.equal(200);
     expect(res.body).to.have.property('unrestricted', true);
+    expect(res.body).to.have.property('linksAnyDomain', true);
     expect(res.body.entities.map((e: { name: string }) => e.name)).to.include(
       'users'
     );
@@ -202,6 +203,7 @@ describe('Authorization scope endpoint', () => {
       unrestricted: false,
       described: false,
       source: null,
+      linksAnyDomain: false,
     });
     expect(res.body.sources).to.deep.equal(['authzPerRoute']);
     expect(res.body.entities).to.deep.equal([]);

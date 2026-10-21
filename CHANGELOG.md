@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `core/auth/authzLinid1`: the administrators of
+  `--authz-global-organization` link an organization to any mail domain, as
+  those of the top organization do; where the top organization is a bare
+  container, nobody could give a new organization a domain.
+  `GET /authz/scope` reports it as `linksAnyDomain`,
+  [docs](docs/usage/plugins/auth/authz-linid1.md#mail-domains)
+
 ## v0.22.0 (2026-10-21)
 
 ### Features
