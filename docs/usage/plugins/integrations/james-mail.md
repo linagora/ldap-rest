@@ -219,6 +219,12 @@ does.
 The domains are pushed as the directory changes: those it held before the
 plugin was loaded are not created in James at startup.
 
+With `authzLinid1`, nobody writes outside the organization tree: name the
+domain branch in `--authz-global-write-branches` so that the administrators
+of the whole directory add and delete domains, while every administrator
+still reads them
+([global branches](../auth/authz-linid1.md#global-branches)).
+
 ### Display Name and Identity
 
 When a user is added, renamed, or their display name changes, the plugin names

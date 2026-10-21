@@ -8,6 +8,11 @@
   and removed with their entry; a domain still linked by an organization,
   or with addresses at it, cannot be deleted,
   [docs](docs/usage/plugins/integrations/james-mail.md#mail-domains)
+- `core/auth/authzLinid1`: `--authz-global-write-branches` reserves the
+  writes and deletes of branches outside the tree, such as the mail domains,
+  to the administrators of `--authz-global-organization`, while every
+  administrator keeps reading them,
+  [docs](docs/usage/plugins/auth/authz-linid1.md#global-branches)
 
 ## v0.21.3 (2026-10-20)
 

@@ -109,7 +109,8 @@ way:
 - Options holding DNs or DN expressions (`--ldap-raw-base`,
   `--james-mailing-list-branch`, `--twake-tombstone-dn`,
   `--twake-tombstone-group-bases`, `--twake-instance-dn`,
-  `--authz-global-branches`): split on `;` only,
+  `--authz-global-branches`, `--authz-global-write-branches`): split on
+  `;` only,
   never on `,` nor spaces, as a DN holds both.
   `DM_LDAP_RAW_BASE="ou=My Unit,dc=example,dc=com"` is one DN; separate
   several DNs with `;`.
@@ -437,11 +438,12 @@ whichever of the two names it selects. A value other than `req.user` or
 
 #### `core/auth/authzLinid1`
 
-| CLI                                                 | Env                              | Default                   | Description                                                                                                                                                |
-| --------------------------------------------------- | -------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--authz-local-admin-attribute`                     | `DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE` | `twakeLocalAdminLink`     | Local admin attribute                                                                                                                                      |
-| `--authz-global-branch` / `--authz-global-branches` | `DM_AUTHZ_GLOBAL_BRANCHES`       |                           | Branches outside the tree only the administrators of `--authz-global-organization` read and write, [details](plugins/auth/authz-linid1.md#global-branches) |
-| `--authz-global-organization`                       | `DM_AUTHZ_GLOBAL_ORGANIZATION`   | `--ldap-top-organization` | The organization holding the global branches                                                                                                               |
+| CLI                                                             | Env                              | Default                   | Description                                                                                                                                                                                   |
+| --------------------------------------------------------------- | -------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--authz-local-admin-attribute`                                 | `DM_AUTHZ_LOCAL_ADMIN_ATTRIBUTE` | `twakeLocalAdminLink`     | Local admin attribute                                                                                                                                                                         |
+| `--authz-global-branch` / `--authz-global-branches`             | `DM_AUTHZ_GLOBAL_BRANCHES`       |                           | Branches outside the tree only the administrators of `--authz-global-organization` read and write, [details](plugins/auth/authz-linid1.md#global-branches)                                    |
+| `--authz-global-write-branch` / `--authz-global-write-branches` | `DM_AUTHZ_GLOBAL_WRITE_BRANCHES` |                           | Branches outside the tree every administrator reads and only the administrators of `--authz-global-organization` write and delete in, [details](plugins/auth/authz-linid1.md#global-branches) |
+| `--authz-global-organization`                                   | `DM_AUTHZ_GLOBAL_ORGANIZATION`   | `--ldap-top-organization` | The organization holding the global branches and global write branches                                                                                                                        |
 
 ### Security Plugins
 

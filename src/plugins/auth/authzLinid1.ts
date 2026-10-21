@@ -10,7 +10,7 @@ import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import AuthzBase from '../../lib/authz/base';
-import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
@@ -43,6 +43,25 @@ export default class AuthzLinid1 extends AuthzBase {
         `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
           `global branch ${holding}`
       );
+    const writeHolding =
+      owner && this.globalWriteBranches().find(dn => isDnInBranch(owner, dn));
+    if (writeHolding)
+      throw new Error(
+        `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
+          `global write branch ${writeHolding}`
+      );
+    // One branch, two rules: which one holds would depend on the order
+    // they are checked in
+    const both = this.globalWriteBranches().find(dn =>
+      this.globalBranches().some(
+        global => normalizeDn(global) === normalizeDn(dn)
+      )
+    );
+    if (both)
+      throw new Error(
+        `AuthzLinid1: ${both} is given both by --authz-global-branches ` +
+          `and --authz-global-write-branches`
+      );
   }
 
   /** The organization holding the global branches */
@@ -67,6 +86,19 @@ export default class AuthzLinid1 extends AuthzBase {
 
   protected globalBranches(): string[] {
     return this.config.authz_global_branch ?? [];
+  }
+
+  /**
+   * Branches written and deleted in by the holders of the global
+   * organization only, and read as the rest of the reference data is: the
+   * mail domains, which every administrator needs to read and none but the
+   * administrators of the whole directory should add or remove. Unlike
+   * {@link globalBranches}, the base class's read checks do not know them: a
+   * search there is filtered no more than in any other branch outside the
+   * tree.
+   */
+  private globalWriteBranches(): string[] {
+    return this.config.authz_global_write_branch ?? [];
   }
 
   /**
@@ -105,7 +137,32 @@ export default class AuthzLinid1 extends AuthzBase {
       return owner && !isDnInBranch(owner, branch)
         ? this.getUserPermissions(userDn, owner)
         : { read: false, write: false, delete: false };
+    // A global write branch is written by whoever holds that organization,
+    // and read by whoever reads it otherwise, or holds it: an entry moved
+    // inside the branch is read at its source
+    if (this.globalWriteBranches().some(dn => isDnInBranch(branch, dn))) {
+      const own = await this.ownPermissions(userDn, branch);
+      const held =
+        owner && !isDnInBranch(owner, branch)
+          ? await this.getUserPermissions(userDn, owner)
+          : { read: false, write: false, delete: false };
+      return {
+        read: own.read || held.read,
+        write: held.write,
+        delete: held.delete,
+      };
+    }
+    return this.ownPermissions(userDn, branch);
+  }
 
+  /**
+   * A user's permissions on a branch from the organizations naming them,
+   * the global branches aside
+   */
+  private async ownPermissions(
+    userDn: string,
+    branch: string
+  ): Promise<BranchPermissions> {
     const now = Date.now();
 
     // Check cache
