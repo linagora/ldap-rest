@@ -11,6 +11,8 @@ import type {
   SearchResult,
 } from '../../lib/ldapActions';
 import { ConflictError } from '../../lib/errors';
+import { extractLdapCode } from '../../lib/ldapCodes';
+import { currentOperation } from '../../lib/operation';
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
@@ -29,6 +31,12 @@ import {
  * these, see docs/usage/plugins/integrations/james-mail.md#replication-lag
  */
 const USER_NOT_SEEN_YET = [400, 404] as const;
+
+/**
+ * What James answers while its storage does not: a call about a mail domain
+ * is retried on these, as an account is on {@link USER_NOT_SEEN_YET}
+ */
+const JAMES_UNAVAILABLE = [500, 502, 503, 504] as const;
 
 type Identity = {
   id: string;
@@ -422,16 +430,19 @@ export default class James extends TwakePlugin {
       return [dn, changes, op, req];
     },
     ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
+      // The trash leaves no DN for what it moved instead
       for (const target of Array.isArray(dn) ? dn : [dn])
-        await this.guardDomainRemoval(target, 'delete');
+        if (target) await this.guardDomainRemoval(target, 'delete');
       return [dn, req] as [string | string[], Request?];
     },
-    // Moved out of every domain branch, an entry no longer declares its
-    // domains: to James, that is a deletion
     ldaprenamerequest: async ([dn, newDn, req]) => {
-      if (this.domainAttribute(dn) && !this.domainAttribute(newDn))
-        await this.guardDomainRemoval(dn, 'move');
+      await this.guardDomainMove(dn, newDn);
       return [dn, newDn, req];
+    },
+    // A rename a request makes is followed from onLdapEntryChange, which a
+    // move made outside one, as the trash makes them, does not publish
+    ldaprenamedone: async ([dn, newDn]: [string, string]) => {
+      if (currentOperation() === undefined) await this.followMove(dn, newDn);
     },
     ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
       this.provisionAccount(dn, attributes),
@@ -798,55 +809,102 @@ export default class James extends TwakePlugin {
   }
 
   /**
-   * Bring James from the domains an entry declared to those it declares:
-   * created at an add, a new value or a move into a domain branch, removed
-   * at a delete, a value dropped or a move out — unless another entry still
-   * declares it. James creates a domain twice without complaint, and removes
-   * one it does not know as well: neither is read first.
+   * The trash turns a delete into a move no request hook sees, and whether
+   * the delete guard below runs before it depends on the order the plugins
+   * were loaded in: say so when the trash watches the domains.
+   */
+  afterLoad(): void {
+    if (!this.server.loadedPlugins['trash']) return;
+    const watched = String(this.config.trash_watched_bases ?? '')
+      .split(';')
+      .map(base => base.trim())
+      .filter(Boolean);
+    for (const { base } of this.domainBranches()) {
+      // Without a list, the trash watches every branch
+      const by = watched.length
+        ? watched.find(dn => {
+            try {
+              return isDnInBranch(base, dn) || isDnInBranch(dn, base);
+            } catch {
+              return false;
+            }
+          })
+        : 'every branch';
+      if (by)
+        this.logger.warn(
+          `James: the trash watches the mail domains of ${base} ` +
+            `(--trash-watched-bases: ${by}): a domain deleted there may skip ` +
+            `the check that it is still in use; leave the domain branch out ` +
+            `of the trash, see ` +
+            `docs/usage/plugins/integrations/james-mail.md#trash`
+        );
+    }
+  }
+
+  /**
+   * Bring James from the domains an entry declared to those it declares,
+   * see docs/usage/plugins/integrations/james-mail.md#mail-domains.
+   * `unguarded`: no request hook judged the write, so a domain addresses are
+   * still at is kept rather than removed.
    */
   private async followDomains(
     before: AttributesList | null,
-    after: AttributesList | null
+    after: AttributesList | null,
+    unguarded = false
   ): Promise<void> {
     const was = this.domainsOf(before);
     const is = this.domainsOf(after);
     if (!was.length && !is.length) return;
     const dn = String((after ?? before)!.dn);
-    const url = (domain: string): string =>
-      `${this.webadminUrl}/domains/${domain}`;
+    const call = (domain: string, method: 'PUT' | 'DELETE'): Promise<void> =>
+      this.callWebAdminApi(
+        method === 'PUT' ? 'domain:create' : 'domain:delete',
+        `${this.webadminUrl}/domains/${domain}`,
+        method,
+        dn,
+        null,
+        { domain },
+        JAMES_UNAVAILABLE
+      );
     await Promise.all([
       ...is
         .filter(domain => !was.includes(domain))
-        .map(domain =>
-          this.inDomainOrder(domain, () =>
-            this.callWebAdminApi(
-              'domain:create',
-              url(domain),
-              'PUT',
-              dn,
-              null,
-              {
-                domain,
-              }
-            )
-          )
-        ),
+        .map(domain => this.inDomainOrder(domain, () => call(domain, 'PUT'))),
       ...was
         .filter(domain => !is.includes(domain))
         .map(domain =>
           this.inDomainOrder(domain, async () => {
             if (await this.domainDeclaredElsewhere(domain, dn)) return;
-            await this.callWebAdminApi(
-              'domain:delete',
-              url(domain),
-              'DELETE',
-              dn,
-              null,
-              { domain }
-            );
+            const user = unguarded ? await this.addressAt(domain) : null;
+            if (user) {
+              this.logger.error({
+                plugin: this.name,
+                event: 'domain:delete',
+                dn,
+                domain,
+                result: 'skipped',
+                error: `${user} still has an address at ${domain}: the domain is kept in James`,
+              });
+              return;
+            }
+            await call(domain, 'DELETE');
           })
         ),
     ]);
+  }
+
+  /**
+   * Follow a move made outside a request, as the trash makes them:
+   * `onLdapEntryChange` is not published for it.
+   */
+  private async followMove(dn: string, newDn: string): Promise<void> {
+    const attributes = [this.domainAttribute(dn), this.domainAttribute(newDn)]
+      .filter((name): name is string => Boolean(name))
+      .filter((name, i, all) => all.findIndex(n => sameAttr(n, name)) === i);
+    if (!attributes.length) return;
+    const entry = await this.ldapGetAttributes(newDn, attributes);
+    if (!entry) return;
+    await this.followDomains({ ...entry, dn }, { ...entry, dn: newDn }, true);
   }
 
   /**
@@ -873,6 +931,33 @@ export default class James extends TwakePlugin {
   private domainQueue: Map<string, Promise<void>> = new Map();
 
   /**
+   * The first entry under `base` that a filter matches and `test` accepts,
+   * walked page by page and no further than that entry: a single search
+   * fails once the answer outgrows the server's size limit. None when
+   * `base` does not exist.
+   */
+  private async firstEntry(
+    base: string,
+    filter: string,
+    attributes: string[],
+    test: (entry: AttributesList) => boolean
+  ): Promise<AttributesList | null> {
+    try {
+      const pages = (await this.server.ldap.search(
+        { paged: { pageSize: 500 }, scope: 'sub', filter, attributes },
+        base
+      )) as AsyncGenerator<SearchResult>;
+      for await (const page of pages)
+        for (const entry of page.searchEntries || [])
+          if (test(entry as AttributesList)) return entry as AttributesList;
+      return null;
+    } catch (err) {
+      if (extractLdapCode(err) === 32) return null;
+      throw err;
+    }
+  }
+
+  /**
    * Whether an entry other than `dn` declares the domain: James keeps it
    * then. An answer the directory does not give counts as yes, as removing a
    * domain still in use is the worse mistake.
@@ -883,27 +968,21 @@ export default class James extends TwakePlugin {
   ): Promise<boolean> {
     try {
       for (const { base, attribute } of this.domainBranches()) {
-        const result = (await this.server.ldap.search(
-          {
-            paged: false,
-            scope: 'sub',
-            filter: `(${attribute}=${escapeLdapFilter(domain)})`,
-            attributes: ['1.1'],
-          },
-          base
-        )) as SearchResult;
-        if (
-          (result.searchEntries || []).some(
-            entry =>
-              !sameDn(String(entry.dn), dn) &&
-              this.domainAttribute(String(entry.dn))
-          )
-        )
-          return true;
+        const found = await this.firstEntry(
+          base,
+          `(${attribute}=${escapeLdapFilter(domain)})`,
+          ['1.1'],
+          entry => {
+            const at = String(entry.dn);
+            const own = this.domainAttribute(at);
+            return !sameDn(at, dn) && !!own && sameAttr(own, attribute);
+          }
+        );
+        if (found) return true;
       }
       return false;
     } catch (err) {
-      this.logger.warn({
+      this.logger.error({
         plugin: this.name,
         event: 'domain:delete',
         dn,
@@ -917,15 +996,10 @@ export default class James extends TwakePlugin {
 
   /**
    * Refuse to delete, or move out of the domain branches, an entry declaring
-   * a mail domain James still needs: one an organization links, or a domain
-   * an address is at. James would drop the domain, and the mail of those
-   * addresses would bounce. Entries declaring no domain — the nodes a nested
-   * layout puts between them, or `*` — are not looked at.
-   *
-   * Searched as the server, like the enterprise rules: an entry the caller
-   * cannot read uses the domain all the same. The error names neither the
-   * organization nor the address, which the caller may not be allowed to
-   * read; the log does.
+   * a mail domain James still needs, see
+   * docs/usage/plugins/integrations/james-mail.md#mail-domains. The error
+   * names neither the organization nor the address, which the caller may not
+   * be allowed to read; the log does.
    *
    * @throws ConflictError
    */
@@ -952,9 +1026,32 @@ export default class James extends TwakePlugin {
   }
 
   /**
+   * Refuse a rename or a move that takes domains from an entry while
+   * addresses are at them: out of every domain branch, as a delete; into
+   * another one, for each domain the entry no longer declares there.
+   *
+   * @throws ConflictError
+   */
+  private async guardDomainMove(dn: string, newDn: string): Promise<void> {
+    const from = this.domainAttribute(dn);
+    if (!from) return;
+    const to = this.domainAttribute(newDn);
+    if (!to) return this.guardDomainRemoval(dn, 'move');
+    const entry =
+      (await this.ldapGetAttributes(
+        dn,
+        sameAttr(from, to) ? [from] : [from, to]
+      )) ?? undefined;
+    const kept = mailDomains(valuesOf(entry, to));
+    for (const domain of mailDomains(valuesOf(entry, from)))
+      if (!kept.includes(domain))
+        await this.assertNoAddressAt(dn, domain, `Cannot move ${dn}`);
+  }
+
+  /**
    * Refuse a modify dropping a domain from an entry while addresses are at
-   * it: James would drop the domain. The organizations linking the entry
-   * are no reason to refuse: they follow the entry, whatever it names.
+   * it. The organizations linking the entry are no reason to refuse: they
+   * follow the entry, whatever it names.
    *
    * @throws ConflictError
    */
@@ -981,7 +1078,8 @@ export default class James extends TwakePlugin {
   /**
    * The attributes linking an organization to its mail domains: those the
    * loaded schemas give the `domainLink` role, then
-   * `--enterprise-domain-link-attribute`.
+   * `--enterprise-domain-link-attribute`. None, and no link is checked,
+   * without either.
    */
   private domainLinkAttributes(): string[] {
     const organizations = this.server.loadedPlugins['ldapOrganizations'] as
@@ -1004,8 +1102,7 @@ export default class James extends TwakePlugin {
   /**
    * The DN of an entry linking the domain entry at `dn` as one of its mail
    * domains, if one does. A link names the entry by its whole DN, compared
-   * as the directory does: the nested domains of a deployment are linked
-   * one by one, and linking `dc=gov,dc=mn,…` is no link to
+   * as the directory does: linking `dc=gov,dc=mn,…` is no link to
    * `dc=customs,dc=gov,dc=mn,…`. The filter asks for the spelling the
    * caller gave, the directory's and the normalized one, for a link
    * attribute that would not compare as a DN.
@@ -1022,18 +1119,39 @@ export default class James extends TwakePlugin {
         spellings.map(value => `(${attr}=${escapeLdapFilter(value)})`)
       )
       .join('')})`;
-    const result = (await this.server.ldap.search(
-      { paged: false, scope: 'sub', filter, attributes },
-      this.config.ldap_base || ''
-    )) as SearchResult;
-    const holder = (result.searchEntries || []).find(entry =>
-      attributes.some(attr =>
-        (valuesOf(entry as AttributesList, attr) ?? []).some(value =>
-          sameDn(value, dn)
+    const holder = await this.firstEntry(
+      this.config.ldap_base || '',
+      filter,
+      attributes,
+      entry =>
+        attributes.some(attr =>
+          (valuesOf(entry, attr) ?? []).some(value => sameDn(value, dn))
         )
-      )
     );
     return holder ? String(holder.dn) : null;
+  }
+
+  /**
+   * The DN of an entry holding an address, or an alias, at a domain.
+   *
+   * Every entry with one is read and its domains compared here: a substring
+   * filter (`*@domain`) finds nothing on an attribute the directory gives no
+   * substring rule, as some schemas declare `mailAlternateAddress`.
+   */
+  private async addressAt(domain: string): Promise<string | null> {
+    const attributes = [this.mailAttr, this.aliasAttr];
+    const atDomain = (value: string): boolean =>
+      this.extractMailDomain(
+        this.normalizeAlias(value.trim())
+      )?.toLowerCase() === domain;
+    const entry = await this.firstEntry(
+      this.config.ldap_base || '',
+      `(|${attributes.map(attr => `(${attr}=*)`).join('')})`,
+      attributes,
+      found =>
+        attributes.some(attr => (valuesOf(found, attr) ?? []).some(atDomain))
+    );
+    return entry ? String(entry.dn) : null;
   }
 
   /**
@@ -1048,22 +1166,9 @@ export default class James extends TwakePlugin {
     refusal: string
   ): Promise<void> {
     if (await this.domainDeclaredElsewhere(domain, dn)) return;
-    const at = `*@${escapeLdapFilter(domain)}`;
-    const result = (await this.server.ldap.search(
-      {
-        paged: false,
-        scope: 'sub',
-        filter: `(|(${this.mailAttr}=${at})(${this.aliasAttr}=${at}))`,
-        attributes: ['1.1'],
-        sizeLimit: 1,
-      },
-      this.config.ldap_base || ''
-    )) as SearchResult;
-    const user = result.searchEntries?.[0];
+    const user = await this.addressAt(domain);
     if (!user) return;
-    this.logger.warn(
-      `${refusal}: ${String(user.dn)} still has an address at ${domain}`
-    );
+    this.logger.warn(`${refusal}: ${user} still has an address at ${domain}`);
     throw new ConflictError(
       `${refusal}: addresses at ${domain} still exist, and James would refuse their mail`
     );

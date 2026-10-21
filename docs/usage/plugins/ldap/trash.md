@@ -73,6 +73,10 @@ ldap-rest \
 
 This only intercepts deletes from `ou=users` and `ou=groups`. Deletes from other branches proceed normally.
 
+With `twake/james`, keep the mail domains out of the trash: a domain moved
+there skips the check that it is still in use, see
+[Trash](../integrations/james-mail.md#trash).
+
 ### Disable Metadata
 
 ```bash

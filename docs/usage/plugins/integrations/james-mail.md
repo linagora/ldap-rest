@@ -184,37 +184,68 @@ are left alone. When no loaded schema declares the role, the plugin falls back
 to that branch and to `--enterprise-domain-name-attribute` (`associatedDomain`
 by default).
 
-| Directory write                                   | WebAdmin call                         |
-| ------------------------------------------------- | ------------------------------------- |
-| Domain entry added                                | `PUT /domains/{domain}`, for each one |
-| Domain value added or changed (`a.org` → `b.org`) | `PUT /domains/b.org`                  |
-| Domain value removed or changed, entry deleted    | `DELETE /domains/a.org`               |
-| Entry moved into, or out of, the domain branches  | as an add, or a delete                |
+| Directory write                                      | WebAdmin call                         |
+| ---------------------------------------------------- | ------------------------------------- |
+| Domain entry added                                   | `PUT /domains/{domain}`, for each one |
+| Domain value added or changed (`a.org` → `b.org`)    | `PUT /domains/b.org`                  |
+| Domain value removed or changed, entry deleted       | `DELETE /domains/a.org`               |
+| Entry moved into, out of, or between domain branches | as an add, a delete, or a change      |
 
 Values are lower-cased, as James stores them. `*`, which the
 [enterprise rules](../ldap/enterprise-rules.md) read as "every domain
 allowed", is no domain and is never pushed, nor is a value that is not a
 fully qualified domain name. A domain another entry still declares is not
-removed. Both calls are safe to repeat: James answers `204` to the creation of
-a domain it already has, and to the removal of one it does not know. A failed
-call is logged, as the plugin's others are; the directory write stands.
+removed.
 
-A delete, or a move out of the domain branches, is refused with `409` while
-the domain is still in use:
+The plugin reads nothing from James first, and does not rely on its answer
+to a repeated call. In Apache James's WebAdmin
+([`DomainsRoutes`](https://github.com/apache/james-project/blob/master/server/protocols/webadmin/webadmin-data/src/main/java/org/apache/james/webadmin/routes/DomainsRoutes.java),
+as of [`53b40cd`](https://github.com/apache/james-project/commit/53b40cdffc5826a94c9a16593e72ad98f49019d3)),
+`PUT /domains/{domain}` answers `204` for a domain it already has, and
+`DELETE /domains/{domain}` answers `204` for one it does not know, and also
+removes the domain aliases pointing to it; it answers `400` to the removal of
+an auto-detected domain. A call James answers `500`, `502`, `503` or `504` is
+retried, `--james-retry-attempts` times in all, as the
+[account calls](#replication-lag) are on `400` and `404`; one that fails
+still, or cannot reach James at all, is logged, and the directory write
+stands.
 
-- an organization links the entry: its `domainLink` attribute
-  (`twakeDomainLink`, or `--enterprise-domain-link-attribute`) names the
-  entry's DN, compared as a DN — linking `dc=gov,dc=mn,…` is no link to
-  `dc=customs,dc=gov,dc=mn,…`;
+A delete, a move out of the domain branches, or a move into another one
+taking a domain from the entry, is refused with `409` while the domain is
+still in use:
+
+- an organization links the entry (on a delete, or a move out of every
+  domain branch): its link attribute names the entry's DN, compared as a
+  DN — linking `dc=gov,dc=mn,…` is no link to `dc=customs,dc=gov,dc=mn,…`.
+  The attribute is the one the organization schema
+  (`--organization-schema`, `twake/organizations.json`: `twakeDomainLink`)
+  gives the `domainLink` role, or `--enterprise-domain-link-attribute`; with
+  neither, nothing is checked;
 - an entry holds an address at the domain, in `--mail-attribute` or
-  `--alias-attribute`: James would drop the domain, and their mail would
-  bounce.
+  `--alias-attribute`, the `smtp:` form of an alias included: James would
+  drop the domain, and their mail would bounce. The entries holding either
+  attribute are read and their domains compared by the plugin, a substring
+  filter (`*@domain`) finding nothing where the directory declares no
+  substring rule for the attribute: on a large directory, a delete takes
+  the time of that walk.
 
 Removing or changing a domain value is refused on the second ground only:
 the organizations linking the entry follow it, whatever it names. The
 searches run as the server, so that an entry the caller cannot read still
 counts; the error names neither the organization nor the address, the log
 does.
+
+#### Trash
+
+The [trash](../ldap/trash.md) turns a delete into a move that no request
+hook judges, and that runs before or after this plugin's delete guard
+depending on the order the plugins were loaded in. Keep the domain branch
+out of `--trash-watched-bases`, which watches every branch when empty: the
+plugin warns at startup when the domains are watched.
+If it is, a domain moved to the trash is removed from James unless an
+address is still at it, in which case it is kept and an error logged; one
+moved back from the trash is created again. The organizations linking it
+are not checked.
 
 The domains are pushed as the directory changes: those it held before the
 plugin was loaded are not created in James at startup.
