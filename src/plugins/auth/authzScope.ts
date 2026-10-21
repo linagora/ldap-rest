@@ -99,7 +99,10 @@ export default class AuthzScope extends DmPlugin {
      *   links: with `authzLinid1`, an administrator holding write on the top
      *   organization or on `--authz-global-organization`. `true` when
      *   unrestricted, `false` when the describing plugin cannot tell, and
-     *   when the scope is not described.
+     *   when the scope is not described. Like the rest of the scope, it is
+     *   the answer of `source` alone: another authorization plugin judging
+     *   the same caller may still refuse the link — `authzPerBranch`
+     *   grants it on the top organization only.
      * tags:
      *   - Authorization
      * responses:
@@ -426,8 +429,8 @@ export default class AuthzScope extends DmPlugin {
       branches,
       // Where any administrator may hand an entry over, and claim one from.
       transit: authz.transitBranch?.() ?? null,
-      // The same question the domain link guard asks, so that a client
-      // offers the domains the server accepts
+      // The question the domain link guard asks, of the describing plugin
+      // only: another one judging this caller may still refuse
       linksAnyDomain: (await authz.mayLinkAnyDomain?.(user)) === true,
       entities,
     });

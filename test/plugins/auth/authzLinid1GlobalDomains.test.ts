@@ -99,6 +99,8 @@ describe('AuthzLinid1: the global organization links any domain', () => {
     top = `ou=GODTop,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
     gov = `ou=GODGov,${top}`;
     local = `ou=GODLocal,${gov}`;
+    // Not created, on purpose: the guard compares the DNs a link holds, it
+    // does not read the domains
     domX = `dc=godx,ou=domains,ou=nomenclature,${base}`;
     domL = `dc=godl,ou=domains,ou=nomenclature,${base}`;
     dm = new DM();

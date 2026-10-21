@@ -122,7 +122,10 @@ applies it too, the top organization alone granting there.
 
 `GET /authz/scope` answers `linksAnyDomain: true` to a caller linking any
 domain, so that a form offers them every domain and the others only those
-the organizations above inherit.
+the organizations above inherit. Like the rest of the scope, it is the
+answer of the plugin describing it (`source`, see `--authz-scope-source`):
+where `authzPerBranch` judges the same caller too, it may still refuse the
+link, granting it on the top organization only.
 
 ### Global branches
 

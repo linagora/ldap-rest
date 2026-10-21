@@ -465,8 +465,8 @@ export default abstract class AuthzBase extends DmPlugin {
    * the directory — another customer's — and create addresses in it (#325).
    *
    * A domain newly linked to an organization must therefore be one an
-   * organization above it already links. Only a caller
-   * {@link mayLinkAnyDomain} accepts links another. Removing a link narrows
+   * organization above it already links. Only a caller accepted by
+   * {@link mayLinkAnyDomain} may link another. Removing a link narrows
    * nothing above the caller's own branch and is judged as any other write.
    *
    * @param user the resolved caller
