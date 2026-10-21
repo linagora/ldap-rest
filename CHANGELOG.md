@@ -1,18 +1,21 @@
 # Changelog
 
-## Unreleased
+## v0.22.0 (2026-10-21)
 
 ### Features
 
 - `twake/james`: the mail domains of the directory are created in James,
   and removed with their entry; a domain still linked by an organization,
   or with addresses at it, cannot be deleted,
-  [docs](docs/usage/plugins/integrations/james-mail.md#mail-domains)
+  [docs](docs/usage/plugins/integrations/james-mail.md#mail-domains),
+  [notes](docs/usage/upgrading.md#james-follows-the-mail-domains)
+  ([#361](https://github.com/linagora/ldap-rest/pull/361))
 - `core/auth/authzLinid1`: `--authz-global-write-branches` reserves the
   writes and deletes of branches outside the tree, such as the mail domains,
   to the administrators of `--authz-global-organization`, while every
   administrator keeps reading them,
   [docs](docs/usage/plugins/auth/authz-linid1.md#global-branches)
+  ([#361](https://github.com/linagora/ldap-rest/pull/361))
 
 ## v0.21.3 (2026-10-20)
 

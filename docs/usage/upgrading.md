@@ -4,6 +4,31 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 0.22.0
+
+### James follows the mail domains
+
+**Who is affected:** a deployment that loads `twake/james` and holds mail
+domain entries (`twake/nomenclature/twakeDomain.json`, or any schema giving
+an attribute the `domainName` role).
+
+From now on, adding a domain entry creates the domain in James, and deleting
+one removes it there. A domain an organization still links, or that an
+address still uses, can no longer be deleted (`409`): unlink it and move the
+addresses first. The domains the directory already holds are not created in
+James at startup: check that James knows each of them
+(`GET /domains` on the WebAdmin) before relying on the directory.
+
+If `core/ldap/trash` watches the domain branch, as it does when
+`--trash-watched-bases` is empty, a warning in the log says so: keep the
+domains out of the trash,
+[details](plugins/integrations/james-mail.md#trash).
+
+To let the administrators of the whole directory add and delete domains
+while every administrator keeps reading them, name the domain branch in
+`--authz-global-write-branches`
+([global branches](plugins/auth/authz-linid1.md#global-branches)).
+
 ## To 0.21.0
 
 ### Accounts another tool created
