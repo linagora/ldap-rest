@@ -65,6 +65,18 @@ export default class AuthzLinid1 extends AuthzBase {
     }
   }
 
+  /**
+   * The administrators of the global organization link any domain too: they
+   * create and delete the domains (`--authz-global-write-branches`), and the
+   * top organization may be a bare container nobody administers.
+   */
+  async mayLinkAnyDomain(user: string): Promise<boolean> {
+    if (await super.mayLinkAnyDomain(user)) return true;
+    const owner = this.globalOrganization();
+    if (!owner) return false;
+    return (await this.getUserPermissions(user, owner)).write === true;
+  }
+
   /** The organization holding the global branches */
   private globalOrganization(): string | undefined {
     return (

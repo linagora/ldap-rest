@@ -105,8 +105,11 @@ write on its parent, so the link itself is held to more:
 
 - a domain newly linked to an organization must already be linked by an
   organization above it, up to the top organization;
-- a caller holding write on the top organization links any domain: they are
-  the one giving each organization its own;
+- a caller holding write on the top organization, or on
+  `--authz-global-organization`, links any domain: they are the one giving
+  each organization its own. The second matters where the top organization
+  is a bare container nobody administers, the administrators of the whole
+  directory holding an organization under it;
 - a domain the organization already links can be kept, and removing one is
   judged as any other change.
 
@@ -115,7 +118,11 @@ Sales' domain, but cannot give it another customer's. The attribute is the
 organization schema's `domainLink` role, or
 `--enterprise-domain-link-attribute`; with neither, nothing is checked. The
 rule belongs to the base of the authorization plugins, so `authzPerBranch`
-applies it too.
+applies it too, the top organization alone granting there.
+
+`GET /authz/scope` answers `linksAnyDomain: true` to a caller linking any
+domain, so that a form offers them every domain and the others only those
+the organizations above inherit.
 
 ### Global branches
 
@@ -158,6 +165,12 @@ the branch, by a move or a rename, asks for the delete permission there, not
 the read every administrator holds: a local administrator cannot move a
 domain into their own organization and delete it from there. Several
 branches are separated by `;`.
+
+The administrators of `--authz-global-organization` also give the
+organizations their domains: they link any domain, as those of the top
+organization do ([Mail domains](#mail-domains)), so that the ones who create
+a domain can hand it to an organization, the top organization being a bare
+container or not.
 
 `--authz-global-organization` must lie outside the global branches and the
 global write branches: nobody would administer it otherwise. A global

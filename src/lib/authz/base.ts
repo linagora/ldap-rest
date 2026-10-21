@@ -465,10 +465,9 @@ export default abstract class AuthzBase extends DmPlugin {
    * the directory — another customer's — and create addresses in it (#325).
    *
    * A domain newly linked to an organization must therefore be one an
-   * organization above it already links. Only a caller holding write on the
-   * top organization — who creates the organizations domains are given to —
-   * links another. Removing a link narrows nothing above the caller's own
-   * branch and is judged as any other write.
+   * organization above it already links. Only a caller
+   * {@link mayLinkAnyDomain} accepts links another. Removing a link narrows
+   * nothing above the caller's own branch and is judged as any other write.
    *
    * @param user the resolved caller
    * @param req the request, for the refusal's wording
@@ -511,11 +510,26 @@ export default abstract class AuthzBase extends DmPlugin {
     const foreign = added.filter(d => !inherited.has(normalizeDn(d)));
     if (foreign.length === 0) return;
 
-    if (top && (await this.getUserPermissions(user, top)).write) return;
+    if (await this.mayLinkAnyDomain(user)) return;
     throw new Error(
       `[authz-forbidden] User ${req.user} may not link ${dn} to domain ` +
         `${foreign[0]}: no organization above it is linked to it`
     );
+  }
+
+  /**
+   * Whether a caller links an organization to any mail domain, not only to
+   * those an organization above it links: one holding write on the top
+   * organization, who creates the organizations domains are given to. A
+   * plugin knowing another such caller says so here; `GET /authz/scope`
+   * reports the answer.
+   *
+   * @param user the resolved caller
+   */
+  async mayLinkAnyDomain(user: string): Promise<boolean> {
+    const top = this.config.ldap_top_organization;
+    if (!top) return false;
+    return (await this.getUserPermissions(user, top)).write === true;
   }
 
   /** Forget what was resolved, for a test that changes the directory. */

@@ -35,6 +35,8 @@ interface AuthzLike extends DmPlugin {
   getUserPermissions(user: string, branch: string): Promise<BranchPermissions>;
   /** `--authz-transit-branch`, where the plugin honours it. */
   transitBranch?(): string | undefined;
+  /** Whether the caller links an organization to any mail domain. */
+  mayLinkAnyDomain?(user: string): Promise<boolean>;
 }
 
 /** One entity, and whether the caller may create one. */
@@ -91,6 +93,13 @@ export default class AuthzScope extends DmPlugin {
      *   describing plugin judges entries by their attachment, `null`
      *   otherwise. Every administrator may put an entry they manage there,
      *   and claim one from it into a branch they write.
+     *
+     *   `linksAnyDomain` says whether the caller may link an organization to
+     *   any mail domain, rather than only to those an organization above it
+     *   links: with `authzLinid1`, an administrator holding write on the top
+     *   organization or on `--authz-global-organization`. `true` when
+     *   unrestricted, `false` when the describing plugin cannot tell, and
+     *   when the scope is not described.
      * tags:
      *   - Authorization
      * responses:
@@ -110,6 +119,7 @@ export default class AuthzScope extends DmPlugin {
      *               write: true
      *               delete: true
      *           transit: ou=Transit,ou=organization,dc=example,dc=com
+     *           linksAnyDomain: false
      *           entities:
      *             - name: users
      *               base: ou=users,dc=example,dc=com
@@ -324,6 +334,7 @@ export default class AuthzScope extends DmPlugin {
           source: null,
           sources: [],
           branches: [],
+          linksAnyDomain: true,
           entities: this.entities().map(({ name, base }) => ({
             name,
             base,
@@ -345,6 +356,7 @@ export default class AuthzScope extends DmPlugin {
         source: null,
         sources: sourceNames,
         branches: [],
+        linksAnyDomain: false,
         entities: [],
       });
       return;
@@ -414,6 +426,9 @@ export default class AuthzScope extends DmPlugin {
       branches,
       // Where any administrator may hand an entry over, and claim one from.
       transit: authz.transitBranch?.() ?? null,
+      // The same question the domain link guard asks, so that a client
+      // offers the domains the server accepts
+      linksAnyDomain: (await authz.mayLinkAnyDomain?.(user)) === true,
       entities,
     });
   }
