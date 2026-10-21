@@ -19,7 +19,7 @@ import { waitFor } from '../../helpers/waitFor';
  * The hooks run one after the other: one subscribed after the plugin's has
  * seen a write only once the plugin's calls about it are over. A request's
  * write is followed from onLdapEntryChange, a move made outside a request
- * from ldaprenamedone.
+ * from ldaprenamedone, and an account's provisioning from ldapadddone.
  */
 const jamesServer = async (
   url: string,
@@ -30,10 +30,12 @@ const jamesServer = async (
   calls: string[];
   settled: (dn: string, write: () => Promise<unknown>) => Promise<void>;
   moved: (dn: string, write: () => Promise<unknown>) => Promise<void>;
+  added: (dn: string, write: () => Promise<unknown>) => Promise<void>;
 }> => {
   const calls: string[] = [];
   const changed: string[] = [];
   const renamed: string[] = [];
+  const provisioned: string[] = [];
   const scope = nock(url).persist();
   for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
     scope
@@ -63,6 +65,12 @@ const jamesServer = async (
       if (after) changed.push(String(after.dn).toLowerCase());
     },
   ];
+  dm.hooks.ldapadddone = [
+    ...(dm.hooks.ldapadddone || []),
+    ([dn]: [string, unknown]) => {
+      provisioned.push(dn.toLowerCase());
+    },
+  ];
   dm.hooks.ldaprenamedone = [
     ...(dm.hooks.ldaprenamedone || []),
     ([, newDn]: [string, string]) => {
@@ -84,6 +92,7 @@ const jamesServer = async (
     calls,
     settled: waiting(changed),
     moved: waiting(renamed),
+    added: waiting(provisioned),
   };
 };
 
@@ -387,15 +396,30 @@ describe('James Plugin - mail domains in the trash', () => {
   let calls: string[];
   let settled: (dn: string, write: () => Promise<unknown>) => Promise<void>;
   let moved: (dn: string, write: () => Promise<unknown>) => Promise<void>;
+  let added: (dn: string, write: () => Promise<unknown>) => Promise<void>;
   let base: string;
   let branch: string;
   let trashBase: string;
+  // Created by the trash, if it had to
+  let trashCreated: boolean;
   let customs: string;
   let trashed: string;
   let user: string;
   const created: string[] = [];
 
   const domainCalls = (): string[] => calls.filter(c => c.includes('/domains'));
+
+  const exists = async (dn: string): Promise<boolean> => {
+    try {
+      const found = (await dm.ldap.search(
+        { scope: 'base', paged: false, attributes: ['1.1'] },
+        dn
+      )) as SearchResult;
+      return found.searchEntries.length > 0;
+    } catch {
+      return false;
+    }
+  };
 
   before(async function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -407,7 +431,7 @@ describe('James Plugin - mail domains in the trash', () => {
     user = `uid=jamestrashuser,${base}`;
 
     nock.disableNetConnect();
-    ({ dm, james, calls, settled, moved } = await jamesServer(
+    ({ dm, james, calls, settled, moved, added } = await jamesServer(
       'http://james.trash.test:8000',
       async server => {
         server.config.trash_base = trashBase;
@@ -415,6 +439,7 @@ describe('James Plugin - mail domains in the trash', () => {
         await server.registerPlugin('trash', new TrashPlugin(server));
       }
     ));
+    trashCreated = !(await exists(trashBase));
     for (const [dn, ou] of [
       [`ou=nomenclature,${base}`, 'nomenclature'],
       [branch, 'domains'],
@@ -435,15 +460,25 @@ describe('James Plugin - mail domains in the trash', () => {
     calls.length = 0;
   });
 
+  // Each write waited for, so that no call to James is still on its way
+  // when the next test, or nock's cleanup, comes
   afterEach(async () => {
-    for (const dn of [user, customs, trashed])
-      await dm.ldap.delete(dn).catch(() => undefined);
+    if (await exists(user)) await settled(user, () => dm.ldap.delete(user));
+    if (await exists(customs))
+      await moved(trashed, () => dm.ldap.delete(customs));
+    if (await exists(trashed))
+      await settled(trashed, () => dm.ldap.delete(trashed));
   });
 
   after(async () => {
-    if (dm)
+    if (dm) {
+      // The branch is watched: deleting it moves it to the trash
       for (const dn of [...created].reverse())
         await dm.ldap.delete(dn).catch(() => undefined);
+      for (const dn of [`ou=domains,${trashBase}`, trashed])
+        await dm.ldap.delete(dn).catch(() => undefined);
+      if (trashCreated) await dm.ldap.delete(trashBase).catch(() => undefined);
+    }
     nock.cleanAll();
     nock.enableNetConnect();
   });
@@ -458,13 +493,15 @@ describe('James Plugin - mail domains in the trash', () => {
   });
 
   it('keeps in James a domain the trash takes while addresses are at it', async () => {
-    await dm.ldap.add(user, {
-      objectClass: ['top', 'inetOrgPerson'],
-      uid: 'jamestrashuser',
-      cn: 'Trash',
-      sn: 'Trash',
-      mail: 'officer@trash.gov.mn',
-    });
+    await added(user, () =>
+      dm.ldap.add(user, {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'jamestrashuser',
+        cn: 'Trash',
+        sn: 'Trash',
+        mail: 'officer@trash.gov.mn',
+      })
+    );
     calls.length = 0;
     await moved(trashed, () => dm.ldap.delete(customs));
     expect(domainCalls()).to.eql([]);
