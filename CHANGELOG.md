@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `twake/james`: the mail domains of the directory are created in James,
+  and removed with their entry; a domain still linked by an organization,
+  or with addresses at it, cannot be deleted,
+  [docs](docs/usage/plugins/integrations/james-mail.md#mail-domains)
+
 ## v0.21.3 (2026-10-20)
 
 ### Fixes

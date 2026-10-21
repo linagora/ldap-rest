@@ -169,6 +169,56 @@ Only the change is applied: a forward the user added in Twake Mail stays
 until the directory names it and removes it, and the directory is never told
 about the forwards set in Twake Mail.
 
+### Mail Domains
+
+James accepts mail only for the domains it knows. The plugin creates in James
+each mail domain the directory declares, and removes it once no entry
+declares it any more.
+
+A domain entry is an entry under the `base` of a flat schema giving one of its
+attributes the `domainName` role, at any depth: with the shipped
+`twake/nomenclature/twakeDomain.json`, the `associatedDomain` of the entries
+under `ou=domains,ou=nomenclature,<base>`. A deployment may nest them,
+`dc=customs,dc=gov,dc=mn,ou=domains,…`, under nodes declaring no domain: those
+are left alone. When no loaded schema declares the role, the plugin falls back
+to that branch and to `--enterprise-domain-name-attribute` (`associatedDomain`
+by default).
+
+| Directory write                                   | WebAdmin call                         |
+| ------------------------------------------------- | ------------------------------------- |
+| Domain entry added                                | `PUT /domains/{domain}`, for each one |
+| Domain value added or changed (`a.org` → `b.org`) | `PUT /domains/b.org`                  |
+| Domain value removed or changed, entry deleted    | `DELETE /domains/a.org`               |
+| Entry moved into, or out of, the domain branches  | as an add, or a delete                |
+
+Values are lower-cased, as James stores them. `*`, which the
+[enterprise rules](../ldap/enterprise-rules.md) read as "every domain
+allowed", is no domain and is never pushed, nor is a value that is not a
+fully qualified domain name. A domain another entry still declares is not
+removed. Both calls are safe to repeat: James answers `204` to the creation of
+a domain it already has, and to the removal of one it does not know. A failed
+call is logged, as the plugin's others are; the directory write stands.
+
+A delete, or a move out of the domain branches, is refused with `409` while
+the domain is still in use:
+
+- an organization links the entry: its `domainLink` attribute
+  (`twakeDomainLink`, or `--enterprise-domain-link-attribute`) names the
+  entry's DN, compared as a DN — linking `dc=gov,dc=mn,…` is no link to
+  `dc=customs,dc=gov,dc=mn,…`;
+- an entry holds an address at the domain, in `--mail-attribute` or
+  `--alias-attribute`: James would drop the domain, and their mail would
+  bounce.
+
+Removing or changing a domain value is refused on the second ground only:
+the organizations linking the entry follow it, whatever it names. The
+searches run as the server, so that an entry the caller cannot read still
+counts; the error names neither the organization nor the address, the log
+does.
+
+The domains are pushed as the directory changes: those it held before the
+plugin was loaded are not created in James at startup.
+
 ### Display Name and Identity
 
 When a user is added, renamed, or their display name changes, the plugin names
@@ -615,6 +665,8 @@ const type = await james.getGroupMailboxType(
 | Remove alias      | `/address/aliases/{mail}/sources/{alias}`  | DELETE |
 | List forwards     | `/address/forwards/{mail}`                 | GET    |
 | Remove forward    | `/address/forwards/{mail}/targets/{to}`    | DELETE |
+| Create domain     | `/domains/{domain}`                        | PUT    |
+| Remove domain     | `/domains/{domain}`                        | DELETE |
 
 ### Authentication
 

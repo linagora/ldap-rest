@@ -14,8 +14,10 @@ import { ConflictError } from '../../lib/errors';
 import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
+import { type Schema, roleAttribute } from '../../config/schema';
 import {
   escapeLdapFilter,
+  isDnInBranch,
   isDummyMemberDn,
   normalizeDn,
 } from '../../lib/utils';
@@ -173,6 +175,42 @@ const isGroup = (classes: AttributeValue | undefined): boolean =>
   (Array.isArray(classes) ? classes : classes ? [classes] : []).some(c =>
     GROUP_CLASSES.includes(String(c).toLowerCase())
   );
+
+/** Where mail domain entries live, and the attribute naming their domain */
+interface DomainBranch {
+  base: string;
+  attribute: string;
+}
+
+// The test of the shipped twakeDomain.json, lower-cased: `*`, which the
+// enterprise rules read as "every domain allowed", is no domain of James's
+const FQDN =
+  /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+/** The mail domains among values, lower-cased as James stores them */
+const mailDomains = (values: string[] | undefined): string[] => [
+  ...new Set(
+    (values ?? []).map(v => v.trim().toLowerCase()).filter(v => FQDN.test(v))
+  ),
+];
+
+/** Whether a modify writes an attribute, whichever way */
+const touches = (changes: ModifyRequest, name: string): boolean =>
+  [changes.add, changes.replace].some(
+    list => list && Object.keys(list).some(key => sameAttr(key, name))
+  ) ||
+  (Array.isArray(changes.delete)
+    ? changes.delete.some(key => sameAttr(key, name))
+    : Object.keys(changes.delete ?? {}).some(key => sameAttr(key, name)));
+
+/** Compare DNs as the directory does; an unparsable one is equal to none */
+const sameDn = (a: string, b: string): boolean => {
+  try {
+    return normalizeDn(a) === normalizeDn(b);
+  } catch {
+    return false;
+  }
+};
 
 export default class James extends TwakePlugin {
   name = 'james';
@@ -380,7 +418,20 @@ export default class James extends TwakePlugin {
     },
     ldapmodifyrequest: async ([dn, changes, op, req]) => {
       await this.guardTeamMailboxChange(dn, changes);
+      await this.guardDomainChange(dn, changes);
       return [dn, changes, op, req];
+    },
+    ldapdeleterequest: async ([dn, req]: [string | string[], Request?]) => {
+      for (const target of Array.isArray(dn) ? dn : [dn])
+        await this.guardDomainRemoval(target, 'delete');
+      return [dn, req] as [string | string[], Request?];
+    },
+    // Moved out of every domain branch, an entry no longer declares its
+    // domains: to James, that is a deletion
+    ldaprenamerequest: async ([dn, newDn, req]) => {
+      if (this.domainAttribute(dn) && !this.domainAttribute(newDn))
+        await this.guardDomainRemoval(dn, 'move');
+      return [dn, newDn, req];
     },
     ldapadddone: ([dn, attributes]: [string, AttributesList]) =>
       this.provisionAccount(dn, attributes),
@@ -680,8 +731,343 @@ export default class James extends TwakePlugin {
         before as AttributesList | null,
         after as AttributesList | null
       );
+      // Here only, not from ldapadddone too: this fires once for an add, a
+      // modify, a rename and a delete alike
+      await this.followDomains(
+        before as AttributesList | null,
+        after as AttributesList | null
+      );
     },
   };
+
+  /**
+   * Where the mail domain entries live, and the attribute naming their
+   * domain: each loaded flat schema declaring the `domainName` role, the
+   * lookup `core/ldap/enterpriseRules` makes. Without one, the branch of the
+   * shipped `twake/nomenclature/twakeDomain.json` and the attribute
+   * `--enterprise-domain-name-attribute` names.
+   *
+   * Rebuilt on each call, as the enterprise rules do theirs: a list taken in
+   * the constructor could predate the schemas.
+   */
+  private domainBranches(): DomainBranch[] {
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      | { instances?: { base: string; schema?: Schema }[] }
+      | undefined;
+    const branches: DomainBranch[] = [];
+    for (const instance of flat?.instances || []) {
+      const attribute = roleAttribute(instance.schema, 'domainName');
+      if (attribute) branches.push({ base: instance.base, attribute });
+    }
+    if (branches.length || !this.config.ldap_base) return branches;
+    return [
+      {
+        base: `ou=domains,ou=nomenclature,${this.config.ldap_base}`,
+        attribute:
+          this.config.enterprise_domain_name_attribute || 'associatedDomain',
+      },
+    ];
+  }
+
+  /**
+   * The attribute naming the mail domain of the entry at a DN, when it lies
+   * in a domain branch: at any depth, as a deployment may nest its domains
+   * (`dc=customs,dc=gov,dc=mn,ou=domains,…`) under nodes naming none. Those
+   * are left alone for carrying no domain, not for where they stand. The
+   * deepest branch wins.
+   */
+  private domainAttribute(dn: string): string | undefined {
+    let found: string | undefined;
+    let depth = -1;
+    for (const { base, attribute } of this.domainBranches()) {
+      try {
+        if (sameDn(dn, base) || !isDnInBranch(dn, base)) continue;
+        const d = normalizeDn(base).split(',').length;
+        if (d > depth) [found, depth] = [attribute, d];
+      } catch {
+        // An unparsable DN lies in no branch
+      }
+    }
+    return found;
+  }
+
+  /** The mail domains an entry declares, none outside the domain branches */
+  private domainsOf(entry: AttributesList | null): string[] {
+    const attribute = entry?.dn && this.domainAttribute(String(entry.dn));
+    return attribute ? mailDomains(valuesOf(entry, attribute)) : [];
+  }
+
+  /**
+   * Bring James from the domains an entry declared to those it declares:
+   * created at an add, a new value or a move into a domain branch, removed
+   * at a delete, a value dropped or a move out — unless another entry still
+   * declares it. James creates a domain twice without complaint, and removes
+   * one it does not know as well: neither is read first.
+   */
+  private async followDomains(
+    before: AttributesList | null,
+    after: AttributesList | null
+  ): Promise<void> {
+    const was = this.domainsOf(before);
+    const is = this.domainsOf(after);
+    if (!was.length && !is.length) return;
+    const dn = String((after ?? before)!.dn);
+    const url = (domain: string): string =>
+      `${this.webadminUrl}/domains/${domain}`;
+    await Promise.all([
+      ...is
+        .filter(domain => !was.includes(domain))
+        .map(domain =>
+          this.inDomainOrder(domain, () =>
+            this.callWebAdminApi(
+              'domain:create',
+              url(domain),
+              'PUT',
+              dn,
+              null,
+              {
+                domain,
+              }
+            )
+          )
+        ),
+      ...was
+        .filter(domain => !is.includes(domain))
+        .map(domain =>
+          this.inDomainOrder(domain, async () => {
+            if (await this.domainDeclaredElsewhere(domain, dn)) return;
+            await this.callWebAdminApi(
+              'domain:delete',
+              url(domain),
+              'DELETE',
+              dn,
+              null,
+              { domain }
+            );
+          })
+        ),
+    ]);
+  }
+
+  /**
+   * Run the calls about one domain in the order of the writes: an entry
+   * added then deleted close together would otherwise race to James, and
+   * the creation could land last.
+   */
+  private async inDomainOrder(
+    domain: string,
+    step: () => Promise<void>
+  ): Promise<void> {
+    const previous = this.domainQueue.get(domain) ?? Promise.resolve();
+    // A failed step does not hold back the next one
+    const current = previous.then(step, step);
+    this.domainQueue.set(domain, current);
+    try {
+      await current;
+    } finally {
+      if (this.domainQueue.get(domain) === current)
+        this.domainQueue.delete(domain);
+    }
+  }
+
+  private domainQueue: Map<string, Promise<void>> = new Map();
+
+  /**
+   * Whether an entry other than `dn` declares the domain: James keeps it
+   * then. An answer the directory does not give counts as yes, as removing a
+   * domain still in use is the worse mistake.
+   */
+  private async domainDeclaredElsewhere(
+    domain: string,
+    dn: string
+  ): Promise<boolean> {
+    try {
+      for (const { base, attribute } of this.domainBranches()) {
+        const result = (await this.server.ldap.search(
+          {
+            paged: false,
+            scope: 'sub',
+            filter: `(${attribute}=${escapeLdapFilter(domain)})`,
+            attributes: ['1.1'],
+          },
+          base
+        )) as SearchResult;
+        if (
+          (result.searchEntries || []).some(
+            entry =>
+              !sameDn(String(entry.dn), dn) &&
+              this.domainAttribute(String(entry.dn))
+          )
+        )
+          return true;
+      }
+      return false;
+    } catch (err) {
+      this.logger.warn({
+        plugin: this.name,
+        event: 'domain:delete',
+        dn,
+        domain,
+        result: 'skipped',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return true;
+    }
+  }
+
+  /**
+   * Refuse to delete, or move out of the domain branches, an entry declaring
+   * a mail domain James still needs: one an organization links, or a domain
+   * an address is at. James would drop the domain, and the mail of those
+   * addresses would bounce. Entries declaring no domain — the nodes a nested
+   * layout puts between them, or `*` — are not looked at.
+   *
+   * Searched as the server, like the enterprise rules: an entry the caller
+   * cannot read uses the domain all the same. The error names neither the
+   * organization nor the address, which the caller may not be allowed to
+   * read; the log does.
+   *
+   * @throws ConflictError
+   */
+  private async guardDomainRemoval(
+    dn: string,
+    action: 'delete' | 'move'
+  ): Promise<void> {
+    const attribute = this.domainAttribute(dn);
+    if (!attribute) return;
+    const entry = await this.ldapGetAttributes(dn, [attribute]);
+    const domains = mailDomains(valuesOf(entry ?? undefined, attribute));
+    if (!domains.length) return;
+    const holder = await this.domainLinkHolder(dn, String(entry!.dn ?? dn));
+    if (holder) {
+      this.logger.warn(
+        `${action} of ${dn} refused: organization ${holder} links it`
+      );
+      throw new ConflictError(
+        `Cannot ${action} ${dn}: an organization still links mail domain ${domains.join(', ')}`
+      );
+    }
+    for (const domain of domains)
+      await this.assertNoAddressAt(dn, domain, `Cannot ${action} ${dn}`);
+  }
+
+  /**
+   * Refuse a modify dropping a domain from an entry while addresses are at
+   * it: James would drop the domain. The organizations linking the entry
+   * are no reason to refuse: they follow the entry, whatever it names.
+   *
+   * @throws ConflictError
+   */
+  private async guardDomainChange(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<void> {
+    const attribute = this.domainAttribute(dn);
+    if (!attribute || !touches(changes, attribute)) return;
+    const current = await this.ldapGetAttributes(dn, [attribute]);
+    if (!current) return;
+    const kept = mailDomains(
+      valuesAfter(current, changes, attribute, v => v.toLowerCase())
+    );
+    for (const domain of mailDomains(valuesOf(current, attribute)))
+      if (!kept.includes(domain))
+        await this.assertNoAddressAt(
+          dn,
+          domain,
+          `Cannot remove mail domain ${domain} from ${dn}`
+        );
+  }
+
+  /**
+   * The attributes linking an organization to its mail domains: those the
+   * loaded schemas give the `domainLink` role, then
+   * `--enterprise-domain-link-attribute`.
+   */
+  private domainLinkAttributes(): string[] {
+    const organizations = this.server.loadedPlugins['ldapOrganizations'] as
+      | { schema?: Schema }
+      | undefined;
+    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
+      | { instances?: { schema?: Schema }[] }
+      | undefined;
+    const names = [
+      organizations?.schema,
+      ...(flat?.instances || []).map(instance => instance.schema),
+    ].map(schema => roleAttribute(schema, 'domainLink'));
+    names.push(this.config.enterprise_domain_link_attribute);
+    const out: string[] = [];
+    for (const name of names)
+      if (name && !out.some(n => sameAttr(n, name))) out.push(name);
+    return out;
+  }
+
+  /**
+   * The DN of an entry linking the domain entry at `dn` as one of its mail
+   * domains, if one does. A link names the entry by its whole DN, compared
+   * as the directory does: the nested domains of a deployment are linked
+   * one by one, and linking `dc=gov,dc=mn,…` is no link to
+   * `dc=customs,dc=gov,dc=mn,…`. The filter asks for the spelling the
+   * caller gave, the directory's and the normalized one, for a link
+   * attribute that would not compare as a DN.
+   */
+  private async domainLinkHolder(
+    dn: string,
+    stored: string
+  ): Promise<string | null> {
+    const attributes = this.domainLinkAttributes();
+    if (!attributes.length) return null;
+    const spellings = [...new Set([dn, stored, normalizeDn(dn)])];
+    const filter = `(|${attributes
+      .flatMap(attr =>
+        spellings.map(value => `(${attr}=${escapeLdapFilter(value)})`)
+      )
+      .join('')})`;
+    const result = (await this.server.ldap.search(
+      { paged: false, scope: 'sub', filter, attributes },
+      this.config.ldap_base || ''
+    )) as SearchResult;
+    const holder = (result.searchEntries || []).find(entry =>
+      attributes.some(attr =>
+        (valuesOf(entry as AttributesList, attr) ?? []).some(value =>
+          sameDn(value, dn)
+        )
+      )
+    );
+    return holder ? String(holder.dn) : null;
+  }
+
+  /**
+   * Throw when an entry holds an address, or an alias, at a domain James
+   * is about to drop — unless another entry still declares it.
+   *
+   * @throws ConflictError, its message starting with `refusal`
+   */
+  private async assertNoAddressAt(
+    dn: string,
+    domain: string,
+    refusal: string
+  ): Promise<void> {
+    if (await this.domainDeclaredElsewhere(domain, dn)) return;
+    const at = `*@${escapeLdapFilter(domain)}`;
+    const result = (await this.server.ldap.search(
+      {
+        paged: false,
+        scope: 'sub',
+        filter: `(|(${this.mailAttr}=${at})(${this.aliasAttr}=${at}))`,
+        attributes: ['1.1'],
+        sizeLimit: 1,
+      },
+      this.config.ldap_base || ''
+    )) as SearchResult;
+    const user = result.searchEntries?.[0];
+    if (!user) return;
+    this.logger.warn(
+      `${refusal}: ${String(user.dn)} still has an address at ${domain}`
+    );
+    throw new ConflictError(
+      `${refusal}: addresses at ${domain} still exist, and James would refuse their mail`
+    );
+  }
 
   /**
    * The address of the team mailbox an entry stands for, and why it is
