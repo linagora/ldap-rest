@@ -44,6 +44,32 @@ describe('AuthzLinid1: global write branches', () => {
   const localDn = (): string => `uid=gwb.local,ou=users,${base}`;
   const seed = (): string => `dc=gwbseed,${branch}`;
   const api = '/api/v1/ldap/domains';
+  // Every place the moved entries can be left in
+  const moving = (): string[] => [
+    `dc=gwbmove,dc=gwbseed,${branch}`,
+    `dc=gwbmove,${branch}`,
+    `dc=gwbmove,${orgDn}`,
+    `dc=gwbmove,${top}`,
+    `dc=gwbin,${branch}`,
+    `dc=gwbin,${orgDn}`,
+  ];
+  const as = (user: string): DmRequest =>
+    ({ user, headers: {} }) as unknown as DmRequest;
+  const domainAt = (dn: string): Promise<boolean> =>
+    dm.ldap.add(dn, {
+      objectClass: ['top', 'domain', 'domainRelatedObject'],
+      dc: /^dc=([^,]+)/.exec(dn)![1],
+      associatedDomain: 'gwbmove.example.org',
+    });
+  const refused = async (write: Promise<unknown>): Promise<void> => {
+    try {
+      await write;
+    } catch (err) {
+      expect(String(err)).to.match(/\[authz-forbidden\]/);
+      return;
+    }
+    throw new Error('the write was accepted');
+  };
 
   before(function () {
     skipIfMissingEnvVars(this, [
@@ -121,6 +147,7 @@ describe('AuthzLinid1: global write branches', () => {
     if (!dm) return;
     for (const dc of ['gwbseed', 'gwbnew', 'gwblocal'])
       await dm.ldap.delete(`dc=${dc},${branch}`).catch(() => undefined);
+    for (const dn of moving()) await dm.ldap.delete(dn).catch(() => undefined);
     for (const dn of [...created].reverse())
       await dm.ldap.delete(dn).catch(() => undefined);
     await dm.ldap
@@ -226,12 +253,97 @@ describe('AuthzLinid1: global write branches', () => {
     }
   });
 
+  it('reads them as every administrator, writes them as the global ones', async () => {
+    const authz = dm.loadedPlugins['authzLinid1'] as AuthzLinid1;
+    expect(await authz.getUserPermissions(localDn(), branch)).to.deep.equal({
+      read: true,
+      write: false,
+      delete: false,
+    });
+    expect(await authz.getUserPermissions(globalDn(), branch)).to.deep.equal({
+      read: true,
+      write: true,
+      delete: true,
+    });
+  });
+
+  describe('moves', () => {
+    afterEach(async () => {
+      for (const dn of moving())
+        await dm.ldap.delete(dn).catch(() => undefined);
+    });
+
+    it('lets a global administrator move within, out of and into them', async () => {
+      const global = as('gwb.global');
+      await domainAt(`dc=gwbmove,${branch}`);
+      // Within, a domain nested under another
+      await dm.ldap.rename(
+        `dc=gwbmove,${branch}`,
+        `dc=gwbmove,dc=gwbseed,${branch}`,
+        global
+      );
+      // Out, to an organization they hold
+      await dm.ldap.rename(
+        `dc=gwbmove,dc=gwbseed,${branch}`,
+        `dc=gwbmove,${top}`,
+        global
+      );
+      // And in again
+      await dm.ldap.rename(`dc=gwbmove,${top}`, `dc=gwbmove,${branch}`, global);
+      const there = (await dm.ldap.search(
+        { scope: 'base', paged: false },
+        `dc=gwbmove,${branch}`
+      )) as SearchResult;
+      expect(there.searchEntries).to.have.length(1);
+    });
+
+    it('refuses a local administrator a move out, though they read there', async () => {
+      await domainAt(`dc=gwbmove,${branch}`);
+      // Write on their organization, read on the branch: taking the entry
+      // out of it is a delete there
+      await refused(
+        dm.ldap.rename(
+          `dc=gwbmove,${branch}`,
+          `dc=gwbmove,${orgDn}`,
+          as('gwb.local')
+        )
+      );
+      const kept = (await dm.ldap.search(
+        { scope: 'base', paged: false },
+        `dc=gwbmove,${branch}`
+      )) as SearchResult;
+      expect(kept.searchEntries).to.have.length(1);
+    });
+
+    it('refuses a local administrator a move in', async () => {
+      await domainAt(`dc=gwbin,${orgDn}`);
+      await refused(
+        dm.ldap.rename(
+          `dc=gwbin,${orgDn}`,
+          `dc=gwbin,${branch}`,
+          as('gwb.local')
+        )
+      );
+    });
+  });
+
   it('refuses to start with a branch given by both options', () => {
     dm.config.authz_global_branch = [branch.toUpperCase()];
     try {
-      expect(() => new AuthzLinid1(dm)).to.throw(/given both/);
+      expect(() => new AuthzLinid1(dm)).to.throw(/overlap/);
     } finally {
       dm.config.authz_global_branch = [];
+    }
+  });
+
+  it('refuses to start with a write branch in a global branch, or holding one', () => {
+    for (const global of [`ou=nomenclature,${base}`, `ou=sub,${branch}`]) {
+      dm.config.authz_global_branch = [global];
+      try {
+        expect(() => new AuthzLinid1(dm), global).to.throw(/overlap/);
+      } finally {
+        dm.config.authz_global_branch = [];
+      }
     }
   });
 });

@@ -135,6 +135,15 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * What taking an entry out of a branch, by a move or a rename, asks of
+   * the caller there: read, by default, the destination being judged on
+   * write.
+   */
+  protected sourcePermission(_branch: string): keyof BranchPermissions {
+    return 'read';
+  }
+
+  /**
    * The branch a write is judged against.
    *
    * An account is stored in the same `ou=users` as everyone else, so its
@@ -613,7 +622,9 @@ export default abstract class AuthzBase extends DmPlugin {
         const toTransit = byAttachment && this.inTransit(destBranch);
 
         if (!fromTransit) {
-          const needed = toTransit ? 'write' : 'read';
+          const needed = toTransit
+            ? 'write'
+            : this.sourcePermission(sourceBranch);
           const sourcePermissions = await this.getUserPermissions(
             user,
             sourceBranch
@@ -967,14 +978,15 @@ export default abstract class AuthzBase extends DmPlugin {
       const sourceBranch = this.extractBranchDn(oldDn);
       const destBranch = this.extractBranchDn(newDn);
 
-      // Check read permission on source
+      // Check read permission on source, or what else it asks
       const sourcePermissions = await this.getUserPermissions(
         user,
         sourceBranch
       );
-      if (!sourcePermissions.read) {
+      const needed = this.sourcePermission(sourceBranch);
+      if (!sourcePermissions[needed]) {
         throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have read permission for source branch ${sourceBranch}`
+          `[authz-forbidden] User ${req!.user} does not have ${needed} permission for source branch ${sourceBranch}`
         );
       }
 

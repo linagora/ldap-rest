@@ -153,12 +153,18 @@ the whole directory, so they are a global write branch:
 There, the administrators of `--authz-global-organization` and above add,
 change, rename and delete, at any depth, and `GET /authz/scope` offers them
 to create the entity whose base it is; any other administrator reads, lists
-and searches, and is refused every write with `403`. Several branches are
-separated by `;`.
+and searches, and is refused every write with `403`. Taking an entry out of
+the branch, by a move or a rename, asks for the delete permission there, not
+the read every administrator holds: a local administrator cannot move a
+domain into their own organization and delete it from there. Several
+branches are separated by `;`.
 
 `--authz-global-organization` must lie outside the global branches and the
-global write branches: nobody would administer it otherwise. A branch named
-by both options is ambiguous. In either case the server refuses to start.
+global write branches: nobody would administer it otherwise. A global
+branch and a global write branch may not be the same, nor lie one in the
+other: the global branch would hide the write branch it holds from the
+administrators meant to read it. In either case the server refuses to
+start.
 
 ## Configuration
 

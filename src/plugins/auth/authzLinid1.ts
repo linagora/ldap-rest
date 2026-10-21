@@ -10,7 +10,7 @@ import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
 import AuthzBase from '../../lib/authz/base';
-import { escapeLdapFilter, isDnInBranch, normalizeDn } from '../../lib/utils';
+import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 interface CachedPermissions {
   branches: Map<string, BranchPermissions>;
@@ -50,18 +50,19 @@ export default class AuthzLinid1 extends AuthzBase {
         `AuthzLinid1: --authz-global-organization ${owner} lies in the ` +
           `global write branch ${writeHolding}`
       );
-    // One branch, two rules: which one holds would depend on the order
-    // they are checked in
-    const both = this.globalWriteBranches().find(dn =>
-      this.globalBranches().some(
-        global => normalizeDn(global) === normalizeDn(dn)
-      )
-    );
-    if (both)
-      throw new Error(
-        `AuthzLinid1: ${both} is given both by --authz-global-branches ` +
-          `and --authz-global-write-branches`
+    // One branch under two rules: the global one, checked first, would
+    // hide a write branch it holds from the administrators meant to read
+    // it, and a global branch inside a write branch would read as one
+    for (const write of this.globalWriteBranches()) {
+      const global = this.globalBranches().find(
+        dn => isDnInBranch(write, dn) || isDnInBranch(dn, write)
       );
+      if (global)
+        throw new Error(
+          `AuthzLinid1: the global branch ${global} and the global write ` +
+            `branch ${write} overlap`
+        );
+    }
   }
 
   /** The organization holding the global branches */
@@ -101,6 +102,18 @@ export default class AuthzLinid1 extends AuthzBase {
     return this.config.authz_global_write_branch ?? [];
   }
 
+  private isGlobalWrite(branch: string): boolean {
+    return this.globalWriteBranches().some(dn => isDnInBranch(branch, dn));
+  }
+
+  /**
+   * Taking an entry out of a global write branch removes it from there: it
+   * asks what a delete asks, not the read every administrator holds
+   */
+  protected sourcePermission(branch: string): keyof BranchPermissions {
+    return this.isGlobalWrite(branch) ? 'delete' : 'read';
+  }
+
   /**
    * Resolve user - for authzLinid1, convert uid to userDn via LDAP
    */
@@ -138,16 +151,15 @@ export default class AuthzLinid1 extends AuthzBase {
         ? this.getUserPermissions(userDn, owner)
         : { read: false, write: false, delete: false };
     // A global write branch is written by whoever holds that organization,
-    // and read by whoever reads it otherwise, or holds it: an entry moved
-    // inside the branch is read at its source
-    if (this.globalWriteBranches().some(dn => isDnInBranch(branch, dn))) {
-      const own = await this.ownPermissions(userDn, branch);
+    // and read by every administrator, as the rest of the reference data
+    if (this.isGlobalWrite(branch)) {
       const held =
         owner && !isDnInBranch(owner, branch)
           ? await this.getUserPermissions(userDn, owner)
           : { read: false, write: false, delete: false };
       return {
-        read: own.read || held.read,
+        read:
+          held.read || (await this.getAuthorizedBranches(userDn)).length > 0,
         write: held.write,
         delete: held.delete,
       };
