@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.22.1 (2026-10-21)
 
 ### Fixes
 
@@ -10,6 +10,7 @@
   container, nobody could give a new organization a domain.
   `GET /authz/scope` reports it as `linksAnyDomain`,
   [docs](docs/usage/plugins/auth/authz-linid1.md#mail-domains)
+  ([#363](https://github.com/linagora/ldap-rest/pull/363))
 
 ## v0.22.0 (2026-10-21)
 
