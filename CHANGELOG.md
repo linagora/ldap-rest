@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.23.0 (2026-10-22)
+
+### Features
+
+- Schemas: `help` says what an attribute is, for a client to show on demand
+  next to its label,
+  [docs](docs/usage/plugins/ldap/flat-generic.md#explaining-an-attribute-help)
+  ([#364](https://github.com/linagora/ldap-rest/pull/364))
+- Schemas: the roles `givenName` and `surname` name the parts of a person's
+  name, which a client composes the `displayName` from; the shipped user
+  schemas mark `givenName` and `sn`,
+  [docs](docs/usage/plugins/ldap/flat-generic.md#semantic-roles)
+  ([#364](https://github.com/linagora/ldap-rest/pull/364))
+- Twake users: the Employee ID explains itself, and the Department comes
+  right after it ([#364](https://github.com/linagora/ldap-rest/pull/364))
+
 ## v0.22.1 (2026-10-21)
 
 ### Fixes
