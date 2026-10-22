@@ -57,6 +57,7 @@
       "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
       "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
       "required": true,
+      "role": "surname",
       "label": "Last name"
     },
     "givenName": {
@@ -65,6 +66,7 @@
       "test": "^[A-ZÀ-ÖØ-Þ](?!.*([\\s’'-]{2}|[.’'-]{2}|\\s\\.|[\\s’'-]$))[A-Za-zÀ-ÖØ-öø-ÿ\\s’'.-]{1,50}$",
       "hint": "Starts with a capital, up to 51 letters, no repeated space, apostrophe, hyphen or dot",
       "required": true,
+      "role": "givenName",
       "label": "First name"
     },
     "displayName": {

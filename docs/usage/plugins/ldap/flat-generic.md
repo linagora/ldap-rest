@@ -222,6 +222,27 @@ cannot drift apart, and neither is hardcoded in the interface. A translated
 hint is picked like a label; the server's messages are in English, so it
 quotes the English text.
 
+### Explaining an attribute: `help`
+
+A label names an attribute; it does not always say what it is. `help` does,
+for a client to show on demand — a tooltip next to the label — rather than
+under every field:
+
+```json
+{
+  "employeeNumber": {
+    "type": "string",
+    "label": { "en": "Employee ID", "fr": "Matricule" },
+    "help": {
+      "en": "The person's registration number, as the personnel records hold it.",
+      "fr": "Le matricule de la personne, tel que le tient la gestion du personnel."
+    }
+  }
+}
+```
+
+It is picked like a label. The server never shows it.
+
 ### Attributes a client may not send
 
 | Marker      | Meaning                                                                         |
@@ -302,6 +323,10 @@ chose in its own. The roles the core looks for:
 
 An attribute may carry several roles (`"role": ["identifier", "displayName"]`),
 and a deployment is free to add its own for its plugins.
+
+Clients look for more: `givenName` and `surname` name the parts of a person's
+name, which a form composes the `displayName` from. The shipped user schemas
+mark `givenName` and `sn` with them.
 
 ### Which attributes a search covers: `searchable`
 

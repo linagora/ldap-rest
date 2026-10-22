@@ -37,11 +37,13 @@
     },
     "sn": {
       "type": "string",
-      "required": true
+      "required": true,
+      "role": "surname"
     },
     "givenName": {
       "type": "string",
-      "required": false
+      "required": false,
+      "role": "givenName"
     },
     "displayName": {
       "type": "string",

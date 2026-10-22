@@ -53,7 +53,8 @@
     },
     "sn": {
       "type": "string",
-      "required": true
+      "required": true,
+      "role": "surname"
     },
     "homeDirectory": {
       "type": "string",
@@ -76,7 +77,8 @@
     },
     "givenName": {
       "type": "string",
-      "required": true
+      "required": true,
+      "role": "givenName"
     },
     "displayName": {
       "type": "string",

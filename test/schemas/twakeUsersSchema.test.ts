@@ -61,6 +61,11 @@ describe('Twake schemas', () => {
       );
     });
 
+    it('should name the parts of a person’s name by role', () => {
+      expect(roleAttribute(users, 'givenName')).to.equal('givenName');
+      expect(roleAttribute(users, 'surname')).to.equal('sn');
+    });
+
     it('should name the mail domains of an organization by role', () => {
       expect(roleAttribute(organizations, 'domainLink')).to.equal(
         'twakeDomainLink'
@@ -241,6 +246,20 @@ describe('Twake schemas', () => {
     });
   });
 
+  describe('the user form', () => {
+    it('should ask for the department right after the employee ID', () => {
+      // A form follows the schema's order: who the person is, then where.
+      const names = Object.keys(users.attributes);
+      expect(names.indexOf('twakeDepartmentLink')).to.equal(
+        names.indexOf('employeeNumber') + 1
+      );
+    });
+
+    it('should explain what the employee ID is', () => {
+      expect(users.attributes.employeeNumber.help).to.be.an('object');
+    });
+  });
+
   describe('translations', () => {
     it('should give every text a client shows in each shipped language', () => {
       // Every file, so a schema added later is held to it too
@@ -273,6 +292,7 @@ describe('Twake schemas', () => {
           texts.push(
             [`${name}.label`, attr.label],
             [`${name}.hint`, attr.hint],
+            [`${name}.help`, attr.help],
             [`${name}.items.hint`, attr.items?.hint],
             [`${name}.group`, attr.group]
           );
