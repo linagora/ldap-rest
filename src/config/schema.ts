@@ -47,6 +47,9 @@ export type SchemaAttributeType =
  * | `accountExpiry`    | Date after which the account is to be removed        |
  * | `domainLink`       | DNs of the mail domains an organization may use      |
  * | `domainName`       | Domain name carried by a domain entry                |
+ *
+ * Clients look for more: `givenName` and `surname` name the parts of a
+ * person's name, which a form composes the `displayName` from.
  */
 export type SchemaRole = string;
 
@@ -203,6 +206,12 @@ export interface SchemaAttribute {
    * client never has to hardcode either.
    */
   hint?: LocalizedText;
+  /**
+   * What the attribute is, for a client to show on demand — a tooltip next to
+   * the label — where its label alone does not say: "Employee ID" names a
+   * number, not whose records hold it.
+   */
+  help?: LocalizedText;
   branch?: string[];
   fixed?: boolean;
   /** Semantic role(s) — see {@link SchemaRole} */

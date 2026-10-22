@@ -53,12 +53,30 @@
       "type": "string",
       "searchable": true,
       "required": true,
-      "unique": { "sentinel": "UNIT" },
+      "unique": {
+        "sentinel": "UNIT"
+      },
       "role": "employeeId",
       "label": {
         "en": "Employee ID",
         "fr": "Matricule",
         "mn": "Ажилтны дугаар"
+      },
+      "help": {
+        "en": "The person's registration number, as the personnel records hold it. Unique in the directory, except UNIT, which the accounts of no one in particular (shared, technical) take.",
+        "fr": "Le matricule de la personne, tel que le tient la gestion du personnel. Unique dans l'annuaire, sauf UNIT, que prennent les comptes qui ne sont à personne en particulier (partagés, techniques).",
+        "mn": "Хүний нөөцийн бүртгэлд байгаа ажилтны дугаар. Лавлахад давхцахгүй байх ёстой; хэн нэгэн хүнд хамааралгүй (дундын, техникийн) бүртгэлүүд UNIT утгыг авна."
+      }
+    },
+    "twakeDepartmentLink": {
+      "type": "pointer",
+      "branch": ["__LDAP_BASE__"],
+      "required": true,
+      "role": "organizationLink",
+      "label": {
+        "en": "Department",
+        "fr": "Organisation",
+        "mn": "Байгууллага"
       }
     },
     "cn": {
@@ -75,6 +93,7 @@
       "type": "string",
       "searchable": true,
       "required": true,
+      "role": "surname",
       "label": {
         "en": "Last name",
         "fr": "Nom de famille",
@@ -85,6 +104,7 @@
       "type": "string",
       "searchable": true,
       "required": true,
+      "role": "givenName",
       "label": {
         "en": "First name",
         "fr": "Prénom",
@@ -287,17 +307,6 @@
         "en": "Password reset required",
         "fr": "Changement de mot de passe requis",
         "mn": "Нууц үгээ солих шаардлагатай"
-      }
-    },
-    "twakeDepartmentLink": {
-      "type": "pointer",
-      "branch": ["__LDAP_BASE__"],
-      "required": true,
-      "role": "organizationLink",
-      "label": {
-        "en": "Department",
-        "fr": "Organisation",
-        "mn": "Байгууллага"
       }
     },
     "twakeDepartmentPath": {
