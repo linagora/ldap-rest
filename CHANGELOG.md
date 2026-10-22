@@ -1,12 +1,13 @@
 # Changelog
 
-## Unreleased
+## v0.24.0 (2026-10-22)
 
 ### Features
 
 - Schemas: `referentialIntegrity: "remove"` takes a deleted entry's DN out
   of the attribute, including when the entry is moved to the trash,
   [docs](docs/usage/plugins/ldap/enterprise-rules.md#deletion-and-references)
+  ([#365](https://github.com/linagora/ldap-rest/pull/365))
 
 ### Fixes
 
@@ -15,10 +16,12 @@
   shared mailboxes it owned and the devices it owned or managed: an account
   created again with the same address inherited the old one's rights,
   [notes](docs/usage/upgrading.md#links-to-deleted-accounts)
-  ([twake-directory-manager#101](https://github.com/linagora/twake-directory-manager/issues/101))
+  ([twake-directory-manager#101](https://github.com/linagora/twake-directory-manager/issues/101),
+  [#365](https://github.com/linagora/ldap-rest/pull/365))
 - `core/ldap/groups`: an entry moved to the trash leaves its groups, as a
   deleted one does; an entry created again with the same DN inherited its
   memberships, [docs](docs/usage/plugins/ldap/trash.md#limitations)
+  ([#365](https://github.com/linagora/ldap-rest/pull/365))
 
 ## v0.23.0 (2026-10-22)
 
