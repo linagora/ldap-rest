@@ -741,6 +741,29 @@ export function isDnInBranch(dn: string, base: string): boolean {
 }
 
 /**
+ * Tell whether a rename moved an entry into the trash branch.
+ *
+ * `core/ldap/trash` turns a deletion into such a move, so the DN it frees is
+ * as free as a deleted one, without any `ldapdeletedone`.
+ *
+ * @param trashBase the `--trash-base`, if any
+ * @param oldDn DN before the rename
+ * @param newDn DN after it
+ * @returns true when the entry entered the trash branch
+ */
+export function movedToTrash(
+  trashBase: string | undefined,
+  oldDn: string,
+  newDn: string
+): boolean {
+  return (
+    !!trashBase &&
+    isDnInBranch(newDn, trashBase) &&
+    !isDnInBranch(oldDn, trashBase)
+  );
+}
+
+/**
  * Wrapper for async Express route handlers to catch errors and pass them to error middleware
  * This ensures that errors in async routes are properly handled and don't crash the server
  *

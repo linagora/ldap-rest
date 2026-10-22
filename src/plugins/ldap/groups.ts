@@ -40,6 +40,7 @@ import {
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  movedToTrash,
   organizationLink,
   substringSearchFilter,
   validateDnValue,
@@ -182,7 +183,8 @@ export default class LdapGroups extends DmPlugin {
   /**
    * Remove deleted entries from groups once the delete has landed: a delete
    * refused, failed or turned into something else by another plugin leaves
-   * the memberships alone.
+   * the memberships alone — except a move into the trash, which frees the DN
+   * all the same.
    */
   hooks: Hooks = {
     ldapdeletedone: async (dn: string | string[]) => {
@@ -194,6 +196,16 @@ export default class LdapGroups extends DmPlugin {
         dns.map(entry => this.deleteMemberFromAll(entry))
       ).catch(err => {
         this.logger.error('Failed to process user deletion in groups:', err);
+      });
+    },
+
+    ldaprenamedone: async ([oldDn, newDn]) => {
+      if (!movedToTrash(this.config.trash_base, oldDn, newDn)) return;
+      await this.deleteMemberFromAll(oldDn).catch(err => {
+        this.logger.error(
+          'Failed to process a move to the trash in groups:',
+          err
+        );
       });
     },
   };

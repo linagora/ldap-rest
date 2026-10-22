@@ -67,6 +67,7 @@ import {
   getParentDn,
   isDnInBranch,
   isDummyMemberDn,
+  movedToTrash,
   normalizeDn,
   rdnValue,
 } from '../../lib/utils';
@@ -545,13 +546,9 @@ export default class LdapEnterpriseRules extends DmPlugin {
       }
     },
 
-    // `core/ldap/trash` turns a deletion into a move, and a DN freed that way
-    // is as free as a deleted one.
     ldaprenamedone: async ([oldDn, newDn], context) => {
-      const trash = this.config.trash_base;
-      if (!trash || !isDnInBranch(newDn, trash) || isDnInBranch(oldDn, trash))
-        return;
-      await this.removeReferences(oldDn, context);
+      if (movedToTrash(this.config.trash_base, oldDn, newDn))
+        await this.removeReferences(oldDn, context);
     },
   };
 
@@ -1039,9 +1036,11 @@ export default class LdapEnterpriseRules extends DmPlugin {
       try {
         referrers = await this.searchReferrers(candidate, dn);
       } catch (err) {
-        this.logger.error(
-          `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
-        );
+        // 32 noSuchObject: the branch to look in is gone, and nothing in it.
+        if (extractLdapCode(err) !== 32)
+          this.logger.error(
+            `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
+          );
         continue;
       }
       for (const entry of referrers) {

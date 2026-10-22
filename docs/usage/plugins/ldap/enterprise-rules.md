@@ -158,7 +158,7 @@ pointer's `branch` tells the plugin which deletions concern it:
   the mailboxes delegated to it, the groups it owned. It also applies to an
   attribute carrying the `owners` role, which is not a pointer. A move into
   the trash (`--trash-base`, see [trash](trash.md)) counts as a deletion,
-  and restoring the entry does not bring the links back.
+  [what a restore brings back](trash.md#limitations).
   This runs with the server's rights, whoever deleted the entry, since a
   link left behind would hand its rights to the next entry created with the
   same DN; the writes are attributed to the deletion's author. Use it on
