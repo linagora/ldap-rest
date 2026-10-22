@@ -4,6 +4,40 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## To 0.23.1
+
+### Links to deleted accounts
+
+**Who is affected:** a deployment using the Twake schemas, or any schema
+whose links to accounts now carry `referentialIntegrity: "remove"`
+([details](plugins/ldap/enterprise-rules.md#deletion-and-references)).
+
+Accounts deleted from now on leave the links naming them. Those deleted
+before still appear as managers, local administrators or delegates, and an
+account created again at the same address gets their rights. List the
+dangling ones and remove them:
+
+```sh
+# Connection to the directory, as for any ldapsearch
+OPTS="-H ldap://localhost -D cn=admin,dc=example,dc=com -w secret"
+BASE="dc=example,dc=com"
+for attr in twakeLocalAdminLink twakeManagerLink twakeDelegatedUsers; do
+  ldapsearch $OPTS -LLL -o ldif-wrap=no -b "$BASE" "($attr=*)" "$attr" |
+    sed -n -e 's/^dn: //p' -e "s/^$attr: />/p" |
+    while IFS= read -r line; do
+      case "$line" in
+        ">"*) target="${line#>}"
+          ldapsearch $OPTS -LLL -s base -b "$target" dn >/dev/null 2>&1 ||
+            echo "$dn: $attr $target" ;;
+        *) dn="$line" ;;
+      esac
+    done
+done
+```
+
+Then, for each line, delete that value
+(`ldapmodify`, `delete: <attribute>` with the DN shown).
+
 ## To 0.22.0
 
 ### James follows the mail domains

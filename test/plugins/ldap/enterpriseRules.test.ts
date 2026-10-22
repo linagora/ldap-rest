@@ -13,6 +13,7 @@ import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
+import { waitFor } from '../../helpers/waitFor';
 
 describe('Enterprise rules', () => {
   describe('parseByteSize', () => {
@@ -543,6 +544,69 @@ describe('Enterprise rules', () => {
           expect((err as Error).message).to.match(/still referenced by/);
         } finally {
           await remove('rules.ref');
+        }
+      });
+
+      it('should take a deleted account out of the links naming it', async () => {
+        const create = (uid: string, employeeNumber: string) =>
+          request
+            .post('/api/v1/ldap/users')
+            .type('json')
+            .send({
+              cn: `Rules ${uid}`,
+              sn: uid,
+              mail: `${uid}@example.com`,
+              twakeDepartmentLink: subOrgDn,
+              employeeNumber,
+              givenName: 'Test',
+              displayName: 'Test Person',
+            })
+            .expect(201);
+        const leaver = `uid=rules.leaver,ou=users,${base}`;
+        const keeper = `uid=rules.keeper,ou=users,${base}`;
+        const read = async (dn: string, name: string): Promise<string[]> => {
+          server.ldap.invalidateCache(dn);
+          const result = (await server.ldap.search(
+            { paged: false, scope: 'base', attributes: [name] },
+            dn
+          )) as { searchEntries: Record<string, unknown>[] };
+          const value = result.searchEntries[0]?.[name];
+          if (value === undefined) return [];
+          return (Array.isArray(value) ? value : [value]).map(String);
+        };
+        await create('rules.leaver', 'ENT0010');
+        await create('rules.keeper', 'ENT0011');
+        try {
+          await server.ldap.modify(subOrgDn, {
+            add: {
+              twakeLocalAdminLink: leaver,
+              twakeManagerLink: [leaver, keeper],
+            },
+          });
+          await server.ldap.modify(keeper, {
+            add: { twakeDelegatedUsers: leaver },
+          });
+
+          await server.ldap.delete(leaver);
+
+          await waitFor(
+            async () =>
+              !(await read(keeper, 'twakeDelegatedUsers')).length &&
+              !(await read(subOrgDn, 'twakeLocalAdminLink')).length &&
+              (await read(subOrgDn, 'twakeManagerLink')).length === 1,
+            { what: 'the links to the deleted account to be removed' }
+          );
+          expect(await read(subOrgDn, 'twakeManagerLink')).to.deep.equal([
+            keeper,
+          ]);
+        } finally {
+          await server.ldap
+            .modify(subOrgDn, {
+              replace: { twakeLocalAdminLink: [], twakeManagerLink: [] },
+            })
+            .catch(() => undefined);
+          await remove('rules.leaver');
+          await remove('rules.keeper');
         }
       });
     });

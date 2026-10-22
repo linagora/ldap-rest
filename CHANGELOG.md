@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Deleting an account takes it out of the organizations it managed or
+  administered, the mailboxes delegated to it and the devices it owned or
+  managed: an account created again with the same address inherited the old
+  one's rights. Schemas declare it with `referentialIntegrity: "remove"`,
+  [docs](docs/usage/plugins/ldap/enterprise-rules.md#deletion-and-references),
+  [notes](docs/usage/upgrading.md#links-to-deleted-accounts)
+  ([twake-directory-manager#101](https://github.com/linagora/twake-directory-manager/issues/101))
+
 ## v0.23.0 (2026-10-22)
 
 ### Features

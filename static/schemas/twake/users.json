@@ -384,6 +384,7 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
+      "referentialIntegrity": "remove",
       "group": {
         "en": "Mailbox Settings",
         "fr": "Paramètres de messagerie",

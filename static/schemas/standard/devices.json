@@ -57,7 +57,8 @@
     "owner": {
       "type": "pointer",
       "branch": ["ou=users,__LDAP_BASE__"],
-      "required": false
+      "required": false,
+      "referentialIntegrity": "remove"
     },
     "ou": {
       "type": "string",
@@ -66,7 +67,8 @@
     "manager": {
       "type": "pointer",
       "branch": ["ou=users,__LDAP_BASE__"],
-      "required": false
+      "required": false,
+      "referentialIntegrity": "remove"
     }
   }
 }

@@ -109,6 +109,7 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
+      "referentialIntegrity": "remove",
       "role": "managers",
       "label": {
         "en": "Managers",
@@ -137,6 +138,7 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
+      "referentialIntegrity": "remove",
       "role": "localAdmins",
       "label": {
         "en": "Local administrators",

@@ -5,7 +5,7 @@
  * Business rules an enterprise directory needs on top of declarative schema
  * validation: uniqueness across a shared namespace, mail addresses confined to
  * the domains an organization owns, computed organization paths, normalised
- * quotas, and referential-integrity guards on deletion.
+ * quotas, and referential integrity on deletion.
  *
  * Nothing here knows a concrete attribute name, a domain, or a nomenclature
  * value. Every rule is driven by the loaded entity schemas — their semantic
@@ -535,6 +535,12 @@ export default class LdapEnterpriseRules extends DmPlugin {
       }
       return [dn, req] as [string | string[], Request?];
     },
+
+    ldapdeletedone: async (dn: string | string[]) => {
+      for (const target of Array.isArray(dn) ? dn : [dn]) {
+        await this.removeReferences(target);
+      }
+    },
   };
 
   /**
@@ -991,6 +997,59 @@ export default class LdapEnterpriseRules extends DmPlugin {
         throw new ConflictError(
           `Cannot delete ${dn}: still referenced by another entry (${candidate.name})`
         );
+      }
+    }
+  }
+
+  /**
+   * Take a deleted DN out of every `referentialIntegrity: remove` pointer
+   * still naming it.
+   *
+   * Written with the server's own rights, not the caller's: the deletion was
+   * authorized, and the entries naming it are often outside what the caller
+   * may write — the organization a deleted account administered. A link left
+   * behind is a right waiting for the next entry given the same DN.
+   *
+   * A failure is logged, not thrown: the entry is already gone.
+   *
+   * @param dn entry just deleted
+   */
+  private async removeReferences(dn: string): Promise<void> {
+    const gone = asDn(dn);
+    const seen = new Set<string>();
+    for (const candidate of this.referringAttributes(dn)) {
+      if (!candidate.pointer) continue;
+      if (candidate.attr.referentialIntegrity !== 'remove') continue;
+      let referrers: Record<string, unknown>[];
+      try {
+        referrers = await this.searchReferrers(candidate, dn);
+      } catch (err) {
+        this.logger.error(
+          `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
+        );
+        continue;
+      }
+      for (const entry of referrers) {
+        const holder = String(entry.dn);
+        // Same reason as in findReferences: two entities can share a branch.
+        const key = `${asDn(holder)} ${candidate.name.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const obsolete = entryValues(entry, candidate.name).filter(
+          value => asDn(value) === gone
+        );
+        if (obsolete.length === 0) continue;
+        try {
+          await this.server.ldap.modify(holder, {
+            delete: { [candidate.name]: obsolete },
+          });
+        } catch (err) {
+          // 16 noSuchAttribute: `refint` removed it first.
+          if ((err as { code?: number }).code === 16) continue;
+          this.logger.error(
+            `Delete of ${dn}: could not remove it from ${candidate.name} of ${holder}: ${String(err)}`
+          );
+        }
       }
     }
   }

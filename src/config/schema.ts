@@ -270,10 +270,12 @@ export interface SchemaAttribute {
    */
   states?: Record<string, AttributeValue>;
   /**
-   * For a `pointer`: refuse to delete the entry it points at while any entry
-   * still references it. `ignore` (the default) leaves the reference dangling.
+   * For a `pointer`, or a list of them: what deleting the entry it points at
+   * does to the reference. `restrict` refuses the deletion while any entry
+   * still references it; `remove` takes the deleted DN out of the attribute;
+   * `ignore` (the default) leaves the reference dangling.
    */
-  referentialIntegrity?: 'restrict' | 'ignore';
+  referentialIntegrity?: 'restrict' | 'remove' | 'ignore';
   /**
    * For a `members`-role attribute: refuse to delete the entry while it still
    * has members. The placeholder member some directories need to keep a

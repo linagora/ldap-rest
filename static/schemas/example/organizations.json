@@ -79,6 +79,7 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
+      "referentialIntegrity": "remove",
       "role": "managers",
       "label": "Managers"
     },
@@ -99,6 +100,7 @@
         "branch": ["ou=users,__LDAP_BASE__"]
       },
       "required": false,
+      "referentialIntegrity": "remove",
       "role": "localAdmins",
       "label": "Local administrators"
     }
