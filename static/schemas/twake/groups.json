@@ -147,7 +147,8 @@
         "en": "Owners",
         "fr": "Propriétaires",
         "mn": "Эзэмшигчид"
-      }
+      },
+      "referentialIntegrity": "remove"
     },
     "twakeDepartmentLink": {
       "type": "pointer",

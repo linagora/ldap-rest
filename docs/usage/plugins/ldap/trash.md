@@ -200,6 +200,15 @@ This plugin uses the `ldapdeleterequest` hook to intercept delete operations bef
 - Entries with the same RDN will overwrite previous trash entries
 - Tree structures (entries with children) must be deleted leaf-first
 - Does not track history (only keeps the latest deleted version)
+- An entry moved to the trash leaves the links declared
+  `referentialIntegrity: "remove"`
+  ([details](enterprise-rules.md#deletion-and-references)) and, with
+  `core/ldap/groups`, its groups. A restore does not bring those links back:
+  a restored account has to be made a manager, an administrator or a
+  delegate again. Attributes the directory's `refint` overlay follows
+  (`member`, `owner`, `manager` in its stock configuration) are the
+  exception: `refint` may move the value to the trashed DN before it is
+  removed, and a restore then brings it back.
 
 ## Troubleshooting
 

@@ -5,7 +5,7 @@
  * Business rules an enterprise directory needs on top of declarative schema
  * validation: uniqueness across a shared namespace, mail addresses confined to
  * the domains an organization owns, computed organization paths, normalised
- * quotas, and referential-integrity guards on deletion.
+ * quotas, and referential integrity on deletion.
  *
  * Nothing here knows a concrete attribute name, a domain, or a nomenclature
  * value. Every rule is driven by the loaded entity schemas — their semantic
@@ -23,8 +23,9 @@
  *
  * ## What "a reference" is, and the one case this cannot see
  *
- * Two rules — the delete guard and the rename cascade — have to find every
- * entry naming another one by its DN. They look in two places, both declared
+ * Three rules — the delete guard, the removal of a deleted DN and the rename
+ * cascade — have to find every entry naming another one by its DN. They look
+ * in two places, both declared
  * by the schemas: every `pointer` (single, or under `items`) whose `branch`
  * admits the target, and every attribute carrying the `members` or `owners`
  * role. The second is not redundant: a group's member list cannot be a
@@ -33,8 +34,8 @@
  *
  * A deployment whose schema stores a DN in an attribute that is neither of
  * those — a plain `string` carrying no role — is therefore not covered: its
- * value is left naming the old DN after a rename, and does not hold a
- * deletion back. Declare such an attribute as a `pointer`, or give it the
+ * value is left naming the old DN after a rename, does not hold a deletion
+ * back, and is not removed when that DN is deleted. Declare such an attribute as a `pointer`, or give it the
  * role it plays. No marker is invented here to cover the gap: a marker
  * meaning "this happens to contain a DN" would be a third way of saying what
  * `pointer` and the roles already say.
@@ -66,10 +67,13 @@ import {
   getParentDn,
   isDnInBranch,
   isDummyMemberDn,
+  movedToTrash,
   normalizeDn,
   rdnValue,
 } from '../../lib/utils';
+import type { ChangeContext } from '../../lib/changeContext';
 import { BadRequestError, ConflictError } from '../../lib/errors';
+import { extractLdapCode } from '../../lib/ldapCodes';
 
 /** One entity the rules apply to: its branch and the schema describing it. */
 interface EntityBinding {
@@ -96,8 +100,8 @@ interface ReferringAttribute {
   /**
    * The element rules of a DN-valued attribute: the attribute itself when it
    * is a `pointer`, its `items` block otherwise. Undefined when the attribute
-   * was retained for the role it carries and declares no element rules — the
-   * test is the one `guardReferences` has always applied.
+   * was retained for the role it carries and declares no element rules:
+   * `restrict` applies to pointers only, `remove` to both.
    */
   pointer?: { branch?: string[] };
   /** True when the schema declares a list rather than a single value */
@@ -534,6 +538,17 @@ export default class LdapEnterpriseRules extends DmPlugin {
         await this.guardDelete(target);
       }
       return [dn, req] as [string | string[], Request?];
+    },
+
+    ldapdeletedone: async (dn: string | string[], context?: ChangeContext) => {
+      for (const target of Array.isArray(dn) ? dn : [dn]) {
+        await this.removeReferences(target, context);
+      }
+    },
+
+    ldaprenamedone: async ([oldDn, newDn], context) => {
+      if (movedToTrash(this.config.trash_base, oldDn, newDn))
+        await this.removeReferences(oldDn, context);
     },
   };
 
@@ -996,9 +1011,71 @@ export default class LdapEnterpriseRules extends DmPlugin {
   }
 
   /**
+   * Take a deleted DN out of every `referentialIntegrity: remove` pointer
+   * still naming it.
+   *
+   * Written with the server's own rights, not the caller's: the deletion was
+   * authorized, and the entries naming it are often outside what the caller
+   * may write — the organization a deleted account administered. A link left
+   * behind is a right waiting for the next entry given the same DN.
+   *
+   * A failure is logged, not thrown: the entry is already gone.
+   *
+   * @param dn entry just deleted
+   * @param context change context of the deletion, to attribute these writes
+   */
+  private async removeReferences(
+    dn: string,
+    context?: ChangeContext
+  ): Promise<void> {
+    const gone = asDn(dn);
+    const seen = new Set<string>();
+    for (const candidate of this.referringAttributes(dn)) {
+      if (candidate.attr.referentialIntegrity !== 'remove') continue;
+      let referrers: Record<string, unknown>[];
+      try {
+        referrers = await this.searchReferrers(candidate, dn);
+      } catch (err) {
+        // 32 noSuchObject: the branch to look in is gone, and nothing in it.
+        if (extractLdapCode(err) !== 32)
+          this.logger.error(
+            `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
+          );
+        continue;
+      }
+      for (const entry of referrers) {
+        const holder = String(entry.dn);
+        // Same reason as in findReferences: two entities can share a branch.
+        const key = `${asDn(holder)} ${candidate.name.toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const obsolete = entryValues(entry, candidate.name).filter(
+          value => asDn(value) === gone
+        );
+        if (obsolete.length === 0) continue;
+        try {
+          await this.server.ldap.modify(
+            holder,
+            { delete: { [candidate.name]: obsolete } },
+            undefined,
+            { context }
+          );
+        } catch (err) {
+          // 16 noSuchAttribute: `refint` removed it first.
+          if (extractLdapCode(err) === 16) continue;
+          this.logger.error(
+            `Delete of ${dn}: could not remove it from ${candidate.name} of ${holder}: ${String(err)}`
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Every attribute of every loaded entity that could hold this DN.
    *
-   * This is the traversal the delete guard and the rename cascade share: it
+   * This is the traversal the delete guard, the removal and the rename
+   * cascade share: it
    * knows no attribute name, only what the schemas declare — a `pointer`
    * (single or under `items`) whose `branch` admits the DN's parent, or an
    * attribute carrying the `members` or `owners` role. The module header says

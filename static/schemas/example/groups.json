@@ -74,7 +74,8 @@
         "hint": "Expected the DN of an entry of this directory"
       },
       "required": false,
-      "role": "owners"
+      "role": "owners",
+      "referentialIntegrity": "remove"
     },
     "twakeDepartmentLink": {
       "type": "pointer",

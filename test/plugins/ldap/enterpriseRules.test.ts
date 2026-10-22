@@ -1,8 +1,13 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import LdapEnterpriseRules, {
   mailInDomains,
@@ -13,6 +18,7 @@ import {
   skipIfMissingEnvVars,
   LDAP_ENV_VARS_WITH_ORG,
 } from '../../helpers/env';
+import { waitFor } from '../../helpers/waitFor';
 
 describe('Enterprise rules', () => {
   describe('parseByteSize', () => {
@@ -122,11 +128,14 @@ describe('Enterprise rules', () => {
     let orgDn: string;
     let subOrgDn: string;
     let otherOrgDn: string;
+    let devicesDn: string;
+    let ownedDn: string;
+    let ownedSchema: string;
     let previousOrganizationSchema: string | undefined;
-    // What this fixture had to create to give the organization a domain, in
-    // creation order; only these are removed, so a directory that already
-    // holds its nomenclature keeps it.
-    const createdForDomain: string[] = [];
+    // What this fixture had to create — the domain of the organization, the
+    // branch of the devices — in creation order; only these are removed, so
+    // a directory that already holds its nomenclature keeps it.
+    const createdFixtures: string[] = [];
 
     before(function () {
       skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
@@ -137,8 +146,43 @@ describe('Enterprise rules', () => {
       orgDn = `ou=RulesOrg,ou=organization,${base}`;
       subOrgDn = `ou=RulesSubOrg,ou=RulesOrg,ou=organization,${base}`;
       otherOrgDn = `ou=RulesOtherOrg,ou=organization,${base}`;
+      devicesDn = `ou=devices,${base}`;
+      ownedDn = `ou=rulesowned,${base}`;
 
-      process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
+      // The shipped group owners, in `seeAlso`: `refint` rewrites `owner` by
+      // itself, and would remove it whether or not the role is honoured.
+      const groups = JSON.parse(
+        fs.readFileSync('./static/schemas/twake/groups.json', 'utf8')
+      ) as { attributes: Record<string, { role?: string }> };
+      expect(groups.attributes.owner.role).to.equal('owners');
+      ownedSchema = path.join(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'ldap-rest-rules-')),
+        'owned.json'
+      );
+      fs.writeFileSync(
+        ownedSchema,
+        JSON.stringify({
+          entity: {
+            name: 'rulesOwned',
+            mainAttribute: 'cn',
+            objectClass: ['top', 'device'],
+            singularName: 'rulesowned',
+            pluralName: 'rulesowneds',
+            base: ownedDn,
+          },
+          attributes: {
+            objectClass: { type: 'array', items: { type: 'string' } },
+            cn: { type: 'string', required: true, role: 'identifier' },
+            seeAlso: groups.attributes.owner,
+          },
+        })
+      );
+
+      process.env.DM_LDAP_FLAT_SCHEMA = [
+        './static/schemas/twake/users.json',
+        './static/schemas/twake/devices.json',
+        ownedSchema,
+      ].join(',');
       previousOrganizationSchema = process.env.DM_ORGANIZATION_SCHEMA;
       process.env.DM_ORGANIZATION_SCHEMA =
         './static/schemas/twake/organizations.json';
@@ -194,6 +238,14 @@ describe('Enterprise rules', () => {
           { objectClass: ['top', 'organizationalUnit'], ou: 'domains' },
         ],
         [
+          devicesDn,
+          { objectClass: ['top', 'organizationalUnit'], ou: 'devices' },
+        ],
+        [
+          ownedDn,
+          { objectClass: ['top', 'organizationalUnit'], ou: 'rulesowned' },
+        ],
+        [
           `dc=example,ou=domains,ou=nomenclature,${base}`,
           {
             objectClass: ['top', 'domain', 'domainRelatedObject'],
@@ -204,7 +256,7 @@ describe('Enterprise rules', () => {
       ] as [string, Record<string, unknown>][]) {
         try {
           await server.ldap.add(dn, attrs as never);
-          createdForDomain.push(dn);
+          createdFixtures.push(dn);
         } catch (e) {
           // already there, and not ours to remove
         }
@@ -212,6 +264,8 @@ describe('Enterprise rules', () => {
 
       const flat = new LdapFlatGeneric(server);
       await server.registerPlugin('ldapFlatGeneric', flat);
+      server.config.group_schema = './static/schemas/twake/groups.json';
+      await server.registerPlugin('ldapGroups', new LdapGroups(server));
       const organizations = new LdapOrganizations(server);
       await server.registerPlugin('ldapOrganizations', organizations);
       await server.registerPlugin(
@@ -227,8 +281,9 @@ describe('Enterprise rules', () => {
     after(async () => {
       for (const dn of [subOrgDn, orgDn, otherOrgDn])
         await server.ldap.delete(dn).catch(() => undefined);
-      for (const dn of [...createdForDomain].reverse())
+      for (const dn of [...createdFixtures].reverse())
         await server.ldap.delete(dn).catch(() => undefined);
+      fs.rmSync(path.dirname(ownedSchema), { recursive: true, force: true });
       // The whole suite shares one process: leaving this set would hand the
       // organization schema to every server built afterwards.
       if (previousOrganizationSchema === undefined)
@@ -543,6 +598,132 @@ describe('Enterprise rules', () => {
           expect((err as Error).message).to.match(/still referenced by/);
         } finally {
           await remove('rules.ref');
+        }
+      });
+
+      const leaver = (): string => `uid=rules.leaver,ou=users,${base}`;
+      const keeper = (): string => `uid=rules.keeper,ou=users,${base}`;
+      const create = (uid: string, employeeNumber: string) =>
+        request
+          .post('/api/v1/ldap/users')
+          .type('json')
+          .send({
+            cn: `Rules ${uid}`,
+            sn: uid,
+            mail: `${uid}@example.com`,
+            twakeDepartmentLink: subOrgDn,
+            employeeNumber,
+            givenName: 'Test',
+            displayName: 'Test Person',
+          })
+          .expect(201);
+      const read = async (dn: string, name: string): Promise<string[]> => {
+        server.ldap.invalidateCache(dn);
+        const result = (await server.ldap.search(
+          { paged: false, scope: 'base', attributes: [name] },
+          dn
+        )) as { searchEntries: Record<string, unknown>[] };
+        const value = result.searchEntries[0]?.[name];
+        if (value === undefined) return [];
+        return (Array.isArray(value) ? value : [value]).map(String);
+      };
+
+      it('should take a deleted account out of the links naming it', async () => {
+        await create('rules.leaver', 'ENT0010');
+        await create('rules.keeper', 'ENT0011');
+        const deviceDn = `cn=rules-device,${devicesDn}`;
+        const ownedEntry = `cn=rules-owned,${ownedDn}`;
+        try {
+          await server.ldap.modify(subOrgDn, {
+            add: {
+              twakeLocalAdminLink: leaver(),
+              twakeManagerLink: [leaver(), keeper()],
+            },
+          });
+          await server.ldap.modify(keeper(), {
+            add: { twakeDelegatedUsers: leaver() },
+          });
+          await server.ldap.add(deviceDn, {
+            objectClass: ['top', 'device'],
+            cn: 'rules-device',
+            owner: leaver(),
+          });
+          await server.ldap.add(ownedEntry, {
+            objectClass: ['top', 'device'],
+            cn: 'rules-owned',
+            seeAlso: [leaver(), keeper()],
+          });
+
+          await server.ldap.delete(leaver());
+
+          await waitFor(
+            async () =>
+              !(await read(keeper(), 'twakeDelegatedUsers')).length &&
+              !(await read(subOrgDn, 'twakeLocalAdminLink')).length &&
+              (await read(subOrgDn, 'twakeManagerLink')).length === 1 &&
+              !(await read(deviceDn, 'owner')).length &&
+              (await read(ownedEntry, 'seeAlso')).length === 1,
+            { what: 'the links to the deleted account to be removed' }
+          );
+          expect(await read(subOrgDn, 'twakeManagerLink')).to.deep.equal([
+            keeper(),
+          ]);
+          expect(await read(ownedEntry, 'seeAlso')).to.deep.equal([keeper()]);
+        } finally {
+          await server.ldap
+            .modify(subOrgDn, {
+              replace: { twakeLocalAdminLink: [], twakeManagerLink: [] },
+            })
+            .catch(() => undefined);
+          await server.ldap.delete(deviceDn).catch(() => undefined);
+          await server.ldap.delete(ownedEntry).catch(() => undefined);
+          await remove('rules.leaver');
+          await remove('rules.keeper');
+        }
+      });
+
+      it('should take an account moved to the trash out of them too', async () => {
+        const trashDn = `ou=rulestrash,${base}`;
+        const trashed = `uid=rules.leaver,${trashDn}`;
+        const groupDn = `cn=rules-trash-group,${server.config.ldap_group_base}`;
+        const previousTrash = server.config.trash_base;
+        server.config.trash_base = trashDn;
+        await create('rules.leaver', 'ENT0012');
+        await create('rules.keeper', 'ENT0013');
+        try {
+          await server.ldap.add(trashDn, {
+            objectClass: ['top', 'organizationalUnit'],
+            ou: 'rulestrash',
+          });
+          await server.ldap.modify(subOrgDn, {
+            add: { twakeLocalAdminLink: leaver() },
+          });
+          await server.ldap.add(groupDn, {
+            objectClass: ['top', 'groupOfNames'],
+            cn: 'rules-trash-group',
+            member: [leaver(), keeper()],
+          });
+
+          await server.ldap.move(leaver(), trashed);
+
+          // `refint` may move the membership to the trashed DN rather than
+          // let the groups plugin remove it: either frees the old DN.
+          await waitFor(
+            async () =>
+              !(await read(subOrgDn, 'twakeLocalAdminLink')).length &&
+              !(await read(groupDn, 'member')).includes(leaver()),
+            { what: 'the links to the trashed account to be removed' }
+          );
+        } finally {
+          server.config.trash_base = previousTrash;
+          await server.ldap
+            .modify(subOrgDn, { replace: { twakeLocalAdminLink: [] } })
+            .catch(() => undefined);
+          await server.ldap.delete(groupDn).catch(() => undefined);
+          await server.ldap.delete(trashed).catch(() => undefined);
+          await server.ldap.delete(trashDn).catch(() => undefined);
+          await remove('rules.leaver');
+          await remove('rules.keeper');
         }
       });
     });
