@@ -3,7 +3,7 @@
 The business rules an enterprise directory needs on top of per-attribute
 validation: uniqueness across a shared namespace, mail addresses confined to
 the domains an organization owns, computed organization paths, normalised
-quotas, and referential-integrity guards on deletion.
+quotas, and referential integrity on deletion.
 
 Every rule is driven by the loaded entity schemas. The plugin contains no
 attribute name, no domain and no nomenclature value, so the same code serves a
@@ -155,10 +155,15 @@ pointer's `branch` tells the plugin which deletions concern it:
   it — a position somebody still holds, a nomenclature value still in use.
 - `remove` takes the deleted entry's DN out of the attribute once the
   deletion has landed: an account leaves the organizations it administered,
-  and the mailboxes delegated to it. This runs with the server's rights,
-  whoever deleted the entry, since a link left behind would hand its rights
-  to the next entry created with the same DN. Use it on optional attributes
-  only.
+  the mailboxes delegated to it, the groups it owned. It also applies to an
+  attribute carrying the `owners` role, which is not a pointer. A move into
+  the trash (`--trash-base`, see [trash](trash.md)) counts as a deletion,
+  and restoring the entry does not bring the links back.
+  This runs with the server's rights, whoever deleted the entry, since a
+  link left behind would hand its rights to the next entry created with the
+  same DN; the writes are attributed to the deletion's author. Use it on
+  optional attributes only. Each deletion searches every attribute marked
+  `remove`: give them an equality index.
 - `ignore`, the default, leaves the reference dangling.
 
 `deleteGuard: "nonEmpty"` refuses to delete a group that still has members.
@@ -168,7 +173,8 @@ The placeholder member some directories keep to satisfy `groupOfNames`
 Both default to off: a deployment turns them on where it wants them. The
 shipped Twake schemas mark `remove` on the links to accounts: the managers
 and local administrators of an organization, the delegates of a mailbox,
-the owner and manager of a device.
+the owners of a group or a shared mailbox, the owner and manager of a
+device. Members leave their groups through the groups plugin.
 
 ## Errors
 

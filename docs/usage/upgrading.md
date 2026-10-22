@@ -4,7 +4,7 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## To 0.23.1
+## To 0.24.0
 
 ### Links to deleted accounts
 
@@ -13,15 +13,16 @@ whose links to accounts now carry `referentialIntegrity: "remove"`
 ([details](plugins/ldap/enterprise-rules.md#deletion-and-references)).
 
 Accounts deleted from now on leave the links naming them. Those deleted
-before still appear as managers, local administrators or delegates, and an
-account created again at the same address gets their rights. List the
-dangling ones and remove them:
+before still appear as managers, local administrators, delegates or owners,
+and an account created again at the same address gets their rights. List
+the dangling ones and remove them:
 
 ```sh
 # Connection to the directory, as for any ldapsearch
 OPTS="-H ldap://localhost -D cn=admin,dc=example,dc=com -w secret"
 BASE="dc=example,dc=com"
-for attr in twakeLocalAdminLink twakeManagerLink twakeDelegatedUsers; do
+for attr in twakeLocalAdminLink twakeManagerLink twakeDelegatedUsers \
+  owner manager; do
   ldapsearch $OPTS -LLL -o ldif-wrap=no -b "$BASE" "($attr=*)" "$attr" |
     sed -n -e 's/^dn: //p' -e "s/^$attr: />/p" |
     while IFS= read -r line; do
@@ -36,7 +37,9 @@ done
 ```
 
 Then, for each line, delete that value
-(`ldapmodify`, `delete: <attribute>` with the DN shown).
+(`ldapmodify`, `delete: <attribute>` with the DN shown). `owner` and
+`manager` may also be listed for entries no schema marks `remove`, an
+account's `manager` say: check before deleting those.
 
 ## To 0.22.0
 

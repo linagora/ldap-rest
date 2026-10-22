@@ -2,13 +2,18 @@
 
 ## Unreleased
 
+### Features
+
+- Schemas: `referentialIntegrity: "remove"` takes a deleted entry's DN out
+  of the attribute, including when the entry is moved to the trash,
+  [docs](docs/usage/plugins/ldap/enterprise-rules.md#deletion-and-references)
+
 ### Fixes
 
-- Deleting an account takes it out of the organizations it managed or
-  administered, the mailboxes delegated to it and the devices it owned or
-  managed: an account created again with the same address inherited the old
-  one's rights. Schemas declare it with `referentialIntegrity: "remove"`,
-  [docs](docs/usage/plugins/ldap/enterprise-rules.md#deletion-and-references),
+- Twake schemas: deleting an account takes it out of the organizations it
+  managed or administered, the mailboxes delegated to it, the groups and
+  shared mailboxes it owned and the devices it owned or managed: an account
+  created again with the same address inherited the old one's rights,
   [notes](docs/usage/upgrading.md#links-to-deleted-accounts)
   ([twake-directory-manager#101](https://github.com/linagora/twake-directory-manager/issues/101))
 

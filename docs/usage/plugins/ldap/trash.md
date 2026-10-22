@@ -200,6 +200,10 @@ This plugin uses the `ldapdeleterequest` hook to intercept delete operations bef
 - Entries with the same RDN will overwrite previous trash entries
 - Tree structures (entries with children) must be deleted leaf-first
 - Does not track history (only keeps the latest deleted version)
+- Links declared `referentialIntegrity: "remove"` are removed when an entry
+  moves to the trash, and are not brought back by a restore: an account
+  restored has to be made a manager, an administrator or an owner again,
+  [details](enterprise-rules.md#deletion-and-references)
 
 ## Troubleshooting
 
