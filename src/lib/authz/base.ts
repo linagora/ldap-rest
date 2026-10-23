@@ -239,19 +239,25 @@ export default abstract class AuthzBase extends DmPlugin {
     const linkAttr = this.config.ldap_organization_link_attribute;
     if (!origin || !linkAttr) return changes;
 
-    const deleted = (name: string): boolean =>
+    // Attribute names are compared as LDAP does, ignoring case and options:
+    // the option may be spelt otherwise than the schema, or the client.
+    const same = (name: string, attr: string): boolean =>
+      name.split(';')[0].toLowerCase() === attr.toLowerCase();
+    const named = (list: AttributesList | undefined, attr: string): boolean =>
+      list !== undefined && Object.keys(list).some(name => same(name, attr));
+    const deleted = (attr: string): boolean =>
       Array.isArray(changes.delete)
-        ? changes.delete.includes(name)
-        : changes.delete !== undefined && name in changes.delete;
+        ? changes.delete.some(name => same(name, attr))
+        : named(changes.delete, attr);
     let next: string | undefined;
-    if (changes.replace && linkAttr in changes.replace)
-      next = organizationLink(changes.replace[linkAttr]);
-    else if (changes.add && linkAttr in changes.add)
-      next = organizationLink(changes.add[linkAttr]);
+    if (named(changes.replace, linkAttr))
+      next = organizationLink(AuthzBase.valuesOf(changes.replace, linkAttr));
+    else if (named(changes.add, linkAttr))
+      next = organizationLink(AuthzBase.valuesOf(changes.add, linkAttr));
     else if (!deleted(linkAttr)) return changes;
     if (
-      (changes.replace && origin in changes.replace) ||
-      (changes.add && origin in changes.add) ||
+      named(changes.replace, origin) ||
+      named(changes.add, origin) ||
       deleted(origin)
     )
       return changes;
@@ -268,13 +274,17 @@ export default abstract class AuthzBase extends DmPlugin {
     }
     if (!stored) return changes;
 
-    const from = organizationLink(stored[linkAttr]);
+    const from = organizationLink(AuthzBase.valuesOf(stored, linkAttr));
     const wasInTransit = this.inTransit(from);
     const goesInTransit = this.inTransit(next);
     if (!wasInTransit && goesInTransit && from)
       return { ...changes, replace: { ...changes.replace, [origin]: from } };
     // Deleting an attribute the entry does not hold is an LDAP error.
-    if (wasInTransit && !goesInTransit && organizationLink(stored[origin]))
+    if (
+      wasInTransit &&
+      !goesInTransit &&
+      AuthzBase.valuesOf(stored, origin).length > 0
+    )
       return {
         ...changes,
         delete: Array.isArray(changes.delete)

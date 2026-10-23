@@ -2,6 +2,9 @@
  * `--authz-transit-origin-attribute`: an entry put in transit keeps the
  * organization it leaves, and loses it when it is claimed, so that who claims
  * it can tell where it comes from.
+ *
+ * The option is spelt both as the schema does and in lower case: LDAP
+ * ignores the case of attribute names, and so must the comparisons.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -31,162 +34,216 @@ class TestAuthPlugin extends AuthBase {
   }
 }
 
-describe('Transit branch: where an entry comes from', function () {
-  let server: DM;
-  let request: ReturnType<typeof supertest>;
-  let userBranch: string;
-  let sales: string;
-  let backend: string;
-  let transit: string;
-  const ADMIN = 'origin.admin';
-  const MOVED = 'origin.entry.moved';
-  const MODIFIED = 'origin.entry.modified';
-  const LOOSE = 'origin.entry.loose';
-  const TYPED = 'origin.entry.typed';
-  const accounts = [MOVED, MODIFIED, LOOSE, TYPED];
-  const ORIGIN = 'departmentNumber';
-  const saved: Record<string, string | undefined> = {};
+/**
+ * A server with the transit branch and its origin attribute as given, and
+ * one administrator writing two organizations.
+ */
+function originSuite(
+  title: string,
+  option: string,
+  withTransit: boolean,
+  tests: (ctx: OriginContext) => void
+): void {
+  describe(title, function () {
+    const ctx = {} as OriginContext;
+    const saved: Record<string, string | undefined> = {};
+    const prefix = `origin.${option.toLowerCase()}.${withTransit ? 't' : 'n'}`;
+    ctx.uid = (name: string) => `${prefix}.${name}`;
+    const names = ['moved', 'modified', 'loose', 'typed'];
 
-  const as = (user: string) => ({
-    'X-Test-User': user,
-    Accept: 'application/json',
-  });
-  const move = (uid: string, targetOrgDn: string) =>
-    request
-      .post(`/api/v1/ldap/users/${uid}/move`)
-      .set(as(ADMIN))
-      .send({ targetOrgDn });
-  const origin = async (uid: string): Promise<unknown> => {
-    const res = (await server.ldap.search(
-      { paged: false, scope: 'base', attributes: [ORIGIN] },
-      `uid=${uid},${userBranch}`
-    )) as SearchResult;
-    const value = res.searchEntries[0]?.[ORIGIN];
-    return Array.isArray(value) ? value[0] : value;
-  };
+    before(function () {
+      skipIfMissingEnvVars(this, [
+        'DM_LDAP_DN',
+        'DM_LDAP_PWD',
+        'DM_LDAP_BASE',
+        'DM_LDAP_TOP_ORGANIZATION',
+      ]);
+    });
 
-  before(function () {
-    skipIfMissingEnvVars(this, [
-      'DM_LDAP_DN',
-      'DM_LDAP_PWD',
-      'DM_LDAP_BASE',
-      'DM_LDAP_TOP_ORGANIZATION',
-    ]);
-  });
+    before(async function () {
+      this.timeout(20000);
+      const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
+      ctx.userBranch = `ou=users,${process.env.DM_LDAP_BASE}`;
+      ctx.sales = `ou=OriginSales,${top}`;
+      ctx.backend = `ou=OriginBackend,${top}`;
+      ctx.transit = `ou=OriginTransit,${top}`;
 
-  before(async function () {
-    this.timeout(20000);
-    const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
-    userBranch = `ou=users,${process.env.DM_LDAP_BASE}`;
-    sales = `ou=OriginSales,${top}`;
-    backend = `ou=OriginBackend,${top}`;
-    transit = `ou=OriginTransit,${top}`;
+      const rw = { read: true, write: true, delete: false };
+      const env: Record<string, string | undefined> = {
+        DM_AUTHZ_FILTER_ATTACHED_ENTRIES: 'true',
+        DM_AUTHZ_TRANSIT_BRANCH: withTransit ? ctx.transit : undefined,
+        DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE: option,
+        DM_LDAP_FLAT_SCHEMA: './static/schemas/twake/users.json',
+        DM_AUTHZ_PER_BRANCH_CONFIG: JSON.stringify({
+          default: { read: false, write: false, delete: false },
+          users: {
+            [ADMIN]: { [ctx.sales]: rw, [ctx.backend]: rw, [ctx.transit]: rw },
+          },
+          groups: {},
+        }),
+      };
+      for (const [key, value] of Object.entries(env)) {
+        saved[key] = process.env[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
 
-    const rw = { read: true, write: true, delete: false };
-    const env: Record<string, string> = {
-      DM_AUTHZ_FILTER_ATTACHED_ENTRIES: 'true',
-      DM_AUTHZ_TRANSIT_BRANCH: transit,
-      DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE: ORIGIN,
-      DM_LDAP_FLAT_SCHEMA: './static/schemas/twake/users.json',
-      DM_AUTHZ_PER_BRANCH_CONFIG: JSON.stringify({
-        default: { read: false, write: false, delete: false },
-        users: { [ADMIN]: { [sales]: rw, [backend]: rw } },
-        groups: {},
-      }),
+      ctx.server = new DM();
+      await ctx.server.ready;
+
+      for (const [dn, ou] of [
+        [ctx.sales, 'OriginSales'],
+        [ctx.backend, 'OriginBackend'],
+        [ctx.transit, 'OriginTransit'],
+      ]) {
+        await ctx.server.ldap.delete(dn).catch(() => undefined);
+        await ctx.server.ldap.add(dn, {
+          objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
+          ou,
+          twakeDepartmentPath: ou,
+        });
+      }
+
+      const account = (uid: string, org: string | null): AttributesList => ({
+        objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+        uid,
+        cn: uid,
+        sn: 'Origin',
+        givenName: 'Test',
+        displayName: 'Test Origin',
+        mail: `${uid}@example.com`,
+        ...(org
+          ? { twakeDepartmentLink: org, twakeDepartmentPath: 'OriginOrg' }
+          : {}),
+      });
+      for (const name of names) {
+        const uid = ctx.uid(name);
+        await ctx.server.ldap
+          .delete(`uid=${uid},${ctx.userBranch}`)
+          .catch(() => undefined);
+        await ctx.server.ldap.add(
+          `uid=${uid},${ctx.userBranch}`,
+          account(uid, name === 'loose' ? null : ctx.sales)
+        );
+      }
+
+      await ctx.server.registerPlugin(
+        'testAuth',
+        new TestAuthPlugin(ctx.server)
+      );
+      await ctx.server.registerPlugin(
+        'authzPerBranch',
+        new AuthzPerBranch(ctx.server)
+      );
+      await ctx.server.registerPlugin(
+        'ldapFlatGeneric',
+        new LdapFlatGeneric(ctx.server)
+      );
+      ctx.server.setupErrorMiddleware();
+      ctx.request = supertest(ctx.server.app);
+    });
+
+    after(async () => {
+      for (const name of names)
+        await ctx.server.ldap
+          .delete(`uid=${ctx.uid(name)},${ctx.userBranch}`)
+          .catch(() => undefined);
+      for (const dn of [ctx.sales, ctx.backend, ctx.transit])
+        await ctx.server.ldap.delete(dn).catch(() => undefined);
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+
+    ctx.move = (name: string, targetOrgDn: string) =>
+      ctx.request
+        .post(`/api/v1/ldap/users/${ctx.uid(name)}/move`)
+        .set(as(ADMIN))
+        .send({ targetOrgDn });
+    ctx.origin = async (name: string): Promise<unknown> => {
+      const res = (await ctx.server.ldap.search(
+        { paged: false, scope: 'base', attributes: [ORIGIN] },
+        `uid=${ctx.uid(name)},${ctx.userBranch}`
+      )) as SearchResult;
+      const value = res.searchEntries[0]?.[ORIGIN];
+      return Array.isArray(value) ? value[0] : value;
     };
-    for (const [key, value] of Object.entries(env)) {
-      saved[key] = process.env[key];
-      process.env[key] = value;
-    }
 
-    server = new DM();
-    await server.ready;
+    tests(ctx);
+  });
+}
 
-    for (const [dn, ou] of [
-      [sales, 'OriginSales'],
-      [backend, 'OriginBackend'],
-      [transit, 'OriginTransit'],
-    ]) {
-      await server.ldap.delete(dn).catch(() => undefined);
-      await server.ldap.add(dn, {
-        objectClass: ['top', 'organizationalUnit', 'twakeDepartment'],
-        ou,
-        twakeDepartmentPath: ou,
+interface OriginContext {
+  server: DM;
+  request: ReturnType<typeof supertest>;
+  userBranch: string;
+  sales: string;
+  backend: string;
+  transit: string;
+  uid(name: string): string;
+  move(name: string, targetOrgDn: string): supertest.Test;
+  origin(name: string): Promise<unknown>;
+}
+
+const ADMIN = 'origin.admin';
+const ORIGIN = 'departmentNumber';
+const as = (user: string) => ({
+  'X-Test-User': user,
+  Accept: 'application/json',
+});
+
+for (const option of [ORIGIN, ORIGIN.toLowerCase()])
+  originSuite(
+    `Transit branch: where an entry comes from (${option})`,
+    option,
+    true,
+    ctx => {
+      it('records the organization an entry leaves for transit', async () => {
+        expect((await ctx.move('moved', ctx.transit)).status).to.equal(200);
+        expect(await ctx.origin('moved')).to.equal(ctx.sales);
+      });
+
+      it('keeps it from transit to transit', async () => {
+        await ctx.server.ldap.modify(
+          `uid=${ctx.uid('moved')},${ctx.userBranch}`,
+          { delete: ['twakeDepartmentLink'] }
+        );
+        expect(await ctx.origin('moved')).to.equal(ctx.sales);
+      });
+
+      it('removes it when the entry is claimed', async () => {
+        expect((await ctx.move('moved', ctx.backend)).status).to.equal(200);
+        expect(await ctx.origin('moved')).to.equal(undefined);
+      });
+
+      it('records it when the link itself is modified', async () => {
+        const res = await ctx.request
+          .put(`/api/v1/ldap/users/${ctx.uid('modified')}`)
+          .set(as(ADMIN))
+          .send({ replace: { twakeDepartmentLink: ctx.transit } });
+        expect(res.status).to.equal(200);
+        expect(await ctx.origin('modified')).to.equal(ctx.sales);
+      });
+
+      it('claims an entry attached to nothing without an origin', async () => {
+        expect((await ctx.move('loose', ctx.backend)).status).to.equal(200);
+        expect(await ctx.origin('loose')).to.equal(undefined);
+      });
+
+      it('leaves alone a modify that names the attribute itself', async () => {
+        await ctx.server.ldap.modify(
+          `uid=${ctx.uid('typed')},${ctx.userBranch}`,
+          { replace: { twakeDepartmentLink: ctx.transit, [ORIGIN]: 'typed' } }
+        );
+        expect(await ctx.origin('typed')).to.equal('typed');
       });
     }
+  );
 
-    const account = (uid: string, org: string | null): AttributesList => ({
-      objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
-      uid,
-      cn: uid,
-      sn: 'Origin',
-      givenName: 'Test',
-      displayName: 'Test Origin',
-      mail: `${uid}@example.com`,
-      ...(org
-        ? { twakeDepartmentLink: org, twakeDepartmentPath: 'OriginOrg' }
-        : {}),
-    });
-    for (const [uid, org] of [
-      [MOVED, sales],
-      [MODIFIED, sales],
-      [LOOSE, null],
-      [TYPED, sales],
-    ] as [string, string | null][]) {
-      await server.ldap
-        .delete(`uid=${uid},${userBranch}`)
-        .catch(() => undefined);
-      await server.ldap.add(`uid=${uid},${userBranch}`, account(uid, org));
-    }
-
-    await server.registerPlugin('testAuth', new TestAuthPlugin(server));
-    await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
-    await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
-    server.setupErrorMiddleware();
-    request = supertest(server.app);
-  });
-
-  after(async () => {
-    for (const uid of accounts)
-      await server.ldap
-        .delete(`uid=${uid},${userBranch}`)
-        .catch(() => undefined);
-    for (const dn of [sales, backend, transit])
-      await server.ldap.delete(dn).catch(() => undefined);
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  });
-
-  it('records the organization an entry leaves for transit', async () => {
-    expect((await move(MOVED, transit)).status).to.equal(200);
-    expect(await origin(MOVED)).to.equal(sales);
-  });
-
-  it('removes it when the entry is claimed', async () => {
-    expect((await move(MOVED, backend)).status).to.equal(200);
-    expect(await origin(MOVED)).to.equal(undefined);
-  });
-
-  it('records it when the link itself is modified', async () => {
-    const res = await request
-      .put(`/api/v1/ldap/users/${MODIFIED}`)
-      .set(as(ADMIN))
-      .send({ replace: { twakeDepartmentLink: transit } });
-    expect(res.status).to.equal(200);
-    expect(await origin(MODIFIED)).to.equal(sales);
-  });
-
-  it('claims an entry attached to nothing without an origin', async () => {
-    expect((await move(LOOSE, backend)).status).to.equal(200);
-    expect(await origin(LOOSE)).to.equal(undefined);
-  });
-
-  it('leaves alone a modify that names the attribute itself', async () => {
-    await server.ldap.modify(`uid=${TYPED},${userBranch}`, {
-      replace: { twakeDepartmentLink: transit, [ORIGIN]: 'typed' },
-    });
-    expect(await origin(TYPED)).to.equal('typed');
+originSuite('Transit origin without a transit branch', ORIGIN, false, ctx => {
+  it('records nothing', async () => {
+    expect((await ctx.move('moved', ctx.transit)).status).to.equal(200);
+    expect(await ctx.origin('moved')).to.equal(undefined);
   });
 });
