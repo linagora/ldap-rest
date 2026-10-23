@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.26.0 (2026-10-23)
 
 ### Features
 
@@ -8,6 +8,7 @@
   account's Matrix ID (`matrixId`, `@local:domain` from its `mail`), which
   cozy-stack stores instead of deriving it from the instance's email,
   [docs](docs/usage/plugins/integrations/instances.md#providers)
+  ([#375](https://github.com/linagora/ldap-rest/pull/375))
 
 ## v0.25.1 (2026-10-23)
 
