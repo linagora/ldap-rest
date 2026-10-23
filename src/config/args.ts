@@ -179,6 +179,12 @@ export interface Config {
    * organization is in transit too, with or without this option.
    */
   authz_transit_branch?: string;
+  /**
+   * The attribute an entry put in transit keeps the organization it leaves
+   * in, removed when it is claimed: who claims it can tell where it comes
+   * from. Empty records nothing. It must exist in the directory's schema.
+   */
+  authz_transit_origin_attribute?: string;
   authz_unresolved_user?: string;
   authz_identity?: string;
   /**
@@ -1240,6 +1246,7 @@ const configArgs: ConfigTemplate = [
     'boolean',
   ],
   ['--authz-transit-branch', 'DM_AUTHZ_TRANSIT_BRANCH', ''],
+  ['--authz-transit-origin-attribute', 'DM_AUTHZ_TRANSIT_ORIGIN_ATTRIBUTE', ''],
   [
     '--authz-per-branch-config',
     'DM_AUTHZ_PER_BRANCH_CONFIG',
