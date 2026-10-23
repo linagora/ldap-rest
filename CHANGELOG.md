@@ -9,6 +9,12 @@
   [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
   ([twake-directory-manager#118](https://github.com/linagora/twake-directory-manager/issues/118),
   [#366](https://github.com/linagora/ldap-rest/pull/366))
+- `GET /authz/scope` says whether the caller may list the password
+  policies (`passwordPolicies`), so that a client no longer asks for them to
+  find out,
+  [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
+  ([#367](https://github.com/linagora/ldap-rest/issues/367),
+  [twake-directory-manager#138](https://github.com/linagora/twake-directory-manager/issues/138))
 
 ### Security
 

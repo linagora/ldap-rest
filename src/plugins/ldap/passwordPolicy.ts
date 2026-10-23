@@ -1377,7 +1377,11 @@ export default class PasswordPolicy extends DmPlugin {
     this.discoveredDefault = null;
   }
 
-  private policyBase(): string {
+  /**
+   * Where the policies are listed from: `--ppolicy-base`, else
+   * `--ldap-base`. `authzScope` asks whether a caller may search it.
+   */
+  policyBase(): string {
     return (
       (this.config.ppolicy_base as string) || (this.config.ldap_base as string)
     );

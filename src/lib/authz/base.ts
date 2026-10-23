@@ -135,6 +135,35 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * Why `user` may not search under `base`, or `undefined` when they may:
+   * the judgement of `ldapsearchrequest`, for `authzScope` to ask it of a
+   * branch without searching it.
+   *
+   * Filtering, an administrator reads the directory whole — the
+   * organization tree, the groups, the nomenclatures — and what is held to
+   * a branch is the accounts, recognised one entry at a time by
+   * `ldapsearchfilter`; only a global branch asks for the branch itself.
+   * Otherwise the branch decides. Where a branch is a tenant rather than a
+   * department, letting a listing cross it is letting a customer read
+   * another.
+   *
+   * @param user the caller's DN
+   * @param base the base of the search
+   * @returns the end of the refusal's message, after the caller's name
+   */
+  async searchRefusal(user: string, base: string): Promise<string | undefined> {
+    if (this.filtersAttachedEntries()) {
+      if ((await this.getAuthorizedBranches(user)).length === 0)
+        return 'administers no branch';
+      if (!this.globalBranches().some(branch => isDnInBranch(base, branch)))
+        return undefined;
+    }
+    return (await this.getUserPermissions(user, base)).read
+      ? undefined
+      : `does not have read permission for branch ${base}`;
+  }
+
+  /**
    * What taking an entry out of a branch, by a move or a rename, asks of
    * the caller there: read, by default, the destination being judged on
    * write.
@@ -771,30 +800,14 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      // Filtering, an administrator reads the directory whole — the
-      // organization tree, the groups, the nomenclatures — and what is held
-      // to a branch is the accounts, recognised one entry at a time by
-      // `ldapsearchfilter` below. Refusing the search here would take the
-      // tree and the reference data with it.
-      //
-      // Otherwise the branch decides. Where a branch is a tenant rather than
-      // a department, letting a listing cross it is letting a customer read
-      // another.
+      // Filtering, the search is granted broadly and `ldapsearchfilter`
+      // below holds the accounts to the caller's branches: refusing it here
+      // would take the tree and the reference data with it.
+      const refusal = await this.searchRefusal(user, base);
+      if (refusal)
+        throw new Error(`[authz-forbidden] User ${req!.user} ${refusal}`);
+
       if (this.filtersAttachedEntries()) {
-        const branches = await this.getAuthorizedBranches(user);
-        if (branches.length === 0) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} administers no branch`
-          );
-        }
-        if (
-          this.globalBranches().some(branch => isDnInBranch(base, branch)) &&
-          !(await this.getUserPermissions(user, base)).read
-        ) {
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have read permission for branch ${base}`
-          );
-        }
         // Granting the broad read also means supplying the means to enforce
         // it. A caller asking only for the fields it displays — the normal
         // client shape, and what SCIM does — would otherwise get entries
@@ -812,13 +825,6 @@ export default abstract class AuthzBase extends DmPlugin {
           AuthzBase.widenedForLink.add(opts);
         }
         return [base, opts, req];
-      }
-
-      const permissions = await this.getUserPermissions(user, base);
-      if (!permissions.read) {
-        throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have read permission for branch ${base}`
-        );
       }
 
       return [base, opts, req];
