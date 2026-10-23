@@ -205,6 +205,16 @@ for (const option of [ORIGIN, ORIGIN.toLowerCase()])
       });
 
       it('keeps it from transit to transit', async () => {
+        // Linked to the transit branch again, as a second hand-over does
+        await ctx.server.ldap.modify(
+          `uid=${ctx.uid('moved')},${ctx.userBranch}`,
+          { replace: { twakeDepartmentLink: ctx.transit } }
+        );
+        expect(await ctx.origin('moved')).to.equal(ctx.sales);
+      });
+
+      it('keeps it when the link is dropped in transit', async () => {
+        // An entry attached to no organization is in transit too
         await ctx.server.ldap.modify(
           `uid=${ctx.uid('moved')},${ctx.userBranch}`,
           { delete: ['twakeDepartmentLink'] }
