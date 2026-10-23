@@ -25,6 +25,29 @@ export const instanceSlug = (value: string): string =>
     .replace(/[^a-z0-9-]/g, '')
     .replace(/^-+|-+$/g, '');
 
+/**
+ * The account's Matrix ID, from its mail, for cozy-stack to store as is. A
+ * value cozy-stack's `IsMatrixID` would refuse is not sent, nor one whose
+ * local part holds a `:`, which a Matrix ID reads as the start of its server.
+ *
+ * @returns `@local:domain` lowercased, undefined for a malformed mail
+ */
+export const matrixId = (mail: string): string | undefined => {
+  const at = mail.lastIndexOf('@');
+  const local = mail.slice(0, at);
+  const domain = mail.slice(at + 1);
+  const id = `@${local}:${domain}`.toLowerCase();
+  if (
+    at < 1 ||
+    !domain ||
+    local.includes(':') ||
+    /\s/.test(id) ||
+    Buffer.byteLength(id) > 255
+  )
+    return undefined;
+  return id;
+};
+
 export interface InstanceRequest {
   /** Slug of the instance, and its OIDC id unless `oidc` says otherwise */
   id: string;
