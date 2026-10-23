@@ -363,7 +363,12 @@ curl -X DELETE "http://localhost:8081/api/v1/ldap/groups/developers/members/uid%
 
 **Notes:**
 
-- If removing the last real member, the dummy member is automatically added
+- If removing the last real member, the dummy member (`--group-dummy-user`)
+  takes its place in the same change, so the group stays valid and reads back
+  with no member; with no dummy member configured, the removal is refused
+  with a 409, as a `groupOfNames` needs at least one member
+- Removing the dummy member itself is refused with a 400, and a DN that is not
+  a member of the group with a 404
 - Member DN must be URL-encoded in the path
 
 **Response (200):**

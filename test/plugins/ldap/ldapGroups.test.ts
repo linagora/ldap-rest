@@ -401,6 +401,60 @@ describe('LdapGroups Plugin', function () {
       });
     });
 
+    describe('the last member of a group', () => {
+      const groupDn = `cn=testgroup,${DM_LDAP_GROUP_BASE}`;
+      const storedMembers = async (): Promise<unknown> =>
+        (
+          (await plugin.ldap.search(
+            { paged: false, scope: 'base', attributes: ['member'] },
+            groupDn
+          )) as SearchResult
+        ).searchEntries[0].member;
+
+      beforeEach(async () => {
+        // Written straight to the directory: a group created through the
+        // plugin always holds the placeholder, so its last real member can
+        // go without emptying it. Here user2 is the only member, the one
+        // groupOfNames requires.
+        await plugin.ldap.add(groupDn, {
+          objectClass: ['top', 'groupOfNames'],
+          cn: 'testgroup',
+          member: user2,
+        });
+      });
+
+      it('should leave the placeholder in its place', async () => {
+        const res = await request
+          .delete(`/api/v1/ldap/groups/testgroup/members/${user2}`)
+          .type('json')
+          .send();
+        expect(res.status).to.equal(200);
+        expect(res.body).to.deep.equal({ success: true });
+        expect(plugin.isDummyMember(String(await storedMembers()))).to.equal(
+          true
+        );
+        expect(
+          (await plugin.searchGroupsByName('testgroup')).testgroup.member
+        ).to.deep.equal([]);
+      });
+
+      it('should answer 409 when no placeholder is configured', async () => {
+        const placeholder = server.config.group_dummy_user;
+        server.config.group_dummy_user = undefined;
+        try {
+          const res = await request
+            .delete(`/api/v1/ldap/groups/testgroup/members/${user2}`)
+            .type('json')
+            .send();
+          expect(res.status).to.equal(409);
+          expect(res.body.error).to.match(/at least one member/);
+        } finally {
+          server.config.group_dummy_user = placeholder;
+        }
+        expect(await storedMembers()).to.equal(user2);
+      });
+    });
+
     it('should answer 400 naming a member that does not exist', async () => {
       await plugin.addGroup('testgroup');
       const ghost = `uid=nobody,${process.env.DM_LDAP_BASE}`;
