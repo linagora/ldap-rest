@@ -477,6 +477,7 @@ export default class PasswordPolicy extends DmPlugin {
   private discoveredDefault: { dn: string | null; time: number } | null = null;
   private warnedAmbiguousDefault = false;
   private warnedMissingBase = false;
+  private warnedUnreadableSchema = false;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
 
   api(app: Express): void {
@@ -707,7 +708,8 @@ export default class PasswordPolicy extends DmPlugin {
      * summary: List password policies
      * description: |
      *   Returns every `pwdPolicy` entry under `--ppolicy-base` (else
-     *   `--ldap-base`), sorted by `cn`.
+     *   `--ldap-base`), sorted by `cn`, and the attributes a policy can be
+     *   given: those the API writes that the directory's schema defines.
      * responses:
      *   '200':
      *     description: The password policies.
@@ -719,11 +721,18 @@ export default class PasswordPolicy extends DmPlugin {
      *             policies:
      *               type: array
      *               items: { $ref: '#/components/schemas/PasswordPolicyEntry' }
+     *             attributes:
+     *               type: array
+     *               items: { type: string }
+     *               example: [pwdMinAge, pwdMaxAge, pwdInHistory]
      */
     app.get(
       `${prefix}/password-policies`,
       asyncHandler(async (req: Request, res: Response) => {
-        res.json({ policies: await this.listPolicies(req) });
+        res.json({
+          policies: await this.listPolicies(req),
+          attributes: await this.definedAttributes(),
+        });
       })
     );
 
@@ -1433,6 +1442,29 @@ export default class PasswordPolicy extends DmPlugin {
       policies.push(await this.toPolicyRecord(entry));
     }
     return policies.sort((a, b) => a.cn.localeCompare(b.cn));
+  }
+
+  /**
+   * The writable policy attributes the directory's schema defines: OpenLDAP
+   * 2.4 lacks pwdMaxLength, pwdMaxIdle, pwdMinDelay and pwdMaxDelay, and
+   * only 2.6 has the checker's. All of them when the schema cannot be read:
+   * the directory still refuses what it lacks.
+   */
+  private async definedAttributes(): Promise<string[]> {
+    const writable = Object.keys(POLICY_ATTRIBUTE_TYPES);
+    try {
+      const schema = await this.server.ldap.schemaIndex();
+      return writable.filter(name => schema.getAttributeType(name));
+    } catch (error) {
+      // Each listing reads it again: once is enough to say so
+      if (!this.warnedUnreadableSchema) {
+        this.warnedUnreadableSchema = true;
+        this.logger.warn(
+          `Unable to read the schema, every policy attribute is listed: ${String(error)}`
+        );
+      }
+      return writable;
+    }
   }
 
   private async toPolicyRecord(entry: RawEntry): Promise<PolicyRecord> {

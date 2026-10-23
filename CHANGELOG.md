@@ -4,6 +4,11 @@
 
 ### Features
 
+- `GET /password-policies` answers the `attributes` a policy can be given
+  in this directory, for a client to offer only those,
+  [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
+  ([twake-directory-manager#118](https://github.com/linagora/twake-directory-manager/issues/118),
+  [#366](https://github.com/linagora/ldap-rest/pull/366))
 - `GET /authz/scope` says whether the caller may list the password
   policies (`passwordPolicies`), so that a client no longer asks for them to
   find out,

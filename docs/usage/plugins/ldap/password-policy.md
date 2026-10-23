@@ -342,7 +342,12 @@ curl -X PATCH "http://localhost:8081/api/v1/password-policies/default" \
   `pwdUseCheckModule`, gives the entry the `pwdPolicyChecker` class. Both
   need OpenLDAP 2.6; an older directory refuses them with a `400`.
 - An attribute the directory's schema does not know is refused with a `400`
-  naming it.
+  naming it. The list answers, next to `policies`, the `attributes` a policy
+  can be given: those of the above that the directory's schema defines.
+  OpenLDAP 2.4 lacks `pwdMaxLength`, `pwdMaxIdle`, `pwdMinDelay` and
+  `pwdMaxDelay`. The schema is read once per `--ldap-raw-schema-cache-ttl`:
+  after an upgrade of the directory, the list follows within that delay, or
+  at the next restart.
 
 **Creating a policy:** `POST` takes `cn` and the attributes to set. The entry
 is created under `--ppolicy-base` as a `person` holding `pwdPolicy`, as in

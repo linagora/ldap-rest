@@ -411,6 +411,47 @@ describe('PasswordPolicy Plugin: policy management', () => {
     expect(flags).to.deep.equal([false, true, false]);
   });
 
+  it('lists the attributes a policy can be given, as the schema defines them', async () => {
+    // pwdMaxLength appeared in OpenLDAP 2.5, pwdCheckModuleArg in 2.6
+    const schema = (await dm.ldap.search(
+      { scope: 'base', attributes: ['attributeTypes'], paged: false },
+      'cn=subschema'
+    )) as unknown as { searchEntries: { attributeTypes?: string[] }[] };
+    const defined = (name: string): boolean =>
+      (schema.searchEntries[0].attributeTypes || []).some(type =>
+        type.includes(`NAME '${name}'`)
+      );
+    const res = await request.get(api);
+    const attributes = res.body.attributes as string[];
+    expect(attributes).to.include.members(['pwdMaxAge', 'pwdMinLength']);
+    expect(attributes).not.to.include.members(['pwdAttribute', 'cn']);
+    for (const name of [
+      'pwdMaxLength',
+      'pwdMaxIdle',
+      'pwdMinDelay',
+      'pwdMaxDelay',
+      'pwdCheckModuleArg',
+      'pwdUseCheckModule',
+    ])
+      expect(attributes.includes(name), name).to.equal(defined(name));
+  });
+
+  it('lists every attribute when the schema cannot be read', async () => {
+    const ldap = dm.ldap as unknown as { schemaIndex: () => Promise<unknown> };
+    const schemaIndex = ldap.schemaIndex;
+    ldap.schemaIndex = () => Promise.reject(new Error('unreadable'));
+    try {
+      const res = await request.get(api);
+      expect(res.status).to.equal(200);
+      expect(res.body.attributes).to.include.members([
+        'pwdMaxLength',
+        'pwdCheckModuleArg',
+      ]);
+    } finally {
+      ldap.schemaIndex = schemaIndex;
+    }
+  });
+
   it('reads an attribute the default policy lacks as absent', async () => {
     const res = await request.get('/api/v1/password-policy');
     expect(res.status).to.equal(200);
