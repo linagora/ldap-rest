@@ -26,6 +26,9 @@ jobs:
   # (docker, helm, npm) depends on this, so nothing is published if tests fail.
   test:
     name: Test
+    # runs-on: linagora
+    # container:
+    #   image: node:22-bookworm
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
