@@ -6,8 +6,9 @@
 
 - `DELETE /ldap/groups/{cn}/members/{member}` removing the last member of a
   group leaves the placeholder (`--group-dummy-user`) in its place, as
-  removing a deleted user from its groups already did, instead of failing
-  with a 500; with no placeholder configured, it answers a 409,
+  removing a deleted user from its groups already did, instead of refusing
+  with a generic 409; with no placeholder configured, the 409 says a group
+  needs at least one member,
   [docs](docs/usage/plugins/ldap/groups.md#remove-member)
 
 ## v0.25.0 (2026-10-23)

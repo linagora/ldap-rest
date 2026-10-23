@@ -412,9 +412,10 @@ describe('LdapGroups Plugin', function () {
         ).searchEntries[0].member;
 
       beforeEach(async () => {
-        // Written straight to the directory, so without the placeholder a
-        // group created through the plugin would hold: user2 is the only
-        // member groupOfNames requires.
+        // Written straight to the directory: a group created through the
+        // plugin always holds the placeholder, so its last real member can
+        // go without emptying it. Here user2 is the only member, the one
+        // groupOfNames requires.
         await plugin.ldap.add(groupDn, {
           objectClass: ['top', 'groupOfNames'],
           cn: 'testgroup',
@@ -429,7 +430,9 @@ describe('LdapGroups Plugin', function () {
           .send();
         expect(res.status).to.equal(200);
         expect(res.body).to.deep.equal({ success: true });
-        expect(await storedMembers()).to.equal(server.config.group_dummy_user);
+        expect(plugin.isDummyMember(String(await storedMembers()))).to.equal(
+          true
+        );
         expect(
           (await plugin.searchGroupsByName('testgroup')).testgroup.member
         ).to.deep.equal([]);

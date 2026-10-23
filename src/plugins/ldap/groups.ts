@@ -501,8 +501,12 @@ export default class LdapGroups extends DmPlugin {
      *     content:
      *       application/json:
      *         example: { success: true }
+     *   '400':
+     *     description: The member is the placeholder (`--group-dummy-user`), which cannot be removed.
      *   '404':
      *     description: Group or member not found.
+     *   '409':
+     *     description: The member is the last one of the group and no placeholder is configured to take its place.
      */
     // Delete member from group
     app.delete(
