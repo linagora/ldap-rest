@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `--authz-transit-origin-attribute` keeps, on an entry put in transit, the
+  organization it leaves, and removes it when the entry is claimed: who
+  claims it can tell where it comes from,
+  [docs](docs/usage/plugins/auth/authz-linid1.md#where-an-entry-comes-from)
+  ([#369](https://github.com/linagora/ldap-rest/issues/369),
+  [twake-directory-manager#127](https://github.com/linagora/twake-directory-manager/issues/127))
+
 ## v0.24.0 (2026-10-22)
 
 ### Features

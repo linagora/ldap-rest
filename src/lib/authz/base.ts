@@ -205,6 +205,86 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * The attribute an entry in transit keeps the organization it was handed
+   * over from in: `--authz-transit-origin-attribute`, with a transit branch
+   * to hand it over through. `undefined` records nothing.
+   */
+  protected transitOriginAttribute(): string | undefined {
+    if (this.transitBranch() === undefined) return undefined;
+    const name = String(
+      this.config.authz_transit_origin_attribute ?? ''
+    ).trim();
+    return name.length > 0 ? name : undefined;
+  }
+
+  /**
+   * A modify that changes an entry's organization link, with the origin of
+   * a hand-over recorded: put in transit, the entry keeps the organization
+   * it leaves in {@link transitOriginAttribute}; claimed out of it, it loses
+   * it. The administrator who claims it can then tell where it comes from.
+   *
+   * The changes are left alone when they already name the attribute, and
+   * when the stored entry cannot be read: a failed read must not cost the
+   * move itself, which is judged elsewhere.
+   *
+   * @param dn the entry modified
+   * @param changes the modify as it stands
+   * @returns the modify, with the origin set or removed
+   */
+  protected async recordTransitOrigin(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<ModifyRequest> {
+    const origin = this.transitOriginAttribute();
+    const linkAttr = this.config.ldap_organization_link_attribute;
+    if (!origin || !linkAttr) return changes;
+
+    const deleted = (name: string): boolean =>
+      Array.isArray(changes.delete)
+        ? changes.delete.includes(name)
+        : changes.delete !== undefined && name in changes.delete;
+    let next: string | undefined;
+    if (changes.replace && linkAttr in changes.replace)
+      next = organizationLink(changes.replace[linkAttr]);
+    else if (changes.add && linkAttr in changes.add)
+      next = organizationLink(changes.add[linkAttr]);
+    else if (!deleted(linkAttr)) return changes;
+    if (
+      (changes.replace && origin in changes.replace) ||
+      (changes.add && origin in changes.add) ||
+      deleted(origin)
+    )
+      return changes;
+
+    let stored: AttributesList | undefined;
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: [linkAttr, origin] },
+        dn
+      )) as SearchResult;
+      stored = res.searchEntries[0];
+    } catch {
+      // Unreadable: the move goes on without its origin.
+    }
+    if (!stored) return changes;
+
+    const from = organizationLink(stored[linkAttr]);
+    const wasInTransit = this.inTransit(from);
+    const goesInTransit = this.inTransit(next);
+    if (!wasInTransit && goesInTransit && from)
+      return { ...changes, replace: { ...changes.replace, [origin]: from } };
+    // Deleting an attribute the entry does not hold is an LDAP error.
+    if (wasInTransit && !goesInTransit && organizationLink(stored[origin]))
+      return {
+        ...changes,
+        delete: Array.isArray(changes.delete)
+          ? [...changes.delete, origin]
+          : { ...changes.delete, [origin]: [] },
+      };
+    return changes;
+  }
+
+  /**
    * The transit branch in the form DNs are compared in. A listing asks once
    * and hands it to {@link inTransit} for every entry, rather than parsing
    * the same constant DN a few thousand times.
@@ -578,12 +658,12 @@ export default abstract class AuthzBase extends DmPlugin {
       DmRequest?,
     ]): Promise<[string, ModifyRequest, number, DmRequest?]> => {
       if (this.shouldSkipAuthorization(req)) {
-        return [dn, changes, opNumber, req];
+        return [dn, await this.recordTransitOrigin(dn, changes), opNumber, req];
       }
 
       const user = await this.resolveCaller(req!);
       if (!user) {
-        return [dn, changes, opNumber, req];
+        return [dn, await this.recordTransitOrigin(dn, changes), opNumber, req];
       }
 
       // Check if this is a move operation (changing organization link)
@@ -697,7 +777,7 @@ export default abstract class AuthzBase extends DmPlugin {
           false
         );
 
-      return [dn, changes, opNumber, req];
+      return [dn, await this.recordTransitOrigin(dn, changes), opNumber, req];
     },
 
     ldapaddrequest: async ([dn, entry, req]: [

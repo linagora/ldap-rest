@@ -96,6 +96,30 @@ to the transit branch follows the same rules through
 `POST /api/v1/ldap/groups/:cn/move`; that endpoint does not move a group
 attached to no organization.
 
+#### Where an entry comes from
+
+Once in transit, an entry no longer says which organization it left, and the
+administrator who would claim it cannot tell whether it is theirs. Name an
+attribute to keep it in:
+
+```bash
+--authz-transit-origin-attribute departmentNumber
+```
+
+Putting an entry in transit, by `move` or by any modify of its
+`twakeDepartmentLink`, then sets that attribute to the DN of the organization
+it leaves; claiming it removes the attribute. A move from transit to transit
+keeps it, and an entry that was attached to no organization gets none. A
+modify that sets or removes the attribute itself is left as it is.
+
+The attribute must be allowed on every entry that can be handed over, by the
+directory's schema: the directory refuses the whole move otherwise. The Twake
+schema has none of its own for this. `departmentNumber` (`twakeWhitePages`)
+suits accounts, but no Twake group class allows it: a deployment that hands
+groups over needs an attribute both allow, added to its schema. Whatever a
+client types in the attribute is replaced at the next hand-over. Without the
+option, nothing is recorded.
+
 ### Mail domains
 
 The mail domains an organization's entries may use are those it links in
