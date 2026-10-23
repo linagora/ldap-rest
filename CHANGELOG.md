@@ -1,44 +1,39 @@
 # Changelog
 
-## Unreleased
+## v0.25.0 (2026-10-23)
 
 ### Features
 
-- `GET /password-policies` answers the `attributes` a policy can be given
-  in this directory, for a client to offer only those,
+- `GET /password-policies` also answers the `attributes` a policy can be
+  given, those the directory's schema defines (OpenLDAP 2.4 lacks some),
   [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
-  ([twake-directory-manager#118](https://github.com/linagora/twake-directory-manager/issues/118),
-  [#366](https://github.com/linagora/ldap-rest/pull/366))
+  ([#366](https://github.com/linagora/ldap-rest/pull/366))
 - `GET /authz/scope` says whether the caller may list the password
-  policies (`passwordPolicies`), so that a client no longer asks for them to
-  find out,
+  policies (`passwordPolicies`), so a client no longer has to ask and be
+  refused,
   [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
-  ([#367](https://github.com/linagora/ldap-rest/issues/367),
-  [twake-directory-manager#138](https://github.com/linagora/twake-directory-manager/issues/138))
-- A refusal a client is expected to explain carries a `code` (`unique`,
-  `mailDomain`, `forbidden`) next to its message, and the `attribute`,
-  `value` and authorised `domains` it concerns, for the client to say it in
-  its own words under the field at fault; the bulk import reports them per
-  row, [docs](docs/client-development/api/rest-api.md#error-response-format)
-  ([twake-directory-manager#126](https://github.com/linagora/twake-directory-manager/issues/126),
-  [#368](https://github.com/linagora/ldap-rest/issues/368))
-- `--authz-transit-origin-attribute` keeps, on an entry put in transit, the
-  organization it leaves, and removes it when the entry is claimed: who
-  claims it can tell where it comes from,
+  ([#371](https://github.com/linagora/ldap-rest/pull/371))
+- The common refusals carry a `code` (`unique`, `mailDomain`, `forbidden`)
+  and the `attribute`, `value` or `domains` at fault, next to their message;
+  the bulk import reports them per row,
+  [docs](docs/client-development/api/rest-api.md#error-response-format)
+  ([#372](https://github.com/linagora/ldap-rest/pull/372))
+- `--authz-transit-origin-attribute` records the organization an entry put
+  in transit leaves, and removes it when the entry is claimed,
   [docs](docs/usage/plugins/auth/authz-linid1.md#where-an-entry-comes-from)
-  ([#369](https://github.com/linagora/ldap-rest/issues/369),
-  [twake-directory-manager#127](https://github.com/linagora/twake-directory-manager/issues/127))
+  ([#370](https://github.com/linagora/ldap-rest/pull/370))
 
 ### Fixes
 
-- The mail domain refusal lists a domain linked at several levels of the
-  tree once ([#350](https://github.com/linagora/ldap-rest/issues/350))
+- The mail domain refusal lists a domain linked at several levels once
+  ([#350](https://github.com/linagora/ldap-rest/issues/350))
 
 ### Security
 
-- Rebuilt with the latest Node.js, for CVE-2026-105481, CVE-2026-105482,
-  CVE-2026-105483, CVE-2026-106069, CVE-2026-106072, CVE-2026-106073 and
-  CVE-2026-106074
+- Docker image rebuilt on the latest Node.js 24, for CVE-2026-105481,
+  CVE-2026-105482, CVE-2026-105483, CVE-2026-106069, CVE-2026-106072,
+  CVE-2026-106073 and CVE-2026-106074
+- `ip-address` 10.7.4, for GHSA-rxp7-6hxx-x8q5
 
 ## v0.24.0 (2026-10-22)
 
