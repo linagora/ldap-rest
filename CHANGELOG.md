@@ -1,15 +1,14 @@
 # Changelog
 
-## Unreleased
+## v0.25.1 (2026-10-23)
 
 ### Fixes
 
-- `DELETE /ldap/groups/{cn}/members/{member}` removing the last member of a
-  group leaves the placeholder (`--group-dummy-user`) in its place, as
-  removing a deleted user from its groups already did, instead of refusing
-  with a generic 409; with no placeholder configured, the 409 says a group
-  needs at least one member,
+- Removing the last member of a group through the API leaves the
+  placeholder (`--group-dummy-user`) in its place, instead of a generic
+  409; without a placeholder, the 409 says a group needs one member,
   [docs](docs/usage/plugins/ldap/groups.md#remove-member)
+  ([#373](https://github.com/linagora/ldap-rest/pull/373))
 
 ## v0.25.0 (2026-10-23)
 
