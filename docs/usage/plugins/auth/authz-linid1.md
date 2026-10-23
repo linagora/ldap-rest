@@ -145,7 +145,8 @@ a search started above the branch leaves its entries out. That is how only
 the administrators of the whole directory manage the
 [password policies](../ldap/password-policy.md#managing-policies). A global
 branch is no branch of theirs in `GET /authz/scope`, so it adds nothing to
-the organizations they are offered.
+the organizations they are offered; `passwordPolicies` there says whether
+they may list the policies.
 
 `--authz-global-write-branches` names branches whose writes and deletes are
 held the same way, while reading them stays as for the rest of the reference

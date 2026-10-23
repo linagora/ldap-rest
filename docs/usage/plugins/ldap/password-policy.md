@@ -357,6 +357,13 @@ every administrator reads there: name `--ppolicy-base` in
 directory read and change the policies
 ([global branches](../auth/authz-linid1.md#global-branches)).
 
+`GET /authz/scope` answers `passwordPolicies: true` to a caller who may list
+the policies, and `false` to the others, so that a client offers them
+without asking for them and being refused. It is the judgement the
+authorization plugin describing the scope makes of a search of
+`--ppolicy-base`, the one listing them makes; the field is absent when this
+plugin is not loaded.
+
 **Deleting a policy** is refused (`409`) while it is the default one or an
 entry's `pwdPolicySubentry` names it. The default one is only known through
 `--ppolicy-default-dn` when there are several: without it, nothing stops

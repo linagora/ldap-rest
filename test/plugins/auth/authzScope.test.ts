@@ -8,6 +8,7 @@ import AuthzPerRoute from '../../../src/plugins/auth/authzPerRoute';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
+import PasswordPolicy from '../../../src/plugins/ldap/passwordPolicy';
 import type { DmRequest } from '../../../src/lib/auth/base';
 import {
   skipIfMissingEnvVars,
@@ -40,6 +41,8 @@ describe('Authorization scope endpoint', () => {
       scopeSource?: string;
       warned?: string[];
       userName?: string;
+      /** Load the password policies, held by this global organization */
+      policiesHeldBy?: string;
     } = {}
   ): Promise<ReturnType<typeof supertest>> => {
     process.env.DM_LDAP_FLAT_SCHEMA = './static/schemas/twake/users.json';
@@ -69,6 +72,16 @@ describe('Authorization scope endpoint', () => {
         'ldapOrganizations',
         new LdapOrganizations(server)
       );
+    if (opts.policiesHeldBy) {
+      // A global branch: only the holders of the global organization read it
+      server.config.ppolicy_base = `ou=policies,${base}`;
+      server.config.authz_global_branch = [`ou=policies,${base}`];
+      server.config.authz_global_organization = opts.policiesHeldBy;
+      await server.registerPlugin(
+        'ldapPasswordPolicy',
+        new PasswordPolicy(server)
+      );
+    }
     // Registered first on purpose: authzPerRoute sits in priority.json, so a
     // server combining route-level and branch-level authorization always has
     // it in hand before the branch-level one.
@@ -97,6 +110,8 @@ describe('Authorization scope endpoint', () => {
     expect(res.status).to.equal(200);
     expect(res.body).to.have.property('unrestricted', true);
     expect(res.body).to.have.property('linksAnyDomain', true);
+    // Nothing serves the password policies: neither yes nor no
+    expect(res.body).not.to.have.property('passwordPolicies');
     expect(res.body.entities.map((e: { name: string }) => e.name)).to.include(
       'users'
     );
@@ -169,6 +184,45 @@ describe('Authorization scope endpoint', () => {
     expect(res.body.branches).to.deep.equal([]);
     expect((res.body.entities as { create: boolean }[]).every(e => !e.create))
       .to.be.true;
+  });
+
+  it('should say whether the caller may list the password policies', async () => {
+    // The judgement the search hook makes of `GET /password-policies`,
+    // asked without the request: a local administrator was refused it on
+    // every page load of a client probing for it.
+    const holder = `ou=Test Org 1,ou=organization,${base}`;
+    const other = `ou=Test Org 2,ou=organization,${base}`;
+    const scopeOf = async (
+      user: string,
+      heldBy: string
+    ): Promise<Record<string, unknown>> => {
+      const request = await serve(user, true, { policiesHeldBy: heldBy });
+      const res = await request
+        .get('/api/v1/authz/scope')
+        .set('Accept', 'application/json');
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      return res.body as Record<string, unknown>;
+    };
+    expect(await scopeOf('alice.admin', holder)).to.have.property(
+      'passwordPolicies',
+      true
+    );
+    expect(await scopeOf('alice.admin', other)).to.have.property(
+      'passwordPolicies',
+      false
+    );
+    expect(await scopeOf('bob.user', holder)).to.have.property(
+      'passwordPolicies',
+      false
+    );
+    // Unrestricted, they are served to anyone
+    const request = await serve('alice.admin', false, {
+      policiesHeldBy: holder,
+    });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.body).to.have.property('passwordPolicies', true);
   });
 
   it('should keep answering when a route-level plugin is loaded too', async () => {

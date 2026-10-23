@@ -37,6 +37,8 @@ interface AuthzLike extends DmPlugin {
   transitBranch?(): string | undefined;
   /** Whether the caller links an organization to any mail domain. */
   mayLinkAnyDomain?(user: string): Promise<boolean>;
+  /** Why the caller may not search under a base, if they may not. */
+  searchRefusal?(user: string, base: string): Promise<string | undefined>;
 }
 
 /** One entity, and whether the caller may create one. */
@@ -103,6 +105,16 @@ export default class AuthzScope extends DmPlugin {
      *   the answer of `source` alone: another authorization plugin judging
      *   the same caller may still refuse the link — `authzPerBranch`
      *   grants it on the top organization only.
+     *
+     *   `passwordPolicies` says whether the caller may list the password
+     *   policies (`GET /password-policies`), so a client offers them without
+     *   asking for them and being refused: the judgement the describing
+     *   plugin makes of a search of `--ppolicy-base` — with `authzLinid1`
+     *   and `--authz-global-branches` holding it, only those who read that
+     *   branch. `true` when unrestricted, `false` when the scope is not
+     *   described, and absent when `core/ldap/passwordPolicy` is not loaded.
+     *   It is the answer of `source` too, and a route-level gate
+     *   (`authzPerRoute`) may still refuse the request.
      * tags:
      *   - Authorization
      * responses:
@@ -123,6 +135,7 @@ export default class AuthzScope extends DmPlugin {
      *               delete: true
      *           transit: ou=Transit,ou=organization,dc=example,dc=com
      *           linksAnyDomain: false
+     *           passwordPolicies: false
      *           entities:
      *             - name: users
      *               base: ou=users,dc=example,dc=com
@@ -338,6 +351,7 @@ export default class AuthzScope extends DmPlugin {
           sources: [],
           branches: [],
           linksAnyDomain: true,
+          ...this.passwordPolicies(true),
           entities: this.entities().map(({ name, base }) => ({
             name,
             base,
@@ -360,6 +374,7 @@ export default class AuthzScope extends DmPlugin {
         sources: sourceNames,
         branches: [],
         linksAnyDomain: false,
+        ...this.passwordPolicies(false),
         entities: [],
       });
       return;
@@ -432,8 +447,43 @@ export default class AuthzScope extends DmPlugin {
       // The question the domain link guard asks, of the describing plugin
       // only: another one judging this caller may still refuse
       linksAnyDomain: (await authz.mayLinkAnyDomain?.(user)) === true,
+      ...this.passwordPolicies(await this.readsPolicies(authz, user)),
       entities,
     });
+  }
+
+  /** The password policy plugin, when loaded. */
+  private policyPlugin(): { policyBase(): string } | undefined {
+    return this.server.loadedPlugins['ldapPasswordPolicy'] as unknown as
+      | { policyBase(): string }
+      | undefined;
+  }
+
+  /**
+   * The `passwordPolicies` field: nothing when no plugin serves the policies,
+   * so that "not served" is not read as "not yours".
+   *
+   * @param may whether the caller may list them
+   */
+  private passwordPolicies(may: boolean): { passwordPolicies?: boolean } {
+    return this.policyPlugin() ? { passwordPolicies: may } : {};
+  }
+
+  /**
+   * Whether the describing plugin lets the caller list the password
+   * policies: the judgement its search hook makes of the listing, asked
+   * without the listing. A plugin that cannot say lets them try.
+   *
+   * @param authz the describing plugin
+   * @param user the caller's DN
+   */
+  private async readsPolicies(
+    authz: AuthzLike,
+    user: string
+  ): Promise<boolean> {
+    const plugin = this.policyPlugin();
+    if (!plugin || !authz.searchRefusal) return true;
+    return (await authz.searchRefusal(user, plugin.policyBase())) === undefined;
   }
 
   /**
