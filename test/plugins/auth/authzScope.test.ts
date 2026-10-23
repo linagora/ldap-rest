@@ -264,6 +264,23 @@ describe('Authorization scope endpoint', () => {
     expect(res.body.branches).to.deep.equal([]);
   });
 
+  it('should not offer the password policies when nothing describes the scope', async () => {
+    // Something restricts the caller and nothing can say what: the policies
+    // are not offered, rather than offered and refused.
+    const request = await serve('alice.admin', false, {
+      perRoute: true,
+      policiesHeldBy: `ou=Test Org 1,ou=organization,${base}`,
+    });
+    const res = await request
+      .get('/api/v1/authz/scope')
+      .set('Accept', 'application/json');
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(res.body).to.include({
+      described: false,
+      passwordPolicies: false,
+    });
+  });
+
   describe('with two plugins able to describe a scope', () => {
     const orgDn = (): string => `ou=Test Org 1,ou=organization,${base}`;
     const perBranch = (): string =>

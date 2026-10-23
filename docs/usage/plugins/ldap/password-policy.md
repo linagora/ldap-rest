@@ -366,8 +366,8 @@ directory read and change the policies
 the policies, and `false` to the others, so that a client offers them
 without asking for them and being refused. It is the judgement the
 authorization plugin describing the scope makes of a search of
-`--ppolicy-base`, the one listing them makes; the field is absent when this
-plugin is not loaded.
+`--ppolicy-base`, which is the search the listing makes; the field is
+absent when this plugin is not loaded.
 
 **Deleting a policy** is refused (`409`) while it is the default one or an
 entry's `pwdPolicySubentry` names it. The default one is only known through

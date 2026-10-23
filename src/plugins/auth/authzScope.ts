@@ -113,8 +113,9 @@ export default class AuthzScope extends DmPlugin {
      *   and `--authz-global-branches` holding it, only those who read that
      *   branch. `true` when unrestricted, `false` when the scope is not
      *   described, and absent when `core/ldap/passwordPolicy` is not loaded.
-     *   It is the answer of `source` too, and a route-level gate
-     *   (`authzPerRoute`) may still refuse the request.
+     *   It is the answer of `source` too: another authorization plugin
+     *   judging the same caller (`--authz-combine`) may still refuse the
+     *   listing, and so may a route-level gate (`authzPerRoute`).
      * tags:
      *   - Authorization
      * responses:
@@ -472,7 +473,8 @@ export default class AuthzScope extends DmPlugin {
   /**
    * Whether the describing plugin lets the caller list the password
    * policies: the judgement its search hook makes of the listing, asked
-   * without the listing. A plugin that cannot say lets them try.
+   * without the listing. A plugin that cannot say does not offer them, as
+   * `linksAnyDomain` does not.
    *
    * @param authz the describing plugin
    * @param user the caller's DN
@@ -482,7 +484,7 @@ export default class AuthzScope extends DmPlugin {
     user: string
   ): Promise<boolean> {
     const plugin = this.policyPlugin();
-    if (!plugin || !authz.searchRefusal) return true;
+    if (!plugin || !authz.searchRefusal) return false;
     return (await authz.searchRefusal(user, plugin.policyBase())) === undefined;
   }
 
