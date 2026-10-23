@@ -10,6 +10,12 @@
   ([twake-directory-manager#118](https://github.com/linagora/twake-directory-manager/issues/118),
   [#366](https://github.com/linagora/ldap-rest/pull/366))
 
+### Security
+
+- Rebuilt with the latest Node.js, for CVE-2026-105481, CVE-2026-105482,
+  CVE-2026-105483, CVE-2026-106069, CVE-2026-106072, CVE-2026-106073 and
+  CVE-2026-106074
+
 ## v0.24.0 (2026-10-22)
 
 ### Features
