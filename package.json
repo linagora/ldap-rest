@@ -1,6 +1,6 @@
 {
   "name": "ldap-rest",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "description": "Light directory manager",
   "keywords": [
     "Identity-Manager"
