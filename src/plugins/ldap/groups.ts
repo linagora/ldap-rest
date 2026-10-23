@@ -150,10 +150,10 @@ export type postModify = ModifyRequest;
  *       items: { type: string }
  *       description: The authorised mail domains, for `mailDomain`.
  *   example:
- *     error: 'user: "alice@example.com" is already used (mail must be unique)'
+ *     error: 'entity: "value" is already used (attribute must be unique)'
  *     code: unique
- *     attribute: mail
- *     value: alice@example.com
+ *     attribute: attribute
+ *     value: value
  */
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';

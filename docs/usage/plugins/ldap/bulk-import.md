@@ -495,10 +495,25 @@ newuser,New User,User,new2@example.com
       "line": 10,
       "identifier": "user009",
       "error": "Invalid DN format"
+    },
+    {
+      "line": 11,
+      "identifier": "user010",
+      "error": "user: \"jane@example.com\" is already used (mail must be unique)",
+      "code": "unique",
+      "attribute": "mail",
+      "value": "jane@example.com"
     }
   ]
 }
 ```
+
+A row refused by a rule a client is expected to explain — a value already
+used, a mail domain outside the authorised ones, with
+[enterprise rules](enterprise-rules.md) loaded — carries the same `code`,
+`attribute`, `value` and `domains` as the answer of a single write: see
+[the error format](../../../client-development/api/rest-api.md#error-response-format).
+Other rows only have `error`.
 
 ## Best Practices
 
