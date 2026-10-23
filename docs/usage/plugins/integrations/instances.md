@@ -140,10 +140,10 @@ of the instance's address; the OIDC id is this slug with the Cloudery, and the
 `uid` with cozy-stack. `user.created` names the account by its `uid`
 (`twakeId`), and gives its Matrix ID as `matrixId`, `@local:domain` from
 its lowercased `mail`; a mail that gives no valid Matrix ID sends none, and
-[cozy-stack](https://github.com/cozy/cozy-stack/blob/3c05972703d8f6c1fe71c9cf1b7a747607a4b395/pkg/rabbitmq/handlers.go#L234-L240)
-derives one. A group named `org` is the organization id sent to
-the provider and in `user.created`, with the mail's domain as its domain; with
-cozy-stack and no such group, `--twake-instance-cozy-org-id` and
+[cozy-stack](https://github.com/cozy/cozy-stack/blob/3c05972703d8f6c1fe71c9cf1b7a747607a4b395/model/settings/common/common.go#L321-L329)
+derives one from the instance's email. A group named `org` is the organization
+id sent to the provider and in `user.created`, with the mail's domain as its
+domain; with cozy-stack and no such group, `--twake-instance-cozy-org-id` and
 `--twake-instance-cozy-org-domain` stand for them.
 
 ## Configuration
