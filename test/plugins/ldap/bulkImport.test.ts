@@ -1,6 +1,8 @@
 import { expect } from 'chai';
 import { DM } from '../../../src/bin';
 import LdapBulkImport from '../../../src/plugins/ldap/bulkImport';
+import LdapEnterpriseRules from '../../../src/plugins/ldap/enterpriseRules';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import supertest from 'supertest';
 import fs from 'fs';
 import path from 'path';
@@ -431,6 +433,94 @@ describe('LDAP Bulk Import Plugin', function () {
 
       expect(res.status).to.equal(400);
       expect(res.body.error).to.include('No file uploaded');
+    });
+  });
+
+  describe('Refusals of the enterprise rules', () => {
+    // A server of its own: the rules apply to the flat entities they find
+    // loaded, and the server above loads none
+    let rulesServer: DM;
+    let rulesRequest: any;
+    let flatSchemaPath: string;
+    let previousFlatSchema: string | undefined;
+
+    before(async function () {
+      this.timeout(10000);
+      flatSchemaPath = path.join(
+        __dirname,
+        '../../fixtures/bulk-import-rules-schema.json'
+      );
+      fs.writeFileSync(
+        flatSchemaPath,
+        JSON.stringify({
+          entity: {
+            name: 'bulkRulesUsers',
+            mainAttribute: 'uid',
+            objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+            singularName: 'bulkrulesuser',
+            pluralName: 'bulkrulesusers',
+            base: process.env.DM_LDAP_BASE,
+          },
+          attributes: {
+            objectClass: { type: 'array', items: { type: 'string' } },
+            uid: { type: 'string', required: true, role: 'identifier' },
+            cn: { type: 'string' },
+            sn: { type: 'string' },
+            mail: { type: 'string', unique: true },
+          },
+        })
+      );
+      previousFlatSchema = process.env.DM_LDAP_FLAT_SCHEMA;
+      process.env.DM_LDAP_FLAT_SCHEMA = flatSchemaPath;
+
+      rulesServer = new DM();
+      await rulesServer.ready;
+      await rulesServer.registerPlugin(
+        'ldapFlatGeneric',
+        new LdapFlatGeneric(rulesServer)
+      );
+      await rulesServer.registerPlugin(
+        'ldapEnterpriseRules',
+        new LdapEnterpriseRules(rulesServer)
+      );
+      const bulk = new LdapBulkImport(rulesServer);
+      await rulesServer.registerPlugin('bulkImport', bulk);
+      bulk.api(rulesServer.app);
+      rulesRequest = supertest(rulesServer.app);
+    });
+
+    after(() => {
+      if (previousFlatSchema === undefined)
+        delete process.env.DM_LDAP_FLAT_SCHEMA;
+      else process.env.DM_LDAP_FLAT_SCHEMA = previousFlatSchema;
+      if (fs.existsSync(flatSchemaPath)) fs.unlinkSync(flatSchemaPath);
+    });
+
+    it('should give a refused row the code, attribute and value of the refusal', async function () {
+      this.timeout(10000);
+      const csvContent = [
+        'uid,cn,sn,givenName,mail,organizationDn',
+        `bulkuser1,Bulk User 1,User1,Bulk,bulk.taken@test.org,"${getTestOrg1Dn()}"`,
+        `bulkuser2,Bulk User 2,User2,Bulk,bulk.taken@test.org,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await rulesRequest
+        .post('/api/v1/ldap/bulk-import/testusers')
+        .attach('file', Buffer.from(csvContent), 'test.csv')
+        .field('continueOnError', 'true');
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('created', 1);
+      expect(res.body).to.have.property('failed', 1);
+      // What a single write answers, for a client to explain the row
+      expect(res.body.errors[0]).to.deep.include({
+        line: 3,
+        identifier: 'bulkuser2',
+        code: 'unique',
+        attribute: 'mail',
+        value: 'bulk.taken@test.org',
+      });
+      expect(res.body.errors[0].error).to.match(/already used/);
     });
   });
 });

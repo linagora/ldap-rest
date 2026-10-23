@@ -577,7 +577,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
         await this.checkUnique(entity, name, attr, list, current ? dn : null);
       }
       if (attr.mailDomainScope) {
-        await this.checkMailDomains(entity, attr, list, values, current);
+        await this.checkMailDomains(entity, name, attr, list, values, current);
       }
       if (hasRole(attr, 'accountExpiry')) {
         this.checkNotInThePast(name, attr, list);
@@ -760,7 +760,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
             `${name}="${value}" refused for ${selfDn || 'a new entry'}: already held by ${foundDn}`
           );
           throw new ConflictError(
-            `${entity.label}: "${value}" is already used (${name} must be unique)`
+            `${entity.label}: "${value}" is already used (${name} must be unique)`,
+            { code: 'unique', attribute: name, value }
           );
         }
       }
@@ -771,7 +772,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * Refuse a mail address outside the domains its organization may use.
    *
    * @param entity entity the entry belongs to
-   * @param attr schema definition of the mail attribute
+   * @param name the mail attribute
+   * @param attr its schema definition
    * @param values addresses submitted
    * @param submitted attributes as submitted, read for the organization link
    * @param current entry as stored, when the link is not being changed
@@ -780,6 +782,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
    */
   private async checkMailDomains(
     entity: EntityBinding,
+    name: string,
     attr: SchemaAttribute,
     values: string[],
     submitted: AttributesList,
@@ -794,7 +797,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     for (const value of values) {
       if (!mailInDomains(value, domains, attr.allowSubdomains)) {
         throw new ConflictError(
-          `The mail domain of "${value}" is not one of the authorised domains (${domains.join(', ')})`
+          `The mail domain of "${value}" is not one of the authorised domains (${domains.join(', ')})`,
+          { code: 'mailDomain', attribute: name, value, domains }
         );
       }
     }
@@ -860,7 +864,12 @@ export default class LdapEnterpriseRules extends DmPlugin {
       const parent = getParentDn(cursor);
       cursor = parent === cursor ? undefined : parent;
     }
-    return domains;
+    // A domain linked at several levels is one domain: the refusal listed it
+    // once per level (#350)
+    return domains.filter(
+      (domain, i) =>
+        domains.findIndex(d => d.toLowerCase() === domain.toLowerCase()) === i
+    );
   }
 
   /**

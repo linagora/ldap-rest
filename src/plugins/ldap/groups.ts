@@ -125,12 +125,35 @@ export type postModify = ModifyRequest;
  *     description: Updated description
  * Error:
  *   type: object
+ *   required: [error]
  *   properties:
- *     error: { type: string }
- *     code: { type: integer }
+ *     error:
+ *       type: string
+ *       description: What was refused, in English.
+ *     code:
+ *       type: string
+ *       description: |
+ *         For a client to explain the refusal in its own words, when there
+ *         is one: `unique` (a value already used), `mailDomain` (an address
+ *         outside the authorised mail domains), `forbidden` (the caller may
+ *         not act on this branch). Absent for any other refusal, which only
+ *         `error` describes. The Twake groups API answers its own codes
+ *         (`INVALID_INPUT`, `REFUSED`…).
+ *     attribute:
+ *       type: string
+ *       description: The attribute refused, for `unique` and `mailDomain`.
+ *     value:
+ *       type: string
+ *       description: The value refused, for `unique` and `mailDomain`.
+ *     domains:
+ *       type: array
+ *       items: { type: string }
+ *       description: The authorised mail domains, for `mailDomain`.
  *   example:
- *     error: Group not found
- *     code: 404
+ *     error: 'entity: "value" is already used (attribute must be unique)'
+ *     code: unique
+ *     attribute: attribute
+ *     value: value
  */
 export default class LdapGroups extends DmPlugin {
   name = 'ldapGroups';

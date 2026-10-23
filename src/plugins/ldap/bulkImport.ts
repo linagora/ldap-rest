@@ -13,6 +13,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses';
+import { HttpError, type Refusal } from '../../lib/errors';
 import { loadSchemaFile } from '../../lib/schemaFile';
 import { escapeDnValue, validateDnValue } from '../../lib/utils';
 
@@ -59,11 +60,13 @@ interface BulkImportResult {
   updated: number;
   skipped: number;
   failed: number;
-  errors: Array<{
-    line: number;
-    identifier?: string;
-    error: string;
-  }>;
+  errors: Array<
+    {
+      line: number;
+      identifier?: string;
+      error: string;
+    } & Partial<Refusal>
+  >;
   details: {
     duration: string;
     linesProcessed: number;
@@ -118,6 +121,16 @@ interface BulkImportResult {
  *           error:
  *             type: string
  *             description: Error message.
+ *           code:
+ *             type: string
+ *             description: |
+ *               `unique` or `mailDomain`, with `attribute`, `value` and
+ *               `domains`, as in the `Error` answer of a single write.
+ *           attribute: { type: string }
+ *           value: { type: string }
+ *           domains:
+ *             type: array
+ *             items: { type: string }
  *       example:
  *         - line: 5
  *           identifier: bob
@@ -428,6 +441,9 @@ export default class LdapBulkImport extends DmPlugin {
             line,
             identifier: record[resource.mainAttribute],
             error: (error as Error).message,
+            // What the API answers a single write, for a client to explain
+            // the row as it explains a form
+            ...(error instanceof HttpError ? error.refusal : undefined),
           });
 
           if (!continueOnError) {

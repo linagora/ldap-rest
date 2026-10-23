@@ -15,6 +15,18 @@
   [docs](docs/usage/plugins/ldap/password-policy.md#managing-policies)
   ([#367](https://github.com/linagora/ldap-rest/issues/367),
   [twake-directory-manager#138](https://github.com/linagora/twake-directory-manager/issues/138))
+- A refusal a client is expected to explain carries a `code` (`unique`,
+  `mailDomain`, `forbidden`) next to its message, and the `attribute`,
+  `value` and authorised `domains` it concerns, for the client to say it in
+  its own words under the field at fault; the bulk import reports them per
+  row, [docs](docs/client-development/api/rest-api.md#error-response-format)
+  ([twake-directory-manager#126](https://github.com/linagora/twake-directory-manager/issues/126),
+  [#368](https://github.com/linagora/ldap-rest/issues/368))
+
+### Fixes
+
+- The mail domain refusal lists a domain linked at several levels of the
+  tree once ([#350](https://github.com/linagora/ldap-rest/issues/350))
 
 ### Security
 

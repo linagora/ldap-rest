@@ -5,7 +5,7 @@
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
-import { AUTHZ_REFUSED } from './errors';
+import { AUTHZ_REFUSED, errorBody } from './errors';
 
 /**
  * The server's logger, once the `DM` constructor has installed it.
@@ -154,7 +154,7 @@ export const serverError = (res: Response, err: unknown): void => {
         ? AUTHZ_REFUSED
         : message;
     _logger?.warn(`Client error ${statusCode}: ${clientMessage}`);
-    res.status(statusCode).json({ error: clientMessage });
+    res.status(statusCode).json(errorBody(err, clientMessage));
     return;
   }
 

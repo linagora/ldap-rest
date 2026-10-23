@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import supertest from 'supertest';
 import type winston from 'winston';
 
+import { AUTHZ_REFUSED, ConflictError } from '../../src/lib/errors';
 import {
   getLogger,
   jsonBody,
@@ -81,6 +82,44 @@ describe('serverError', () => {
     expect(sent).to.deep.equal({
       status: 404,
       body: { error: 'no such entry' },
+    });
+  });
+
+  it('adds the refusal a client error carries to its sentence', () => {
+    const { res, sent } = fakeResponse();
+
+    serverError(
+      res,
+      new ConflictError('user: "a@example.com" is already used', {
+        code: 'unique',
+        attribute: 'mail',
+        value: 'a@example.com',
+      })
+    );
+
+    expect(sent).to.deep.equal({
+      status: 409,
+      body: {
+        error: 'user: "a@example.com" is already used',
+        code: 'unique',
+        attribute: 'mail',
+        value: 'a@example.com',
+      },
+    });
+  });
+
+  it('codes an authorization refusal without naming its branch', () => {
+    const { res, sent } = fakeResponse();
+
+    // Wrapped into a plain Error: only the marker is left
+    serverError(
+      res,
+      new Error('[authz-forbidden] User bob may not write ou=Sales,dc=x')
+    );
+
+    expect(sent).to.deep.equal({
+      status: 403,
+      body: { error: AUTHZ_REFUSED, code: 'forbidden' },
     });
   });
 });

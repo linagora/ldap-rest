@@ -797,7 +797,6 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *         example:
      *           error: user not found
-     *           code: 404
      */
     // Get entry by id or DN
     app.get(
