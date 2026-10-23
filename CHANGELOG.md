@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- `user.created`, published by `core/twake/instances`, carries the
+  account's Matrix ID (`matrixId`, `@local:domain` from its `mail`), which
+  cozy-stack stores instead of deriving it from the instance's email,
+  [docs](docs/usage/plugins/integrations/instances.md#providers)
+
 ## v0.25.1 (2026-10-23)
 
 ### Fixes

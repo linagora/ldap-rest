@@ -270,6 +270,27 @@ describe('Twake instances plugin', function () {
       expect(rabbit.published.map(p => p.key)).to.deep.equal(['user.created']);
     });
 
+    it('announces an account whose mail has no domain without a Matrix ID', async () => {
+      search('in-alice.example.org').reply(200, {
+        items: [
+          {
+            fqdn: 'in-alice.example.org',
+            internal_email: 'in-alice',
+            oidc: 'in-alice',
+            instantiated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+      });
+      await dm.ldap.add(
+        dnOf('in-alice'),
+        person('in-alice', { mail: 'in-alice' }),
+        rest()
+      );
+      expect(rabbit.published).to.have.length(1);
+      expect(rabbit.published[0].message).to.include({ twakeId: 'in-alice' });
+      expect(rabbit.published[0].message).not.to.have.property('matrixId');
+    });
+
     it('answers the add when the Cloudery refuses, the entry left pending', async () => {
       search('in-alice.example.org').reply(200, { items: [] });
       nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
@@ -381,6 +402,7 @@ describe('Twake instances plugin', function () {
             twakeId: 'in-alice',
             internalEmail: 'in-alice@example.org',
             workplaceFqdn: 'in-alice.example.org',
+            matrixId: '@in-alice:example.org',
             mobile: '+33600000000',
           },
         },
@@ -494,6 +516,7 @@ describe('Twake instances plugin', function () {
             twakeId: 'in.dave',
             internalEmail: 'in.dave@acme.example',
             workplaceFqdn: 'indaveacme1.example.org',
+            matrixId: '@in.dave:acme.example',
             organizationId: 'acme1',
             domain: 'acme.example',
             organizationDomain: 'acme.example',
@@ -1101,6 +1124,7 @@ describe('Twake instances plugin', function () {
           twakeId: 'in.erin',
           internalEmail: 'in.erin@acme.example',
           workplaceFqdn: 'inerinacme1.example.org',
+          matrixId: '@in.erin:acme.example',
           organizationId: 'acme1',
           domain: 'acme.example',
           organizationDomain: 'acme.example',
@@ -1764,6 +1788,7 @@ describe('Twake instances plugin', function () {
             twakeId: 'in-alice',
             internalEmail: 'in-alice@example.org',
             workplaceFqdn: 'in-alice.example.org',
+            matrixId: '@in-alice:example.org',
             organizationId: 'linagora',
             domain: 'linagora.example',
             organizationDomain: 'linagora.example',

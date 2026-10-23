@@ -21,6 +21,7 @@ import {
   type InstanceProvider,
   instanceSlug,
   type InstanceRequest,
+  matrixId,
 } from '../../lib/instanceProviders';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
@@ -549,6 +550,7 @@ export default class TwakeInstances extends DmPlugin {
         `${this.name}: ${dn} is not below its organization entry, so it is announced before organization ${account.orgId} is linked; clear its ${this.sentAttribute} and send it again once the organization is announced`
       );
     }
+    const matrix = matrixId(account.email);
     await this.announce(
       this.config.twake_instance_auth_exchange || 'auth',
       this.config.twake_instance_user_created_key || 'user.created',
@@ -556,6 +558,7 @@ export default class TwakeInstances extends DmPlugin {
         twakeId: account.twakeId,
         internalEmail: account.email,
         workplaceFqdn: fqdn,
+        ...(matrix ? { matrixId: matrix } : {}),
         ...(account.orgId ? { organizationId: account.orgId } : {}),
         ...(account.orgDomain
           ? {
