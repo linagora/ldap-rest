@@ -477,6 +477,7 @@ export default class PasswordPolicy extends DmPlugin {
   private discoveredDefault: { dn: string | null; time: number } | null = null;
   private warnedAmbiguousDefault = false;
   private warnedMissingBase = false;
+  private warnedUnreadableSchema = false;
   private readonly POLICY_CACHE_TTL = 60000; // 1 minute
 
   api(app: Express): void {
@@ -1451,9 +1452,13 @@ export default class PasswordPolicy extends DmPlugin {
       const schema = await this.server.ldap.schemaIndex();
       return writable.filter(name => schema.getAttributeType(name));
     } catch (error) {
-      this.logger.warn(
-        `Unable to read the schema, every policy attribute is listed: ${String(error)}`
-      );
+      // Each listing reads it again: once is enough to say so
+      if (!this.warnedUnreadableSchema) {
+        this.warnedUnreadableSchema = true;
+        this.logger.warn(
+          `Unable to read the schema, every policy attribute is listed: ${String(error)}`
+        );
+      }
       return writable;
     }
   }
