@@ -45,7 +45,12 @@ import {
   substringSearchFilter,
   validateDnValue,
 } from '../../lib/utils';
-import { BadRequestError, HttpError, NotFoundError } from '../../lib/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  HttpError,
+  NotFoundError,
+} from '../../lib/errors';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
@@ -963,19 +968,44 @@ export default class LdapGroups extends DmPlugin {
     // a plain Error made it a 500.
     if (this.isDummyMember(member))
       throw new BadRequestError('Cannot delete dummy member from group');
+    return await this.removeMember(dn, member, req).catch(err => {
+      if (extractLdapCode(err) === 16)
+        throw new NotFoundError(`${member} is not a member of ${dn}`);
+      if (err instanceof HttpError) throw err;
+      throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
+    });
+  }
+
+  /**
+   * Take a member out of a group. The last member of a `groupOfNames` cannot
+   * simply go — the schema wants one (objectClassViolation): the placeholder
+   * takes its place in the same change, as it does in a group created empty.
+   * With no placeholder configured, the group cannot be left empty, which is
+   * the caller's to resolve, not a fault of the server.
+   *
+   * @param dn group DN
+   * @param member member DN
+   * @param req the request, to authorize the change against its caller
+   */
+  private async removeMember(
+    dn: string,
+    member: string,
+    req?: Request
+  ): Promise<boolean> {
     return await this.ldap
-      .modify(
-        dn,
-        {
-          delete: { member: member },
-        },
-        req
-      )
+      .modify(dn, { delete: { member } }, req)
       .catch(err => {
-        if (extractLdapCode(err) === 16)
-          throw new NotFoundError(`${member} is not a member of ${dn}`);
-        if (err instanceof HttpError) throw err;
-        throw new Error(`Failed to delete member ${member} from ${dn}: ${err}`);
+        if (extractLdapCode(err) !== 65) throw err;
+        const placeholder = this.config.group_dummy_user;
+        if (!placeholder)
+          throw new ConflictError(
+            `Cannot remove ${member}, the last member of ${dn}: a group needs at least one member`
+          );
+        return this.ldap.modify(
+          dn,
+          { add: { member: placeholder }, delete: { member } },
+          req
+        );
       });
   }
 
@@ -995,31 +1025,17 @@ export default class LdapGroups extends DmPlugin {
 
     await Promise.all(
       res.searchEntries.map(entry =>
-        this.ldap
-          .modify(entry.dn, {
-            delete: { member: memberDn },
-          })
-          .catch(err => {
-            // The last member of a groupOfNames: the placeholder takes its
-            // place, as it does in a group created empty.
-            if (extractLdapCode(err) === 65 && this.config.group_dummy_user)
-              return this.ldap.modify(entry.dn, {
-                add: { member: this.config.group_dummy_user },
-                delete: { member: memberDn },
-              });
-            throw err;
-          })
-          .catch(err => {
-            // A directory running the refint overlay removes the member on
-            // its own, after the delete has answered; a group deleted in the
-            // meantime has no member left to remove either.
-            const code = extractLdapCode(err);
-            if (code === 16 || code === 32) return;
-            this.logger.error(
-              `Failed to remove ${memberDn} from group ${entry.dn}:`,
-              err
-            );
-          })
+        this.removeMember(entry.dn, memberDn).catch(err => {
+          // A directory running the refint overlay removes the member on
+          // its own, after the delete has answered; a group deleted in the
+          // meantime has no member left to remove either.
+          const code = extractLdapCode(err);
+          if (code === 16 || code === 32) return;
+          this.logger.error(
+            `Failed to remove ${memberDn} from group ${entry.dn}:`,
+            err
+          );
+        })
       )
     );
   }
