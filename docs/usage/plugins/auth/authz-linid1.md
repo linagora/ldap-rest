@@ -100,7 +100,8 @@ attached to no organization.
 
 Once in transit, an entry no longer says which organization it left, and the
 administrator who would claim it cannot tell whether it is theirs. Name an
-attribute to keep it in:
+attribute to keep it in; `twakeTransitOrigin` below is an example, which
+the directory's schema must define (see the rules after it):
 
 ```bash
 --authz-transit-origin-attribute twakeTransitOrigin
