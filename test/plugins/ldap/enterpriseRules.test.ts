@@ -410,6 +410,12 @@ describe('Enterprise rules', () => {
         const res = await create('rules.taken@example.com');
         expect(res.status).to.equal(409);
         expect(res.body.error).to.match(/already used/);
+        // For a client to say it in its own words, under the field
+        expect(res.body).to.include({
+          code: 'unique',
+          attribute: 'mail',
+          value: 'rules.taken@example.com',
+        });
       });
 
       it('should not name the entry holding it', async () => {
@@ -492,6 +498,39 @@ describe('Enterprise rules', () => {
         });
         expect(res.status).to.equal(409);
         expect(res.body.error).to.match(/not one of the authorised domains/);
+        expect(res.body).to.deep.include({
+          code: 'mailDomain',
+          attribute: 'mail',
+          value: 'rules.domain@elsewhere.example',
+          domains: ['example.com'],
+        });
+      });
+
+      it('should list a domain linked at several levels once', async () => {
+        // #350: the sub-organization links the domain its parent links too
+        const link = `dc=example,ou=domains,ou=nomenclature,${base}`;
+        await server.ldap.modify(subOrgDn, { add: { twakeDomainLink: link } });
+        try {
+          const res = await request
+            .post('/api/v1/ldap/users')
+            .type('json')
+            .send({
+              cn: 'Rules Domain',
+              sn: 'Domain',
+              mail: 'rules.domain@elsewhere.example',
+              twakeDepartmentLink: subOrgDn,
+              employeeNumber: 'ENT0050',
+              givenName: 'Test',
+              displayName: 'Test Person',
+            });
+          expect(res.status).to.equal(409);
+          expect(res.body.error).to.match(/domains \(example\.com\)$/);
+          expect(res.body.domains).to.deep.equal(['example.com']);
+        } finally {
+          await server.ldap.modify(subOrgDn, {
+            delete: { twakeDomainLink: link },
+          });
+        }
       });
 
       it('should accept any address when no ancestor declares a domain', async () => {

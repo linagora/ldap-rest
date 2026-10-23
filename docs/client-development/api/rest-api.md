@@ -1142,6 +1142,20 @@ All errors return a JSON object with an error message:
 }
 ```
 
+The message is English, for a log or a developer. The refusals a client is
+expected to explain to its users carry a `code` too, and what was refused,
+for the client to say it in its own words and next to the field at fault.
+`error` is always there; read the other fields only when `code` is:
+
+| `code`       | Status | Refusal                                                      | Other fields                    |
+| ------------ | ------ | ------------------------------------------------------------ | ------------------------------- |
+| `unique`     | 409    | A value another entry already holds                          | `attribute`, `value`            |
+| `mailDomain` | 409    | An address outside the mail domains its organization may use | `attribute`, `value`, `domains` |
+| `forbidden`  | 403    | The caller may not act on this branch                        | none: the branch is not named   |
+
+Any other refusal has no `code`, and only its message says what it is. The
+bulk import reports the same fields on each refused row.
+
 ### Common Errors
 
 #### 400 Bad Request
@@ -1210,6 +1224,18 @@ not a DN (LDAP result code 34):
 }
 ```
 
+#### 403 Forbidden
+
+**Refused by authorization** — the caller may not read, write or delete in
+this branch. The branch is not named, the caller may not know of it:
+
+```json
+{
+  "error": "Token does not have permission on this branch",
+  "code": "forbidden"
+}
+```
+
 #### 404 Not Found
 
 **User Not Found:**
@@ -1258,6 +1284,32 @@ result codes 32 and 16). Removing a group member that is not one names both:
 
 A rename or a move onto a DN already taken answers the same way, naming that
 DN (LDAP result code 68).
+
+**Value already used** — a value the schema says is unique
+([`unique`](../../usage/plugins/ldap/enterprise-rules.md)), held by another
+entry, which is not named:
+
+```json
+{
+  "error": "user: \"alice@example.com\" is already used (mail must be unique)",
+  "code": "unique",
+  "attribute": "mail",
+  "value": "alice@example.com"
+}
+```
+
+**Mail domain not authorised** — an address outside the domains the entry's
+organization, or one of its ancestors, links to:
+
+```json
+{
+  "error": "The mail domain of \"x.user@other.org\" is not one of the authorised domains (example.com)",
+  "code": "mailDomain",
+  "attribute": "mail",
+  "value": "x.user@other.org",
+  "domains": ["example.com"]
+}
+```
 
 **Entry that cannot hold a change** — a modify adding an attribute the
 classes of the entry do not allow, or a value it already holds (LDAP result

@@ -9,11 +9,32 @@
 export class HttpError extends Error {
   constructor(
     message: string,
-    public statusCode: number = 500
+    public statusCode: number = 500,
+    public refusal?: Refusal
   ) {
     super(message);
     this.name = 'HttpError';
   }
+}
+
+/**
+ * What a client is told of a refusal besides its sentence: enough to say it
+ * in its own language and next to the field at fault, without reading the
+ * sentence back. Added to the `error` field of the answer, never in place
+ * of it.
+ */
+export interface Refusal {
+  /**
+   * `unique` (a value already used), `mailDomain` (an address outside the
+   * authorised domains) or `forbidden` (an authorization plugin refused)
+   */
+  code: 'unique' | 'mailDomain' | 'forbidden';
+  /** The attribute refused */
+  attribute?: string;
+  /** The value refused */
+  value?: string;
+  /** The authorised mail domains, for `mailDomain` */
+  domains?: string[];
 }
 
 /**
@@ -38,6 +59,25 @@ export class UnauthorizedError extends HttpError {
  * threw names the branch, which the caller may not know of.
  */
 export const AUTHZ_REFUSED = 'Token does not have permission on this branch';
+
+/**
+ * The JSON answer of a client error: its sentence, and the refusal it
+ * carries. An authorization plugin's refusal carries none — its message names
+ * the branch, which is why the client is told `AUTHZ_REFUSED` — so the code
+ * is given here, from the sentence the caller settled on.
+ *
+ * @param err the error thrown
+ * @param message the sentence the client is told
+ * @returns the body to answer
+ */
+export const errorBody = (
+  err: unknown,
+  message: string
+): { error: string } & Partial<Refusal> => {
+  if (message === AUTHZ_REFUSED) return { error: message, code: 'forbidden' };
+  const refusal = err instanceof HttpError ? err.refusal : undefined;
+  return refusal ? { error: message, ...refusal } : { error: message };
+};
 
 export class ForbiddenError extends HttpError {
   constructor(message = 'Forbidden') {
@@ -77,8 +117,8 @@ export class NotFoundError extends HttpError {
 }
 
 export class ConflictError extends HttpError {
-  constructor(message = 'Conflict') {
-    super(message, 409);
+  constructor(message = 'Conflict', refusal?: Refusal) {
+    super(message, 409, refusal);
     this.name = 'ConflictError';
   }
 }

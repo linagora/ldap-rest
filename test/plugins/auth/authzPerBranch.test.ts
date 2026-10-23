@@ -804,10 +804,10 @@ describe('AuthzPerBranch', function () {
           .set('Accept', 'application/json');
 
         expect(res.status).to.equal(403);
-        expect(res.body).to.have.property('error');
-        expect(res.body.error).to.equal(
-          'Token does not have permission on this branch'
-        );
+        expect(res.body).to.deep.equal({
+          error: 'Token does not have permission on this branch',
+          code: 'forbidden',
+        });
       });
 
       it('should allow search in authorized branch', async function () {

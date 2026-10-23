@@ -183,6 +183,13 @@ device. Members leave their groups through the groups plugin.
 | `400`  | A size that is not a size, a date already past                                |
 | `409`  | A duplicate value, a mail domain outside the authorised set, a guarded delete |
 
+A duplicate value answers `code: "unique"` with the `attribute` and the
+`value` refused, and a mail domain outside the authorised set answers
+`code: "mailDomain"` with them and the authorised `domains`, each listed once:
+a client explains them in its own words, under the field at fault. The
+holder of a duplicate value is never named.
+See [the error format](../../../client-development/api/rest-api.md#error-response-format).
+
 ## See also
 
 - [flat-generic](flat-generic.md) — the schema format these markers extend

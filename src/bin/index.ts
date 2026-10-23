@@ -32,7 +32,7 @@ import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
 import { assertAuthzComposition } from '../lib/authz/composition';
-import { AUTHZ_REFUSED } from '../lib/errors';
+import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner } from '../lib/utils';
 import pluginPriority from '../plugins/priority.json';
 
@@ -511,7 +511,7 @@ export class DM {
         // `res.json` answers the response object; the middleware answers
         // nothing, which is what lets the signature say so.
         if (!res.headersSent)
-          res.status(statusCode).json({ error: clientMessage });
+          res.status(statusCode).json(errorBody(err, clientMessage));
         return;
       }
 

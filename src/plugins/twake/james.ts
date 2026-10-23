@@ -304,7 +304,6 @@ export default class James extends TwakePlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *         example:
      *           error: User alice has no mail attribute
-     *           code: 400
      *   '404':
      *     description: User not found in LDAP, or quota entry absent in James.
      *     content:
@@ -312,7 +311,6 @@ export default class James extends TwakePlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *         example:
      *           error: User alice not found
-     *           code: 404
      *   '502':
      *     description: James WebAdmin API is unreachable or returned an error.
      *     content:
@@ -320,7 +318,6 @@ export default class James extends TwakePlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *         example:
      *           error: "Failed to retrieve quota from James: Bad Gateway"
-     *           code: 502
      *   '500':
      *     description: Unexpected internal error.
      *     content:
