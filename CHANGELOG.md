@@ -11,9 +11,12 @@
   organization (a pointer leading nowhere), a group or organization move,
   the erase of a tombstone, the deletion of an app account; and the
   creation of a group created its external members before it was judged
+  ([#381](https://github.com/linagora/ldap-rest/pull/381))
 - `GET /users/{user}/quota-usage` and the app account routes answer 404
   for an account the caller cannot read, as for one that is not there:
-  the quota of any account was served to any caller the route let in
+  the quota of any account was served to any caller the route let in,
+  [upgrading](docs/usage/upgrading.md#quota-and-app-accounts-need-read-access-to-the-account)
+  ([#381](https://github.com/linagora/ldap-rest/pull/381))
 
 ### Fixes
 
