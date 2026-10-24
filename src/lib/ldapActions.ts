@@ -1503,7 +1503,10 @@ class ldapActions {
     const name =
       known.map(n => this.spellings.get(n.toLowerCase())).find(Boolean) ??
       type?.names[0] ??
-      base;
+      // An alias of a name nobody spelled: the name, as `normalizeDn` reads it
+      (attributeTypeName(base) !== base.toLowerCase()
+        ? attributeTypeName(base)
+        : base);
     return options.length ? `${name};binary` : name;
   }
 

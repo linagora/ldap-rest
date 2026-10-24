@@ -74,6 +74,32 @@ describe('Attribute names of a write', function () {
     expect(Object.keys(entry)).to.deep.equal(['RANK']);
   });
 
+  it('resolves the names it knows of itself without the schema', async () => {
+    const other = new DM();
+    await other.ready;
+    (
+      other.ldap as unknown as { schemaIndex: () => Promise<never> }
+    ).schemaIndex = () => Promise.reject(new Error('cn=Subschema unreadable'));
+    for (const [given, name] of [
+      ['commonName', 'cn'],
+      ['OID.2.5.4.3', 'cn'],
+      ['MAIL', 'mail'],
+    ]) {
+      const entry: AttributesList = { [given]: 'x' };
+      await other.ldap.canonicalAttributes(entry);
+      expect(Object.keys(entry), given).to.deep.equal([name]);
+    }
+    let status: number | 'ok' = 'ok';
+    try {
+      await other.ldap.canonicalAttributes({
+        '1.3.6.1.4.1.10943.1.50.1.1': 'x',
+      });
+    } catch (err) {
+      status = (err as { statusCode?: number }).statusCode ?? 500;
+    }
+    expect(status).to.equal(400);
+  });
+
   it('keeps ;binary, and refuses any other option', async () => {
     expect(await names({ 'USERCERTIFICATE;BINARY': 'x' })).to.deep.equal([
       'userCertificate;binary',
