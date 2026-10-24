@@ -1383,8 +1383,9 @@ export default abstract class AuthzBase extends DmPlugin {
       // Extract source and destination branches, as the directory names
       // them
       const from = await this.storedDn(oldDn);
+      const to = await this.storedParent(newDn);
       const sourceBranch = this.extractBranchDn(from);
-      const destBranch = this.extractBranchDn(await this.storedParent(newDn));
+      const destBranch = this.extractBranchDn(to);
 
       // Check read permission on source, or what else it asks
       const sourcePermissions = await this.getUserPermissions(
@@ -1419,6 +1420,12 @@ export default abstract class AuthzBase extends DmPlugin {
           `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
         );
       }
+      // Nor where a rule refuses it, at the very DN the entry takes
+      const target = await this.refusingRule(user, to, ['write'], false);
+      if (target)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${target}`
+        );
 
       return [oldDn, newDn, req];
     },

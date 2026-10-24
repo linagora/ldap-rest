@@ -374,6 +374,9 @@ describe('LDAP Utils', () => {
       for (const spelled of ['ou=a\u00a0b,dc=x', 'ou=a\\C2\\A0b,dc=x'])
         expect(normalizeDn(spelled), spelled).to.equal('ou=a b,dc=x');
       expect(normalizeDn('ou=a\u3000\u00a0 b,dc=x')).to.equal('ou=a b,dc=x');
+      // Not those the directory keeps apart
+      for (const other of ['\u1680', '\u2028', '\u2029'])
+        expect(normalizeDn(`ou=a${other}b,dc=x`)).to.not.equal('ou=a b,dc=x');
       // A tab is not
       expect(normalizeDn('ou=a\\09b,dc=x')).to.not.equal('ou=a b,dc=x');
     });
@@ -402,6 +405,15 @@ describe('LDAP Utils', () => {
 
     it('escapes the specials whether or not the writer did', () => {
       expect(normalizeDn('ou=a=b,dc=x')).to.equal(normalizeDn('ou=a\\=b,dc=x'));
+    });
+
+    it('reads Unicode equivalents as the directory does', () => {
+      expect(normalizeDn('ou=cafe\u0301,dc=x')).to.equal(
+        normalizeDn('ou=café,dc=x')
+      );
+      expect(normalizeDn('ou=\ufb01le,dc=x')).to.equal('ou=file,dc=x');
+      // A fullwidth comma is a comma, so a special
+      expect(normalizeDn('ou=a\uff0cb,dc=x')).to.equal('ou=a\\,b,dc=x');
     });
 
     it('reads a quoted value ending in an escaped backslash', () => {

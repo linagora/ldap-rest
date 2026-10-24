@@ -659,22 +659,19 @@ export function isChildOf(dn: string, parentDn: string): boolean {
   return beforeParent.endsWith(',');
 }
 
-/** The characters RFC 4518 maps to a space (§2.2). */
-const SPACES =
-  /^[\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$/;
-
 /** A DN value's escapes: a run of hex pairs, or one escaped character. */
 const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 
 /**
  * One spelling for a DN value (RFC 4514 §2.4): every escape decoded — the
  * directory answers `ou=Sales\2C EMEA` for what a configuration writes
- * `ou=Sales\, EMEA`, `\20` for `\ `, `\C3\A9` for `é` — then its
- * insignificant spaces dropped as OpenLDAP's matching rules drop them (at
- * either end, and all but one of a run), and the characters that need it
- * escaped again with a backslash: the specials anywhere, a `#` at the
- * start. A control character, or hex pairs that
- * are not UTF-8, stay hex. A value starting with an unescaped `#` is the
+ * `ou=Sales\, EMEA`, `\20` for `\ `, `\C3\A9` for `é` — then folded as
+ * OpenLDAP's matching rules fold it: Unicode compatibility equivalence
+ * (NFKC), which also makes a no-break or an ideographic space a space,
+ * and its insignificant spaces dropped (at either end, and all but one of
+ * a run). The characters that need it are escaped again with a
+ * backslash: the specials anywhere, a `#` at the start. A control
+ * character, or hex pairs that are not UTF-8, stay hex. A value starting with an unescaped `#` is the
  * BER form, which is not decoded; one in double quotes (LDAPv2) is read
  * as it stands.
  *
@@ -699,69 +696,69 @@ function canonicalValue(raw: string): string {
     trimmed.endsWith('"') &&
     backslashes % 2 === 0;
   if (quoted) raw = trimmed.slice(1, -1);
-  // Each character, and whether the writer escaped it
-  const chars: { char: string; escaped: boolean }[] = [];
+  // Each character, decoded; hex pairs that are not, kept as `\xx`
+  const chars: string[] = [];
   let last = 0;
   const plain = (text: string): void => {
-    for (const char of text) chars.push({ char, escaped: quoted });
+    for (const char of text) chars.push(char);
   };
   for (const match of raw.matchAll(DN_ESCAPE)) {
     plain(raw.slice(last, match.index));
     last = match.index + match[0].length;
     const [, hex, char] = match;
     if (char !== undefined) {
-      chars.push({ char, escaped: true });
+      chars.push(char);
       continue;
     }
     const bytes = hex
       .split('\\')
       .filter(Boolean)
       .map(pair => parseInt(pair, 16));
-    let decoded: string[];
     try {
-      decoded = [
-        ...new TextDecoder('utf-8', { fatal: true }).decode(
-          Uint8Array.from(bytes)
-        ),
-      ];
+      plain(
+        new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes))
+      );
     } catch {
       // Not UTF-8: each pair alone
-      decoded = bytes.map(byte =>
-        byte < 0x80 ? String.fromCharCode(byte) : `\\${hexByte(byte)}`
-      );
+      for (const byte of bytes)
+        chars.push(
+          byte < 0x80 ? String.fromCharCode(byte) : `\\${hexByte(byte)}`
+        );
     }
-    for (const char of decoded) chars.push({ char, escaped: true });
   }
   // A lone trailing backslash escapes nothing: it is one
   if (last < raw.length) plain(raw.slice(last));
 
-  // The space characters RFC 4518 (§2.2) maps to a space, escaped or not;
-  // then the insignificant ones (§2.6.1), as the matching rules of the
-  // naming attributes see them: none at either end, and one for a run
-  const spaced = chars.map(c =>
-    SPACES.test(c.char) ? { ...c, char: ' ' } : c
-  );
-  const space = ({ char }: { char: string }): boolean => char === ' ';
-  const folded = spaced.filter(
-    (c, i) => !space(c) || (i > 0 && !space(spaced[i - 1]))
+  // Unicode equivalence (NFKC), as the directory's matching rules fold it:
+  // `cafe\u0301` is `café`, `ﬁ` is `fi`, a no-break space or an
+  // ideographic one is a space
+  const kept = (char: string): boolean => char.length === 3 && char[0] === '\\';
+  const tokens: string[] = [];
+  let run = '';
+  for (const char of chars)
+    if (kept(char)) {
+      tokens.push(...run.normalize('NFKC'), char);
+      run = '';
+    } else run += char;
+  tokens.push(...run.normalize('NFKC'));
+
+  // Insignificant spaces (RFC 4518 §2.6.1): none at either end, and one
+  // for a run of them
+  const folded = tokens.filter(
+    (char, i) => char !== ' ' || (i > 0 && tokens[i - 1] !== ' ')
   );
   let start = 0;
   let end = folded.length;
-  while (start < end && space(folded[start])) start++;
-  while (end > start && space(folded[end - 1])) end--;
+  while (start < end && folded[start] === ' ') start++;
+  while (end > start && folded[end - 1] === ' ') end--;
 
   let out = '';
   for (let i = start; i < end; i++) {
-    const { char } = folded[i];
-    if (char.length > 1)
-      out += char; // a pair kept hex
+    const char = folded[i];
+    if (kept(char)) out += char;
     else if (char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)
       out += `\\${hexByte(char.charCodeAt(0))}`;
-    else if (
-      ',+"\\<>;='.includes(char) ||
-      (i === start && (char === '#' || char === ' ')) ||
-      (i === end - 1 && char === ' ')
-    )
+    else if (',+"\\<>;='.includes(char) || (i === start && char === '#'))
       out += `\\${char}`;
     else out += char;
   }

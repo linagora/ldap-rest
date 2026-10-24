@@ -450,6 +450,7 @@ describe('Branch rule precedence', function () {
               [acme]: { read: true, write: true, delete: true },
               [`ou=precnew,${acme}`]: { read: true, write: false },
               [`ou=prec new,${acme}`]: { read: true, write: false },
+              [`ou=pre\u0301c,${acme}`]: { read: true, write: false },
             },
           },
           groups: {},
@@ -461,6 +462,7 @@ describe('Branch rule precedence', function () {
           'ou=prec\u00a0new',
           'ou=prec  new',
           'ou="prec new"',
+          'ou=pr\u00e9c',
         ]) {
           let error: unknown;
           await plugin.hooks
@@ -490,6 +492,28 @@ describe('Branch rule precedence', function () {
           server.ldap.search = search;
         }
         expect((error as { statusCode?: number })?.statusCode).to.equal(503);
+      });
+
+      it('refuses to rename into a DN a rule refuses writing', async () => {
+        plugin.authConfig = {
+          default: { read: false, write: false, delete: false },
+          users: {
+            [USER]: {
+              [acme]: { read: true, write: true, delete: true },
+              [`ou=prectarget,${acme}`]: { read: true, write: false },
+            },
+          },
+          groups: {},
+        };
+        let error: unknown;
+        await plugin.hooks
+          .ldaprenamerequest([
+            `uid=prec-sales,${acme}`,
+            `ou=prectarget,${acme}`,
+            { user: USER, headers: {} } as unknown as DmRequest,
+          ])
+          .catch((err: unknown) => (error = err));
+        expect(String(error)).to.match(/forbidden/i);
       });
 
       it('lets a group grant what the user rule refuses', async () => {
