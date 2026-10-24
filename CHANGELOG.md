@@ -4,6 +4,15 @@
 
 ### Security
 
+- `core/auth/authzPerBranch`: among one user's or one group's rules, the
+  most specific branch now applies, whatever order the rules are written
+  in, and a search granted on a branch no longer returns what a narrower
+  rule refuses. The first rule written used to win, so a restriction on a
+  sub-branch written after the grant on its parent was ignored. Branches
+  are compared as DNs in `authzPerBranch` and `authzLinid1`, whatever their
+  case and spacing,
+  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution)
+
 - `core/twake/groups`: the `/organizations/{id}/groups` routes read the
   directory as the server, so any caller let in got the groups and member
   profiles of every organization, and could tell which names, users and

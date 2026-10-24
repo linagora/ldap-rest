@@ -9,7 +9,7 @@
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import type { BranchPermissions } from '../../config/args';
-import AuthzBase from '../../lib/authz/base';
+import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
 import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
 interface CachedPermissions {
@@ -285,22 +285,13 @@ export default class AuthzLinid1 extends AuthzBase {
   /**
    * Find permissions for a branch (supports sub-branch matching)
    */
+  /**
+   * The caller's rights on a branch: see {@link mostSpecificBranchRule}.
+   */
   private findBranchPermissions(
     branchPerms: Map<string, BranchPermissions>,
     targetBranch: string
   ): BranchPermissions | null {
-    // Exact match first
-    if (branchPerms.has(targetBranch)) {
-      return branchPerms.get(targetBranch) || null;
-    }
-
-    // Check if targetBranch is a sub-branch of any configured branch
-    for (const [branch, perms] of branchPerms.entries()) {
-      if (targetBranch.toLowerCase().endsWith(`,${branch.toLowerCase()}`)) {
-        return perms;
-      }
-    }
-
-    return null;
+    return mostSpecificBranchRule(branchPerms.entries(), targetBranch);
   }
 }

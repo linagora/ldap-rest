@@ -37,6 +37,34 @@ import { authzFor, servesRequest } from './composition';
  * Abstract base class for authorization plugins
  * Provides common utility methods and interface for LDAP-based authorization
  */
+/**
+ * The rule of the most specific configured branch holding `target`.
+ *
+ * Branches are compared as DNs, whatever the case and spacing a rule or the
+ * directory spells them in. Among one subject's rules, the narrowest branch
+ * holding the target applies: a rule on `ou=payroll,ou=acme` takes over from
+ * one on `ou=acme` for everything below it, whichever was written first.
+ * Rules of different subjects (a user and their groups) are combined by the
+ * caller.
+ *
+ * @param rules the subject's rules, by branch
+ * @param target the branch judged
+ * @returns the rule that applies, or null when no branch holds the target
+ */
+export function mostSpecificBranchRule<T>(
+  rules: Iterable<[string, T]>,
+  target: string
+): T | null {
+  let found: T | null = null;
+  let depth = -1;
+  for (const [branch, rule] of rules) {
+    if (!isDnInBranch(target, branch)) continue;
+    const parts = normalizeDn(branch).split(',').filter(Boolean).length;
+    if (parts > depth) [found, depth] = [rule, parts];
+  }
+  return found;
+}
+
 export default abstract class AuthzBase extends DmPlugin {
   /**
    * Searches whose projection we widened to carry the organization link.
@@ -975,7 +1003,12 @@ export default abstract class AuthzBase extends DmPlugin {
     },
 
     /**
-     * Drop the accounts attached outside the branches this caller manages.
+     * Drop what this caller may not read from a search it was granted.
+     *
+     * Judged by branch, the search was granted on its base: each entry is
+     * kept only where the caller may read it, a rule narrower than the base
+     * refusing part of what it holds. Judged by attachment, the accounts
+     * attached outside the branches this caller manages are dropped.
      *
      * Runs after the cache and carries the request, so what one caller may
      * not see never reaches another. An entry with no organization link —
@@ -995,12 +1028,27 @@ export default abstract class AuthzBase extends DmPlugin {
         req,
         opts,
       ];
-      if (!this.filtersAttachedEntries()) return pass;
       if (this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
 
       const user = await this.resolveCaller(req!);
       if (!user) return pass;
+
+      // Judged by branch, a search is granted on its base, and a rule
+      // narrower than the base may refuse part of what it holds: each entry
+      // is read only where the caller may read it.
+      if (!this.filtersAttachedEntries()) {
+        const kept = [];
+        for (const entry of result.searchEntries)
+          if ((await this.getUserPermissions(user, String(entry.dn))).read)
+            kept.push(entry);
+          else
+            this.logger.debug(
+              `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, refused by a narrower branch rule`
+            );
+        result.searchEntries = kept;
+        return pass;
+      }
 
       // A search above a global branch, from the root say, would otherwise
       // bring back what it holds

@@ -6,6 +6,16 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Nested branch rules of `authzPerBranch`
+
+**Who is affected:** a deployment of `core/auth/authzPerBranch` whose rules
+for one user, or one group, name a branch and a sub-branch of it.
+
+The rule of the sub-branch now applies below it, whatever order the two are
+written in; the first one written used to win. A sub-branch rule that was
+ignored, a restriction or a grant, now takes effect, in single reads and
+writes and in searches. Check such rules: they now mean what they say.
+
 ### Organization groups need read access to the organization
 
 **Who is affected:** a deployment loading an authorization plugin together

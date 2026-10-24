@@ -11,7 +11,7 @@ import type { Hooks } from '../../hooks';
 import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
-import AuthzBase from '../../lib/authz/base';
+import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
 import { AmbiguousIdentityError } from '../../lib/errors';
 import { escapeLdapFilter, normalizeDn } from '../../lib/utils';
 import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
@@ -247,23 +247,14 @@ export default class AuthzPerBranch extends AuthzBase {
   /**
    * Find permissions for a branch (supports sub-branch matching)
    */
+  /**
+   * The subject's rule on a branch: see {@link mostSpecificBranchRule}.
+   */
   private findBranchPermissions(
     branchPerms: { [branch: string]: BranchPermissions },
     targetBranch: string
   ): BranchPermissions | null {
-    // Exact match first
-    if (branchPerms[targetBranch]) {
-      return branchPerms[targetBranch];
-    }
-
-    // Check if targetBranch is a sub-branch of any configured branch
-    for (const [branch, perms] of Object.entries(branchPerms)) {
-      if (targetBranch.toLowerCase().endsWith(`,${branch.toLowerCase()}`)) {
-        return perms;
-      }
-    }
-
-    return null;
+    return mostSpecificBranchRule(Object.entries(branchPerms), targetBranch);
   }
 
   /**

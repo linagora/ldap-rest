@@ -112,7 +112,11 @@ Permissions are resolved in this order:
 2. **Group permissions** - Check all groups user belongs to
 3. **Default permissions** - Fall back to defaults if no specific rules match
 
-For each permission type (read/write/delete), the **most permissive** rule wins.
+Within one source (the user's own rules, or one group's), the rule of the
+**most specific** branch holding the target applies, whatever order the rules
+are written in. Branches are compared as DNs, whatever their case and
+spacing. Between sources, for each permission type (read/write/delete), the
+**most permissive** wins.
 
 ## How It Works
 
@@ -211,6 +215,25 @@ With this config, user `manager` can read:
 - `ou=dept1,ou=organization,dc=example,dc=com`
 - `ou=team1,ou=dept1,ou=organization,dc=example,dc=com`
 - ... all descendants
+
+A rule on a sub-branch takes over below it. To keep `manager` out of one
+department:
+
+```json
+{
+  "users": {
+    "manager": {
+      "ou=organization,dc=example,dc=com": { "read": true },
+      "ou=payroll,ou=organization,dc=example,dc=com": { "read": false }
+    }
+  }
+}
+```
+
+A search granted on `ou=organization` then returns nothing from
+`ou=payroll`: each entry it finds is kept only where the caller may read it.
+A group the user belongs to may still grant the department, as the most
+permissive source wins.
 
 ## Examples
 
