@@ -580,6 +580,44 @@ function opensValue(before: string): boolean {
 }
 
 /**
+ * Whether a string has the shape of a DN: RDNs of `type=value` assertions,
+ * a type being a name or an OID. What the directory would refuse as
+ * `invalidDNSyntax` is answered without asking it.
+ *
+ * @param dn - The string
+ * @returns whether it reads as a DN
+ */
+export function isDnSyntax(dn: string): boolean {
+  let rdns: string[];
+  try {
+    rdns = parseDn(dn);
+  } catch {
+    return false;
+  }
+  if (rdns.length === 0) return false;
+  const type = /^\s*(?:[A-Za-z][A-Za-z0-9-]*|(?:OID\.)?\d+(?:\.\d+)+)\s*=/i;
+  return rdns.every(rdn => {
+    if (!rdn) return false;
+    // The assertions of a multi-valued RDN, split on the unescaped `+`
+    const parts: string[] = [];
+    let current = '';
+    let escaped = false;
+    for (const char of rdn) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '+') {
+        parts.push(current);
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    parts.push(current);
+    return parts.every(part => type.test(part));
+  });
+}
+
+/**
  * Extract the parent DN from a DN
  * Removes the first RDN component to get the parent branch
  *

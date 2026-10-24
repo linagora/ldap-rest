@@ -37,8 +37,12 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   isAuthzRefusal,
+  getRdn,
+  isDnInBranch,
+  isDnSyntax,
   isDummyMemberDn,
   launchHooks,
+  normalizeDn,
   launchHooksChained,
   movedToTrash,
   organizationLink,
@@ -476,6 +480,7 @@ export default class LdapGroups extends DmPlugin {
       asyncHandler(async (req, res) => {
         const cn = decodeURIComponent(req.params.cn as string);
         if (!cn) throw new BadRequestError('cn is required');
+        const dn = this.routeGroupDn(cn);
         const body = jsonBody(req, res, 'member') as {
           member: string | string[];
         };
@@ -486,6 +491,14 @@ export default class LdapGroups extends DmPlugin {
         if (members.some(m => typeof m !== 'string')) {
           throw new BadRequestError('member must be a string or string array');
         }
+        await this.judgedGroup(dn, () =>
+          this.ldap.authorize('ldapmodifyrequest', [
+            dn,
+            { add: { member: members } },
+            this.opNumber(),
+            req,
+          ])
+        );
         await tryMethod(res, this.addMember.bind(this), cn, body.member, req);
       })
     );
@@ -518,6 +531,15 @@ export default class LdapGroups extends DmPlugin {
         if (!cn || !member) {
           throw new BadRequestError('cn and member are required');
         }
+        const dn = this.routeGroupDn(cn);
+        await this.judgedGroup(dn, () =>
+          this.ldap.authorize('ldapmodifyrequest', [
+            dn,
+            { delete: { member: [member] } },
+            this.opNumber(),
+            req,
+          ])
+        );
         await tryMethod(res, this.deleteMember.bind(this), cn, member, req);
       })
     );
@@ -560,6 +582,7 @@ export default class LdapGroups extends DmPlugin {
           if (!wantJson(req, res)) return;
           const cn = decodeURIComponent(req.params.cn as string);
           if (!cn) throw new BadRequestError('cn is required');
+          const dn = this.routeGroupDn(cn);
           const body = jsonBody(req, res, 'targetOrgDn') as {
             targetOrgDn: string;
           };
@@ -567,6 +590,16 @@ export default class LdapGroups extends DmPlugin {
           if (typeof body.targetOrgDn !== 'string') {
             throw new BadRequestError('targetOrgDn must be a string');
           }
+          const linkAttr = this.config
+            .ldap_organization_link_attribute as string;
+          await this.judgedGroup(dn, () =>
+            this.ldap.authorize('ldapmodifyrequest', [
+              dn,
+              { replace: { [linkAttr]: body.targetOrgDn } },
+              this.opNumber(),
+              req,
+            ])
+          );
           await tryMethod(
             res,
             this.moveGroup.bind(this),
@@ -608,6 +641,7 @@ export default class LdapGroups extends DmPlugin {
         if (!wantJson(req, res)) return;
         const cn = decodeURIComponent(req.params.cn as string);
         if (!cn) throw new BadRequestError('cn is required');
+        const dn = this.routeGroupDn(cn);
         const body = jsonBody(req, res, 'newCn') as {
           newCn: string;
         };
@@ -615,6 +649,13 @@ export default class LdapGroups extends DmPlugin {
         if (typeof body.newCn !== 'string') {
           throw new BadRequestError('newCn must be a string');
         }
+        // Renamed into the groups branch, as a group, or not at all
+        const newDn = /,/.test(body.newCn)
+          ? this.routeGroupDn(body.newCn)
+          : this.toGroupDn(body.newCn);
+        await this.judgedGroup(dn, () =>
+          this.ldap.authorize('ldaprenamerequest', [dn, newDn, req])
+        );
         await tryMethod(res, this.renameGroup.bind(this), cn, body.newCn, req);
       })
     );
@@ -657,12 +698,11 @@ export default class LdapGroups extends DmPlugin {
   async apiGet(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
+    const dn = this.routeGroupDn(cn);
     try {
-      const dn = /,/.test(cn)
-        ? cn
-        : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+      // A group only: another entry named alike is not one
       const result = (await this.ldap.search(
-        { paged: false, scope: 'base' },
+        { paged: false, scope: 'base', filter: this.groupFilter() },
         dn,
         req
       )) as SearchResult;
@@ -680,6 +720,9 @@ export default class LdapGroups extends DmPlugin {
       ) {
         throw new NotFoundError('Group not found');
       }
+      // A DN the directory refuses that the syntax check let through
+      if (extractLdapCode(err) === 34)
+        throw new BadRequestError(`${cn} is not a valid DN`);
       throw err;
     }
   }
@@ -693,6 +736,13 @@ export default class LdapGroups extends DmPlugin {
     if (!body) return;
     assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
+    // Given as a DN, it is created in the groups branch or not at all
+    // A DN as addGroup reads one: a comma, or the groups' main attribute
+    if (
+      typeof cn === 'string' &&
+      (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
+    )
+      this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
     const members = body.member ? body.member : [];
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
@@ -718,6 +768,10 @@ export default class LdapGroups extends DmPlugin {
     if (!wantJson(req, res)) return;
     const cn = decodeURIComponent(req.params.cn as string);
     if (!cn) throw new BadRequestError('cn is required');
+    const dn = this.routeGroupDn(cn);
+    await this.judgedGroup(dn, () =>
+      this.ldap.authorize('ldapdeleterequest', [dn, req])
+    );
     await tryMethod(res, this.deleteGroup.bind(this), cn, req);
   }
 
@@ -725,8 +779,9 @@ export default class LdapGroups extends DmPlugin {
     const body = jsonBody(req, res) as postModify | false;
     if (!body) return;
     assertModifyRequest(body);
-    const dn = this.fixDn(decodeURIComponent(req.params.cn as string));
-    if (!dn) throw new BadRequestError('cn is required');
+    const cn = decodeURIComponent(req.params.cn as string);
+    if (!cn) throw new BadRequestError('cn is required');
+    const dn = this.routeGroupDn(cn);
     assertClientMaySet(
       this.schema,
       modifiedAttributeNames(
@@ -739,6 +794,14 @@ export default class LdapGroups extends DmPlugin {
         ([key, _value]) => !(this.schema?.attributes[key]?.fixed === true)
       )
     ) as postModify;
+    await this.judgedGroup(dn, () =>
+      this.ldap.authorize('ldapmodifyrequest', [
+        dn,
+        filteredBody,
+        this.opNumber(),
+        req,
+      ])
+    );
     await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody, req);
   }
 
@@ -753,11 +816,12 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     let dn: string;
-    if (new RegExp(`^${this.cn}=`).test(cn)) {
-      dn = cn;
+    if (new RegExp(`^${this.cn}=`, 'i').test(cn)) {
+      // A bare RDN lies in the groups branch, as a name does
+      dn = /,/.test(cn) ? cn : `${cn},${this.base as string}`;
       // Extract the RDN value, correctly handling escaped commas
       cn = cn.replace(
-        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
         '$1'
       );
     } else {
@@ -855,7 +919,7 @@ export default class LdapGroups extends DmPlugin {
     },
     req?: Request
   ): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    let dn = this.toGroupDn(cn);
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
       this.registeredHooks.ldapgroupmodify,
@@ -913,10 +977,8 @@ export default class LdapGroups extends DmPlugin {
     if (!/,/.test(newCn)) {
       validateDnValue(newCn, this.cn);
     }
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
-    let newDn = /,/.test(newCn)
-      ? newCn
-      : `${this.cn}=${escapeDnValue(newCn)},${this.base}`;
+    let dn = this.toGroupDn(cn);
+    let newDn = this.toGroupDn(newCn);
     [dn, newDn] = await launchHooksChained(
       this.registeredHooks.ldapgrouprename,
       [dn, newDn]
@@ -927,7 +989,7 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteGroup(cn: string, req?: Request): Promise<boolean> {
-    let dn = /,/.test(cn) ? cn : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    let dn = this.toGroupDn(cn);
     dn = await launchHooksChained(this.registeredHooks.ldapgroupdelete, dn);
     const res = await this.ldap.delete(dn, req);
     void launchHooks(this.registeredHooks.ldapgroupdeletedone, dn);
@@ -952,9 +1014,7 @@ export default class LdapGroups extends DmPlugin {
     member: string | string[],
     req?: Request
   ): Promise<boolean> {
-    const dn = /,/.test(cn)
-      ? cn
-      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = this.toGroupDn(cn);
     if (!Array.isArray(member)) member = [member];
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupaddmember,
@@ -995,9 +1055,7 @@ export default class LdapGroups extends DmPlugin {
     member: string,
     req?: Request
   ): Promise<boolean> {
-    const dn = /,/.test(cn)
-      ? cn
-      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = this.toGroupDn(cn);
     [cn, member] = await launchHooksChained(
       this.registeredHooks.ldapgroupdeletemember,
       [cn, member]
@@ -1093,9 +1151,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<{ success: boolean }> {
     const linkAttr = this.config.ldap_organization_link_attribute as string;
     const pathAttr = this.config.ldap_organization_path_attribute as string;
-    const dn = /,/.test(cn)
-      ? cn
-      : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    const dn = this.toGroupDn(cn);
 
     // Judged before the group and the target are read, as the server: which
     // organization holds a group, and whether either is there, are not for
@@ -1274,9 +1330,99 @@ export default class LdapGroups extends DmPlugin {
     return await this.listGroups({ filter, attributes, req });
   }
 
-  protected fixDn(dn: string): string | false {
-    if (!dn) return false;
-    return /,/.test(dn) ? dn : `${this.cn}=${escapeDnValue(dn)},${this.base}`;
+  /**
+   * The DN of a group named by its `cn`, or given as a DN: one with a comma.
+   * A DN the directory would refuse is answered 400 rather than its error.
+   *
+   * @param cn the group's name, or its DN
+   * @returns its DN
+   */
+  protected toGroupDn(cn: string): string {
+    if (!/,/.test(cn)) return `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    if (!isDnSyntax(cn)) throw new BadRequestError(`${cn} is not a valid DN`);
+    return cn;
+  }
+
+  /**
+   * {@link toGroupDn} for a route serving the groups branch: what is not
+   * below it, nor named as these groups are (`cn=`), is no group of these
+   * routes, whatever entry it is (#395). The branch may be the whole
+   * directory, which is the default: the naming is what tells an account
+   * from a group there. A multi-valued RDN holding the main attribute
+   * passes here; the group class, checked next, is what settles it.
+   *
+   * @param cn the group's name, or its DN
+   * @returns its DN
+   */
+  protected routeGroupDn(cn: string): string {
+    const dn = this.toGroupDn(cn);
+    const base = this.base as string;
+    const type = normalizeDn(`${this.cn}=x`).split('=')[0];
+    if (
+      !isDnInBranch(dn, base) ||
+      normalizeDn(dn) === normalizeDn(base) ||
+      // Any assertion of the RDN, the unescaped `+` apart
+      !normalizeDn(getRdn(dn))
+        .split(/(?<!\\)\+/)
+        .some(assertion => assertion.startsWith(`${type}=`))
+    )
+      throw new NotFoundError('Group not found');
+    return dn;
+  }
+
+  /**
+   * A filter matching a group: one of the classes this plugin gives groups
+   * (`--group-class`), or a standard group class.
+   */
+  private groupFilter(): string {
+    const classes = new Set(
+      [
+        ...(this.config.group_class ?? []),
+        'groupOfNames',
+        'groupOfUniqueNames',
+        'groupOfURLs',
+        'posixGroup',
+      ].filter(name => name && name.toLowerCase() !== 'top')
+    );
+    return `(|${[...classes].map(name => `(objectClass=${escapeLdapFilter(name)})`).join('')})`;
+  }
+
+  /**
+   * That the entry a route writes is a group, once the write is judged:
+   * another entry named alike is not one, and is not written as one (#395).
+   *
+   * Judged first, a caller who may not make the write gets the refusal
+   * whether the entry is there, a group or not; only one who may learns
+   * that it is none.
+   *
+   * @param dn the entry, from {@link routeGroupDn}
+   * @param judge the authorization of the write, as `ldap.authorize`
+   */
+  protected async judgedGroup(
+    dn: string,
+    judge: () => Promise<void>
+  ): Promise<void> {
+    await judge();
+    let found: SearchResult;
+    try {
+      // As the server: the write was judged, this only shapes the answer
+      found = (await this.ldap.system.search(
+        {
+          paged: false,
+          scope: 'base',
+          filter: this.groupFilter(),
+          attributes: ['1.1'],
+        },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      const code = extractLdapCode(err);
+      if (code === 32) throw new NotFoundError('Group not found');
+      if (code === 34) throw new BadRequestError(`${dn} is not a valid DN`);
+      throw err;
+    }
+    if (!found.searchEntries?.length)
+      throw new NotFoundError('Group not found');
   }
 
   /**

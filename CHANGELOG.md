@@ -101,6 +101,16 @@
 
 ### Fixes
 
+- `core/ldap/groups`: a group named with a comma is taken for a DN only
+  when it is one: `GET /api/v1/ldap/groups/a%2Cb` answered 500, it
+  answers 400. And the `/api/v1/ldap/groups/{cn}` routes, creation and
+  rename target included, answer 404 for a DN that is not a group below
+  the groups branch, named by the groups' main attribute: they read any
+  entry as a group, an
+  account included, and would have written or deleted it as one,
+  [upgrading](docs/usage/upgrading.md#the-group-routes-take-a-dn-for-a-group-only)
+  ([#399](https://github.com/linagora/ldap-rest/pull/399))
+
 - Shipped schemas (`twake`, `example`): a mail domain an organization
   still links, and a nomenclature value — account status, delivery mode,
   personal title, list type, mailbox type (team mailboxes' included) — an
