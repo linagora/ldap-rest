@@ -65,6 +65,8 @@ What the caller may read is the authorization model's to say:
   organization, not on its group branch only. What stays every
   administrator's: whether an organization exists or is deleted, its spaces,
   and users carrying no link, whose link is the provisioning tool's to set.
+  Such users are in transit, and the administrator they belong to claims
+  them: see [transit](../auth/authz-linid1.md#transit-handing-an-entry-over).
   With `core/ldap/organizations` loaded too, the organizations must lie under
   `--ldap-top-organization`, where it accepts a link.
 - A plugin judging every read made for the request, as

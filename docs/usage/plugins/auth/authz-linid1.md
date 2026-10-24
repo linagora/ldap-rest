@@ -78,17 +78,24 @@ organization through which entries change hands.
 ```
 
 An entry is **in transit** when it is attached to that organization, or to
-none (with or without the option).
+none (with or without the option). An entry carrying no link is in transit
+on purpose: it is how the entries other tools insert without one are
+caught, by whichever administrator they belong to.
 
 - Every administrator sees the entries in transit.
 - **Claiming** one (`POST /api/v1/ldap/users/:id/move` towards an
-  organization) asks for write on that organization only.
+  organization) asks for write on that organization only. The write
+  claiming it may carry other changes to the entry — its password, say —
+  judged with it: the entry lands in the organization that write is
+  allowed in.
 - **Putting** one in transit asks for write on the organization it leaves,
   and nothing on the transit branch: an administrator only lets go of what
   they manage. Handing an account over to an organization one does not manage
   is two steps: put it in transit, then its new administrator claims it.
-- Any other change to an entry in transit (attributes, password, status,
-  deletion) is judged as before, so the entry is claimed first.
+- Any other change to an entry in transit, not claiming it (attributes,
+  password, status, deletion), is judged as before: on the transit branch
+  for an entry attached to it, on its parent branch for one attached to
+  nothing.
 
 `GET /api/v1/authz/scope` returns the transit branch as `transit` (`null`
 when there is none), so that a client can offer these moves. A group attached
