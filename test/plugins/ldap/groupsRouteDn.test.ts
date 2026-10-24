@@ -48,9 +48,40 @@ describe('Group routes and the DN they are given', function () {
       .catch(() => undefined);
   });
 
+  /** Entries in the groups branch that are no group */
+  const strangers = (): [string, Record<string, unknown>][] => [
+    [
+      `uid=routedn-in,${plugin.base as string}`,
+      {
+        objectClass: ['top', 'inetOrgPerson'],
+        uid: 'routedn-in',
+        cn: 'routedn-in',
+        sn: 'routedn-in',
+      },
+    ],
+    [
+      `cn=routedn-person,${plugin.base as string}`,
+      {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'routedn-person',
+        sn: 'routedn-person',
+      },
+    ],
+  ];
+
+  before(async () => {
+    for (const [dn, entry] of strangers())
+      await server.ldap.add(dn, entry as never).catch(() => undefined);
+  });
+
   after(async () => {
     await plugin.deleteGroup(named).catch(() => undefined);
     await server.ldap.delete(accountDn).catch(() => undefined);
+    for (const [dn] of strangers())
+      await server.ldap.delete(dn).catch(() => undefined);
+    await server.ldap
+      .delete(`cn=routedn-elsewhere,ou=users,${base}`)
+      .catch(() => undefined);
   });
 
   const get = (id: string) =>
@@ -59,7 +90,15 @@ describe('Group routes and the DN they are given', function () {
       .set('Accept', 'application/json');
 
   it('answers 400 for a name the directory would not take as a DN', async () => {
-    for (const id of ['a,b', 'a,b=']) {
+    const groups = plugin.base as string;
+    for (const id of [
+      'a,b',
+      'a,b=',
+      // Shaped like DNs in the branch, refused by the directory
+      `cn=g,${groups},`,
+      `cn=,${groups}`,
+      `cn=a<b,${groups}`,
+    ]) {
       const res = await get(id);
       expect(res.status, `${id}: ${JSON.stringify(res.body)}`).to.equal(400);
       expect(res.body.error).to.match(/is not a valid DN/);
@@ -70,6 +109,46 @@ describe('Group routes and the DN they are given', function () {
     const res = await get(accountDn);
     expect(res.status, JSON.stringify(res.body)).to.equal(404);
     expect(res.body.error).to.equal('Group not found');
+  });
+
+  it('answers 404 for the branch itself, and for what in it is no group', async () => {
+    for (const id of [
+      plugin.base as string,
+      ...strangers().map(([dn]) => dn),
+    ]) {
+      const res = await get(id);
+      expect(res.status, `${id}: ${JSON.stringify(res.body)}`).to.equal(404);
+    }
+  });
+
+  it('creates and renames into the groups branch only', async () => {
+    const elsewhere = `cn=routedn-elsewhere,ou=users,${base}`;
+    const created = await request
+      .post('/api/v1/ldap/groups')
+      .set('Accept', 'application/json')
+      .type('json')
+      .send({ cn: elsewhere, member: [] });
+    expect(created.status, JSON.stringify(created.body)).to.equal(404);
+    const renamed = await request
+      .post(`/api/v1/ldap/groups/${encodeURIComponent(named)}/rename`)
+      .set('Accept', 'application/json')
+      .type('json')
+      .send({ newCn: elsewhere });
+    expect(renamed.status, JSON.stringify(renamed.body)).to.equal(404);
+    expect((await get(named)).status).to.equal(200);
+  });
+
+  it('writes nothing in the branch that is no group', async () => {
+    const [, [person]] = strangers();
+    const del = await request
+      .delete(`/api/v1/ldap/groups/${encodeURIComponent(person)}`)
+      .set('Accept', 'application/json');
+    expect(del.status, JSON.stringify(del.body)).to.equal(404);
+    const still = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: ['1.1'] },
+      person
+    )) as { searchEntries: unknown[] };
+    expect(still.searchEntries).to.have.length(1);
   });
 
   it('writes nothing outside the groups branch', async () => {

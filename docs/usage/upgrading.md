@@ -6,6 +6,20 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### The group routes take a DN for a group only
+
+**Who is affected:** a client calling `/api/v1/ldap/groups/{cn}` with a
+DN rather than a name.
+
+A DN given to these routes, to read, write, delete, create or rename a
+group, must name a group below the groups branch (`--ldap-group-base`),
+named by the groups' main attribute (`--ldap-groups-main-attribute`, `cn`
+by default) and of a group class (`--group-class`, or a standard one) the
+caller reads; anything else answers `404 Group not found`, and a DN the
+directory would refuse `400`. A client that managed the organization
+groups of `core/twake/groups` by DN through these routes, when they lie
+outside `--ldap-group-base`, uses `/api/v1/organizations/{id}/groups`.
+
 ### Reference data still in use is not deleted
 
 **Who is affected:** a deployment loading the shipped `twake` or `example`

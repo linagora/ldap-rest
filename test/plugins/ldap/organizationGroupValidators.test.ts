@@ -187,6 +187,24 @@ describe('Organization and group validators', function () {
   });
 
   describe('a pointer on a group', () => {
+    // The group written, there for the pointer to be what is checked
+    const groupDn = (): string =>
+      `cn=validatorsgroup,${(server.loadedPlugins['ldapGroups'] as LdapGroups).base as string}`;
+
+    before(async () => {
+      await server.ldap
+        .add(groupDn(), {
+          objectClass: ['top', 'groupOfNames'],
+          cn: 'validatorsgroup',
+          member: [`uid=nobody,${base}`],
+        })
+        .catch(() => undefined);
+    });
+
+    after(async () => {
+      await server.ldap.delete(groupDn()).catch(() => undefined);
+    });
+
     it('should compare the branch RDN by RDN, and answer 400', async () => {
       // Ends with the branch as text, but its parent is `xou=twakeListType`
       const res = await request
