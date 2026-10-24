@@ -11,7 +11,7 @@
   may not write a branch got its 409 ("already used", "still referenced")
   instead of a 403, and could learn which addresses the directory holds
   outside their scope
-  ([#PR](https://github.com/linagora/ldap-rest/pull/PR))
+  ([#378](https://github.com/linagora/ldap-rest/pull/378))
 
 ### Fixes
 
