@@ -60,7 +60,10 @@ checked before a login rather than staying silent.
 Every plugin that judges LDAP operations — `core/auth/authzPerBranch`,
 `core/auth/authzLinid1`, `core/auth/authzDynamic` — registers the same hooks,
 and all of them run: loaded together, they compose as an **AND**, and the
-first refusal wins. The per-caller read filter (`ldapsearchfilter`) is one of
+first refusal wins. Their request hooks run before any other plugin's,
+whatever order the plugins loaded in: a caller who may not make an operation
+gets the 403, not another plugin's 409, and the operation is not replaced
+(by `core/ldap/trash`, for instance) before it is judged. The per-caller read filter (`ldapsearchfilter`) is one of
 those hooks: two plugins there compose as an intersection, which is the same
 AND. That is sound when it is meant. When it is not, it is a
 refusal nobody can explain: `authzPerBranch` beside `authzDynamic` judges a

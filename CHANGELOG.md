@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Security
+
+- The authorization plugins judge an LDAP operation before any other
+  plugin, whatever order the plugins loaded in. When `core/ldap/trash`
+  loaded first, a caller with no right on an entry could delete it, as a
+  move to the trash. When `core/ldap/enterpriseRules` did, a caller who
+  may not write a branch got its 409 ("already used", "still referenced")
+  instead of a 403, and could learn which addresses the directory holds
+  outside their scope
+  ([#PR](https://github.com/linagora/ldap-rest/pull/PR))
+
 ### Fixes
 
 - With the search cache on (`--ldap-cache-ttl`), a change of a group's

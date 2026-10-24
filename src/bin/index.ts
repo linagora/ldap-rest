@@ -31,12 +31,36 @@ import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
 import { setLogger } from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
-import { assertAuthzComposition } from '../lib/authz/composition';
+import {
+  assertAuthzComposition,
+  LDAP_JUDGING_HOOKS,
+} from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner } from '../lib/utils';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
+
+/**
+ * The hooks an authorization plugin refuses a request from, which run before
+ * any other plugin's whatever the order the plugins loaded in.
+ *
+ * The first hook to throw answers the request. A plugin judging a write on
+ * its content — `enterpriseRules` answering 409 "already used", or "still
+ * referenced" — therefore told a caller who may not write there what the
+ * directory holds where they cannot read, one request at a time, and told
+ * them to fix a write they would then be refused anyway. A plugin replacing
+ * a write — `trash` moving an entry instead of deleting it — did it before
+ * anyone judged the delete. Which came first was the order the plugins'
+ * imports completed in. The authorization plugins keep their own order
+ * among themselves: they compose as an AND, the first refusal winning.
+ *
+ * `ldapsearchfilter` is not here: it narrows a result already read rather
+ * than refusing a request, and plugins rely on what it leaves.
+ */
+const AUTHZ_FIRST_HOOKS: string[] = LDAP_JUDGING_HOOKS.filter(
+  hook => hook !== 'ldapsearchfilter'
+);
 
 // Internal Express router structure (used to remove error middleware and to
 // list the registered routes when checking authentication coverage).
@@ -116,6 +140,11 @@ export class DM {
    * whose name is taken. A Map, so that `withConfig` views share it.
    */
   private readonly pluginLoads = new Map<string, Promise<boolean>>();
+  /**
+   * The request hooks of the authorization plugins, which `registerPlugin`
+   * keeps ahead of every other plugin's. See {@link AUTHZ_FIRST_HOOKS}.
+   */
+  private readonly authzHooks = new WeakSet<object>();
 
   constructor() {
     this.config = parseConfig(configArgs);
@@ -787,9 +816,16 @@ export class DM {
           this.hooks[hookName as keyof Hooks] = [];
         }
         if (hook && typeof hook === 'function') {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore: object is defined
-          this.hooks[hookName as keyof Hooks].push(hook);
+          const list = this.hooks[hookName as keyof Hooks]!;
+          if (
+            obj.roles?.includes('authz') &&
+            AUTHZ_FIRST_HOOKS.includes(hookName)
+          ) {
+            // After the authorization hooks already there, before the rest
+            const at = list.findIndex(other => !this.authzHooks.has(other));
+            list.splice(at === -1 ? list.length : at, 0, hook);
+            this.authzHooks.add(hook);
+          } else list.push(hook);
           recordHookOwner(hook, obj.name, hookName);
         } else {
           throw new Error(`Plugin ${obj.name}: hook ${hookName} is invalid`);
