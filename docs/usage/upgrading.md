@@ -21,7 +21,13 @@ first name the directory declares. An option other than `;binary` is
 refused with a 400: a tagged value is one of its own, which the rules
 guarding the attribute would not see. Two names for one attribute in one
 `add`, `replace` or `delete` are refused with a 400 too. Values already
-stored under an option are still read; rewrite them without it.
+stored under an option are still read, but cannot be written or deleted
+through ldap-rest: clean them up in the directory.
+
+A rename gives the entry one value of the attribute it is already named by
+(`cn=new` for a group named by `cn`): a new RDN holding several values, or
+naming another attribute, is refused with a 400. The directory writes the
+values of the new RDN on the entry, where no check of a write saw them.
 
 When the directory schema cannot be read, the case is still set from the
 configuration and the schemas, a name given as an OID is refused, and an

@@ -10,7 +10,9 @@
   plugins and the hooks reading them by name — an administrator moved an
   account to an organization they may not write. An option other than
   `;binary` and an attribute named twice in one part of a write are refused
-  (400). The route checks of the flat entities, groups and organizations
+  (400). A rename to an RDN holding several values, or naming another
+  attribute, is refused too: `cn=x+twakeDepartmentLink=…` linked a group
+  past every check of a write. The route checks of the flat entities, groups and organizations
   look schema attributes up whatever their case: a fixed attribute deleted
   as `OBJECTCLASS`, and members added as `MEMBER` past the group's own
   routes, went through,

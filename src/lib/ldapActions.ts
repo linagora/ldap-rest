@@ -16,6 +16,7 @@ import { type DM } from '../bin';
 import type { Hooks } from '../hooks';
 
 import {
+  attributeTypeName,
   escapeDnValue,
   getParentDn,
   hookOwner,
@@ -24,6 +25,7 @@ import {
   launchHooks,
   launchHooksChained,
   normalizeDn,
+  rdnTypes,
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
@@ -1384,7 +1386,14 @@ class ldapActions {
     for (const name of names) {
       if (!name || name.includes(';')) continue;
       const key = name.toLowerCase();
-      if (!this.spellings.has(key)) this.spellings.set(key, name);
+      const known = this.spellings.get(key);
+      if (known === undefined) this.spellings.set(key, name);
+      // A plugin comparing with the other spelling would miss the writes
+      else if (known !== name)
+        this.logger.warn(
+          `Attribute "${name}" is also spelled "${known}" in the configuration ` +
+            `or a schema: writes name it "${known}"`
+        );
     }
   }
 
@@ -1474,18 +1483,23 @@ class ldapActions {
    * @param index the directory schema, when it could be read
    */
   private canonicalName(key: string, index?: SchemaIndex): string {
-    const [base, ...options] = key.split(';');
+    const [written, ...options] = key.split(';');
+    // `OID.2.5.4.3`, the LDAPv2 spelling of an OID
+    const base = written.replace(/^oid\./i, '');
     const option = options.find(o => o.toLowerCase() !== 'binary');
     if (option !== undefined)
       throw new BadRequestError(
         `Attribute option "${option}" of "${key}" is not accepted`
       );
     const type = index?.getAttributeType(base);
-    if (!type && !index && /^\d+(\.\d+)+$/.test(base))
+    if (!type && !index && /^\d+(\.\d+)+$/.test(attributeTypeName(base)))
       throw new BadRequestError(
         `Attribute "${key}" cannot be named by its OID here`
       );
-    const known = type ? [...type.names, type.oid] : [base];
+    // Without the schema, the names and OIDs this server knows of itself
+    const known = type
+      ? [...type.names, type.oid]
+      : [base, attributeTypeName(base)];
     const name =
       known.map(n => this.spellings.get(n.toLowerCase())).find(Boolean) ??
       type?.names[0] ??
@@ -1964,6 +1978,16 @@ class ldapActions {
     req ??= currentRequest();
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
+    // The directory writes the values of the new RDN on the entry, where no
+    // check of a write sees them: `cn=x+twakeDepartmentLink=…` linked a
+    // group past the move check. One value, of the attribute the entry is
+    // already named by
+    const named = rdnTypes(dn);
+    const renamed = rdnTypes(newRdn);
+    if (renamed.length !== 1 || !named.includes(renamed[0]))
+      throw new BadRequestError(
+        `${newRdn}: an entry is renamed by one value of the attribute it is named by`
+      );
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {

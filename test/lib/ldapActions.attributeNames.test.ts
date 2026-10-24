@@ -56,6 +56,7 @@ describe('Attribute names of a write', function () {
       ['rfc822Mailbox', 'mail'],
       ['0.9.2342.19200300.100.1.3', 'mail'],
       ['commonName', 'cn'],
+      ['OID.2.5.4.3', 'cn'],
       ['OBJECTCLASS', 'objectClass'],
       // The Twake link, by the OID its schema gives it
       ['1.3.6.1.4.1.10943.1.50.1.1', 'twakeDepartmentLink'],
@@ -117,5 +118,28 @@ describe('Attribute names of a write', function () {
     ).searchEntries[0];
     expect(entry.mail).to.equal('names-other@example.com');
     expect(entry.sn).to.equal('Test');
+  });
+
+  // A rename writes the values of its new RDN on the entry, past every check
+  // of a write: one value, of the attribute the entry is named by
+  it('renames an entry by one value of the attribute it is named by', async () => {
+    const users = `ou=users,${base}`;
+    for (const newDn of [
+      `uid=names-x+mail=taken@example.com,${users}`,
+      `cn=names-test,${users}`,
+      `2.5.4.3=names-test,${users}`,
+    ]) {
+      let status: number | 'ok' = 'ok';
+      try {
+        await server.ldap.rename(dn, newDn);
+      } catch (err) {
+        status = (err as { statusCode?: number }).statusCode ?? 500;
+      }
+      expect(status, newDn).to.equal(400);
+    }
+    // Under any spelling of that attribute
+    const renamed = `userid=names-renamed,${users}`;
+    await server.ldap.rename(dn, renamed);
+    await server.ldap.rename(renamed, dn);
   });
 });
