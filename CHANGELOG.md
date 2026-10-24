@@ -133,9 +133,11 @@
 - `core/ldap/enterpriseRules`: a write naming an attribute in another case
   or with an option — `MAIL`, `mail;lang-en` — found no rule under that
   name, and went through unchecked: uniqueness, mail domains, lifecycle
-  dates. The rule of the attribute applies whatever its spelling. The
-  shipped schemas are strict, so the API refused such names already; the
-  writes of other plugins did not
+  dates. A move spelled `TWAKEDEPARTMENTLINK` did not recheck the stored
+  addresses against the new organization's domains, and a mail sent along
+  with it was checked against the old one. The rules apply whatever the
+  spelling. The shipped schemas are strict, so the API refused such names
+  already; the writes of other plugins did not
   ([#404](https://github.com/linagora/ldap-rest/pull/404))
 
 - `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`

@@ -160,12 +160,34 @@ function valueList(value: AttributeValue | undefined): string[] {
  * @returns its values, empty when the entry does not carry it
  */
 function entryValues(entry: Record<string, unknown>, name: string): string[] {
-  const wanted = name.toLowerCase();
   for (const [key, value] of Object.entries(entry)) {
-    if (key.split(';')[0].toLowerCase() === wanted)
-      return valueList(value as AttributeValue);
+    if (spells(key, name)) return valueList(value as AttributeValue);
   }
   return [];
+}
+
+/**
+ * Whether a key, as a client or the directory spells it, names an attribute:
+ * `MAIL` and `mail;lang-en` are `mail`.
+ *
+ * @param key attribute description, in any case, options included
+ * @param name attribute name, as a schema writes it
+ */
+function spells(key: string, name: string): boolean {
+  return key.split(';')[0].toLowerCase() === name.toLowerCase();
+}
+
+/**
+ * Every value of an attribute, under each of its spellings.
+ *
+ * @param entry entry as read or submitted
+ * @param name attribute name, in any case
+ * @returns its values, empty when no key names it
+ */
+function allValues(entry: AttributesList | null, name: string): string[] {
+  return Object.entries(entry || {})
+    .filter(([key]) => spells(key, name))
+    .flatMap(([, value]) => valueList(value));
 }
 
 /**
@@ -507,13 +529,18 @@ export default class LdapEnterpriseRules extends DmPlugin {
       // organization now responsible for them — `/move` walked straight past
       // the domain rule this plugin exists to enforce. When the link changes,
       // the stored mail-scoped values are checked as if they had been sent.
+      // Whatever the spelling of the keys: `TWAKEDEPARTMENTLINK` moves the
+      // entry as surely
       const linkAttr = roleAttribute(entity.schema, 'organizationLink');
       const toCheck: AttributesList = { ...submitted };
-      if (linkAttr && linkAttr in submitted && current) {
+      const sent = (name: string): boolean =>
+        Object.keys(toCheck).some(key => spells(key, name));
+      if (linkAttr && sent(linkAttr) && current) {
         for (const [name, attr] of Object.entries(entity.schema.attributes)) {
           if (!attr.mailDomainScope) continue;
-          if (name in toCheck) continue;
-          if (current[name] !== undefined) toCheck[name] = current[name];
+          if (sent(name)) continue;
+          const stored = allValues(current, name);
+          if (stored.length) toCheck[name] = stored;
         }
       }
 
@@ -571,8 +598,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     for (const [key, value] of Object.entries(values)) {
       // Its rule whatever the spelling: a write to `MAIL` or `mail;lang-en`
       // is one to `mail`, and found no rule under that name
-      const wanted = key.split(';')[0].toLowerCase();
-      const name = names.find(n => n.toLowerCase() === wanted);
+      const name = names.find(n => spells(key, n));
       if (!name) continue;
       const attr = entity.schema.attributes[name];
       const list = valueList(value);
@@ -764,13 +790,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     // Compared as stored, exactly: whether two spellings are one value is
     // the attribute's matching rule, which this cannot read
     // Under every spelling the directory answers, options included
-    const checked = new Set(
-      attributes.filter(covers).map(a => a.toLowerCase())
-    );
     const held = new Set(
-      Object.entries(current || {})
-        .filter(([key]) => checked.has(key.split(';')[0].toLowerCase()))
-        .flatMap(([, value]) => valueList(value))
+      attributes.filter(covers).flatMap(a => allValues(current, a))
     );
 
     for (const value of values) {
@@ -866,8 +887,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     const linkAttr = roleAttribute(entity.schema, 'organizationLink');
     if (!linkAttr) return [];
     const link =
-      valueList(submitted[linkAttr])[0] ||
-      valueList(current?.[linkAttr])[0] ||
+      allValues(submitted, linkAttr)[0] ||
+      allValues(current, linkAttr)[0] ||
       undefined;
     if (!link) return [];
 

@@ -603,6 +603,36 @@ describe('Enterprise rules', () => {
         });
       });
 
+      it('should check a move whatever the spelling of the link', async () => {
+        // No domain where it stands, so any address
+        const res = await request.post('/api/v1/ldap/users').type('json').send({
+          cn: 'Rules Domain',
+          sn: 'Domain',
+          mail: 'rules.domain@elsewhere.example',
+          twakeDepartmentLink: otherOrgDn,
+          employeeNumber: 'ENT0051',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+        const self = `uid=rules.domain,ou=users,${base}`;
+        // Into an organization that allows example.com only: the stored
+        // address, or one sent along, is checked against it
+        for (const replace of [
+          { TWAKEDEPARTMENTLINK: subOrgDn },
+          { 'twakeDepartmentLink;x-tag': subOrgDn },
+          {
+            TwakeDepartmentLink: subOrgDn,
+            mail: 'rules.other@elsewhere.example',
+          },
+        ])
+          await server.ldap.modify(self, { replace } as never).then(
+            () => expect.fail(`${JSON.stringify(replace)} was written`),
+            (err: Error) =>
+              expect(err.message).to.match(/not one of the authorised domains/)
+          );
+      });
+
       it('should list a domain linked at several levels once', async () => {
         // #350: the sub-organization links the domain its parent links too
         const link = `dc=example,ou=domains,ou=nomenclature,${base}`;
