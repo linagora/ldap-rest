@@ -197,6 +197,8 @@ export function movedInto(
 
 /** The auxiliary class a group is given to hold its organization link. */
 const LINK_CLASS = 'twakeGroup';
+/** The group classes allowing the link, lower-cased */
+const LINK_CLASSES = ['twakegroup', 'twakestaticgroup'] as const;
 
 /** Search options whose member lists keep the tombstones they hold. */
 const WHOLE = Symbol('whole member lists');
@@ -282,7 +284,7 @@ export default class TwakeGroups extends LdapGroups {
    * would announce a member removed on an erase, which publishes nothing.
    */
   hooks: Hooks = {
-    ldapaddrequest: async ([dn, entry, req]) => {
+    ldapaddrequest: ([dn, entry, req]) => {
       this.checkMembers(dn, entry.member);
       const org = this.organizationOf(dn);
       // A group written without the routes, through SCIM, is dated too. Only
@@ -295,7 +297,7 @@ export default class TwakeGroups extends LdapGroups {
       )
         entry = { ...entry, [this.createdAt]: new Date().toISOString() };
       // Linked to its organization, whatever wrote it
-      if (org !== undefined) entry = await this.linked(dn, org, entry);
+      if (org !== undefined) entry = this.linked(dn, org, entry);
       return [dn, entry, req];
     },
     ldapmodifyrequest: ([dn, changes, op, req]) => {
@@ -336,7 +338,13 @@ export default class TwakeGroups extends LdapGroups {
     ldaprenamedone: async ([dn, newDn]) => {
       const org = movedInto(this.groupPattern, dn, newDn);
       const attribute = this.config.ldap_organization_link_attribute;
-      if (org === undefined || !attribute || !this.orgPattern) return;
+      if (
+        org === undefined ||
+        !attribute ||
+        !this.orgPattern ||
+        !this.judgedByAttachment()
+      )
+        return;
       const { searchEntries } = (await this.ldap.system.search(
         { paged: false, scope: 'base', attributes: [attribute] },
         newDn
@@ -390,58 +398,64 @@ export default class TwakeGroups extends LdapGroups {
       );
   }
 
-  /** The organization a group DN belongs to, if it is a group at all. */
   /**
-   * A group of `org` with its organization link: what an authorization model
-   * judging by attachment (`authzLinid1`, `--authz-filter-attached-entries`)
-   * reads to tell whose it is. Without it, every administrator reads and
-   * changes the group.
+   * A group of `org` with its organization link, under an authorization
+   * model judging entries by that link (`authzLinid1`,
+   * `--authz-filter-attached-entries`): there, a group without one is every
+   * administrator's. Elsewhere the group is left as it is, and judged by its
+   * branch as before.
    *
-   * The auxiliary class allowing the attribute is added when the group's
-   * classes do not. Nothing changes when the directory defines no such
-   * attribute; a directory whose classes cannot hold it refuses the group
-   * rather than leave it to every administrator.
+   * The auxiliary class `twakeGroup` is added when the group holds neither
+   * it nor `twakeStaticGroup`. A link the writer gave is kept when it names
+   * the group's organization, refused otherwise: a group in one
+   * organization's branch belonging to another would mix their members.
    *
    * @param dn the group's DN
    * @param org its organization
    * @param entry the group as written
    * @returns the group, linked
+   * @throws BadRequestError when the link given names another organization
    */
-  async linked(
-    dn: string,
-    org: string,
-    entry: AttributesList
-  ): Promise<AttributesList> {
+  linked(dn: string, org: string, entry: AttributesList): AttributesList {
     const attribute = this.config.ldap_organization_link_attribute;
-    if (
-      !attribute ||
-      !this.orgPattern ||
-      valueOf(entry, attribute) !== undefined
-    )
+    if (!attribute || !this.orgPattern || !this.judgedByAttachment())
       return entry;
-    const schema = await this.ldap.schemaIndex();
-    if (!schema.getAttributeType(attribute)) return entry;
-    const allows = (classes: string[]): boolean => {
-      const { must, may } = schema.resolveAttributes(classes);
-      return [...must, ...may].some(
-        name => name.toLowerCase() === attribute.toLowerCase()
-      );
-    };
-    let objectClass = values(entry.objectClass);
-    if (!allows(objectClass)) {
-      if (!allows([LINK_CLASS]))
-        throw new Error(
-          `${this.name}: no class of ${dn} allows ${attribute}, nor does ${LINK_CLASS}`
+    const orgDn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const given = read(entry, attribute);
+    if (given !== undefined) {
+      if (dnKey(given) !== dnKey(orgDn))
+        throw new BadRequestError(
+          `${dn} lies in the branch of ${org}, and must be linked to it`
         );
-      objectClass = [...objectClass, LINK_CLASS];
+      return entry;
     }
-    return {
-      ...entry,
-      objectClass,
-      [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
-    };
+    const objectClass = values(entry.objectClass);
+    if (
+      !objectClass.some(name =>
+        LINK_CLASSES.includes(
+          name.toLowerCase() as (typeof LINK_CLASSES)[number]
+        )
+      )
+    )
+      objectClass.push(LINK_CLASS);
+    return { ...entry, objectClass, [attribute]: orgDn };
   }
 
+  /**
+   * Whether an authorization plugin judges entries by their organization
+   * link: then a group needs one.
+   */
+  private judgedByAttachment(): boolean {
+    return Object.values(this.server.loadedPlugins).some(
+      plugin =>
+        plugin.roles?.includes('authz') &&
+        (
+          plugin as { judgesByAttachment?: () => boolean }
+        ).judgesByAttachment?.() === true
+    );
+  }
+
+  /** The organization a group DN belongs to, if it is a group at all. */
   organizationOf(dn: string): string | undefined {
     return organizationIn(this.groupPattern, dn);
   }
@@ -859,7 +873,7 @@ export default class TwakeGroups extends LdapGroups {
     if (body.color) additional[this.color] = body.color;
     // The link the add hook would give it, so that the creation judged is
     // the one written
-    const linked = await this.linked(this.groupDn(org, id), org, additional);
+    const linked = this.linked(this.groupDn(org, id), org, additional);
     // Judged before the name is looked for: whether it is taken is not for
     // a caller who may not create a group here
     await this.ldap.authorize('ldapaddrequest', [

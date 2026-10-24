@@ -54,13 +54,19 @@ What the caller may read is the authorization model's to say:
 - A model judging by branch (`core/auth/authzPerBranch`) gives an
   organization's groups and users to the callers granted its branch.
 - A model judging entries by their organization link (`core/auth/authzLinid1`,
-  or `--authz-filter-attached-entries`) gives a group to its organization's
-  administrators: every group written in an organization's branch, through
-  these routes, SCIM or another plugin, is given the organization link
-  (`--ldap-organization-link-attribute`, with the auxiliary class `twakeGroup`
-  when its classes do not allow it), and follows it when moved to another
-  organization. Entries carrying no link, users included, are every
-  administrator's: the link of the users is the provisioning tool's to set.
+  or `--authz-filter-attached-entries`) gives an entry carrying no link to
+  every administrator. Under such a model only, every group written in an
+  organization's branch — through these routes, SCIM or another plugin — is
+  given the organization link (`--ldap-organization-link-attribute`, with the
+  auxiliary class `twakeGroup` when it holds neither it nor
+  `twakeStaticGroup`), and follows it when moved to another organization; a
+  link naming another organization is refused (400). A group is then judged
+  on its organization: creating or changing one needs write on the
+  organization, not on its group branch only. What stays every
+  administrator's: whether an organization exists or is deleted, its spaces,
+  and users carrying no link, whose link is the provisioning tool's to set.
+  With `core/ldap/organizations` loaded too, the organizations must lie under
+  `--ldap-top-organization`, where it accepts a link.
 - A plugin judging every read made for the request, as
   `core/auth/authzDynamic` does, refuses the organization check itself: 403
   `REFUSED`, whether the organization exists or not.

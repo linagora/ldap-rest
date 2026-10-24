@@ -15,6 +15,8 @@ import { DM } from '../../../src/bin';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
+import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
+import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
@@ -42,6 +44,8 @@ describe('Twake group routes and the caller', function () {
   const ADMIN = 'tgz.admin';
   // May read acme, but not its users, or not its groups
   const NO_USERS = 'tgz.nousers';
+  // Manages acme's groups, and only reads the organization
+  const MANAGER = 'tgz.manager';
   const NO_GROUPS = 'tgz.nogroups';
   let orgs: string;
   const orgDn = (org: string): string => `ou=${org},${orgs}`;
@@ -57,6 +61,13 @@ describe('Twake group routes and the caller', function () {
   const route = (org: string, rest = ''): string =>
     `/api/v1/organizations/${org}/groups${rest}`;
   const as = (user: string) => ({ 'X-Test-User': user });
+  const linkOf = async (dn: string): Promise<unknown> =>
+    (
+      (await plain.ldap.search(
+        { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+        dn
+      )) as { searchEntries: Record<string, unknown>[] }
+    ).searchEntries[0]?.twakeDepartmentLink;
   const ou = (dn: string, extra = {}): Promise<unknown> =>
     plain.ldap
       .add(dn, {
@@ -106,6 +117,10 @@ describe('Twake group routes and the caller', function () {
         [ADMIN]: { [orgs]: { read: true, write: true, delete: true } },
         // The narrower branch first: an entry below both takes the rule of
         // the first branch holding it
+        [MANAGER]: {
+          [groupBase('acme')]: { read: true, write: true, delete: true },
+          [orgDn('acme')]: { read: true, write: false, delete: false },
+        },
         [NO_USERS]: {
           [users('acme')]: { read: false, write: false, delete: false },
           [orgDn('acme')]: { read: true, write: false, delete: false },
@@ -313,18 +328,22 @@ describe('Twake group routes and the caller', function () {
     expect(answers[0].status, JSON.stringify(answers[0].body)).to.equal(403);
     sameAnswers(answers);
   });
+  it('leaves a group unlinked when no model judges by attachment, for a manager of the groups branch to create', async () => {
+    const res = await request
+      .post(route('acme'))
+      .set(as(MANAGER))
+      .send({ name: 'Managed group' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    expect(
+      await linkOf(`cn=${res.body.id},${groupBase('acme')}`)
+    ).to.deep.equal([]);
+  });
+
   // A model judging entries by their organization link: a group carrying
   // none would be every administrator's
   describe('judged by attachment', () => {
     let server: DM;
     let attached: ReturnType<typeof supertest>;
-    const linkOf = async (dn: string): Promise<unknown> =>
-      (
-        (await plain.ldap.search(
-          { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
-          dn
-        )) as { searchEntries: Record<string, unknown>[] }
-      ).searchEntries[0]?.twakeDepartmentLink;
 
     before(async function () {
       this.timeout(20000);
@@ -373,6 +392,69 @@ describe('Twake group routes and the caller', function () {
       await waitFor(async () => (await linkOf(moved)) === orgDn('mine'), {
         what: 'the moved group to follow its organization',
       });
+    });
+
+    it('refuses a group linked to another organization than its branch', async () => {
+      let refused: unknown;
+      await server.ldap
+        .add(`cn=tgz-elsewhere,${groupBase('acme')}`, {
+          objectClass: ['top', 'groupOfNames', 'twakeGroup'],
+          cn: 'tgz-elsewhere',
+          member: `uid=${MEMBER},${users('acme')}`,
+          twakeDepartmentLink: orgDn('mine'),
+        })
+        .catch(err => (refused = err));
+      expect((refused as { statusCode?: number })?.statusCode).to.equal(400);
+    });
+  });
+  // A plugin judging every read made for the request, the server's own
+  // included: creating a group must not need any read beyond the caller's
+  describe('with a token of authzDynamic', () => {
+    const TOKEN = 'tgz-token-value';
+    let tokens: string;
+    let dynamic: ReturnType<typeof supertest>;
+
+    before(async function () {
+      this.timeout(20000);
+      tokens = `ou=tgz-tokens,${process.env.DM_LDAP_BASE}`;
+      previous.DM_AUTHZ_DYNAMIC_BASE = process.env.DM_AUTHZ_DYNAMIC_BASE;
+      process.env.DM_AUTHZ_DYNAMIC_BASE = tokens;
+      await ou(tokens);
+      await plain.ldap.delete(`cn=tgz-app,${tokens}`).catch(() => undefined);
+      await plain.ldap.add(`cn=tgz-app,${tokens}`, {
+        objectClass: ['top', 'inetOrgPerson'],
+        cn: 'tgz-app',
+        sn: 'tgz-app',
+        userPassword: ssha(TOKEN),
+        description: JSON.stringify({
+          tenant: 'tgz-app',
+          bases: [{ dn: orgs, read: true, write: true, delete: true }],
+        }),
+      });
+      const server = new DM();
+      Object.assign(server.config, twakeConfig());
+      await server.ready;
+      const plugin = new AuthzDynamic(server);
+      await server.registerPlugin('authzDynamic', plugin);
+      await server.registerPlugin('core/twake/groups', new TwakeGroups(server));
+      await plugin.reload();
+      server.setupErrorMiddleware();
+      dynamic = supertest(server.app);
+    });
+
+    after(async () => {
+      await plain.ldap.delete(`cn=tgz-app,${tokens}`).catch(() => undefined);
+      await plain.ldap.delete(tokens).catch(() => undefined);
+    });
+
+    it('creates a group', async () => {
+      for (const name of ['Token group', 'Token group 2']) {
+        const res = await dynamic
+          .post(route('acme'))
+          .set('Authorization', `Bearer ${TOKEN}`)
+          .send({ name });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+      }
     });
   });
 });

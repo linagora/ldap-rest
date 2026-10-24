@@ -13,14 +13,17 @@ with `core/twake/groups` (and `core/twake/spaces`, which goes through it).
 
 The `/organizations/{id}/groups` and `/organizations/{id}/spaces` routes read
 as the caller. A client calling them must be granted read access to the
-organization, its groups and its users, and write access to change them. An
-organization it cannot read answers `404`, and a user it cannot read
-`404 USER_NOT_FOUND` where it used to get `403`.
+organization, its groups and its users, write access to change them and
+delete access to delete one. An organization it cannot read answers `404`,
+and a user it cannot read `404 USER_NOT_FOUND` where it used to get `403`.
 
-Groups written in an organization's branch now carry its link
-(`--ldap-organization-link-attribute`). Under `core/auth/authzLinid1` or
-`--authz-filter-attached-entries`, a group without one is read and changed by
-every administrator: link the groups written before, for instance:
+Under `core/auth/authzLinid1` or `--authz-filter-attached-entries`, groups
+written in an organization's branch now carry its link
+(`--ldap-organization-link-attribute`): creating or changing a group needs
+write on the organization, and a group without a link is read and changed by
+every administrator. Link the groups written before; this script is an
+example to adapt to your patterns, attribute names and organization names
+(it expects plain ones, without spaces or commas):
 
 ```sh
 # Connection to the directory, as for any ldapsearch
