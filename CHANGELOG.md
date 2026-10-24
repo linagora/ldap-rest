@@ -176,6 +176,7 @@
   (`DM_APP_ACCOUNTS_USER_ATTRIBUTE`) sets the attribute the `:user` of the
   routes is matched against, the mail attribute by default. It could only
   be set in a plugin's own configuration
+  ([#400](https://github.com/linagora/ldap-rest/pull/400))
 
 ## v0.26.0 (2026-10-23)
 
