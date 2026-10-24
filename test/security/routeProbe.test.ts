@@ -13,8 +13,10 @@
  * - no answer, listings included, may carry what was read from the
  *   targets: their secret marker.
  *
- * Bulk import names its targets in the rows of a file, not in a path: its
- * routes are listed here, and its rows probed by `bulkImportAuthz`.
+ * Only the targets a route names in its path are varied. Those carried in
+ * a body or a query — a member, a link, a name to be taken — are not yet
+ * (#396). Bulk import names its targets in the rows of a file: its routes
+ * are listed here, and its rows probed by `bulkImportAuthz`.
  *
  * An administrator holding everything is probed too, and must see the
  * difference: the probe does find one where there is one.
@@ -152,7 +154,7 @@ const TRANSIT_ALLOWED: Record<string, string> = {
       'DELETE /api/v1/organizations/:id/spaces/:spaceId/groups/:groupId',
     ].map(route => [
       route,
-      'a space carries no link: every administrator reads it',
+      'a space carries no link: every administrator reads it, its members’ usernames included',
     ])
   ),
   ...Object.fromEntries(
@@ -626,7 +628,20 @@ for (const model of MODELS)
         [policyDn, 'base'],
       ] as [string, 'sub' | 'base'][]) {
         const found = (await server.ldap
-          .search({ paged: false, scope, attributes: ['*'] }, branch)
+          .search(
+            {
+              paged: false,
+              scope,
+              // And what the password routes write, which `*` leaves out
+              attributes: [
+                '*',
+                'pwdPolicySubentry',
+                'pwdAccountLockedTime',
+                'pwdFailureTime',
+              ],
+            },
+            branch
+          )
           .catch(() => ({ searchEntries: [] }))) as SearchResult;
         for (const entry of found.searchEntries) out[String(entry.dn)] = entry;
       }
