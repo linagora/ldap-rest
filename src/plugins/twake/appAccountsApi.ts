@@ -334,17 +334,19 @@ export default class AppAccountsApi extends DmPlugin {
     // The applicative branch lives under ldap_base and its entries (the
     // principal account and the app accounts) carry the same mail, so exclude
     // them: only a real user entry can be the principal.
-    const entries = ((result as SearchResult).searchEntries || []).filter(
+    let entries = ((result as SearchResult).searchEntries || []).filter(
       entry => !isDnInBranch(entry.dn, this.applicativeAccountBase)
     );
 
     // Found as the server, across branches: a user the caller cannot read
-    // gets the answer a user that is not there gets
-    if (
-      entries.length === 0 ||
-      (entries.length === 1 &&
-        !(await this.server.ldap.readableBy(String(entries[0].dn), req)))
-    ) {
+    // gets the answer a user that is not there gets. Counted among those it
+    // can read only, or a duplicate would tell it the identity exists.
+    const readable: typeof entries = [];
+    for (const entry of entries)
+      if (await this.server.ldap.readableBy(String(entry.dn), req))
+        readable.push(entry);
+    entries = readable;
+    if (entries.length === 0) {
       res.status(404).json({ error: `User ${principal} not found` });
       return null;
     }
@@ -758,6 +760,10 @@ export default class AppAccountsApi extends DmPlugin {
           this.logger.warn(
             `${this.name}: Password of ${uid} was already absent from principal account ${principalDn}, resuming deletion`
           );
+        } else if (answeredRefusal(error, res)) {
+          // A caller who may delete the account but not change the
+          // principal: refused, the account kept
+          return;
         } else {
           // Keep the app account: leaving it in place makes the call replayable
           // once the cause is fixed, whereas deleting it would strand a working

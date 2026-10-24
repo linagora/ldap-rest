@@ -13,6 +13,10 @@
  * (the James quota, the app accounts) answer 404 for an entry the caller
  * cannot read, as for one that is not there.
  */
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { expect } from 'chai';
 import nock from 'nock';
 import supertest from 'supertest';
@@ -74,8 +78,10 @@ describe('Authorization before the checks that read the directory', function () 
     base = process.env.DM_LDAP_BASE as string;
     users = `ou=users,${base}`;
     groups = process.env.DM_LDAP_GROUP_BASE as string;
-    ownOrg = `ou=AbcOwnOrg,${base}`;
-    otherOrg = `ou=AbcOtherOrg,${base}`;
+    // Under the top organization, where an organization link may point
+    const top = process.env.DM_LDAP_TOP_ORGANIZATION || base;
+    ownOrg = `ou=AbcOwnOrg,${top}`;
+    otherOrg = `ou=AbcOtherOrg,${top}`;
     holderDn = `uid=${HOLDER},${users}`;
     groupDn = `cn=${GROUP},${groups}`;
     for (const k of [
@@ -163,6 +169,11 @@ describe('Authorization before the checks that read the directory', function () 
     }
   };
 
+  /** The refusals, which must not tell an entry there from one that is not */
+  const sameAnswers = (bodies: unknown[]): void => {
+    expect(new Set(bodies.map(body => JSON.stringify(body))).size).to.equal(1);
+  };
+
   describe('writes', () => {
     let server: DM;
     let request: ReturnType<typeof supertest>;
@@ -212,13 +223,16 @@ describe('Authorization before the checks that read the directory', function () 
     const as = (user: string) => ({ 'X-Test-User': user });
 
     it('refuses a rename the same way whether the entry is there or not', async () => {
+      const bodies: unknown[] = [];
       for (const id of [HOLDER, 'abc.nobody']) {
         const res = await request
           .post(`/api/v1/ldap/users/${id}/rename`)
           .set(as(OUTSIDER))
           .send({ newId: 'abc.renamed' });
         expect(res.status, `${id}: ${JSON.stringify(res.body)}`).to.equal(403);
+        bodies.push(res.body);
       }
+      sameAnswers(bodies);
       // Allowed, the caller gets the route's own answer
       const res = await request
         .post('/api/v1/ldap/users/abc.nobody/rename')
@@ -243,12 +257,38 @@ describe('Authorization before the checks that read the directory', function () 
     });
 
     it('refuses a group move the same way whether the group is there or not', async () => {
+      const bodies: unknown[] = [];
       for (const cn of [GROUP, 'abc-nogroup']) {
         const res = await request
           .post(`/api/v1/ldap/groups/${cn}/move`)
           .set(as(OUTSIDER))
           .send({ targetOrgDn: otherOrg });
         expect(res.status, `${cn}: ${JSON.stringify(res.body)}`).to.equal(403);
+        bodies.push(res.body);
+      }
+      sameAnswers(bodies);
+    });
+
+    it('judges a group with the default attributes it is written with', async () => {
+      // A default organization link puts every new group in the outsider's
+      // organization: judged without it, the creation was refused
+      const saved = server.config.group_default_attributes;
+      const savedClass = server.config.group_class;
+      server.config.group_default_attributes = { twakeDepartmentLink: ownOrg };
+      // A class allowing the link, which a default does not bring
+      server.config.group_class = ['top', 'groupOfNames', 'twakeStaticGroup'];
+      try {
+        const res = await request
+          .post('/api/v1/ldap/groups')
+          .set(as(OUTSIDER))
+          .send({ cn: 'abc-defaultgroup' });
+        expect(res.status, JSON.stringify(res.body)).to.be.within(200, 201);
+      } finally {
+        server.config.group_default_attributes = saved;
+        server.config.group_class = savedClass;
+        await plain.ldap
+          .delete(`cn=abc-defaultgroup,${groups}`)
+          .catch(() => undefined);
       }
     });
 
@@ -262,23 +302,29 @@ describe('Authorization before the checks that read the directory', function () 
     });
 
     it('refuses an organization move the same way whether it is there or not', async () => {
+      const bodies: unknown[] = [];
       for (const dn of [otherOrg, `ou=AbcNowhere,${base}`]) {
         const res = await request
           .post(`/api/v1/ldap/organizations/${encodeURIComponent(dn)}/move`)
           .set(as(OUTSIDER))
           .send({ targetOrgDn: ownOrg });
         expect(res.status, `${dn}: ${JSON.stringify(res.body)}`).to.equal(403);
+        bodies.push(res.body);
       }
+      sameAnswers(bodies);
     });
 
     it('refuses to erase a tombstone before saying whether there is one', async () => {
+      const bodies: unknown[] = [];
       for (const dn of [holderDn, `uid=abc.nobody,${users}`]) {
         const res = await request
           .post('/api/v1/twake/tombstones/erase')
           .set(as(OUTSIDER))
           .send({ dn });
         expect(res.status, `${dn}: ${JSON.stringify(res.body)}`).to.equal(403);
+        bodies.push(res.body);
       }
+      sameAnswers(bodies);
       const res = await request
         .post('/api/v1/twake/tombstones/erase')
         .set(as(ADMIN))
@@ -349,6 +395,27 @@ describe('Authorization before the checks that read the directory', function () 
       expect(allowed.status, JSON.stringify(allowed.body)).to.equal(200);
     });
 
+    it('refuses to create or delete an app account before saying it is there', async () => {
+      const created = await request
+        .post(`/api/v1/users/${HOLDER}@test.org/app-accounts`)
+        .set('X-Test-User', OUTSIDER)
+        .set('Accept', 'application/json')
+        .send({ name: 'probe' });
+      expect(created.status, JSON.stringify(created.body)).to.equal(404);
+      expect(created.body).to.not.have.property('pwd');
+
+      const bodies: unknown[] = [];
+      for (const uid of ['abc_test_org_c00000001', 'abc_nobody']) {
+        const res = await request
+          .delete(`/api/v1/users/${HOLDER}@test.org/app-accounts/${uid}`)
+          .set('X-Test-User', OUTSIDER)
+          .set('Accept', 'application/json');
+        expect(res.status, `${uid}: ${JSON.stringify(res.body)}`).to.equal(403);
+        bodies.push(res.body);
+      }
+      sameAnswers(bodies);
+    });
+
     it('answers the app accounts of an account the caller cannot read as of none', async () => {
       const res = await request
         .get(`/api/v1/users/${HOLDER}@test.org/app-accounts`)
@@ -361,6 +428,59 @@ describe('Authorization before the checks that read the directory', function () 
         .set('X-Test-User', ADMIN)
         .set('Accept', 'application/json');
       expect(allowed.status, JSON.stringify(allowed.body)).to.equal(200);
+    });
+  });
+  describe('a generated identifier', () => {
+    let server: DM;
+    let request: ReturnType<typeof supertest>;
+    let dir: string;
+
+    // The Twake users schema, refusing a collision instead of suffixing it
+    before(async function () {
+      this.timeout(20000);
+      const schema = JSON.parse(
+        readFileSync('./static/schemas/twake/users.json', 'utf8')
+      ) as { attributes: Record<string, { generatedFrom?: object }> };
+      schema.attributes.uid.generatedFrom = {
+        ...schema.attributes.uid.generatedFrom,
+        onCollision: 'error',
+      };
+      dir = mkdtempSync(join(tmpdir(), 'abc-schema-'));
+      writeFileSync(join(dir, 'users.json'), JSON.stringify(schema));
+      server = new DM();
+      await server.ready;
+      server.config.ldap_flat_schema = [join(dir, 'users.json')];
+      await server.registerPlugin('testAuth', new TestAuthPlugin(server));
+      await server.registerPlugin(
+        'ldapFlatGeneric',
+        new LdapFlatGeneric(server)
+      );
+      await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
+      server.setupErrorMiddleware();
+      request = supertest(server.app);
+    });
+
+    after(() => rmSync(dir, { recursive: true, force: true }));
+
+    const create = (user: string): Promise<supertest.Response> =>
+      request
+        .post('/api/v1/ldap/users')
+        .set('X-Test-User', user)
+        .send({
+          givenName: 'Abc',
+          sn: 'Probe',
+          displayName: 'Abc Probe',
+          // Derives the holder's uid
+          mail: `${HOLDER}@other.test.org`,
+          employeeNumber: 'ABC003',
+          twakeDepartmentLink: otherOrg,
+        });
+
+    it('refuses a creation before saying the derived name is taken', async () => {
+      const res = await create(OUTSIDER);
+      expect(res.status, JSON.stringify(res.body)).to.equal(403);
+      const allowed = await create(ADMIN);
+      expect(allowed.status, JSON.stringify(allowed.body)).to.equal(409);
     });
   });
 });

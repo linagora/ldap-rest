@@ -969,6 +969,13 @@ class ldapActions {
     hook: H,
     args: Parameters<NonNullable<Hooks[H]>>[0]
   ): Promise<void> {
+    // The DNs as the operation completes them before its hooks see them
+    const [target, ...rest] = args as unknown[];
+    const judged: unknown[] =
+      hook === 'ldapdeleterequest'
+        ? [[target].flat().map(dn => this.setDn(String(dn))), ...rest]
+        : [this.setDn(String(target)), ...rest];
+    if (hook === 'ldaprenamerequest') judged[1] = this.setDn(String(judged[1]));
     const judges = (this.parent.hooks[hook] ?? []).filter(fn => {
       const owner = hookOwner(fn);
       return Boolean(
@@ -976,7 +983,7 @@ class ldapActions {
         this.parent.loadedPlugins[owner.plugin]?.roles?.includes('authz')
       );
     });
-    await launchHooksChained(judges, args);
+    await launchHooksChained(judges, judged as typeof args);
   }
 
   /**
