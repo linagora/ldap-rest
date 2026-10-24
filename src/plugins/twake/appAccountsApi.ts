@@ -304,8 +304,9 @@ export default class AppAccountsApi extends DmPlugin {
    * `:user` is matched against the configured resolution attribute
    * (`app_accounts_user_attribute`, default the mail attribute). Mail is
    * globally unique; resolving by the LDAP `uid` instead is only safe when uid
-   * is unique directory-wide, as the same `uid` may repeat under different
-   * subtrees and resolve to an arbitrary same-named user (see #88).
+   * is unique directory-wide: a `uid` repeated under different subtrees is
+   * answered 409 when the caller reads several of its holders, and resolves
+   * to the one it reads otherwise (see #88).
    *
    * On failure (no match, or an ambiguous one) this writes the HTTP error
    * response and returns null, so callers can simply `return` when it does.
