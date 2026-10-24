@@ -623,21 +623,73 @@ export function isChildOf(dn: string, parentDn: string): boolean {
   return beforeParent.endsWith(',');
 }
 
+/** A DN value's escapes: a run of hex pairs, or one escaped character. */
+const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
+
 /**
- * One spelling for an escaped printable ASCII character of a DN value: the
- * directory answers `ou=Sales\2C EMEA` for what a configuration writes
- * `ou=Sales\, EMEA`. A special character keeps its backslash, any other is
- * written plain; spaces, `#` and multi-byte sequences are left as they are.
+ * One spelling for an escaped character of a DN value: the directory
+ * answers `ou=Sales\2C EMEA` for what a configuration writes
+ * `ou=Sales\, EMEA`, `\20` for `\ `, and `\C3\A9` for `é`. A special
+ * character keeps its backslash; any other, a space or `#` included, is
+ * written plain. Hex pairs that are not UTF-8, or spell a control
+ * character, are left as they are.
  */
 function canonicalEscapes(value: string): string {
   if (!value.includes('\\')) return value;
-  return value.replace(/\\([0-9a-fA-F]{2})|\\([^])/g, (whole, hex, char) => {
-    if (char !== undefined) return whole;
-    const code = parseInt(hex as string, 16);
-    if (code <= 0x20 || code === 0x23 || code > 0x7e) return whole;
-    const decoded = String.fromCharCode(code);
-    return ',+"\\<>;='.includes(decoded) ? `\\${decoded}` : decoded;
+  return value.replace(DN_ESCAPE, (whole, hex, char) => {
+    let decoded: string;
+    if (char !== undefined) decoded = char as string;
+    else {
+      const bytes = (hex as string)
+        .split('\\')
+        .filter(Boolean)
+        .map(pair => parseInt(pair, 16));
+      try {
+        decoded = new TextDecoder('utf-8', { fatal: true }).decode(
+          Uint8Array.from(bytes)
+        );
+      } catch {
+        // Not UTF-8: the ASCII pairs alone are read
+        return bytes
+          .map(byte =>
+            byte >= 0x20 && byte < 0x7f
+              ? plainOrEscaped(String.fromCharCode(byte))
+              : `\\${byte.toString(16).padStart(2, '0')}`
+          )
+          .join('');
+      }
+      // eslint-disable-next-line no-control-regex
+      if (/[\u0000-\u001f\u007f]/.test(decoded)) return whole.toLowerCase();
+    }
+    return [...decoded].map(plainOrEscaped).join('');
   });
+}
+
+/** A DN value's character as {@link canonicalEscapes} spells it. */
+function plainOrEscaped(char: string): string {
+  return ',+"\\<>;='.includes(char) ? `\\${char}` : char;
+}
+
+/**
+ * The attribute-value assertions of an RDN: split on the `+` that are not
+ * escaped, as `parseDn` splits a DN on its commas.
+ */
+function splitRdn(rdn: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let escaped = false;
+  for (const char of rdn) {
+    if (escaped) escaped = false;
+    else if (char === '\\') escaped = true;
+    else if (char === '+') {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+  return parts;
 }
 
 /**
@@ -673,8 +725,7 @@ export function normalizeDn(dn: string): string {
 function normalizedRdns(dn: string): string[] {
   return parseDn(dn)
     .map(rdn =>
-      rdn
-        .split('+')
+      splitRdn(rdn)
         .map(atav => {
           // Split on the first `=` (the type/value separator — attribute types
           // never contain `=`, and value `=` are escaped as `\=`) and trim each

@@ -344,9 +344,40 @@ describe('LDAP Utils', () => {
         'cn=smith\\, john,ou=users'
       );
     });
+
+    it('spells an escape one way, whatever the directory wrote', () => {
+      for (const [a, b] of [
+        ['ou=Sales\\2C EMEA', 'ou=Sales\\, EMEA'],
+        ['ou=Sales\\20EMEA', 'ou=Sales EMEA'],
+        ['ou=\\23Sales', 'ou=\\#Sales'],
+        ['ou=Sales\\2B EMEA', 'ou=Sales\\+ EMEA'],
+        ['ou=caf\\C3\\A9', 'ou=café'],
+        ['ou=a\\4D', 'ou=aM'],
+        // Not UTF-8: the ASCII pair is still read
+        ['ou=x\\FF\\2C', 'ou=x\\ff\\,'],
+      ])
+        expect(normalizeDn(a), a).to.equal(normalizeDn(b));
+    });
+
+    it('keeps an escaped backslash apart from the hex that follows', () => {
+      expect(normalizeDn('ou=a\\5c2C')).to.equal(normalizeDn('ou=a\\\\2C'));
+      expect(normalizeDn('ou=a\\5c2C')).to.not.equal(normalizeDn('ou=a\\,'));
+    });
+
+    it('splits a multi-valued RDN on unescaped plus signs only', () => {
+      expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn=b,dc=x');
+      expect(normalizeDn('sn=b+cn=a,dc=x')).to.equal('cn=a+sn=b,dc=x');
+    });
   });
 
   describe('isDnInBranch', () => {
+    it('does not read an escaped comma as a separator', () => {
+      expect(isDnInBranch('cn=x\\2Cou=pub,ou=acme', 'ou=pub,ou=acme')).to.equal(
+        false
+      );
+      expect(isDnInBranch('cn=x\\2Cou=pub,ou=acme', 'ou=acme')).to.equal(true);
+    });
+
     it('should return true for a descendant', () => {
       expect(
         isDnInBranch(

@@ -13,11 +13,11 @@
   case and spacing. `default` is a fallback rather than a floor: a rule
   refusing a permission is no longer overridden by it. A branch a rule
   names can no longer be renamed or moved out of that rule by a caller it
-  refuses, judged by branch or by attachment. Judged by branch, a write
-  setting the organization link and anything else needs write in the
-  branch of the entry: one carrying a password change went through with
-  read there. A DN the directory spells with hex escapes (`\2C`) matches
-  a rule written with `\,`,
+  refuses, judged by branch or by attachment, nor created where it
+  refuses writing. A write setting the organization link and anything else
+  needs write where the entry stands: one carrying a password change went
+  through with read there. A DN the directory spells with hex escapes
+  (`\2C`, `\20`, `\C3\A9`) matches a rule written plain or with `\,`,
   [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
   [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
   ([#388](https://github.com/linagora/ldap-rest/pull/388))

@@ -356,6 +356,76 @@ describe('Branch rule precedence', function () {
         }
       });
 
+      it('holds what a link write carries, judged by attachment too', async () => {
+        plugin.authConfig = {
+          default: { read: false, write: false, delete: false },
+          users: {
+            [USER]: {
+              [acme]: { read: true, write: false, delete: false },
+              [payroll]: { read: true, write: true, delete: true },
+            },
+          },
+          groups: {},
+        };
+        const link = server.config.ldap_organization_link_attribute as string;
+        const req = { user: USER, headers: {} } as unknown as DmRequest;
+        // Attached to `acme`: one attached to nothing is in transit, and any
+        // administrator claims it
+        const linked = `uid=prec-linked,${acme}`;
+        await server.ldap.add(linked, {
+          objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
+          uid: 'prec-linked',
+          cn: 'prec-linked',
+          sn: 'prec-linked',
+          [link]: acme,
+        });
+        const previousMode = server.config.authz_filter_attached_entries;
+        server.config.authz_filter_attached_entries = true;
+        try {
+          let error: unknown;
+          await plugin.hooks
+            .ldapmodifyrequest([
+              linked,
+              { replace: { [link]: payroll, userPassword: 'Secret123!' } },
+              0,
+              req,
+            ])
+            .catch((err: unknown) => (error = err));
+          expect(String(error)).to.match(/forbidden/i);
+          await plugin.hooks.ldapmodifyrequest([
+            linked,
+            { replace: { [link]: payroll } },
+            0,
+            req,
+          ]);
+        } finally {
+          server.config.authz_filter_attached_entries = previousMode;
+          await server.ldap.delete(linked).catch(() => undefined);
+        }
+      });
+
+      it('refuses to create an entry where a rule refuses writing', async () => {
+        plugin.authConfig = {
+          default: { read: false, write: false, delete: false },
+          users: {
+            [USER]: {
+              [acme]: { read: true, write: true, delete: true },
+              [`ou=precnew,${acme}`]: { read: true, write: false },
+            },
+          },
+          groups: {},
+        };
+        let error: unknown;
+        await plugin.hooks
+          .ldapaddrequest([
+            `ou=precnew,${acme}`,
+            { objectClass: ['top', 'organizationalUnit'], ou: 'precnew' },
+            { user: USER, headers: {} } as unknown as DmRequest,
+          ])
+          .catch((err: unknown) => (error = err));
+        expect(String(error)).to.match(/forbidden/i);
+      });
+
       it('lets a group grant what the user rule refuses', async () => {
         const group = `cn=precgroup,${base}`;
         (plugin as unknown as Record<string, unknown>).getUserGroups = () =>

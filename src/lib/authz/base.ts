@@ -936,11 +936,12 @@ export default abstract class AuthzBase extends DmPlugin {
             );
           }
         }
-        // Judged by branch, the link does not say who holds the entry: what
-        // the write carries besides the link and its path, a password say,
-        // is still a write in its branch
-        if (!byAttachment && !this.onlyRelinks(changes)) {
-          const branch = this.extractBranchDn(dn);
+        // What the write carries besides the link and its path, a password
+        // say, is a write on the entry where it stands: in its branch, or,
+        // judged by attachment, in the organization it leaves. Claimed from
+        // transit, it lands in the destination, already judged on write.
+        if (!fromTransit && !this.onlyRelinks(changes)) {
+          const branch = byAttachment ? sourceBranch : this.extractBranchDn(dn);
           if (!(await this.getUserPermissions(user, branch)).write)
             throw new Error(
               `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branch}`
@@ -1023,6 +1024,12 @@ export default abstract class AuthzBase extends DmPlugin {
           `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
         );
       }
+      // Nor where a rule refuses it, at the very DN created
+      const named = await this.refusingRule(user, dn, ['write'], false);
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        );
 
       const domainAttr = this.domainLinkAttribute();
       if (domainAttr)

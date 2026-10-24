@@ -29,11 +29,12 @@ default's, not the broader rule's.
 Renaming or moving an entry a rule names, or one holding such an entry, now
 needs read and write permission at each of those rules, and deleting it
 needs delete there; changing the entry itself needs that rule's write
-permission. Judged by branch, a write setting the organization link and
-changing anything besides the link and its path needs write in the branch
-of the entry: it used to need only read where the entry was attached, so
-the rest of the write — a password, say — went through. Moving an entry
-between organizations is unchanged.
+permission, as does creating it. A write setting the organization link and
+changing anything besides the link and its path needs write where the
+entry stands — its branch, or under `--authz-filter-attached-entries` the
+organization it leaves: it used to need only read there, so the rest of
+the write — a password, say — went through. Moving an entry between
+organizations is unchanged.
 
 ### Organization groups need read access to the organization
 
