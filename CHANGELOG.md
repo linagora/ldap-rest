@@ -11,7 +11,7 @@
   every caller, or every authenticated caller, has every right,
   [docs](docs/usage/plugins/auth/README.md#what-is-refused-at-startup),
   [upgrading](docs/usage/upgrading.md#an-authorization-plugin-needs-an-authentication-plugin)
-  ([#385](https://github.com/linagora/ldap-rest/issues/385))
+  ([#390](https://github.com/linagora/ldap-rest/pull/390))
 
 - `core/auth/authzPerBranch`: among one user's or one group's rules, the
   most specific branch now applies, whatever order the rules are written
