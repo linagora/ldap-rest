@@ -758,10 +758,14 @@ export default class LdapEnterpriseRules extends DmPlugin {
     };
     // Compared as stored, exactly: whether two spellings are one value is
     // the attribute's matching rule, which this cannot read
+    // Under every spelling the directory answers, options included
+    const checked = new Set(
+      attributes.filter(covers).map(a => a.toLowerCase())
+    );
     const held = new Set(
-      current
-        ? attributes.filter(covers).flatMap(a => valueList(current[a]))
-        : []
+      Object.entries(current || {})
+        .filter(([key]) => checked.has(key.split(';')[0].toLowerCase()))
+        .flatMap(([, value]) => valueList(value))
     );
 
     for (const value of values) {

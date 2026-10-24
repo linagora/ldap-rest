@@ -506,6 +506,38 @@ describe('Enterprise rules', () => {
         }
       });
 
+      it('should read the values held under an option of the attribute', async () => {
+        const copies = `ou=rulescopies,${base}`;
+        const copy = `uid=rules.uniq@example.com,${copies}`;
+        const self = `uid=rules.uniq,ou=users,${base}`;
+        await server.ldap
+          .add(copies, { objectClass: ['top', 'organizationalUnit'] } as never)
+          .catch(() => undefined);
+        try {
+          await create('rules.uniq@example.com').expect(201);
+          // As another tool may store it: the address under a tagged name
+          await server.ldap.modify(self, {
+            delete: { mail: 'rules.uniq@example.com' },
+            add: { 'mail;lang-en': 'rules.uniq@example.com' },
+          } as never);
+          await server.ldap.add(copy, {
+            objectClass: ['top', 'twakeAccount'],
+            uid: 'rules.uniq@example.com',
+            mail: 'rules.uniq@example.com',
+          } as never);
+          const res = await request
+            .put('/api/v1/ldap/users/rules.uniq')
+            .type('json')
+            .send({
+              replace: { mail: 'rules.uniq@example.com', sn: 'Changed' },
+            });
+          expect(res.status, JSON.stringify(res.body)).to.equal(200);
+        } finally {
+          await server.ldap.delete(copy).catch(() => undefined);
+          await server.ldap.delete(copies).catch(() => undefined);
+        }
+      });
+
       it('should still refuse a value the entry does not hold', async () => {
         await create('rules.uniq@example.com').expect(201);
         await create('rules.other@example.com').expect(201);

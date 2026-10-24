@@ -127,7 +127,7 @@
   answered `409 … is already used` once `appAccountsConsistency` had made
   its applicative entry, which carries the same mail. A value the entry
   already holds, as stored, is no longer looked for on an update; only the
-  values it does not hold yet are
+  values it does not hold yet are looked for
   ([#402](https://github.com/linagora/ldap-rest/issues/402))
 
 - `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
