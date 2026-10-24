@@ -155,10 +155,9 @@ export default [
   },
 
   // The SCIM plugin serves identity providers, and every operation it makes
-  // must reach the authorization hooks. `ldapActions`'s own methods take the
-  // request as a trailing optional argument, so forgetting it silently skips
-  // authorization — three such bugs have shipped here. Bind the request once
-  // with `ldap.forRequest(req)` and the omission stops being expressible.
+  // is judged by the request it is made for. Bind the request once with
+  // `ldap.forRequest(req)`, so each operation names the request it means
+  // rather than relying on the one being served.
   {
     files: ['src/plugins/scim/**/*.ts'],
     rules: {

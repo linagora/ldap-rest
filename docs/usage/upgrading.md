@@ -9,8 +9,9 @@ decision or a configuration change appear here; see the
 ### Plugins: an operation naming no request is judged as the caller
 
 **Who is affected:** a third-party plugin calling `this.server.ldap.search`,
-`add`, `modify`, `rename`, `move` or `delete` without a request, from a
-route, while an authorization plugin is loaded.
+`add`, `modify`, `rename` or `delete` without a request, from a route, while
+an authorization plugin is loaded. `move` is the server's and stays unjudged:
+move an entry for a caller with `rename`.
 
 Such an operation used to pass unjudged, as the server's. While an
 authenticated request is being served, it is now judged as that request's

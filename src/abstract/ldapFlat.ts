@@ -1204,7 +1204,7 @@ export default abstract class LdapFlat extends DmPlugin {
     await this.addEntry(id, additional, req);
     // As the server: the identifier the caller just wrote is answered back
     // to them, whether or not they may read the branch it went to — that
-    // only, as before. By its DN: the name may be another entry's elsewhere.
+    // only. By its DN: the name may be another entry's elsewhere.
     const written = (await this.ldap.system.search(
       { paged: false, scope: 'base', attributes: [this.mainAttribute] },
       this.resolveDn(id)
@@ -1854,10 +1854,8 @@ export default abstract class LdapFlat extends DmPlugin {
   ): Promise<LdapList> {
     // An identifier the schema admits has to survive the trip: the shipped
     // position and group schemas accept `( )` and `*`, which a raw
-    // interpolation turns into an unparseable filter. `apiAdd` used to
-    // re-read what it wrote through this, and answered a 500 on a creation
-    // that had succeeded. A partial search means the value to look for, not
-    // a pattern to run.
+    // interpolation turns into an unparseable filter. A partial search means
+    // the value to look for, not a pattern to run.
     const escaped = escapeLdapFilter(name);
     const filter = partial
       ? `(${this.mainAttribute}=*${escaped}*)`

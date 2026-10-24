@@ -4,10 +4,10 @@
 
 ### Security
 
-- Every directory operation made while serving an authenticated request is
-  judged as its caller, even when the code making it did not hand the
-  request down: a forgotten request used to let the operation through
-  unjudged. `ldap.system` makes an operation as the server, for every
+- A directory search, add, modify, rename or delete made while serving an
+  authenticated request is judged as its caller, even when the code making
+  it did not hand the request down: a forgotten request used to let the
+  operation through unjudged. `ldap.system` makes an operation as the server, for every
   authorization plugin, `authzDynamic` included; hooks act as the server.
   A lint rule refuses an operation naming neither,
   [docs](docs/plugin-development/README.md#using-ldap-operations),

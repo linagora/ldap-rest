@@ -81,11 +81,9 @@ describe('Derived identifiers', function () {
     expect(found.searchEntries).to.have.length(1);
   });
 
-  it('should re-read an identifier carrying filter metacharacters', async () => {
-    // The position schema admits parentheses. Interpolated raw into the
-    // search-back filter they made it unparseable — after the entry was
-    // committed, so the caller got a 500 on a creation that had worked and a
-    // retry then hit a duplicate DN.
+  it('should create and find by name an identifier carrying filter metacharacters', async () => {
+    // The position schema admits parentheses, which a raw interpolation
+    // into a search filter makes unparseable.
     const res = await request
       .post('/api/v1/ldap/positions')
       .type('json')
