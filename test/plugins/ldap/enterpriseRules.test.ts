@@ -538,6 +538,22 @@ describe('Enterprise rules', () => {
         }
       });
 
+      it('should check a value written under another spelling of the attribute', async () => {
+        await create('rules.uniq@example.com').expect(201);
+        await create('rules.other@example.com').expect(201);
+        // Below the API, which a strict schema guards: what another plugin
+        // or a non-strict schema lets through
+        for (const name of ['MAIL', 'mail;lang-en'])
+          await server.ldap
+            .modify(`uid=rules.other,ou=users,${base}`, {
+              replace: { [name]: 'rules.uniq@example.com' },
+            } as never)
+            .then(
+              () => expect.fail(`${name} was written`),
+              (err: Error) => expect(err.message).to.match(/already used/)
+            );
+      });
+
       it('should still refuse a value the entry does not hold', async () => {
         await create('rules.uniq@example.com').expect(201);
         await create('rules.other@example.com').expect(201);

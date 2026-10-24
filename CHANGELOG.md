@@ -130,6 +130,14 @@
   values it does not hold yet are looked for
   ([#402](https://github.com/linagora/ldap-rest/issues/402))
 
+- `core/ldap/enterpriseRules`: a write naming an attribute in another case
+  or with an option — `MAIL`, `mail;lang-en` — found no rule under that
+  name, and went through unchecked: uniqueness, mail domains, lifecycle
+  dates. The rule of the attribute applies whatever its spelling. The
+  shipped schemas are strict, so the API refused such names already; the
+  writes of other plugins did not
+  ([#404](https://github.com/linagora/ldap-rest/pull/404))
+
 - `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
   and `…/subnodes/search` looked for the attached entries from the parent of
   the top organization only, and answered 403 to an administrator held to

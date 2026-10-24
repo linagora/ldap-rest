@@ -567,9 +567,14 @@ export default class LdapEnterpriseRules extends DmPlugin {
     values: AttributesList,
     current: AttributesList | null
   ): Promise<void> {
-    for (const [name, value] of Object.entries(values)) {
+    const names = Object.keys(entity.schema.attributes);
+    for (const [key, value] of Object.entries(values)) {
+      // Its rule whatever the spelling: a write to `MAIL` or `mail;lang-en`
+      // is one to `mail`, and found no rule under that name
+      const wanted = key.split(';')[0].toLowerCase();
+      const name = names.find(n => n.toLowerCase() === wanted);
+      if (!name) continue;
       const attr = entity.schema.attributes[name];
-      if (!attr) continue;
       const list = valueList(value);
       if (list.length === 0) continue;
 
