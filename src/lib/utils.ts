@@ -678,6 +678,11 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  * BER form, which is not decoded; one in double quotes (LDAPv2) is read
  * as it stands.
  *
+ * It covers the spellings of the naming attributes, not the whole of RFC
+ * 4518: the authorization hooks judge writes on the DN the directory
+ * returns, and only what does not exist yet — a new DN, a configured
+ * branch — rests on this.
+ *
  * @param raw the value as written, after its `=`
  */
 function canonicalValue(raw: string): string {

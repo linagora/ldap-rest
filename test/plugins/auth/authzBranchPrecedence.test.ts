@@ -474,6 +474,24 @@ describe('Branch rule precedence', function () {
         }
       });
 
+      it('judges an absent entry as spelled, and an unreadable one not at all', async () => {
+        const req = { user: USER, headers: {} } as unknown as DmRequest;
+        // Absent: judged on the spelling given, the write then fails on it
+        await plugin.hooks.ldapdeleterequest([`uid=prec-absent,${acme}`, req]);
+        // Unreadable: refused as the outage it is
+        const search = server.ldap.search.bind(server.ldap);
+        server.ldap.search = () => Promise.reject(new Error('busy'));
+        let error: unknown;
+        try {
+          await plugin.hooks
+            .ldapdeleterequest([`uid=prec-sales,${acme}`, req])
+            .catch((err: unknown) => (error = err));
+        } finally {
+          server.ldap.search = search;
+        }
+        expect((error as { statusCode?: number })?.statusCode).to.equal(503);
+      });
+
       it('lets a group grant what the user rule refuses', async () => {
         const group = `cn=precgroup,${base}`;
         (plugin as unknown as Record<string, unknown>).getUserGroups = () =>

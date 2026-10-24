@@ -22,6 +22,7 @@ import {
   AmbiguousIdentityError,
   BadRequestError,
   ForbiddenError,
+  ServiceUnavailableError,
 } from '../errors';
 import {
   escapeLdapFilter,
@@ -32,7 +33,6 @@ import {
   organizationLink,
   parseDn,
 } from '../utils';
-import { extractLdapCode } from '../ldapCodes';
 
 import { authzFor, servesRequest } from './composition';
 
@@ -246,10 +246,12 @@ export default abstract class AuthzBase extends DmPlugin {
       if (found) return String(found);
     } catch (err) {
       // Any other failure might not stop the write that follows, judged
-      // then on a spelling the rules may not know
-      if (extractLdapCode(err) !== 32)
-        throw new Error(
-          `[authz-forbidden] ${dn} could not be read to be judged: ${String(err)}`
+      // then on a spelling the rules may not know: refused, as the outage
+      // it is rather than a denial. Recognized by its code alone, not by a
+      // message that may echo the DN asked for.
+      if ((err as { code?: unknown })?.code !== 32)
+        throw new ServiceUnavailableError(
+          `${dn} could not be read to be authorized: ${String(err)}`
         );
     }
     return dn;
