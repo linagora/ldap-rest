@@ -723,10 +723,15 @@ export function isDummyMemberDn(
 export function organizationLink(
   value: AttributeValue | undefined
 ): string | undefined {
-  const one = Array.isArray(value) ? value[0] : value;
-  if (one === undefined || one === null) return undefined;
-  const link = String(one);
-  return link.length > 0 ? link : undefined;
+  // The first value that names something: an entry stored with an empty
+  // one beside an organization, before such writes were refused, is that
+  // organization's
+  for (const one of Array.isArray(value) ? value : [value]) {
+    if (one === undefined || one === null) continue;
+    const link = String(one).trim();
+    if (link.length > 0) return link;
+  }
+  return undefined;
 }
 
 /**

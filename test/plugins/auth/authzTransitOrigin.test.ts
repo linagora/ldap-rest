@@ -49,7 +49,7 @@ function originSuite(
     const saved: Record<string, string | undefined> = {};
     const prefix = `origin.${option.toLowerCase()}.${withTransit ? 't' : 'n'}`;
     ctx.uid = (name: string) => `${prefix}.${name}`;
-    const names = ['moved', 'modified', 'loose', 'typed'];
+    const names = ['moved', 'modified', 'loose', 'typed', 'empty'];
 
     before(function () {
       skipIfMissingEnvVars(this, [
@@ -239,6 +239,30 @@ for (const option of [ORIGIN, ORIGIN.toLowerCase()])
       it('claims an entry attached to nothing without an origin', async () => {
         expect((await ctx.move('loose', ctx.backend)).status).to.equal(200);
         expect(await ctx.origin('loose')).to.equal(undefined);
+      });
+
+      it('refuses an empty link value on a modify, and records no origin', async () => {
+        for (const changes of [
+          { replace: { twakeDepartmentLink: '' } },
+          { replace: { twakeDepartmentLink: [''] } },
+          { replace: { twakeDepartmentLink: ['', ctx.transit] } },
+          { replace: { twakeDepartmentLink: [ctx.transit, ''] } },
+          { add: { twakeDepartmentLink: ['', ctx.backend] } },
+        ]) {
+          const res = await ctx.request
+            .put(`/api/v1/ldap/users/${ctx.uid('empty')}`)
+            .set(as(ADMIN))
+            .send(changes);
+          expect(res.status, JSON.stringify(changes)).to.equal(400);
+        }
+        const stored = (await ctx.server.ldap.search(
+          { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+          `uid=${ctx.uid('empty')},${ctx.userBranch}`
+        )) as SearchResult;
+        expect(stored.searchEntries[0]?.twakeDepartmentLink).to.equal(
+          ctx.sales
+        );
+        expect(await ctx.origin('empty')).to.equal(undefined);
       });
 
       it('leaves alone a modify that names the attribute itself', async () => {

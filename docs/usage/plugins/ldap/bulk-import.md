@@ -318,6 +318,26 @@ curl -X POST "http://localhost:8081/api/v1/ldap/bulk-import/users" \
 - Check organization DNs exist
 - Estimate import duration
 
+A dry run is judged as the import is: a row the caller may not write fails,
+and a row updating an existing entry counts as `updated`.
+
+### Authorization
+
+Each row's write is judged by the authorization plugins before anything is
+looked for in the directory: the entry, its organization, whether it exists.
+A row is let through when the caller may create its entry, or change the
+entry it names (an administrator updating the accounts of their organization
+from a file naming none). Otherwise it fails with
+`Token does not have permission on this branch` (`code: forbidden`), whether
+its entry and its organization are there or not.
+
+A row the caller may write tells, as a single creation does, whether its
+identifier is taken: it is then skipped, or updated with `updateExisting`.
+
+The organization link of a row names one organization: a row naming several,
+or holding an empty value (`;` in a cell), fails as invalid, reported in
+`errors` (a 400 answer with `continueOnError=false`).
+
 ### Update Existing Mode
 
 Update entries that already exist:

@@ -13,9 +13,18 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 import { badRequest, serverError } from '../../lib/expressFormatedResponses';
-import { HttpError, type Refusal } from '../../lib/errors';
+import {
+  AUTHZ_REFUSED,
+  HttpError,
+  errorBody,
+  type Refusal,
+} from '../../lib/errors';
 import { loadSchemaFile } from '../../lib/schemaFile';
-import { escapeDnValue, validateDnValue } from '../../lib/utils';
+import {
+  escapeDnValue,
+  isAuthzRefusal,
+  validateDnValue,
+} from '../../lib/utils';
 
 interface BulkImportSchema {
   base?: string;
@@ -92,11 +101,11 @@ interface BulkImportResult {
  *       example: 42
  *     created:
  *       type: integer
- *       description: Entries successfully created (or counted in dry-run).
+ *       description: Entries successfully created (or that would be, in a dry run).
  *       example: 38
  *     updated:
  *       type: integer
- *       description: Existing entries updated.
+ *       description: Existing entries updated (or that would be, in a dry run).
  *       example: 2
  *     skipped:
  *       type: integer
@@ -125,7 +134,8 @@ interface BulkImportResult {
  *             type: string
  *             description: |
  *               `unique` or `mailDomain`, with `attribute`, `value` and
- *               `domains`, as in the `Error` answer of a single write.
+ *               `domains`, as in the `Error` answer of a single write;
+ *               `forbidden` when the caller may not write the row.
  *           attribute: { type: string }
  *           value: { type: string }
  *           domains:
@@ -263,8 +273,9 @@ export default class LdapBulkImport extends DmPlugin {
        *   header) may be provided to set the organization link and path attributes
        *   automatically.
        *
-       *   **Dry-run mode** (`dryRun=true`) validates and counts rows without writing
-       *   to LDAP. `continueOnError` (default `true`) keeps processing subsequent rows
+       *   **Dry-run mode** (`dryRun=true`) validates, judges and counts rows without
+       *   writing to LDAP: a row the caller may not write fails as in an import.
+       *   `continueOnError` (default `true`) keeps processing subsequent rows
        *   after an individual row fails.
        * requestBody:
        *   required: true
@@ -406,9 +417,12 @@ export default class LdapBulkImport extends DmPlugin {
         const record = records[i];
 
         try {
-          const { dn, entry } = await this.processRecord(record, resource);
-
-          // const identifier = entry[resource.mainAttribute];
+          const { dn, entry, orgDn } = this.buildRecord(record, resource);
+          // Judged before the directory is read for the row: whether the
+          // entry or its organization is there is not for a caller who may
+          // not write it. A dry run is judged as the import is.
+          await this.authorizeRow(dn, entry, req);
+          await this.completeRecord(entry, orgDn, resource);
 
           // Check if entry exists
           const exists = await this.entryExists(dn);
@@ -419,7 +433,24 @@ export default class LdapBulkImport extends DmPlugin {
           }
 
           if (dryRun) {
-            result.created++;
+            // The import judges the write itself again: a row let through
+            // for a change it turns out not to be is judged as the creation
+            // it will be, and the other way round
+            if (!exists)
+              await this.server.ldap.authorize('ldapaddrequest', [
+                dn,
+                entry,
+                req,
+              ]);
+            if (exists)
+              await this.server.ldap.authorize('ldapmodifyrequest', [
+                dn,
+                { replace: entry },
+                this.opNumber(),
+                req,
+              ]);
+            if (exists) result.updated++;
+            else result.created++;
             continue;
           }
 
@@ -440,10 +471,16 @@ export default class LdapBulkImport extends DmPlugin {
           result.errors.push({
             line,
             identifier: record[resource.mainAttribute],
-            error: (error as Error).message,
             // What the API answers a single write, for a client to explain
-            // the row as it explains a form
-            ...(error instanceof HttpError ? error.refusal : undefined),
+            // the row as it explains a form. An authorization refusal names
+            // the branch it judged, the organization of an existing entry
+            // among them: the row is told the refusal only.
+            ...(isAuthzRefusal(error)
+              ? errorBody(error, AUTHZ_REFUSED)
+              : {
+                  error: (error as Error).message,
+                  ...(error instanceof HttpError ? error.refusal : undefined),
+                }),
           });
 
           if (!continueOnError) {
@@ -462,12 +499,52 @@ export default class LdapBulkImport extends DmPlugin {
   }
 
   /**
-   * Process a single CSV record
+   * Whether the caller may write a row: create its entry, or change the one
+   * it names. Which of the two the row turns into is known only once the
+   * directory has been read, so the caller is judged first on both.
+   *
+   * The creation alone is not enough: judged by attachment, an entry is
+   * judged on the organization the row links it to, or on its parent when
+   * the row links it to none, while a change is judged on the organization
+   * it is attached to. An administrator updating their own accounts from a
+   * file naming no organization would be refused.
+   *
+   * No oracle: the change is judged on the entry as stored, and an entry
+   * that is not there is judged on its parent, as a creation without a link
+   * is.
+   *
+   * @throws the refusal of the creation when neither is allowed
    */
-  private async processRecord(
+  private async authorizeRow(
+    dn: string,
+    entry: AttributesList,
+    req: Request
+  ): Promise<void> {
+    try {
+      await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
+    } catch (refusal) {
+      if (!isAuthzRefusal(refusal)) throw refusal;
+      try {
+        await this.server.ldap.authorize('ldapmodifyrequest', [
+          dn,
+          { replace: entry },
+          this.opNumber(),
+          req,
+        ]);
+      } catch {
+        throw refusal;
+      }
+    }
+  }
+
+  /**
+   * Build the entry of a CSV record, reading nothing from the directory: the
+   * write it makes is judged on it before anything is looked for.
+   */
+  private buildRecord(
     csvLine: Record<string, string>,
     resource: BulkImportResource
-  ): Promise<{ dn: string; entry: AttributesList }> {
+  ): { dn: string; entry: AttributesList; orgDn?: string } {
     const entry: AttributesList = {};
     const schema = resource.schema;
 
@@ -500,29 +577,16 @@ export default class LdapBulkImport extends DmPlugin {
       }
     }
 
-    // 4. Calculate organizationLink and organizationPath
+    // 4. The organization link; the path, read from the organization, waits
+    // for completeRecord
     if (orgDn) {
       const linkAttr = this.findAttributeByRole(schema, 'organizationLink');
       if (linkAttr) {
         entry[linkAttr] = orgDn;
       }
-
-      const pathAttr = this.findAttributeByRole(schema, 'organizationPath');
-      if (pathAttr) {
-        const org = await this.fetchOrganization(orgDn);
-        const pathValue = org[pathAttr];
-        entry[pathAttr] = Array.isArray(pathValue) ? pathValue[0] : pathValue;
-      }
     }
 
-    // 5. Validate required attributes
-    for (const [attr, def] of Object.entries(schema.properties || {})) {
-      if (def.required === true && !entry[attr]) {
-        throw new Error(`Missing required attribute: ${attr}`);
-      }
-    }
-
-    // 6. Build DN
+    // 5. Build DN
     const mainAttr = resource.mainAttribute;
     const rawMainValue = entry[mainAttr];
     if (!rawMainValue) {
@@ -535,7 +599,32 @@ export default class LdapBulkImport extends DmPlugin {
     validateDnValue(mainValue, mainAttr);
     const dn = `${mainAttr}=${escapeDnValue(mainValue)},${resource.base}`;
 
-    return { dn, entry };
+    return { dn, entry, orgDn };
+  }
+
+  /**
+   * Complete a record once its write has been judged: the organization path,
+   * read from the organization, then the required attributes.
+   */
+  private async completeRecord(
+    entry: AttributesList,
+    orgDn: string | undefined,
+    resource: BulkImportResource
+  ): Promise<void> {
+    const schema = resource.schema;
+    if (orgDn) {
+      const pathAttr = this.findAttributeByRole(schema, 'organizationPath');
+      if (pathAttr) {
+        const org = await this.fetchOrganization(orgDn);
+        const pathValue = org[pathAttr];
+        entry[pathAttr] = Array.isArray(pathValue) ? pathValue[0] : pathValue;
+      }
+    }
+    for (const [attr, def] of Object.entries(schema.properties || {})) {
+      if (def.required === true && !entry[attr]) {
+        throw new Error(`Missing required attribute: ${attr}`);
+      }
+    }
   }
 
   /**

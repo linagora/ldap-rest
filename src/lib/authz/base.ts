@@ -18,7 +18,11 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../ldapActions';
-import { AmbiguousIdentityError, ForbiddenError } from '../errors';
+import {
+  AmbiguousIdentityError,
+  BadRequestError,
+  ForbiddenError,
+} from '../errors';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -550,6 +554,31 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * The organization a write attaches an entry to, among the link values it
+   * gives: one at most. The judgement reads one, so a second would attach
+   * the entry to an organization nobody judged; and an empty value, which
+   * the directory stores, would make the entry read as attached to none.
+   *
+   * @throws BadRequestError when a value is empty or the values name
+   * several organizations
+   */
+  private static organizationLinks(
+    linkAttr: string,
+    values: string[]
+  ): string[] {
+    if (values.some(value => value.trim() === ''))
+      throw new BadRequestError(`${linkAttr} cannot hold an empty value`);
+    const links = [
+      ...new Map(values.map(value => [normalizeDn(value), value])).values(),
+    ];
+    if (links.length > 1)
+      throw new BadRequestError(
+        `${linkAttr} attaches an entry to one organization, not ${links.length}`
+      );
+    return links;
+  }
+
+  /**
    * The values a write gives an attribute, whatever case its name is
    * spelled in.
    */
@@ -719,7 +748,16 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Check if this is a move operation (changing organization link)
       const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && changes.replace?.[linkAttr]) {
+      // Whatever case the write spells the attribute in, and whether it
+      // replaces the link or adds one to an entry that had none: either
+      // attaches the entry to the organization named
+      const newLinks = linkAttr
+        ? AuthzBase.organizationLinks(linkAttr, [
+            ...AuthzBase.valuesOf(changes.replace, linkAttr),
+            ...AuthzBase.valuesOf(changes.add, linkAttr),
+          ])
+        : [];
+      if (linkAttr && newLinks.length > 0) {
         // For move operations, we need to check:
         // 1. Read permission on the source (current location)
         // 2. Write permission on the destination (new location)
@@ -757,10 +795,7 @@ export default abstract class AuthzBase extends DmPlugin {
           // The entry could not be read: its parent branch stands in.
         }
 
-        const newLink = changes.replace[linkAttr];
-        const destBranch = Array.isArray(newLink)
-          ? String(newLink[0])
-          : String(newLink);
+        const destBranch = newLinks[0];
 
         const byAttachment = this.filtersAttachedEntries();
         const fromTransit = byAttachment && read && this.inTransit(storedLink);
@@ -850,11 +885,15 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // If the entry has an organization link, check permissions for that organization
       const linkAttr = this.config.ldap_organization_link_attribute;
-      if (linkAttr && entry[linkAttr]) {
-        const linkValue = entry[linkAttr];
-        branchToCheck = Array.isArray(linkValue)
-          ? String(linkValue[0])
-          : String(linkValue);
+      // Whatever case the entry spells the attribute in
+      const links = linkAttr
+        ? AuthzBase.organizationLinks(
+            linkAttr,
+            AuthzBase.valuesOf(entry, linkAttr)
+          )
+        : [];
+      if (links.length > 0) {
+        branchToCheck = links[0];
       } else {
         // For organizations (ou entries) or entries without link, check the parent DN
         branchToCheck = this.extractBranchDn(dn);
