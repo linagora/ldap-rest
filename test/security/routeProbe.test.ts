@@ -75,6 +75,24 @@ const CALLER = 'probe.caller';
 /** In every value the targets carry that the caller must never read */
 const SECRET = 'probesecret';
 
+/** What names the targets: no listing may carry any of it */
+const TARGETS = [
+  SECRET,
+  'probe-them',
+  'probe-tuser',
+  'probe-tgroup',
+  'probe-them-group',
+];
+
+/**
+ * Routes whose probe stops at the shape of the call, the target unread:
+ * `METHOD path` → why.
+ */
+const UNEXERCISED: Record<string, string> = {
+  'POST /api/v1/ldap/positions/:id/move':
+    'positions carry no organization link: they are never moved',
+};
+
 /** The two values of a route parameter: a target there, one not there */
 interface Pair {
   there: string;
@@ -83,7 +101,10 @@ interface Pair {
 
 /** An authorization model, as the probe needs it */
 interface Model {
+  /** The plugin's name, under which it is registered */
   name: string;
+  /** How the suite names the model */
+  label?: string;
   plugin: new (server: DM) => DmPlugin;
   /** Environment configuring it, given the parent of the organizations */
   env: (orgs: string, base: string) => Record<string, string>;
@@ -96,6 +117,54 @@ interface Model {
    */
   publicOrganizations?: boolean;
 }
+
+/**
+ * Judged by attachment, what carries no link is in transit, every
+ * administrator's to read (#387): the organizations, their spaces, the
+ * password policies. That they exist may differ; a write must still be
+ * refused, and no secret answered.
+ */
+const TRANSIT_ALLOWED: Record<string, string> = {
+  ...Object.fromEntries(
+    [
+      'GET /api/v1/ldap/organizations/:dn',
+      'GET /api/v1/ldap/organizations/:dn/subnodes',
+      'GET /api/v1/ldap/organizations/:dn/subnodes/search',
+      'GET /api/v1/ldap/organizations/:dn/search',
+    ].map(route => [
+      route,
+      'an organization carries no link: every administrator reads it',
+    ])
+  ),
+  ...Object.fromEntries(
+    [
+      'GET /api/v1/organizations/:id/spaces/:spaceId',
+      'GET /api/v1/organizations/:id/spaces/:spaceId/members',
+      'GET /api/v1/organizations/:id/spaces/:spaceId/groups',
+      'PATCH /api/v1/organizations/:id/spaces/:spaceId',
+      'DELETE /api/v1/organizations/:id/spaces/:spaceId',
+      'POST /api/v1/organizations/:id/spaces/:spaceId/members',
+      'PATCH /api/v1/organizations/:id/spaces/:spaceId/members/:userId',
+      'DELETE /api/v1/organizations/:id/spaces/:spaceId/members/:userId',
+      'POST /api/v1/organizations/:id/spaces/:spaceId/groups',
+      'PATCH /api/v1/organizations/:id/spaces/:spaceId/groups/:groupId',
+      'DELETE /api/v1/organizations/:id/spaces/:spaceId/groups/:groupId',
+    ].map(route => [
+      route,
+      'a space carries no link: every administrator reads it',
+    ])
+  ),
+  ...Object.fromEntries(
+    [
+      'GET /api/v1/password-policies/:cn',
+      'PATCH /api/v1/password-policies/:cn',
+      'DELETE /api/v1/password-policies/:cn',
+    ].map(route => [
+      route,
+      'a password policy carries no link: every administrator reads it',
+    ])
+  ),
+};
 
 const MODELS: Model[] = [
   {
@@ -121,54 +190,33 @@ const MODELS: Model[] = [
     plugin: AuthzLinid1,
     env: () => ({}),
     publicOrganizations: true,
-    allowed: {
-      // What carries no link is in transit, every administrator's (#387):
-      // the organizations, their spaces, the password policies
-      ...Object.fromEntries(
-        [
-          'GET /api/v1/ldap/organizations/:dn',
-          'GET /api/v1/ldap/organizations/:dn/subnodes',
-          'GET /api/v1/ldap/organizations/:dn/subnodes/search',
-          'GET /api/v1/ldap/organizations/:dn/search',
-        ].map(route => [
-          route,
-          'an organization carries no link: every administrator reads it',
-        ])
-      ),
-      ...Object.fromEntries(
-        [
-          'GET /api/v1/organizations/:id/spaces/:spaceId',
-          'GET /api/v1/organizations/:id/spaces/:spaceId/members',
-          'GET /api/v1/organizations/:id/spaces/:spaceId/groups',
-          'PATCH /api/v1/organizations/:id/spaces/:spaceId',
-          'DELETE /api/v1/organizations/:id/spaces/:spaceId',
-          'POST /api/v1/organizations/:id/spaces/:spaceId/members',
-          'PATCH /api/v1/organizations/:id/spaces/:spaceId/members/:userId',
-          'DELETE /api/v1/organizations/:id/spaces/:spaceId/members/:userId',
-          'POST /api/v1/organizations/:id/spaces/:spaceId/groups',
-          'PATCH /api/v1/organizations/:id/spaces/:spaceId/groups/:groupId',
-          'DELETE /api/v1/organizations/:id/spaces/:spaceId/groups/:groupId',
-        ].map(route => [
-          route,
-          'a space carries no link: every administrator reads it',
-        ])
-      ),
-      ...Object.fromEntries(
-        [
-          'GET /api/v1/password-policies/:cn',
-          'PATCH /api/v1/password-policies/:cn',
-          'DELETE /api/v1/password-policies/:cn',
-        ].map(route => [
-          route,
-          'a password policy carries no link: every administrator reads it',
-        ])
-      ),
-    },
+    allowed: TRANSIT_ALLOWED,
+  },
+  {
+    name: 'authzPerBranch',
+    label: 'authzPerBranch, judging by attachment',
+    plugin: AuthzPerBranch,
+    env: (orgs, base) => ({
+      DM_AUTHZ_PER_BRANCH_CONFIG: JSON.stringify({
+        default: { read: false, write: false, delete: false },
+        users: {
+          [ADMIN]: { [base]: { read: true, write: true, delete: true } },
+          [CALLER]: {
+            [`ou=probemine,${orgs}`]: { read: true, write: true, delete: true },
+          },
+        },
+        groups: {},
+      }),
+      DM_AUTHZ_PER_BRANCH_CACHE_TTL: '60',
+      DM_AUTHZ_FILTER_ATTACHED_ENTRIES: 'true',
+    }),
+    publicOrganizations: true,
+    allowed: TRANSIT_ALLOWED,
   },
 ];
 
 for (const model of MODELS)
-  describe(`What every route tells a caller without rights, under ${model.name}`, function () {
+  describe(`What every route tells a caller without rights, under ${model.label ?? model.name}`, function () {
     let server: DM;
     let request: ReturnType<typeof supertest>;
     let base: string;
@@ -185,10 +233,12 @@ for (const model of MODELS)
       'DM_APPLICATIVE_ACCOUNT_BASE',
       'DM_AUTHZ_GLOBAL_ORGANIZATION',
       'DM_BULK_IMPORT_SCHEMAS',
+      'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
     ];
     let dir: string;
 
     let params: (path: string) => Record<string, Pair> | null;
+    let policyDn = '';
     let spaceId: string | undefined;
 
     before(function () {
@@ -262,6 +312,7 @@ for (const model of MODELS)
           uid,
           cn: secret ? `Probe ${SECRET} ${uid}` : uid,
           sn: secret ? SECRET : uid,
+          ...(secret ? { title: SECRET } : {}),
           ...(secret ? { mail: `${uid}@${SECRET}.example` } : {}),
           twakeDepartmentLink: link,
         });
@@ -320,6 +371,11 @@ for (const model of MODELS)
         await server.registerPlugin(name, new Plugin(server));
       server.setupErrorMiddleware();
       request = supertest(server.app);
+      policyDn = `cn=probepolicy,${(
+        server.loadedPlugins['ldapPasswordPolicy'] as unknown as {
+          policyBase(): string;
+        }
+      ).policyBase()}`;
 
       // Through the routes, as the administrator: the plugins' own formats.
       // A space carries no link, so it holds no secret: under a model
@@ -402,7 +458,7 @@ for (const model of MODELS)
         `cn=probe-them-group,ou=groups,${base}`,
         `uid=${ADMIN},ou=users,${base}`,
         `uid=${CALLER},ou=users,${base}`,
-        `cn=probepolicy,${base}`
+        policyDn
       );
       // The deepest first
       doomed.sort((a, b) => b.split(',').length - a.split(',').length);
@@ -425,16 +481,37 @@ for (const model of MODELS)
           server.app as unknown as {
             router?: {
               stack: {
+                name?: string;
                 route?: { path: string; methods: Record<string, boolean> };
+                handle?: { stack?: unknown[] };
               }[];
             };
           }
         ).router?.stack ?? [];
       const out: [string, string][] = [];
-      for (const layer of stack)
+      /** Whether a mounted router holds routes, at any depth */
+      const holdsRoutes = (layers: unknown[]): boolean =>
+        layers.some(inner => {
+          const l = inner as { route?: unknown; handle?: { stack?: unknown } };
+          return (
+            Boolean(l.route) ||
+            (Array.isArray(l.handle?.stack) && holdsRoutes(l.handle.stack))
+          );
+        });
+      for (const layer of stack) {
+        // A mounted router's routes are not listed here: one would go
+        // unprobed, so it is said. The body parsers' router holds none.
+        if (
+          Array.isArray(layer.handle?.stack) &&
+          holdsRoutes(layer.handle.stack)
+        )
+          throw new Error(
+            `A router holding routes is mounted (${layer.name ?? 'anonymous'}): list its routes`
+          );
         if (layer.route)
           for (const method of Object.keys(layer.route.methods))
             out.push([method.toUpperCase(), layer.route.path]);
+      }
       return out;
     };
 
@@ -518,6 +595,26 @@ for (const model of MODELS)
     };
 
     /**
+     * The targets and the other organization, as the server reads them:
+     * what a write the caller should not make would change.
+     */
+    const snapshot = async (): Promise<Record<string, unknown>> => {
+      const out: Record<string, unknown> = {};
+      for (const [branch, scope] of [
+        [`ou=probetheirs,${orgs}`, 'sub'],
+        [`uid=probe-them,ou=users,${base}`, 'base'],
+        [`cn=probe-them-group,ou=groups,${base}`, 'base'],
+        [policyDn, 'base'],
+      ] as [string, 'sub' | 'base'][]) {
+        const found = (await server.ldap
+          .search({ paged: false, scope, attributes: ['*'] }, branch)
+          .catch(() => ({ searchEntries: [] }))) as SearchResult;
+        for (const entry of found.searchEntries) out[String(entry.dn)] = entry;
+      }
+      return out;
+    };
+
+    /**
      * Call every route naming a target twice as `who`, on a target there and
      * on one that is not: the routes answering differently, and the ones
      * this test cannot place.
@@ -528,14 +625,18 @@ for (const model of MODELS)
     const probe = async (
       who: string,
       only?: string[]
-    ): Promise<{ differing: string[]; unplaced: string[] }> => {
+    ): Promise<{
+      differing: string[];
+      unplaced: string[];
+      unexercised: string[];
+    }> => {
       const differing: string[] = [];
       const unplaced: string[] = [];
+      const unexercised: string[] = [];
       for (const [method, path] of routes()) {
         if (!path.includes(':')) continue;
         if (only && !only.includes(method)) continue;
         const key = `${method} ${path}`;
-        if (who === CALLER && model.allowed[key]) continue;
         const pairs = params(path);
         if (!pairs) {
           unplaced.push(key);
@@ -552,12 +653,24 @@ for (const model of MODELS)
         const b = await call(method, fill(path, absent), body, who);
         const left = neutral(a, there);
         const right = neutral(b, absent);
-        if (left !== right)
-          differing.push(`${key}\n    there:  ${left}\n    absent: ${right}`);
-        else if (String(JSON.stringify(a.body)).includes(SECRET))
+        if (String(JSON.stringify(a.body)).includes(SECRET))
           differing.push(`${key} answered a secret: ${JSON.stringify(a.body)}`);
+        if (who !== CALLER) {
+          if (left !== right)
+            differing.push(`${key}\n    there:  ${left}\n    absent: ${right}`);
+          continue;
+        }
+        // Refused at the shape: the call never reached what it probes
+        if (a.status === 400 && !UNEXERCISED[key]) unexercised.push(key);
+        // A write to a target the caller holds nothing of is refused,
+        // whatever its existence tells
+        if (method !== 'GET' && a.status < 400)
+          differing.push(`${key} wrote: ${a.status} ${JSON.stringify(a.body)}`);
+        // That a target exists may be every administrator's to read
+        if (!model.allowed[key] && left !== right)
+          differing.push(`${key}\n    there:  ${left}\n    absent: ${right}`);
       }
-      return { differing, unplaced };
+      return { differing, unplaced, unexercised };
     };
 
     it('tells the targets apart for a caller who may read them', async function () {
@@ -579,9 +692,19 @@ for (const model of MODELS)
 
     it('answers alike whether a target it may not touch is there or not', async function () {
       this.timeout(120000);
-      const { differing, unplaced } = await probe(CALLER);
+      const before = await snapshot();
+      // The targets are there to be touched
+      expect(Object.keys(before)).to.include.members([
+        `uid=probe-them,ou=users,${base}`,
+        `uid=probe-tuser,ou=users,ou=probetheirs,${orgs}`,
+        `cn=probe-tgroup,ou=groups,ou=probetheirs,${orgs}`,
+      ]);
+      const { differing, unplaced, unexercised } = await probe(CALLER);
       expect(unplaced, 'routes this test cannot place').to.deep.equal([]);
+      expect(unexercised, 'routes refused at the shape').to.deep.equal([]);
       expect(differing, differing.join('\n')).to.deep.equal([]);
+      // Nothing the caller may not touch was touched
+      expect(await snapshot()).to.deep.equal(before);
     });
 
     /** A search asks for the targets, under the whole tree */
@@ -602,7 +725,8 @@ for (const model of MODELS)
       for (const [method, path] of routes()) {
         if (method !== 'GET' || path.includes(':')) continue;
         const res = await call(method, path + listQuery(path), undefined);
-        if (String(JSON.stringify(res.body)).includes(SECRET))
+        const text = String(JSON.stringify(res.body));
+        if (TARGETS.some(token => text.includes(token)))
           leaking.push(
             `${method} ${path}: ${JSON.stringify(res.body).slice(0, 300)}`
           );
