@@ -116,6 +116,16 @@ aside — `authzDynamic` letting a request through on
 
 ### What is refused at startup
 
+- An authorization plugin with no authentication plugin is refused: no
+  request carries an identity, so every authorization plugin would step
+  aside and everything would pass while authorization looks on.
+  `authzDynamic`, which authenticates the requests it judges, needs nothing
+  else. With neither kind of plugin, the server serves every request with
+  every right, on purpose (local development, a trusted network); with
+  authentication alone, every authenticated caller has every right (a
+  single administration token, say). The log says which, once. This is
+  checked over the plugins the configuration loads (`--plugin`); a host
+  registering plugins itself answers for what they enforce.
 - Two plugins judging LDAP operations for the same authenticator's requests
   — two branch-level plugins with no `authz_for`, or a branch-level plugin
   judging `authzDynamic`'s tokens — are refused, with both names, unless
@@ -132,7 +142,8 @@ aside — `authzDynamic` letting a request through on
   already.
 
 A host that assembles the server itself — `registerPlugin` after `ready`,
-rather than `--plugin` — gets the same checks, as each plugin arrives: the
+rather than `--plugin` — gets the same checks of the composition, as each
+plugin arrives (not the one asking for an authentication plugin, above): the
 refusal comes out of `registerPlugin`, before any of the plugin's routes or
 hooks exist. An arriving plugin is judged against what is already there, so
 the authentication plugins an `authz_for` or `--authz-scope-source` names

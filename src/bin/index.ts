@@ -33,6 +33,7 @@ import { setLogger } from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
 import {
   assertAuthzComposition,
+  assertEnforceable,
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
@@ -240,6 +241,7 @@ export class DM {
             // judging the same requests is a configuration nobody decided,
             // and the server does not start on it.
             await assertAuthzComposition(this);
+            assertEnforceable(this);
             await this.learnAttributeTypes();
             this._composed = true;
             this.afterLoad();
@@ -247,6 +249,8 @@ export class DM {
           })
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
+        // No plugin yet: a host assembling the server registers its own,
+        // and answers for what they enforce
         this.setupErrorMiddleware();
         this._composed = true;
         resolve();
@@ -507,10 +511,16 @@ export class DM {
           prefix => path === prefix || path.startsWith(`${prefix}/`)
         )
     );
+    // No identity there, so no authorization plugin judges them either
+    const judged = Object.values(this.loadedPlugins).some(p =>
+      p.roles?.includes('authz')
+    );
     if (unguarded.length > 0)
       this.logger.warn(
         `Authentication is restricted to ${prefixes.join(', ')}, so these ` +
-          `routes are served without authentication: ${unguarded.sort().join(', ')}`
+          `routes are served without authentication` +
+          (judged ? ' nor authorization' : '') +
+          `: ${unguarded.sort().join(', ')}`
       );
     return unguarded.sort();
   }

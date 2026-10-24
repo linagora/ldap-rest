@@ -4,6 +4,15 @@
 
 ### Security
 
+- The server refuses to start with an authorization plugin and no
+  authentication plugin: no request carried an identity, so the
+  authorization plugins stepped aside and every request passed. With
+  neither kind of plugin, or authentication alone, it starts and says that
+  every caller, or every authenticated caller, has every right,
+  [docs](docs/usage/plugins/auth/README.md#what-is-refused-at-startup),
+  [upgrading](docs/usage/upgrading.md#an-authorization-plugin-needs-an-authentication-plugin)
+  ([#390](https://github.com/linagora/ldap-rest/pull/390))
+
 - `core/auth/authzPerBranch`: among one user's or one group's rules, the
   most specific branch now applies, whatever order the rules are written
   in, and a search granted on a branch no longer returns what a narrower

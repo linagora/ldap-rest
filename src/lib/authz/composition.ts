@@ -376,3 +376,50 @@ export function assertAuthzComposition(
     for (const plugin of plugins) await plugin.assertComposition?.();
   })();
 }
+
+/**
+ * What the loaded plugins can enforce, decided once the configuration is
+ * loaded (#385).
+ *
+ * - No authentication nor authorization plugin: every request is served
+ *   with every right. An open mode on purpose — local development, a
+ *   trusted network — said once.
+ * - Authorization without authentication: no request carries an identity,
+ *   so every authorization plugin steps aside and everything passes while
+ *   the operator believes authorization is on. The server does not start.
+ * - Authentication without authorization: every authenticated caller has
+ *   every right, which a single administration token legitimately wants.
+ *   Said once.
+ *
+ * A plugin carrying both roles (`authzDynamic`) authenticates the requests
+ * it judges.
+ *
+ * @param server the server, its configuration loaded
+ * @throws Error naming the authorization plugins nothing authenticates for
+ */
+export function assertEnforceable(server: DM): void {
+  const plugins = Object.values(server.loadedPlugins);
+  const judges = plugins
+    .filter(plugin => plugin.roles?.includes('authz'))
+    .map(plugin => plugin.name);
+  // The dispatcher's: only they give a request its identity
+  const authenticated = server.authenticators.length > 0;
+  if (judges.length > 0 && !authenticated)
+    throw new Error(
+      `${judges.join(', ')} ${judges.length > 1 ? 'judge' : 'judges'} ` +
+        "requests by their caller's identity, and no authentication plugin " +
+        'is loaded to give them one: every request would pass unjudged. ' +
+        'Load an authentication plugin, or remove the authorization ones to ' +
+        'serve the directory openly.'
+    );
+  if (judges.length === 0 && !authenticated)
+    server.logger.warn(
+      'No authentication nor authorization plugin is loaded: every request ' +
+        'is served with every right'
+    );
+  else if (judges.length === 0)
+    server.logger.notice(
+      'No authorization plugin is loaded: every authenticated caller has ' +
+        'every right'
+    );
+}
