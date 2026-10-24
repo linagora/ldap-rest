@@ -362,7 +362,8 @@ export default class AuthzPerBranch extends AuthzBase {
 
     const memberAttr = this.config.ldap_group_member_attribute || 'member';
     const filter = `(${memberAttr as string}=${escapeLdapFilter(userDn)})`;
-    const searchResult = (await this.server.ldap.search(
+    // As the server: the caller's groups decide what they may do: read before any judgement
+    const searchResult = (await this.server.ldap.system.search(
       {
         paged: false,
         filter,

@@ -39,6 +39,10 @@ interface ModifyCall {
 /** Minimal stand-in for this.server.ldap used by the plugin. */
 class StubLdap {
   modifyCalls: ModifyCall[] = [];
+  // The server's own operations are the same ones here
+  get system(): this {
+    return this;
+  }
   // entry returned by a base-scope search keyed by dn
   entries: Record<string, Record<string, unknown>> = {};
   async modify(

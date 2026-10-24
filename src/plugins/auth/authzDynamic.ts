@@ -24,7 +24,6 @@
  * Sub-branch matching is used (a permission on `ou=acme` covers
  * `ou=users,ou=acme`).
  */
-import { AsyncLocalStorage } from 'async_hooks';
 
 import type { Express, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
@@ -76,17 +75,6 @@ interface PendingRequest extends AuthzDynamicRequest {
   authzDynamicPending?: boolean;
   authzDynamicPendingReason?: string;
 }
-
-/**
- * Per-request async context holding the authenticated token.
- *
- * Core plugins (ldapGroups, ldapFlat, etc.) do not always forward the Express
- * `req` object down to `ldapActions.search()` / `.modify()`. Relying solely
- * on `req` would therefore let un-tracked operations bypass authorization.
- * Using AsyncLocalStorage gives us a request-scoped, ambient handle that the
- * authz hooks can read regardless of whether the caller threaded `req`.
- */
-export const authzContext = new AsyncLocalStorage<TokenEntry>();
 
 function asString(v: AttributeValue | undefined): string | undefined {
   if (v == null) return undefined;
@@ -235,7 +223,8 @@ export default class AuthzDynamic extends AuthBase {
       const attrs = Array.from(
         new Set(['dn', 'cn', this.tokenAttr, this.configAttr, this.tenantAttr])
       );
-      const result = (await this.server.ldap.search(
+      // As the server: the token store, loaded by the server whatever request triggers it
+      const result = (await this.server.ldap.system.search(
         {
           filter: '(objectClass=*)',
           scope: 'sub',
@@ -580,11 +569,10 @@ export default class AuthzDynamic extends AuthBase {
         // ACLs are enforced — which is the whole point of not stepping
         // aside any more.
         if (!req.user) this.publishIdentity(req, match.tenant);
+        // The hooks read it off the request, which the dispatcher keeps as
+        // the one being served for the operations that are not handed it
         (req as AuthzDynamicRequest).authzToken = match;
-        // Run `next` (and everything downstream) inside an AsyncLocalStorage
-        // frame so authz hooks can read the token even when plugins don't
-        // thread `req` into ldapActions calls.
-        authzContext.run(match, next);
+        next();
       })
       .catch(err => {
         this.logger.error(`authzDynamic: authMethod error: ${String(err)}`);
@@ -632,9 +620,7 @@ export default class AuthzDynamic extends AuthBase {
       return [dn, changes, opNumber, req];
     },
 
-    // Prefer the request-borne token; fall back to AsyncLocalStorage's active
-    // token for callers that do not thread `req`. Enforce delete permission on
-    // every target DN's parent branch.
+    // Enforce delete permission on every target DN's parent branch.
     ldapdeleterequest: ([dn, req]: [string | string[], DmRequest?]): [
       string | string[],
       DmRequest?,
@@ -661,12 +647,13 @@ export default class AuthzDynamic extends AuthBase {
     },
   };
 
-  /** Read the active token from the async context, or (as a fallback) from `req`. */
+  /**
+   * The token of the request an operation is made for: the one it names,
+   * or the one being served (`ldapActions` fills it in). An operation the
+   * server makes as itself (`ldap.system`) has none, and is not judged.
+   */
   private activeToken(req?: DmRequest): TokenEntry | undefined {
-    return (
-      authzContext.getStore() ||
-      (req as AuthzDynamicRequest | undefined)?.authzToken
-    );
+    return (req as AuthzDynamicRequest | undefined)?.authzToken;
   }
 
   /**

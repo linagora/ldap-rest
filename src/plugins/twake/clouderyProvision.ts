@@ -526,7 +526,8 @@ export default class ClouderyProvision extends DmPlugin {
         dn,
         hasPhones: phones.length > 0,
       });
-      await this.server.ldap.modify(dn, { replace }, undefined, {
+      // As the server: the provisioned instance is recorded on the account, whoever created it
+      await this.server.ldap.system.modify(dn, { replace }, undefined, {
         declaredClasses: this.config.user_class,
       });
       this.logger.info({
@@ -604,7 +605,8 @@ export default class ClouderyProvision extends DmPlugin {
         dn,
         result: 'searching',
       });
-      const res = (await this.server.ldap.search(
+      // As the server: what a delete removes is read to release its instance, whoever deletes
+      const res = (await this.server.ldap.system.search(
         {
           paged: false,
           scope: 'base',

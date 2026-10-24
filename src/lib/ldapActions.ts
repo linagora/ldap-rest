@@ -27,6 +27,7 @@ import {
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
+import { currentRequest, outsideRequest } from './requestContext';
 import { BadRequestError, ConflictError, NotFoundError } from './errors';
 import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
@@ -57,6 +58,16 @@ const defaultSearchOptions: SearchOptions = {
   },
 };
 export type { SearchOptions, SearchResult };
+
+/** The operations {@link ldapActions.system} makes as the server. */
+const SYSTEM_OPERATIONS = new Set<string | symbol>([
+  'search',
+  'add',
+  'modify',
+  'rename',
+  'move',
+  'delete',
+]);
 
 /**
  * The directory as seen by one HTTP request.
@@ -886,17 +897,33 @@ class ldapActions {
    * must still not be handed it as a free identifier, and a reference to an
    * organization they cannot read is still a valid reference.
    *
-   * The methods are the same objects as this instance's own — writes
-   * included, since a scheduled task writes: the examples above are reads
-   * because that is where the ambiguity lives, not because a write cannot
-   * belong to nobody. What this adds is a name: `ldap.system.search(…)` says
-   * the omission was meant, where `ldap.search(…)` says nothing and looks
-   * exactly like the mistake it takes one review to miss. A plugin serving a
-   * request should reach for {@link forRequest} instead.
+   * Writes included, since a scheduled task writes: the examples above are
+   * reads because that is where the ambiguity lives, not because a write
+   * cannot belong to nobody.
+   *
+   * While a request is being served, an operation that names none is made
+   * for it ({@link currentRequest}), so `ldap.search(…)` is judged as the
+   * caller. These operations step out of the request instead: they are the
+   * server's, whatever plugin serves the request — `authzDynamic` included.
+   * Each use says why the work is the server's.
    */
   get system(): this {
-    return this;
+    this.systemView ??= new Proxy(this, {
+      get: (target, prop): unknown => {
+        const value: unknown = Reflect.get(target, prop, target);
+        if (typeof value !== 'function' || !SYSTEM_OPERATIONS.has(prop))
+          return value;
+        return (...args: unknown[]): unknown =>
+          outsideRequest(() =>
+            (value as (...a: unknown[]) => unknown).apply(target, args)
+          );
+      },
+    });
+    return this.systemView;
   }
+
+  /** {@link system}, built once. */
+  private systemView?: this;
 
   /**
    * Bind every directory operation to one request, so the authorization
@@ -927,6 +954,7 @@ class ldapActions {
    * @returns whether a read of the entry, as that caller, finds it
    */
   async readableBy(dn: string, req?: Request): Promise<boolean> {
+    req ??= currentRequest();
     if (!req) return true;
     try {
       const found = (await this.search(
@@ -1353,6 +1381,7 @@ class ldapActions {
     base: string = this.base,
     req?: Request
   ): Promise<SearchResult | AsyncGenerator<SearchResult>> {
+    req ??= currentRequest();
     let opts = {
       ...defaultSearchOptions,
       ...options,
@@ -1468,6 +1497,7 @@ class ldapActions {
     entry: AttributesList,
     req?: Request
   ): Promise<boolean> {
+    req ??= currentRequest();
     dn = this.setDn(dn);
     if (
       (!entry.objectClass || entry.objectClass.length === 0) &&
@@ -1565,6 +1595,7 @@ class ldapActions {
     req?: Request,
     options: ModifyOptions = {}
   ): Promise<boolean> {
+    req ??= currentRequest();
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {
@@ -1778,6 +1809,7 @@ class ldapActions {
   }
 
   async rename(dn: string, newRdn: string, req?: Request): Promise<boolean> {
+    req ??= currentRequest();
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
     const op: number = this.opNumber();
@@ -1854,6 +1886,7 @@ class ldapActions {
    * @param req - Request behind the move, when there is one
    */
   async move(dn: string, newDn: string, req?: Request): Promise<boolean> {
+    req ??= currentRequest();
     dn = this.setDn(dn);
     newDn = this.setDn(newDn);
     const pooled = await this.acquireConnection();
@@ -1906,6 +1939,7 @@ class ldapActions {
     req?: Request,
     options: Pick<ModifyOptions, 'context'> = {}
   ): Promise<boolean> {
+    req ??= currentRequest();
     const requested = (Array.isArray(dn) ? dn : [dn]).map(d => this.setDn(d));
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];

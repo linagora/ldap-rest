@@ -62,6 +62,7 @@ import {
 } from '../lib/errors';
 import { extractLdapCode } from '../lib/ldapCodes';
 import { loadSchemaFile } from '../lib/schemaFile';
+import { outsideRequest } from '../lib/requestContext';
 
 import DmPlugin from './plugin';
 
@@ -1202,7 +1203,11 @@ export default abstract class LdapFlat extends DmPlugin {
       : (body[this.mainAttribute] as string);
 
     await this.addEntry(id, additional, req);
-    const entry = await this.searchEntriesByName(id, false);
+    // As the server: what the caller just wrote is answered back to them,
+    // whether or not they may read the branch it went to
+    const entry = await outsideRequest(() =>
+      this.searchEntriesByName(id, false)
+    );
     return created(res, this.project(entry[id]));
   }
 
@@ -1604,9 +1609,7 @@ export default abstract class LdapFlat extends DmPlugin {
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
     );
-    const res = await (req
-      ? this.ldap.forRequest(req).rename(dn, newDn)
-      : this.ldap.rename(dn, newDn));
+    const res = await this.ldap.rename(dn, newDn, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}renamedone`], [
       dn,
       newDn,

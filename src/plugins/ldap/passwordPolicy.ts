@@ -1304,7 +1304,8 @@ export default class PasswordPolicy extends DmPlugin {
     }
     let dn: string | null = null;
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: which policy is the default is the directory's, read once and cached
+      const result = (await this.server.ldap.system.search(
         {
           filter: '(objectClass=pwdPolicy)',
           scope: 'sub',
@@ -1343,7 +1344,8 @@ export default class PasswordPolicy extends DmPlugin {
     let policy: PpolicyConfig | null = null;
     let failure: string | undefined;
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: the policy settings are cached for every caller; a caller's read is checked apart
+      const result = (await this.server.ldap.system.search(
         {
           filter: '(objectClass=pwdPolicy)',
           scope: 'base',
@@ -1618,9 +1620,8 @@ export default class PasswordPolicy extends DmPlugin {
     if (defaultDn && normalizeDn(defaultDn) === normalizeDn(entry.dn)) {
       throw new ConflictError(`${entry.dn} is the default password policy`);
     }
-    // Searched as the server: an entry the caller cannot read still uses
-    // the policy
-    const users = (await this.server.ldap.search(
+    // As the server: an entry the caller cannot read still uses the policy
+    const users = (await this.server.ldap.system.search(
       {
         filter: `(pwdPolicySubentry=${escapeLdapFilter(entry.dn)})`,
         scope: 'sub',

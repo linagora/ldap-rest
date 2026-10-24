@@ -2,7 +2,6 @@
  * Utility functions
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
@@ -12,6 +11,7 @@ import type { Config } from '../bin';
 import type { AttributeValue } from './ldapActions';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
+import { outsideRequest } from './requestContext';
 
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
@@ -94,6 +94,11 @@ const hookLabel = (hook: Function): string => {
 //     (args: [A, B]) => void     (packed-tuple)    → launchHooks(hooks, [a, b])
 // LDAP "*done" hooks still use the packed-tuple form; SCIM "*done" hooks use
 // VoidHook. Check src/hooks.ts before adding a new call site.
+//
+// What these hooks are told of has happened, and was judged: they react as
+// the server — synchronizing, publishing, keeping invariants — whoever's
+// request caused it, and run outside that request (#385), as the chained
+// hooks do. They are handed the change's context, not the request.
 export const launchHooks = async (
   hooks: Function[] | undefined,
   ...args: unknown[]
@@ -102,7 +107,9 @@ export const launchHooks = async (
     for (const hook of hooks) {
       if (hook) {
         try {
-          await hook(...args);
+          await outsideRequest(() =>
+            (hook as (...a: unknown[]) => unknown)(...args)
+          );
         } catch (e: unknown) {
           // Resolved at call time, not captured when this module was
           // evaluated: `setLogger` runs in the `DM` constructor, and this
@@ -195,6 +202,11 @@ const isRefusal = (err: unknown): boolean =>
 // Calling convention: SINGLE PACKED ARG. If a chained hook needs several
 // inputs, pack them in a tuple — that is what `ChainedHook<[A, B]>` declares.
 // Unlike launchHooks, the arg is NOT spread; passing `[a, b]` is correct here.
+//
+// Hooks run outside the request being served, as the notifications do: what
+// a hook reads or writes to validate, complete or keep track of an operation
+// is the server's (#385). The request is in the arguments of the hooks that
+// judge, which judge by it; a hook acting as the caller names it.
 export const launchHooksChained = async <T>(
   hooks: Function[] | undefined,
   args: T
@@ -203,8 +215,9 @@ export const launchHooksChained = async <T>(
     for (const hook of hooks) {
       if (!hook) continue;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        args = await hook(args);
+        args = await outsideRequest(() =>
+          (hook as (a: T) => T | Promise<T>)(args)
+        );
       } catch (err) {
         // A hook pushed onto the list directly — through
         // `registeredHooks`, or replaced by a wrapper — has no owner on

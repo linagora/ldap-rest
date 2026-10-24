@@ -486,11 +486,14 @@ export default class TwakeSpaces extends DmPlugin {
   ): Promise<AttributesList | undefined> {
     try {
       return (
-        (await this.server.ldap.search(
-          { paged: false, scope: 'base', attributes },
-          dn
-        )) as SearchResult
-      ).searchEntries[0];
+        // As the server: an entry read for no one, as the space sync needs it
+        (
+          (await this.server.ldap.system.search(
+            { paged: false, scope: 'base', attributes },
+            dn
+          )) as SearchResult
+        ).searchEntries[0]
+      );
     } catch (err) {
       if (extractLdapCode(err) === 32) return undefined;
       throw err;
@@ -1011,14 +1014,16 @@ export default class TwakeSpaces extends DmPlugin {
       [];
     if (!space || members.some(h => h.role === 'admin')) return;
     if (!members.length) {
-      await this.server.ldap.delete(this.spaceDn(org, id), undefined, {
+      // As the server: a space nobody belongs to any more goes, whoever's write emptied it
+      await this.server.ldap.system.delete(this.spaceDn(org, id), undefined, {
         context,
       });
       return;
     }
     const role = members.some(h => h.role === 'editor') ? 'editor' : 'viewer';
     const promoted = members.filter(h => h.role === role).map(h => h.dn);
-    await this.server.ldap.modify(
+    // As the server: a space keeps an administrator, whoever's write removed the last one
+    await this.server.ldap.system.modify(
       this.spaceDn(org, id),
       {
         delete: { [this.roleAttributes[role]]: promoted },
@@ -1430,7 +1435,8 @@ export default class TwakeSpaces extends DmPlugin {
     const at = rdns.findIndex(rdn => rdn.includes(ORG));
     const below = rdns.slice(0, at);
     const out: string[] = [];
-    const pages = (await this.server.ldap.search(
+    // As the server: the organizations holding spaces, for the server's sync
+    const pages = (await this.server.ldap.system.search(
       {
         paged: { pageSize: 500 },
         scope: 'one',
@@ -1641,12 +1647,14 @@ export default class TwakeSpaces extends DmPlugin {
     const keep = new Set(wanted.map(v => v.toLowerCase()));
     for (let attempt = 0; ; attempt++) {
       try {
-        const [entry] = (
-          (await this.server.ldap.search(
-            { paged: false, scope: 'base', attributes: [attribute] },
-            dn
-          )) as SearchResult
-        ).searchEntries;
+        const [entry] =
+          // As the server: the roles an account holds follow its spaces, whoever changed them
+          (
+            (await this.server.ldap.system.search(
+              { paged: false, scope: 'base', attributes: [attribute] },
+              dn
+            )) as SearchResult
+          ).searchEntries;
         if (!entry) return undefined;
         const held = values(valueOf(entry, attribute));
         const has = new Set(held.map(v => v.toLowerCase()));
@@ -1655,7 +1663,8 @@ export default class TwakeSpaces extends DmPlugin {
         );
         const missing = wanted.filter(v => !has.has(v.toLowerCase()));
         if (stale.length || missing.length)
-          await this.server.ldap.modify(dn, {
+          // As the server: the roles an account holds follow its spaces, whoever changed them
+          await this.server.ldap.system.modify(dn, {
             ...(stale.length && { delete: { [attribute]: stale } }),
             ...(missing.length && { add: { [attribute]: missing } }),
           });

@@ -321,7 +321,8 @@ export default class AppAccountsApi extends DmPlugin {
     res: Response,
     attributes?: string[]
   ): Promise<SearchResult['searchEntries'][number] | null> {
-    const result = await this.server.ldap.search(
+    // As the server: found across branches, then answered only if the caller can read it (readableBy)
+    const result = await this.server.ldap.system.search(
       {
         scope: 'sub',
         filter: `(${this.userAttr}=${escapeLdapFilter(principal)})`,
@@ -389,7 +390,8 @@ export default class AppAccountsApi extends DmPlugin {
       const mailStr = Array.isArray(mail) ? String(mail[0]) : String(mail);
 
       // Search for applicative accounts with this mail
-      const accountsResult = await this.server.ldap.search(
+      // As the server: the user was checked readable; the applicative branch is the server's
+      const accountsResult = await this.server.ldap.system.search(
         {
           scope: 'sub',
           filter: `(${this.mailAttr}=${escapeLdapFilter(mailStr)})`,
@@ -468,7 +470,8 @@ export default class AppAccountsApi extends DmPlugin {
       const prefix = this.appUidPrefix(principal);
 
       // Enforce the per-user limit, scoped by the unique principal mail.
-      const accountsResult = await this.server.ldap.search(
+      // As the server: the per-user limit counts every account, whoever may read them
+      const accountsResult = await this.server.ldap.system.search(
         {
           scope: 'sub',
           filter: `(${this.mailAttr}=${escapeLdapFilter(mailStr)})`,
@@ -618,7 +621,8 @@ export default class AppAccountsApi extends DmPlugin {
    * Whether a uid already exists anywhere under the applicative branch.
    */
   private async uidExists(uid: string): Promise<boolean> {
-    const result = await this.server.ldap.search(
+    // As the server: a uid is taken or not whoever may read the entry holding it
+    const result = await this.server.ldap.system.search(
       {
         scope: 'sub',
         filter: `(uid=${escapeLdapFilter(uid)})`,
@@ -651,7 +655,8 @@ export default class AppAccountsApi extends DmPlugin {
       // explicitly: revocation needs the stored hash to know which of the
       // principal's values to remove, so this is a hard requirement rather
       // than a side effect of returning every user attribute.
-      const accountResult = await this.server.ldap.search(
+      // As the server: the delete was judged first (authorize), this only shapes the answer
+      const accountResult = await this.server.ldap.system.search(
         {
           scope: 'sub',
           filter: `(uid=${escapeLdapFilter(uid)})`,

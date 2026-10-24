@@ -488,7 +488,8 @@ export default class TwakeLifecycleEvents extends DmPlugin {
     attributes: string[]
   ): Promise<AttributesList | undefined> {
     try {
-      const { searchEntries } = (await this.server.ldap.search(
+      // As the server: the events describe the entry whole, whoever's write raised them
+      const { searchEntries } = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes },
         dn
       )) as SearchResult;

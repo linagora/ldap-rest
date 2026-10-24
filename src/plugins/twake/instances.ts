@@ -358,7 +358,8 @@ export default class TwakeInstances extends DmPlugin {
       // organization.created reads the name from the entry, which an entry
       // written before it was kept there lacks
       if (org.name && !first(this.value(entry, this.organizationName))) {
-        await this.server.ldap.modify(entry.dn as string, {
+        // As the server: the instance provisioning records its own progress, whoever's write started it
+        await this.server.ldap.system.modify(entry.dn as string, {
           replace: { [this.organizationName]: org.name },
         });
         entry[this.organizationName] = org.name;
@@ -595,7 +596,8 @@ export default class TwakeInstances extends DmPlugin {
       this.organizationFqdn &&
       !first(this.value(entry, this.organizationFqdn))
     )
-      await this.server.ldap.modify(dn, {
+      // As the server: the instance provisioning records its own progress, whoever's write started it
+      await this.server.ldap.system.modify(dn, {
         replace: { [this.organizationFqdn]: fqdn },
       });
     const domain = first(this.value(entry, this.organizationDomain));
@@ -611,7 +613,8 @@ export default class TwakeInstances extends DmPlugin {
         ...(domain ? { domain } : {}),
       }
     );
-    await this.server.ldap.modify(dn, {
+    // As the server: the instance provisioning records its own progress, whoever's write started it
+    await this.server.ldap.system.modify(dn, {
       replace: { [this.sentAttribute]: new Date().toISOString() },
     });
     await this.releaseMembers(dn);
@@ -619,7 +622,8 @@ export default class TwakeInstances extends DmPlugin {
 
   /** Send the user.created held while the organization at `dn` was pending */
   private async releaseMembers(dn: string): Promise<void> {
-    const members = (await this.server.ldap.search(
+    // As the server: the members held back are released whoever may read them
+    const members = (await this.server.ldap.system.search(
       {
         paged: false,
         scope: 'sub',
@@ -713,7 +717,8 @@ export default class TwakeInstances extends DmPlugin {
   ): Promise<AttributesList | undefined> {
     const base = this.config.twake_instance_organization_base;
     if (!base) return undefined;
-    const res = (await this.server.ldap.search(
+    // As the server: the instance provisioning finds its organization, whoever's write started it
+    const res = (await this.server.ldap.system.search(
       {
         paged: false,
         scope: 'one',

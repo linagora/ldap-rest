@@ -231,7 +231,8 @@ export default class AuthzLinid1 extends AuthzBase {
       const orgBase =
         this.config.ldap_top_organization || this.config.ldap_base || '';
 
-      const result = (await this.server.ldap.search(
+      // As the server: the caller's rights, read before any judgement
+      const result = (await this.server.ldap.system.search(
         {
           paged: false,
           filter,

@@ -38,6 +38,7 @@ import {
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
+import { runForRequest } from '../lib/requestContext';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -423,8 +424,10 @@ export class DM {
     // its registration fell among the others, and a route plugin registered
     // first would answer before the refusal — registration order deciding an
     // authorization answer, in the direction that fails open.
+    // Let through: what serves the request is made for it, whether or not
+    // the request is handed down (#385)
     const finish = (index: number): void => {
-      if (index >= selected.length) return next();
+      if (index >= selected.length) return runForRequest(req, next);
       const plugin = selected[index];
       if (!plugin.afterChain) return finish(index + 1);
       plugin.afterChain(req, res, () => finish(index + 1));

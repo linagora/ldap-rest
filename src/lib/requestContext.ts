@@ -1,0 +1,48 @@
+/**
+ * The request a directory operation is made for
+ * @module lib/requestContext
+ */
+import { AsyncLocalStorage } from 'async_hooks';
+
+import type { Request } from 'express';
+
+/**
+ * The authenticated request being served. The authentication dispatcher
+ * runs everything downstream of a request it let through inside it, so an
+ * operation made while serving it, by whatever plugin, is judged as its
+ * caller even when the request was not handed down (#385). A call that
+ * forgets the request then fails closed instead of being let through
+ * unjudged.
+ */
+const requests = new AsyncLocalStorage<Request>();
+
+/**
+ * Serve a request: what runs inside, synchronously or not, is made for it.
+ *
+ * @param req the authenticated request
+ * @param fn what serves it
+ * @returns what `fn` returns
+ */
+export function runForRequest<T>(req: Request, fn: () => T): T {
+  return requests.run(req, fn);
+}
+
+/**
+ * Run something as the server, outside the request being served: its
+ * operations are judged by nobody. What `ldap.system` does.
+ *
+ * @param fn what to run
+ * @returns what it returns
+ */
+export function outsideRequest<T>(fn: () => T): T {
+  return requests.exit(fn);
+}
+
+/**
+ * The request being served.
+ *
+ * @returns the request, or undefined outside any, or as the server
+ */
+export function currentRequest(): Request | undefined {
+  return requests.getStore();
+}

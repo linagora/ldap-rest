@@ -150,7 +150,8 @@ export default class AppAccountsConsistency extends DmPlugin {
    */
   private async deleteApplicativeEntry(dn: string): Promise<void> {
     try {
-      await this.server.ldap.delete(dn);
+      // As the server: the applicative accounts follow their user, whoever wrote the user
+      await this.server.ldap.system.delete(dn);
       this.logger.info(`${this.name}: Deleted applicative account ${dn}`);
     } catch (deleteError) {
       if (isNoSuchObject(deleteError)) {
@@ -282,7 +283,8 @@ export default class AppAccountsConsistency extends DmPlugin {
 
     try {
       // Read user attributes
-      const userResult = await this.server.ldap.search(
+      // As the server: the applicative accounts follow their user, whoever wrote the user
+      const userResult = await this.server.ldap.system.search(
         {
           scope: 'base',
           paged: false,
@@ -305,7 +307,8 @@ export default class AppAccountsConsistency extends DmPlugin {
       // Update uid to mail
       applicativeAttrs.uid = mail;
 
-      await this.server.ldap.add(applicativeDn, applicativeAttrs);
+      // As the server: the applicative accounts follow their user, whoever wrote the user
+      await this.server.ldap.system.add(applicativeDn, applicativeAttrs);
 
       this.logger.info(
         `${this.name}: Created applicative account ${applicativeDn} for user ${userDn}`
@@ -335,7 +338,8 @@ export default class AppAccountsConsistency extends DmPlugin {
       // Search for applicative accounts by mail attribute
       const filter = `(${this.mailAttr}=${escapeLdapFilter(mail)})`;
 
-      const result = await this.server.ldap.search(
+      // As the server: the applicative accounts follow their user, whoever wrote the user
+      const result = await this.server.ldap.system.search(
         {
           filter,
           scope: 'sub',
@@ -391,7 +395,8 @@ export default class AppAccountsConsistency extends DmPlugin {
     try {
       // Search for the old applicative account
       const filter = `(${this.mailAttr}=${escapeLdapFilter(oldMail)})`;
-      const result = await this.server.ldap.search(
+      // As the server: the applicative accounts follow their user, whoever wrote the user
+      const result = await this.server.ldap.system.search(
         {
           filter,
           scope: 'sub',
@@ -462,7 +467,8 @@ export default class AppAccountsConsistency extends DmPlugin {
           const newAttrs: AttributesList = { ...oldApplicativeAttrs };
 
           // Read the current user entry to get fresh user attributes
-          const userResult = await this.server.ldap.search(
+          // As the server: the applicative accounts follow their user, whoever wrote the user
+          const userResult = await this.server.ldap.system.search(
             {
               scope: 'base',
               paged: false,
@@ -484,7 +490,8 @@ export default class AppAccountsConsistency extends DmPlugin {
           // The principal account is keyed on the mail address
           newAttrs.uid = newMail;
 
-          await this.server.ldap.add(newApplicativeDn, newAttrs);
+          // As the server: the applicative accounts follow their user, whoever wrote the user
+          await this.server.ldap.system.add(newApplicativeDn, newAttrs);
           this.logger.info(
             `${this.name}: Created new applicative account ${newApplicativeDn} (mail changed from ${oldMail} to ${newMail})`
           );

@@ -709,7 +709,8 @@ export default class LdapOrganizations extends DmPlugin {
         } else if (changes.add?.objectClass) {
           isOrgEntry = this.isOu({ objectClass: changes.add.objectClass });
         } else {
-          const entry = await this.server.ldap.search(
+          // As the server: what kind of entry a write is on, read for the consistency hooks
+          const entry = await this.server.ldap.system.search(
             { paged: false, scope: 'base' },
             dn
           );
@@ -805,7 +806,8 @@ export default class LdapOrganizations extends DmPlugin {
         Array.isArray(linkValue) ? linkValue[0] : linkValue
       ) as string;
       // Use scope: 'base' to benefit from LDAP cache
-      const res = await this.server.ldap.search(
+      // As the server: a link must lead to an organization, whoever may read it
+      const res = await this.server.ldap.system.search(
         { paged: false, scope: 'base' },
         orgDn
       );
@@ -907,7 +909,8 @@ export default class LdapOrganizations extends DmPlugin {
       // the chain element by element was both more work and wrong past two
       // levels, since it compared an ancestor's name against its own
       // ancestors' path.
-      const entries = (await this.server.ldap.search(
+      // As the server: a path must be one an organization holds, whoever may read it
+      const entries = (await this.server.ldap.system.search(
         {
           paged: false,
           scope: 'sub',
@@ -924,7 +927,8 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   async isEmptyOrganization(dn: string): Promise<void> {
-    const res = await this.server.ldap.search({
+    // As the server: an organization still holding entries is not empty, whoever may read them
+    const res = await this.server.ldap.system.search({
       paged: false,
       filter: `(${this.config.ldap_organization_link_attribute}=${escapeLdapFilter(dn)})`,
     });
@@ -1434,7 +1438,8 @@ export default class LdapOrganizations extends DmPlugin {
    */
   private async entryExists(dn: string): Promise<boolean> {
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: a DN value must name an entry, whoever may read it
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['dn'] },
         dn
       )) as SearchResult;
@@ -1469,7 +1474,8 @@ export default class LdapOrganizations extends DmPlugin {
     // result set as "not found" (404).
     let targetOrg: SearchResult;
     try {
-      targetOrg = (await this.server.ldap.search(
+      // As the server: the move was judged first (authorize), this only shapes the answer
+      targetOrg = (await this.server.ldap.system.search(
         { paged: false, scope: 'base' },
         targetOrgDn
       )) as SearchResult;
@@ -1491,7 +1497,8 @@ export default class LdapOrganizations extends DmPlugin {
     // Verify the organization to move exists
     let sourceOrg: SearchResult;
     try {
-      sourceOrg = (await this.server.ldap.search(
+      // As the server: the move was judged first (authorize), this only shapes the answer
+      sourceOrg = (await this.server.ldap.system.search(
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;

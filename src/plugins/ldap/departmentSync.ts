@@ -167,7 +167,8 @@ export default class LdapDepartmentSync extends DmPlugin {
     const separator =
       (this.config.ldap_organization_path_separator as string) || ' / ';
 
-    const results = await this.server.ldap.search(
+    // As the server: the paths below a renamed organization are kept in step whoever renamed it
+    const results = await this.server.ldap.system.search(
       {
         paged: true,
         scope: 'sub',
@@ -213,7 +214,8 @@ export default class LdapDepartmentSync extends DmPlugin {
       computed.set(normalizeDn(dn), newPath);
       if (newPath === path) continue;
       try {
-        await this.server.ldap.modify(dn, {
+        // As the server: the paths below a renamed organization are kept in step whoever renamed it
+        await this.server.ldap.system.modify(dn, {
           replace: { [pathAttr]: newPath },
         });
         updated++;
@@ -238,7 +240,8 @@ export default class LdapDepartmentSync extends DmPlugin {
   private async readPath(dn: string): Promise<string | null> {
     const pathAttr = this.organizationPathAttribute();
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: the paths below a renamed organization are kept in step whoever renamed it
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [pathAttr] },
         dn
       )) as SearchResult;
@@ -264,7 +267,8 @@ export default class LdapDepartmentSync extends DmPlugin {
       `Searching for resources directly linked to ${oldDn}: ${filter}`
     );
 
-    const results = await this.server.ldap.search(
+    // As the server: the links to a renamed organization are kept in step whoever renamed it
+    const results = await this.server.ldap.system.search(
       {
         paged: true,
         filter,
@@ -284,7 +288,8 @@ export default class LdapDepartmentSync extends DmPlugin {
           const newPath = await this.getDepartmentPath(newDn);
 
           // Update the entry
-          await this.server.ldap.modify(entryDn, {
+          // As the server: the links to a renamed organization are kept in step whoever renamed it
+          await this.server.ldap.system.modify(entryDn, {
             replace: {
               [attrs.link]: newDn,
               [attrs.path]: newPath,
@@ -328,7 +333,8 @@ export default class LdapDepartmentSync extends DmPlugin {
       `Searching for resources linked to descendants of ${oldParentDn}: ${filter}`
     );
 
-    const results = await this.server.ldap.search(
+    // As the server: the links to a renamed organization are kept in step whoever renamed it
+    const results = await this.server.ldap.system.search(
       {
         paged: true,
         filter,
@@ -365,7 +371,8 @@ export default class LdapDepartmentSync extends DmPlugin {
           const newPath = await this.getDepartmentPath(newLink);
 
           // Update the entry
-          await this.server.ldap.modify(entryDn, {
+          // As the server: the links to a renamed organization are kept in step whoever renamed it
+          await this.server.ldap.system.modify(entryDn, {
             replace: {
               [attrs.link]: newLink,
               [attrs.path]: newPath,
@@ -397,7 +404,8 @@ export default class LdapDepartmentSync extends DmPlugin {
   private async getDepartmentPath(orgDn: string): Promise<string> {
     const pathAttr = this.organizationPathAttribute();
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: the path an entry is given is its organization's, whoever may read it
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [pathAttr, 'ou', 'o'] },
         orgDn
       )) as SearchResult;

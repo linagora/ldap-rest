@@ -40,6 +40,7 @@ import {
   mergeMapping,
 } from '../scim/mapping';
 import type { ScimGroup } from '../scim/types';
+import { outsideRequest } from '../../lib/requestContext';
 
 import {
   first,
@@ -315,7 +316,8 @@ export default class TwakeGroups extends LdapGroups {
       if (org === undefined) return [dn, newDn, req];
       let members: AttributeValue | undefined;
       try {
-        const { searchEntries } = (await this.ldap.search(
+        // As the server: the members a moved group takes along, whoever may read them
+        const { searchEntries } = (await this.ldap.system.search(
           {
             paged: false,
             scope: 'base',
@@ -575,7 +577,8 @@ export default class TwakeGroups extends LdapGroups {
     const { deleted, deletedValue } = this.attrs;
     if (!deleted) return [];
     try {
-      const { searchEntries } = (await this.ldap.search(
+      // As the server: hiding a tombstone is integrity, not what the caller may see
+      const { searchEntries } = (await this.ldap.system.search(
         {
           paged: false,
           scope: 'one',
@@ -714,7 +717,8 @@ export default class TwakeGroups extends LdapGroups {
     if (!(await this.ldap.readableBy(dn, req))) throw notFound('organization');
     let entry: AttributesList | undefined;
     try {
-      const found = (await this.ldap.search(
+      // As the server: the organization was checked readable first (readableBy)
+      const found = (await this.ldap.system.search(
         { paged: false, scope: 'base', attributes: [status] },
         dn
       )) as SearchResult;
@@ -925,10 +929,13 @@ export default class TwakeGroups extends LdapGroups {
       req,
     ]);
     // Unique for groups made here only: a provider may push two of one name.
-    if (await this.named(org, body.name))
+    // As the server: a name is taken whoever may read the group holding it
+    const name = body.name;
+    if (await outsideRequest(() => this.named(org, name)))
       throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
     await this.addGroup(this.groupDn(org, id), [], linked, req);
-    const group = await this.readGroup(org, id);
+    // As the server: what the caller just wrote is answered back to them
+    const group = await outsideRequest(() => this.readGroup(org, id));
     res.status(201).json(group);
   }
 

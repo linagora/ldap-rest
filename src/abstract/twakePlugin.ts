@@ -259,7 +259,8 @@ export abstract class TwakePlugin extends DmPlugin {
       const searchAttrs =
         attributes && attributes.length > 0 ? attributes : undefined;
 
-      const result = (await this.server.ldap.search(
+      // As the server: what the integrations sync to their service, whoever's write triggered it
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: searchAttrs },
         dn
       )) as SearchResult;
