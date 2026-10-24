@@ -494,6 +494,10 @@ export default class LdapRaw extends DmPlugin {
   ): Promise<RawSearchResult> {
     this.checkDn(options.base);
     this.checkFilter(options.filter);
+    // The base itself first: what is found below it, even nothing, would
+    // say it is there to a caller who may not read it
+    if (!(await this.server.ldap.readableBy(options.base, req)))
+      throw new NotFoundError(`Entry ${options.base} not found`);
     const limit = Math.min(options.limit || this.maxResults, this.maxResults);
 
     // Ask for one entry more than the limit to detect truncation
@@ -669,6 +673,12 @@ export default class LdapRaw extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      *   '403':
      *     description: Base outside the exposed subtrees.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: |
+     *       No such base, or one the caller cannot read: both answer alike.
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }

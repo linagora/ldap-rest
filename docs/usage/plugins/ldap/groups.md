@@ -410,6 +410,12 @@ The plugin supports JSON schema validation for group attributes. Example schema:
 }
 ```
 
+A `pointer` attribute is checked as in
+[flat schemas](flat-generic.md#pointer-dn-reference): the DN must name an
+entry in the allowed branches, looked for as the server, whoever writes.
+A caller may point at an entry it cannot read, and learns from the answer
+whether one is there, never what it holds.
+
 ## Hooks
 
 The plugin emits and listens to lifecycle hooks:

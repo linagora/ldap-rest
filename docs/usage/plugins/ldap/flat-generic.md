@@ -120,6 +120,9 @@ Each schema file must include an `entity` metadata section and attribute definit
 ```
 
 Pointer validation ensures the DN exists and is within allowed branches.
+The DN is looked for as the server, whoever writes: a caller may point at
+an entry it cannot read, and learns from the answer whether one is there,
+never what it holds.
 
 #### Fixed Attributes
 

@@ -322,14 +322,23 @@ export class ScimUsers {
     const dn = this.dnForId(id, req);
     // Fetch current LDAP entry so we only delete attributes that actually
     // exist on the entry (avoids noSuchAttribute errors on atomic modify).
-    const currentResult = (await this.ldap.forRequest(req).search(
-      {
-        paged: false,
-        scope: 'base',
-        attributes: this.ldapAttributes(),
-      },
-      dn
-    )) as SearchResult;
+    let currentResult: SearchResult;
+    try {
+      currentResult = (await this.ldap.forRequest(req).search(
+        {
+          paged: false,
+          scope: 'base',
+          attributes: this.ldapAttributes(),
+        },
+        dn
+      )) as SearchResult;
+    } catch (err) {
+      // The answer a user hidden from the caller gets: the generic one told
+      // an absent user from a hidden one
+      if (extractLdapCode(err) === 32)
+        throw scimNotFound(`User ${id} not found`);
+      throw err;
+    }
     if (!currentResult.searchEntries?.length) {
       throw scimNotFound(`User ${id} not found`);
     }
@@ -529,11 +538,13 @@ export class ScimUsers {
     const base = this.baseResolver.userBase(req);
     // Client-supplied DN: only accept when it falls under the tenant's base,
     // otherwise a client could reference an entry outside its own subtree.
-    if (value.includes('=') && value.includes(',')) {
-      if (isChildOf(value, base)) return value;
-      return undefined;
-    }
-    const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
+    // Under it, it is looked up as a name is: as the caller, so that an
+    // entry hidden from them is one they cannot put in a group.
+    const given = value.includes('=') && value.includes(',');
+    if (given && !isChildOf(value, base)) return undefined;
+    const dn = given
+      ? value
+      : `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
       const res = (await this.ldap
         .forRequest(req)
@@ -551,6 +562,8 @@ export class ScimUsers {
       if (extractLdapCode(err) !== 32) throw err;
       // Not there under that DN; try a filter.
     }
+    // A DN names one entry: no filter finds it elsewhere
+    if (given) return undefined;
     try {
       const res = (await this.ldap.forRequest(req).search(
         {

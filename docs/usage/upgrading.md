@@ -6,6 +6,24 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### SCIM group members are looked up as the caller
+
+**Who is affected:** a SCIM client writing group members by DN, and one
+that tells an absent user from a hidden one by the message of
+`PUT /Users/{id}`.
+
+A member given by DN in `POST`, `PUT` or `PATCH /Groups` was taken as it
+stood. It is now looked up as the caller, as a member given by id is: a DN
+the caller cannot read, or that names no entry, is left out of the group,
+and under a model judging by branch a member in a refused branch makes the
+whole write refused. A DN outside the user base is left out, compared RDN by
+RDN. A client that wrote members it may not read asks an administrator
+whose rules cover them.
+
+`PUT /Users/{id}` on a user that is not there answered `Resource not found`;
+it now answers `User {id} not found`, as it did for a user the caller may
+not read. The status, `404`, is unchanged.
+
 ### The group routes take a DN for a group only
 
 **Who is affected:** a client calling `/api/v1/ldap/groups/{cn}` with a

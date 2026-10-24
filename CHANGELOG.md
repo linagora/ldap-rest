@@ -11,6 +11,28 @@
   rights
   ([#393](https://github.com/linagora/ldap-rest/pull/393))
 
+- `core/ldap/raw`: `GET /search` below a base the caller may not read
+  answered an empty list, and a 404 for a base that is not there: it told
+  whether the base exists. It answers that 404. Found by the probe of the
+  targets a body or a query names
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+
+- `core/scim`: a group member given as a DN under the user base was taken
+  as it stood, so a caller could put in its group an account it may not
+  read. It is looked up as the caller, as a member given by id is: left
+  out when the caller cannot read it, or the write refused when its branch
+  is refused. A DN naming no entry is left out too. A DN is compared to the
+  base RDN by RDN: `cn=a\,ou=users,…` was taken for an entry of
+  `ou=users,…`,
+  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+
+- `core/scim`: `PUT /Users/{id}` answered `User … not found` for a user
+  the caller may not read and `Resource not found` for one that is not
+  there: it told whether the user exists. Both get the first answer,
+  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+
 - A directory search, add, modify, rename or delete made while serving an
   authenticated request is judged as its caller, even when the code making
   it did not hand the request down: a forgotten request used to let the
@@ -100,6 +122,13 @@
   ([#381](https://github.com/linagora/ldap-rest/pull/381))
 
 ### Fixes
+
+- `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
+  and `…/subnodes/search` looked for the attached entries from the parent of
+  the top organization only, and answered 403 to an administrator held to
+  their organization — `authzPerBranch` judging by DN, `authzDynamic`. Such
+  a caller now gets the entries attached within the organization's branch
+  ([#403](https://github.com/linagora/ldap-rest/issues/403))
 
 - `core/ldap/groups`: a group named with a comma is taken for a DN only
   when it is one: `GET /api/v1/ldap/groups/a%2Cb` answered 500, it

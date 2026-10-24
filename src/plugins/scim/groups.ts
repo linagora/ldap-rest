@@ -500,11 +500,12 @@ export class ScimGroups {
   async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
     if (!value) return undefined;
     const base = this.baseResolver.groupBase(req);
-    if (value.includes('=') && value.includes(',')) {
-      if (isChildOf(value, base)) return value;
-      return undefined;
-    }
-    const dn = `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
+    // A DN under the base is looked up as a name is: as the caller
+    const given = value.includes('=') && value.includes(',');
+    if (given && !isChildOf(value, base)) return undefined;
+    const dn = given
+      ? value
+      : `${this.rdnAttribute}=${escapeDnValue(value)},${base}`;
     try {
       const res = (await this.ldap
         .forRequest(req)
@@ -522,6 +523,8 @@ export class ScimGroups {
       if (extractLdapCode(err) !== 32) throw err;
       // Not there under that DN; try a filter.
     }
+    // A DN names one entry: no filter finds it elsewhere
+    if (given) return undefined;
     try {
       const res = (await this.ldap.forRequest(req).search(
         {

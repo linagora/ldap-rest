@@ -310,6 +310,25 @@ describe('LDAP Utils', () => {
       ).to.be.false;
     });
 
+    it('should not read an escaped comma as a separator', () => {
+      // `cn=a\,ou=users` is one RDN, beside `ou=users`
+      expect(
+        isChildOf(
+          'cn=a\\,ou=users,dc=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.false;
+    });
+
+    it('should compare RDN by RDN, whatever the spelling', () => {
+      expect(
+        isChildOf(
+          'UID=user, OU=Users,DC=example,dc=com',
+          'ou=users,dc=example,dc=com'
+        )
+      ).to.be.true;
+    });
+
     it('should return false for unrelated DNs', () => {
       expect(
         isChildOf(
