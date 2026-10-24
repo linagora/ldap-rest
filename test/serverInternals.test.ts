@@ -161,6 +161,14 @@ describe('Server internals', () => {
   });
 
   describe('hook order', () => {
+    const REQUEST_HOOKS = [
+      'ldapsearchrequest',
+      'ldapaddrequest',
+      'ldapmodifyrequest',
+      'ldapdeleterequest',
+      'ldaprenamerequest',
+    ] as const;
+
     /** A plugin recording, in `calls`, each time one of its hooks runs */
     const recorder = (
       dm: DM,
@@ -172,16 +180,15 @@ describe('Server internals', () => {
         name,
         roles,
         config: dm.config,
-        hooks: {
-          ldapaddrequest: (args: unknown) => {
-            calls.push(`${name} add`);
-            return args;
-          },
-          ldapsearchfilter: (args: unknown) => {
-            calls.push(`${name} filter`);
-            return args;
-          },
-        },
+        hooks: Object.fromEntries(
+          [...REQUEST_HOOKS, 'ldapsearchfilter'].map(hook => [
+            hook,
+            (args: unknown) => {
+              calls.push(name);
+              return args;
+            },
+          ])
+        ),
       }) as unknown as DmPlugin;
 
     it('runs the authorization request hooks first, in their own order', async () => {
@@ -199,23 +206,21 @@ describe('Server internals', () => {
       ] as [string, Role[]][])
         await dm.registerPlugin(name, recorder(dm, name, roles, calls));
 
-      await launchHooksChained(dm.hooks.ldapaddrequest, []);
-      expect(calls).to.deep.equal([
-        'authzA add',
-        'authzB add',
-        'rules add',
-        'other add',
-      ]);
+      for (const hook of REQUEST_HOOKS) {
+        calls.length = 0;
+        await launchHooksChained(dm.hooks[hook], []);
+        expect(calls, hook).to.deep.equal([
+          'authzA',
+          'authzB',
+          'rules',
+          'other',
+        ]);
+      }
 
       // A result filter keeps registration order
       calls.length = 0;
       await launchHooksChained(dm.hooks.ldapsearchfilter, []);
-      expect(calls).to.deep.equal([
-        'rules filter',
-        'authzA filter',
-        'other filter',
-        'authzB filter',
-      ]);
+      expect(calls).to.deep.equal(['rules', 'authzA', 'other', 'authzB']);
     });
   });
 
