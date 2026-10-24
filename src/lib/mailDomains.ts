@@ -9,6 +9,7 @@
 import type { DM } from '../bin';
 import { type Schema, roleAttribute } from '../config/schema';
 
+import { getLogger } from './expressFormatedResponses';
 import { extractLdapCode } from './ldapCodes';
 import type { SearchResult } from './ldapActions';
 
@@ -94,8 +95,10 @@ export async function declaredMailDomains(server: DM): Promise<string[]> {
             if (name.toLowerCase() === attribute.toLowerCase())
               domains.push(...[value].flat().map(String));
     } catch (err) {
-      if (extractLdapCode(err) === 32) continue;
-      throw err;
+      if (extractLdapCode(err) !== 32) throw err;
+      // A deployment may keep no domain branch; a mistyped base reads the
+      // same, so it is said
+      getLogger()?.debug(`No mail domain branch at ${base}`);
     }
   }
   return mailDomains(domains);

@@ -234,6 +234,30 @@ describe('External users in groups', function () {
         }
       });
 
+      it('reads the domain after the last @, without its trailing dot', async () => {
+        for (const mail of ['c@lists.example.com.', 'd@x@lists.example.com'])
+          expect(await outcome(mail), mail).to.match(
+            /Cannot create external user with managed domain/
+          );
+        expect(await outcome('nodomain')).to.match(/Malformed member/);
+      });
+
+      it('refuses to create one while the domains cannot be read', async () => {
+        const search = server.ldap.search;
+        server.ldap.search = ((...args: Parameters<typeof search>) =>
+          // The existence check of the member still answers
+          (args[0] as { paged?: unknown }).paged
+            ? Promise.reject(new Error('directory down'))
+            : search.apply(server.ldap, args)) as typeof search;
+        try {
+          expect(await outcome('h@partner-domain.org')).to.match(
+            /directory down/
+          );
+        } finally {
+          server.ldap.search = search;
+        }
+      });
+
       it('takes a subdomain of a managed domain for an external one', async () => {
         expect(await outcome(`d@sub.${managedDomain}`)).to.equal('created');
         expect(await outcome('e@sub.lists.example.com')).to.equal('created');

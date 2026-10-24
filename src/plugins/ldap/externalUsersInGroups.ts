@@ -19,6 +19,22 @@ import {
   unescapeDnValue,
 } from '../../lib/utils';
 
+/**
+ * The domain of an address, as the managed domains are compared: after its
+ * last `@` (the local part may hold one, quoted), lower-cased, without the
+ * trailing dot DNS allows. Empty for an address without one.
+ */
+export const mailDomainOf = (mail: string): string => {
+  const at = mail.lastIndexOf('@');
+  return at < 1
+    ? ''
+    : mail
+        .slice(at + 1)
+        .trim()
+        .toLowerCase()
+        .replace(/\.$/, '');
+};
+
 export default class ExternalUsersInGroups extends DmPlugin {
   name = 'externalUsersInGroups';
   roles: Role[] = ['consistency', 'configurable'] as const;
@@ -51,9 +67,10 @@ export default class ExternalUsersInGroups extends DmPlugin {
               // Member doesn't exist, create it
               if (!mail) throw new Error(`Malformed member ${m}`);
 
-              const domain = mail.split('@')[1]?.toLowerCase();
+              const domain = mailDomainOf(mail);
+              if (!domain) throw new Error(`Malformed member ${m}`);
               managed ??= this.managedDomains();
-              if (domain && (await managed).includes(domain)) {
+              if ((await managed).includes(domain)) {
                 throw new Error(
                   `Cannot create external user with managed domain: ${mail}`
                 );
