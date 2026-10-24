@@ -144,6 +144,12 @@ export default [
           message:
             'Name the request this operation is made for, or make it as the server through ldap.system and say why.',
         },
+        {
+          selector:
+            "CallExpression[callee.object.property.name=/^(ldap|system)$/][callee.property.name='move']",
+          message:
+            'ldap.move is never judged, request or not: it is the trash moving what a judged delete removed. Move for a caller with ldap.rename.',
+        },
       ],
     },
   },

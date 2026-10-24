@@ -1202,11 +1202,11 @@ export default abstract class LdapFlat extends DmPlugin {
       : (body[this.mainAttribute] as string);
 
     await this.addEntry(id, additional, req);
-    // As the server: what the caller just wrote is answered back to them,
-    // whether or not they may read the branch it went to. By its DN: the
-    // name may be another entry's elsewhere.
+    // As the server: the identifier the caller just wrote is answered back
+    // to them, whether or not they may read the branch it went to — that
+    // only, as before. By its DN: the name may be another entry's elsewhere.
     const written = (await this.ldap.system.search(
-      { paged: false, scope: 'base', attributes: this.entryAttributes() },
+      { paged: false, scope: 'base', attributes: [this.mainAttribute] },
       this.resolveDn(id)
     )) as SearchResult;
     return created(res, this.project(written.searchEntries[0]));

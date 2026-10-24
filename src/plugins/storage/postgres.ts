@@ -15,6 +15,7 @@
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
+import { outsideRequest } from '../../lib/requestContext';
 
 type Pg = typeof import('pg');
 type Pool = InstanceType<Pg['Pool']>;
@@ -62,7 +63,8 @@ export default class PostgresStore extends Store {
    * leave the store unusable once it is back.
    */
   private pool(): Promise<Pool> {
-    this.connection ??= this.connect().catch(err => {
+    // Outside the request it may be opened for: the connection outlives it
+    this.connection ??= outsideRequest(() => this.connect()).catch(err => {
       this.connection = undefined;
       throw err;
     });

@@ -253,6 +253,8 @@ class TrashPlugin extends DmPlugin {
             `Moving ${currentDn} to ${trashDn} using LDAP move (atomic)`
           );
 
+          // The delete was judged; the move into the trash is the server's
+          // eslint-disable-next-line no-restricted-syntax
           await this.server.ldap.move(currentDn, trashDn, req);
 
           this.logger.info(`Entry ${currentDn} moved to trash at ${trashDn}`);
