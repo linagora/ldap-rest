@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- DN values with UTF-8 hex escapes (`\C3\A9`) are decoded correctly
+  (`é`) instead of one character per byte
+  ([#376](https://github.com/linagora/ldap-rest/pull/376))
+
 ## v0.26.0 (2026-10-23)
 
 ### Features

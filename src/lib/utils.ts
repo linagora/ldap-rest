@@ -345,7 +345,7 @@ export function escapeDnValue(value: string): string {
     .replace(/^#/, '\\#'); // leading hash
 }
 
-const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 
 /**
  * Unescape special characters in LDAP DN attribute values according to RFC 4514

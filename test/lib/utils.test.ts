@@ -105,6 +105,11 @@ describe('LDAP Utils', () => {
       );
     });
 
+    it('should keep an escaped U+FEFF instead of stripping it as a BOM', () => {
+      expect(unescapeDnValue('a\\EF\\BB\\BFb')).to.equal('a\uFEFFb');
+      expect(unescapeDnValue('\\EF\\BB\\BFabc')).to.equal('\uFEFFabc');
+    });
+
     it('should keep invalid UTF-8 hex escapes as one char per byte', () => {
       expect(unescapeDnValue('caf\\E9')).to.equal('café');
     });
