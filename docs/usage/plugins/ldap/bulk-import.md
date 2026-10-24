@@ -318,6 +318,17 @@ curl -X POST "http://localhost:8081/api/v1/ldap/bulk-import/users" \
 - Check organization DNs exist
 - Estimate import duration
 
+A dry run is judged as the import is: a row the caller may not write fails,
+and a row updating an existing entry counts as `updated`.
+
+### Authorization
+
+Each row's write is judged by the authorization plugins before anything is
+looked for in the directory: the entry, its organization, whether it exists.
+A row the caller may not write fails with
+`Token does not have permission on this branch`, whether its entry and its
+organization are there or not.
+
 ### Update Existing Mode
 
 Update entries that already exist:

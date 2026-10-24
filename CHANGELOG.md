@@ -4,6 +4,13 @@
 
 ### Security
 
+- `core/ldap/bulkImport` judges each row's write before looking in the
+  directory for it. A row the caller may not write was reported skipped when
+  its entry existed, counted created by a dry run, answered with its
+  organization's absence, and refused with the branch the authorization
+  plugin named; it now fails with the same refusal in every case,
+  [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
+
 - The authorization plugins judge an LDAP operation before any other
   plugin, whatever order the plugins loaded in. When `core/ldap/trash`
   loaded first, a caller with no right on an entry could delete it, as a
