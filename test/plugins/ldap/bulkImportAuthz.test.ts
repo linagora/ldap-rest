@@ -188,6 +188,25 @@ describe('Bulk import and the caller', function () {
     expect(JSON.stringify(res.body)).to.not.match(/authz-forbidden|ou=/i);
   });
 
+  it('refuses to update an entry of another organization from a row linked to the caller own', async () => {
+    for (const fields of [
+      { updateExisting: 'true', dryRun: 'true' },
+      { updateExisting: 'true' },
+    ] as Record<string, string>[]) {
+      const res = await importRows(
+        [`${HOLDER},Holder,Holder,"${ownOrg}"`],
+        fields
+      );
+      expect(res.body, JSON.stringify(res.body)).to.include({
+        updated: 0,
+        failed: 1,
+      });
+      expect((res.body.errors as RowError[])[0].error).to.equal(AUTHZ_REFUSED);
+      // Never the branch the entry is attached to
+      expect(JSON.stringify(res.body)).to.not.match(/authz-forbidden|ou=/i);
+    }
+  });
+
   it('refuses in a dry run what the import refuses', async () => {
     const res = await importRows([`bia-new,New,New,"${otherOrg}"`], {
       dryRun: 'true',
@@ -209,6 +228,95 @@ describe('Bulk import and the caller', function () {
     expect(res.body, JSON.stringify(res.body)).to.include({
       created: 1,
       failed: 0,
+    });
+  });
+  // Judged by attachment: an entry is the organization's it is linked to
+  describe('judged by attachment', () => {
+    let attached: ReturnType<typeof supertest>;
+    const OWN = 'bia-own';
+    let ownDn: string;
+
+    const send = (
+      header: string,
+      rows: string[],
+      fields: Record<string, string> = {}
+    ): Promise<supertest.Response> => {
+      let call = attached
+        .post('/api/v1/ldap/bulk-import/biausers')
+        .set('X-Test-User', OUTSIDER)
+        .attach('file', Buffer.from([header, ...rows].join('\n')), 'rows.csv');
+      for (const [name, value] of Object.entries(fields))
+        call = call.field(name, value);
+      return call;
+    };
+    const linkOf = async (dn: string): Promise<unknown> =>
+      (
+        (await plain.ldap.search(
+          { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+          dn
+        )) as { searchEntries: Record<string, unknown>[] }
+      ).searchEntries[0]?.twakeDepartmentLink;
+
+    before(async function () {
+      this.timeout(20000);
+      ownDn = `uid=${OWN},${base}`;
+      await plain.ldap.delete(ownDn).catch(() => undefined);
+      await plain.ldap.add(ownDn, {
+        objectClass: ['top', 'twakeAccount', 'twakeWhitePages'],
+        uid: OWN,
+        cn: OWN,
+        sn: 'Own',
+        twakeDepartmentLink: ownOrg,
+        twakeDepartmentPath: 'BiaOwnOrg',
+      });
+      const server = new DM();
+      Object.assign(server.config, { authz_filter_attached_entries: true });
+      await server.ready;
+      await server.registerPlugin('testAuth', new TestAuthPlugin(server));
+      await server.registerPlugin('bulkImport', new LdapBulkImport(server));
+      await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
+      server.setupErrorMiddleware();
+      attached = supertest(server.app);
+    });
+
+    after(async () => {
+      await plain.ldap.delete(ownDn).catch(() => undefined);
+    });
+
+    it('lets an administrator update their own entries from rows naming no organization', async () => {
+      for (const fields of [
+        { updateExisting: 'true', dryRun: 'true' },
+        { updateExisting: 'true' },
+      ] as Record<string, string>[]) {
+        const res = await send('uid,cn,sn', [`${OWN},Own,Renamed`], fields);
+        expect(res.body, JSON.stringify(res.body)).to.include({
+          updated: 1,
+          failed: 0,
+        });
+      }
+    });
+
+    it('judges a link written in another case as a move', async () => {
+      const res = await send(
+        'uid,cn,sn,twakedepartmentlink',
+        [`${OWN},Own,Own,"${otherOrg}"`],
+        { updateExisting: 'true' }
+      );
+      expect(res.body, JSON.stringify(res.body)).to.include({
+        updated: 0,
+        failed: 1,
+      });
+      expect(await linkOf(ownDn)).to.equal(ownOrg);
+    });
+
+    it('stops on a refused row with the refusal only', async () => {
+      const res = await send(
+        'uid,cn,sn,organizationDn',
+        [`bia-new,New,New,"${otherOrg}"`],
+        { continueOnError: 'false' }
+      );
+      expect(res.status).to.equal(403);
+      expect(res.body.error).to.equal(AUTHZ_REFUSED);
     });
   });
 });

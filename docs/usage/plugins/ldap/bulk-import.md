@@ -325,9 +325,14 @@ and a row updating an existing entry counts as `updated`.
 
 Each row's write is judged by the authorization plugins before anything is
 looked for in the directory: the entry, its organization, whether it exists.
-A row the caller may not write fails with
-`Token does not have permission on this branch`, whether its entry and its
-organization are there or not.
+A row is let through when the caller may create its entry, or change the
+entry it names (an administrator updating the accounts of their organization
+from a file naming none). Otherwise it fails with
+`Token does not have permission on this branch` (`code: forbidden`), whether
+its entry and its organization are there or not.
+
+A row the caller may write tells, as a single creation does, whether its
+identifier is taken: it is then skipped, or updated with `updateExisting`.
 
 ### Update Existing Mode
 

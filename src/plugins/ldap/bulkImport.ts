@@ -101,11 +101,11 @@ interface BulkImportResult {
  *       example: 42
  *     created:
  *       type: integer
- *       description: Entries successfully created (or counted in dry-run).
+ *       description: Entries successfully created (or that would be, in a dry run).
  *       example: 38
  *     updated:
  *       type: integer
- *       description: Existing entries updated.
+ *       description: Existing entries updated (or that would be, in a dry run).
  *       example: 2
  *     skipped:
  *       type: integer
@@ -134,7 +134,8 @@ interface BulkImportResult {
  *             type: string
  *             description: |
  *               `unique` or `mailDomain`, with `attribute`, `value` and
- *               `domains`, as in the `Error` answer of a single write.
+ *               `domains`, as in the `Error` answer of a single write;
+ *               `forbidden` when the caller may not write the row.
  *           attribute: { type: string }
  *           value: { type: string }
  *           domains:
@@ -272,8 +273,9 @@ export default class LdapBulkImport extends DmPlugin {
        *   header) may be provided to set the organization link and path attributes
        *   automatically.
        *
-       *   **Dry-run mode** (`dryRun=true`) validates and counts rows without writing
-       *   to LDAP. `continueOnError` (default `true`) keeps processing subsequent rows
+       *   **Dry-run mode** (`dryRun=true`) validates, judges and counts rows without
+       *   writing to LDAP: a row the caller may not write fails as in an import.
+       *   `continueOnError` (default `true`) keeps processing subsequent rows
        *   after an individual row fails.
        * requestBody:
        *   required: true
@@ -418,8 +420,8 @@ export default class LdapBulkImport extends DmPlugin {
           const { dn, entry, orgDn } = this.buildRecord(record, resource);
           // Judged before the directory is read for the row: whether the
           // entry or its organization is there is not for a caller who may
-          // not create it. A dry run is judged as the import is.
-          await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
+          // not write it. A dry run is judged as the import is.
+          await this.authorizeRow(dn, entry, req);
           await this.completeRecord(entry, orgDn, resource);
 
           // Check if entry exists
@@ -485,6 +487,45 @@ export default class LdapBulkImport extends DmPlugin {
       res.json(result);
     } catch (error) {
       return serverError(res, error);
+    }
+  }
+
+  /**
+   * Whether the caller may write a row: create its entry, or change the one
+   * it names. Which of the two the row turns into is known only once the
+   * directory has been read, so the caller is judged first on both.
+   *
+   * The creation alone is not enough: judged by attachment, an entry is
+   * judged on the organization the row links it to, or on its parent when
+   * the row links it to none, while a change is judged on the organization
+   * it is attached to. An administrator updating their own accounts from a
+   * file naming no organization would be refused.
+   *
+   * No oracle: the change is judged on the entry as stored, and an entry
+   * that is not there is judged on its parent, as a creation without a link
+   * is.
+   *
+   * @throws the refusal of the creation when neither is allowed
+   */
+  private async authorizeRow(
+    dn: string,
+    entry: AttributesList,
+    req: Request
+  ): Promise<void> {
+    try {
+      await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
+    } catch (refusal) {
+      if (!isAuthzRefusal(refusal)) throw refusal;
+      try {
+        await this.server.ldap.authorize('ldapmodifyrequest', [
+          dn,
+          { replace: entry },
+          this.opNumber(),
+          req,
+        ]);
+      } catch {
+        throw refusal;
+      }
     }
   }
 
