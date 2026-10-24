@@ -512,6 +512,40 @@ export default abstract class LdapFlat extends DmPlugin {
   protected async generateMainAttribute(
     body: Record<string, AttributeValue>
   ): Promise<string | undefined> {
+    const value = this.deriveMainAttribute(body);
+    const rule = this.schema?.attributes[this.mainAttribute]?.generatedFrom;
+    if (value === undefined || !rule) return undefined;
+
+    // The generated value becomes the RDN, so a collision is a duplicate DN.
+    // The source of the identifier is rarely unique on its own: two mail
+    // domains give `jean.dupont@a.example` and `jean.dupont@b.example` the
+    // same local part.
+    if (!(await this.rdnExists(value))) return value;
+    if (rule.onCollision !== 'suffix') {
+      throw new ConflictError(
+        `${this.singularName} "${value}" already exists (generated from ${rule.attribute})`
+      );
+    }
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${value}-${n}`;
+      if (!(await this.rdnExists(candidate))) return candidate;
+    }
+    throw new ConflictError(
+      `Cannot generate a free "${this.mainAttribute}" from "${rule.attribute}"`
+    );
+  }
+
+  /**
+   * The identifier the schema derives from a creation body, before any
+   * collision is looked for: no directory read, so a creation can be judged
+   * on it before the branch is searched.
+   *
+   * @param body creation body
+   * @returns the derived value, or undefined when the schema derives none
+   */
+  protected deriveMainAttribute(
+    body: Record<string, AttributeValue>
+  ): string | undefined {
     const attr = this.schema?.attributes[this.mainAttribute];
     const rule = attr?.generatedFrom;
     // `generated` is the switch, `generatedFrom` only the recipe: an operator
@@ -545,24 +579,35 @@ export default abstract class LdapFlat extends DmPlugin {
         `Cannot generate "${this.mainAttribute}" from "${rule.attribute}"`
       );
     }
+    return value;
+  }
 
-    // The generated value becomes the RDN, so a collision is a duplicate DN.
-    // The source of the identifier is rarely unique on its own: two mail
-    // domains give `jean.dupont@a.example` and `jean.dupont@b.example` the
-    // same local part.
-    if (!(await this.rdnExists(value))) return value;
-    if (rule.onCollision !== 'suffix') {
-      throw new ConflictError(
-        `${this.singularName} "${value}" already exists (generated from ${rule.attribute})`
-      );
-    }
-    for (let n = 2; n < 1000; n++) {
-      const candidate = `${value}-${n}`;
-      if (!(await this.rdnExists(candidate))) return candidate;
-    }
-    throw new ConflictError(
-      `Cannot generate a free "${this.mainAttribute}" from "${rule.attribute}"`
-    );
+  /**
+   * The entry `addEntry` writes for an identifier, as the plugin's own hooks
+   * receive it. Built in one place, so that the creation judged first is the
+   * creation made: a default attribute missing from one of two copies — an
+   * organization link among them — judged another branch than the one
+   * written to.
+   *
+   * @param id identifier
+   * @param additional attributes sent
+   * @returns the entry
+   */
+  protected candidateEntry(
+    id: string,
+    additional: AttributesList
+  ): AttributesList {
+    const entry: AttributesList = {
+      objectClass: this.objectClass,
+      ...this.defaultAttributes,
+      [this.mainAttribute]: id,
+      ...additional,
+    };
+    // The fixed values of the schema, whatever was sent
+    for (const [field, attr] of Object.entries(this.schema?.attributes ?? {}))
+      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
+        entry[field] = attr.default;
+    return entry;
   }
 
   /**
@@ -1138,13 +1183,23 @@ export default abstract class LdapFlat extends DmPlugin {
 
     this.rejectForbiddenInput(Object.keys(body));
 
-    const id = generatesId
-      ? ((await this.generateMainAttribute(body)) as string)
-      : (body[this.mainAttribute] as string);
     const additional = { ...body };
     delete additional[this.mainAttribute];
     // Remove dn if provided - it will be constructed by addEntry
     delete additional.dn;
+    // Judged before the branch is searched for a collision: whether the
+    // derived name is taken is not for a caller who may not create here. A
+    // suffix added on a collision keeps the entry in the same branch.
+    const derived = generatesId ? this.deriveMainAttribute(body) : undefined;
+    if (derived !== undefined)
+      await this.ldap.authorize('ldapaddrequest', [
+        this.resolveDn(derived),
+        this.candidateEntry(derived, additional),
+        req,
+      ]);
+    const id = generatesId
+      ? ((await this.generateMainAttribute(body)) as string)
+      : (body[this.mainAttribute] as string);
 
     await this.addEntry(id, additional, req);
     const entry = await this.searchEntriesByName(id, false);
@@ -1261,6 +1316,9 @@ export default abstract class LdapFlat extends DmPlugin {
       );
     }
 
+    // Before looking for either entry: whether they are there is not for a
+    // caller who may not rename here
+    await this.ldap.authorize('ldaprenamerequest', [dn, newDn, req]);
     const sameName = normalizeDn(dn) === normalizeDn(newDn);
     const source = await this.entryExists(dn);
     const target = sameName ? source : await this.entryExists(newDn);
@@ -1395,24 +1453,15 @@ export default abstract class LdapFlat extends DmPlugin {
       validateDnValue(id, this.mainAttribute);
       dn = this.resolveDn(id);
     }
+    let entry = this.candidateEntry(id, additional);
+    // Before the checks reading the directory: a pointer leading nowhere, a
+    // value already taken, are not for a caller who may not create here
+    await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
     await this.validateNewEntry(dn, {
       objectClass: this.objectClass,
       [this.mainAttribute]: id,
       ...additional,
     });
-
-    // Build entry
-    let entry: AttributesList = {
-      objectClass: this.objectClass,
-      ...this.defaultAttributes,
-      [this.mainAttribute]: id,
-      ...additional,
-    };
-    // validateNewEntry forced the fixed values into its copy only; the
-    // classes come from the entity
-    for (const [field, attr] of Object.entries(this.schema?.attributes ?? {}))
-      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
-        entry[field] = attr.default;
     // validateNewEntry converted the copy it was handed, not this one
     toDirectoryEntry(this.schema, entry);
 
@@ -1511,6 +1560,8 @@ export default abstract class LdapFlat extends DmPlugin {
         );
     }
 
+    // Before the checks reading the directory, as on a creation
+    await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
     await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}modifydone`], [

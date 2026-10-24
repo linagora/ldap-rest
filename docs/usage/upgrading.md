@@ -4,6 +4,19 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### Quota and app accounts need read access to the account
+
+**Who is affected:** a deployment loading an authorization plugin
+(`core/auth/authzPerBranch`, `authzLinid1`, `authzDynamic`) together with
+`core/twake/james` or `core/twake/appAccountsApi`.
+
+`GET /users/{user}/quota-usage` and the app account routes answer `404` for
+an account the caller cannot read. A client calling them must be granted
+read access to the accounts it asks about, as it already needed write
+access to create or delete an app account.
+
 ## To 0.24.0
 
 ### Links to deleted accounts
