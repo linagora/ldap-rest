@@ -12,6 +12,7 @@
   A lint rule refuses an operation naming neither,
   [docs](docs/plugin-development/README.md#using-ldap-operations),
   [upgrading](docs/usage/upgrading.md#plugins-an-operation-naming-no-request-is-judged-as-the-caller)
+  ([#391](https://github.com/linagora/ldap-rest/pull/391))
 
 - The server refuses to start with an authorization plugin and no
   authentication plugin: no request carried an identity, so the
