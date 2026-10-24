@@ -142,7 +142,8 @@ aside — `authzDynamic` letting a request through on
   already.
 
 A host that assembles the server itself — `registerPlugin` after `ready`,
-rather than `--plugin` — gets the same checks, as each plugin arrives: the
+rather than `--plugin` — gets the same checks of the composition, as each
+plugin arrives (not the one asking for an authentication plugin, above): the
 refusal comes out of `registerPlugin`, before any of the plugin's routes or
 hooks exist. An arriving plugin is judged against what is already there, so
 the authentication plugins an `authz_for` or `--authz-scope-source` names
