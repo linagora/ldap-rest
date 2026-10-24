@@ -15,7 +15,7 @@
   as `OBJECTCLASS`, and members added as `MEMBER` past the group's own
   routes, went through,
   [upgrading](docs/usage/upgrading.md#attribute-names-in-a-write-one-name-per-attribute-no-option)
-  ([#PRNUM](https://github.com/linagora/ldap-rest/pull/PRNUM))
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
 
 - `core/ldap/raw`: `GET /children/{dn}` answered the children of an entry
   the caller may not read, an empty list where an entry that is not there
@@ -140,16 +140,16 @@
   attributes the schema fixes, and filtered `add`, `replace` and `delete`
   themselves, which no schema fixes: a fixed `objectClass` was written. They
   are dropped from each part, as on a creation
-  ([#PRNUM](https://github.com/linagora/ldap-rest/pull/PRNUM))
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
 
 - `core/ldap/organizations`: an organization deleted as `OU=…` skipped the
   check that it is empty
-  ([#PRNUM](https://github.com/linagora/ldap-rest/pull/PRNUM))
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
 
 - `core/twake/james`: a mailbox type pointer written `CN=TeamMailbox,…`
   leads to the team mailbox entry, and was not read as one: the checks of
   a team mailbox's members did not run
-  ([#PRNUM](https://github.com/linagora/ldap-rest/pull/PRNUM))
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
 
 - `core/ldap/enterpriseRules`: saving an account with its mail unchanged
   answered `409 … is already used` once `appAccountsConsistency` had made
