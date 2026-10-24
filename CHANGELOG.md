@@ -10,6 +10,7 @@
   organization's absence, and refused with the branch the authorization
   plugin named; it now fails with the same refusal in every case,
   [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
+  ([#384](https://github.com/linagora/ldap-rest/pull/384))
 
 - The authorization plugins judge an LDAP operation before any other
   plugin, whatever order the plugins loaded in. When `core/ldap/trash`
