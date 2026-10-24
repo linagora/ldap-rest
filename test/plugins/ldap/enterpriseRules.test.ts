@@ -640,6 +640,39 @@ describe('Enterprise rules', () => {
         }
       });
 
+      it('should find no reference in a branch the directory does not hold', async () => {
+        const rules = server.loadedPlugins[
+          'ldapEnterpriseRules'
+        ] as unknown as {
+          searchReferrers(
+            candidate: { name: string; binding: { base: string } },
+            dn: string
+          ): Promise<unknown[]>;
+        };
+        expect(
+          await rules.searchReferrers(
+            { name: 'title', binding: { base: `ou=nowhere,${base}` } },
+            `cn=x,${base}`
+          )
+        ).to.deep.equal([]);
+      });
+
+      it('should refuse to delete a mail domain an organization still links', async () => {
+        // `orgDn` links it: deleted, the link would name nothing, and no
+        // account could be created at that domain any more (#394)
+        const domainDn = `dc=example,ou=domains,ou=nomenclature,${base}`;
+        let error: unknown;
+        await server.ldap
+          .delete(domainDn)
+          .catch((err: unknown) => (error = err));
+        expect(String(error)).to.match(/still referenced by.*twakeDomainLink/);
+        const found = (await server.ldap.search(
+          { paged: false, scope: 'base', attributes: ['1.1'] },
+          domainDn
+        )) as { searchEntries: unknown[] };
+        expect(found.searchEntries).to.have.length(1);
+      });
+
       const leaver = (): string => `uid=rules.leaver,ou=users,${base}`;
       const keeper = (): string => `uid=rules.keeper,ou=users,${base}`;
       const create = (uid: string, employeeNumber: string) =>

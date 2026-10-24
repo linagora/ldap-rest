@@ -1142,15 +1142,22 @@ export default class LdapEnterpriseRules extends DmPlugin {
     dn: string
   ): Promise<Record<string, unknown>[]> {
     // As the server: the references to an entry, whoever may read their holders
-    const result = (await this.server.ldap.system.search(
-      {
-        paged: false,
-        scope: 'sub',
-        filter: `(${candidate.name}=${escapeLdapFilter(dn)})`,
-        attributes: ['dn', candidate.name],
-      },
-      candidate.binding.base
-    )) as SearchResult;
+    const result = (await this.server.ldap.system
+      .search(
+        {
+          paged: false,
+          scope: 'sub',
+          filter: `(${candidate.name}=${escapeLdapFilter(dn)})`,
+          attributes: ['dn', candidate.name],
+        },
+        candidate.binding.base
+      )
+      .catch((err: unknown) => {
+        // A branch the directory does not hold holds no reference: a schema
+        // loaded for an entity this deployment has none of
+        if (extractLdapCode(err) === 32) return { searchEntries: [] };
+        throw err;
+      })) as SearchResult;
     return (result.searchEntries || []) as Record<string, unknown>[];
   }
 

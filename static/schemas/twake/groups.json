@@ -82,6 +82,7 @@
     "businessCategory": {
       "type": "pointer",
       "branch": ["ou=twakeListType,ou=nomenclature,__LDAP_BASE__"],
+      "referentialIntegrity": "restrict",
       "required": false,
       "role": "writePolicy",
       "label": {
@@ -98,6 +99,7 @@
     "twakeMailboxType": {
       "type": "pointer",
       "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
+      "referentialIntegrity": "restrict",
       "group": {
         "en": "Mailbox Settings",
         "fr": "Paramètres de messagerie",

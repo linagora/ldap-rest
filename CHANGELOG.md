@@ -101,6 +101,15 @@
 
 ### Fixes
 
+- Shipped schemas (`twake`, `example`): a mail domain an organization
+  still links, and a nomenclature value — account status, delivery mode,
+  personal title, list type, mailbox type — an entry still holds, can no
+  longer be deleted (`409 still referenced`). The mail domain used to go,
+  leaving the link naming nothing and no account creatable at it. The
+  check no longer refuses every delete when a schema with such a pointer
+  is loaded for a branch the directory does not hold
+  ([#398](https://github.com/linagora/ldap-rest/pull/398))
+
 - `core/ldap/passwordPolicy`: `POST /api/v1/users/{id}/unlock` for a user
   that is not there answered 500; it answers 404, as for one the caller
   may not read
