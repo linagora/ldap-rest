@@ -1176,6 +1176,12 @@ for (const model of MODELS)
        * through, and must write the same
        */
       leavesOut?: boolean;
+      /**
+       * The caller's call gets past the authorization, to the lookup of the
+       * target: its absent variant is no refusal. Without it, two refusals
+       * would answer alike and probe nothing.
+       */
+      reaches?: boolean;
     }
 
     const theirsOrg = (): string => `ou=probetheirs,${orgs}`;
@@ -1214,6 +1220,7 @@ for (const model of MODELS)
         vary: userPair,
         body: target => ({ member: [target] }),
         attachedOnly: true,
+        reaches: true,
       },
       'parent of a new organization': {
         method: 'POST',
@@ -1229,6 +1236,7 @@ for (const model of MODELS)
         vary: () => ({ there: 'probe-lodger', absent: 'probe-absent' }),
         body: target => ({ usernames: [target] }),
         narrowed: true,
+        reaches: true,
       },
       'member added to a space': {
         method: 'POST',
@@ -1237,6 +1245,7 @@ for (const model of MODELS)
         vary: () => ({ there: 'probe-lodger', absent: 'probe-absent' }),
         body: target => ({ usernames: [target], role: 'viewer' }),
         narrowed: true,
+        reaches: true,
       },
       'group linked to a space': {
         method: 'POST',
@@ -1245,6 +1254,7 @@ for (const model of MODELS)
         vary: () => ({ there: 'probe-lgroup', absent: 'probe-absent' }),
         body: target => ({ groupIds: [target], role: 'viewer' }),
         narrowed: true,
+        reaches: true,
       },
       'tombstone erased': {
         method: 'POST',
@@ -1275,6 +1285,7 @@ for (const model of MODELS)
         query: target =>
           `?base=${encodeURIComponent(target)}&scope=base&filter=${encodeURIComponent('(objectClass=*)')}`,
       },
+      // Judged by branch, the SCIM users are not the caller's: refused alike
       'SCIM user filter': {
         method: 'GET',
         path: () => '/scim/v2/Users',
@@ -1282,6 +1293,9 @@ for (const model of MODELS)
         query: target =>
           `?filter=${encodeURIComponent(`userName eq "${target}"`)}`,
       },
+      // Judged by branch, refused alike: the linked entries are looked for
+      // from the base. Kept for the day they are looked for where the caller
+      // reads
       'organization search': {
         method: 'GET',
         path: () =>
@@ -1309,6 +1323,7 @@ for (const model of MODELS)
           twakeDepartmentLink: `ou=probemine,${orgs}`,
         }),
         attachedOnly: true,
+        reaches: true,
       },
       'member of a SCIM group': {
         method: 'PUT',
@@ -1321,6 +1336,7 @@ for (const model of MODELS)
         }),
         attachedOnly: true,
         leavesOut: true,
+        reaches: true,
       },
       'members of a new space': {
         method: 'POST',
@@ -1331,6 +1347,7 @@ for (const model of MODELS)
           members: [{ username: target, role: 'admin' }],
         }),
         narrowed: true,
+        reaches: true,
       },
       'account whose instance is ensured': {
         method: 'POST',
@@ -1420,6 +1437,10 @@ for (const model of MODELS)
           differing.push(
             `${name} wrote: ${a.status} ${JSON.stringify(a.body)}`
           );
+        if (c.reaches && b.status === 403)
+          differing.push(
+            `${name} refused the caller: ${JSON.stringify(b.body)}`
+          );
         if (c.writes && b.status >= 400)
           differing.push(
             `${name} refused the caller its own write: ${b.status} ${JSON.stringify(b.body)}`
@@ -1445,7 +1466,8 @@ for (const model of MODELS)
     it('tells the carried targets apart for a caller who may read them', async function () {
       // The cases above probe something: an administrator naming the same
       // targets is answered differently. Its writes go through, so this
-      // comes last.
+      // comes last, as mocha runs the tests in the order they are declared:
+      // run alone with --grep, it leaves the caller's tests nothing to probe.
       this.timeout(120000);
       const alike: string[] = [];
       for (const [name, c] of carried()) {
