@@ -18,6 +18,13 @@ caller, and refused where the caller may not. Hand the request down
 (`ldap.forRequest(req)`), or, for the server's own work, go through
 `ldap.system`. Hooks run outside the request and keep acting as the server.
 
+Under `core/auth/authzDynamic`, a hook's operations that named no request
+used to be judged against the token, through an async context of the
+plugin's own; they now act as the server, as under the other authorization
+plugins. A hook writing on the caller's behalf passes the request it is
+handed. That context, `authzContext`, is no longer exported: read the token
+off the request (`req.authzToken`).
+
 ### An authorization plugin needs an authentication plugin
 
 **Who is affected:** a deployment loading `core/auth/authzPerBranch`,

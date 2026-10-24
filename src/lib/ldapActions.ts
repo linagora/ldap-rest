@@ -59,6 +59,14 @@ const defaultSearchOptions: SearchOptions = {
 };
 export type { SearchOptions, SearchResult };
 
+/** Where each judged hook takes the request in its arguments. */
+const AUTHORIZED_REQUEST_AT: Record<AuthorizedHook, number> = {
+  ldapaddrequest: 2,
+  ldapmodifyrequest: 3,
+  ldaprenamerequest: 2,
+  ldapdeleterequest: 1,
+};
+
 /** The operations {@link ldapActions.system} makes as the server. */
 const SYSTEM_OPERATIONS = new Set<string | symbol>([
   'search',
@@ -702,7 +710,8 @@ class ldapActions {
 
     // If pool is not full, create a new connection
     if (this.connectionPool.length < this.poolSize) {
-      const client = await this.createConnection();
+      // Outside the request it is opened for: the connection outlives it
+      const client = await outsideRequest(() => this.createConnection());
       const pooled: PooledConnection = {
         client,
         createdAt: Date.now(),
@@ -906,6 +915,9 @@ class ldapActions {
    * caller. These operations step out of the request instead: they are the
    * server's, whatever plugin serves the request — `authzDynamic` included.
    * Each use says why the work is the server's.
+   *
+   * Only those six step out: `system.readableBy` and `system.forRequest`
+   * still judge the request they are given or find.
    */
   get system(): this {
     this.systemView ??= new Proxy(this, {
@@ -997,8 +1009,12 @@ class ldapActions {
     hook: H,
     args: Parameters<NonNullable<Hooks[H]>>[0]
   ): Promise<void> {
+    // The request being served, when none is named, as for the operation
+    const given = [...(args as unknown[])];
+    const at = AUTHORIZED_REQUEST_AT[hook];
+    given[at] ??= currentRequest();
     // The DNs as the operation completes them before its hooks see them
-    const [target, ...rest] = args as unknown[];
+    const [target, ...rest] = given;
     const judged: unknown[] =
       hook === 'ldapdeleterequest'
         ? [[target].flat().map(dn => this.setDn(String(dn))), ...rest]

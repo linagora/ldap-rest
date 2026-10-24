@@ -62,7 +62,6 @@ import {
 } from '../lib/errors';
 import { extractLdapCode } from '../lib/ldapCodes';
 import { loadSchemaFile } from '../lib/schemaFile';
-import { outsideRequest } from '../lib/requestContext';
 
 import DmPlugin from './plugin';
 
@@ -1204,11 +1203,13 @@ export default abstract class LdapFlat extends DmPlugin {
 
     await this.addEntry(id, additional, req);
     // As the server: what the caller just wrote is answered back to them,
-    // whether or not they may read the branch it went to
-    const entry = await outsideRequest(() =>
-      this.searchEntriesByName(id, false)
-    );
-    return created(res, this.project(entry[id]));
+    // whether or not they may read the branch it went to. By its DN: the
+    // name may be another entry's elsewhere.
+    const written = (await this.ldap.system.search(
+      { paged: false, scope: 'base', attributes: this.entryAttributes() },
+      this.resolveDn(id)
+    )) as SearchResult;
+    return created(res, this.project(written.searchEntries[0]));
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {

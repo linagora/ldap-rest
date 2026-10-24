@@ -74,6 +74,16 @@ class Reader extends DmPlugin {
       })
     );
     app.get(
+      '/api/test/context/judge',
+      asyncHandler(async (_req: DmRequest, res: Response) => {
+        await this.server.ldap.authorize('ldapdeleterequest', [
+          this.target(),
+          undefined,
+        ]);
+        res.json({ judged: true });
+      })
+    );
+    app.get(
       '/api/test/context/system',
       asyncHandler(async (_req: DmRequest, res: Response) => {
         res.json({ found: await this.count(true) });
@@ -163,6 +173,17 @@ describe('Operations made while serving a request', function () {
 
     const refused = await request
       .get('/api/test/context/forgotten')
+      .set('X-Test-User', STRANGER);
+    expect(refused.status, JSON.stringify(refused.body)).to.equal(403);
+  });
+
+  it('has a write judged first as the caller, request named or not', async () => {
+    const allowed = await request
+      .get('/api/test/context/judge')
+      .set('X-Test-User', READER);
+    expect(allowed.status, JSON.stringify(allowed.body)).to.equal(200);
+    const refused = await request
+      .get('/api/test/context/judge')
       .set('X-Test-User', STRANGER);
     expect(refused.status, JSON.stringify(refused.body)).to.equal(403);
   });
