@@ -123,6 +123,13 @@
 
 ### Fixes
 
+- `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
+  and `…/subnodes/search` looked for the attached entries from the parent of
+  the top organization only, and answered 403 to an administrator held to
+  their organization — `authzPerBranch` judging by DN, `authzDynamic`. Such
+  a caller now gets the entries attached within the organization's branch
+  ([#403](https://github.com/linagora/ldap-rest/issues/403))
+
 - `core/ldap/groups`: a group named with a comma is taken for a DN only
   when it is one: `GET /api/v1/ldap/groups/a%2Cb` answered 500, it
   answers 400. And the `/api/v1/ldap/groups/{cn}` routes, creation and

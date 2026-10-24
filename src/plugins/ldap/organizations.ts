@@ -22,6 +22,7 @@ import {
   escapeLdapFilter,
   getParentDn,
   getRdn,
+  isAuthzRefusal,
   isChildOf,
   isDnInBranch,
   launchHooksChained,
@@ -1221,7 +1222,8 @@ export default class LdapOrganizations extends DmPlugin {
    * search just learned to survive: a directory that will not walk the whole
    * link filter is told about rather than turned into an empty list.
    *
-   * @param baseDn branch the attached entries live in
+   * @param baseDn branch the attached entries live in; the organization's
+   *        own, for a caller who may not search it
    * @param filter what links them to the organization
    * @param cap how many to return
    * @param dn organization they are attached to, for the indicator's DN
@@ -1250,6 +1252,14 @@ export default class LdapOrganizations extends DmPlugin {
         if (remaining > 0) kept.push(...sub.searchEntries.slice(0, remaining));
       }
     } catch (err) {
+      // A caller held to branches below the base — judged by DN, or by the
+      // bases of a token — may not search it: what they can be shown is
+      // what is attached to the organization within its own branch.
+      if (
+        baseDn !== dn &&
+        (isAuthzRefusal(err) || (err as HttpError)?.statusCode === 403)
+      )
+        return this.linkedEntities(dn, filter, cap, dn, req);
       const code = extractLdapCode(err);
       // `noSuchObject` is not answered with an empty list here, where it is
       // for the children. The base is not the caller's node but the branch

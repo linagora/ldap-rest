@@ -174,6 +174,14 @@ curl "http://localhost:8081/api/v1/ldap/organizations/ou%3DIT%2Co%3Dgov%2Cc%3Dmu
 ]
 ```
 
+**Where the attached entries are looked for**
+
+Below the parent of `--ldap-top-organization`, as the caller. A caller an
+authorization plugin does not let search there — `authzPerBranch` judging
+by DN, a token of `authzDynamic` — gets the entries attached within the
+organization's own branch; those attached from elsewhere are not listed.
+`/subnodes/search` looks the same way.
+
 **When the answer is partial**
 
 Two things bound what comes back, and both are announced in the list rather
