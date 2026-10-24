@@ -10,6 +10,7 @@
   memberships exist from the answers to writes. They read as the caller, and
   judge a write before looking for anything,
   [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
+  ([#383](https://github.com/linagora/ldap-rest/pull/383))
 
 - The authorization plugins judge an LDAP operation before any other
   plugin, whatever order the plugins loaded in. When `core/ldap/trash`
