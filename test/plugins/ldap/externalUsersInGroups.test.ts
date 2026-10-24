@@ -222,6 +222,18 @@ describe('External users in groups', function () {
         );
       });
 
+      it('reads the domain attribute whatever case the option spells it in', async () => {
+        const saved = server.config.enterprise_domain_name_attribute;
+        server.config.enterprise_domain_name_attribute = 'ASSOCIATEDDOMAIN';
+        try {
+          expect(await outcome('f@lists.example.com')).to.match(
+            /Cannot create external user with managed domain/
+          );
+        } finally {
+          server.config.enterprise_domain_name_attribute = saved;
+        }
+      });
+
       it('takes a subdomain of a managed domain for an external one', async () => {
         expect(await outcome(`d@sub.${managedDomain}`)).to.equal('created');
         expect(await outcome('e@sub.lists.example.com')).to.equal('created');
@@ -287,6 +299,25 @@ describe('External users in groups', function () {
   });
 
   describe('Config API', function () {
+    it('keeps the block, with the configured domains, when the directory does not answer', async () => {
+      const saved = server.config.mail_domain;
+      const search = server.ldap.search;
+      server.config.mail_domain = ['Example.COM'];
+      server.ldap.search = (() =>
+        Promise.reject(new Error('directory down'))) as typeof search;
+      try {
+        const data = await external.getConfigApiData();
+        expect(data).to.include({
+          enabled: true,
+          branch: process.env.DM_EXTERNAL_MEMBERS_BRANCH,
+        });
+        expect(data.managedDomains).to.deep.equal(['example.com']);
+      } finally {
+        server.ldap.search = search;
+        server.config.mail_domain = saved;
+      }
+    });
+
     it('publishes the branch, the RDN attribute and the managed domains, those of the directory included', async () => {
       const saved = server.config.mail_domain;
       server.config.mail_domain = ['Example.COM'];

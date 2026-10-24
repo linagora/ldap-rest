@@ -122,26 +122,43 @@ export default class ExternalUsersInGroups extends DmPlugin {
    * declared itself.
    */
   async managedDomains(): Promise<string[]> {
-    const configured = this.config.mail_domain;
     return [
       ...new Set([
-        ...(Array.isArray(configured)
-          ? configured.map(domain => String(domain).toLowerCase())
-          : []),
+        ...this.configuredDomains(),
         ...(await declaredMailDomains(this.server)),
       ]),
     ];
+  }
+
+  /** `--mail-domain`, lower-cased */
+  private configuredDomains(): string[] {
+    const configured = this.config.mail_domain;
+    return Array.isArray(configured)
+      ? configured.map(domain => String(domain).toLowerCase())
+      : [];
   }
 
   /**
    * Where a client sends an external member: `mail=<escaped address>,<branch>`
    */
   async getConfigApiData(): Promise<Record<string, unknown>> {
+    let managedDomains: string[];
+    try {
+      managedDomains = await this.managedDomains();
+    } catch (err) {
+      // The branch and the configured domains are still known: a client
+      // keeps them while the directory does not answer. The creation itself
+      // refuses an external member then.
+      this.logger.warn(
+        `${this.name}: the directory's mail domains could not be read: ${String(err)}`
+      );
+      managedDomains = this.configuredDomains();
+    }
     return {
       enabled: true,
       branch: this.config.external_members_branch,
       rdnAttribute: 'mail',
-      managedDomains: await this.managedDomains(),
+      managedDomains,
     };
   }
 }

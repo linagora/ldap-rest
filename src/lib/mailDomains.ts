@@ -75,23 +75,28 @@ export function domainBranches(server: DM): DomainBranch[] {
 export async function declaredMailDomains(server: DM): Promise<string[]> {
   const domains: string[] = [];
   for (const { base, attribute } of domainBranches(server)) {
-    let result: SearchResult;
     try {
-      result = (await server.ldap.system.search(
+      // Paged: a branch past the server's size limit would otherwise fail,
+      // and every write needing the list with it
+      const pages = (await server.ldap.system.search(
         {
-          paged: false,
+          paged: { pageSize: 500 },
           scope: 'sub',
           filter: `(${attribute}=*)`,
           attributes: [attribute],
         },
         base
-      )) as SearchResult;
+      )) as AsyncGenerator<SearchResult>;
+      for await (const page of pages)
+        for (const entry of page.searchEntries || [])
+          // The directory answers the attribute in its own case
+          for (const [name, value] of Object.entries(entry))
+            if (name.toLowerCase() === attribute.toLowerCase())
+              domains.push(...[value].flat().map(String));
     } catch (err) {
       if (extractLdapCode(err) === 32) continue;
       throw err;
     }
-    for (const entry of result.searchEntries || [])
-      domains.push(...[entry[attribute] ?? []].flat().map(String));
   }
   return mailDomains(domains);
 }
