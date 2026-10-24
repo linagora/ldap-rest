@@ -359,13 +359,20 @@ describe('LDAP Utils', () => {
         expect(normalizeDn(a), a).to.equal(normalizeDn(b));
     });
 
-    it('keeps the spaces and the # that an escape protects', () => {
-      expect(normalizeDn('ou=Sales\\ ,dc=x')).to.equal(
-        normalizeDn('ou=Sales\\20,dc=x')
+    it('drops the spaces the matching rules ignore, escaped or not', () => {
+      for (const spelled of [
+        'ou=Sales\\ ,dc=x',
+        'ou=Sales\\20,dc=x',
+        'ou=\\20Sales,dc=x',
+        'ou= Sales ,dc=x',
+      ])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=sales,dc=x');
+      expect(normalizeDn('ou=Sales  \\20EMEA,dc=x')).to.equal(
+        'ou=sales emea,dc=x'
       );
-      expect(normalizeDn('ou=Sales\\ ,dc=x')).to.not.equal(
-        normalizeDn('ou=Sales,dc=x')
-      );
+    });
+
+    it('keeps the # that an escape protects', () => {
       expect(normalizeDn('ou=\\23x,dc=x')).to.equal('ou=\\#x,dc=x');
       // The BER form is another value
       expect(normalizeDn('ou=#0c0178,dc=x')).to.not.equal(
@@ -389,6 +396,13 @@ describe('LDAP Utils', () => {
 
     it('escapes the specials whether or not the writer did', () => {
       expect(normalizeDn('ou=a=b,dc=x')).to.equal(normalizeDn('ou=a\\=b,dc=x'));
+    });
+
+    it('reads a quote as a value only where it opens one', () => {
+      expect(normalizeDn('cn=a"b,dc=x')).to.equal('cn=a\\"b,dc=x');
+      expect(() => normalizeDn('uid=x,ou="payroll,dc=x')).to.throw(
+        /unbalanced quote/
+      );
     });
 
     it('reads the LDAPv2 separators and quotes OpenLDAP accepts', () => {

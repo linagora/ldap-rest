@@ -523,7 +523,7 @@ export function parseDn(dn: string): string[] {
     } else if (char === '\\') {
       current += char;
       escaped = true;
-    } else if (char === '"') {
+    } else if (char === '"' && (quoted || opensValue(current))) {
       current += char;
       quoted = !quoted;
     } else if (!quoted && (char === ',' || char === ';')) {
@@ -534,12 +534,27 @@ export function parseDn(dn: string): string[] {
     }
   }
 
+  // Read otherwise, the rest of the DN would be one value
+  if (quoted) throw new BadRequestError('DN has an unbalanced quote');
+
   // Don't forget the last part
   if (current) {
     parts.push(trimUnescaped(current));
   }
 
   return parts;
+}
+
+/**
+ * Whether a double quote here opens a value: only right after its `=`, as
+ * LDAPv2 quotes a whole value. Anywhere else it is a character of it.
+ */
+function opensValue(before: string): boolean {
+  const text = before.trimEnd();
+  if (!text.endsWith('=')) return false;
+  let backslashes = 0;
+  for (let i = text.length - 2; i >= 0 && text[i] === '\\'; i--) backslashes++;
+  return backslashes % 2 === 0;
 }
 
 /**
@@ -650,10 +665,11 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 /**
  * One spelling for a DN value (RFC 4514 §2.4): every escape decoded — the
  * directory answers `ou=Sales\2C EMEA` for what a configuration writes
- * `ou=Sales\, EMEA`, `\20` for `\ `, `\C3\A9` for `é` — then the
- * unescaped whitespace around it trimmed, and the characters that need it
- * escaped again with a backslash: the specials anywhere, a `#` or a space
- * at the start, a space at the end. A control character, or hex pairs that
+ * `ou=Sales\, EMEA`, `\20` for `\ `, `\C3\A9` for `é` — then its
+ * insignificant spaces dropped as OpenLDAP's matching rules drop them (at
+ * either end, and all but one of a run), and the characters that need it
+ * escaped again with a backslash: the specials anywhere, a `#` at the
+ * start. A control character, or hex pairs that
  * are not UTF-8, stay hex. A value starting with an unescaped `#` is the
  * BER form, which is not decoded; one in double quotes (LDAPv2) is read
  * as it stands.
@@ -706,20 +722,27 @@ function canonicalValue(raw: string): string {
   // A lone trailing backslash escapes nothing: it is one
   if (last < raw.length) plain(raw.slice(last));
 
+  // Insignificant space (RFC 4518 §2.6.1), as the matching rules of the
+  // naming attributes see it: none at either end, escaped or not, and one
+  // for a run of them
+  const space = ({
+    char,
+    escaped,
+  }: {
+    char: string;
+    escaped: boolean;
+  }): boolean => char === ' ' || (!escaped && /\s/.test(char));
+  const folded = chars.filter(
+    (c, i) => !space(c) || (i > 0 && !space(chars[i - 1]))
+  );
   let start = 0;
-  let end = chars.length;
-  while (start < end && !chars[start].escaped && /\s/.test(chars[start].char))
-    start++;
-  while (
-    end > start &&
-    !chars[end - 1].escaped &&
-    /\s/.test(chars[end - 1].char)
-  )
-    end--;
+  let end = folded.length;
+  while (start < end && space(folded[start])) start++;
+  while (end > start && space(folded[end - 1])) end--;
 
   let out = '';
   for (let i = start; i < end; i++) {
-    const { char } = chars[i];
+    const { char } = folded[i];
     if (char.length > 1)
       out += char; // a pair kept hex
     else if (char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)
@@ -808,7 +831,7 @@ function splitRdn(rdn: string): string[] {
   for (const char of rdn) {
     if (escaped) escaped = false;
     else if (char === '\\') escaped = true;
-    else if (char === '"') quoted = !quoted;
+    else if (char === '"' && (quoted || opensValue(current))) quoted = !quoted;
     else if (char === '+' && !quoted) {
       parts.push(current);
       current = '';

@@ -189,6 +189,9 @@ describe('Branch rule precedence', function () {
         // LDAPv2, which OpenLDAP still reads
         `ou=precpayroll;${acme}`,
         `ou="precpayroll",${acme}`,
+        // Spaces the matching rule ignores
+        `ou=precpayroll\\20,${acme}`,
+        `ou=\\20precpayroll,${acme}`,
       ]) {
         // Refused outright, as the same search spelled `ou=`
         let refused: unknown;
