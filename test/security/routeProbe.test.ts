@@ -1173,9 +1173,10 @@ for (const model of MODELS)
       writes?: boolean;
       /**
        * The variant naming a target that is there is a write the caller may
-       * make, on what it holds: it goes through
+       * make, on what it holds: it goes through, setting this attribute of
+       * this entry to the target, and nothing else
        */
-      sets?: boolean;
+      sets?: { dn: () => string; attribute: string };
       /**
        * A target not found is left out, the rest written: both variants go
        * through, and must write the same
@@ -1378,7 +1379,10 @@ for (const model of MODELS)
         vary: userPair,
         body: target => ({ replace: { twakeManagerLink: [target] } }),
         allowed: POINTER,
-        sets: true,
+        sets: {
+          dn: () => `ou=probesub,ou=probemine,${orgs}`,
+          attribute: 'twakeManagerLink',
+        },
         reaches: true,
       },
       'destination of an organization move': {
@@ -1432,9 +1436,29 @@ for (const model of MODELS)
         const { there, absent } = c.vary();
         const before = await snapshot();
         const a = await send(c, there);
-        const after = JSON.stringify(await snapshot());
+        const taken = await snapshot();
+        const after = JSON.stringify(taken);
+        if (c.sets) {
+          const { dn, attribute } = c.sets;
+          const held = [
+            (taken[dn()] as Record<string, unknown> | undefined)?.[attribute] ??
+              [],
+          ].flat();
+          if (!held.includes(there))
+            differing.push(`${name} did not set ${attribute}: ${a.status}`);
+          // The pointer aside, nothing was touched
+          const aside = (s: Record<string, unknown>) =>
+            JSON.stringify({
+              ...s,
+              [dn()]: { ...(s[dn()] as object), [attribute]: undefined },
+            });
+          if (aside(taken) !== aside(before))
+            differing.push(
+              `${name} changed the directory beyond ${attribute}: ${a.status}`
+            );
+        }
         // Nothing the caller may not touch was touched, nor what it holds
-        if (!c.leavesOut && !c.sets && after !== JSON.stringify(before))
+        else if (!c.leavesOut && after !== JSON.stringify(before))
           differing.push(`${name} changed the directory: ${a.status}`);
         const b = await send(c, absent);
         // What was not found was left out alike

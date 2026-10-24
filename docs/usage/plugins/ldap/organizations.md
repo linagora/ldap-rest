@@ -723,6 +723,15 @@ The plugin validates organizations against configured object classes. Example sc
 }
 ```
 
+A `pointer` attribute is checked as in
+[flat schemas](flat-generic.md#pointer-dn-reference): the DN must name an
+entry in the allowed branches, looked for as the server, whoever writes.
+A caller may point at an entry it cannot read, and learns from the answer
+whether one is there, never what it holds. A pointer that grants rights
+follows the same rule: an organization administrator may name, in
+`twakeLocalAdminLink`, an account they cannot read, and so hand the
+administration of their organization to it.
+
 ## See Also
 
 - [LDAP Flat Plugin](./ldapFlat.md) - For managing flat LDAP entities (users, positions, nomenclature) through schema-driven approach
