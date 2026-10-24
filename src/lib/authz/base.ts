@@ -249,10 +249,13 @@ export default abstract class AuthzBase extends DmPlugin {
       // then on a spelling the rules may not know: refused, as the outage
       // it is rather than a denial. Recognized by its code alone, not by a
       // message that may echo the DN asked for.
-      if ((err as { code?: unknown })?.code !== 32)
-        throw new ServiceUnavailableError(
-          `${dn} could not be read to be authorized: ${String(err)}`
+      if ((err as { code?: unknown })?.code !== 32) {
+        // The directory's diagnostic stays here: SCIM hands the message on
+        this.logger.error(
+          `${this.name}: ${dn} could not be read to be authorized: ${String(err)}`
         );
+        throw new ServiceUnavailableError('Directory unavailable');
+      }
     }
     return dn;
   }

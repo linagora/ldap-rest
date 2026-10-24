@@ -462,19 +462,28 @@ export function validateDnValue(value: string, fieldName: string): void {
 
 // LDAP DN utilities
 
+/** A space, or the ASCII whitespace a configured DN may end in. */
+function asciiSpace(char: string): boolean {
+  return char === ' ' || (char >= '\t' && char <= '\r');
+}
+
 /**
  * Trim the whitespace around a DN component, but not a trailing space its
  * backslash escapes: `ou=a\ ` names a value ending in a space.
  */
 function trimUnescaped(part: string): string {
-  const start = part.trimStart();
-  let end = start.trimEnd();
-  if (end.length < start.length) {
+  // ASCII whitespace only: `trim()` also takes characters the directory
+  // keeps, such as U+1680
+  let start = 0;
+  let end = part.length;
+  while (start < end && asciiSpace(part[start])) start++;
+  while (end > start && asciiSpace(part[end - 1])) end--;
+  if (end < part.length) {
     let backslashes = 0;
-    for (let i = end.length - 1; i >= 0 && end[i] === '\\'; i--) backslashes++;
-    if (backslashes % 2 === 1) end += ' ';
+    for (let i = end - 1; i >= start && part[i] === '\\'; i--) backslashes++;
+    if (backslashes % 2 === 1) end++;
   }
-  return end;
+  return part.slice(start, end);
 }
 
 /**
@@ -683,9 +692,13 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  * @param raw the value as written, after its `=`
  */
 function canonicalValue(raw: string): string {
-  if (raw.trimStart().startsWith('#')) return raw.trim();
+  let from = 0;
+  let to = raw.length;
+  while (from < to && asciiSpace(raw[from])) from++;
+  while (to > from && asciiSpace(raw[to - 1])) to--;
+  const trimmed = raw.slice(from, to);
+  if (trimmed.startsWith('#')) return trimmed;
   // LDAPv2: in double quotes, every character is the value's
-  const trimmed = raw.trim();
   // The closing quote is not escaped: an even run of backslashes before it
   let backslashes = 0;
   for (let i = trimmed.length - 2; i > 0 && trimmed[i] === '\\'; i--)

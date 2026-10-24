@@ -377,6 +377,13 @@ describe('LDAP Utils', () => {
       // Not those the directory keeps apart
       for (const other of ['\u1680', '\u2028', '\u2029'])
         expect(normalizeDn(`ou=a${other}b,dc=x`)).to.not.equal('ou=a b,dc=x');
+      // Nor trimmed at the edges, where the directory keeps them too
+      expect(normalizeDn('ou=payroll\u1680,dc=x')).to.not.equal(
+        'ou=payroll,dc=x'
+      );
+      expect(normalizeDn(normalizeDn('ou=\\E1\\9A\\80#abc,dc=x'))).to.equal(
+        normalizeDn('ou=\\E1\\9A\\80#abc,dc=x')
+      );
       // A tab is not
       expect(normalizeDn('ou=a\\09b,dc=x')).to.not.equal('ou=a b,dc=x');
     });
