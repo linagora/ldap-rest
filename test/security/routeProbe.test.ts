@@ -64,6 +64,7 @@ import James from '../../src/plugins/twake/james';
 import LdapEnterpriseRules from '../../src/plugins/ldap/enterpriseRules';
 import ExternalUsersInGroups from '../../src/plugins/ldap/externalUsersInGroups';
 import TwakeTombstone from '../../src/plugins/twake/tombstone';
+import TwakeInstances from '../../src/plugins/twake/instances';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
 
 /** Authentication reduced to a header */
@@ -81,6 +82,20 @@ class TestAuth extends AuthBase {
   }
 }
 
+/** A broker that takes every message, for the plugins requiring one */
+class StubRabbitMq {
+  name = 'rabbitmq';
+  getRawClient(): Promise<unknown> {
+    return Promise.resolve({});
+  }
+  subscribe(): Promise<void> {
+    return Promise.resolve();
+  }
+  publish(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 const ADMIN = 'probe.admin';
 const CALLER = 'probe.caller';
 /** In every value the targets carry that the caller must never read */
@@ -94,6 +109,8 @@ const TARGETS = [
   'probe-tgroup',
   'probe-them-group',
   'probe-position',
+  'probe-slodger',
+  'probe-slgroup',
 ];
 
 /**
@@ -103,6 +120,25 @@ const TARGETS = [
 const UNEXERCISED: Record<string, string> = {
   'POST /api/v1/ldap/positions/:id/move':
     'positions carry no organization link: they are never moved',
+};
+
+/**
+ * Writes naming no target in their path, nor one this test carries in their
+ * body: `METHOD path` → why.
+ */
+const NO_TARGET: Record<string, string> = {
+  'POST /api/v1/ldap/bulk-import/users':
+    'its targets are in the rows of a file: bulkImportAuthz probes them',
+  'POST /api/v1/ldap/positions':
+    'the body names the entry it creates only: its name is taken whoever may read it, as for an account',
+  'POST /api/v1/password-policies':
+    'the body names the entry it creates only: its name is taken whoever may read it, as for an account',
+  'POST /scim/v2/Users':
+    'the body names the entry it creates only: its name is taken whoever may read it, as for an account',
+  'POST /scim/v2/Groups':
+    'its members are resolved as those of a group replaced, which is probed',
+  'POST /scim/v2/Bulk':
+    'each operation is that of a SCIM route, probed on its own',
 };
 
 /** The two values of a route parameter: a target there, one not there */
@@ -136,7 +172,28 @@ interface Model {
     string,
     { token: string; branch: (orgs: string, base: string) => string }
   >;
+  /**
+   * A grant holds its whole branch: no narrower rule hides part of it from
+   * the caller
+   */
+  wholeBranch?: boolean;
+  /**
+   * The caller reads an organization it does not write: its routes are
+   * probed inside it too, on what a narrower rule hides
+   */
+  readOnlyOrg?: boolean;
 }
+
+/** Where the caller's organization lodges what it may not read */
+const lodger = (orgs: string): string =>
+  `uid=probe-lodger,ou=users,ou=probemine,${orgs}`;
+const lodgerGroup = (orgs: string): string =>
+  `cn=probe-lgroup,ou=groups,ou=probemine,${orgs}`;
+/** What the organization the caller only reads holds, hidden from it */
+const seenLodger = (orgs: string): string =>
+  `uid=probe-slodger,ou=users,ou=probeseen,${orgs}`;
+const seenGroup = (orgs: string): string =>
+  `cn=probe-slgroup,ou=groups,ou=probeseen,${orgs}`;
 
 /**
  * Judged by attachment, what carries no link is in transit, every
@@ -198,9 +255,10 @@ const MODELS: Model[] = [
     plugin: AuthzDynamic,
     env: (_orgs, base) => ({
       DM_AUTHZ_DYNAMIC_BASE: `ou=probetokens,${base}`,
-      DM_AUTHZ_DYNAMIC_CACHE_TTL: '1',
+      DM_AUTHZ_DYNAMIC_CACHE_TTL: '60',
     }),
     allowed: {},
+    wholeBranch: true,
     tokens: {
       [ADMIN]: { token: 'probe-admin-token', branch: (_orgs, base) => base },
       [CALLER]: {
@@ -219,6 +277,21 @@ const MODELS: Model[] = [
           [ADMIN]: { [base]: { read: true, write: true, delete: true } },
           [CALLER]: {
             [`ou=probemine,${orgs}`]: { read: true, write: true, delete: true },
+            // Read, not written
+            [`ou=probeseen,${orgs}`]: {
+              read: true,
+              write: false,
+              delete: false,
+            },
+            // Lodged in the caller's branches, refused by a narrower rule
+            ...Object.fromEntries(
+              [
+                lodger(orgs),
+                lodgerGroup(orgs),
+                seenLodger(orgs),
+                seenGroup(orgs),
+              ].map(dn => [dn, { read: false, write: false, delete: false }])
+            ),
           },
         },
         groups: {},
@@ -226,6 +299,7 @@ const MODELS: Model[] = [
       DM_AUTHZ_PER_BRANCH_CACHE_TTL: '60',
     }),
     allowed: {},
+    readOnlyOrg: true,
   },
   {
     name: 'authzLinid1',
@@ -287,6 +361,9 @@ for (const model of MODELS)
       'DM_TWAKE_SPACE_ADMIN_ATTRIBUTE',
       'DM_TWAKE_SPACE_EDITOR_ATTRIBUTE',
       'DM_TWAKE_SPACE_VIEWER_ATTRIBUTE',
+      'DM_ORGANIZATION_SCHEMA',
+      'DM_SCIM_USER_BASE',
+      'DM_SCIM_GROUP_BASE',
     ];
     let dir: string;
 
@@ -342,15 +419,21 @@ for (const model of MODELS)
         ...model.env(orgs, base),
         DM_LDAP_FLAT_SCHEMA:
           './static/schemas/twake/users.json,./static/schemas/example/positions.json',
+        // Its pointers are checked: a manager must exist
+        DM_ORGANIZATION_SCHEMA: './static/schemas/twake/organizations.json',
+        // Where SCIM finds the targets: by default, right under the base
+        DM_SCIM_USER_BASE: `ou=users,${base}`,
+        DM_SCIM_GROUP_BASE: `ou=groups,${base}`,
         DM_TWAKE_GROUP_BASE: `ou=groups,ou={org},${orgs}`,
         DM_TWAKE_GROUP_USER_BASE: `ou=users,ou={org},${orgs}`,
         DM_TWAKE_GROUP_ORGANIZATION_DN: `ou={org},${orgs}`,
         DM_TWAKE_SPACE_BASE: `ou=spaces,ou={org},${orgs}`,
         // A deleted account is kept as a tombstone, marked in a standard
-        // attribute
+        // attribute: the one deleted to be one, so that the others are
+        // removed for good
         DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE: 'employeeType',
         DM_TWAKE_LIFECYCLE_DELETED_VALUE: 'deleted',
-        DM_TWAKE_TOMBSTONE_DN: `^uid=[^,]+,ou=users,${base}$`,
+        DM_TWAKE_TOMBSTONE_DN: `^uid=probe-gone,ou=users,${base}$`,
         // Spaces of standard classes, which the test directory knows
         DM_TWAKE_SPACE_CLASS: 'top,organizationalRole,extensibleObject',
         DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE: 'o',
@@ -366,6 +449,17 @@ for (const model of MODELS)
       // The app accounts find their user by uid, as the probe names it: no
       // option sets it
       server.config.app_accounts_user_attribute = 'uid';
+      // An instance provider nobody answers at, and attributes the test
+      // directory knows
+      Object.assign(server.config, {
+        twake_instance_provider: 'cozy-stack',
+        twake_instance_cozy_url: 'http://127.0.0.1:9',
+        twake_instance_cozy_domain: 'probe.example',
+        twake_instance_dn: [`^uid=[^,]+,ou=users,${base}$`],
+        twake_instance_fqdn_attribute: 'carLicense',
+        twake_instance_sent_attribute: 'businessCategory',
+      });
+      server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as never;
       await wipe();
       const add = (dn: string, entry: Record<string, unknown>) =>
         server.ldap.add(dn, entry as never);
@@ -399,7 +493,8 @@ for (const model of MODELS)
       await department(orgs, [adminDn]);
       await department(org('probemine'), [callerDn]);
       await department(theirs, []);
-      for (const name of ['probemine', 'probetheirs'])
+      await department(org('probeseen'), []);
+      for (const name of ['probemine', 'probetheirs', 'probeseen'])
         for (const sub of ['users', 'groups', 'spaces'])
           await ou(`ou=${sub},${org(name)}`);
       await person(ADMIN, `ou=users,${base}`, orgs, false);
@@ -474,6 +569,32 @@ for (const model of MODELS)
         member: [`uid=probe-mtuser,ou=users,${mine}`],
         twakeDepartmentLink: mine,
       });
+      // Lodged in the caller's branch, attached to the other organization:
+      // hidden from the caller, by a narrower rule when judged by branch
+      await person('probe-lodger', `ou=users,${mine}`, theirs, false);
+      await add(lodgerGroup(orgs), {
+        objectClass: ['top', 'twakeStaticGroup'],
+        cn: 'probe-lgroup',
+        o: 'Probe lodged group',
+        member: [lodger(orgs)],
+        twakeDepartmentLink: theirs,
+      });
+      // In the organization the caller only reads, hidden by a narrower rule
+      await person(
+        'probe-slodger',
+        `ou=users,${org('probeseen')}`,
+        org('probeseen')
+      );
+      await add(seenGroup(orgs), {
+        objectClass: ['top', 'twakeStaticGroup'],
+        cn: 'probe-slgroup',
+        o: `Probe ${SECRET} seen group`,
+        member: [seenLodger(orgs)],
+        twakeDepartmentLink: org('probeseen'),
+      });
+      // Attached to the caller's organization, outside its branch: hidden
+      // from the caller when judged by branch
+      await person('probe-hidden', `ou=users,${base}`, mine, false);
 
       for (const [name, Plugin] of [
         ...(model.tokens ? [] : [['testAuth', TestAuth]]),
@@ -496,6 +617,7 @@ for (const model of MODELS)
         ['ldapEnterpriseRules', LdapEnterpriseRules],
         ['externalUsersInGroups', ExternalUsersInGroups],
         ['twakeTombstone', TwakeTombstone],
+        ['twakeInstances', TwakeInstances],
       ] as [string, new (s: DM) => DmPlugin][])
         await server.registerPlugin(name, new Plugin(server));
       server.setupErrorMiddleware();
@@ -510,7 +632,18 @@ for (const model of MODELS)
 
       // Deleted by the administrator, kept as a tombstone of the other
       // organization
-      await request.delete('/api/v1/ldap/users/probe-gone').set(as(ADMIN));
+      const gone = await request
+        .delete('/api/v1/ldap/users/probe-gone')
+        .set(as(ADMIN));
+      const tombstone = (await server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['employeeType'] },
+        `uid=probe-gone,ou=users,${base}`
+      )) as SearchResult;
+      // Without it, erasing a tombstone would probe nothing
+      if (tombstone.searchEntries[0]?.employeeType !== 'deleted')
+        throw new Error(
+          `probe-gone left no tombstone: ${gone.status} ${JSON.stringify(gone.body)}`
+        );
 
       // Through the routes, as the administrator: the plugins' own formats.
       // A space carries no link, so it holds no secret: under a model
@@ -595,6 +728,12 @@ for (const model of MODELS)
 
     /** Everything this test wrote: the probe tree, and the entries named */
     const wipe = async (): Promise<void> => {
+      // A tombstone deleted is written again: it is erased
+      await (
+        server.loadedPlugins['twakeTombstone'] as TwakeTombstone | undefined
+      )
+        ?.erase(`uid=probe-gone,ou=users,${base}`, { force: true })
+        .catch(() => undefined);
       const doomed: string[] = [];
       for (const branch of [
         orgs,
@@ -610,14 +749,28 @@ for (const model of MODELS)
         } catch {
           // Not there
         }
+      // And what the routes created in the shared branches
+      for (const [branch, filter] of [
+        [`ou=users,${base}`, '(uid=probe-new*)'],
+        [`ou=groups,${base}`, '(cn=probe-new*)'],
+      ])
+        try {
+          const found = (await server.ldap.search(
+            { paged: false, scope: 'one', filter, attributes: ['1.1'] },
+            branch
+          )) as SearchResult;
+          doomed.push(...found.searchEntries.map(e => String(e.dn)));
+        } catch {
+          // Not there
+        }
       doomed.push(
         `uid=probe-them,ou=users,${base}`,
         `cn=probe-them-group,ou=groups,${base}`,
         `cn=probe-position,ou=positions,${base}`,
         `uid=probe-muser,ou=users,${base}`,
         `uid=probe-gone,ou=users,${base}`,
+        `uid=probe-hidden,ou=users,${base}`,
         `cn=probe-mgroup,ou=groups,${base}`,
-        `ou=probe-neworg,ou=probemine,${orgs}`,
         `uid=${ADMIN},ou=users,${base}`,
         `uid=${CALLER},ou=users,${base}`,
         policyDn
@@ -735,7 +888,10 @@ for (const model of MODELS)
       res: supertest.Response,
       asked: Record<string, string>
     ): string => {
-      let text = JSON.stringify({ status: res.status, body: res.body });
+      let text = JSON.stringify({ status: res.status, body: res.body })
+        // Where each call was served, and when
+        .replace(/127\.0\.0\.1:\d+/g, '<server>')
+        .replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, '<time>');
       for (const value of Object.values(asked).sort(
         (a, b) => b.length - a.length
       ))
@@ -768,6 +924,13 @@ for (const model of MODELS)
         [`cn=probe-them-group,ou=groups,${base}`, 'base'],
         [`cn=probe-position,ou=positions,${base}`, 'base'],
         [policyDn, 'base'],
+        // And what the caller holds: a write refused leaves it alone too
+        [`ou=probemine,${orgs}`, 'sub'],
+        [`ou=probeseen,${orgs}`, 'sub'],
+        [`uid=probe-muser,ou=users,${base}`, 'base'],
+        [`cn=probe-mgroup,ou=groups,${base}`, 'base'],
+        [`uid=probe-hidden,ou=users,${base}`, 'base'],
+        [`uid=probe-gone,ou=users,${base}`, 'base'],
       ] as [string, 'sub' | 'base'][]) {
         const found = (await server.ldap
           .search(
@@ -797,10 +960,13 @@ for (const model of MODELS)
      *
      * @param who the caller
      * @param only the methods to call
+     * @param place the targets of a route, none to leave it out
      */
     const probe = async (
       who: string,
-      only?: string[]
+      only?: string[],
+      place: (path: string) => Record<string, Pair> | null | undefined = path =>
+        params(path)
     ): Promise<{
       differing: string[];
       unplaced: string[];
@@ -813,7 +979,8 @@ for (const model of MODELS)
         if (!path.includes(':')) continue;
         if (only && !only.includes(method)) continue;
         const key = `${method} ${path}`;
-        const pairs = params(path);
+        const pairs = place(path);
+        if (pairs === undefined) continue;
         if (!pairs) {
           unplaced.push(key);
           continue;
@@ -867,6 +1034,8 @@ for (const model of MODELS)
         'GET /api/v1/organizations/:id/spaces/:spaceId',
         'GET /api/v1/ldap/positions/:id',
         'GET /api/v1/users/:user/app-accounts',
+        'GET /scim/v2/Users/:id',
+        'GET /scim/v2/Groups/:id',
       ])
         expect(
           differing.some(line => line.startsWith(`${route}\n`)),
@@ -891,6 +1060,49 @@ for (const model of MODELS)
       expect(await snapshot()).to.deep.equal(before);
     });
 
+    it('answers alike inside an organization it reads, but may not write', async function () {
+      // Judged by branch, every organization route stops at the
+      // organization's gate: here, the caller goes past it, and the groups
+      // and users a narrower rule hides must answer as absent ones do
+      if (!model.readOnlyOrg) this.skip();
+      this.timeout(120000);
+      const inside = (path: string) =>
+        // A space carries no link, and no rule here hides one
+        path.startsWith('/api/v1/organizations/:id') &&
+        !path.includes(':spaceId')
+          ? {
+              id: { there: 'probeseen', absent: 'probeseen' },
+              groupId: { there: 'probe-slgroup', absent: 'probe-absent' },
+              userId: { there: 'probe-slodger', absent: 'probe-absent' },
+            }
+          : undefined;
+      // Past the gate: the organization is the caller's to read
+      const gate = await call(
+        'GET',
+        '/api/v1/organizations/probeseen/groups',
+        undefined
+      );
+      expect(gate.status, JSON.stringify(gate.body)).to.equal(200);
+      // And the targets are there to be found, by one who may read them
+      const seen = await probe(ADMIN, ['GET'], inside);
+      expect(
+        seen.differing.some(line =>
+          line.startsWith('GET /api/v1/organizations/:id/groups/:groupId\n')
+        ),
+        seen.differing.join('\n')
+      ).to.equal(true);
+      const before = await snapshot();
+      const { differing, unplaced, unexercised } = await probe(
+        CALLER,
+        undefined,
+        inside
+      );
+      expect(unplaced).to.deep.equal([]);
+      expect(unexercised, 'routes refused at the shape').to.deep.equal([]);
+      expect(differing, differing.join('\n')).to.deep.equal([]);
+      expect(await snapshot()).to.deep.equal(before);
+    });
+
     /** A search asks for the targets, under the whole tree */
     const listQuery = (path: string): string =>
       path === '/api/v1/ldap/raw/search'
@@ -912,9 +1124,12 @@ for (const model of MODELS)
         const text = String(JSON.stringify(res.body));
         // Judged by attachment, a nomenclature value is every
         // administrator's: the positions are listed to all
-        const hidden = model.publicOrganizations
-          ? TARGETS.filter(token => token !== 'probe-position')
-          : TARGETS;
+        const hidden = [
+          ...(model.publicOrganizations
+            ? TARGETS.filter(token => token !== 'probe-position')
+            : [...TARGETS, 'probe-hidden']),
+          ...(model.wholeBranch ? [] : ['probe-lodger', 'probe-lgroup']),
+        ];
         if (hidden.some(token => text.includes(token)))
           leaking.push(
             `${method} ${path}: ${JSON.stringify(res.body).slice(0, 300)}`
@@ -936,10 +1151,31 @@ for (const model of MODELS)
       query?: (target: string) => string;
       /** Only judged by attachment: by branch, the path is not the caller's */
       attachedOnly?: boolean;
+      /**
+       * Only judged by branch: by attachment, the target is the caller's to
+       * read
+       */
+      branchOnly?: boolean;
+      /**
+       * The route looks in the caller's own branch only: the target hides
+       * there behind a narrower rule, which a model granting whole branches
+       * has not
+       */
+      narrowed?: boolean;
       /** Judged by attachment, a difference allowed: why */
       transit?: string;
-      /** The absent variant is a write the caller may make */
+      /** A difference allowed under every model: why */
+      allowed?: string;
+      /**
+       * The absent variant is a write the caller may make, and goes
+       * through: the route is the caller's to use
+       */
       writes?: boolean;
+      /**
+       * A target not found is left out, the rest written: both variants go
+       * through, and must write the same
+       */
+      leavesOut?: boolean;
     }
 
     const theirsOrg = (): string => `ou=probetheirs,${orgs}`;
@@ -953,7 +1189,24 @@ for (const model of MODELS)
     });
     const ORG_EXISTS =
       'an organization carries no link: every administrator reads it';
+    let freeMail = 0;
+    let created = 0;
+    const TAKEN =
+      'a name is taken whoever may read the entry holding it: uniqueness answers about the whole directory';
+    /** An account of the caller's organization, as the Twake schema wants it */
+    const newAccount = (uid: string, link = `ou=probemine,${orgs}`) => ({
+      // The uid is the mail's, suffixed if taken: no name to probe
+      cn: uid,
+      sn: 'Probe',
+      givenName: 'New',
+      displayName: `Probe ${uid}`,
+      mail: `${uid}@example.org`,
+      employeeNumber: `N-${uid}`,
+      twakeDepartmentLink: link,
+    });
 
+    // In the order the administrator's control calls them: the moves last,
+    // as they take away what the cases before them are called on
     const CARRIED: Record<string, Carried> = {
       'member added to a group': {
         method: 'POST',
@@ -968,6 +1221,131 @@ for (const model of MODELS)
         vary: orgPair,
         body: target => ({ ou: 'probe-neworg', parentDn: target }),
         transit: ORG_EXISTS,
+      },
+      'member added to an organization group': {
+        method: 'POST',
+        path: () =>
+          '/api/v1/organizations/probemine/groups/probe-mtgroup/members',
+        vary: () => ({ there: 'probe-lodger', absent: 'probe-absent' }),
+        body: target => ({ usernames: [target] }),
+        narrowed: true,
+      },
+      'member added to a space': {
+        method: 'POST',
+        path: () =>
+          `/api/v1/organizations/probemine/spaces/${mySpaceId!}/members`,
+        vary: () => ({ there: 'probe-lodger', absent: 'probe-absent' }),
+        body: target => ({ usernames: [target], role: 'viewer' }),
+        narrowed: true,
+      },
+      'group linked to a space': {
+        method: 'POST',
+        path: () =>
+          `/api/v1/organizations/probemine/spaces/${mySpaceId!}/groups`,
+        vary: () => ({ there: 'probe-lgroup', absent: 'probe-absent' }),
+        body: target => ({ groupIds: [target], role: 'viewer' }),
+        narrowed: true,
+      },
+      'tombstone erased': {
+        method: 'POST',
+        path: () => '/api/v1/twake/tombstones/erase',
+        vary: () => ({
+          there: `uid=probe-gone,ou=users,${base}`,
+          absent: `uid=probe-absent,ou=users,${base}`,
+        }),
+        body: target => ({ dn: target }),
+      },
+      'mail taken elsewhere': {
+        method: 'PUT',
+        path: () => '/api/v1/ldap/users/probe-muser',
+        vary: () => ({
+          there: `probe-them@${SECRET}.example`,
+          // Another each time: an address given is held by the account
+          absent: `probe-free${++freeMail}@example.org`,
+        }),
+        body: target => ({ replace: { mail: target } }),
+        attachedOnly: true,
+        allowed: TAKEN,
+        writes: true,
+      },
+      'base of a raw search': {
+        method: 'GET',
+        path: () => '/api/v1/ldap/raw/search',
+        vary: userPair,
+        query: target =>
+          `?base=${encodeURIComponent(target)}&scope=base&filter=${encodeURIComponent('(objectClass=*)')}`,
+      },
+      'SCIM user filter': {
+        method: 'GET',
+        path: () => '/scim/v2/Users',
+        vary: () => ({ there: 'probe-them', absent: 'probe-absent' }),
+        query: target =>
+          `?filter=${encodeURIComponent(`userName eq "${target}"`)}`,
+      },
+      'organization search': {
+        method: 'GET',
+        path: () =>
+          `/api/v1/ldap/organizations/${encodeURIComponent(`ou=probemine,${orgs}`)}/subnodes/search`,
+        vary: () => ({ there: 'probe-hidden', absent: 'probe-absent' }),
+        query: target => `?q=${encodeURIComponent(target)}`,
+        branchOnly: true,
+      },
+      'organization of a new account': {
+        method: 'POST',
+        path: () => '/api/v1/ldap/users',
+        vary: orgPair,
+        body: target => newAccount(`probe-new${++created}`, target),
+        attachedOnly: true,
+        transit: ORG_EXISTS,
+      },
+      'member of a new group': {
+        method: 'POST',
+        path: () => '/api/v1/ldap/groups',
+        vary: userPair,
+        body: target => ({
+          cn: `probe-new${++created}`,
+          member: [target],
+          objectClass: ['top', 'twakeStaticGroup'],
+          twakeDepartmentLink: `ou=probemine,${orgs}`,
+        }),
+        attachedOnly: true,
+      },
+      'member of a SCIM group': {
+        method: 'PUT',
+        path: () => '/scim/v2/Groups/probe-mgroup',
+        vary: userPair,
+        body: target => ({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'probe-mgroup',
+          members: [{ value: target }],
+        }),
+        attachedOnly: true,
+        leavesOut: true,
+      },
+      'members of a new space': {
+        method: 'POST',
+        path: () => '/api/v1/organizations/probemine/spaces',
+        vary: () => ({ there: 'probe-lodger', absent: 'probe-absent' }),
+        body: target => ({
+          name: `probe-new${++created}`,
+          members: [{ username: target, role: 'admin' }],
+        }),
+        narrowed: true,
+      },
+      'account whose instance is ensured': {
+        method: 'POST',
+        path: () => '/api/v1/twake/instances/ensure',
+        vary: userPair,
+        body: target => ({ dn: target }),
+      },
+      'account whose instance is ensured, by mail': {
+        method: 'POST',
+        path: () => '/api/v1/twake/instances/ensure',
+        vary: () => ({
+          there: `probe-them@${SECRET}.example`,
+          absent: 'probe-absent@example.org',
+        }),
+        body: target => ({ mail: target }),
       },
       'destination of an organization move': {
         method: 'POST',
@@ -993,87 +1371,41 @@ for (const model of MODELS)
         attachedOnly: true,
         transit: ORG_EXISTS,
       },
-      'member added to an organization group': {
-        method: 'POST',
-        path: () =>
-          '/api/v1/organizations/probemine/groups/probe-mtgroup/members',
-        vary: () => ({ there: 'probe-tuser', absent: 'probe-absent' }),
-        body: target => ({ usernames: [target] }),
-      },
-      'member added to a space': {
-        method: 'POST',
-        path: () =>
-          `/api/v1/organizations/probemine/spaces/${mySpaceId ?? 'none'}/members`,
-        vary: () => ({ there: 'probe-tuser', absent: 'probe-absent' }),
-        body: target => ({ usernames: [target], role: 'viewer' }),
-      },
-      'group linked to a space': {
-        method: 'POST',
-        path: () =>
-          `/api/v1/organizations/probemine/spaces/${mySpaceId ?? 'none'}/groups`,
-        vary: () => ({ there: 'probe-tgroup', absent: 'probe-absent' }),
-        body: target => ({ groupIds: [target], role: 'viewer' }),
-      },
-      'tombstone erased': {
-        method: 'POST',
-        path: () => '/api/v1/twake/tombstones/erase',
-        vary: () => ({
-          there: `uid=probe-gone,ou=users,${base}`,
-          absent: `uid=probe-absent,ou=users,${base}`,
-        }),
-        body: target => ({ dn: target }),
-      },
-      'mail taken elsewhere': {
-        method: 'PUT',
-        path: () => '/api/v1/ldap/users/probe-muser',
-        vary: () => ({
-          there: `probe-them@${SECRET}.example`,
-          absent: 'probe-free@example.org',
-        }),
-        body: target => ({ replace: { mail: target } }),
-        attachedOnly: true,
-        transit:
-          'a value is taken whoever may read the entry holding it: uniqueness answers about the whole directory',
-        writes: true,
-      },
-      'base of a raw search': {
-        method: 'GET',
-        path: () => '/api/v1/ldap/raw/search',
-        vary: userPair,
-        query: target =>
-          `?base=${encodeURIComponent(target)}&scope=base&filter=${encodeURIComponent('(objectClass=*)')}`,
-      },
-      'SCIM user filter': {
-        method: 'GET',
-        path: () => '/scim/v2/Users',
-        vary: () => ({ there: 'probe-them', absent: 'probe-absent' }),
-        query: target =>
-          `?filter=${encodeURIComponent(`userName eq "${target}"`)}`,
-      },
-      'organization search': {
-        method: 'GET',
-        path: () =>
-          `/api/v1/ldap/organizations/${encodeURIComponent(`ou=probemine,${orgs}`)}/subnodes/search`,
-        vary: () => ({ there: 'probe-them', absent: 'probe-absent' }),
-        query: target => `?q=${encodeURIComponent(target)}`,
-      },
     };
+
+    /** The cases this model runs */
+    const carried = (): [string, Carried][] =>
+      Object.entries(CARRIED).filter(
+        ([, c]) =>
+          !(c.attachedOnly && !model.publicOrganizations) &&
+          !(c.branchOnly && model.publicOrganizations) &&
+          !(c.narrowed && model.wholeBranch)
+      );
+
+    /** A carried case called as `who`, on a target */
+    const send = (c: Carried, target: string, who = CALLER) =>
+      call(
+        c.method,
+        c.path() + (c.query?.(target) ?? ''),
+        c.body?.(target),
+        who
+      );
 
     it('answers alike whether a target its body or query names is there or not', async function () {
       this.timeout(120000);
-      const before = await snapshot();
       const differing: string[] = [];
-      for (const [name, carried] of Object.entries(CARRIED)) {
-        if (carried.attachedOnly && !model.publicOrganizations) continue;
-        const { there, absent } = carried.vary();
-        const send = (target: string) =>
-          call(
-            carried.method,
-            carried.path() + (carried.query?.(target) ?? ''),
-            carried.body?.(target)
-          );
-        const a = await send(there);
-        const b = await send(absent);
+      for (const [name, c] of carried()) {
+        const { there, absent } = c.vary();
+        const before = await snapshot();
+        const a = await send(c, there);
+        const after = JSON.stringify(await snapshot());
+        // Nothing the caller may not touch was touched, nor what it holds
+        if (!c.leavesOut && after !== JSON.stringify(before))
+          differing.push(`${name} changed the directory: ${a.status}`);
+        const b = await send(c, absent);
+        // What was not found was left out alike
+        if (c.leavesOut && after !== JSON.stringify(await snapshot()))
+          differing.push(`${name} wrote what it was named: ${a.status}`);
         const left = neutral(a, { target: there });
         const right = neutral(b, { target: absent });
         if (a.status >= 500 || b.status >= 500)
@@ -1084,15 +1416,45 @@ for (const model of MODELS)
             `${name} answered a secret: ${JSON.stringify(a.body)}`
           );
         // A write naming what the caller holds nothing of is refused
-        if (carried.method !== 'GET' && a.status < 400)
+        if (c.method !== 'GET' && !c.leavesOut && a.status < 400)
           differing.push(
             `${name} wrote: ${a.status} ${JSON.stringify(a.body)}`
           );
-        const allowed = model.publicOrganizations && carried.transit;
+        if (c.writes && b.status >= 400)
+          differing.push(
+            `${name} refused the caller its own write: ${b.status} ${JSON.stringify(b.body)}`
+          );
+        const allowed = c.allowed || (model.publicOrganizations && c.transit);
         if (!allowed && left !== right)
           differing.push(`${name}\n    there:  ${left}\n    absent: ${right}`);
       }
       expect(differing, differing.join('\n')).to.deep.equal([]);
-      expect(await snapshot()).to.deep.equal(before);
+    });
+
+    it('places every write that names no target in its path', () => {
+      const covered = new Set(
+        Object.values(CARRIED).map(c => `${c.method} ${c.path()}`)
+      );
+      const unplaced = routes()
+        .filter(([method, path]) => method !== 'GET' && !path.includes(':'))
+        .map(([method, path]) => `${method} ${path}`)
+        .filter(key => !covered.has(key) && !NO_TARGET[key]);
+      expect(unplaced, 'writes this test cannot place').to.deep.equal([]);
+    });
+
+    it('tells the carried targets apart for a caller who may read them', async function () {
+      // The cases above probe something: an administrator naming the same
+      // targets is answered differently. Its writes go through, so this
+      // comes last.
+      this.timeout(120000);
+      const alike: string[] = [];
+      for (const [name, c] of carried()) {
+        const { there, absent } = c.vary();
+        const a = await send(c, there, ADMIN);
+        const b = await send(c, absent, ADMIN);
+        if (neutral(a, { target: there }) === neutral(b, { target: absent }))
+          alike.push(`${name}: ${a.status} ${JSON.stringify(a.body)}`);
+      }
+      expect(alike, alike.join('\n')).to.deep.equal([]);
     });
   });

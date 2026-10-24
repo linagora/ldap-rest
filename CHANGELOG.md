@@ -17,6 +17,17 @@
   targets a body or a query names
   ([#401](https://github.com/linagora/ldap-rest/pull/401))
 
+- `core/scim`: a group member given as a DN under the user base was taken
+  as it stood, so a caller could put in its group an account it may not
+  read. It is looked up as the caller, as a member given by id is, and left
+  out when the caller cannot read it. A DN naming no entry is left out too
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+
+- `core/scim`: `PUT /Users/{id}` answered `User … not found` for a user
+  the caller may not read and `Resource not found` for one that is not
+  there: it told whether the user exists. Both get the first answer
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+
 - A directory search, add, modify, rename or delete made while serving an
   authenticated request is judged as its caller, even when the code making
   it did not hand the request down: a forgotten request used to let the
