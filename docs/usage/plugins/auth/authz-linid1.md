@@ -80,9 +80,11 @@ organization through which entries change hands.
 An entry is **in transit** when it is attached to that organization, or to
 none (with or without the option). An entry carrying no link is in transit
 on purpose: it is how the entries other tools insert without one are
-caught, by whichever administrator they belong to.
+caught. Nothing ties such an entry to an organization: any administrator
+may claim it into one they manage, and the first to claim it takes it.
 
-- Every administrator sees the entries in transit.
+- Every administrator sees the entries in transit, but in a global branch
+  (`--authz-global-branch`), which only its holders read.
 - **Claiming** one (`POST /api/v1/ldap/users/:id/move` towards an
   organization) asks for write on that organization only. The write
   claiming it may carry other changes to the entry — its password, say —
