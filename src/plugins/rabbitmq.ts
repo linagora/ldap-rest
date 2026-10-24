@@ -19,6 +19,7 @@
  */
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
+import { outsideRequest } from '../lib/requestContext';
 
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;
@@ -155,7 +156,8 @@ export default class RabbitMq extends DmPlugin {
 
     this.clientInit = (async (): Promise<RabbitClient | null> => {
       try {
-        const client = await this.connect();
+        // Outside the request it may be opened for: the client outlives it
+        const client = await outsideRequest(() => this.connect());
         this.client = client;
         this.logger.info(
           `${this.name}: connected to RabbitMQ at ${redactAmqpUrl(

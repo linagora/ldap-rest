@@ -507,7 +507,8 @@ export default class AuthzScope extends DmPlugin {
       roleAttribute(organizations?.schema, 'organizationPath') ||
       this.config.ldap_organization_path_attribute;
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: names of the branches the caller holds, which the rules already granted
+      const result = (await this.server.ldap.system.search(
         {
           paged: false,
           scope: 'base',

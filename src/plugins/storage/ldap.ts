@@ -43,7 +43,8 @@ export default class LdapStore extends Store {
 
   protected async load(key: string): Promise<StoredRecord | null> {
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the plugins' own storage, not the caller's data
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['description'] },
         this.dn(key)
       )) as SearchResult;
@@ -64,7 +65,8 @@ export default class LdapStore extends Store {
     const dn = this.dn(key);
     const description = LdapStore.encodeRecord(key, record);
     try {
-      await this.server.ldap.add(dn, {
+      // As the server: the plugins' own storage, not the caller's data
+      await this.server.ldap.system.add(dn, {
         objectClass: ['top', this.objectClass],
         cn: dn.slice(3, dn.indexOf(',')),
         description,
@@ -79,12 +81,14 @@ export default class LdapStore extends Store {
         );
         throw err;
       }
-      await this.server.ldap.modify(dn, { replace: { description } });
+      // As the server: the plugins' own storage, not the caller's data
+      await this.server.ldap.system.modify(dn, { replace: { description } });
     }
   }
 
   protected async drop(key: string): Promise<void> {
-    await this.server.ldap
+    // As the server: the plugins' own storage, not the caller's data
+    await this.server.ldap.system
       .delete(this.dn(key))
       .catch((err: { code?: number }) => {
         if (err?.code !== 32)
@@ -97,7 +101,8 @@ export default class LdapStore extends Store {
   async sweep(): Promise<number> {
     const now = Date.now();
     let gone = 0;
-    const res = (await this.server.ldap.search(
+    // As the server: the plugins' own storage, not the caller's data
+    const res = (await this.server.ldap.system.search(
       {
         paged: false,
         scope: 'one',
@@ -111,7 +116,10 @@ export default class LdapStore extends Store {
       // A record nothing can be read from goes too: it cannot expire on its
       // own and would sit there forever.
       if (record !== null && record.deadline > now) continue;
-      await this.server.ldap.delete(String(entry.dn)).catch(() => undefined);
+      // As the server: the plugins' own storage, not the caller's data
+      await this.server.ldap.system
+        .delete(String(entry.dn))
+        .catch(() => undefined);
       gone++;
     }
     return gone;

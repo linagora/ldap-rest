@@ -1048,7 +1048,8 @@ export default class LdapGroups extends DmPlugin {
   }
 
   async deleteMemberFromAll(memberDn: string): Promise<void> {
-    const res = (await this.ldap
+    // As the server: a deleted entry leaves every group, whoever deleted it
+    const res = (await this.ldap.system
       .search(
         {
           filter: `member=${escapeLdapFilter(memberDn)}`,
@@ -1109,7 +1110,8 @@ export default class LdapGroups extends DmPlugin {
     // Get current group to check if it has department attributes
     let currentGroup: SearchResult;
     try {
-      currentGroup = (await this.ldap.search(
+      // As the server: the move was judged first (authorize), this only shapes the answer
+      currentGroup = (await this.ldap.system.search(
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;
@@ -1142,7 +1144,8 @@ export default class LdapGroups extends DmPlugin {
     // Verify target organization exists and get its path
     let targetOrg: SearchResult;
     try {
-      targetOrg = (await this.ldap.search(
+      // As the server: the move was judged first (authorize), this only shapes the answer
+      targetOrg = (await this.ldap.system.search(
         {
           paged: false,
           scope: 'base',
@@ -1472,7 +1475,8 @@ export default class LdapGroups extends DmPlugin {
     // looked up. `items.branch` and the existence of array elements were not
     // read at all here.
     await checkDnValues(field, test, value, async dn => {
-      const result = (await this.ldap.search(
+      // As the server: a pointer must lead to an entry, whoever may read it
+      const result = (await this.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['dn'] },
         dn
       )) as SearchResult;

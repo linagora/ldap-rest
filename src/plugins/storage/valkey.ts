@@ -16,6 +16,7 @@
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
+import { outsideRequest } from '../../lib/requestContext';
 
 type IoValkey = typeof import('iovalkey');
 type Client = InstanceType<IoValkey['Valkey']>;
@@ -60,7 +61,8 @@ export default class ValkeyStore extends Store {
    * own.
    */
   private client(): Promise<Client> {
-    this.connection ??= this.connect().catch(err => {
+    // Outside the request it may be opened for: the connection outlives it
+    this.connection ??= outsideRequest(() => this.connect()).catch(err => {
       this.connection = undefined;
       throw err;
     });

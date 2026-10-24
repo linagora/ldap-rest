@@ -664,7 +664,8 @@ export default class LdapBulkImport extends DmPlugin {
    * Fetch organization to get its path
    */
   private async fetchOrganization(dn: string): Promise<AttributesList> {
-    const result = await this.server.ldap.search(
+    // As the server: the path a row is given is its organization's; the row's write is judged as the caller
+    const result = await this.server.ldap.system.search(
       { paged: false, scope: 'base' },
       dn
     );
@@ -681,7 +682,8 @@ export default class LdapBulkImport extends DmPlugin {
    */
   private async entryExists(dn: string): Promise<boolean> {
     try {
-      const result = await this.server.ldap.search(
+      // As the server: whether a row creates or updates is the directory's; the write is judged as the caller
+      const result = await this.server.ldap.system.search(
         { paged: false, scope: 'base' },
         dn
       );

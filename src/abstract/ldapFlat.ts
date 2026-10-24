@@ -1202,8 +1202,14 @@ export default abstract class LdapFlat extends DmPlugin {
       : (body[this.mainAttribute] as string);
 
     await this.addEntry(id, additional, req);
-    const entry = await this.searchEntriesByName(id, false);
-    return created(res, this.project(entry[id]));
+    // As the server: the identifier the caller just wrote is answered back
+    // to them, whether or not they may read the branch it went to — that
+    // only. By its DN: the name may be another entry's elsewhere.
+    const written = (await this.ldap.system.search(
+      { paged: false, scope: 'base', attributes: [this.mainAttribute] },
+      this.resolveDn(id)
+    )) as SearchResult;
+    return created(res, this.project(written.searchEntries[0]));
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
@@ -1575,12 +1581,10 @@ export default abstract class LdapFlat extends DmPlugin {
   /**
    * Change the RDN of an entry.
    *
-   * The request is not optional in practice: `ldapActions` hands it to the
-   * `ldaprenamerequest` hook, and every authorization plugin skips its check
-   * when there is none (`AuthzBase.shouldSkipAuthorization`). Renaming
-   * without one therefore renames without authorization — silently. It stays
-   * optional in the signature for the callers that genuinely belong to no
-   * request, as the rest of this class does.
+   * `ldapActions` hands the request to the `ldaprenamerequest` hook, which
+   * the authorization plugins judge by. Without one, the request being
+   * served is judged; outside any, nobody judges, as for the startup or
+   * scheduled work the optional signature is for.
    *
    * @param id current identifier, or the entry's DN
    * @param newId new identifier, or the entry's new DN
@@ -1604,9 +1608,7 @@ export default abstract class LdapFlat extends DmPlugin {
       this.registeredHooks[`${this.hookPrefix}rename`],
       [dn, newDn]
     );
-    const res = await (req
-      ? this.ldap.forRequest(req).rename(dn, newDn)
-      : this.ldap.rename(dn, newDn));
+    const res = await this.ldap.rename(dn, newDn, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}renamedone`], [
       dn,
       newDn,
@@ -1850,12 +1852,10 @@ export default abstract class LdapFlat extends DmPlugin {
     partial = false,
     attrs: string[] = [this.mainAttribute]
   ): Promise<LdapList> {
-    // `apiAdd` re-reads the entry it has just written through this, so an
-    // identifier the schema admits has to survive the trip: the shipped
+    // An identifier the schema admits has to survive the trip: the shipped
     // position and group schemas accept `( )` and `*`, which a raw
-    // interpolation turns into an unparseable filter — after the entry is
-    // committed, so the caller saw a 500 on a creation that had succeeded.
-    // A partial search means the value to look for, not a pattern to run.
+    // interpolation turns into an unparseable filter. A partial search means
+    // the value to look for, not a pattern to run.
     const escaped = escapeLdapFilter(name);
     const filter = partial
       ? `(${this.mainAttribute}=*${escaped}*)`

@@ -1,7 +1,7 @@
 /**
  * The status and password endpoints change an account, so they need the same
- * branch authorization as `PUT /users/<id>`: every authorization plugin built
- * on `AuthzBase` skips its check when the directory call carries no request.
+ * branch authorization as `PUT /users/<id>`, judged by the request they
+ * hand down.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';

@@ -238,7 +238,8 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   protected async storedDn(dn: string): Promise<string> {
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the judgement's own read: as the caller, it would be judged by itself
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['1.1'] },
         dn
       )) as SearchResult;
@@ -290,7 +291,8 @@ export default abstract class AuthzBase extends DmPlugin {
       return this.extractBranchDn(dn);
 
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the judgement's own read: as the caller, it would be judged by itself
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [linkAttr] },
         dn
       )) as SearchResult;
@@ -391,7 +393,8 @@ export default abstract class AuthzBase extends DmPlugin {
 
     let stored: AttributesList | undefined;
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the server's bookkeeping of a move, not the caller's read
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [linkAttr, origin] },
         dn
       )) as SearchResult;
@@ -446,7 +449,8 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   protected async findUserDn(uid: string): Promise<string | null> {
     const filter = `(${this.config.ldap_user_main_attribute || 'uid'}=${escapeLdapFilter(uid)})`;
-    const result = (await this.server.ldap.search(
+    // As the server: resolving the caller, before anything can be judged as them
+    const result = (await this.server.ldap.system.search(
       {
         paged: false,
         filter,
@@ -744,7 +748,8 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   private async storedValues(dn: string, attr: string): Promise<string[]> {
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the judgement's own read: as the caller, it would be judged by itself
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [attr] },
         dn
       )) as SearchResult;
@@ -924,7 +929,8 @@ export default abstract class AuthzBase extends DmPlugin {
         let read = false;
         let storedLink: string | undefined;
         try {
-          const currentEntry = (await this.server.ldap.search(
+          // As the server: the judgement's own read: as the caller, it would be judged by itself
+          const currentEntry = (await this.server.ldap.system.search(
             { paged: false, scope: 'base', attributes: [linkAttr] },
             dn
           )) as SearchResult;

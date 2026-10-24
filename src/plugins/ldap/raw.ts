@@ -34,6 +34,7 @@ import {
   NotFoundError,
 } from '../../lib/errors';
 import type { LdapSchema, SchemaIndex } from '../../lib/ldapSchema';
+import { outsideRequest } from '../../lib/requestContext';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -305,11 +306,14 @@ export default class LdapRaw extends DmPlugin {
    * @returns root DSE as a JSON entry (its `dn` is the empty string)
    */
   async getRootDse(): Promise<RawEntry> {
-    const result = await this.searchDirectory('', {
-      scope: 'base',
-      filter: '(objectClass=*)',
-      attributes: ['*', '+'],
-    });
+    // As the server: the root DSE describes the server, not its data
+    const result = await outsideRequest(() =>
+      this.searchDirectory('', {
+        scope: 'base',
+        filter: '(objectClass=*)',
+        attributes: ['*', '+'],
+      })
+    );
     const entry = result.searchEntries[0];
     if (!entry) throw new NotFoundError('Root DSE is not readable');
     return this.formatEntry({ ...entry, dn: '' });

@@ -742,7 +742,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
       if (constraint.filter) filter = `(&${constraint.filter}${filter})`;
 
       for (const base of bases) {
-        const result = (await this.server.ldap.search(
+        // As the server: a value is taken or not whoever may read the entry holding it
+        const result = (await this.server.ldap.system.search(
           { paged: false, scope: 'sub', filter, attributes: ['dn'] },
           base
         )) as SearchResult;
@@ -895,7 +896,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     const base = this.config.ldap_base;
     if (!base) return [];
     const domainNameAttr = this.domainNameAttribute();
-    const result = (await this.server.ldap.search(
+    // As the server: the domains declared anywhere, whoever may read them
+    const result = (await this.server.ldap.system.search(
       {
         paged: false,
         scope: 'sub',
@@ -1063,7 +1065,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
         );
         if (obsolete.length === 0) continue;
         try {
-          await this.server.ldap.modify(
+          // As the server: a reference to a deleted entry goes, whoever may write its holder
+          await this.server.ldap.system.modify(
             holder,
             { delete: { [candidate.name]: obsolete } },
             undefined,
@@ -1138,7 +1141,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     candidate: ReferringAttribute,
     dn: string
   ): Promise<Record<string, unknown>[]> {
-    const result = (await this.server.ldap.search(
+    // As the server: the references to an entry, whoever may read their holders
+    const result = (await this.server.ldap.system.search(
       {
         paged: false,
         scope: 'sub',
@@ -1246,7 +1250,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       ? this.server.ldap.forRequest(req)
       : {
           modify: (dn: string, changes: ModifyRequest): Promise<boolean> =>
-            this.server.ldap.modify(dn, changes),
+            this.server.ldap.system.modify(dn, changes),
         };
 
     // What still names the old DN, and how the directory spells it now.
@@ -1351,7 +1355,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
    */
   private async freshValues(dn: string, name: string): Promise<string[]> {
     this.server.ldap.invalidateCache(dn);
-    const result = (await this.server.ldap.search(
+    // As the server: a re-read of what this rewrite wrote
+    const result = (await this.server.ldap.system.search(
       { paged: false, scope: 'base', attributes: [name] },
       dn
     )) as SearchResult;
@@ -1418,7 +1423,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
    */
   private async readEntry(dn: string): Promise<AttributesList | null> {
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: these rules answer about the whole directory, not one caller's view
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base' },
         dn
       )) as SearchResult;

@@ -330,7 +330,8 @@ export default class James extends TwakePlugin {
     try {
       // Get user's mail from LDAP (escape username to prevent LDAP injection)
       const escapedUsername = escapeLdapFilter(username);
-      const userResult = await this.server.ldap.search(
+      // As the server: found across branches, then answered only if the caller can read it (readableBy)
+      const userResult = await this.server.ldap.system.search(
         {
           scope: 'sub',
           filter: `(uid=${escapedUsername})`,
@@ -501,7 +502,8 @@ export default class James extends TwakePlugin {
 
       // Get current aliases from LDAP and recreate them for the new mail
       try {
-        const aliasesEntry = (await this.server.ldap.search(
+        // As the server: James is kept in step with the directory, whoever's write changed it
+        const aliasesEntry = (await this.server.ldap.system.search(
           { paged: false, scope: 'base', attributes: [this.aliasAttr] },
           dn
         )) as SearchResult;
@@ -902,7 +904,8 @@ export default class James extends TwakePlugin {
     test: (entry: AttributesList) => boolean
   ): Promise<AttributesList | null> {
     try {
-      const pages = (await this.server.ldap.search(
+      // As the server: James is kept in step with the directory, whoever's write changed it
+      const pages = (await this.server.ldap.system.search(
         { paged: { pageSize: 500 }, scope: 'sub', filter, attributes },
         base
       )) as AsyncGenerator<SearchResult>;
@@ -1938,7 +1941,8 @@ export default class James extends TwakePlugin {
     groupDn: string
   ): Promise<'group' | 'mailingList' | 'teamMailbox' | null> {
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: James is kept in step with the directory, whoever's write changed it
+      const result = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: [this.mailboxTypeAttr] },
         groupDn
       )) as SearchResult;

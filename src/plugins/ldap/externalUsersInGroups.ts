@@ -61,7 +61,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
 
             try {
               // Check if member exists (will use cache with scope: 'base')
-              await this.ldap.search({ paged: false, scope: 'base' }, m);
+              // As the server: the group write was judged first; its external members are the server's bookkeeping
+              await this.ldap.system.search({ paged: false, scope: 'base' }, m);
               return true;
             } catch {
               // Member doesn't exist, create it
@@ -89,7 +90,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
               );
 
               try {
-                await this.ldap.add(m, entry);
+                // As the server: the group write was judged first; its external members are the server's bookkeeping
+                await this.ldap.system.add(m, entry);
                 void launchHooks(
                   this.registeredHooks.externaluseradded,
                   m,

@@ -342,12 +342,15 @@ export default class TwakeTombstone extends DmPlugin {
           name !== 'dn' && !(Array.isArray(value) && value.length === 0)
       )
     );
-    await this.server.ldap.add(dn, attributes);
+    // As the server: the tombstone of a judged delete is the server's bookkeeping
+    await this.server.ldap.system.add(dn, attributes);
     const dummy = this.config.group_dummy_user;
     for (const group of groups) {
-      await this.server.ldap.modify(group, { add: { member: dn } });
+      // As the server: the tombstone of a judged delete is the server's bookkeeping
+      await this.server.ldap.system.modify(group, { add: { member: dn } });
       if (!dummy || placeholders.has(group)) continue;
-      await this.server.ldap
+      // As the server: the tombstone of a judged delete is the server's bookkeeping
+      await this.server.ldap.system
         .modify(group, { delete: { member: dummy } })
         .catch((err: unknown) => {
           // No placeholder: the group was not left empty.
@@ -387,7 +390,8 @@ export default class TwakeTombstone extends DmPlugin {
 
   private async read(dn: string): Promise<AttributesList | undefined> {
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: the tombstone of a judged delete is the server's bookkeeping
+      const res = (await this.server.ldap.system.search(
         { paged: false, scope: 'base', attributes: ['*', this.attrs.lock] },
         dn
       )) as SearchResult;
@@ -446,7 +450,8 @@ export default class TwakeTombstone extends DmPlugin {
     const found: string[] = [];
     for (const base of this.groupBases.filter(Boolean)) {
       try {
-        const groups = (await this.server.ldap.search(
+        // As the server: the tombstone of a judged delete is the server's bookkeeping
+        const groups = (await this.server.ldap.system.search(
           {
             paged: false,
             scope: 'sub',
@@ -477,7 +482,8 @@ export default class TwakeTombstone extends DmPlugin {
     let placeholder = false;
     for (let attempt = 0; ; attempt++) {
       try {
-        await this.server.ldap.modify(
+        // As the server: the tombstone of a judged delete is the server's bookkeeping
+        await this.server.ldap.system.modify(
           group,
           placeholder
             ? { add: { member: dummy! }, delete: { member: dn } }

@@ -6,9 +6,8 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 
-import AuthzDynamic, {
-  authzContext,
-} from '../../../src/plugins/auth/authzDynamic';
+import AuthzDynamic from '../../../src/plugins/auth/authzDynamic';
+import { currentRequest } from '../../../src/lib/requestContext';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import { DM } from '../../../src/bin';
 import { ssha } from '../../../src/plugins/auth/authzDynamicHash';
@@ -241,7 +240,7 @@ describe('authzDynamic behavioural regressions', function () {
       } finally {
         done();
       }
-      expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
+      expect(currentRequest(), 'no leaked frame').to.be.undefined;
     });
 
     it('should let it through when the deployment names the identity', async () => {
@@ -254,9 +253,10 @@ describe('authzDynamic behavioural regressions', function () {
         server.config.authz_dynamic_bypass = [];
         done();
       }
-      // A bypass carries no token, so no frame is entered and the hooks
-      // enforce nothing — which is what the deployment asked for.
-      expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
+      // A bypass carries no token, so the hooks enforce nothing — which is
+      // what the deployment asked for — and the request frame is left once
+      // it is served.
+      expect(currentRequest(), 'no leaked frame').to.be.undefined;
     });
 
     it('should let it through under the old blanket behaviour, when asked for', async () => {
@@ -315,7 +315,7 @@ describe('authzDynamic behavioural regressions', function () {
       } finally {
         done();
       }
-      expect(authzContext.getStore(), 'no leaked frame').to.be.undefined;
+      expect(currentRequest(), 'no leaked frame').to.be.undefined;
     });
   });
 });

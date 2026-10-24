@@ -4,8 +4,8 @@
  * a usable `uid` — the client cannot repair it, since a generated attribute is
  * refused as input.
  *
- * And whatever the identifier ends up being, `apiAdd` re-reads the entry it
- * has just written by filtering on it.
+ * And whatever the identifier ends up being, it is created, answered, and
+ * found again by name.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -81,15 +81,21 @@ describe('Derived identifiers', function () {
     expect(found.searchEntries).to.have.length(1);
   });
 
-  it('should re-read an identifier carrying filter metacharacters', async () => {
-    // The position schema admits parentheses. Interpolated raw into the
-    // search-back filter they made it unparseable — after the entry was
-    // committed, so the caller got a 500 on a creation that had worked and a
-    // retry then hit a duplicate DN.
+  it('should create and find by name an identifier carrying filter metacharacters', async () => {
+    // The position schema admits parentheses, which a raw interpolation
+    // into a search filter makes unparseable.
     const res = await request
       .post('/api/v1/ldap/positions')
       .type('json')
       .send({ cn: positionCn });
     expect(res.status, JSON.stringify(res.body)).to.be.oneOf([200, 201]);
+    // Found by name, its parentheses escaped in the filter
+    const flat = server.loadedPlugins['ldapFlatGeneric'] as LdapFlatGeneric;
+    const positions = flat.instances.find(i =>
+      i.base.toLowerCase().startsWith('ou=positions')
+    );
+    expect(positions, 'the positions entity').to.exist;
+    const found = await positions!.searchEntriesByName(positionCn, false);
+    expect(Object.keys(found)).to.include(positionCn);
   });
 });

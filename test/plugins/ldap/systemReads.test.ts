@@ -1,10 +1,10 @@
 /**
  * The reads a plugin makes as the server rather than as its caller.
  *
- * `ldapActions.forRequest(req)` exists so an operation carries the request
- * the authorization hooks read; a call without one skips every check. Some
- * reads have no business being the caller's, and saying which is the point
- * of `ldap.system` — a uniqueness check has to see the whole branch, or it
+ * An operation made while serving a request is judged as its caller, the
+ * request handed down or not. Some reads have no business being the
+ * caller's, and saying which is the point of `ldap.system` — a uniqueness
+ * check has to see the whole branch, or it
  * answers "free" about a name that is taken and hands it out as an
  * identifier.
  *

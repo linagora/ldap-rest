@@ -202,7 +202,8 @@ class OnLdapChange extends DmPlugin {
       )
     );
     try {
-      const res = (await this.server.ldap.search(
+      // As the server: what changed is read whole for the change events, whoever made the change
+      const res = (await this.server.ldap.system.search(
         {
           paged: false,
           scope: 'base',

@@ -122,11 +122,42 @@ export default [
     },
   },
 
+  // Every directory operation says whose it is (#385): the request it is
+  // made for, or `ldap.system` for the server's own work, with the reason.
+  // An operation naming neither is judged as the request being served, if
+  // any — but which one was meant is for the code to say, not the context.
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/browser/**', 'src/lib/ldapActions.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.property.name='ldap'][callee.property.name=/^(search|add|modify|rename|move)$/][arguments.length<3]",
+          message:
+            'Name the request this operation is made for, or make it as the server through ldap.system and say why.',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.property.name='ldap'][callee.property.name='delete'][arguments.length<2]",
+          message:
+            'Name the request this operation is made for, or make it as the server through ldap.system and say why.',
+        },
+        {
+          selector:
+            "CallExpression[callee.object.property.name=/^(ldap|system)$/][callee.property.name='move']",
+          message:
+            'ldap.move is never judged, request or not: it is the trash moving what a judged delete removed. Move for a caller with ldap.rename.',
+        },
+      ],
+    },
+  },
+
   // The SCIM plugin serves identity providers, and every operation it makes
-  // must reach the authorization hooks. `ldapActions`'s own methods take the
-  // request as a trailing optional argument, so forgetting it silently skips
-  // authorization — three such bugs have shipped here. Bind the request once
-  // with `ldap.forRequest(req)` and the omission stops being expressible.
+  // is judged by the request it is made for. Bind the request once with
+  // `ldap.forRequest(req)`, so each operation names the request it means
+  // rather than relying on the one being served.
   {
     files: ['src/plugins/scim/**/*.ts'],
     rules: {

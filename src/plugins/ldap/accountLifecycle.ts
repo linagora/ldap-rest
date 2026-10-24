@@ -332,8 +332,8 @@ export default class LdapAccountLifecycle extends DmPlugin {
    * @param entity flat entity holding the account
    * @param id identifier or DN of the entry
    * @param changes modification to apply
-   * @param req request this comes from: without it, every authorization
-   *   plugin built on `AuthzBase` skips its branch check
+   * @param req request this comes from, which the authorization plugins
+   *   judge the write by
    */
   private async modify(
     entity: FlatEntity,

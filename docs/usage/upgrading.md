@@ -6,6 +6,26 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Plugins: an operation naming no request is judged as the caller
+
+**Who is affected:** a third-party plugin calling `this.server.ldap.search`,
+`add`, `modify`, `rename` or `delete` without a request, from a route, while
+an authorization plugin is loaded. `move` is the server's and stays unjudged:
+move an entry for a caller with `rename`.
+
+Such an operation used to pass unjudged, as the server's. While an
+authenticated request is being served, it is now judged as that request's
+caller, and refused where the caller may not. Hand the request down
+(`ldap.forRequest(req)`), or, for the server's own work, go through
+`ldap.system`. Hooks run outside the request and keep acting as the server.
+
+Under `core/auth/authzDynamic`, a hook's operations that named no request
+used to be judged against the token, through an async context of the
+plugin's own; they now act as the server, as under the other authorization
+plugins. A hook writing on the caller's behalf passes the request it is
+handed. That context, `authzContext`, is no longer exported: read the token
+off the request (`req.authzToken`).
+
 ### An authorization plugin needs an authentication plugin
 
 **Who is affected:** a deployment loading `core/auth/authzPerBranch`,

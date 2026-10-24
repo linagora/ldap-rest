@@ -455,14 +455,13 @@ export default class MyPlugin extends DmPlugin {
 
 The `this.server.ldap` object provides access to all LDAP operations:
 
-> **Serving an HTTP request? Bind it first.**
+> **Say whose each operation is.**
 >
 > The authorization plugins (`core/auth/authzPerBranch`,
 > `core/auth/authzDynamic`, …) hook `ldapsearchrequest`, `ldapaddrequest`,
-> `ldapmodifyrequest`, `ldaprenamerequest` and `ldapdeleterequest`, and they
-> **skip every check when the request is missing**. The methods below take it as a trailing
-> optional argument, so forgetting it does not fail — it silently authorizes
-> the operation. Three such bugs shipped in the SCIM plugin.
+> `ldapmodifyrequest`, `ldaprenamerequest` and `ldapdeleterequest`, and judge
+> an operation by the request it carries. The methods below take it as a
+> trailing optional argument.
 >
 > In a request handler, bind once and use the result:
 >
@@ -472,21 +471,23 @@ The `this.server.ldap` object provides access to all LDAP operations:
 > await directory.modify(dn, changes);
 > ```
 >
-> `forRequest()` returns a `RequestBoundLdap`, whose methods have no request
-> parameter at all — the omission stops being expressible. Use the unbound
-> methods only for work that genuinely belongs to no request, such as startup
-> or scheduled tasks, where passing nothing is the deliberate answer — and
-> say so by reaching for them through `ldap.system`:
+> An operation that names no request while an authenticated request is being
+> served is made for that request all the same, and judged as its caller: a
+> forgotten argument fails closed. Work that is the server's — a uniqueness
+> check has to see a whole branch, and a reference to an entry the caller
+> cannot read is still a valid reference — goes through `ldap.system`, which
+> steps out of the request, with a comment saying why:
 >
 > ```typescript
+> // As the server: a name is taken whoever may read the entry holding it
 > await this.server.ldap.system.search({ scope: 'base' }, dn);
 > ```
 >
-> It is the same object, and that is the point: `ldap.system.search(…)` reads
-> as a decision where `ldap.search(…)` reads as a forgotten argument. Some
-> reads are the server's by nature — a uniqueness check has to see a whole
-> branch, and a reference to an entry the caller cannot read is still a valid
-> reference — and those are the ones it names.
+> A lint rule refuses an operation that names neither a request nor
+> `ldap.system`. Hooks run outside the request: what a hook reads or writes
+> to validate, complete or follow an operation is the server's, and a hook
+> acting as the caller passes the request it is handed. Startup and
+> scheduled tasks run outside any request.
 
 > **Read as the server? Judge the caller first.**
 >

@@ -120,7 +120,8 @@ class TrashPlugin extends DmPlugin {
     }
 
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: the trash branch is the server's, whoever's delete needs it
+      const result = (await this.server.ldap.system.search(
         { paged: false },
         this.trashBase
       )) as SearchResult;
@@ -139,7 +140,8 @@ class TrashPlugin extends DmPlugin {
       const rdn = this.extractRDN(this.trashBase);
       const ouName = rdn.split('=')[1];
 
-      await this.server.ldap.add(this.trashBase, {
+      // As the server: the trash branch is the server's, whoever's delete needs it
+      await this.server.ldap.system.add(this.trashBase, {
         objectClass: ['top', 'organizationalUnit'],
         ou: ouName,
         description: 'LDAP Trash - Deleted entries are moved here',
@@ -162,7 +164,8 @@ class TrashPlugin extends DmPlugin {
    */
   private async removeOldTrashEntry(trashDn: string): Promise<void> {
     try {
-      const result = (await this.server.ldap.search(
+      // As the server: the trash is the server's; the delete moving an entry there was judged
+      const result = (await this.server.ldap.system.search(
         { paged: false },
         trashDn
       )) as SearchResult;
@@ -171,7 +174,8 @@ class TrashPlugin extends DmPlugin {
         this.logger.info(
           `Removing old trash entry ${trashDn} before overwrite`
         );
-        await this.server.ldap.delete(trashDn);
+        // As the server: the trash is the server's; the delete moving an entry there was judged
+        await this.server.ldap.system.delete(trashDn);
         this.logger.debug(`Old trash entry ${trashDn} deleted`);
       }
     } catch (error) {
@@ -195,7 +199,8 @@ class TrashPlugin extends DmPlugin {
       const timestamp = new Date().toISOString();
       const metadata = `Deleted on ${timestamp} from ${originalDn}`;
 
-      await this.server.ldap.modify(trashDn, {
+      // As the server: the trash is the server's; the delete moving an entry there was judged
+      await this.server.ldap.system.modify(trashDn, {
         replace: {
           description: metadata,
         },
@@ -248,6 +253,8 @@ class TrashPlugin extends DmPlugin {
             `Moving ${currentDn} to ${trashDn} using LDAP move (atomic)`
           );
 
+          // The delete was judged; the move into the trash is the server's
+          // eslint-disable-next-line no-restricted-syntax
           await this.server.ldap.move(currentDn, trashDn, req);
 
           this.logger.info(`Entry ${currentDn} moved to trash at ${trashDn}`);
