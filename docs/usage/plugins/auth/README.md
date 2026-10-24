@@ -61,11 +61,19 @@ Every plugin that judges LDAP operations — `core/auth/authzPerBranch`,
 `core/auth/authzLinid1`, `core/auth/authzDynamic` — registers the same hooks,
 and all of them run: loaded together, they compose as an **AND**, and the
 first refusal wins. The per-caller read filter (`ldapsearchfilter`) is one of
-those hooks: two plugins there compose as an intersection, which is the same
-AND. That is sound when it is meant. When it is not, it is a
+the hooks they register: two plugins there compose as an intersection, which
+is the same AND. That is sound when it is meant. When it is not, it is a
 refusal nobody can explain: `authzPerBranch` beside `authzDynamic` judges a
 machine token by a branch configuration written for administrators, finds
 no entry for the tenant, and refuses a write the token's own ACLs grant.
+
+The authorization plugins' request hooks (`ldapsearchrequest`,
+`ldapaddrequest`, `ldapmodifyrequest`, `ldapdeleterequest`,
+`ldaprenamerequest`) run before any other plugin's, whatever order the
+plugins loaded in: a caller who may not make an operation gets the 403, not
+another plugin's 409, and the operation is not replaced (by
+`core/ldap/trash`, for instance) before it is judged. `ldapsearchfilter`
+keeps the load order.
 
 The AND needs no second plugin to bite. `--authz-per-branch-config` has a
 default — read everywhere, write nowhere — so a lone `authzPerBranch` judges

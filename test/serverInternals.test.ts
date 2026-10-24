@@ -9,6 +9,7 @@ import AuthToken from '../src/plugins/auth/token';
 import DmPlugin, { type Role } from '../src/abstract/plugin';
 import TrustedProxy from '../src/plugins/auth/trustedProxy';
 import { jsonBodyParser } from '../src/lib/rawBody';
+import { launchHooksChained } from '../src/lib/utils';
 
 /** Express 5 exposes the layer stack as `router`, Express 4 as `_router` */
 interface AppInternal {
@@ -156,6 +157,70 @@ describe('Server internals', () => {
         'hello'
       );
       expect((await request(dm.app).get('/api/hello')).status).to.equal(200);
+    });
+  });
+
+  describe('hook order', () => {
+    const REQUEST_HOOKS = [
+      'ldapsearchrequest',
+      'ldapaddrequest',
+      'ldapmodifyrequest',
+      'ldapdeleterequest',
+      'ldaprenamerequest',
+    ] as const;
+
+    /** A plugin recording, in `calls`, each time one of its hooks runs */
+    const recorder = (
+      dm: DM,
+      name: string,
+      roles: Role[],
+      calls: string[]
+    ): DmPlugin =>
+      ({
+        name,
+        roles,
+        config: dm.config,
+        hooks: Object.fromEntries(
+          [...REQUEST_HOOKS, 'ldapsearchfilter'].map(hook => [
+            hook,
+            (args: unknown) => {
+              calls.push(name);
+              return args;
+            },
+          ])
+        ),
+      }) as unknown as DmPlugin;
+
+    it('runs the authorization request hooks first, in their own order', async () => {
+      const dm = new DM();
+      await dm.ready;
+      // Two authorization plugins judging the same requests, on purpose
+      dm.config.authz_combine = true;
+      const calls: string[] = [];
+      // Registered in the order that used to let `rules` answer first
+      for (const [name, roles] of [
+        ['rules', []],
+        ['authzA', ['authz']],
+        ['other', ['consistency']],
+        ['authzB', ['authz']],
+      ] as [string, Role[]][])
+        await dm.registerPlugin(name, recorder(dm, name, roles, calls));
+
+      for (const hook of REQUEST_HOOKS) {
+        calls.length = 0;
+        await launchHooksChained(dm.hooks[hook], []);
+        expect(calls, hook).to.deep.equal([
+          'authzA',
+          'authzB',
+          'rules',
+          'other',
+        ]);
+      }
+
+      // A result filter keeps registration order
+      calls.length = 0;
+      await launchHooksChained(dm.hooks.ldapsearchfilter, []);
+      expect(calls).to.deep.equal(['rules', 'authzA', 'other', 'authzB']);
     });
   });
 

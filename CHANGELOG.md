@@ -4,6 +4,14 @@
 
 ### Security
 
+- The authorization plugins judge an LDAP operation before any other
+  plugin, whatever order the plugins loaded in. When `core/ldap/trash`
+  loaded first, a caller with no right on an entry could delete it, as a
+  move to the trash. When `core/ldap/enterpriseRules` did, a caller who
+  may not write a branch got its 409 ("already used", "still referenced")
+  instead of a 403, and could learn which addresses the directory holds
+  outside their scope
+  ([#378](https://github.com/linagora/ldap-rest/pull/378))
 - A caller who may not make a write is refused before the route looks in
   the directory as the server, and gets the same 403 whether the entry is
   there or not. These routes answered what they found first: the rename of

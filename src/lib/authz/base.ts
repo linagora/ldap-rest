@@ -39,10 +39,14 @@ export default abstract class AuthzBase extends DmPlugin {
    *
    * The filter cannot ask `opts` whether the caller wanted the attribute: by
    * then `opts` is the widened one and would answer yes about an attribute
-   * we added ourselves. Holding the objects we touched keeps the question
-   * answerable, and a WeakSet lets them be collected with the request.
+   * we added ourselves. A mark on the options keeps the question answerable.
+   *
+   * A symbol key rather than a set of the objects touched: authorization
+   * judges a search before any other plugin, and one rewriting it after —
+   * `twake/tombstone` narrows the filter of a SCIM search — hands on a copy.
+   * An object spread copies the key; a set would no longer know the copy.
    */
-  private static widenedForLink = new WeakSet<object>();
+  private static readonly widenedForLink = Symbol('widened for the link');
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
@@ -911,8 +915,11 @@ export default abstract class AuthzBase extends DmPlugin {
           const list = Array.isArray(asked)
             ? asked.map(String)
             : [String(asked)];
-          opts = { ...opts, attributes: [...list, linkAttr] };
-          AuthzBase.widenedForLink.add(opts);
+          opts = {
+            ...opts,
+            attributes: [...list, linkAttr],
+            [AuthzBase.widenedForLink]: true,
+          } as SearchOptions;
         }
         return [base, opts, req];
       }
@@ -1009,7 +1016,11 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // The link was added to the projection so the judgement above could be
       // made; a caller that did not ask for it must not receive it.
-      if (opts && AuthzBase.widenedForLink.has(opts)) {
+      if (
+        (opts as { [key: symbol]: unknown } | undefined)?.[
+          AuthzBase.widenedForLink
+        ]
+      ) {
         for (const entry of result.searchEntries) delete entry[linkAttr];
       }
 
