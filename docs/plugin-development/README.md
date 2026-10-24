@@ -577,6 +577,24 @@ await this.server.ldap.modify('uid=john,ou=users,dc=example,dc=com', {
 });
 ```
 
+#### Attribute names
+
+An add or a modify names its attributes as the server does before the
+authorization plugins and the hooks see them: `MAIL`, `rfc822Mailbox` or
+the OID of `mail` reach a hook as `mail`, spelled as the configuration or a
+loaded schema spells it. A hook may therefore look an attribute up by that
+name. An option other than `;binary` is refused, as is one attribute named
+twice in one part of a write.
+
+A route that checks a body before handing it to `add` or `modify` names
+its attributes the same way first, and a plugin loading a schema of its
+own says how it spells them:
+
+```typescript
+await this.server.ldap.canonicalChanges(changes); // or canonicalAttributes(entry)
+this.server.ldap.knowAttributeNames(Object.keys(schema.attributes));
+```
+
 #### Delete
 
 ```typescript

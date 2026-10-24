@@ -65,6 +65,7 @@ import {
   missingRequiredAttribute,
   toDirectoryChanges,
   toDirectoryEntry,
+  schemaAttribute,
 } from '../../config/schema';
 
 export interface postAdd {
@@ -196,6 +197,9 @@ export default class LdapGroups extends DmPlugin {
       loadSchemaFileAsync<Schema>(file, { config: this.config })
         .then(schema => {
           this.schema = this.adaptSchema(schema);
+          this.server.ldap.knowAttributeNames(
+            Object.keys(this.schema.attributes)
+          );
           this.logger.debug('Group schema loaded');
         })
         .catch(err =>
@@ -734,6 +738,7 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<void> {
     const body = jsonBody(req, res, ...requiredFields) as postAdd | false;
     if (!body) return;
+    await this.server.ldap.canonicalAttributes(body as AttributesList);
     assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
     // Given as a DN, it is created in the groups branch or not at all
@@ -751,7 +756,7 @@ export default class LdapGroups extends DmPlugin {
           key !== 'member' &&
           _value !== undefined &&
           // Filter out fixed fields from schema
-          !(this.schema?.attributes[key]?.fixed === true)
+          !(schemaAttribute(this.schema, key)?.[1]?.fixed === true)
       )
     ) as AttributesList;
     await tryMethod(
@@ -782,18 +787,33 @@ export default class LdapGroups extends DmPlugin {
     const cn = decodeURIComponent(req.params.cn as string);
     if (!cn) throw new BadRequestError('cn is required');
     const dn = this.routeGroupDn(cn);
+    await this.server.ldap.canonicalChanges(body);
     assertClientMaySet(
       this.schema,
       modifiedAttributeNames(
         body as Parameters<typeof modifiedAttributeNames>[0]
       )
     );
-    // Filter out fixed fields from schema
-    const filteredBody = Object.fromEntries(
-      Object.entries(body).filter(
-        ([key, _value]) => !(this.schema?.attributes[key]?.fixed === true)
-      )
-    ) as postModify;
+    // Fixed fields are dropped from each part, as from a creation: the
+    // filter used to run on `add`, `replace` and `delete` themselves
+    const fixed = (key: string): boolean =>
+      schemaAttribute(this.schema, key)?.[1]?.fixed === true;
+    const keep = (part?: AttributesList): AttributesList | undefined =>
+      part &&
+      (Object.fromEntries(
+        Object.entries(part).filter(([key]) => !fixed(key))
+      ) as AttributesList);
+    const filteredBody: postModify = {
+      ...(body.add ? { add: keep(body.add) } : {}),
+      ...(body.replace ? { replace: keep(body.replace) } : {}),
+      ...(body.delete
+        ? {
+            delete: Array.isArray(body.delete)
+              ? body.delete.filter(key => !fixed(key))
+              : keep(body.delete),
+          }
+        : {}),
+    };
     await this.judgedGroup(dn, () =>
       this.ldap.authorize('ldapmodifyrequest', [
         dn,
@@ -815,6 +835,7 @@ export default class LdapGroups extends DmPlugin {
     additional: AttributesList = {},
     req?: Request
   ): Promise<boolean> {
+    await this.server.ldap.canonicalAttributes(additional);
     let dn: string;
     if (new RegExp(`^${this.cn}=`, 'i').test(cn)) {
       // A bare RDN lies in the groups branch, as a name does
@@ -919,6 +940,9 @@ export default class LdapGroups extends DmPlugin {
     },
     req?: Request
   ): Promise<boolean> {
+    // `MEMBER` is `member`: the guards below compare names as the write
+    // gives them
+    await this.server.ldap.canonicalChanges(changes);
     let dn = this.toGroupDn(cn);
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
@@ -1508,7 +1532,7 @@ export default class LdapGroups extends DmPlugin {
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
         throw new BadRequestError(
-          invalidValueMessage(field, this.schema.attributes[field])
+          invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
         );
       }
     }
@@ -1546,7 +1570,7 @@ export default class LdapGroups extends DmPlugin {
       for (const [field, value] of Object.entries(changes.add)) {
         if (!(await this._validateOneChange(field, value)))
           throw new BadRequestError(
-            invalidValueMessage(field, this.schema.attributes[field])
+            invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
           );
       }
     }
@@ -1554,7 +1578,7 @@ export default class LdapGroups extends DmPlugin {
       for (const [field, value] of Object.entries(changes.replace)) {
         if (!(await this._validateOneChange(field, value)))
           throw new BadRequestError(
-            invalidValueMessage(field, this.schema.attributes[field])
+            invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
           );
       }
     }
@@ -1578,7 +1602,7 @@ export default class LdapGroups extends DmPlugin {
     if (!this.schema) return true;
     // Every refusal of a value is a 400: a plain Error reached the client as
     // a 500 "check logs".
-    const test = this.schema.attributes[field];
+    const test = schemaAttribute(this.schema, field)?.[1];
     if (!test) {
       if (this.schema.strict)
         throw new BadRequestError(`Attribute "${field}" is not allowed`);

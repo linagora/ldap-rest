@@ -52,6 +52,7 @@ import {
   missingRequiredAttribute,
   toDirectoryChanges,
   toDirectoryEntry,
+  schemaAttribute,
 } from '../../config/schema';
 
 /**
@@ -171,6 +172,7 @@ export default class LdapOrganizations extends DmPlugin {
       loadSchemaFileAsync<Schema>(file, { config: this.config })
         .then(schema => {
           this.schema = schema;
+          this.server.ldap.knowAttributeNames(Object.keys(schema.attributes));
           this.logger.debug('Organization schema loaded');
         })
         .catch(err =>
@@ -786,7 +788,8 @@ export default class LdapOrganizations extends DmPlugin {
       // Deletion of a non empty organization is forbidden
       const targets = Array.isArray(dn) ? dn : [dn];
       for (const target of targets) {
-        if (/^ou=/.test(target)) await this.isEmptyOrganization(target);
+        // `OU=Sales,…` names the same entry
+        if (/^\s*ou\s*=/i.test(target)) await this.isEmptyOrganization(target);
       }
       return [dn, req] as [string | string[], Request?];
     },
@@ -1372,7 +1375,7 @@ export default class LdapOrganizations extends DmPlugin {
   }
 
   invalidValueMessage(field: string): string {
-    return invalidValueMessage(field, this.schema?.attributes[field]);
+    return invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1]);
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
@@ -1411,7 +1414,7 @@ export default class LdapOrganizations extends DmPlugin {
     // Every refusal here is the client's value, so a 400: a plain Error
     // reached the client as a 500 "check logs", which also left the hint-
     // quoting message of the callers unreachable.
-    const fieldTest = this.schema.attributes[field];
+    const fieldTest = schemaAttribute(this.schema, field)?.[1];
     if (!fieldTest) {
       if (this.schema.strict)
         throw new BadRequestError(`Attribute "${field}" is not allowed`);

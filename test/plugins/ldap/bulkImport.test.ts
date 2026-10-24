@@ -377,12 +377,12 @@ describe('LDAP Bulk Import Plugin', function () {
       expect(await exists('bulkuser2')).to.be.true;
     });
 
-    it('should accept attribute options, numeric OIDs and empty extra columns', async () => {
+    it('should accept numeric OIDs and empty extra columns', async () => {
       // 2.5.4.13 is description; Commentaire is empty on every line and the
       // trailing comma adds an unnamed column, both imported fine before
       const csvContent = [
-        'uid,cn,sn,givenName,title;lang-fr,2.5.4.13,Commentaire,organizationDn,',
-        `bulkuser1,Bulk User 1,User1,Bulk,Ingénieur,Imported,,"${getTestOrg1Dn()}",`,
+        'uid,cn,sn,givenName,2.5.4.13,Commentaire,organizationDn,',
+        `bulkuser1,Bulk User 1,User1,Bulk,Imported,,"${getTestOrg1Dn()}",`,
       ].join('\n');
 
       const res = await request
@@ -391,6 +391,23 @@ describe('LDAP Bulk Import Plugin', function () {
 
       expect(res.status).to.equal(200);
       expect(res.body).to.include({ created: 1, failed: 0 });
+    });
+
+    it('should refuse a row naming an attribute option', async () => {
+      // `title;lang-fr` is a value of its own, which the rules guarding
+      // `title` would not see
+      const csvContent = [
+        'uid,cn,sn,givenName,title;lang-fr,organizationDn',
+        `bulkuser1,Bulk User 1,User1,Bulk,Ingénieur,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/testusers')
+        .attach('file', Buffer.from(csvContent), 'test.csv');
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.include({ created: 0, failed: 1 });
+      expect(res.body.errors[0].error).to.match(/option "lang-fr"/);
     });
 
     it('should handle multi-value attributes', async function () {

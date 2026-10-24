@@ -5,7 +5,7 @@ import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import LdapGroups from '../../../src/plugins/ldap/groups';
-import { ConflictError } from '../../../src/lib/errors';
+import { BadRequestError, ConflictError } from '../../../src/lib/errors';
 import type { SearchResult } from '../../../src/lib/ldapActions';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
 import { waitFor } from '../../helpers/waitFor';
@@ -266,19 +266,21 @@ describe('James and groups', () => {
       await deleteTeamMailbox(dn, 'tm-new', 'mlalice');
     });
 
-    it('follows a member under an attribute option', async () => {
+    it('refuses a member under an attribute option', async () => {
+      // `member;lang-en` is a value of its own, which the hooks guarding
+      // `member` would not follow
       const dn = await addGroup('tm-option', 'teamMailbox');
       await reached(created('tm-option'));
       calls.length = 0;
 
-      await dm.ldap.modify(dn, { add: { 'member;lang-en': bob } });
-      const added = [`PUT ${mailbox('tm-option')}/members/${user('mlbob')}`];
-      expect(await reached(added)).to.deep.equal(added);
-      calls.length = 0;
+      let error: unknown;
+      await dm.ldap
+        .modify(dn, { add: { 'member;lang-en': bob } })
+        .catch(e => (error = e));
+      expect(error).to.be.instanceOf(BadRequestError);
       await groups.deleteGroup(dn);
       const emptied = [
         `DELETE ${mailbox('tm-option')}/members/${user('mlalice')}`,
-        `DELETE ${mailbox('tm-option')}/members/${user('mlbob')}`,
       ];
       expect(await reached(emptied)).to.have.members(emptied);
     });
@@ -485,7 +487,7 @@ describe('James and groups', () => {
       const error = await refusal(
         dm.ldap.modify(dn, { add: { member: bob, 'member;lang-en': carol } })
       );
-      expect(error).to.be.instanceOf(ConflictError);
+      expect(error).to.be.instanceOf(BadRequestError);
       expect(await membersOf(dn)).not.to.include(carol);
       await deleteTeamMailbox(dn, 'tm-option', 'mlalice');
     });

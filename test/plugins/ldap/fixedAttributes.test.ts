@@ -149,6 +149,22 @@ describe('Fixed attributes validation', function () {
         expect(err.message).to.match(/fixed and cannot be deleted/i);
       }
 
+      // Nor under another spelling of its name
+      for (const changes of [
+        { delete: ['OBJECTCLASS'] },
+        { delete: { ObjectClass: 'inetOrgPerson' } },
+      ]) {
+        let message = '';
+        try {
+          await plugin.modifyEntry('testfixed', changes);
+        } catch (err: any) {
+          message = String(err.message);
+        }
+        expect(message, JSON.stringify(changes)).to.match(
+          /fixed and cannot be deleted/i
+        );
+      }
+
       // Cleanup
       await plugin.deleteEntry('testfixed');
     });

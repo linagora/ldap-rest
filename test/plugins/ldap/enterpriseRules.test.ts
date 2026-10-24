@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 
 import { expect } from 'chai';
+import { Attribute, Change, Client } from 'ldapts';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
@@ -515,11 +516,33 @@ describe('Enterprise rules', () => {
           .catch(() => undefined);
         try {
           await create('rules.uniq@example.com').expect(201);
-          // As another tool may store it: the address under a tagged name
-          await server.ldap.modify(self, {
-            delete: { mail: 'rules.uniq@example.com' },
-            add: { 'mail;lang-en': 'rules.uniq@example.com' },
-          } as never);
+          // As another tool may store it, which this server refuses to: the
+          // address under a tagged name
+          const client = new Client({ url: process.env.DM_LDAP_URI as string });
+          try {
+            await client.bind(
+              process.env.DM_LDAP_DN as string,
+              process.env.DM_LDAP_PWD as string
+            );
+            await client.modify(self, [
+              new Change({
+                operation: 'delete',
+                modification: new Attribute({
+                  type: 'mail',
+                  values: ['rules.uniq@example.com'],
+                }),
+              }),
+              new Change({
+                operation: 'add',
+                modification: new Attribute({
+                  type: 'mail;lang-en',
+                  values: ['rules.uniq@example.com'],
+                }),
+              }),
+            ]);
+          } finally {
+            await client.unbind();
+          }
           await server.ldap.add(copy, {
             objectClass: ['top', 'twakeAccount'],
             uid: 'rules.uniq@example.com',
@@ -543,14 +566,19 @@ describe('Enterprise rules', () => {
         await create('rules.other@example.com').expect(201);
         // Below the API, which a strict schema guards: what another plugin
         // or a non-strict schema lets through
-        for (const name of ['MAIL', 'mail;lang-en'])
+        // An option is refused before any rule
+        for (const [name, refusal] of [
+          ['MAIL', /already used/],
+          ['rfc822Mailbox', /already used/],
+          ['mail;lang-en', /option "lang-en"/],
+        ] as [string, RegExp][])
           await server.ldap
             .modify(`uid=rules.other,ou=users,${base}`, {
               replace: { [name]: 'rules.uniq@example.com' },
             } as never)
             .then(
               () => expect.fail(`${name} was written`),
-              (err: Error) => expect(err.message).to.match(/already used/)
+              (err: Error) => expect(err.message).to.match(refusal)
             );
       });
 
@@ -618,18 +646,24 @@ describe('Enterprise rules', () => {
         const self = `uid=rules.domain,ou=users,${base}`;
         // Into an organization that allows example.com only: the stored
         // address, or one sent along, is checked against it
-        for (const replace of [
-          { TWAKEDEPARTMENTLINK: subOrgDn },
-          { 'twakeDepartmentLink;x-tag': subOrgDn },
-          {
-            TwakeDepartmentLink: subOrgDn,
-            mail: 'rules.other@elsewhere.example',
-          },
-        ])
+        for (const [replace, refusal] of [
+          [{ TWAKEDEPARTMENTLINK: subOrgDn }, /not one of the authorised/],
+          [
+            { '1.3.6.1.4.1.10943.1.50.1.1': subOrgDn },
+            /not one of the authorised/,
+          ],
+          [{ 'twakeDepartmentLink;x-tag': subOrgDn }, /option "x-tag"/],
+          [
+            {
+              TwakeDepartmentLink: subOrgDn,
+              mail: 'rules.other@elsewhere.example',
+            },
+            /not one of the authorised/,
+          ],
+        ] as [Record<string, string>, RegExp][])
           await server.ldap.modify(self, { replace } as never).then(
             () => expect.fail(`${JSON.stringify(replace)} was written`),
-            (err: Error) =>
-              expect(err.message).to.match(/not one of the authorised domains/)
+            (err: Error) => expect(err.message).to.match(refusal)
           );
       });
 
