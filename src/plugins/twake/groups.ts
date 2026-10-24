@@ -473,7 +473,11 @@ export default class TwakeGroups extends LdapGroups {
     app.get(
       `${base}/:groupId`,
       route('getting group', async (req, res, org) => {
-        const group = await this.readGroup(org, req.params.groupId as string);
+        const group = await this.readGroup(
+          org,
+          req.params.groupId as string,
+          req
+        );
         if (!group) throw notFound('group');
         res.json(group);
       })
@@ -516,7 +520,7 @@ export default class TwakeGroups extends LdapGroups {
     return async (req, res) => {
       try {
         const org = req.params.id as string;
-        await this.checkOrganization(org);
+        await this.checkOrganization(org, req);
         await handler(req, res, org);
       } catch (err) {
         if (err instanceof RouteError) {
@@ -557,22 +561,30 @@ export default class TwakeGroups extends LdapGroups {
     return `${this.userAttribute}=${escapeDnValue(username)},${this.userBaseOf(org)}`;
   }
 
-  /** Every route answers 404 for a missing organization, 410 for a deleted one. */
-  async checkOrganization(org: string): Promise<void> {
+  /**
+   * Every route answers 404 for a missing organization, 410 for a deleted one.
+   *
+   * The status is read as the server, whoever asks; an organization the
+   * caller of `req` cannot read answers as one that is not there, deleted or
+   * not.
+   */
+  async checkOrganization(org: string, req?: Request): Promise<void> {
     if (!this.orgPattern) return;
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
+    const dn = this.orgPattern.replace(ORG, escapeDnValue(org));
     let entry: AttributesList | undefined;
     try {
       const found = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: [status] },
-        this.orgPattern.replace(ORG, escapeDnValue(org))
+        dn
       )) as SearchResult;
       entry = found.searchEntries[0];
     } catch (err) {
       if (extractLdapCode(err) !== 32) throw err;
     }
-    if (!entry) throw notFound('organization');
+    if (!entry || !(await this.ldap.readableBy(dn, req)))
+      throw notFound('organization');
     const deleted =
       this.config.twake_group_organization_deleted_value || 'deleted';
     if (read(entry, status) === deleted)
@@ -672,18 +684,24 @@ export default class TwakeGroups extends LdapGroups {
     }
   }
 
+  /**
+   * A group, read as the caller of `req` when there is one: a group they
+   * cannot read answers as one that is not there.
+   */
   private async readGroup(
     org: string,
-    id: string
+    id: string,
+    req?: Request
   ): Promise<Record<string, unknown> | undefined> {
     try {
       const { searchEntries } = (await this.ldap.search(
         { paged: false, scope: 'base' },
-        this.groupDn(org, id)
+        this.groupDn(org, id),
+        req
       )) as SearchResult;
       return searchEntries[0] && this.groupOf(org, searchEntries[0]);
     } catch (err) {
-      if (extractLdapCode(err) === 32) return undefined;
+      if (extractLdapCode(err) === 32 || isAuthzRefusal(err)) return undefined;
       throw err;
     }
   }
@@ -721,7 +739,9 @@ export default class TwakeGroups extends LdapGroups {
       filter = `(&${filter}(|(${this.displayName}=*${s}*)(description=*${s}*)(&(!(${this.displayName}=*))(${this.cn}=*${s}*))))`;
     }
     const groups = this.sorted(
-      (await this.groups(org, filter)).map(e => this.groupOf(org, e)),
+      (await this.groups(org, filter, undefined, req)).map(e =>
+        this.groupOf(org, e)
+      ),
       p.sortBy,
       p.desc
     );
@@ -748,9 +768,6 @@ export default class TwakeGroups extends LdapGroups {
       throw invalid('description must be a string');
     if (body.color !== undefined && !isColor(body.color))
       throw invalid('color must be a hex code (e.g. #RRGGBB or #RGB)');
-    // Unique for groups made here only: a provider may push two of one name.
-    if (await this.named(org, body.name))
-      throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
     const id = randomUUID();
     const additional: AttributesList = {
       objectClass: this.config.group_class || ['top', 'groupOfNames'],
@@ -759,6 +776,16 @@ export default class TwakeGroups extends LdapGroups {
     };
     if (body.description) additional.description = body.description;
     if (body.color) additional[this.color] = body.color;
+    // Judged before the name is looked for: whether it is taken is not for
+    // a caller who may not create a group here
+    await this.ldap.authorize('ldapaddrequest', [
+      this.groupDn(org, id),
+      this.candidateGroup(id, [], additional),
+      req,
+    ]);
+    // Unique for groups made here only: a provider may push two of one name.
+    if (await this.named(org, body.name))
+      throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
     await this.addGroup(this.groupDn(org, id), [], additional, req);
     const group = await this.readGroup(org, id);
     res.status(201).json(group);
@@ -791,16 +818,23 @@ export default class TwakeGroups extends LdapGroups {
         'color must be a hex code (e.g. #RRGGBB or #RGB) or empty to clear it'
       );
     const replace: AttributesList = {};
-    if (name !== undefined) {
-      const holder = await this.named(org, name);
-      if (holder && holder !== id)
-        throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
-      replace[this.displayName] = name;
-    }
+    if (name !== undefined) replace[this.displayName] = name;
     // An empty value clears the attribute.
     if (description !== undefined)
       replace.description = description ? description : [];
     if (color !== undefined) replace[this.color] = color ? color : [];
+    // Judged before the name is looked for, as on a creation
+    await this.ldap.authorize('ldapmodifyrequest', [
+      this.groupDn(org, id),
+      { replace },
+      this.opNumber(),
+      req,
+    ]);
+    if (name !== undefined) {
+      const holder = await this.named(org, name);
+      if (holder && holder !== id)
+        throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
+    }
     await this.onGroup(() =>
       this.modifyGroup(this.groupDn(org, id), { replace }, req)
     );
@@ -814,12 +848,18 @@ export default class TwakeGroups extends LdapGroups {
   ): Promise<void> {
     const p = this.page(req, MEMBER_SORT);
     const id = req.params.groupId as string;
-    const group = await this.readGroup(org, id);
+    const group = await this.readGroup(org, id, req);
     if (!group) throw notFound('group');
     res.json({
       organizationId: org,
       id,
-      ...(await this.memberPage(p, org, group.members as string[])),
+      ...(await this.memberPage(
+        p,
+        org,
+        group.members as string[],
+        undefined,
+        req
+      )),
     });
   }
 
@@ -896,7 +936,8 @@ export default class TwakeGroups extends LdapGroups {
         )) as SearchResult;
         out.push(...searchEntries);
       } catch (err) {
-        if (extractLdapCode(err) !== 32) throw err;
+        // Users the caller may not read are users it does not find
+        if (extractLdapCode(err) !== 32 && !isAuthzRefusal(err)) throw err;
       }
     }
     return out;
@@ -950,11 +991,19 @@ export default class TwakeGroups extends LdapGroups {
         `usernames cannot exceed ${this.maxPage} entries per request`
       );
     const id = req.params.groupId as string;
-    const group = await this.readGroup(org, id);
-    if (!group) throw notFound('group');
     const wanted = [
       ...new Map((usernames as string[]).map(u => [u.toLowerCase(), u])).keys(),
     ];
+    // Judged before the group and the users are looked for, and before the
+    // members already there are left out — even a change writing nothing
+    await this.ldap.authorize('ldapmodifyrequest', [
+      this.groupDn(org, id),
+      { add: { member: wanted.map(u => this.userDn(org, u)) } },
+      this.opNumber(),
+      req,
+    ]);
+    const group = await this.readGroup(org, id);
+    if (!group) throw notFound('group');
     const found = new Map(
       (await this.users(org, wanted, [this.userAttribute])).map(e => {
         const name = read(e, this.userAttribute) || '';

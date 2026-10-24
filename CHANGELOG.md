@@ -4,6 +4,13 @@
 
 ### Security
 
+- `core/twake/groups`: the `/organizations/{id}/groups` routes read the
+  directory as the server, so any caller let in got the groups and member
+  profiles of every organization, and could tell which names, users and
+  memberships exist from the answers to writes. They read as the caller, and
+  judge a write before looking for anything,
+  [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
+
 - The authorization plugins judge an LDAP operation before any other
   plugin, whatever order the plugins loaded in. When `core/ldap/trash`
   loaded first, a caller with no right on an entry could delete it, as a

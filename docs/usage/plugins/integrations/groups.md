@@ -38,9 +38,14 @@ branch per organization. It serves the groups of an organization under
 ## Routes
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
-is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
-`{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
-answers 403 `REFUSED`.
+is missing or the caller cannot read it, and 410 `ORGANIZATION_DELETED` when
+it is deleted. Errors are `{ "error": "...", "code": "..." }`. A request an
+authorization plugin refuses answers 403 `REFUSED`.
+
+The routes read as the caller: the authorization plugins decide which groups
+and members it gets, and a group it cannot read answers 404. A write is
+judged before anything is looked for, so a caller who may not make it gets
+403 whether the name is taken, the users exist or they are already members.
 
 A group reads:
 

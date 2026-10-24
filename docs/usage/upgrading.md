@@ -6,6 +6,15 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Organization groups need read access to the organization
+
+**Who is affected:** a deployment loading an authorization plugin together
+with `core/twake/groups`.
+
+The `/organizations/{id}/groups` routes read as the caller. A client calling
+them must be granted read access to the organization and its groups, and
+write access to change them; an organization it cannot read answers `404`.
+
 ### Quota and app accounts need read access to the account
 
 **Who is affected:** a deployment loading an authorization plugin

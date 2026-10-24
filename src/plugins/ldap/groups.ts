@@ -764,34 +764,7 @@ export default class LdapGroups extends DmPlugin {
       validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }
-    // Build entry
-    const objectClasses = [...(this.config.group_class as string[])];
-
-    // Add twakeGroup objectClass if group has mail or twake-specific attributes
-    // Only add if not already using twakeStaticGroup (which includes all these attributes)
-    if (
-      (additional.mail ||
-        additional.twakeMailboxType ||
-        additional.twakeDepartmentLink ||
-        additional.twakeDepartmentPath) &&
-      !objectClasses.includes('twakeGroup') &&
-      !objectClasses.includes('twakeStaticGroup')
-    ) {
-      objectClasses.push('twakeGroup');
-    }
-
-    let entry: AttributesList = {
-      // Classes from --group-class (with twakeGroup added if mail present)
-      objectClass: objectClasses,
-      // Default attributes from --group-default-attributes
-      ...this.config.group_default_attributes,
-      // cn calculated here
-      [this.cn]: cn,
-      // members with at least one fake member to satisfy LDAP groupOfNames schema
-      member: [this.config.group_dummy_user as string],
-      ...additional,
-    };
-    if (members.length) (entry.member as string[]).push(...members);
+    let entry = this.candidateGroup(cn, members, additional);
 
     // The entry written, judged before the checks reading the directory and
     // before the external members are created: none of it is for a caller
@@ -825,6 +798,52 @@ export default class LdapGroups extends DmPlugin {
     }
     void launchHooks(this.registeredHooks.ldapgroupadddone, [dn, entry]);
     return res;
+  }
+
+  /**
+   * The entry `addGroup` writes, as the plugin's own hooks receive it. Built
+   * in one place, so that a creation judged before it is made — here, or by
+   * a plugin checking something first — is the creation made.
+   *
+   * @param cn the group's cn
+   * @param members member DNs
+   * @param additional attributes sent
+   * @returns the entry
+   */
+  candidateGroup(
+    cn: string,
+    members: string[],
+    additional: AttributesList
+  ): AttributesList {
+    // Build entry
+    const objectClasses = [...(this.config.group_class as string[])];
+
+    // Add twakeGroup objectClass if group has mail or twake-specific attributes
+    // Only add if not already using twakeStaticGroup (which includes all these attributes)
+    if (
+      (additional.mail ||
+        additional.twakeMailboxType ||
+        additional.twakeDepartmentLink ||
+        additional.twakeDepartmentPath) &&
+      !objectClasses.includes('twakeGroup') &&
+      !objectClasses.includes('twakeStaticGroup')
+    ) {
+      objectClasses.push('twakeGroup');
+    }
+
+    const entry: AttributesList = {
+      // Classes from --group-class (with twakeGroup added if mail present)
+      objectClass: objectClasses,
+      // Default attributes from --group-default-attributes
+      ...this.config.group_default_attributes,
+      // cn calculated here
+      [this.cn]: cn,
+      // members with at least one fake member to satisfy LDAP groupOfNames schema
+      member: [this.config.group_dummy_user as string],
+      ...additional,
+    };
+    if (members.length) (entry.member as string[]).push(...members);
+    return entry;
   }
 
   async modifyGroup(
