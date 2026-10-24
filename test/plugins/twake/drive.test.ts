@@ -17,6 +17,10 @@ describe('Drive Plugin', () => {
   let dm: DM;
   let drive: Drive;
   let scope: nock.Scope;
+  // Writes the entries the public methods read: the server under test
+  // would call Twake Drive for them in the background, alongside the call
+  // under test
+  let setup: DM;
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -35,6 +39,11 @@ describe('Drive Plugin', () => {
     ).persist();
 
     nock.disableNetConnect();
+  });
+
+  before(async () => {
+    setup = new DM();
+    await setup.ready;
   });
 
   after(function () {
@@ -445,6 +454,11 @@ describe('Drive Plugin', () => {
   });
 
   describe('Public methods', () => {
+    // A failing test leaves its interceptor behind for the next ones
+    afterEach(() => {
+      nock.cleanAll();
+    });
+
     it('getCozyDomain should return the Cozy domain attribute', async () => {
       const entry = {
         objectClass: ['top', 'inetOrgPerson', 'twakeWhitePages'],
@@ -454,7 +468,7 @@ describe('Drive Plugin', () => {
         mail: 'cozy@test.org',
         twakeCozyDomain: 'cozyuser.mycozy.cloud',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const domain = await drive.getCozyDomain(testDN);
       expect(domain).to.equal('cozyuser.mycozy.cloud');
@@ -468,7 +482,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'nocozy@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const domain = await drive.getCozyDomain(testDN);
       expect(domain).to.be.null;
@@ -484,12 +498,12 @@ describe('Drive Plugin', () => {
         mail: 'test@test.org',
         displayName: 'Display Name',
       };
-      await dm.ldap.add(testDN, entry1);
+      await setup.ldap.add(testDN, entry1);
 
       let name = await drive.getDisplayNameFromDN(testDN);
       expect(name).to.equal('Display Name');
 
-      await dm.ldap.delete(testDN);
+      await setup.ldap.delete(testDN);
 
       // Test with cn fallback (no displayName)
       const entry2 = {
@@ -499,12 +513,12 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'test@test.org',
       };
-      await dm.ldap.add(testDN, entry2);
+      await setup.ldap.add(testDN, entry2);
 
       name = await drive.getDisplayNameFromDN(testDN);
       expect(name).to.equal('CN Name');
 
-      await dm.ldap.delete(testDN);
+      await setup.ldap.delete(testDN);
 
       // Test with givenName + sn fallback (cn present but displayName not)
       const entry3 = {
@@ -515,7 +529,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'test@test.org',
       };
-      await dm.ldap.add(testDN, entry3);
+      await setup.ldap.add(testDN, entry3);
 
       // Since cn is present, it will be used as fallback (displayName -> cn -> givenName+sn)
       name = await drive.getDisplayNameFromDN(testDN);
@@ -530,7 +544,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'mailuser@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const mail = await drive.getMailFromDN(testDN);
       expect(mail).to.equal('mailuser@test.org');
@@ -545,7 +559,7 @@ describe('Drive Plugin', () => {
         mail: 'quota@test.org',
         twakeDriveQuota: '5368709120',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const quota = await drive.getDriveQuotaFromDN(testDN);
       expect(quota).to.equal(5368709120);
@@ -559,7 +573,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'noquota@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const quota = await drive.getDriveQuotaFromDN(testDN);
       expect(quota).to.be.null;
@@ -592,7 +606,7 @@ describe('Drive Plugin', () => {
         twakeCozyDomain: 'syncuser.twake.cloud',
         twakeDriveQuota: '1073741824',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.syncUserToCozy(testDN);
       expect(result).to.be.true;
@@ -607,7 +621,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'nocozy@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.syncUserToCozy(testDN);
       expect(result).to.be.false;
@@ -645,7 +659,7 @@ describe('Drive Plugin', () => {
         mail: 'block@test.org',
         twakeCozyDomain: 'blockuser.mycozy.cloud',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.blockInstance(testDN, 'PAYMENT_FAILED');
       expect(result).to.be.true;
@@ -679,7 +693,7 @@ describe('Drive Plugin', () => {
         mail: 'block2@test.org',
         twakeCozyDomain: 'blockuser2.mycozy.cloud',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.blockInstance(testDN);
       expect(result).to.be.true;
@@ -694,7 +708,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'nocozy@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.blockInstance(testDN);
       expect(result).to.be.false;
@@ -723,7 +737,7 @@ describe('Drive Plugin', () => {
         mail: 'unblock@test.org',
         twakeCozyDomain: 'unblockuser.mycozy.cloud',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.unblockInstance(testDN);
       expect(result).to.be.true;
@@ -739,7 +753,7 @@ describe('Drive Plugin', () => {
         uid: 'testdriveuser',
         mail: 'nocozy@test.org',
       };
-      await dm.ldap.add(testDN, entry);
+      await setup.ldap.add(testDN, entry);
 
       const result = await drive.unblockInstance(testDN);
       expect(result).to.be.false;
@@ -753,7 +767,7 @@ describe('Drive Plugin', () => {
       testDNMalicious = `uid=malicioususer,${process.env.DM_LDAP_BASE}`;
       // Clean up any existing entry
       try {
-        await dm.ldap.delete(testDNMalicious);
+        await setup.ldap.delete(testDNMalicious);
       } catch {
         // Entry may not exist, ignore
       }
@@ -762,7 +776,7 @@ describe('Drive Plugin', () => {
     afterEach(async () => {
       nock.cleanAll();
       try {
-        await dm.ldap.delete(testDNMalicious);
+        await setup.ldap.delete(testDNMalicious);
       } catch {
         // Entry may not exist, ignore
       }
@@ -778,7 +792,7 @@ describe('Drive Plugin', () => {
         mail: 'malicious@test.org',
         twakeCozyDomain: '../admin',
       };
-      await dm.ldap.add(testDNMalicious, entry);
+      await setup.ldap.add(testDNMalicious, entry);
 
       // syncUserToCozy should return true (it found the user) but no API call should be made
       const result = await drive.syncUserToCozy(testDNMalicious);
@@ -797,7 +811,7 @@ describe('Drive Plugin', () => {
         mail: 'malicious@test.org',
         twakeCozyDomain: 'valid.com?admin=true',
       };
-      await dm.ldap.add(testDNMalicious, entry);
+      await setup.ldap.add(testDNMalicious, entry);
 
       const result = await drive.syncUserToCozy(testDNMalicious);
       expect(result).to.be.true;
@@ -813,7 +827,7 @@ describe('Drive Plugin', () => {
         mail: 'malicious@test.org',
         twakeCozyDomain: 'valid.com#admin',
       };
-      await dm.ldap.add(testDNMalicious, entry);
+      await setup.ldap.add(testDNMalicious, entry);
 
       const result = await drive.syncUserToCozy(testDNMalicious);
       expect(result).to.be.true;
@@ -839,7 +853,7 @@ describe('Drive Plugin', () => {
         mail: 'valid@test.org',
         twakeCozyDomain: 'user.company.mycozy.cloud',
       };
-      await dm.ldap.add(testDNMalicious, entry);
+      await setup.ldap.add(testDNMalicious, entry);
 
       const result = await drive.syncUserToCozy(testDNMalicious);
       expect(result).to.be.true;
