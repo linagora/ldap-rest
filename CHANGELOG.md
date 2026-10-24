@@ -4,6 +4,13 @@
 
 ### Security
 
+- `core/ldap/raw`: `GET /children/{dn}` answered the children of an entry
+  the caller may not read, an empty list where an entry that is not there
+  got a 404: it told whether the entry exists. It answers that 404. Found
+  by a new test probing every route for what it tells a caller without
+  rights
+  ([#393](https://github.com/linagora/ldap-rest/pull/393))
+
 - A directory search, add, modify, rename or delete made while serving an
   authenticated request is judged as its caller, even when the code making
   it did not hand the request down: a forgotten request used to let the
@@ -93,6 +100,11 @@
   ([#381](https://github.com/linagora/ldap-rest/pull/381))
 
 ### Fixes
+
+- `core/ldap/passwordPolicy`: `POST /api/v1/users/{id}/unlock` for a user
+  that is not there answered 500; it answers 404, as for one the caller
+  may not read
+  ([#393](https://github.com/linagora/ldap-rest/pull/393))
 
 - `core/ldap/externalUsersInGroups` refuses an external member in a mail
   domain the directory declares, not only one `--mail-domain` names, and
