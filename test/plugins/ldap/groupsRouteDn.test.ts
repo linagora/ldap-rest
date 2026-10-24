@@ -138,6 +138,21 @@ describe('Group routes and the DN they are given', function () {
     expect((await get(named)).status).to.equal(200);
   });
 
+  it('renames a group by its name only', async () => {
+    // A multi-valued RDN is written on the entry, past every check of a write
+    const renamed = await request
+      .post(`/api/v1/ldap/groups/${encodeURIComponent(named)}/rename`)
+      .set('Accept', 'application/json')
+      .type('json')
+      .send({
+        newCn: `cn=routedn-x+description=planted,${plugin.base as string}`,
+      });
+    expect(renamed.status, JSON.stringify(renamed.body)).to.equal(400);
+    const res = await get(named);
+    expect(res.status).to.equal(200);
+    expect(res.body.description).to.equal('A group');
+  });
+
   it('creates a group given as a bare RDN in the groups branch', async () => {
     const res = await request
       .post('/api/v1/ldap/groups')

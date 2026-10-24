@@ -263,6 +263,36 @@ describe('Delegated administration bypasses (#325)', function () {
     }
   });
 
+  // The link named otherwise than the authorization plugins read it: the
+  // write was judged as one leaving the link alone, on the account's
+  // current organization, which the administrator may write
+  describe('the organization link under another name', () => {
+    for (const name of [
+      'TWAKEDEPARTMENTLINK',
+      'twakeDepartmentLink;x-tag',
+      '1.3.6.1.4.1.10943.1.50.1.1',
+    ])
+      it(`refuses moving an account to another branch as ${name}`, async () => {
+        const req = { user: ADMIN_A, headers: {} } as unknown as DmRequest;
+        let status: number | 'ok' = 'ok';
+        try {
+          await server.ldap.modify(
+            userDn(IN_A2),
+            { replace: { [name]: orgB } },
+            req
+          );
+        } catch (err) {
+          status =
+            (err as { statusCode?: number }).statusCode ??
+            (/authz-forbidden/.test(String(err)) ? 403 : 500);
+        }
+        expect(status).to.be.oneOf([400, 403]);
+        expect(await read(userDn(IN_A2), 'twakeDepartmentLink')).to.deep.equal([
+          orgA,
+        ]);
+      });
+  });
+
   describe('group membership', () => {
     const members = (cn: string) => read(groupDn(cn), 'member');
 

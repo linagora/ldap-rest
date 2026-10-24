@@ -16,6 +16,7 @@ import { type DM } from '../bin';
 import type { Hooks } from '../hooks';
 
 import {
+  attributeTypeName,
   escapeDnValue,
   getParentDn,
   hookOwner,
@@ -24,6 +25,7 @@ import {
   launchHooks,
   launchHooksChained,
   normalizeDn,
+  rdnTypes,
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
@@ -494,6 +496,11 @@ class ldapActions {
   private schemaLoading?: Promise<SchemaIndex>;
   /** Whether the last schema read failed, so a failure is logged once. */
   private schemaUnavailable = false;
+  /**
+   * How this server spells attribute names, by name in lower case: the
+   * configuration's, then the loaded schemas'. See {@link canonicalName}.
+   */
+  private spellings = new Map<string, string>();
   /** Class problems already reported, per entry. See {@link warnOnce}. */
   private classWarnings = new LRUCache<string, true>({ max: 10000 });
 
@@ -501,6 +508,12 @@ class ldapActions {
     this.parent = server;
     this.logger = server.logger;
     this.config = server.config;
+    // The attribute names the options give: the plugins compare with these
+    for (const [key, value] of Object.entries(this.config))
+      if (/_attributes?$/.test(key))
+        this.knowAttributeNames(
+          [value].flat().filter((v): v is string => typeof v === 'string')
+        );
 
     // Initialize connection pool settings
     this.poolSize = this.config.ldap_pool_size || 5;
@@ -1009,6 +1022,11 @@ class ldapActions {
   ): Promise<void> {
     // The request being served, when none is named, as for the operation
     const given = [...(args as unknown[])];
+    // Judged under the names the operation will give them
+    if (hook === 'ldapaddrequest')
+      await this.canonicalAttributes(given[1] as AttributesList);
+    if (hook === 'ldapmodifyrequest')
+      await this.canonicalChanges(given[1] as ModifyRequest);
     const at = AUTHORIZED_REQUEST_AT[hook];
     given[at] ??= currentRequest();
     // The DNs as the operation completes them before its hooks see them
@@ -1358,6 +1376,138 @@ class ldapActions {
   }
 
   /**
+   * Say how this server spells attribute names: a schema loaded by a plugin
+   * names its attributes as the plugins compare them. The first spelling of
+   * a name wins.
+   *
+   * @param names attribute names
+   */
+  knowAttributeNames(names: Iterable<string>): void {
+    for (const name of names) {
+      if (!name || name.includes(';')) continue;
+      const key = name.toLowerCase();
+      const known = this.spellings.get(key);
+      if (known === undefined) this.spellings.set(key, name);
+      // A plugin comparing with the other spelling would miss the writes
+      else if (known !== name)
+        this.logger.warn(
+          `Attribute "${name}" is also spelled "${known}" in the configuration ` +
+            `or a schema: writes name it "${known}"`
+        );
+    }
+  }
+
+  /**
+   * Name each attribute of a write as this server does, in place.
+   *
+   * The directory takes `MAIL`, `rfc822Mailbox` and `0.9.2342.19200300.100.1.3`
+   * for `mail`, while the authorization plugins and the hooks look for
+   * `mail`: a write naming the organization link by its OID was judged as
+   * if it left the link alone. Each name is resolved through the directory
+   * schema — case, aliases, OIDs — and written as the configuration or a
+   * loaded schema spells it, or as the directory declares it first.
+   *
+   * An option names a value of its own (`member;lang-en` is not `member` to
+   * the hooks guarding `member`), and is refused, `;binary` aside. Two names
+   * for one attribute in one part of a write are refused too: on a modify
+   * the directory applies both, and only one would have been judged.
+   *
+   * Without the schema, the case is still set, and a name given as an OID,
+   * which nothing here could resolve, is refused.
+   *
+   * @param entry attributes of an add, or one part of a modify
+   * @throws BadRequestError on an option, or on one attribute named twice
+   */
+  async canonicalAttributes(entry: AttributesList | undefined): Promise<void> {
+    if (!entry) return;
+    const keys = Object.keys(entry);
+    const names = await this.canonicalNames(keys);
+    if (keys.every((key, i) => key === names[i])) return;
+    const values = keys.map(key => entry[key]);
+    for (const key of keys) delete entry[key];
+    names.forEach((name, i) => (entry[name] = values[i]));
+  }
+
+  /**
+   * {@link canonicalAttributes} for every part of a modify, in place.
+   *
+   * @param changes the modify
+   * @throws BadRequestError as {@link canonicalAttributes}
+   */
+  async canonicalChanges(changes: ModifyRequest | undefined): Promise<void> {
+    if (!changes) return;
+    await this.canonicalAttributes(changes.add);
+    await this.canonicalAttributes(changes.replace);
+    if (Array.isArray(changes.delete))
+      changes.delete = await this.canonicalNames(changes.delete);
+    else await this.canonicalAttributes(changes.delete);
+  }
+
+  /**
+   * The names of one part of a write, as {@link canonicalAttributes} writes
+   * them.
+   */
+  private async canonicalNames(keys: string[]): Promise<string[]> {
+    if (keys.length === 0) return keys;
+    let index: SchemaIndex | undefined;
+    try {
+      index = await this.schemaIndex();
+      this.schemaUnavailable = false;
+    } catch (err) {
+      // One warning for both its uses, this and the class repair
+      if (!this.schemaUnavailable)
+        this.logger.warn(
+          `The directory schema could not be read (${String(err)}): ` +
+            'attribute names are not resolved, names given as OIDs are ' +
+            'refused, and object classes are not repaired'
+        );
+      this.schemaUnavailable = true;
+    }
+    const seen = new Map<string, string>();
+    return keys.map(key => {
+      const name = this.canonicalName(key, index);
+      const same = seen.get(name.toLowerCase());
+      if (same !== undefined)
+        throw new BadRequestError(
+          `"${same}" and "${key}" name the same attribute`
+        );
+      seen.set(name.toLowerCase(), key);
+      return name;
+    });
+  }
+
+  /**
+   * One attribute description, named as this server does.
+   *
+   * @param key the name as written, options included
+   * @param index the directory schema, when it could be read
+   */
+  private canonicalName(key: string, index?: SchemaIndex): string {
+    const [written, ...options] = key.split(';');
+    // `OID.2.5.4.3`, the LDAPv2 spelling of an OID
+    const base = written.replace(/^oid\./i, '');
+    const option = options.find(o => o.toLowerCase() !== 'binary');
+    if (option !== undefined)
+      throw new BadRequestError(
+        `Attribute option "${option}" of "${key}" is not accepted`
+      );
+    const type = index?.getAttributeType(base);
+    if (!type && !index && /^\d+(\.\d+)+$/.test(attributeTypeName(base)))
+      throw new BadRequestError(
+        `Attribute "${key}" cannot be named by its OID here`
+      );
+    // Without the schema, the names and OIDs this server knows of itself
+    const known = type
+      ? [...type.names, type.oid]
+      : [base, attributeTypeName(base)];
+    const name =
+      known.map(n => this.spellings.get(n.toLowerCase())).find(Boolean) ??
+      type?.names[0] ??
+      base;
+    return options.length ? `${name};binary` : name;
+  }
+
+  /**
    * Hand a search result to `ldapsearchfilter`, which may drop entries the
    * caller is not allowed to see.
    *
@@ -1513,6 +1663,7 @@ class ldapActions {
   ): Promise<boolean> {
     req ??= currentRequest();
     dn = this.setDn(dn);
+    await this.canonicalAttributes(entry);
     if (
       (!entry.objectClass || entry.objectClass.length === 0) &&
       this.config.user_class
@@ -1631,6 +1782,7 @@ class ldapActions {
   ): Promise<boolean> {
     dn = this.setDn(dn);
     const ldapChanges: Change[] = [];
+    await this.canonicalChanges(changes);
     [dn, changes] = await launchHooksChained(
       this.parent.hooks.ldapmodifyrequest,
       [dn, changes, op, req]
@@ -1826,6 +1978,16 @@ class ldapActions {
     req ??= currentRequest();
     dn = this.setDn(dn);
     newRdn = this.setDn(newRdn);
+    // The directory writes the values of the new RDN on the entry, where no
+    // check of a write sees them: `cn=x+twakeDepartmentLink=…` linked a
+    // group past the move check. One value, of the attribute the entry is
+    // already named by
+    const named = rdnTypes(dn);
+    const renamed = rdnTypes(newRdn);
+    if (renamed.length !== 1 || !named.includes(renamed[0]))
+      throw new BadRequestError(
+        `${newRdn}: an entry is renamed by one value of the attribute it is named by`
+      );
     const op: number = this.opNumber();
     const done: Promise<void>[] = [];
     try {

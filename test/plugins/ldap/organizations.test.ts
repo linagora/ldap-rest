@@ -309,6 +309,12 @@ describe('LDAP Organizations Plugin', function () {
           await plugin.isEmptyOrganization(org).catch(e => (error = e));
           expect(error).to.be.instanceOf(Error);
           expect((error as Error).message).to.match(/is not empty/);
+          // Its delete is refused, however the DN is spelled
+          for (const spelled of [org, org.replace(/^ou=/, 'OU=')]) {
+            let refused: unknown;
+            await plugin.server.ldap.delete(spelled).catch(e => (refused = e));
+            expect(String(refused), spelled).to.match(/is not empty/);
+          }
         } finally {
           await plugin.server.ldap.delete(user).catch(() => undefined);
           await plugin.server.ldap.delete(org).catch(() => undefined);

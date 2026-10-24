@@ -873,6 +873,30 @@ registerAttributeTypes([
 ]);
 
 /** An attribute type of a DN as {@link normalizeDn} spells it. */
+/**
+ * The name an attribute type is known by, in lower case, from the names and
+ * OIDs {@link registerAttributeTypes} was given: `commonName` and `2.5.4.3`
+ * are `cn`. A type it was not given is answered as written, in lower case.
+ *
+ * @param type attribute name or OID
+ */
+export function attributeTypeName(type: string): string {
+  return canonicalType(type);
+}
+
+/**
+ * The attribute types the first RDN of a DN names, as {@link normalizeDn}
+ * reads them: `CN=a+2.5.4.11=b,…` names `cn` and `ou`.
+ *
+ * @param dn the DN
+ */
+export function rdnTypes(dn: string): string[] {
+  return splitRdn(parseDn(dn)[0] ?? '').map(atav => {
+    const eq = atav.indexOf('=');
+    return eq === -1 ? '' : canonicalType(atav.slice(0, eq).trim());
+  });
+}
+
 function canonicalType(type: string): string {
   // `OID.2.5.4.11`, the LDAPv2 spelling of an OID
   const name = type.toLowerCase().replace(/^oid\./, '');

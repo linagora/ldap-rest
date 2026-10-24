@@ -135,6 +135,20 @@ describe('LdapGroups Plugin', function () {
           description: 'My modified test group',
         },
       });
+      // Members go through their own API, however the attribute is named
+      for (const changes of [
+        { add: { MEMBER: [user1] } },
+        { replace: { Member: [user1] } },
+        { delete: ['MEMBER'] },
+      ]) {
+        let message = '';
+        try {
+          await plugin.modifyGroup('testgroup', changes);
+        } catch (err) {
+          message = String((err as Error).message);
+        }
+        expect(message, JSON.stringify(changes)).to.match(/Use dedicated API/);
+      }
       expect(await plugin.deleteGroup('testgroup')).to.be.true;
     });
   });

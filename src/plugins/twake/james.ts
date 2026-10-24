@@ -1874,15 +1874,21 @@ export default class James extends TwakePlugin {
       ? String(mailboxType[0])
       : String(mailboxType);
 
-    const match = mailboxTypeDn.match(/^cn=([^,]+)/);
+    // Read as the directory reads the pointer: `CN=TeamMailbox,…` leads to
+    // the same entry, and its check let it through
+    const match = /^\s*cn\s*=\s*([^,]+)/i.exec(mailboxTypeDn);
     if (!match) return null;
 
-    const type = match[1];
-    if (type === 'group' || type === 'mailingList' || type === 'teamMailbox') {
-      return type;
-    }
-
-    return null;
+    const type = match[1].trim().toLowerCase();
+    return (
+      (
+        {
+          group: 'group',
+          mailinglist: 'mailingList',
+          teammailbox: 'teamMailbox',
+        } as const
+      )[type] ?? null
+    );
   }
 
   /**
