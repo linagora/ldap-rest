@@ -19,6 +19,8 @@ caller reads; anything else answers `404 Group not found`, and a DN the
 directory would refuse `400`. A client that managed the organization
 groups of `core/twake/groups` by DN through these routes, when they lie
 outside `--ldap-group-base`, uses `/api/v1/organizations/{id}/groups`.
+A deployment whose groups carry a class of their own, and none of the
+standard ones, declares it in `--group-class`.
 
 ### Reference data still in use is not deleted
 

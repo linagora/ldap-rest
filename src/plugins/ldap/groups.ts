@@ -737,7 +737,12 @@ export default class LdapGroups extends DmPlugin {
     assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
     // Given as a DN, it is created in the groups branch or not at all
-    if (typeof cn === 'string' && /,/.test(cn)) this.routeGroupDn(cn);
+    // A DN as addGroup reads one: a comma, or the groups' main attribute
+    if (
+      typeof cn === 'string' &&
+      (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
+    )
+      this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
     const members = body.member ? body.member : [];
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
@@ -811,11 +816,12 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     let dn: string;
-    if (new RegExp(`^${this.cn}=`).test(cn)) {
-      dn = cn;
+    if (new RegExp(`^${this.cn}=`, 'i').test(cn)) {
+      // A bare RDN lies in the groups branch, as a name does
+      dn = /,/.test(cn) ? cn : `${cn},${this.base as string}`;
       // Extract the RDN value, correctly handling escaped commas
       cn = cn.replace(
-        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`),
+        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
         '$1'
       );
     } else {
@@ -1342,7 +1348,8 @@ export default class LdapGroups extends DmPlugin {
    * below it, nor named as these groups are (`cn=`), is no group of these
    * routes, whatever entry it is (#395). The branch may be the whole
    * directory, which is the default: the naming is what tells an account
-   * from a group there.
+   * from a group there. A multi-valued RDN holding the main attribute
+   * passes here; the group class, checked next, is what settles it.
    *
    * @param cn the group's name, or its DN
    * @returns its DN
@@ -1354,7 +1361,10 @@ export default class LdapGroups extends DmPlugin {
     if (
       !isDnInBranch(dn, base) ||
       normalizeDn(dn) === normalizeDn(base) ||
-      !normalizeDn(getRdn(dn)).startsWith(`${type}=`)
+      // Any assertion of the RDN, the unescaped `+` apart
+      !normalizeDn(getRdn(dn))
+        .split(/(?<!\\)\+/)
+        .some(assertion => assertion.startsWith(`${type}=`))
     )
       throw new NotFoundError('Group not found');
     return dn;

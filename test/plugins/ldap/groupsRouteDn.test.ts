@@ -138,6 +138,35 @@ describe('Group routes and the DN they are given', function () {
     expect((await get(named)).status).to.equal(200);
   });
 
+  it('creates a group given as a bare RDN in the groups branch', async () => {
+    const res = await request
+      .post('/api/v1/ldap/groups')
+      .set('Accept', 'application/json')
+      .type('json')
+      .send({ cn: 'CN=routedn-bare', member: [] });
+    expect(res.status, JSON.stringify(res.body)).to.be.oneOf([200, 201]);
+    expect((await get('routedn-bare')).status).to.equal(200);
+    await plugin.deleteGroup('routedn-bare').catch(() => undefined);
+  });
+
+  it('reads a group named by a multi-valued RDN holding its name', async () => {
+    // `businessCategory` sorts before `cn` once normalized
+    const dn = `businessCategory=x+cn=routedn-multi,${plugin.base as string}`;
+    await server.ldap
+      .add(dn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'routedn-multi',
+        businessCategory: 'x',
+        member: [`uid=nobody,${base}`],
+      } as never)
+      .catch(() => undefined);
+    try {
+      expect((await get(dn)).status).to.equal(200);
+    } finally {
+      await server.ldap.delete(dn).catch(() => undefined);
+    }
+  });
+
   it('writes nothing in the branch that is no group', async () => {
     const [, [person]] = strangers();
     const del = await request
