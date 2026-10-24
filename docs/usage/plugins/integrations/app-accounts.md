@@ -100,6 +100,11 @@ DM_MAIL_ATTRIBUTE="mail"
 
 - `--applicative-account-base`: LDAP base DN for applicative accounts (required)
 - `--max-app-accounts`: Maximum number of app accounts per user (default: 5)
+- `--app-accounts-user-attribute`: attribute the `:user` of the routes is
+  matched against (default: the mail attribute, unique directory-wide).
+  `uid` is safe only where a uid is unique across the whole directory: a
+  uid shared by users the caller can read is answered `409`, and one
+  shared with a user it cannot read resolves to the one it can
 - `--mail-attribute`: LDAP attribute for email (default: `mail`)
 - `--api-prefix`: API endpoint prefix (default: `/api`)
 
