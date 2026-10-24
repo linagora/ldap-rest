@@ -123,6 +123,7 @@
         "type": "pointer",
         "branch": ["ou=domains,ou=nomenclature,__LDAP_BASE__"]
       },
+      "referentialIntegrity": "restrict",
       "required": false,
       "role": "domainLink",
       "label": {

@@ -6,6 +6,18 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Reference data still in use is not deleted
+
+**Who is affected:** a deployment loading the shipped `twake` or `example`
+schemas with `core/ldap/enterpriseRules`.
+
+Deleting a mail domain an organization links, or a nomenclature value an
+entry holds (account status, delivery mode, personal title, list type,
+mailbox type), answers `409 still referenced` instead of leaving the
+reference naming nothing. Change the referrers first. A deployment with
+its own schemas marks its pointers `"referentialIntegrity": "restrict"` to
+get the same.
+
 ### Plugins: an operation naming no request is judged as the caller
 
 **Who is affected:** a third-party plugin calling `this.server.ldap.search`,

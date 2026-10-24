@@ -77,6 +77,7 @@
     "personalTitle": {
       "type": "pointer",
       "branch": ["ou=twakeTitle,ou=nomenclature,__LDAP_BASE__"],
+      "referentialIntegrity": "restrict",
       "required": false,
       "label": "Title"
     },
@@ -203,6 +204,7 @@
     "twakeAccountStatus": {
       "type": "pointer",
       "branch": ["ou=twakeAccountStatus,ou=nomenclature,__LDAP_BASE__"],
+      "referentialIntegrity": "restrict",
       "required": true,
       "generated": true,
       "role": "accountStatus",
@@ -220,6 +222,7 @@
         "type": "pointer",
         "branch": ["ou=twakeDeliveryMode,ou=nomenclature,__LDAP_BASE__"]
       },
+      "referentialIntegrity": "restrict",
       "required": true,
       "generated": true,
       "default": [
