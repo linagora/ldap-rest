@@ -67,12 +67,13 @@ refusal nobody can explain: `authzPerBranch` beside `authzDynamic` judges a
 machine token by a branch configuration written for administrators, finds
 no entry for the tenant, and refuses a write the token's own ACLs grant.
 
-The authorization plugins' request hooks (`ldapsearchrequest`, `ldapaddrequest`,
-`ldapmodifyrequest`, `ldapdeleterequest`, `ldaprenamerequest`) run before any
-other plugin's, whatever order the plugins loaded in: a caller who may not
-make an operation gets the 403, not another plugin's 409, and the operation
-is not replaced (by `core/ldap/trash`, for instance) before it is judged.
-`ldapsearchfilter` keeps the load order.
+The authorization plugins' request hooks (`ldapsearchrequest`,
+`ldapaddrequest`, `ldapmodifyrequest`, `ldapdeleterequest`,
+`ldaprenamerequest`) run before any other plugin's, whatever order the
+plugins loaded in: a caller who may not make an operation gets the 403, not
+another plugin's 409, and the operation is not replaced (by
+`core/ldap/trash`, for instance) before it is judged. `ldapsearchfilter`
+keeps the load order.
 
 The AND needs no second plugin to bite. `--authz-per-branch-config` has a
 default — read everywhere, write nowhere — so a lone `authzPerBranch` judges
