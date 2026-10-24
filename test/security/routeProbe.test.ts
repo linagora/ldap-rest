@@ -82,6 +82,7 @@ const TARGETS = [
   'probe-tuser',
   'probe-tgroup',
   'probe-them-group',
+  'probe-position',
 ];
 
 /**
@@ -152,6 +153,12 @@ const TRANSIT_ALLOWED: Record<string, string> = {
     ].map(route => [
       route,
       'a space carries no link: every administrator reads it',
+    ])
+  ),
+  ...Object.fromEntries(
+    ['GET /api/v1/ldap/positions/:id'].map(route => [
+      route,
+      'a position is a nomenclature value: every administrator reads it',
     ])
   ),
   ...Object.fromEntries(
@@ -234,6 +241,8 @@ for (const model of MODELS)
       'DM_AUTHZ_GLOBAL_ORGANIZATION',
       'DM_BULK_IMPORT_SCHEMAS',
       'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
+      'DM_LDAP_USERS_BASE',
+      'DM_APP_ACCOUNTS_USER_ATTRIBUTE',
     ];
     let dir: string;
 
@@ -278,6 +287,9 @@ for (const model of MODELS)
       );
       Object.assign(process.env, {
         DM_BULK_IMPORT_SCHEMAS: `users:${bulkSchema}`,
+        // Where the account routes find a user, and by what
+        DM_LDAP_USERS_BASE: `ou=users,${base}`,
+        DM_APP_ACCOUNTS_USER_ATTRIBUTE: 'uid',
         ...model.env(orgs, base),
         DM_LDAP_FLAT_SCHEMA:
           './static/schemas/twake/users.json,./static/schemas/example/positions.json',
@@ -338,6 +350,11 @@ for (const model of MODELS)
         member: [`uid=probe-them,ou=users,${base}`],
         description: SECRET,
         twakeDepartmentLink: theirs,
+      });
+      // A position holds its name only: no listing may carry it
+      await add(`cn=probe-position,ou=positions,${base}`, {
+        objectClass: ['top', 'twakePosition'],
+        cn: 'probe-position',
       });
       // And in the other organization's own branches
       await person('probe-tuser', `ou=users,${theirs}`, theirs);
@@ -427,7 +444,7 @@ for (const model of MODELS)
           };
         if (path.startsWith('/api/v1/ldap/users/:id')) return { id: user };
         if (path.startsWith('/api/v1/ldap/positions/:id'))
-          return { id: { there: 'probe-them', absent: 'probe-absent' } };
+          return { id: { there: 'probe-position', absent: 'probe-absent' } };
         if (path.startsWith('/api/v1/users/:id')) return { id: user };
         if (path.startsWith('/api/v1/users/:user'))
           return {
@@ -456,6 +473,7 @@ for (const model of MODELS)
       doomed.push(
         `uid=probe-them,ou=users,${base}`,
         `cn=probe-them-group,ou=groups,${base}`,
+        `cn=probe-position,ou=positions,${base}`,
         `uid=${ADMIN},ou=users,${base}`,
         `uid=${CALLER},ou=users,${base}`,
         policyDn
@@ -604,6 +622,7 @@ for (const model of MODELS)
         [`ou=probetheirs,${orgs}`, 'sub'],
         [`uid=probe-them,ou=users,${base}`, 'base'],
         [`cn=probe-them-group,ou=groups,${base}`, 'base'],
+        [`cn=probe-position,ou=positions,${base}`, 'base'],
         [policyDn, 'base'],
       ] as [string, 'sub' | 'base'][]) {
         const found = (await server.ldap
@@ -660,6 +679,11 @@ for (const model of MODELS)
             differing.push(`${key}\n    there:  ${left}\n    absent: ${right}`);
           continue;
         }
+        // An error is no answer: it hides what the route would say
+        if (a.status >= 500 || b.status >= 500)
+          differing.push(
+            `${key} failed: ${a.status} ${b.status} ${JSON.stringify(b.body)}`
+          );
         // Refused at the shape: the call never reached what it probes
         if (a.status === 400 && !UNEXERCISED[key]) unexercised.push(key);
         // A write to a target the caller holds nothing of is refused,
@@ -726,7 +750,12 @@ for (const model of MODELS)
         if (method !== 'GET' || path.includes(':')) continue;
         const res = await call(method, path + listQuery(path), undefined);
         const text = String(JSON.stringify(res.body));
-        if (TARGETS.some(token => text.includes(token)))
+        // Judged by attachment, a nomenclature value is every
+        // administrator's: the positions are listed to all
+        const hidden = model.publicOrganizations
+          ? TARGETS.filter(token => token !== 'probe-position')
+          : TARGETS;
+        if (hidden.some(token => text.includes(token)))
           leaking.push(
             `${method} ${path}: ${JSON.stringify(res.body).slice(0, 300)}`
           );

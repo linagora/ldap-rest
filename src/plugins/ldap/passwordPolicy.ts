@@ -1118,17 +1118,24 @@ export default class PasswordPolicy extends DmPlugin {
   private async unlockAccount(userId: string, req?: Request): Promise<void> {
     const dn = this.resolveUserDn(userId);
 
-    // First check if user exists
-    const result = (await this.server.ldap.search(
-      {
-        filter: '(objectClass=*)',
-        scope: 'base',
-        attributes: ['pwdAccountLockedTime', 'pwdFailureTime'],
-        paged: false,
-      },
-      dn,
-      req
-    )) as SearchResult;
+    // First check if user exists: one that is not there is a 404, as for
+    // one the caller may not read, not an error
+    const result = (await this.server.ldap
+      .search(
+        {
+          filter: '(objectClass=*)',
+          scope: 'base',
+          attributes: ['pwdAccountLockedTime', 'pwdFailureTime'],
+          paged: false,
+        },
+        dn,
+        req
+      )
+      .catch((error: unknown) => {
+        if (extractLdapCode(error) === 32)
+          throw new NotFoundError(`User not found: ${userId}`);
+        throw error;
+      })) as SearchResult;
 
     if (!result.searchEntries || result.searchEntries.length === 0) {
       throw new NotFoundError(`User not found: ${userId}`);

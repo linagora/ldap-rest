@@ -101,6 +101,11 @@
 
 ### Fixes
 
+- `core/ldap/passwordPolicy`: `POST /api/v1/users/{id}/unlock` for a user
+  that is not there answered 500; it answers 404, as for one the caller
+  may not read
+  ([#393](https://github.com/linagora/ldap-rest/pull/393))
+
 - `core/ldap/externalUsersInGroups` refuses an external member in a mail
   domain the directory declares, not only one `--mail-domain` names, and
   `GET /config` lists those domains in `managedDomains`,
