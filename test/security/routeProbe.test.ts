@@ -1172,6 +1172,11 @@ for (const model of MODELS)
        */
       writes?: boolean;
       /**
+       * The variant naming a target that is there is a write the caller may
+       * make, on what it holds: it goes through
+       */
+      sets?: boolean;
+      /**
        * A target not found is left out, the rest written: both variants go
        * through, and must write the same
        */
@@ -1199,6 +1204,8 @@ for (const model of MODELS)
     let created = 0;
     const TAKEN =
       'a name is taken whoever may read the entry holding it: uniqueness answers about the whole directory';
+    const POINTER =
+      'a pointer leads somewhere whoever may read where: whether an account exists is answered, not what it holds';
     /** An account of the caller's organization, as the Twake schema wants it */
     const newAccount = (uid: string, link = `ou=probemine,${orgs}`) => ({
       // The uid is the mail's, suffixed if taken: no name to probe
@@ -1293,9 +1300,8 @@ for (const model of MODELS)
         query: target =>
           `?filter=${encodeURIComponent(`userName eq "${target}"`)}`,
       },
-      // Judged by branch, refused alike: the linked entries are looked for
-      // from the base. Kept for the day they are looked for where the caller
-      // reads
+      // Judged by branch, the linked entries are looked for in the
+      // organization's branch, which the caller reads
       'organization search': {
         method: 'GET',
         path: () =>
@@ -1303,6 +1309,7 @@ for (const model of MODELS)
         vary: () => ({ there: 'probe-hidden', absent: 'probe-absent' }),
         query: target => `?q=${encodeURIComponent(target)}`,
         branchOnly: true,
+        reaches: true,
       },
       'organization of a new account': {
         method: 'POST',
@@ -1364,6 +1371,16 @@ for (const model of MODELS)
         }),
         body: target => ({ mail: target }),
       },
+      'manager of an organization': {
+        method: 'PUT',
+        path: () =>
+          `/api/v1/ldap/organizations/${encodeURIComponent(`ou=probesub,ou=probemine,${orgs}`)}`,
+        vary: userPair,
+        body: target => ({ replace: { twakeManagerLink: [target] } }),
+        allowed: POINTER,
+        sets: true,
+        reaches: true,
+      },
       'destination of an organization move': {
         method: 'POST',
         path: () =>
@@ -1417,7 +1434,7 @@ for (const model of MODELS)
         const a = await send(c, there);
         const after = JSON.stringify(await snapshot());
         // Nothing the caller may not touch was touched, nor what it holds
-        if (!c.leavesOut && after !== JSON.stringify(before))
+        if (!c.leavesOut && !c.sets && after !== JSON.stringify(before))
           differing.push(`${name} changed the directory: ${a.status}`);
         const b = await send(c, absent);
         // What was not found was left out alike
@@ -1433,7 +1450,7 @@ for (const model of MODELS)
             `${name} answered a secret: ${JSON.stringify(a.body)}`
           );
         // A write naming what the caller holds nothing of is refused
-        if (c.method !== 'GET' && !c.leavesOut && a.status < 400)
+        if (c.method !== 'GET' && !c.leavesOut && !c.sets && a.status < 400)
           differing.push(
             `${name} wrote: ${a.status} ${JSON.stringify(a.body)}`
           );
