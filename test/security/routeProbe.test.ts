@@ -244,7 +244,6 @@ for (const model of MODELS)
       'DM_BULK_IMPORT_SCHEMAS',
       'DM_AUTHZ_FILTER_ATTACHED_ENTRIES',
       'DM_LDAP_USERS_BASE',
-      'DM_APP_ACCOUNTS_USER_ATTRIBUTE',
     ];
     let dir: string;
 
@@ -289,9 +288,8 @@ for (const model of MODELS)
       );
       Object.assign(process.env, {
         DM_BULK_IMPORT_SCHEMAS: `users:${bulkSchema}`,
-        // Where the account routes find a user, and by what
+        // Where the account routes find a user
         DM_LDAP_USERS_BASE: `ou=users,${base}`,
-        DM_APP_ACCOUNTS_USER_ATTRIBUTE: 'uid',
         ...model.env(orgs, base),
         DM_LDAP_FLAT_SCHEMA:
           './static/schemas/twake/users.json,./static/schemas/example/positions.json',
@@ -305,6 +303,9 @@ for (const model of MODELS)
 
       server = new DM();
       await server.ready;
+      // The app accounts find their user by uid, as the probe names it: no
+      // option sets it
+      server.config.app_accounts_user_attribute = 'uid';
       await wipe();
       const add = (dn: string, entry: Record<string, unknown>) =>
         server.ldap.add(dn, entry as never);
@@ -722,6 +723,8 @@ for (const model of MODELS)
         'GET /api/v1/ldap/groups/:cn',
         'GET /api/v1/ldap/raw/entry/:dn',
         'GET /api/v1/organizations/:id/groups/:groupId',
+        'GET /api/v1/ldap/positions/:id',
+        'GET /api/v1/users/:user/app-accounts',
       ])
         expect(
           differing.some(line => line.startsWith(`${route}\n`)),
