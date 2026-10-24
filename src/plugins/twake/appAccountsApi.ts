@@ -760,9 +760,13 @@ export default class AppAccountsApi extends DmPlugin {
           this.logger.warn(
             `${this.name}: Password of ${uid} was already absent from principal account ${principalDn}, resuming deletion`
           );
-        } else if (answeredRefusal(error, res)) {
+        } else if (
+          isAuthzRefusal(error) ||
+          (error instanceof HttpError && error.statusCode === 403)
+        ) {
           // A caller who may delete the account but not change the
           // principal: refused, the account kept
+          answeredRefusal(error, res);
           return;
         } else {
           // Keep the app account: leaving it in place makes the call replayable
