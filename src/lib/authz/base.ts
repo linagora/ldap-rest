@@ -454,29 +454,53 @@ export default abstract class AuthzBase extends DmPlugin {
   abstract ruleBranches(user: string): Promise<string[]>;
 
   /**
-   * Judged by branch, an entry a rule names is under that rule as well as
-   * its parent's, and moving it takes along the rules naming what lies
-   * below it, which name nothing afterwards: the first of these branches
-   * where `user` lacks `permission`.
+   * Whether a write changes nothing but the organization link and the path
+   * that goes with it: what moving an entry between organizations writes.
+   */
+  private onlyRelinks(changes: ModifyRequest): boolean {
+    const allowed = [
+      this.config.ldap_organization_link_attribute,
+      this.config.ldap_organization_path_attribute,
+    ]
+      .filter((attr): attr is string => typeof attr === 'string')
+      .map(attr => attr.toLowerCase());
+    const touched = [
+      ...Object.keys(changes.add ?? {}),
+      ...Object.keys(changes.replace ?? {}),
+      ...(Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete ?? {})),
+    ];
+    // `attr;option` names the same attribute
+    return touched.every(attr =>
+      allowed.includes(String(attr).split(';')[0].toLowerCase())
+    );
+  }
+
+  /**
+   * An entry a rule names is under that rule as well as under what judged
+   * the write, and moving it takes along the rules naming what lies below
+   * it, which name nothing afterwards (`departmentSync` relinks the
+   * accounts attached there to the new DN): the first of these branches
+   * where `user` lacks one of `permissions`.
    *
-   * Only those: an entry no rule names is under its parent's rule, which
-   * the caller judges.
+   * Only those: an entry no rule names is under the rule the caller judges.
    *
-   * @param subtree whether the rules below `dn` count too: a move
+   * @param subtree whether the rules below `dn` count too: a move, or a
+   *   delete, which `trash` turns into one
    */
   private async refusingRule(
     user: string,
     dn: string,
-    permission: keyof BranchPermissions,
+    permissions: (keyof BranchPermissions)[],
     subtree: boolean
   ): Promise<string | undefined> {
-    if (this.filtersAttachedEntries()) return undefined;
     const target = normalizeDn(dn);
     for (const branch of await this.ruleBranches(user)) {
       const named = normalizeDn(branch) === target;
       if (!named && !(subtree && isDnInBranch(branch, dn))) continue;
-      if (!(await this.getUserPermissions(user, branch))[permission])
-        return branch;
+      const held = await this.getUserPermissions(user, branch);
+      if (permissions.some(permission => !held[permission])) return branch;
     }
     return undefined;
   }
@@ -912,6 +936,16 @@ export default abstract class AuthzBase extends DmPlugin {
             );
           }
         }
+        // Judged by branch, the link does not say who holds the entry: what
+        // the write carries besides the link and its path, a password say,
+        // is still a write in its branch
+        if (!byAttachment && !this.onlyRelinks(changes)) {
+          const branch = this.extractBranchDn(dn);
+          if (!(await this.getUserPermissions(user, branch)).write)
+            throw new Error(
+              `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branch}`
+            );
+        }
       } else {
         // For other modifications, check write permission on the entry's current branch
         const branchToCheck = await this.effectiveBranch(dn);
@@ -922,12 +956,14 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
           );
         }
-        const named = await this.refusingRule(user, dn, 'write', false);
-        if (named)
-          throw new Error(
-            `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
-          );
       }
+
+      // Whichever path judged it, the write lands on the entry itself
+      const named = await this.refusingRule(user, dn, ['write'], false);
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        );
 
       const domainAttr = this.domainLinkAttribute();
       if (domainAttr)
@@ -1325,11 +1361,17 @@ export default abstract class AuthzBase extends DmPlugin {
       }
 
       // A branch a rule names, or holding one, is moved out of that rule:
-      // the caller must be able to write there
-      const named = await this.refusingRule(user, oldDn, 'write', true);
+      // the caller must be able to read and write there, or the move would
+      // lift what it refuses
+      const named = await this.refusingRule(
+        user,
+        oldDn,
+        ['read', 'write'],
+        true
+      );
       if (named)
         throw new Error(
-          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+          `[authz-forbidden] User ${req!.user} does not have read and write permission for branch ${named}`
         );
 
       // Check write permission on destination
@@ -1366,7 +1408,7 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${branchToCheck}`
           );
         }
-        const named = await this.refusingRule(user, target, 'delete', false);
+        const named = await this.refusingRule(user, target, ['delete'], true);
         if (named)
           throw new Error(
             `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${named}`

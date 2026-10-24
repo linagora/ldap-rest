@@ -49,6 +49,15 @@ describe('Branch rule precedence', function () {
       ).to.equal('payroll');
     });
 
+    it('reads an escape as the directory spells it', () => {
+      expect(
+        mostSpecificBranchRule(
+          [['ou=Sales\\, EMEA,ou=acme,dc=example,dc=com', 'sales']],
+          'uid=x,ou=Sales\\2C EMEA,ou=acme,dc=example,dc=com'
+        )
+      ).to.equal('sales');
+    });
+
     it('holds nothing outside every branch', () => {
       expect(
         mostSpecificBranchRule(rules, 'ou=acme2,dc=example,dc=com')
@@ -185,6 +194,33 @@ describe('Branch rule precedence', function () {
         await write().catch((err: unknown) => (error = err));
         expect(String(error)).to.match(/forbidden/i);
       }
+      // Nor by carrying the organization link along
+      const link = server.config.ldap_organization_link_attribute as string;
+      let error: unknown;
+      await server.ldap
+        .modify(
+          payroll,
+          {
+            add: { [link]: acme },
+            replace: { description: 'moved' },
+          },
+          req
+        )
+        .catch((err: unknown) => (error = err));
+      expect(String(error)).to.match(/forbidden/i);
+      // Judged by attachment as well: `departmentSync` would relink the
+      // accounts attached there, out of the rule
+      const previousMode = server.config.authz_filter_attached_entries;
+      server.config.authz_filter_attached_entries = true;
+      error = undefined;
+      try {
+        await server.ldap
+          .rename(payroll, `ou=precmoved,${acme}`, req)
+          .catch((err: unknown) => (error = err));
+      } finally {
+        server.config.authz_filter_attached_entries = previousMode;
+      }
+      expect(String(error)).to.match(/forbidden/i);
       // A rule naming nothing below it does not get in the way
       await server.ldap.rename(
         `uid=prec-sales,${acme}`,
@@ -250,6 +286,36 @@ describe('Branch rule precedence', function () {
         expect(
           await plugin.getUserPermissions(USER, `uid=prec-pay,${payroll}`)
         ).to.deep.equal({ read: false, write: false, delete: false });
+      });
+
+      it('holds a write carrying a link to the branch of the entry', async () => {
+        plugin.authConfig = {
+          default: { read: false, write: false, delete: false },
+          users: {
+            [USER]: {
+              [acme]: { read: true, write: false, delete: false },
+              [payroll]: { read: true, write: true, delete: false },
+            },
+          },
+          groups: {},
+        };
+        const link = server.config.ldap_organization_link_attribute as string;
+        let error: unknown;
+        await server.ldap
+          .modify(
+            `uid=prec-sales,${acme}`,
+            { add: { [link]: payroll }, replace: { description: 'taken' } },
+            { user: USER, headers: {} } as unknown as DmRequest
+          )
+          .catch((err: unknown) => (error = err));
+        expect(String(error)).to.match(/forbidden/i);
+        // The link alone is what a move between organizations writes
+        await plugin.hooks.ldapmodifyrequest([
+          `uid=prec-sales,${acme}`,
+          { replace: { [link]: payroll } },
+          0,
+          { user: USER, headers: {} } as unknown as DmRequest,
+        ]);
       });
 
       it('lets a group grant what the user rule refuses', async () => {

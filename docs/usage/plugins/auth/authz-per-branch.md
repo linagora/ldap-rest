@@ -118,10 +118,16 @@ belong to, are combined:
 3. **Default permissions** apply to a permission none of these rules sets. They are a fallback, not a floor: `"default": {"read": true}` does
    not undo a rule refusing read.
 
-Writing an entry a rule names, or moving one holding such an entry, also
-asks for that rule's permission: a caller granted `ou=organization` cannot
+Writing an entry a rule names also asks for that rule's permission, and
+moving or deleting one holding such an entry asks for read and write, or
+delete, at every rule below it: a caller granted `ou=organization` cannot
 rename `ou=payroll` from under the rule refusing it, nor change or delete
-the `ou=payroll` entry itself.
+the `ou=payroll` entry itself. This holds under
+`--authz-filter-attached-entries` too, where `departmentSync` would relink
+the accounts attached there. A write setting the organization link
+(`--ldap-organization-link-attribute`) is judged on the organizations it
+leaves and joins; anything else it carries still needs write in the branch
+of the entry.
 
 ## How It Works
 

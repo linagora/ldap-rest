@@ -624,6 +624,23 @@ export function isChildOf(dn: string, parentDn: string): boolean {
 }
 
 /**
+ * One spelling for an escaped printable ASCII character of a DN value: the
+ * directory answers `ou=Sales\2C EMEA` for what a configuration writes
+ * `ou=Sales\, EMEA`. A special character keeps its backslash, any other is
+ * written plain; spaces, `#` and multi-byte sequences are left as they are.
+ */
+function canonicalEscapes(value: string): string {
+  if (!value.includes('\\')) return value;
+  return value.replace(/\\([0-9a-fA-F]{2})|\\([^])/g, (whole, hex, char) => {
+    if (char !== undefined) return whole;
+    const code = parseInt(hex as string, 16);
+    if (code <= 0x20 || code === 0x23 || code > 0x7e) return whole;
+    const decoded = String.fromCharCode(code);
+    return ',+"\\<>;='.includes(decoded) ? `\\${decoded}` : decoded;
+  });
+}
+
+/**
  * Normalize a DN into a canonical, comparable form.
  *
  * Parses the DN into RDNs (honouring escaped commas via {@link parseDn}), then
@@ -633,7 +650,8 @@ export function isChildOf(dn: string, parentDn: string): boolean {
  * `,`. Empty components (e.g. from a trailing separator) are dropped.
  *
  * This makes equality / suffix comparisons robust to case, surrounding
- * whitespace and multi-valued RDN ordering — unlike a raw string match.
+ * whitespace, multi-valued RDN ordering and the hex escapes a directory
+ * answers with ({@link canonicalEscapes}) — unlike a raw string match.
  *
  * @param dn - The DN to normalize
  * @returns The canonical form
@@ -658,7 +676,7 @@ export function normalizeDn(dn: string): string {
           const normalized =
             eq === -1
               ? atav.trim()
-              : `${atav.slice(0, eq).trim()}=${atav.slice(eq + 1).trim()}`;
+              : `${atav.slice(0, eq).trim()}=${canonicalEscapes(atav.slice(eq + 1).trim())}`;
           return normalized.toLowerCase();
         })
         .sort()

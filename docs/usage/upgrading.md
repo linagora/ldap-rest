@@ -12,8 +12,9 @@ decision or a configuration change appear here; see the
 for one user, or one group, name a branch and a sub-branch of it.
 
 The rule of the sub-branch now applies to everything below it, whatever
-order the two are written in. It used to apply to the sub-branch entry
-itself only, and below it the first rule written won. A sub-branch rule that
+order the two are written in. It used to apply only where it matched
+exactly — the sub-branch entry, and writes on its direct children, judged
+on their parent — and below that the first rule written won. A sub-branch rule that
 was ignored, a restriction or a grant, now takes effect in single reads and
 writes and in searches: a search on the parent no longer lists what the
 sub-branch rule refuses, so a listing may now be shorter. Check such rules:
@@ -26,8 +27,13 @@ to grant it anyway. A permission a rule leaves unset is still the
 default's, not the broader rule's.
 
 Renaming or moving an entry a rule names, or one holding such an entry, now
-needs write permission there, and changing or deleting the entry itself
-needs that rule's write or delete permission.
+needs read and write permission at each of those rules, and deleting it
+needs delete there; changing the entry itself needs that rule's write
+permission. Judged by branch, a write setting the organization link and
+changing anything besides the link and its path needs write in the branch
+of the entry: it used to need only read where the entry was attached, so
+the rest of the write — a password, say — went through. Moving an entry
+between organizations is unchanged.
 
 ### Organization groups need read access to the organization
 
