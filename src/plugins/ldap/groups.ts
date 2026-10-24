@@ -764,14 +764,6 @@ export default class LdapGroups extends DmPlugin {
       validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }
-    await this.validateMembers(dn, members, req);
-    await this.validateNewGroup(dn, {
-      objectClass: this.config.group_class as string[],
-      cn,
-      member: members,
-      ...additional,
-    });
-
     // Build entry
     const objectClasses = [...(this.config.group_class as string[])];
 
@@ -800,6 +792,20 @@ export default class LdapGroups extends DmPlugin {
       ...additional,
     };
     if (members.length) (entry.member as string[]).push(...members);
+
+    // The entry written, judged before the checks reading the directory and
+    // before the external members are created: none of it is for a caller
+    // who may not create the group. Its default attributes are judged too:
+    // one may set the organization link.
+    await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
+    await this.validateMembers(dn, members, req);
+    await this.validateNewGroup(dn, {
+      objectClass: this.config.group_class as string[],
+      cn,
+      member: members,
+      ...additional,
+    });
+
     // validateNewGroup converted the copy it was handed, not this one
     toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
@@ -865,6 +871,8 @@ export default class LdapGroups extends DmPlugin {
         );
     }
 
+    // Before the checks reading the directory, as on a creation
+    await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
     await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
@@ -933,6 +941,13 @@ export default class LdapGroups extends DmPlugin {
       this.registeredHooks.ldapgroupaddmember,
       [cn, member]
     );
+    // Before the members are looked for, and the external ones created
+    await this.ldap.authorize('ldapmodifyrequest', [
+      dn,
+      { add: { member } },
+      this.opNumber(),
+      req,
+    ]);
     await this.validateMembers(dn, member, req);
     return await this.ldap
       .modify(
@@ -1061,6 +1076,16 @@ export default class LdapGroups extends DmPlugin {
     const dn = /,/.test(cn)
       ? cn
       : `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+
+    // Judged before the group and the target are read, as the server: which
+    // organization holds a group, and whether either is there, are not for
+    // a caller who may not move it there
+    await this.ldap.authorize('ldapmodifyrequest', [
+      dn,
+      { replace: { [linkAttr]: targetOrgDn } },
+      this.opNumber(),
+      req,
+    ]);
 
     // Get current group to check if it has department attributes
     let currentGroup: SearchResult;

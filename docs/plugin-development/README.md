@@ -488,6 +488,33 @@ The `this.server.ldap` object provides access to all LDAP operations:
 > branch, and a reference to an entry the caller cannot read is still a valid
 > reference — and those are the ones it names.
 
+> **Read as the server? Judge the caller first.**
+>
+> A read the server makes for a request answers the caller with what it
+> found: a 404 for an entry that is not there, a 400 for a pointer leading
+> nowhere, a 409 for a name taken. Made before the write it prepares is
+> judged, it tells a caller who may not make that write what the directory
+> holds where they cannot read. Have the authorization plugins judge the
+> write first, without making it:
+>
+> ```typescript
+> await this.server.ldap.authorize('ldaprenamerequest', [dn, newDn, req]);
+> // only now: does dn exist, is newDn free, …
+> ```
+>
+> It runs the hooks of the plugins with the `authz` role only, and refuses
+> with their 403 whether the entry is there or not. The write, when made,
+> is judged again with every other hook.
+>
+> A route that finds an entry as the server, across branches, and then
+> answers about it, checks that the caller can read what it found, and
+> answers as for an entry that is not there otherwise:
+>
+> ```typescript
+> if (!(await this.server.ldap.readableBy(dn, req)))
+>   throw new NotFoundError(`User ${id} not found`);
+> ```
+
 #### Search
 
 ```typescript

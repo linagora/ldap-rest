@@ -581,7 +581,13 @@ guards.
 
 ## Hook Execution Order
 
-Hooks are executed in the order plugins are loaded. For chained hooks:
+Hooks are executed in the order plugins are loaded, with one exception: the
+request hooks of authorization plugins (`ldapsearchrequest`, `ldapaddrequest`,
+`ldapmodifyrequest`, `ldapdeleterequest`, `ldaprenamerequest`) run before any
+other plugin's, in the order the authorization plugins loaded. The first hook
+to throw answers the request, so a caller who may not make an operation is
+refused before a plugin judges its content, or replaces it.
+`ldapsearchfilter` keeps the load order. For chained hooks:
 
 1. First plugin in chain can modify/validate data
 2. Returns modified data to next plugin
@@ -595,7 +601,7 @@ For non-chained hooks:
 **Example**: `ldapdeleterequest` chain
 
 ```
-Request → trash (moves to trash) → groups (checks members) → organizations (checks empty) → LDAP
+Request → authorization → trash (moves to trash) → groups (checks members) → organizations (checks empty) → LDAP
 ```
 
 ## Creating Plugins with Dependencies
