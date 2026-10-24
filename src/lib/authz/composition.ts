@@ -402,9 +402,8 @@ export function assertEnforceable(server: DM): void {
   const judges = plugins
     .filter(plugin => plugin.roles?.includes('authz'))
     .map(plugin => plugin.name);
-  const authenticated =
-    server.authenticators.length > 0 ||
-    plugins.some(plugin => plugin.roles?.includes('auth'));
+  // The dispatcher's: only they give a request its identity
+  const authenticated = server.authenticators.length > 0;
   if (judges.length > 0 && !authenticated)
     throw new Error(
       `${judges.join(', ')} ${judges.length > 1 ? 'judge' : 'judges'} ` +
@@ -414,12 +413,12 @@ export function assertEnforceable(server: DM): void {
         'serve the directory openly.'
     );
   if (judges.length === 0 && !authenticated)
-    server.logger.info(
+    server.logger.warn(
       'No authentication nor authorization plugin is loaded: every request ' +
         'is served with every right'
     );
   else if (judges.length === 0)
-    server.logger.info(
+    server.logger.notice(
       'No authorization plugin is loaded: every authenticated caller has ' +
         'every right'
     );

@@ -645,6 +645,30 @@ describe('Authorization plugins loaded together', function () {
       );
     });
 
+    it('should not start authzPerRoute with nothing to authenticate for it', async () => {
+      process.env.DM_PLUGINS = '../../dist/plugins/auth/authzPerRoute.js';
+      const server = new DM();
+      let refused: Error | undefined;
+      await server.ready.catch((err: Error) => {
+        refused = err;
+      });
+      expect(refused, 'ready rejected').to.be.instanceOf(Error);
+      expect(refused!.message).to.match(/authzPerRoute judges/);
+    });
+
+    it('should start an authorization plugin beside an authentication one', async () => {
+      process.env.DM_PLUGINS = [
+        '../../dist/plugins/auth/token.js',
+        PER_BRANCH,
+      ].join(';');
+      const server = new DM();
+      await server.ready;
+      expect(Object.keys(server.loadedPlugins)).to.include.members([
+        'authToken',
+        'authzPerBranch',
+      ]);
+    });
+
     it('should start authentication alone, every caller holding every right', async () => {
       process.env.DM_PLUGINS = '../../dist/plugins/auth/token.js';
       const server = new DM();

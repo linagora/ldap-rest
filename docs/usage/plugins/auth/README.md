@@ -123,7 +123,9 @@ aside — `authzDynamic` letting a request through on
   else. With neither kind of plugin, the server serves every request with
   every right, on purpose (local development, a trusted network); with
   authentication alone, every authenticated caller has every right (a
-  single administration token, say). The log says which, once.
+  single administration token, say). The log says which, once. This is
+  checked over the plugins the configuration loads (`--plugin`); a host
+  registering plugins itself answers for what they enforce.
 - Two plugins judging LDAP operations for the same authenticator's requests
   — two branch-level plugins with no `authz_for`, or a branch-level plugin
   judging `authzDynamic`'s tokens — are refused, with both names, unless
