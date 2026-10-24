@@ -23,12 +23,14 @@
   out when the caller cannot read it, or the write refused when its branch
   is refused. A DN naming no entry is left out too. A DN is compared to the
   base RDN by RDN: `cn=a\,ou=users,…` was taken for an entry of
-  `ou=users,…`
+  `ou=users,…`,
+  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
   ([#401](https://github.com/linagora/ldap-rest/pull/401))
 
 - `core/scim`: `PUT /Users/{id}` answered `User … not found` for a user
   the caller may not read and `Resource not found` for one that is not
-  there: it told whether the user exists. Both get the first answer
+  there: it told whether the user exists. Both get the first answer,
+  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
   ([#401](https://github.com/linagora/ldap-rest/pull/401))
 
 - A directory search, add, modify, rename or delete made while serving an
