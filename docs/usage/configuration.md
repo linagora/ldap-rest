@@ -186,8 +186,10 @@ deployment has run with it on, and a cache that silently serves stale entries
 is not something to switch on for everyone at once.
 
 Writes made through this service (add, modify, rename, move, delete) drop what
-they change, the moved subtree included. Writes made anywhere else do not:
-another replica of this service, an LSC synchronisation, a hand-run
+they change, the moved subtree included, and what the directory's overlays
+change with them: the `memberOf` of the members a group gains or loses, and
+the entries naming an entry renamed or deleted. Writes made anywhere else do
+not: another replica of this service, an LSC synchronisation, a hand-run
 `ldapmodify`. Each process caches on its own, and only its own writes drop what
 it cached. Turn the cache on when this service is the only writer, or when
 serving an entry up to `--ldap-cache-ttl` seconds old is acceptable; leave it

@@ -238,6 +238,26 @@ const foldDn = (dn: string): string =>
     .join(',');
 
 /**
+ * Group attributes the `memberof` overlay mirrors onto the entries they name,
+ * as their `memberOf`. Lowercase, as attribute names compare.
+ */
+const MEMBERSHIP_ATTRIBUTES = new Set(['member', 'uniquemember']);
+
+const isMembershipAttribute = (name: string): boolean =>
+  MEMBERSHIP_ATTRIBUTES.has(name.toLowerCase());
+
+/** The DNs that attributes of an entry or a change name as members. */
+const membersNamed = (attributes: object | undefined): string[] =>
+  Object.entries(attributes ?? {}).flatMap(([name, value]) =>
+    isMembershipAttribute(name)
+      ? ([value] as unknown[])
+          .flat()
+          .map(v => (Buffer.isBuffer(v) ? v.toString() : v))
+          .filter((v): v is string => typeof v === 'string')
+      : []
+  );
+
+/**
  * Copy a search result at the cache boundary.
  *
  * Without this the cache hands the very same object to every caller, and a
@@ -802,6 +822,46 @@ class ldapActions {
     for (const key of doomed) this.searchCache.delete(key);
   }
 
+  /**
+   * Drop every cached read holding a value that names `dn`, or an entry
+   * below it.
+   *
+   * The directory mirrors some writes onto other entries than the one
+   * written: the `memberof` overlay keeps each member's `memberOf` in step
+   * with the group's `member` / `uniqueMember`, and `refint` rewrites or
+   * removes the references to an entry renamed or deleted. Those entries'
+   * cached reads are what {@link invalidateCache} cannot find, and they name
+   * the entry written: the members of a group name it in their `memberOf`.
+   * A member a write adds names it only once the write has landed; the
+   * caller drops those by their own DN.
+   *
+   * Every attribute is looked at, not `memberOf` alone: which attributes an
+   * overlay maintains is the deployment's configuration. A read naming `dn`
+   * for another reason is dropped too, which costs a miss.
+   */
+  private invalidateReferences(dn: string): void {
+    if (!this.cacheEnabled) return;
+    this.cacheGeneration++;
+    const target = foldDn(dn);
+    const descendantSuffix = `,${target}`;
+    const names = (value: unknown): boolean => {
+      if (typeof value !== 'string') return false;
+      const folded = foldDn(value);
+      return folded === target || folded.endsWith(descendantSuffix);
+    };
+    const doomed: string[] = [];
+    for (const [key, result] of this.searchCache.entries())
+      if (
+        result.searchEntries.some(entry =>
+          Object.values(entry).some(value =>
+            Array.isArray(value) ? value.some(names) : names(value)
+          )
+        )
+      )
+        doomed.push(key);
+    for (const key of doomed) this.searchCache.delete(key);
+  }
+
   /*
     LDAP search
    */
@@ -1352,6 +1412,8 @@ class ldapActions {
       req,
     ])) as [string, typeof entry, Request?];
 
+    const members = membersNamed(entry);
+
     // Convert to Attribute objects
     const attributes: Attribute[] = [];
     for (const [key, value] of Object.entries(entry)) {
@@ -1377,6 +1439,8 @@ class ldapActions {
       // fails, which is harmless, and `cacheGeneration` keeps a read the write
       // overtook from putting it back.
       this.invalidateCache(dn);
+      // A group created with members changes their `memberOf`
+      for (const member of members) this.invalidateCache(member);
       await pooled.client.add(dn, attributes);
       // Drop any cached read of this DN.
       //
@@ -1387,6 +1451,7 @@ class ldapActions {
       // ldapmodify — and re-created through this call, where the cache would
       // otherwise keep answering the entry that used to carry this DN.
       this.invalidateCache(dn);
+      for (const member of members) this.invalidateCache(member);
       void launchHooks(
         this.parent.hooks.ldapadddone,
         [dn, entry],
@@ -1500,6 +1565,22 @@ class ldapActions {
         }
       }
     }
+    // A change of a group's members changes their `memberOf`: those it names,
+    // and those a replace or a delete of every value removes, which only
+    // their cached reads still tie to the group.
+    const membershipChanged = [changes.add, changes.replace, changes.delete]
+      .flatMap(part =>
+        Array.isArray(part) ? part : Object.keys((part as object) ?? {})
+      )
+      .some(isMembershipAttribute);
+    const invalidate = (): void => {
+      this.invalidateCache(dn);
+      if (!membershipChanged) return;
+      this.invalidateReferences(dn);
+      for (const part of [changes.add, changes.replace, changes.delete])
+        for (const member of membersNamed(Array.isArray(part) ? {} : part))
+          this.invalidateCache(member);
+    };
     if (ldapChanges.length !== 0) {
       const controls = options.permissive
         ? [new Control(PERMISSIVE_MODIFY, { critical: false })]
@@ -1520,7 +1601,7 @@ class ldapActions {
         // before the write. Dropping it early costs a miss if the write then
         // fails, which is harmless, and `cacheGeneration` keeps a read the write
         // overtook from putting it back.
-        this.invalidateCache(dn);
+        invalidate();
         try {
           await send();
         } catch (error) {
@@ -1560,7 +1641,7 @@ class ldapActions {
             await send();
           }
         }
-        this.invalidateCache(dn);
+        invalidate();
         done.push(
           launchHooks(
             this.parent.hooks.ldapmodifydone,
@@ -1647,14 +1728,18 @@ class ldapActions {
       // overtook from putting it back.
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
+      this.invalidateReferences(dn);
       await pooled.client.modifyDN(dn, newRdn);
       // Invalidate both ends. A base-scope read of the old DN would
       // otherwise keep answering the entry that is no longer there, and a
       // read cached under the new DN — of whatever used to carry it — would
       // hide the entry that just took its place. `invalidateCache` drops the
-      // subtree too: renaming a container moves every DN under it.
+      // subtree too: renaming a container moves every DN under it. And the
+      // directory rewrites what named the old DN — the members' `memberOf`
+      // of a renamed group, the references `refint` follows.
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
+      this.invalidateReferences(dn);
       done.push(
         launchHooks(
           this.parent.hooks.ldaprenamedone,
@@ -1698,10 +1783,12 @@ class ldapActions {
       // overtook from putting it back.
       this.invalidateCache(dn);
       this.invalidateCache(newDn);
+      this.invalidateReferences(dn);
       await pooled.client.modifyDN(dn, newDn);
       // Invalidate both ends — see rename() above for why both matter.
       this.invalidateCache(dn);
       this.invalidateCache(newDn);
+      this.invalidateReferences(dn);
       // A move is a modifyDN, so it is a rename: the plugins that watch a
       // rename watch a move, and the two caches that outlive the search cache
       // (the authz group cache, the identity → DN resolution cache) are
@@ -1770,9 +1857,12 @@ class ldapActions {
           // fails, which is harmless, and `cacheGeneration` keeps a read the write
           // overtook from putting it back.
           this.invalidateCache(entry);
+          this.invalidateReferences(entry);
           await pooled.client.del(entry);
-          // Invalidate cache for this DN
+          // Invalidate cache for this DN, and for what named it: a deleted
+          // group leaves its members' `memberOf`
           this.invalidateCache(entry);
+          this.invalidateReferences(entry);
         } catch (error) {
           const code = extractLdapCode(error);
           throw code === 32
