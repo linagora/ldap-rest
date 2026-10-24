@@ -11,7 +11,9 @@
   sub-branch written after the grant on its parent was ignored. Branches
   are compared as DNs in `authzPerBranch` and `authzLinid1`, whatever their
   case and spacing,
-  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution)
+  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
+  [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
+  ([#388](https://github.com/linagora/ldap-rest/pull/388))
 
 - `core/twake/groups`: the `/organizations/{id}/groups` routes read the
   directory as the server, so any caller let in got the groups and member
