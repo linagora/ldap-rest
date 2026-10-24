@@ -253,8 +253,9 @@ describe('authzDynamic behavioural regressions', function () {
         server.config.authz_dynamic_bypass = [];
         done();
       }
-      // A bypass carries no token, so no frame is entered and the hooks
-      // enforce nothing — which is what the deployment asked for.
+      // A bypass carries no token, so the hooks enforce nothing — which is
+      // what the deployment asked for — and the request frame is left once
+      // it is served.
       expect(currentRequest(), 'no leaked frame').to.be.undefined;
     });
 

@@ -4,10 +4,10 @@ import ldapActions from '../../src/lib/ldapActions';
 import type { RequestBoundLdap } from '../../src/lib/ldapActions';
 
 /**
- * The authorization plugins hook `ldap*request` and skip every check when the
- * request is missing, so an omitted argument is a silent authorization
- * bypass. `forRequest()` exists to make the omission inexpressible — these
- * cases pin that every bound method really forwards the request.
+ * The authorization plugins hook `ldap*request` and judge by the request an
+ * operation carries. `forRequest()` binds it once, so a handler says which
+ * request it means rather than relying on the one being served — these
+ * cases pin that every bound method really forwards it.
  */
 describe('ldapActions.forRequest', () => {
   interface Call {

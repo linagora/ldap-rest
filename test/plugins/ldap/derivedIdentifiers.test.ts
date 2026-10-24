@@ -4,8 +4,8 @@
  * a usable `uid` — the client cannot repair it, since a generated attribute is
  * refused as input.
  *
- * And whatever the identifier ends up being, `apiAdd` re-reads the entry it
- * has just written by filtering on it.
+ * And whatever the identifier ends up being, it is created, answered, and
+ * found again by name.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -91,5 +91,13 @@ describe('Derived identifiers', function () {
       .type('json')
       .send({ cn: positionCn });
     expect(res.status, JSON.stringify(res.body)).to.be.oneOf([200, 201]);
+    // Found by name, its parentheses escaped in the filter
+    const flat = server.loadedPlugins['ldapFlatGeneric'] as LdapFlatGeneric;
+    const positions = flat.instances.find(i =>
+      i.base.toLowerCase().startsWith('ou=positions')
+    );
+    expect(positions, 'the positions entity').to.exist;
+    const found = await positions!.searchEntriesByName(positionCn, false);
+    expect(Object.keys(found)).to.include(positionCn);
   });
 });

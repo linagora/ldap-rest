@@ -1852,12 +1852,12 @@ export default abstract class LdapFlat extends DmPlugin {
     partial = false,
     attrs: string[] = [this.mainAttribute]
   ): Promise<LdapList> {
-    // `apiAdd` re-reads the entry it has just written through this, so an
-    // identifier the schema admits has to survive the trip: the shipped
+    // An identifier the schema admits has to survive the trip: the shipped
     // position and group schemas accept `( )` and `*`, which a raw
-    // interpolation turns into an unparseable filter — after the entry is
-    // committed, so the caller saw a 500 on a creation that had succeeded.
-    // A partial search means the value to look for, not a pattern to run.
+    // interpolation turns into an unparseable filter. `apiAdd` used to
+    // re-read what it wrote through this, and answered a 500 on a creation
+    // that had succeeded. A partial search means the value to look for, not
+    // a pattern to run.
     const escaped = escapeLdapFilter(name);
     const filter = partial
       ? `(${this.mainAttribute}=*${escaped}*)`
