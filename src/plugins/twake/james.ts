@@ -17,6 +17,7 @@ import { Hooks } from '../../hooks';
 import type { ChangesToNotify } from '../ldap/onChange';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { type Schema, roleAttribute } from '../../config/schema';
+import { domainBranches, mailDomains } from '../../lib/mailDomains';
 import {
   escapeLdapFilter,
   isDnInBranch,
@@ -183,24 +184,6 @@ const isGroup = (classes: AttributeValue | undefined): boolean =>
   (Array.isArray(classes) ? classes : classes ? [classes] : []).some(c =>
     GROUP_CLASSES.includes(String(c).toLowerCase())
   );
-
-/** Where mail domain entries live, and the attribute naming their domain */
-interface DomainBranch {
-  base: string;
-  attribute: string;
-}
-
-// The test of the shipped twakeDomain.json, lower-cased: `*`, which the
-// enterprise rules read as "every domain allowed", is no domain of James's
-const FQDN =
-  /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
-
-/** The mail domains among values, lower-cased as James stores them */
-const mailDomains = (values: string[] | undefined): string[] => [
-  ...new Set(
-    (values ?? []).map(v => v.trim().toLowerCase()).filter(v => FQDN.test(v))
-  ),
-];
 
 /** Whether a modify writes an attribute, whichever way */
 const touches = (changes: ModifyRequest, name: string): boolean =>
@@ -749,35 +732,6 @@ export default class James extends TwakePlugin {
   };
 
   /**
-   * Where the mail domain entries live, and the attribute naming their
-   * domain: each loaded flat schema declaring the `domainName` role, the
-   * lookup `core/ldap/enterpriseRules` makes. Without one, the branch of the
-   * shipped `twake/nomenclature/twakeDomain.json` and the attribute
-   * `--enterprise-domain-name-attribute` names.
-   *
-   * Rebuilt on each call, as the enterprise rules do theirs: a list taken in
-   * the constructor could predate the schemas.
-   */
-  private domainBranches(): DomainBranch[] {
-    const flat = this.server.loadedPlugins['ldapFlatGeneric'] as
-      | { instances?: { base: string; schema?: Schema }[] }
-      | undefined;
-    const branches: DomainBranch[] = [];
-    for (const instance of flat?.instances || []) {
-      const attribute = roleAttribute(instance.schema, 'domainName');
-      if (attribute) branches.push({ base: instance.base, attribute });
-    }
-    if (branches.length || !this.config.ldap_base) return branches;
-    return [
-      {
-        base: `ou=domains,ou=nomenclature,${this.config.ldap_base}`,
-        attribute:
-          this.config.enterprise_domain_name_attribute || 'associatedDomain',
-      },
-    ];
-  }
-
-  /**
    * The attribute naming the mail domain of the entry at a DN, when it lies
    * in a domain branch: at any depth, as a deployment may nest its domains
    * (`dc=customs,dc=gov,dc=mn,ou=domains,…`) under nodes naming none. Those
@@ -787,7 +741,7 @@ export default class James extends TwakePlugin {
   private domainAttribute(dn: string): string | undefined {
     let found: string | undefined;
     let depth = -1;
-    for (const { base, attribute } of this.domainBranches()) {
+    for (const { base, attribute } of domainBranches(this.server)) {
       try {
         if (sameDn(dn, base) || !isDnInBranch(dn, base)) continue;
         const d = normalizeDn(base).split(',').length;
@@ -816,7 +770,7 @@ export default class James extends TwakePlugin {
       .split(';')
       .map(base => base.trim())
       .filter(Boolean);
-    for (const { base } of this.domainBranches()) {
+    for (const { base } of domainBranches(this.server)) {
       // Without a list, the trash watches every branch
       const by = watched.length
         ? watched.find(dn => {
@@ -964,7 +918,7 @@ export default class James extends TwakePlugin {
     dn: string
   ): Promise<boolean> {
     try {
-      for (const { base, attribute } of this.domainBranches()) {
+      for (const { base, attribute } of domainBranches(this.server)) {
         const found = await this.firstEntry(
           base,
           `(${attribute}=${escapeLdapFilter(domain)})`,

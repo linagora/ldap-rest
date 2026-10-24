@@ -10,6 +10,7 @@ import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
 import { HttpError } from '../../lib/errors';
 import ldapActions, { AttributesList } from '../../lib/ldapActions';
+import { declaredMailDomains } from '../../lib/mailDomains';
 import {
   launchHooks,
   launchHooksChained,
@@ -33,6 +34,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
 
   hooks: Hooks = {
     ldapgroupvalidatemembers: async ([dn, members]) => {
+      // Read once per group write, and only when an external member is new
+      let managed: Promise<string[]> | undefined;
       // Parallelize member validation/creation with global concurrency limit
       await Promise.all(
         members.map(m =>
@@ -49,7 +52,8 @@ export default class ExternalUsersInGroups extends DmPlugin {
               if (!mail) throw new Error(`Malformed member ${m}`);
 
               const domain = mail.split('@')[1]?.toLowerCase();
-              if (domain && this.managedDomains().includes(domain)) {
+              managed ??= this.managedDomains();
+              if (domain && (await managed).includes(domain)) {
                 throw new Error(
                   `Cannot create external user with managed domain: ${mail}`
                 );
@@ -107,23 +111,37 @@ export default class ExternalUsersInGroups extends DmPlugin {
     return unescapeDnValue(value);
   }
 
-  /** `--mail-domain`, lower-cased: the domains no external member may use */
-  managedDomains(): string[] {
-    const domains = this.config.mail_domain;
-    return Array.isArray(domains)
-      ? domains.map(domain => String(domain).toLowerCase())
-      : [];
+  /**
+   * The domains no external member may use, lower-cased: those of
+   * `--mail-domain` and those the directory declares in its domain branches,
+   * the ones `core/twake/james` follows. A deployment declaring its domains
+   * in the directory only would otherwise take an address of its own for an
+   * external one, and so would a client reading the list from `/config`.
+   *
+   * A subdomain of a managed domain is not managed: it is external unless
+   * declared itself.
+   */
+  async managedDomains(): Promise<string[]> {
+    const configured = this.config.mail_domain;
+    return [
+      ...new Set([
+        ...(Array.isArray(configured)
+          ? configured.map(domain => String(domain).toLowerCase())
+          : []),
+        ...(await declaredMailDomains(this.server)),
+      ]),
+    ];
   }
 
   /**
    * Where a client sends an external member: `mail=<escaped address>,<branch>`
    */
-  getConfigApiData(): Record<string, unknown> {
+  async getConfigApiData(): Promise<Record<string, unknown>> {
     return {
       enabled: true,
       branch: this.config.external_members_branch,
       rdnAttribute: 'mail',
-      managedDomains: this.managedDomains(),
+      managedDomains: await this.managedDomains(),
     };
   }
 }

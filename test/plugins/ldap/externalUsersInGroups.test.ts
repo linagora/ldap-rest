@@ -180,6 +180,53 @@ describe('External users in groups', function () {
         },
       });
     });
+
+    describe('with several domains', function () {
+      const branch = () => process.env.DM_EXTERNAL_MEMBERS_BRANCH as string;
+      const created: string[] = [];
+      // Refused, or created and listed for cleanup
+      const outcome = async (mail: string): Promise<string> => {
+        const member = `mail=${mail},${branch()}`;
+        try {
+          await plugin.addGroup('testgroup2', [member]);
+          created.push(member);
+          return 'created';
+        } catch (e) {
+          return (e as Error).message;
+        } finally {
+          await plugin.deleteGroup('testgroup2').catch(() => undefined);
+        }
+      };
+
+      afterEach(async () => {
+        for (const member of created.splice(0))
+          await plugin.ldap.delete(member).catch(() => undefined);
+      });
+
+      it('rejects each domain --mail-domain names', async () => {
+        server.config.mail_domain = [managedDomain, 'Second.Example.org'];
+        try {
+          for (const mail of [`a@${managedDomain}`, 'b@second.example.org'])
+            expect(await outcome(mail), mail).to.match(
+              /Cannot create external user with managed domain/
+            );
+        } finally {
+          server.config.mail_domain = [managedDomain];
+        }
+      });
+
+      it('rejects a domain the directory declares, which --mail-domain does not name', async () => {
+        // Declared in ou=domains,ou=nomenclature by the test directory
+        expect(await outcome('c@lists.example.com')).to.match(
+          /Cannot create external user with managed domain/
+        );
+      });
+
+      it('takes a subdomain of a managed domain for an external one', async () => {
+        expect(await outcome(`d@sub.${managedDomain}`)).to.equal('created');
+        expect(await outcome('e@sub.lists.example.com')).to.equal('created');
+      });
+    });
   });
 
   describe('Member addresses', function () {
@@ -240,7 +287,7 @@ describe('External users in groups', function () {
   });
 
   describe('Config API', function () {
-    it('publishes the branch, the RDN attribute and the managed domains', async () => {
+    it('publishes the branch, the RDN attribute and the managed domains, those of the directory included', async () => {
       const saved = server.config.mail_domain;
       server.config.mail_domain = ['Example.COM'];
       try {
@@ -249,12 +296,18 @@ describe('External users in groups', function () {
           .get('/api/v1/config')
           .set('Accept', 'application/json');
         expect(res.status).to.equal(200);
-        expect(res.body.features.externalUsersInGroups).to.deep.equal({
+        const { managedDomains, ...rest } =
+          res.body.features.externalUsersInGroups;
+        expect(rest).to.deep.equal({
           enabled: true,
           branch: process.env.DM_EXTERNAL_MEMBERS_BRANCH,
           rdnAttribute: 'mail',
-          managedDomains: ['example.com'],
         });
+        // --mail-domain, and the domains the test directory declares
+        expect(managedDomains).to.have.members([
+          'example.com',
+          'lists.example.com',
+        ]);
       } finally {
         server.config.mail_domain = saved;
       }
