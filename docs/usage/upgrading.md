@@ -6,6 +6,49 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Organization groups need read access to the organization
+
+**Who is affected:** a deployment loading an authorization plugin together
+with `core/twake/groups` (and `core/twake/spaces`, which goes through it).
+
+The `/organizations/{id}/groups` and `/organizations/{id}/spaces` routes read
+as the caller. A client calling them must be granted read access to the
+organization, its groups and its users, write access to change them and
+delete access to delete one. An organization it cannot read answers `404`,
+and a user it cannot read `404 USER_NOT_FOUND` where it used to get `403`.
+
+Under `core/auth/authzLinid1` or `--authz-filter-attached-entries`, groups
+written in an organization's branch now carry its link
+(`--ldap-organization-link-attribute`): creating or changing a group needs
+write on the organization, and a group without a link is read and changed by
+every administrator. Link the groups written before; this script is an
+example to adapt to your patterns, attribute names and organization names
+(it expects plain ones, without spaces or commas):
+
+```sh
+# Connection to the directory, as for any ldapsearch
+OPTS="-H ldap://localhost -D cn=admin,dc=example,dc=com -w secret"
+# --twake-group-organization-dn and --twake-group-base, {org} left out
+ORGS="dc=example,dc=com"
+for org in $(ldapsearch $OPTS -LLL -s one -b "$ORGS" '(ou=*)' ou |
+  sed -n 's/^ou: //p'); do
+  ldapsearch $OPTS -LLL -o ldif-wrap=no -s one \
+    -b "ou=groups,ou=$org,$ORGS" '(!(twakeDepartmentLink=*))' objectClass |
+    awk -v link="ou=$org,$ORGS" '
+      function flush() {
+        if (!dn) return
+        print "dn: " dn "\nchangetype: modify"
+        # The class is added only to a group lacking one allowing the link
+        if (!held) print "add: objectClass\nobjectClass: twakeGroup\n-"
+        print "add: twakeDepartmentLink\ntwakeDepartmentLink: " link "\n"
+        dn = ""
+      }
+      /^dn: / { flush(); dn = substr($0, 5); held = 0 }
+      tolower($0) ~ /^objectclass: (twakegroup|twakestaticgroup)$/ { held = 1 }
+      END { flush() }'
+done | ldapmodify $OPTS
+```
+
 ### Quota and app accounts need read access to the account
 
 **Who is affected:** a deployment loading an authorization plugin

@@ -179,7 +179,9 @@ Member events compare each moved user's roles before and after a change:
 ## Routes
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
-is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
+is missing or the caller cannot read it, and 410 `ORGANIZATION_DELETED` when
+it is deleted. A user the caller cannot read is not found
+(`USER_NOT_FOUND`). Errors are
 `{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
 answers 403 `REFUSED`. A write answers `{ "success": true }` unless stated
 otherwise.

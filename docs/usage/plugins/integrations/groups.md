@@ -38,9 +38,39 @@ branch per organization. It serves the groups of an organization under
 ## Routes
 
 Every route answers 404 `ORGANIZATION_NOT_FOUND` when the organization entry
-is missing, and 410 `ORGANIZATION_DELETED` when it is deleted. Errors are
-`{ "error": "...", "code": "..." }`. A request an authorization plugin refuses
-answers 403 `REFUSED`.
+is missing or the caller cannot read it, and 410 `ORGANIZATION_DELETED` when
+it is deleted. Errors are `{ "error": "...", "code": "..." }`. A request an
+authorization plugin refuses answers 403 `REFUSED`.
+
+The routes read as the caller: the authorization plugins decide which groups
+and members it gets. A group it cannot read answers 404, a user it cannot
+read is not found (404 `USER_NOT_FOUND` when adding it), and a member it
+cannot read lists as `{ "uid": "..." }`. A write is judged before anything
+is looked for, so a caller who may not make it gets 403 whether the name is
+taken, the users exist or they are already members.
+
+What the caller may read is the authorization model's to say:
+
+- A model judging by branch (`core/auth/authzPerBranch`) gives an
+  organization's groups and users to the callers granted its branch.
+- A model judging entries by their organization link (`core/auth/authzLinid1`,
+  or `--authz-filter-attached-entries`) gives an entry carrying no link to
+  every administrator. Under such a model only, every group written in an
+  organization's branch — through these routes, SCIM or another plugin — is
+  given the organization link (`--ldap-organization-link-attribute`, with the
+  auxiliary class `twakeGroup` when it holds neither it nor
+  `twakeStaticGroup`), and follows it when moved to another organization; a
+  link naming another organization is refused (400). A group is then judged
+  on its organization: creating or changing one needs write on the
+  organization, not on its group branch only. What stays every
+  administrator's: whether an organization exists or is deleted, its spaces,
+  and users carrying no link, whose link is the provisioning tool's to set.
+  With `core/ldap/organizations` loaded too, the organizations must lie under
+  `--ldap-top-organization`, where it accepts a link.
+- A plugin judging every read made for the request, as
+  `core/auth/authzDynamic` does, judges the organization check too: an
+  organization its token does not reach answers 404, as one that is not
+  there.
 
 A group reads:
 

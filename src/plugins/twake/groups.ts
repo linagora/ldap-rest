@@ -20,6 +20,7 @@ import { extractLdapCode } from '../../lib/ldapCodes';
 import type {
   AttributesList,
   AttributeValue,
+  ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
 import {
@@ -195,6 +196,11 @@ export function movedInto(
     : undefined;
 }
 
+/** The auxiliary class a group is given to hold its organization link. */
+const LINK_CLASS = 'twakeGroup';
+/** The group classes allowing the link, lower-cased */
+const LINK_CLASSES = ['twakegroup', 'twakestaticgroup'] as const;
+
 /** Search options whose member lists keep the tombstones they hold. */
 const WHOLE = Symbol('whole member lists');
 
@@ -257,6 +263,10 @@ export default class TwakeGroups extends LdapGroups {
       [this.color]: { type: 'string', test: COLOR.source },
       [this.createdAt]: { type: 'string' },
     };
+    // Written by the server (see `linked`), never by a client
+    const link = this.config.ldap_organization_link_attribute;
+    if (link && this.orgPattern)
+      own[link] = { type: 'string', generated: true };
     for (const [name, spec] of Object.entries(own)) {
       const key = Object.keys(schema.attributes).find(
         k => k.toLowerCase() === name.toLowerCase()
@@ -277,20 +287,24 @@ export default class TwakeGroups extends LdapGroups {
   hooks: Hooks = {
     ldapaddrequest: ([dn, entry, req]) => {
       this.checkMembers(dn, entry.member);
+      const org = this.organizationOf(dn);
       // A group written without the routes, through SCIM, is dated too. Only
       // one holding the display name: its classes then allow the date, which
       // a plain groupOfNames would refuse.
       if (
-        this.organizationOf(dn) !== undefined &&
+        org !== undefined &&
         valueOf(entry, this.displayName) !== undefined &&
         valueOf(entry, this.createdAt) === undefined
       )
         entry = { ...entry, [this.createdAt]: new Date().toISOString() };
+      // Linked to its organization, whatever wrote it
+      if (org !== undefined) entry = this.linked(dn, org, entry);
       return [dn, entry, req];
     },
     ldapmodifyrequest: ([dn, changes, op, req]) => {
       this.checkMembers(dn, changes.add?.member);
       this.checkMembers(dn, changes.replace?.member);
+      this.checkLinkChange(dn, changes);
       return [dn, changes, op, req];
     },
     // A group moved to another organization takes its members along, the
@@ -319,6 +333,30 @@ export default class TwakeGroups extends LdapGroups {
           `The group holds members of another organization than ${org}`
         );
       return [dn, newDn, req];
+    },
+    // A group moved to another organization's branch follows it: kept
+    // linked to the one it left, the administrators of that one would keep
+    // it under an authorization model judging by attachment
+    ldaprenamedone: async ([dn, newDn]) => {
+      const org = movedInto(this.groupPattern, dn, newDn);
+      const attribute = this.config.ldap_organization_link_attribute;
+      if (
+        org === undefined ||
+        !attribute ||
+        !this.orgPattern ||
+        !this.judgedByAttachment()
+      )
+        return;
+      const { searchEntries } = (await this.ldap.system.search(
+        { paged: false, scope: 'base', attributes: [attribute] },
+        newDn
+      )) as SearchResult;
+      if (valueOf(searchEntries[0] ?? {}, attribute) === undefined) return;
+      await this.ldap.system.modify(newDn, {
+        replace: {
+          [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
+        },
+      });
     },
     ldapsearchfilter: async ([result, req, opts]) => [
       (opts as { [WHOLE]?: boolean } | undefined)?.[WHOLE]
@@ -360,6 +398,104 @@ export default class TwakeGroups extends LdapGroups {
           `so SCIM groups keep it as their RDN instead of a generated cn: ` +
           `map ${writer.scim} to another attribute with --scim-group-mapping`
       );
+  }
+
+  /**
+   * A group of `org` with its organization link, under an authorization
+   * model judging entries by that link (`authzLinid1`,
+   * `--authz-filter-attached-entries`): there, a group without one is every
+   * administrator's. Elsewhere the group is left as it is, and judged by its
+   * branch as before.
+   *
+   * The auxiliary class `twakeGroup` is added when the group holds neither
+   * it nor `twakeStaticGroup`. A link the writer gave is kept when it names
+   * the group's organization, refused otherwise: a group in one
+   * organization's branch belonging to another would mix their members.
+   *
+   * @param dn the group's DN
+   * @param org its organization
+   * @param entry the group as written
+   * @returns the group, linked
+   * @throws BadRequestError when the link given names another organization
+   */
+  linked(dn: string, org: string, entry: AttributesList): AttributesList {
+    const attribute = this.config.ldap_organization_link_attribute;
+    if (!attribute || !this.orgPattern || !this.judgedByAttachment())
+      return entry;
+    const orgDn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const given = read(entry, attribute);
+    if (given !== undefined) {
+      if (dnKey(given) !== dnKey(orgDn))
+        throw new BadRequestError(
+          `${dn} lies in the branch of ${org}, and must be linked to it`
+        );
+      return entry;
+    }
+    const objectClass = values(entry.objectClass);
+    if (
+      !objectClass.some(name =>
+        LINK_CLASSES.includes(
+          name.toLowerCase() as (typeof LINK_CLASSES)[number]
+        )
+      )
+    )
+      objectClass.push(LINK_CLASS);
+    return { ...entry, objectClass, [attribute]: orgDn };
+  }
+
+  /**
+   * Refuse a change taking a group's link away from its organization, under
+   * a model judging by attachment: as on a creation, a group in one
+   * organization's branch cannot belong to another, nor to none.
+   *
+   * @param dn the group's DN
+   * @param changes the modification
+   * @throws BadRequestError when the change links it elsewhere or unlinks it
+   */
+  private checkLinkChange(dn: string, changes: ModifyRequest): void {
+    const attribute = this.config.ldap_organization_link_attribute;
+    const org = this.organizationOf(dn);
+    if (
+      org === undefined ||
+      !attribute ||
+      !this.orgPattern ||
+      !this.judgedByAttachment()
+    )
+      return;
+    const orgDn = dnKey(this.orgPattern.replace(ORG, escapeDnValue(org)));
+    const named = (list?: AttributesList): string[] =>
+      Object.keys(list ?? {}).filter(
+        key => key.toLowerCase() === attribute.toLowerCase()
+      );
+    const written = [
+      ...named(changes.add).flatMap(key => values(changes.add![key])),
+      ...named(changes.replace).flatMap(key => values(changes.replace![key])),
+    ];
+    const removed = Array.isArray(changes.delete)
+      ? changes.delete.some(
+          key => key.toLowerCase() === attribute.toLowerCase()
+        )
+      : named(changes.delete).length > 0;
+    const replacedEmpty =
+      named(changes.replace).length > 0 && written.length === 0;
+    if (removed || replacedEmpty || written.some(v => dnKey(v) !== orgDn))
+      throw new BadRequestError(
+        `${dn} lies in the branch of ${org}, and must stay linked to it`
+      );
+  }
+
+  /**
+   * Whether an authorization plugin judges entries by their organization
+   * link: then a group needs one.
+   */
+  private judgedByAttachment(): boolean {
+    return Object.values(this.server.loadedPlugins).some(
+      plugin =>
+        plugin.roles?.includes('authz') &&
+        (
+          plugin as { judgesByAttachment?: () => boolean }
+        ).judgesByAttachment?.() === true
+    );
   }
 
   /** The organization a group DN belongs to, if it is a group at all. */
@@ -473,7 +609,11 @@ export default class TwakeGroups extends LdapGroups {
     app.get(
       `${base}/:groupId`,
       route('getting group', async (req, res, org) => {
-        const group = await this.readGroup(org, req.params.groupId as string);
+        const group = await this.readGroup(
+          org,
+          req.params.groupId as string,
+          req
+        );
         if (!group) throw notFound('group');
         res.json(group);
       })
@@ -516,7 +656,7 @@ export default class TwakeGroups extends LdapGroups {
     return async (req, res) => {
       try {
         const org = req.params.id as string;
-        await this.checkOrganization(org);
+        await this.checkOrganization(org, req);
         await handler(req, res, org);
       } catch (err) {
         if (err instanceof RouteError) {
@@ -557,16 +697,26 @@ export default class TwakeGroups extends LdapGroups {
     return `${this.userAttribute}=${escapeDnValue(username)},${this.userBaseOf(org)}`;
   }
 
-  /** Every route answers 404 for a missing organization, 410 for a deleted one. */
-  async checkOrganization(org: string): Promise<void> {
+  /**
+   * Every route answers 404 for a missing organization, 410 for a deleted one.
+   *
+   * The status is read as the server, whoever asks; an organization the
+   * caller of `req` cannot read answers as one that is not there, deleted or
+   * not.
+   */
+  async checkOrganization(org: string, req?: Request): Promise<void> {
     if (!this.orgPattern) return;
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
+    const dn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    // First, so that an organization the caller cannot read costs the same
+    // as one that is not there
+    if (!(await this.ldap.readableBy(dn, req))) throw notFound('organization');
     let entry: AttributesList | undefined;
     try {
       const found = (await this.ldap.search(
         { paged: false, scope: 'base', attributes: [status] },
-        this.orgPattern.replace(ORG, escapeDnValue(org))
+        dn
       )) as SearchResult;
       entry = found.searchEntries[0];
     } catch (err) {
@@ -672,18 +822,24 @@ export default class TwakeGroups extends LdapGroups {
     }
   }
 
+  /**
+   * A group, read as the caller of `req` when there is one: a group they
+   * cannot read answers as one that is not there.
+   */
   private async readGroup(
     org: string,
-    id: string
+    id: string,
+    req?: Request
   ): Promise<Record<string, unknown> | undefined> {
     try {
       const { searchEntries } = (await this.ldap.search(
         { paged: false, scope: 'base' },
-        this.groupDn(org, id)
+        this.groupDn(org, id),
+        req
       )) as SearchResult;
       return searchEntries[0] && this.groupOf(org, searchEntries[0]);
     } catch (err) {
-      if (extractLdapCode(err) === 32) return undefined;
+      if (extractLdapCode(err) === 32 || isAuthzRefusal(err)) return undefined;
       throw err;
     }
   }
@@ -721,7 +877,9 @@ export default class TwakeGroups extends LdapGroups {
       filter = `(&${filter}(|(${this.displayName}=*${s}*)(description=*${s}*)(&(!(${this.displayName}=*))(${this.cn}=*${s}*))))`;
     }
     const groups = this.sorted(
-      (await this.groups(org, filter)).map(e => this.groupOf(org, e)),
+      (await this.groups(org, filter, undefined, req)).map(e =>
+        this.groupOf(org, e)
+      ),
       p.sortBy,
       p.desc
     );
@@ -748,9 +906,6 @@ export default class TwakeGroups extends LdapGroups {
       throw invalid('description must be a string');
     if (body.color !== undefined && !isColor(body.color))
       throw invalid('color must be a hex code (e.g. #RRGGBB or #RGB)');
-    // Unique for groups made here only: a provider may push two of one name.
-    if (await this.named(org, body.name))
-      throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
     const id = randomUUID();
     const additional: AttributesList = {
       objectClass: this.config.group_class || ['top', 'groupOfNames'],
@@ -759,7 +914,20 @@ export default class TwakeGroups extends LdapGroups {
     };
     if (body.description) additional.description = body.description;
     if (body.color) additional[this.color] = body.color;
-    await this.addGroup(this.groupDn(org, id), [], additional, req);
+    // The link the add hook would give it, so that the creation judged is
+    // the one written
+    const linked = this.linked(this.groupDn(org, id), org, additional);
+    // Judged before the name is looked for: whether it is taken is not for
+    // a caller who may not create a group here
+    await this.ldap.authorize('ldapaddrequest', [
+      this.groupDn(org, id),
+      this.candidateGroup(id, [], linked),
+      req,
+    ]);
+    // Unique for groups made here only: a provider may push two of one name.
+    if (await this.named(org, body.name))
+      throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
+    await this.addGroup(this.groupDn(org, id), [], linked, req);
     const group = await this.readGroup(org, id);
     res.status(201).json(group);
   }
@@ -791,16 +959,23 @@ export default class TwakeGroups extends LdapGroups {
         'color must be a hex code (e.g. #RRGGBB or #RGB) or empty to clear it'
       );
     const replace: AttributesList = {};
-    if (name !== undefined) {
-      const holder = await this.named(org, name);
-      if (holder && holder !== id)
-        throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
-      replace[this.displayName] = name;
-    }
+    if (name !== undefined) replace[this.displayName] = name;
     // An empty value clears the attribute.
     if (description !== undefined)
       replace.description = description ? description : [];
     if (color !== undefined) replace[this.color] = color ? color : [];
+    // Judged before the name is looked for, as on a creation
+    await this.ldap.authorize('ldapmodifyrequest', [
+      this.groupDn(org, id),
+      { replace },
+      this.opNumber(),
+      req,
+    ]);
+    if (name !== undefined) {
+      const holder = await this.named(org, name);
+      if (holder && holder !== id)
+        throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
+    }
     await this.onGroup(() =>
       this.modifyGroup(this.groupDn(org, id), { replace }, req)
     );
@@ -814,12 +989,18 @@ export default class TwakeGroups extends LdapGroups {
   ): Promise<void> {
     const p = this.page(req, MEMBER_SORT);
     const id = req.params.groupId as string;
-    const group = await this.readGroup(org, id);
+    const group = await this.readGroup(org, id, req);
     if (!group) throw notFound('group');
     res.json({
       organizationId: org,
       id,
-      ...(await this.memberPage(p, org, group.members as string[])),
+      ...(await this.memberPage(
+        p,
+        org,
+        group.members as string[],
+        undefined,
+        req
+      )),
     });
   }
 
@@ -896,7 +1077,8 @@ export default class TwakeGroups extends LdapGroups {
         )) as SearchResult;
         out.push(...searchEntries);
       } catch (err) {
-        if (extractLdapCode(err) !== 32) throw err;
+        // Users the caller may not read are users it does not find
+        if (extractLdapCode(err) !== 32 && !isAuthzRefusal(err)) throw err;
       }
     }
     return out;
@@ -950,13 +1132,23 @@ export default class TwakeGroups extends LdapGroups {
         `usernames cannot exceed ${this.maxPage} entries per request`
       );
     const id = req.params.groupId as string;
-    const group = await this.readGroup(org, id);
-    if (!group) throw notFound('group');
     const wanted = [
       ...new Map((usernames as string[]).map(u => [u.toLowerCase(), u])).keys(),
     ];
+    // Judged before the group and the users are looked for, and before the
+    // members already there are left out — even a change writing nothing
+    await this.ldap.authorize('ldapmodifyrequest', [
+      this.groupDn(org, id),
+      { add: { member: wanted.map(u => this.userDn(org, u)) } },
+      this.opNumber(),
+      req,
+    ]);
+    // As the caller, as the users below
+    const group = await this.readGroup(org, id, req);
+    if (!group) throw notFound('group');
     const found = new Map(
-      (await this.users(org, wanted, [this.userAttribute])).map(e => {
+      // As the caller: users it may not read are users it does not find
+      (await this.users(org, wanted, [this.userAttribute], req)).map(e => {
         const name = read(e, this.userAttribute) || '';
         return [name.toLowerCase(), name];
       })

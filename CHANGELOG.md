@@ -4,6 +4,18 @@
 
 ### Security
 
+- `core/twake/groups`: the `/organizations/{id}/groups` routes read the
+  directory as the server, so any caller let in got the groups and member
+  profiles of every organization, and could tell which names, users and
+  memberships exist from the answers to writes. They read as the caller, and
+  judge a write before looking for anything. Under a model judging by
+  attachment (`authzLinid1`), groups written in an organization's branch
+  carry its link, so that it gives them to that organization only; whether
+  an organization exists, its spaces and its unlinked users stay every
+  administrator's,
+  [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
+  ([#383](https://github.com/linagora/ldap-rest/pull/383))
+
 - The authorization plugins judge an LDAP operation before any other
   plugin, whatever order the plugins loaded in. When `core/ldap/trash`
   loaded first, a caller with no right on an entry could delete it, as a
