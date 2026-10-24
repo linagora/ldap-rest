@@ -32,6 +32,7 @@ import {
   organizationLink,
   parseDn,
 } from '../utils';
+import { extractLdapCode } from '../ldapCodes';
 
 import { authzFor, servesRequest } from './composition';
 
@@ -243,8 +244,13 @@ export default abstract class AuthzBase extends DmPlugin {
       )) as SearchResult;
       const found = res.searchEntries?.[0]?.dn;
       if (found) return String(found);
-    } catch {
-      // Absent or unreadable: the spelling given stands
+    } catch (err) {
+      // Any other failure might not stop the write that follows, judged
+      // then on a spelling the rules may not know
+      if (extractLdapCode(err) !== 32)
+        throw new Error(
+          `[authz-forbidden] ${dn} could not be read to be judged: ${String(err)}`
+        );
     }
     return dn;
   }
@@ -927,7 +933,7 @@ export default abstract class AuthzBase extends DmPlugin {
           // The entry could not be read: its parent branch stands in.
         }
 
-        const destBranch = newLinks[0];
+        const destBranch = await this.storedDn(newLinks[0]);
 
         const byAttachment = this.filtersAttachedEntries();
         const fromTransit = byAttachment && read && this.inTransit(storedLink);
@@ -1044,12 +1050,14 @@ export default abstract class AuthzBase extends DmPlugin {
             AuthzBase.valuesOf(entry, linkAttr)
           )
         : [];
+      // The entry created, under its parent as the directory names it
+      const judged = await this.storedParent(dn);
       if (links.length > 0) {
-        branchToCheck = links[0];
+        branchToCheck = await this.storedDn(links[0]);
       } else {
         // For organizations (ou entries) or entries without link, check the
-        // parent DN, as the directory names it
-        branchToCheck = this.extractBranchDn(await this.storedParent(dn));
+        // parent DN
+        branchToCheck = this.extractBranchDn(judged);
       }
 
       const permissions = await this.getUserPermissions(user, branchToCheck);
@@ -1061,12 +1069,7 @@ export default abstract class AuthzBase extends DmPlugin {
         );
       }
       // Nor where a rule refuses it, at the very DN created
-      const named = await this.refusingRule(
-        user,
-        await this.storedParent(dn),
-        ['write'],
-        false
-      );
+      const named = await this.refusingRule(user, judged, ['write'], false);
       if (named)
         throw new Error(
           `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`

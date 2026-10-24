@@ -370,6 +370,10 @@ describe('LDAP Utils', () => {
       expect(normalizeDn('ou=Sales  \\20EMEA,dc=x')).to.equal(
         'ou=sales emea,dc=x'
       );
+      // A non-breaking space, raw or escaped alike
+      expect(normalizeDn('ou=a\u00a0b,dc=x')).to.equal(
+        normalizeDn('ou=a\\C2\\A0b,dc=x')
+      );
     });
 
     it('keeps the # that an escape protects', () => {

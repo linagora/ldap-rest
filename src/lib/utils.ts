@@ -724,14 +724,8 @@ function canonicalValue(raw: string): string {
 
   // Insignificant space (RFC 4518 §2.6.1), as the matching rules of the
   // naming attributes see it: none at either end, escaped or not, and one
-  // for a run of them
-  const space = ({
-    char,
-    escaped,
-  }: {
-    char: string;
-    escaped: boolean;
-  }): boolean => char === ' ' || (!escaped && /\s/.test(char));
+  // for a run of them. The same characters whether escaped or not.
+  const space = ({ char }: { char: string }): boolean => /\s/.test(char);
   const folded = chars.filter(
     (c, i) => !space(c) || (i > 0 && !space(chars[i - 1]))
   );
