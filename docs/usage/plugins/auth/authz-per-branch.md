@@ -106,13 +106,44 @@ Permissions applied to all group members:
 
 ## Permission Resolution
 
-Permissions are resolved in this order:
+The rules holding the target, the user's own and those of every group they
+belong to, are combined:
 
-1. **User-specific permissions** - If user has direct branch permissions, use them
-2. **Group permissions** - Check all groups user belongs to
-3. **Default permissions** - Fall back to defaults if no specific rules match
+1. **Within one source** (the user's own rules, or one group's), the rule of
+   the **most specific** branch holding the target applies, whatever order
+   the rules are written in, broader rules of that source aside. Branches
+   are compared as DNs, whatever their case and spacing.
+2. **Between sources**, for each permission type (read/write/delete), the
+   **most permissive** wins.
+3. **Default permissions** apply to a permission none of these rules sets. They are a fallback, not a floor: `"default": {"read": true}` does
+   not undo a rule refusing read.
 
-For each permission type (read/write/delete), the **most permissive** rule wins.
+Creating or writing an entry a rule names also asks for that rule's
+permission, and
+moving or deleting one holding such an entry asks for read and write, or
+delete, at every rule below it: a caller granted `ou=organization` cannot
+rename `ou=payroll` from under the rule refusing it, nor change or delete
+the `ou=payroll` entry itself. This holds under
+`--authz-filter-attached-entries` too, where `departmentSync` would relink
+the accounts attached there. A write setting the organization link
+(`--ldap-organization-link-attribute`) is judged on the organizations it
+leaves and joins; anything else it carries still needs write where the
+entry stands: its branch, or, judged by attachment, the organization it
+leaves.
+
+A rule's branch matches a DN however it is spelled, as OpenLDAP reads it:
+case, spaces, escapes (`\2C` and `\,`, `\20` and a space, `\C3\A9` and
+`é`), an attribute type by any of its names or its OID
+(`organizationalUnitName=` and `2.5.4.11=` are `ou=`, learned from the
+directory schema at startup), the spaces its matching rules ignore, and
+the LDAPv2 forms (`;` between RDNs, a value in double quotes). A write is
+judged on the entry as the directory names it, read as the server before
+the write. A caller cannot step around a rule by spelling its branch
+another way.
+
+A move is judged on the mover's own rules. The rules of other users and
+groups name the branch by its DN: once a caller allowed to move it has done
+so, they no longer apply to it, and need rewriting for the new DN.
 
 ## How It Works
 
@@ -211,6 +242,25 @@ With this config, user `manager` can read:
 - `ou=dept1,ou=organization,dc=example,dc=com`
 - `ou=team1,ou=dept1,ou=organization,dc=example,dc=com`
 - ... all descendants
+
+A rule on a sub-branch takes over below it. To keep `manager` out of one
+department:
+
+```json
+{
+  "users": {
+    "manager": {
+      "ou=organization,dc=example,dc=com": { "read": true },
+      "ou=payroll,ou=organization,dc=example,dc=com": { "read": false }
+    }
+  }
+}
+```
+
+A search granted on `ou=organization` then returns nothing from
+`ou=payroll`: each entry it finds is kept only where the caller may read it.
+A group the user belongs to may still grant the department, as the most
+permissive source wins.
 
 ## Examples
 
@@ -412,8 +462,9 @@ Cache hit/miss logging:
 
 ### Permission Inheritance
 
-- Sub-branch permissions inherit from parent branches
-- Cannot grant more restrictive permissions on sub-branches
+- Sub-branch rules take over from parent branch rules, for what they set
+- A rule may restrict a sub-branch as well as widen it, but another source
+  (a group) granting more still wins
 - Plan branch structure carefully
 
 ### Default Permissions

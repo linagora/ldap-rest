@@ -4,6 +4,27 @@
 
 ### Security
 
+- `core/auth/authzPerBranch`: among one user's or one group's rules, the
+  most specific branch now applies, whatever order the rules are written
+  in, and a search granted on a branch no longer returns what a narrower
+  rule refuses. The first rule written used to win, so a restriction on a
+  sub-branch written after the grant on its parent was ignored. Branches
+  are compared as DNs in `authzPerBranch` and `authzLinid1`, whatever their
+  case and spacing. `default` is a fallback rather than a floor: a rule
+  refusing a permission is no longer overridden by it. A branch a rule
+  names can no longer be renamed or moved out of that rule by a caller it
+  refuses, judged by branch or by attachment, nor created where it
+  refuses writing. A write setting the organization link and anything else
+  needs write where the entry stands: one carrying a password change went
+  through with read there. A DN matches a rule however it is spelled:
+  escapes (`\2C`, `\20`, `\C3\A9`), attribute type names and OIDs
+  (`2.5.4.11=payroll` is `ou=payroll`), insignificant spaces, and the
+  LDAPv2 `;` and quotes, which OpenLDAP accepts and a caller could use to
+  step around a rule; a write is judged on the DN the directory returns,
+  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
+  [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
+  ([#388](https://github.com/linagora/ldap-rest/pull/388))
+
 - `core/twake/groups`: the `/organizations/{id}/groups` routes read the
   directory as the server, so any caller let in got the groups and member
   profiles of every organization, and could tell which names, users and

@@ -11,7 +11,7 @@ import type { Hooks } from '../../hooks';
 import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
-import AuthzBase from '../../lib/authz/base';
+import AuthzBase, { mostSpecificBranchRule } from '../../lib/authz/base';
 import { AmbiguousIdentityError } from '../../lib/errors';
 import { escapeLdapFilter, normalizeDn } from '../../lib/utils';
 import { warnUnmatchedRuleKeys } from '../../lib/auth/base';
@@ -164,37 +164,39 @@ export default class AuthzPerBranch extends AuthzBase {
       return { read: true, write: true, delete: true };
     }
 
-    // Start with default permissions
-    let permissions: BranchPermissions = {
-      read: this.authConfig.default?.read ?? false,
-      write: this.authConfig.default?.write ?? false,
-      delete: this.authConfig.default?.delete ?? false,
-    };
-
-    // Check user-specific permissions
+    // The rules matching the branch, the user's own and their groups'
+    const matched: BranchPermissions[] = [];
     if (this.authConfig.users?.[uid]) {
       const userPerms = this.findBranchPermissions(
         this.authConfig.users[uid],
         branch
       );
-      if (userPerms) {
-        permissions = this.mergePermissions(permissions, userPerms);
-      }
+      if (userPerms) matched.push(userPerms);
     }
-
-    // Check group-based permissions
     const userGroups = await this.getUserGroups(uid);
     for (const groupDn of userGroups) {
       const rules = this.groupRules(groupDn);
       if (rules) {
         const groupPerms = this.findBranchPermissions(rules, branch);
-        if (groupPerms) {
-          permissions = this.mergePermissions(permissions, groupPerms);
-        }
+        if (groupPerms) matched.push(groupPerms);
       }
     }
 
-    return permissions;
+    // A permission no matching rule sets is the default's: as a floor, the
+    // default would make a rule refusing what it grants mean nothing
+    const decide = (type: keyof BranchPermissions): boolean => {
+      const set = matched
+        .map(rule => rule[type])
+        .filter(value => value !== undefined);
+      return set.length > 0
+        ? set.some(Boolean)
+        : (this.authConfig?.default?.[type] ?? false);
+    };
+    return {
+      read: decide('read'),
+      write: decide('write'),
+      delete: decide('delete'),
+    };
   }
 
   /**
@@ -202,6 +204,17 @@ export default class AuthzPerBranch extends AuthzBase {
    */
   async getAuthorizedBranches(uid: string): Promise<string[]> {
     return this.getAuthorizedBranchesForPermission(uid, 'read');
+  }
+
+  /**
+   * The branches named by the user's rules and their groups'
+   */
+  async ruleBranches(uid: string): Promise<string[]> {
+    if (!this.authConfig) return [];
+    const branches = Object.keys(this.authConfig.users?.[uid] ?? {});
+    for (const groupDn of await this.getUserGroups(uid))
+      branches.push(...Object.keys(this.groupRules(groupDn) ?? {}));
+    return [...new Set(branches)];
   }
 
   /**
@@ -245,70 +258,13 @@ export default class AuthzPerBranch extends AuthzBase {
   }
 
   /**
-   * Find permissions for a branch (supports sub-branch matching)
+   * The subject's rule on a branch: see {@link mostSpecificBranchRule}.
    */
   private findBranchPermissions(
     branchPerms: { [branch: string]: BranchPermissions },
     targetBranch: string
   ): BranchPermissions | null {
-    // Exact match first
-    if (branchPerms[targetBranch]) {
-      return branchPerms[targetBranch];
-    }
-
-    // Check if targetBranch is a sub-branch of any configured branch
-    for (const [branch, perms] of Object.entries(branchPerms)) {
-      if (targetBranch.toLowerCase().endsWith(`,${branch.toLowerCase()}`)) {
-        return perms;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Merge permissions (OR logic - grant if any source grants)
-   */
-  private mergePermissions(
-    current: BranchPermissions,
-    additional: BranchPermissions
-  ): BranchPermissions {
-    return {
-      read: current.read || additional.read || false,
-      write: current.write || additional.write || false,
-      delete: current.delete || additional.delete || false,
-    };
-  }
-
-  /**
-   * Build LDAP filter for authorized branches
-   */
-  private buildBranchFilter(
-    baseDn: string,
-    authorizedBranches: string[]
-  ): string | null {
-    // If base DN is within authorized branches, no additional filter needed
-    const baseInAuthorized = authorizedBranches.some(
-      branch =>
-        baseDn.toLowerCase() === branch.toLowerCase() ||
-        baseDn.toLowerCase().endsWith(`,${branch.toLowerCase()}`)
-    );
-
-    if (baseInAuthorized) {
-      return null;
-    }
-
-    // Otherwise, restrict to authorized branches
-    if (authorizedBranches.length === 1) {
-      return `(entryDN=*,${authorizedBranches[0]})`;
-    } else if (authorizedBranches.length > 1) {
-      const filters = authorizedBranches
-        .map(branch => `(entryDN=*,${branch})`)
-        .join('');
-      return `(|${filters})`;
-    }
-
-    return null;
+    return mostSpecificBranchRule(Object.entries(branchPerms), targetBranch);
   }
 
   /**

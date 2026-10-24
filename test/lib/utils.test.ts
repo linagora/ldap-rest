@@ -344,9 +344,138 @@ describe('LDAP Utils', () => {
         'cn=smith\\, john,ou=users'
       );
     });
+
+    it('spells an escape one way, whatever the directory wrote', () => {
+      for (const [a, b] of [
+        ['ou=Sales\\2C EMEA', 'ou=Sales\\, EMEA'],
+        ['ou=Sales\\20EMEA', 'ou=Sales EMEA'],
+        ['ou=\\23Sales', 'ou=\\#Sales'],
+        ['ou=Sales\\2B EMEA', 'ou=Sales\\+ EMEA'],
+        ['ou=caf\\C3\\A9', 'ou=café'],
+        ['ou=a\\4D', 'ou=aM'],
+        // Not UTF-8: the ASCII pair is still read
+        ['ou=x\\FF\\2C', 'ou=x\\ff\\,'],
+      ])
+        expect(normalizeDn(a), a).to.equal(normalizeDn(b));
+    });
+
+    it('drops the spaces the matching rules ignore, escaped or not', () => {
+      for (const spelled of [
+        'ou=Sales\\ ,dc=x',
+        'ou=Sales\\20,dc=x',
+        'ou=\\20Sales,dc=x',
+        'ou= Sales ,dc=x',
+      ])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=sales,dc=x');
+      expect(normalizeDn('ou=Sales  \\20EMEA,dc=x')).to.equal(
+        'ou=sales emea,dc=x'
+      );
+      // A non-breaking space, raw or escaped, is a space
+      for (const spelled of ['ou=a\u00a0b,dc=x', 'ou=a\\C2\\A0b,dc=x'])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=a b,dc=x');
+      expect(normalizeDn('ou=a\u3000\u00a0 b,dc=x')).to.equal('ou=a b,dc=x');
+      // Not those the directory keeps apart
+      for (const other of ['\u1680', '\u2028', '\u2029'])
+        expect(normalizeDn(`ou=a${other}b,dc=x`)).to.not.equal('ou=a b,dc=x');
+      // Nor trimmed at the edges, where the directory keeps them too
+      expect(normalizeDn('ou=payroll\u1680,dc=x')).to.not.equal(
+        'ou=payroll,dc=x'
+      );
+      expect(normalizeDn(normalizeDn('ou=\\E1\\9A\\80#abc,dc=x'))).to.equal(
+        normalizeDn('ou=\\E1\\9A\\80#abc,dc=x')
+      );
+      // A tab is not
+      expect(normalizeDn('ou=a\\09b,dc=x')).to.not.equal('ou=a b,dc=x');
+    });
+
+    it('keeps the # that an escape protects', () => {
+      expect(normalizeDn('ou=\\23x,dc=x')).to.equal('ou=\\#x,dc=x');
+      // The BER form is another value
+      expect(normalizeDn('ou=#0c0178,dc=x')).to.not.equal(
+        normalizeDn('ou=\\#0c0178,dc=x')
+      );
+    });
+
+    it('is idempotent', () => {
+      for (const dn of [
+        'ou=Sales\\20,dc=x',
+        'ou=\\20Sales,dc=x',
+        'ou=\\23Sales,dc=x',
+        'cn=a\\2Bb+sn=c,dc=x',
+        'ou=a\\5c,dc=x',
+        'ou=x\\FF\\2C,dc=x',
+        'ou=caf\\C3\\A9,dc=x',
+        'ou=a=b;c,dc=x',
+      ])
+        expect(normalizeDn(normalizeDn(dn)), dn).to.equal(normalizeDn(dn));
+    });
+
+    it('escapes the specials whether or not the writer did', () => {
+      expect(normalizeDn('ou=a=b,dc=x')).to.equal(normalizeDn('ou=a\\=b,dc=x'));
+    });
+
+    it('reads Unicode equivalents as the directory does', () => {
+      expect(normalizeDn('ou=cafe\u0301,dc=x')).to.equal(
+        normalizeDn('ou=café,dc=x')
+      );
+      expect(normalizeDn('ou=\ufb01le,dc=x')).to.equal('ou=file,dc=x');
+      // A fullwidth comma is a comma, so a special
+      expect(normalizeDn('ou=a\uff0cb,dc=x')).to.equal('ou=a\\,b,dc=x');
+    });
+
+    it('reads a quoted value ending in an escaped backslash', () => {
+      expect(normalizeDn(String.raw`ou="a\\",dc=x`)).to.equal(
+        normalizeDn(String.raw`ou=a\\,dc=x`)
+      );
+    });
+
+    it('reads a quote as a value only where it opens one', () => {
+      expect(normalizeDn('cn=a"b,dc=x')).to.equal('cn=a\\"b,dc=x');
+      expect(() => normalizeDn('uid=x,ou="payroll,dc=x')).to.throw(
+        /unbalanced quote/
+      );
+    });
+
+    it('reads the LDAPv2 separators and quotes OpenLDAP accepts', () => {
+      expect(normalizeDn('ou=a; dc=x;dc=y')).to.equal('ou=a,dc=x,dc=y');
+      expect(normalizeDn('ou="a,b;c",dc=x')).to.equal(
+        normalizeDn('ou=a\\,b\\;c,dc=x')
+      );
+      expect(normalizeDn('cn="a+b"+sn=c,dc=x')).to.equal(
+        normalizeDn('sn=c+cn=a\\+b,dc=x')
+      );
+    });
+
+    it('reads an attribute type by any of its names or its OID', () => {
+      for (const spelled of [
+        'organizationalUnitName=Payroll,dc=x',
+        '2.5.4.11=Payroll,dc=x',
+        'OID.2.5.4.11=Payroll,dc=x',
+        'OU=Payroll,domainComponent=x',
+      ])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=payroll,dc=x');
+    });
+
+    it('keeps an escaped backslash apart from the hex that follows', () => {
+      expect(normalizeDn('ou=a\\5c2C')).to.equal(normalizeDn('ou=a\\\\2C'));
+      expect(normalizeDn('ou=a\\5c2C')).to.not.equal(normalizeDn('ou=a\\,'));
+    });
+
+    it('splits a multi-valued RDN on unescaped plus signs only', () => {
+      // One assertion: its value holds the `+` and the `=`
+      expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn\\=b,dc=x');
+      expect(normalizeDn('sn=b+cn=a,dc=x')).to.equal('cn=a+sn=b,dc=x');
+    });
   });
 
   describe('isDnInBranch', () => {
+    it('does not read an escaped comma as a separator', () => {
+      expect(isDnInBranch('cn=x\\2Cou=pub,ou=acme', 'ou=pub,ou=acme')).to.equal(
+        false
+      );
+      expect(isDnInBranch('cn=x\\2Cou=pub,ou=acme', 'ou=acme')).to.equal(true);
+    });
+
     it('should return true for a descendant', () => {
       expect(
         isDnInBranch(

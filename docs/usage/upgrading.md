@@ -6,6 +6,36 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Nested branch rules of `authzPerBranch`
+
+**Who is affected:** a deployment of `core/auth/authzPerBranch` whose rules
+for one user, or one group, name a branch and a sub-branch of it.
+
+The rule of the sub-branch now applies to everything below it, whatever
+order the two are written in. It used to apply only where it matched
+exactly — the sub-branch entry, and writes on its direct children, judged
+on their parent — and below that the first rule written won. A sub-branch rule that
+was ignored, a restriction or a grant, now takes effect in single reads and
+writes and in searches: a search on the parent no longer lists what the
+sub-branch rule refuses, so a listing may now be shorter. Check such rules:
+they now mean what they say.
+
+`default` no longer adds to what the rules grant: it applies to a
+permission none of the rules that apply sets. A rule's `read`, `write` or
+`delete` set to `false` now refuses, where `"default": {"read": true}` used
+to grant it anyway. A permission a rule leaves unset is still the
+default's, not the broader rule's.
+
+Renaming or moving an entry a rule names, or one holding such an entry, now
+needs read and write permission at each of those rules, and deleting it
+needs delete there; changing the entry itself needs that rule's write
+permission, as does creating it. A write setting the organization link and
+changing anything besides the link and its path needs write where the
+entry stands — its branch, or under `--authz-filter-attached-entries` the
+organization it leaves: it used to need only read there, so the rest of
+the write — a password, say — went through. Moving an entry between
+organizations is unchanged.
+
 ### Organization groups need read access to the organization
 
 **Who is affected:** a deployment loading an authorization plugin together

@@ -22,16 +22,48 @@ import {
   AmbiguousIdentityError,
   BadRequestError,
   ForbiddenError,
+  ServiceUnavailableError,
 } from '../errors';
 import {
   escapeLdapFilter,
   getParentDn,
+  getRdn,
   isDnInBranch,
   normalizeDn,
   organizationLink,
+  parseDn,
 } from '../utils';
 
 import { authzFor, servesRequest } from './composition';
+
+/**
+ * The rule of the most specific configured branch holding `target`.
+ *
+ * Branches are compared as DNs, whatever the case and spacing a rule or the
+ * directory spells them in. Among one subject's rules, the narrowest branch
+ * holding the target applies: a rule on `ou=payroll,ou=acme` takes over from
+ * one on `ou=acme` for everything below it, whichever was written first.
+ * Rules of different subjects (a user and their groups) are combined by the
+ * caller.
+ *
+ * @param rules the subject's rules, by branch
+ * @param target the branch judged
+ * @returns the rule that applies, or null when no branch holds the target
+ */
+export function mostSpecificBranchRule<T>(
+  rules: Iterable<[string, T]>,
+  target: string
+): T | null {
+  let found: T | null = null;
+  let depth = -1;
+  for (const [branch, rule] of rules) {
+    if (!isDnInBranch(target, branch)) continue;
+    // RDN by RDN: an escaped comma inside a value is not a separator
+    const parts = parseDn(branch).length;
+    if (parts > depth) [found, depth] = [rule, parts];
+  }
+  return found;
+}
 
 /**
  * Abstract base class for authorization plugins
@@ -51,6 +83,14 @@ export default abstract class AuthzBase extends DmPlugin {
    * An object spread copies the key; a set would no longer know the copy.
    */
   private static readonly widenedForLink = Symbol('widened for the link');
+
+  /**
+   * The search of the top organization by itself, which every caller may
+   * make (`getOrganisationTop`): granted by `ldapsearchrequest` whatever the
+   * rules say, it is not filtered by them either. A symbol key, for the
+   * reason given at {@link widenedForLink}.
+   */
+  private static readonly topOrganizationRead = Symbol('top organization');
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
@@ -186,6 +226,48 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   protected sourcePermission(_branch: string): keyof BranchPermissions {
     return 'read';
+  }
+
+  /**
+   * `dn` as the directory names it, read as the server. OpenLDAP reads a DN
+   * through its schema and matching rules — `2.5.4.11=payroll`,
+   * `ou=payroll\20` and `ou=payroll` are one entry — further than a text
+   * comparison can follow, so a write is judged on the entry it acts on,
+   * by the name the rules know it by. An entry that is not there keeps the
+   * spelling given: the write fails on it anyway.
+   */
+  protected async storedDn(dn: string): Promise<string> {
+    try {
+      const res = (await this.server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['1.1'] },
+        dn
+      )) as SearchResult;
+      const found = res.searchEntries?.[0]?.dn;
+      if (found) return String(found);
+    } catch (err) {
+      // Any other failure might not stop the write that follows, judged
+      // then on a spelling the rules may not know: refused, as the outage
+      // it is rather than a denial. Recognized by its code alone, not by a
+      // message that may echo the DN asked for.
+      if ((err as { code?: unknown })?.code !== 32) {
+        // The directory's diagnostic stays here: SCIM hands the message on
+        this.logger.error(
+          `${this.name}: ${dn} could not be read to be authorized: ${String(err)}`
+        );
+        throw new ServiceUnavailableError('Directory unavailable');
+      }
+    }
+    return dn;
+  }
+
+  /**
+   * A DN about to be written, under its parent as the directory names it:
+   * see {@link storedDn}.
+   */
+  protected async storedParent(dn: string): Promise<string> {
+    const parent = getParentDn(dn);
+    if (parent === dn) return dn;
+    return `${getRdn(dn)},${await this.storedDn(parent)}`;
   }
 
   /**
@@ -405,6 +487,64 @@ export default abstract class AuthzBase extends DmPlugin {
    * Must be implemented by subclasses
    */
   abstract getAuthorizedBranches(user: string): Promise<string[]>;
+
+  /**
+   * Every branch one of the caller's rules names, whatever it grants: the
+   * branches where what applies differs from the branch above.
+   */
+  abstract ruleBranches(user: string): Promise<string[]>;
+
+  /**
+   * Whether a write changes nothing but the organization link and the path
+   * that goes with it: what moving an entry between organizations writes.
+   */
+  private onlyRelinks(changes: ModifyRequest): boolean {
+    const allowed = [
+      this.config.ldap_organization_link_attribute,
+      this.config.ldap_organization_path_attribute,
+    ]
+      .filter((attr): attr is string => typeof attr === 'string')
+      .map(attr => attr.toLowerCase());
+    const touched = [
+      ...Object.keys(changes.add ?? {}),
+      ...Object.keys(changes.replace ?? {}),
+      ...(Array.isArray(changes.delete)
+        ? changes.delete
+        : Object.keys(changes.delete ?? {})),
+    ];
+    // `attr;option` names the same attribute
+    return touched.every(attr =>
+      allowed.includes(String(attr).split(';')[0].toLowerCase())
+    );
+  }
+
+  /**
+   * An entry a rule names is under that rule as well as under what judged
+   * the write, and moving it takes along the rules naming what lies below
+   * it, which name nothing afterwards (`departmentSync` relinks the
+   * accounts attached there to the new DN): the first of these branches
+   * where `user` lacks one of `permissions`.
+   *
+   * Only those: an entry no rule names is under the rule the caller judges.
+   *
+   * @param subtree whether the rules below `dn` count too: a move, or a
+   *   delete, which `trash` turns into one
+   */
+  private async refusingRule(
+    user: string,
+    dn: string,
+    permissions: (keyof BranchPermissions)[],
+    subtree: boolean
+  ): Promise<string | undefined> {
+    const target = normalizeDn(dn);
+    for (const branch of await this.ruleBranches(user)) {
+      const named = normalizeDn(branch) === target;
+      if (!named && !(subtree && isDnInBranch(branch, dn))) continue;
+      const held = await this.getUserPermissions(user, branch);
+      if (permissions.some(permission => !held[permission])) return branch;
+    }
+    return undefined;
+  }
 
   /**
    * Whether this request is none of this plugin's business.
@@ -746,6 +886,9 @@ export default abstract class AuthzBase extends DmPlugin {
         return [dn, await this.recordTransitOrigin(dn, changes), opNumber, req];
       }
 
+      // The entry written, as the directory and the rules name it
+      const judged = await this.storedDn(dn);
+
       // Check if this is a move operation (changing organization link)
       const linkAttr = this.config.ldap_organization_link_attribute;
       // Whatever case the write spells the attribute in, and whether it
@@ -775,7 +918,7 @@ export default abstract class AuthzBase extends DmPlugin {
         // judged the parent branch instead: a caller who could read the
         // entry's parent but not the organization it was linked to could
         // move it out, and nothing was logged.
-        let sourceBranch = this.extractBranchDn(dn);
+        let sourceBranch = this.extractBranchDn(judged);
         // Whether the stored entry was read: one that could not be is not
         // the same as one attached to nothing, and is not in transit.
         let read = false;
@@ -795,7 +938,7 @@ export default abstract class AuthzBase extends DmPlugin {
           // The entry could not be read: its parent branch stands in.
         }
 
-        const destBranch = newLinks[0];
+        const destBranch = await this.storedDn(newLinks[0]);
 
         const byAttachment = this.filtersAttachedEntries();
         const fromTransit = byAttachment && read && this.inTransit(storedLink);
@@ -837,9 +980,22 @@ export default abstract class AuthzBase extends DmPlugin {
             );
           }
         }
+        // What the write carries besides the link and its path, a password
+        // say, is a write on the entry where it stands: in its branch, or,
+        // judged by attachment, in the organization it leaves. Claimed from
+        // transit, it lands in the destination, already judged on write.
+        if (!fromTransit && !this.onlyRelinks(changes)) {
+          const branch = byAttachment
+            ? sourceBranch
+            : this.extractBranchDn(judged);
+          if (!(await this.getUserPermissions(user, branch)).write)
+            throw new Error(
+              `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branch}`
+            );
+        }
       } else {
         // For other modifications, check write permission on the entry's current branch
-        const branchToCheck = await this.effectiveBranch(dn);
+        const branchToCheck = await this.effectiveBranch(judged);
         const permissions = await this.getUserPermissions(user, branchToCheck);
 
         if (!permissions.write) {
@@ -848,6 +1004,13 @@ export default abstract class AuthzBase extends DmPlugin {
           );
         }
       }
+
+      // Whichever path judged it, the write lands on the entry itself
+      const named = await this.refusingRule(user, judged, ['write'], false);
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        );
 
       const domainAttr = this.domainLinkAttribute();
       if (domainAttr)
@@ -892,11 +1055,14 @@ export default abstract class AuthzBase extends DmPlugin {
             AuthzBase.valuesOf(entry, linkAttr)
           )
         : [];
+      // The entry created, under its parent as the directory names it
+      const judged = await this.storedParent(dn);
       if (links.length > 0) {
-        branchToCheck = links[0];
+        branchToCheck = await this.storedDn(links[0]);
       } else {
-        // For organizations (ou entries) or entries without link, check the parent DN
-        branchToCheck = this.extractBranchDn(dn);
+        // For organizations (ou entries) or entries without link, check the
+        // parent DN
+        branchToCheck = this.extractBranchDn(judged);
       }
 
       const permissions = await this.getUserPermissions(user, branchToCheck);
@@ -907,6 +1073,12 @@ export default abstract class AuthzBase extends DmPlugin {
           `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
         );
       }
+      // Nor where a rule refuses it, at the very DN created
+      const named = await this.refusingRule(user, judged, ['write'], false);
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        );
 
       const domainAttr = this.domainLinkAttribute();
       if (domainAttr)
@@ -938,7 +1110,11 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Allow base scope search on top organization (for getOrganisationTop)
       if (base === this.config.ldap_top_organization && opts.scope === 'base') {
-        return [base, opts, req];
+        return [
+          base,
+          { ...opts, [AuthzBase.topOrganizationRead]: true } as SearchOptions,
+          req,
+        ];
       }
 
       // Filtering, the search is granted broadly and `ldapsearchfilter`
@@ -975,7 +1151,12 @@ export default abstract class AuthzBase extends DmPlugin {
     },
 
     /**
-     * Drop the accounts attached outside the branches this caller manages.
+     * Drop what this caller may not read from a search it was granted.
+     *
+     * Judged by branch, the search was granted on its base: each entry is
+     * kept only where the caller may read it, a rule narrower than the base
+     * refusing part of what it holds. Judged by attachment, the accounts
+     * attached outside the branches this caller manages are dropped.
      *
      * Runs after the cache and carries the request, so what one caller may
      * not see never reaches another. An entry with no organization link —
@@ -995,12 +1176,45 @@ export default abstract class AuthzBase extends DmPlugin {
         req,
         opts,
       ];
-      if (!this.filtersAttachedEntries()) return pass;
       if (this.shouldSkipAuthorization(req)) return pass;
       if (!result?.searchEntries?.length) return pass;
 
       const user = await this.resolveCaller(req!);
       if (!user) return pass;
+
+      // Judged by branch, a search is granted on its base, and a rule
+      // narrower than the base may refuse part of what it holds: each entry
+      // is read only where the caller may read it.
+      if (!this.filtersAttachedEntries()) {
+        if (
+          (opts as { [key: symbol]: unknown } | undefined)?.[
+            AuthzBase.topOrganizationRead
+          ]
+        )
+          return pass;
+        const keys = await this.ruleBranches(user);
+        const kept = [];
+        // An entry is under its parent's rule unless a rule names it
+        const byParent = new Map<string, boolean>();
+        const named = new Set(keys.map(normalizeDn));
+        for (const entry of result.searchEntries) {
+          const dn = String(entry.dn);
+          const parent = normalizeDn(getParentDn(dn));
+          const own = named.has(normalizeDn(dn));
+          let readable = own ? undefined : byParent.get(parent);
+          if (readable === undefined) {
+            readable = (await this.getUserPermissions(user, dn)).read === true;
+            if (!own) byParent.set(parent, readable);
+          }
+          if (readable) kept.push(entry);
+          else
+            this.logger.debug(
+              `${this.name}: hiding ${dn} from ${req!.user}, refused by a narrower branch rule`
+            );
+        }
+        result.searchEntries = kept;
+        return pass;
+      }
 
       // A search above a global branch, from the root say, would otherwise
       // bring back what it holds
@@ -1042,15 +1256,42 @@ export default abstract class AuthzBase extends DmPlugin {
         branches.some(branch => isDnInBranch(dn, branch));
       const transitKey = this.transitKey();
 
-      result.searchEntries = result.searchEntries.filter(entry => {
+      // Within a branch the caller holds, a narrower rule may still refuse
+      // the organization: asked once per organization
+      const readable = new Map<string, boolean>();
+      const reads = async (value: string): Promise<boolean> => {
+        if (!within(value)) return false;
+        const key = normalizeDn(value);
+        if (!readable.has(key))
+          readable.set(
+            key,
+            (await this.getUserPermissions(user, value)).read === true
+          );
+        return readable.get(key)!;
+      };
+
+      const attached = [];
+      for (const entry of result.searchEntries) {
         const link = entry[linkAttr];
-        if (link === undefined || link === null) return true;
-        const values = (Array.isArray(link) ? link : [link]).map(String);
-        if (values.length === 0) return true;
-        if (values.some(within)) return true;
+        const values =
+          link === undefined || link === null
+            ? []
+            : (Array.isArray(link) ? link : [link]).map(String);
+        if (values.length === 0) {
+          attached.push(entry);
+          continue;
+        }
+        let shown = false;
+        for (const value of values)
+          if (await reads(value)) {
+            shown = true;
+            break;
+          }
         // In transit: every administrator sees it, so that one can claim it.
-        if (values.some(value => this.inTransit(value, transitKey)))
-          return true;
+        if (shown || values.some(value => this.inTransit(value, transitKey))) {
+          attached.push(entry);
+          continue;
+        }
         // Attached outside every branch this caller holds. A link that
         // matches nothing configured lands here too: hidden rather than
         // shown, since a wrong link would otherwise be a way to be seen by
@@ -1058,8 +1299,8 @@ export default abstract class AuthzBase extends DmPlugin {
         this.logger.debug(
           `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, attached to ${values[0]}`
         );
-        return false;
-      });
+      }
+      result.searchEntries = attached;
 
       // The link was added to the projection so the judgement above could be
       // made; a caller that did not ask for it must not receive it.
@@ -1142,9 +1383,12 @@ export default abstract class AuthzBase extends DmPlugin {
       // 1. Read permission on the source (current location)
       // 2. Write permission on the destination (new location)
 
-      // Extract source and destination branches
-      const sourceBranch = this.extractBranchDn(oldDn);
-      const destBranch = this.extractBranchDn(newDn);
+      // Extract source and destination branches, as the directory names
+      // them
+      const from = await this.storedDn(oldDn);
+      const to = await this.storedParent(newDn);
+      const sourceBranch = this.extractBranchDn(from);
+      const destBranch = this.extractBranchDn(to);
 
       // Check read permission on source, or what else it asks
       const sourcePermissions = await this.getUserPermissions(
@@ -1158,6 +1402,20 @@ export default abstract class AuthzBase extends DmPlugin {
         );
       }
 
+      // A branch a rule names, or holding one, is moved out of that rule:
+      // the caller must be able to read and write there, or the move would
+      // lift what it refuses
+      const named = await this.refusingRule(
+        user,
+        from,
+        ['read', 'write'],
+        true
+      );
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have read and write permission for branch ${named}`
+        );
+
       // Check write permission on destination
       const destPermissions = await this.getUserPermissions(user, destBranch);
       if (!destPermissions.write) {
@@ -1165,6 +1423,12 @@ export default abstract class AuthzBase extends DmPlugin {
           `[authz-forbidden] User ${req!.user} does not have write permission for destination branch ${destBranch}`
         );
       }
+      // Nor where a rule refuses it, at the very DN the entry takes
+      const target = await this.refusingRule(user, to, ['write'], false);
+      if (target)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${target}`
+        );
 
       return [oldDn, newDn, req];
     },
@@ -1184,7 +1448,8 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Check delete permission on the branch of every target entry.
       const targets = Array.isArray(dn) ? dn : [dn];
-      for (const target of targets) {
+      for (const given of targets) {
+        const target = await this.storedDn(given);
         const branchToCheck = await this.effectiveBranch(target);
         const permissions = await this.getUserPermissions(user, branchToCheck);
         if (!permissions.delete) {
@@ -1192,6 +1457,11 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${branchToCheck}`
           );
         }
+        const named = await this.refusingRule(user, target, ['delete'], true);
+        if (named)
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${named}`
+          );
       }
 
       return [dn, req];
