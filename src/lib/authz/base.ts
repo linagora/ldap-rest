@@ -18,7 +18,11 @@ import type {
   ModifyRequest,
   SearchResult,
 } from '../ldapActions';
-import { AmbiguousIdentityError, ForbiddenError } from '../errors';
+import {
+  AmbiguousIdentityError,
+  BadRequestError,
+  ForbiddenError,
+} from '../errors';
 import {
   escapeLdapFilter,
   getParentDn,
@@ -550,6 +554,33 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * The organization a write attaches an entry to, among the link values it
+   * gives: empty ones dropped, one organization at most. The judgement reads
+   * one, so a second would attach the entry to an organization nobody
+   * judged.
+   *
+   * @throws BadRequestError when the values name several organizations
+   */
+  private static organizationLinks(
+    linkAttr: string,
+    values: string[]
+  ): string[] {
+    const links = [
+      ...new Map(
+        values
+          .map(value => value.trim())
+          .filter(value => value !== '')
+          .map(value => [normalizeDn(value), value])
+      ).values(),
+    ];
+    if (links.length > 1)
+      throw new BadRequestError(
+        `${linkAttr} attaches an entry to one organization, not ${links.length}`
+      );
+    return links;
+  }
+
+  /**
    * The values a write gives an attribute, whatever case its name is
    * spelled in.
    */
@@ -723,10 +754,10 @@ export default abstract class AuthzBase extends DmPlugin {
       // replaces the link or adds one to an entry that had none: either
       // attaches the entry to the organization named
       const newLinks = linkAttr
-        ? [
+        ? AuthzBase.organizationLinks(linkAttr, [
             ...AuthzBase.valuesOf(changes.replace, linkAttr),
             ...AuthzBase.valuesOf(changes.add, linkAttr),
-          ]
+          ])
         : [];
       if (linkAttr && newLinks.length > 0) {
         // For move operations, we need to check:
@@ -857,7 +888,12 @@ export default abstract class AuthzBase extends DmPlugin {
       // If the entry has an organization link, check permissions for that organization
       const linkAttr = this.config.ldap_organization_link_attribute;
       // Whatever case the entry spells the attribute in
-      const links = linkAttr ? AuthzBase.valuesOf(entry, linkAttr) : [];
+      const links = linkAttr
+        ? AuthzBase.organizationLinks(
+            linkAttr,
+            AuthzBase.valuesOf(entry, linkAttr)
+          )
+        : [];
       if (links.length > 0) {
         branchToCheck = links[0];
       } else {

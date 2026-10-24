@@ -433,7 +433,15 @@ export default class LdapBulkImport extends DmPlugin {
           }
 
           if (dryRun) {
-            // The import judges the update with the write itself
+            // The import judges the write itself again: a row let through
+            // for a change it turns out not to be is judged as the creation
+            // it will be, and the other way round
+            if (!exists)
+              await this.server.ldap.authorize('ldapaddrequest', [
+                dn,
+                entry,
+                req,
+              ]);
             if (exists)
               await this.server.ldap.authorize('ldapmodifyrequest', [
                 dn,

@@ -49,10 +49,12 @@ interface RowError {
 
 describe('Bulk import and the caller', function () {
   const OUTSIDER = 'bia.outsider';
+  const BASE_WRITER = 'bia.basewriter';
   const HOLDER = 'bia-holder';
   let base: string;
   let ownOrg: string;
   let otherOrg: string;
+  let transit: string;
   let holderDn: string;
   let plain: DM;
   let request: ReturnType<typeof supertest>;
@@ -69,6 +71,7 @@ describe('Bulk import and the caller', function () {
     const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
     ownOrg = `ou=BiaOwnOrg,${top}`;
     otherOrg = `ou=BiaOtherOrg,${top}`;
+    transit = `ou=BiaTransit,${top}`;
     holderDn = `uid=${HOLDER},${base}`;
 
     dir = mkdtempSync(join(tmpdir(), 'bia-'));
@@ -102,6 +105,11 @@ describe('Bulk import and the caller', function () {
       default: { read: false, write: false, delete: false },
       users: {
         [OUTSIDER]: { [ownOrg]: { read: true, write: true, delete: true } },
+        // Writes the whole base, not the transit branch
+        [BASE_WRITER]: {
+          [transit]: { read: false, write: false, delete: false },
+          [base]: { read: true, write: true, delete: true },
+        },
       },
       groups: {},
     });
@@ -113,6 +121,7 @@ describe('Bulk import and the caller', function () {
     for (const [dn, ou] of [
       [ownOrg, 'BiaOwnOrg'],
       [otherOrg, 'BiaOtherOrg'],
+      [transit, 'BiaTransit'],
     ])
       await plain.ldap
         .add(dn, {
@@ -144,9 +153,12 @@ describe('Bulk import and the caller', function () {
     for (const dn of [
       holderDn,
       `uid=bia-new,${base}`,
+      `uid=bia-multi,${base}`,
+      `uid=bia-t1,${base}`,
       `uid=bia-mine,${base}`,
       ownOrg,
       otherOrg,
+      transit,
     ])
       await plain.ldap.delete(dn).catch(() => undefined);
     rmSync(dir, { recursive: true, force: true });
@@ -239,11 +251,12 @@ describe('Bulk import and the caller', function () {
     const send = (
       header: string,
       rows: string[],
-      fields: Record<string, string> = {}
+      fields: Record<string, string> = {},
+      user = OUTSIDER
     ): Promise<supertest.Response> => {
       let call = attached
         .post('/api/v1/ldap/bulk-import/biausers')
-        .set('X-Test-User', OUTSIDER)
+        .set('X-Test-User', user)
         .attach('file', Buffer.from([header, ...rows].join('\n')), 'rows.csv');
       for (const [name, value] of Object.entries(fields))
         call = call.field(name, value);
@@ -270,7 +283,10 @@ describe('Bulk import and the caller', function () {
         twakeDepartmentPath: 'BiaOwnOrg',
       });
       const server = new DM();
-      Object.assign(server.config, { authz_filter_attached_entries: true });
+      Object.assign(server.config, {
+        authz_filter_attached_entries: true,
+        authz_transit_branch: transit,
+      });
       await server.ready;
       await server.registerPlugin('testAuth', new TestAuthPlugin(server));
       await server.registerPlugin('bulkImport', new LdapBulkImport(server));
@@ -307,6 +323,36 @@ describe('Bulk import and the caller', function () {
         failed: 1,
       });
       expect(await linkOf(ownDn)).to.equal(ownOrg);
+    });
+
+    it('refuses a link naming several organizations', async () => {
+      const res = await send('uid,cn,sn,twakeDepartmentLink', [
+        `bia-multi,M,M,"${ownOrg};${otherOrg}"`,
+      ]);
+      expect(res.body, JSON.stringify(res.body)).to.include({
+        created: 0,
+        failed: 1,
+      });
+    });
+
+    it('counts in a dry run only what the import would write', async () => {
+      // Let through as a move into transit, which it is not: there is no
+      // entry to move
+      for (const fields of [{ dryRun: 'true' }, {}] as Record<
+        string,
+        string
+      >[]) {
+        const res = await send(
+          'uid,cn,sn,organizationDn',
+          [`bia-t1,T,T,"${transit}"`],
+          fields,
+          BASE_WRITER
+        );
+        expect(res.body, JSON.stringify(res.body)).to.include({
+          created: 0,
+          failed: 1,
+        });
+      }
     });
 
     it('stops on a refused row with the refusal only', async () => {
