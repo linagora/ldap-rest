@@ -18,8 +18,9 @@
   needs write where the entry stands: one carrying a password change went
   through with read there. A DN matches a rule however it is spelled:
   escapes (`\2C`, `\20`, `\C3\A9`), attribute type names and OIDs
-  (`2.5.4.11=payroll` is `ou=payroll`), and the LDAPv2 `;` and quotes,
-  which OpenLDAP accepts and a caller could use to step around a rule,
+  (`2.5.4.11=payroll` is `ou=payroll`), insignificant spaces, and the
+  LDAPv2 `;` and quotes, which OpenLDAP accepts and a caller could use to
+  step around a rule; a write is judged on the DN the directory returns,
   [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
   [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
   ([#388](https://github.com/linagora/ldap-rest/pull/388))
