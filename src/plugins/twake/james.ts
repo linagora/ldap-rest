@@ -23,6 +23,7 @@ import {
   isDnInBranch,
   isDummyMemberDn,
   normalizeDn,
+  parseDn,
 } from '../../lib/utils';
 
 /**
@@ -751,7 +752,7 @@ export default class James extends TwakePlugin {
     for (const { base, attribute } of domainBranches(this.server)) {
       try {
         if (sameDn(dn, base) || !isDnInBranch(dn, base)) continue;
-        const d = normalizeDn(base).split(',').length;
+        const d = parseDn(base).length;
         if (d > depth) [found, depth] = [attribute, d];
       } catch {
         // An unparsable DN lies in no branch

@@ -16,9 +16,8 @@
   refuses, judged by branch or by attachment. Judged by branch, a write
   setting the organization link and anything else needs write in the
   branch of the entry: one carrying a password change went through with
-  read there. A DN the
-  directory spells with hex escapes (`\2C`) matches a rule written with
-  `\,`,
+  read there. A DN the directory spells with hex escapes (`\2C`) matches
+  a rule written with `\,`,
   [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
   [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
   ([#388](https://github.com/linagora/ldap-rest/pull/388))

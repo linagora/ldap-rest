@@ -129,6 +129,10 @@ the accounts attached there. A write setting the organization link
 leaves and joins; anything else it carries still needs write in the branch
 of the entry.
 
+A move is judged on the mover's own rules. The rules of other users and
+groups name the branch by its DN: once a caller allowed to move it has done
+so, they no longer apply to it, and need rewriting for the new DN.
+
 ## How It Works
 
 ### LDAP Search Hook

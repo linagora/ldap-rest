@@ -58,6 +58,19 @@ describe('Branch rule precedence', function () {
       ).to.equal('sales');
     });
 
+    it('does not read an escaped comma as a separator', () => {
+      // An entry named `cn=x\2Cou=pub` sits in the parent, not in `ou=pub`
+      expect(
+        mostSpecificBranchRule(
+          [
+            ['ou=acme,dc=example,dc=com', 'acme'],
+            ['ou=pub,ou=acme,dc=example,dc=com', 'pub'],
+          ],
+          'cn=x\\2Cou=pub,ou=acme,dc=example,dc=com'
+        )
+      ).to.equal('acme');
+    });
+
     it('holds nothing outside every branch', () => {
       expect(
         mostSpecificBranchRule(rules, 'ou=acme2,dc=example,dc=com')
@@ -316,6 +329,31 @@ describe('Branch rule precedence', function () {
           0,
           { user: USER, headers: {} } as unknown as DmRequest,
         ]);
+      });
+
+      it('holds the rules below a moved or deleted entry', async () => {
+        // Read refused below, write granted: moving the parent would lift it
+        plugin.authConfig = {
+          default: { read: false, write: false, delete: false },
+          users: {
+            [USER]: {
+              [base]: { read: true, write: true, delete: true },
+              [payroll]: { read: false, write: true, delete: false },
+            },
+          },
+          groups: {},
+        };
+        const req = { user: USER, headers: {} } as unknown as DmRequest;
+        for (const judge of [
+          () =>
+            plugin.hooks.ldaprenamerequest([acme, `ou=precmoved,${base}`, req]),
+          // `trash` turns a delete into a move of the subtree
+          () => plugin.hooks.ldapdeleterequest([acme, req]),
+        ]) {
+          let error: unknown;
+          await judge().catch((err: unknown) => (error = err));
+          expect(String(error)).to.match(/forbidden/i);
+        }
       });
 
       it('lets a group grant what the user rule refuses', async () => {

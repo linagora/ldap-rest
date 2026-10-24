@@ -663,6 +663,14 @@ function canonicalEscapes(value: string): string {
  * ```
  */
 export function normalizeDn(dn: string): string {
+  return normalizedRdns(dn).join(',');
+}
+
+/**
+ * The RDNs of {@link normalizeDn}, kept apart: joined, an escaped separator
+ * the directory spelled `\2C` would read as one that was not escaped.
+ */
+function normalizedRdns(dn: string): string[] {
   return parseDn(dn)
     .map(rdn =>
       rdn
@@ -682,8 +690,7 @@ export function normalizeDn(dn: string): string {
         .sort()
         .join('+')
     )
-    .filter(rdn => rdn.length > 0)
-    .join(',');
+    .filter(rdn => rdn.length > 0);
 }
 
 /**
@@ -775,9 +782,9 @@ export function organizationLink(
  * ```
  */
 export function isDnInBranch(dn: string, base: string): boolean {
-  const baseParts = normalizeDn(base).split(',').filter(Boolean);
+  const baseParts = normalizedRdns(base);
   if (baseParts.length === 0) return false;
-  const dnParts = normalizeDn(dn).split(',').filter(Boolean);
+  const dnParts = normalizedRdns(dn);
   if (dnParts.length < baseParts.length) return false;
   const tail = dnParts.slice(dnParts.length - baseParts.length);
   return tail.every((part, i) => part === baseParts[i]);
