@@ -12,7 +12,13 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { SearchResult } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
-import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import { AUTHZ_REFUSED, HttpError, errorBody } from '../../lib/errors';
+import {
+  escapeDnValue,
+  escapeLdapFilter,
+  isAuthzRefusal,
+  isDnInBranch,
+} from '../../lib/utils';
 
 /**
  * @openapi-component
@@ -79,6 +85,24 @@ import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
  *   example:
  *     name: Work laptop
  */
+/**
+ * Answer a refusal with its own status: an authorization plugin's is a 403,
+ * as the error middleware would answer it, not the 500 of a fault.
+ *
+ * @returns whether the error was a refusal, and has been answered
+ */
+const answeredRefusal = (error: unknown, res: Response): boolean => {
+  if (isAuthzRefusal(error)) {
+    res.status(403).json(errorBody(error, AUTHZ_REFUSED));
+    return true;
+  }
+  if (error instanceof HttpError && error.statusCode < 500) {
+    res.status(error.statusCode).json(errorBody(error, error.message));
+    return true;
+  }
+  return false;
+};
+
 export default class AppAccountsApi extends DmPlugin {
   name = 'appAccountsApi';
   roles: Role[] = ['api', 'configurable'] as const;
@@ -293,6 +317,7 @@ export default class AppAccountsApi extends DmPlugin {
    */
   private async resolvePrincipal(
     principal: string,
+    req: Request,
     res: Response,
     attributes?: string[]
   ): Promise<SearchResult['searchEntries'][number] | null> {
@@ -313,7 +338,13 @@ export default class AppAccountsApi extends DmPlugin {
       entry => !isDnInBranch(entry.dn, this.applicativeAccountBase)
     );
 
-    if (entries.length === 0) {
+    // Found as the server, across branches: a user the caller cannot read
+    // gets the answer a user that is not there gets
+    if (
+      entries.length === 0 ||
+      (entries.length === 1 &&
+        !(await this.server.ldap.readableBy(String(entries[0].dn), req)))
+    ) {
       res.status(404).json({ error: `User ${principal} not found` });
       return null;
     }
@@ -340,7 +371,7 @@ export default class AppAccountsApi extends DmPlugin {
     const principal = req.params.user as string;
 
     try {
-      const userEntry = await this.resolvePrincipal(principal, res, [
+      const userEntry = await this.resolvePrincipal(principal, req, res, [
         this.mailAttr,
       ]);
       if (!userEntry) return;
@@ -414,7 +445,7 @@ export default class AppAccountsApi extends DmPlugin {
     const { name } = req.body || {};
 
     try {
-      const userEntry = await this.resolvePrincipal(principal, res);
+      const userEntry = await this.resolvePrincipal(principal, req, res);
       if (!userEntry) return;
 
       const mail = userEntry[this.mailAttr];
@@ -562,6 +593,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       res.json({ uid: newUid, pwd: newPassword, mail: mailStr });
     } catch (error) {
+      if (answeredRefusal(error, res)) return;
       this.logger.error(
         `${this.name}: Failed to create account for ${principal}:`,
         error
@@ -606,6 +638,13 @@ export default class AppAccountsApi extends DmPlugin {
     const uid = req.params.uid as string;
 
     try {
+      // Judged before the account is looked for, as the server, where every
+      // account is created: whether it is there is not for a caller who may
+      // not delete it
+      await this.server.ldap.authorize('ldapdeleterequest', [
+        `uid=${escapeDnValue(uid)},${this.applicativeAccountBase}`,
+        req,
+      ]);
       // Search for the applicative account. `userPassword` is requested
       // explicitly: revocation needs the stored hash to know which of the
       // principal's values to remove, so this is a hard requirement rather
@@ -645,9 +684,12 @@ export default class AppAccountsApi extends DmPlugin {
       // and read its mail.
       let principalMail = principal;
       if (this.userAttr !== this.mailAttr) {
-        const principalEntry = await this.resolvePrincipal(principal, res, [
-          this.mailAttr,
-        ]);
+        const principalEntry = await this.resolvePrincipal(
+          principal,
+          req,
+          res,
+          [this.mailAttr]
+        );
         if (!principalEntry) return;
         const pm = principalEntry[this.mailAttr];
         const pmStr = pm
@@ -741,6 +783,7 @@ export default class AppAccountsApi extends DmPlugin {
 
       res.json({ uid });
     } catch (error) {
+      if (answeredRefusal(error, res)) return;
       this.logger.error(
         `${this.name}: Failed to delete account ${uid} for ${principal}:`,
         error

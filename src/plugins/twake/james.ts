@@ -357,7 +357,12 @@ export default class James extends TwakePlugin {
       );
 
       const userEntry = (userResult as SearchResult).searchEntries?.[0];
-      if (!userEntry) {
+      // Found as the server, across branches: a user the caller cannot read
+      // gets the answer a user that is not there gets
+      if (
+        !userEntry ||
+        !(await this.server.ldap.readableBy(String(userEntry.dn), req))
+      ) {
         res.status(404).json({ error: `User ${username} not found` });
         return;
       }

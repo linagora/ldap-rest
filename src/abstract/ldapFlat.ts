@@ -1261,6 +1261,9 @@ export default abstract class LdapFlat extends DmPlugin {
       );
     }
 
+    // Before looking for either entry: whether they are there is not for a
+    // caller who may not rename here
+    await this.ldap.authorize('ldaprenamerequest', [dn, newDn, req]);
     const sameName = normalizeDn(dn) === normalizeDn(newDn);
     const source = await this.entryExists(dn);
     const target = sameName ? source : await this.entryExists(newDn);
@@ -1395,6 +1398,17 @@ export default abstract class LdapFlat extends DmPlugin {
       validateDnValue(id, this.mainAttribute);
       dn = this.resolveDn(id);
     }
+    // Before the checks reading the directory: a pointer leading nowhere, a
+    // value already taken, are not for a caller who may not create here
+    await this.ldap.authorize('ldapaddrequest', [
+      dn,
+      {
+        objectClass: this.objectClass,
+        [this.mainAttribute]: id,
+        ...additional,
+      },
+      req,
+    ]);
     await this.validateNewEntry(dn, {
       objectClass: this.objectClass,
       [this.mainAttribute]: id,
@@ -1511,6 +1525,8 @@ export default abstract class LdapFlat extends DmPlugin {
         );
     }
 
+    // Before the checks reading the directory, as on a creation
+    await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
     await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks[`${this.hookPrefix}modifydone`], [

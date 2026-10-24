@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Security
+
+- A caller who may not make a write is refused before the route looks in
+  the directory as the server, and gets the same 403 whether the entry is
+  there or not. These routes answered what they found first: the rename of
+  an entry, the creation and modification of a flat entry, a group or an
+  organization (a pointer leading nowhere), a group or organization move,
+  the erase of a tombstone, the deletion of an app account; and the
+  creation of a group created its external members before it was judged
+- `GET /users/{user}/quota-usage` and the app account routes answer 404
+  for an account the caller cannot read, as for one that is not there:
+  the quota of any account was served to any caller the route let in
+
 ### Fixes
 
 - With the search cache on (`--ldap-cache-ttl`), a change of a group's

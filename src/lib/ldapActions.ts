@@ -13,10 +13,13 @@ import pLimit from 'p-limit';
 
 import { type Config } from '../config/args';
 import { type DM } from '../bin';
+import type { Hooks } from '../hooks';
 
 import {
   escapeDnValue,
   getParentDn,
+  hookOwner,
+  isAuthzRefusal,
   isDnInBranch,
   launchHooks,
   launchHooksChained,
@@ -193,6 +196,13 @@ function withCode<T extends Error>(err: T, code: number): T {
  * what this used to join on — is a legal DN character.
  */
 const CACHE_KEY_SEPARATOR = '\u0000';
+
+/** The request hooks an operation is judged in, see `ldapActions.authorize` */
+type AuthorizedHook =
+  | 'ldapaddrequest'
+  | 'ldapmodifyrequest'
+  | 'ldapdeleterequest'
+  | 'ldaprenamerequest';
 
 /**
  * Short, stable stand-in for a cache key in a log line.
@@ -900,6 +910,73 @@ class ldapActions {
       rename: (dn, newRdn) => this.rename(dn, newRdn, req),
       delete: dn => this.delete(dn, req),
     };
+  }
+
+  /**
+   * Whether the caller of a request can read an entry.
+   *
+   * For a route that finds an entry as the server — by an attribute, across
+   * branches — and then answers about it: an entry the caller cannot read
+   * must get the answer an entry that is not there gets, or the route tells
+   * them what the directory holds where they cannot read. Refused or
+   * filtered out by an authorization plugin, the entry reads as absent.
+   * Without a request, as for any operation, nobody judges.
+   *
+   * @param dn the entry
+   * @param req the request whose caller asks
+   * @returns whether a read of the entry, as that caller, finds it
+   */
+  async readableBy(dn: string, req?: Request): Promise<boolean> {
+    if (!req) return true;
+    try {
+      const found = (await this.search(
+        { paged: false, scope: 'base', attributes: ['1.1'] },
+        dn,
+        req
+      )) as SearchResult;
+      return (found.searchEntries?.length ?? 0) > 0;
+    } catch (err) {
+      if (
+        isAuthzRefusal(err) ||
+        (err as { statusCode?: number })?.statusCode === 403 ||
+        extractLdapCode(err) === 32
+      )
+        return false;
+      throw err;
+    }
+  }
+
+  /**
+   * Have the authorization plugins judge an operation, without making it.
+   *
+   * A route that looks in the directory before it writes — whether an entry
+   * is there, which organization holds it, whether a pointer leads
+   * somewhere — answers what it found, as the server, to whoever asked. A
+   * caller who may not make the write then learns, one request at a time,
+   * what the directory holds where they cannot read. Judged first, they get
+   * the 403 the write itself would get, whether the entry is there or not.
+   *
+   * Only the hooks of the plugins with the `authz` role run, and what they
+   * return is dropped: the operation, when it is made, runs every hook
+   * again. Without a request in the arguments nobody judges, as for the
+   * operation itself.
+   *
+   * @param hook the request hook the operation launches
+   * @param args what the operation hands that hook
+   * @throws the refusal of the first authorization plugin refusing
+   */
+  async authorize<H extends AuthorizedHook>(
+    hook: H,
+    args: Parameters<NonNullable<Hooks[H]>>[0]
+  ): Promise<void> {
+    const judges = (this.parent.hooks[hook] ?? []).filter(fn => {
+      const owner = hookOwner(fn);
+      return Boolean(
+        owner &&
+        this.parent.loadedPlugins[owner.plugin]?.roles?.includes('authz')
+      );
+    });
+    await launchHooksChained(judges, args);
   }
 
   /**
