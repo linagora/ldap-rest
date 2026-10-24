@@ -4,7 +4,11 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## From 0.26 to 1.0.0
+
+Every breaking change since 0.26.0. Authorization fails closed in 1.0.0:
+what used to pass because a call site forgot the request, or because a
+name was spelled otherwise, is now judged, and may be refused.
 
 ### Attribute names in a write: one name per attribute, no option
 

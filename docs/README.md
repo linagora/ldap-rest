@@ -32,6 +32,26 @@ Integrate LDAP-Rest into your web applications.
 - **[JSON Schemas](client-development/schemas/README.md)** - Schema structure and validation
 - **[Examples](client-development/examples/README.md)** - React, Vue.js, Vanilla JS integration
 
+## API stability
+
+From 1.0.0, ldap-rest follows semantic versioning. These are its public
+API, which a minor or a patch release does not break:
+
+- **Configuration**: the options and environment variables of
+  [Configuration](usage/configuration.md) and of each plugin's page.
+- **Routes**: the paths, bodies and answers of the
+  [REST API](client-development/api/rest-api.md) and the plugin pages,
+  their statuses and their error `code`s.
+- **Plugin API**: `DmPlugin` and its roles (`auth`, `authz`, …), the
+  [hooks](plugin-development/hooks.md) and their arguments, and the
+  directory operations of [the development guide](plugin-development/README.md):
+  `ldap.search`, `add`, `modify`, `rename`, `delete`, `ldap.forRequest`,
+  `ldap.system`, `ldap.authorize`, `ldap.readableBy`.
+- **Schemas**: the JSON schema format and the shipped schemas' attributes.
+
+Everything else — other exports, internal helpers, log messages — may
+change in any release.
+
 ## Presentations
 
 Interactive presentations (using [presenterm](https://github.com/mfontanini/presenterm)):
