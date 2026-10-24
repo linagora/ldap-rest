@@ -10,6 +10,7 @@ import {
   isChildOf,
   normalizeDn,
   isDnInBranch,
+  organizationLink,
 } from '../../src/lib/utils';
 import { BadRequestError } from '../../src/lib/errors';
 
@@ -403,6 +404,15 @@ describe('LDAP Utils', () => {
 
     it('should return false when base is empty', () => {
       expect(isDnInBranch('uid=x,ou=a,dc=c', '')).to.be.false;
+    });
+  });
+
+  describe('organizationLink', () => {
+    it('reads the first value naming an organization', () => {
+      expect(organizationLink(['', 'ou=a,dc=x'])).to.equal('ou=a,dc=x');
+      expect(organizationLink(['  ', 'ou=a,dc=x'])).to.equal('ou=a,dc=x');
+      expect(organizationLink('')).to.equal(undefined);
+      expect(organizationLink([])).to.equal(undefined);
     });
   });
 });
