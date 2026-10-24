@@ -160,12 +160,56 @@ function valueList(value: AttributeValue | undefined): string[] {
  * @returns its values, empty when the entry does not carry it
  */
 function entryValues(entry: Record<string, unknown>, name: string): string[] {
-  const wanted = name.toLowerCase();
   for (const [key, value] of Object.entries(entry)) {
-    if (key.split(';')[0].toLowerCase() === wanted)
-      return valueList(value as AttributeValue);
+    if (spells(key, name)) return valueList(value as AttributeValue);
   }
   return [];
+}
+
+/**
+ * Whether a key, as a client or the directory spells it, names an attribute:
+ * `MAIL` and `mail;lang-en` are `mail`.
+ *
+ * @param key attribute description, in any case, options included
+ * @param name attribute name, as a schema writes it
+ */
+function spells(key: string, name: string): boolean {
+  return key.split(';')[0].toLowerCase() === name.toLowerCase();
+}
+
+/**
+ * Every value of an attribute, under each of its spellings.
+ *
+ * @param entry entry as read or submitted
+ * @param name attribute name, in any case
+ * @returns its values, empty when no key names it
+ */
+function allValues(entry: AttributesList | null, name: string): string[] {
+  return Object.entries(entry || {})
+    .filter(([key]) => spells(key, name))
+    .flatMap(([, value]) => valueList(value));
+}
+
+/**
+ * Respell, in place, the keys that name a schema attribute in another case
+ * (`MAIL` for `mail`) the way the schema does, so that the rewrites reading
+ * values by name — the path, the defaults, the sizes — find them. A key with
+ * options names a value of its own, and is left as sent, as is one whose
+ * schema spelling is sent too.
+ *
+ * @param schema the entity's schema
+ * @param values attributes as submitted; mutated
+ */
+function respell(schema: Schema, values: AttributesList | undefined): void {
+  if (!values) return;
+  const names = Object.keys(schema.attributes);
+  for (const key of Object.keys(values)) {
+    if (key.includes(';')) continue;
+    const name = names.find(n => n !== key && spells(key, n));
+    if (!name || name in values) continue;
+    values[name] = values[key];
+    delete values[key];
+  }
 }
 
 /**
@@ -479,6 +523,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     ldapaddrequest: async ([dn, entry, req]) => {
       const entity = this.resolveEntity(dn);
       if (entity) {
+        respell(entity.schema, entry);
         await this.runChecks(entity, dn, entry, null);
         await this.runTransformations(entity, dn, entry, true);
       }
@@ -490,6 +535,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     ldapmodifyrequest: async ([dn, changes, op, req]) => {
       const entity = this.resolveEntity(dn);
       if (!entity) return [dn, changes, op, req];
+      respell(entity.schema, changes.add);
+      respell(entity.schema, changes.replace);
 
       // A modify only carries what changes; rules that need the rest of the
       // entry — the organization a mail address is checked against, say — read
@@ -507,13 +554,18 @@ export default class LdapEnterpriseRules extends DmPlugin {
       // organization now responsible for them — `/move` walked straight past
       // the domain rule this plugin exists to enforce. When the link changes,
       // the stored mail-scoped values are checked as if they had been sent.
+      // Whatever the spelling of the keys: `TWAKEDEPARTMENTLINK` moves the
+      // entry as surely
       const linkAttr = roleAttribute(entity.schema, 'organizationLink');
       const toCheck: AttributesList = { ...submitted };
-      if (linkAttr && linkAttr in submitted && current) {
+      const sent = (name: string): boolean =>
+        Object.keys(toCheck).some(key => spells(key, name));
+      if (linkAttr && sent(linkAttr) && current) {
         for (const [name, attr] of Object.entries(entity.schema.attributes)) {
           if (!attr.mailDomainScope) continue;
-          if (name in toCheck) continue;
-          if (current[name] !== undefined) toCheck[name] = current[name];
+          if (sent(name)) continue;
+          const stored = allValues(current, name);
+          if (stored.length) toCheck[name] = stored;
         }
       }
 
@@ -567,14 +619,18 @@ export default class LdapEnterpriseRules extends DmPlugin {
     values: AttributesList,
     current: AttributesList | null
   ): Promise<void> {
-    for (const [name, value] of Object.entries(values)) {
+    const names = Object.keys(entity.schema.attributes);
+    for (const [key, value] of Object.entries(values)) {
+      // Its rule whatever the spelling: a write to `MAIL` or `mail;lang-en`
+      // is one to `mail`, and found no rule under that name
+      const name = names.find(n => spells(key, n));
+      if (!name) continue;
       const attr = entity.schema.attributes[name];
-      if (!attr) continue;
       const list = valueList(value);
       if (list.length === 0) continue;
 
       if (attr.unique) {
-        await this.checkUnique(entity, name, attr, list, current ? dn : null);
+        await this.checkUnique(entity, name, attr, list, dn, current);
       }
       if (attr.mailDomainScope) {
         await this.checkMailDomains(entity, name, attr, list, values, current);
@@ -708,11 +764,19 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * compared by content, and the entry being updated is excluded from the
    * search — so re-sending an unchanged name no longer conflicts with itself.
    *
+   * Nor with its copies: a value the entry already holds, as stored, is not
+   * looked for again, or the copies other plugins keep of the entry — the
+   * applicative accounts of `appAccountsConsistency` carry its mail — would
+   * hold it against it. Held under another attribute, it is skipped only
+   * when that attribute's own constraint looked for it wherever this one
+   * looks: a value accepted under a narrower one is checked here.
+   *
    * @param entity entity the entry belongs to
    * @param name attribute being checked
    * @param attr its schema definition
    * @param values values submitted for it
-   * @param selfDn DN to exclude, on a modification
+   * @param dn entry being written
+   * @param current entry as stored, on a modification; its DN is excluded
    * @throws ConflictError naming the entry that already holds the value
    */
   private async checkUnique(
@@ -720,21 +784,45 @@ export default class LdapEnterpriseRules extends DmPlugin {
     name: string,
     attr: SchemaAttribute,
     values: string[],
-    selfDn: string | null
+    dn: string,
+    current: AttributesList | null
   ): Promise<void> {
     const constraint: UniqueConstraint =
       typeof attr.unique === 'object' ? attr.unique : {};
     const attributes = [name, ...(constraint.attributes || [])];
+    const selfDn = current ? dn : null;
     // `branches` widens the search, it does not move it: it used to *replace*
     // the entity's own base, so a schema naming only a neighbouring branch —
     // the lists a mail address is also shared with, say — stopped enforcing
     // uniqueness where its own entries live, and two users could hold the
     // same address. The shipped schemas hid it by naming the whole base.
     const bases = uniquenessBases(entity.base, constraint.branches);
+    /** Whether a value accepted under `other` was looked for as here */
+    const covers = (other: string): boolean => {
+      if (other === name) return true;
+      const unique = entity.schema.attributes[other]?.unique;
+      if (!unique) return false;
+      const theirs: UniqueConstraint = typeof unique === 'object' ? unique : {};
+      const spanned = [other, ...(theirs.attributes || [])];
+      const wide = uniquenessBases(entity.base, theirs.branches);
+      return (
+        (!theirs.filter || theirs.filter === constraint.filter) &&
+        theirs.sentinel === constraint.sentinel &&
+        attributes.every(a => spanned.includes(a)) &&
+        bases.every(b => wide.some(w => isDnInBranch(b, w)))
+      );
+    };
+    // Compared as stored, exactly: whether two spellings are one value is
+    // the attribute's matching rule, which this cannot read
+    // Under every spelling the directory answers, options included
+    const held = new Set(
+      attributes.filter(covers).flatMap(a => allValues(current, a))
+    );
 
     for (const value of values) {
       if (constraint.sentinel !== undefined && value === constraint.sentinel)
         continue;
+      if (held.has(value)) continue;
       const terms = attributes
         .map(a => `(${a}=${escapeLdapFilter(value)})`)
         .join('');
@@ -824,8 +912,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     const linkAttr = roleAttribute(entity.schema, 'organizationLink');
     if (!linkAttr) return [];
     const link =
-      valueList(submitted[linkAttr])[0] ||
-      valueList(current?.[linkAttr])[0] ||
+      allValues(submitted, linkAttr)[0] ||
+      allValues(current, linkAttr)[0] ||
       undefined;
     if (!link) return [];
 

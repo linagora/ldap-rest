@@ -63,8 +63,18 @@ check that justified it.
   non-individual entries.
 - `filter` narrows the search, e.g. `(objectClass=twakeAccount)`.
 
-On an update the entry being modified is excluded from the search, so
-re-sending an unchanged value never conflicts with itself.
+On an update, a value the entry already holds, as stored and spelled the
+same, is not looked for again; only the values it does not hold yet are.
+Re-sending an unchanged value conflicts neither with the entry itself nor
+with the copies other plugins keep of it — the applicative accounts of
+`appAccountsConsistency` carry the account's mail. A value held under
+another attribute the constraint spans, an alias becoming the mail, is
+skipped only when that attribute's own constraint looks for it everywhere
+this one does; otherwise it is checked. A duplicate the directory already
+holds, from before the rule or another tool, is therefore not reported on a
+re-save. A value spelled differently is a new one, and looked for: changing
+only the case of an account's mail is refused while an applicative copy
+holds the old spelling, which the directory takes for the same address.
 
 ### Mail domains
 

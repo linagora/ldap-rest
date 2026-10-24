@@ -466,6 +466,103 @@ describe('Enterprise rules', () => {
           .send({ replace: { employeeNumber: 'E999', sn: 'Changed' } });
         expect(res.status).to.equal(200);
       });
+
+      it('should not hold a copy of the entry against it (#402)', async () => {
+        // What `appAccountsConsistency` keeps of an account: an entry of its
+        // own, elsewhere, carrying the account's mail
+        const copies = `ou=rulescopies,${base}`;
+        const copy = `uid=rules.uniq@example.com,${copies}`;
+        await server.ldap
+          .add(copies, { objectClass: ['top', 'organizationalUnit'] } as never)
+          .catch(() => undefined);
+        try {
+          await create('rules.uniq@example.com', {
+            mailAlternateAddress: ['rules.alias@example.com'],
+          }).expect(201);
+          await server.ldap.add(copy, {
+            objectClass: ['top', 'twakeAccount'],
+            uid: 'rules.uniq@example.com',
+            mail: 'RULES.UNIQ@example.com',
+            mailAlternateAddress: 'rules.alias@example.com',
+          } as never);
+          // The whole entry saved again, its values unchanged, or moved
+          // between the attributes the constraint spans
+          for (const replace of [
+            { mail: 'rules.uniq@example.com', sn: 'Changed' },
+            {
+              mail: 'rules.alias@example.com',
+              mailAlternateAddress: ['rules.uniq@example.com'],
+            },
+          ]) {
+            const res = await request
+              .put('/api/v1/ldap/users/rules.uniq')
+              .type('json')
+              .send({ replace });
+            expect(res.status, JSON.stringify(res.body)).to.equal(200);
+          }
+        } finally {
+          await server.ldap.delete(copy).catch(() => undefined);
+          await server.ldap.delete(copies).catch(() => undefined);
+        }
+      });
+
+      it('should read the values held under an option of the attribute', async () => {
+        const copies = `ou=rulescopies,${base}`;
+        const copy = `uid=rules.uniq@example.com,${copies}`;
+        const self = `uid=rules.uniq,ou=users,${base}`;
+        await server.ldap
+          .add(copies, { objectClass: ['top', 'organizationalUnit'] } as never)
+          .catch(() => undefined);
+        try {
+          await create('rules.uniq@example.com').expect(201);
+          // As another tool may store it: the address under a tagged name
+          await server.ldap.modify(self, {
+            delete: { mail: 'rules.uniq@example.com' },
+            add: { 'mail;lang-en': 'rules.uniq@example.com' },
+          } as never);
+          await server.ldap.add(copy, {
+            objectClass: ['top', 'twakeAccount'],
+            uid: 'rules.uniq@example.com',
+            mail: 'rules.uniq@example.com',
+          } as never);
+          const res = await request
+            .put('/api/v1/ldap/users/rules.uniq')
+            .type('json')
+            .send({
+              replace: { mail: 'rules.uniq@example.com', sn: 'Changed' },
+            });
+          expect(res.status, JSON.stringify(res.body)).to.equal(200);
+        } finally {
+          await server.ldap.delete(copy).catch(() => undefined);
+          await server.ldap.delete(copies).catch(() => undefined);
+        }
+      });
+
+      it('should check a value written under another spelling of the attribute', async () => {
+        await create('rules.uniq@example.com').expect(201);
+        await create('rules.other@example.com').expect(201);
+        // Below the API, which a strict schema guards: what another plugin
+        // or a non-strict schema lets through
+        for (const name of ['MAIL', 'mail;lang-en'])
+          await server.ldap
+            .modify(`uid=rules.other,ou=users,${base}`, {
+              replace: { [name]: 'rules.uniq@example.com' },
+            } as never)
+            .then(
+              () => expect.fail(`${name} was written`),
+              (err: Error) => expect(err.message).to.match(/already used/)
+            );
+      });
+
+      it('should still refuse a value the entry does not hold', async () => {
+        await create('rules.uniq@example.com').expect(201);
+        await create('rules.other@example.com').expect(201);
+        const res = await request
+          .put('/api/v1/ldap/users/rules.other')
+          .type('json')
+          .send({ replace: { mail: 'rules.uniq@example.com' } });
+        expect(res.status).to.equal(409);
+      });
     });
 
     describe('mail domains', () => {
@@ -504,6 +601,66 @@ describe('Enterprise rules', () => {
           value: 'rules.domain@elsewhere.example',
           domains: ['example.com'],
         });
+      });
+
+      it('should check a move whatever the spelling of the link', async () => {
+        // No domain where it stands, so any address
+        const res = await request.post('/api/v1/ldap/users').type('json').send({
+          cn: 'Rules Domain',
+          sn: 'Domain',
+          mail: 'rules.domain@elsewhere.example',
+          twakeDepartmentLink: otherOrgDn,
+          employeeNumber: 'ENT0051',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+        const self = `uid=rules.domain,ou=users,${base}`;
+        // Into an organization that allows example.com only: the stored
+        // address, or one sent along, is checked against it
+        for (const replace of [
+          { TWAKEDEPARTMENTLINK: subOrgDn },
+          { 'twakeDepartmentLink;x-tag': subOrgDn },
+          {
+            TwakeDepartmentLink: subOrgDn,
+            mail: 'rules.other@elsewhere.example',
+          },
+        ])
+          await server.ldap.modify(self, { replace } as never).then(
+            () => expect.fail(`${JSON.stringify(replace)} was written`),
+            (err: Error) =>
+              expect(err.message).to.match(/not one of the authorised domains/)
+          );
+      });
+
+      it('should rewrite what is sent in another case of a name', async () => {
+        const res = await request.post('/api/v1/ldap/users').type('json').send({
+          cn: 'Rules Domain',
+          sn: 'Domain',
+          mail: 'rules.domain@example.com',
+          twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0052',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+        const self = `uid=rules.domain,ou=users,${base}`;
+        await server.ldap.modify(self, {
+          replace: { TWAKEDEPARTMENTLINK: orgDn, MAILQUOTASIZE: '5GB' },
+        } as never);
+        const stored = (
+          (await server.ldap.search(
+            {
+              paged: false,
+              scope: 'base',
+              attributes: ['twakeDepartmentPath', 'mailQuotaSize'],
+            },
+            self
+          )) as { searchEntries: Record<string, unknown>[] }
+        ).searchEntries[0];
+        // The path follows the move, the size is counted in bytes
+        expect(stored.twakeDepartmentPath).to.equal('RulesOrg');
+        expect(stored.mailQuotaSize).to.equal('5000000000');
       });
 
       it('should list a domain linked at several levels once', async () => {

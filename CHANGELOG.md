@@ -123,6 +123,25 @@
 
 ### Fixes
 
+- `core/ldap/enterpriseRules`: saving an account with its mail unchanged
+  answered `409 … is already used` once `appAccountsConsistency` had made
+  its applicative entry, which carries the same mail. A value the entry
+  already holds, as stored, is no longer looked for on an update; only the
+  values it does not hold yet are looked for
+  ([#402](https://github.com/linagora/ldap-rest/issues/402))
+
+- `core/ldap/enterpriseRules`: a write naming an attribute in another case
+  or with an option — `MAIL`, `mail;lang-en` — found no rule under that
+  name, and went through unchecked: uniqueness, mail domains, lifecycle
+  dates. A move spelled `TWAKEDEPARTMENTLINK` did not recheck the stored
+  addresses against the new organization's domains, and a mail sent along
+  with it was checked against the old one. The rules apply whatever the
+  spelling, and a name sent in another case is written as the schema spells
+  it, so the organization path follows such a move and a size is counted in
+  bytes. The shipped schemas are strict, so the API refused such names
+  already; the writes of other plugins did not
+  ([#404](https://github.com/linagora/ldap-rest/pull/404))
+
 - `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
   and `…/subnodes/search` looked for the attached entries from the parent of
   the top organization only, and answered 403 to an administrator held to
