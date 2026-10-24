@@ -25,7 +25,9 @@
 - The authorization plugins read the organization link whatever case a
   write spells it in, and judge adding a link to an entry that had none as
   a move: written `twakedepartmentlink`, a link escaped the move check, and
-  an entry could be attached to an organization the caller may not write
+  an entry could be attached to an organization the caller may not write.
+  A link naming several organizations, or holding an empty value, is
+  refused (400): only one was judged
   ([#384](https://github.com/linagora/ldap-rest/pull/384))
 
 - The authorization plugins judge an LDAP operation before any other

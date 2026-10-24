@@ -154,6 +154,7 @@ describe('Bulk import and the caller', function () {
       holderDn,
       `uid=bia-new,${base}`,
       `uid=bia-multi,${base}`,
+      `uid=bia-empty,${base}`,
       `uid=bia-t1,${base}`,
       `uid=bia-mine,${base}`,
       ownOrg,
@@ -333,6 +334,29 @@ describe('Bulk import and the caller', function () {
         created: 0,
         failed: 1,
       });
+    });
+
+    it('refuses an empty link value, alone or beside an organization', async () => {
+      for (const link of [';', `;${ownOrg}`]) {
+        // A creation, then an update of the caller's own entry
+        const created = await send('uid,cn,sn,twakeDepartmentLink', [
+          `bia-empty,E,E,"${link}"`,
+        ]);
+        expect(created.body, JSON.stringify(created.body)).to.include({
+          created: 0,
+          failed: 1,
+        });
+        const updated = await send(
+          'uid,cn,sn,twakeDepartmentLink',
+          [`${OWN},Own,Own,"${link}"`],
+          { updateExisting: 'true' }
+        );
+        expect(updated.body, JSON.stringify(updated.body)).to.include({
+          updated: 0,
+          failed: 1,
+        });
+      }
+      expect(await linkOf(ownDn)).to.equal(ownOrg);
     });
 
     it('counts in a dry run only what the import would write', async () => {

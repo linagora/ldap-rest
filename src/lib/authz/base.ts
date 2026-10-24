@@ -555,23 +555,21 @@ export default abstract class AuthzBase extends DmPlugin {
 
   /**
    * The organization a write attaches an entry to, among the link values it
-   * gives: empty ones dropped, one organization at most. The judgement reads
-   * one, so a second would attach the entry to an organization nobody
-   * judged.
+   * gives: one at most. The judgement reads one, so a second would attach
+   * the entry to an organization nobody judged; and an empty value, which
+   * the directory stores, would make the entry read as attached to none.
    *
-   * @throws BadRequestError when the values name several organizations
+   * @throws BadRequestError when a value is empty or the values name
+   * several organizations
    */
   private static organizationLinks(
     linkAttr: string,
     values: string[]
   ): string[] {
+    if (values.some(value => value.trim() === ''))
+      throw new BadRequestError(`${linkAttr} cannot hold an empty value`);
     const links = [
-      ...new Map(
-        values
-          .map(value => value.trim())
-          .filter(value => value !== '')
-          .map(value => [normalizeDn(value), value])
-      ).values(),
+      ...new Map(values.map(value => [normalizeDn(value), value])).values(),
     ];
     if (links.length > 1)
       throw new BadRequestError(

@@ -334,6 +334,9 @@ its entry and its organization are there or not.
 A row the caller may write tells, as a single creation does, whether its
 identifier is taken: it is then skipped, or updated with `updateExisting`.
 
+The organization link of a row names one organization: several, or an
+empty value (`;` in a cell), fail with a 400.
+
 ### Update Existing Mode
 
 Update entries that already exist:
