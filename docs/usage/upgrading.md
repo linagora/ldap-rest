@@ -6,6 +6,17 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### An authorization plugin needs an authentication plugin
+
+**Who is affected:** a deployment loading `core/auth/authzPerBranch`,
+`core/auth/authzLinid1` or `core/auth/authzPerRoute` without any
+authentication plugin.
+
+Such a server no longer starts. No request carried an identity, so each of
+these plugins stepped aside and every request passed, whatever the rules
+said. Load the authentication plugin the rules were written for, or remove
+the authorization plugins to serve the directory openly, as it already was.
+
 ### Nested branch rules of `authzPerBranch`
 
 **Who is affected:** a deployment of `core/auth/authzPerBranch` whose rules

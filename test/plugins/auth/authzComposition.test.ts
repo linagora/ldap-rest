@@ -632,6 +632,33 @@ describe('Authorization plugins loaded together', function () {
       expect(refused!.message).to.match(/the service is unreachable/);
     });
 
+    it('should not start an authorization plugin with nothing to authenticate for it', async () => {
+      process.env.DM_PLUGINS = PER_BRANCH;
+      const server = new DM();
+      let refused: Error | undefined;
+      await server.ready.catch((err: Error) => {
+        refused = err;
+      });
+      expect(refused, 'ready rejected').to.be.instanceOf(Error);
+      expect(refused!.message).to.match(
+        /authzPerBranch judges .*no authentication plugin is loaded/
+      );
+    });
+
+    it('should start authentication alone, every caller holding every right', async () => {
+      process.env.DM_PLUGINS = '../../dist/plugins/auth/token.js';
+      const server = new DM();
+      await server.ready;
+      expect(Object.keys(server.loadedPlugins)).to.include('authToken');
+    });
+
+    it('should start authzDynamic alone, which authenticates for itself', async () => {
+      process.env.DM_PLUGINS = DYNAMIC;
+      const server = new DM();
+      await server.ready;
+      expect(Object.keys(server.loadedPlugins)).to.include('authzDynamic');
+    });
+
     it('should start once the branch plugin is scoped away from the tokens', async () => {
       process.env.DM_PLUGINS = [
         DYNAMIC,

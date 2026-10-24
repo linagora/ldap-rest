@@ -33,6 +33,7 @@ import { setLogger } from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
 import {
   assertAuthzComposition,
+  assertEnforceable,
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
@@ -240,6 +241,7 @@ export class DM {
             // judging the same requests is a configuration nobody decided,
             // and the server does not start on it.
             await assertAuthzComposition(this);
+            assertEnforceable(this);
             await this.learnAttributeTypes();
             this._composed = true;
             this.afterLoad();
@@ -248,6 +250,7 @@ export class DM {
           .catch(err => reject(new Error('Error loading plugins: ' + err)));
       } else {
         this.setupErrorMiddleware();
+        assertEnforceable(this);
         this._composed = true;
         resolve();
       }
