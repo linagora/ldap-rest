@@ -494,6 +494,10 @@ export default class LdapRaw extends DmPlugin {
   ): Promise<RawSearchResult> {
     this.checkDn(options.base);
     this.checkFilter(options.filter);
+    // The base itself first: what is found below it, even nothing, would
+    // say it is there to a caller who may not read it
+    if (!(await this.server.ldap.readableBy(options.base, req)))
+      throw new NotFoundError(`Entry ${options.base} not found`);
     const limit = Math.min(options.limit || this.maxResults, this.maxResults);
 
     // Ask for one entry more than the limit to detect truncation

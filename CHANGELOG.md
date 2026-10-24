@@ -11,6 +11,12 @@
   rights
   ([#393](https://github.com/linagora/ldap-rest/pull/393))
 
+- `core/ldap/raw`: `GET /search` below a base the caller may not read
+  answered an empty list, and a 404 for a base that is not there: it told
+  whether the base exists. It answers that 404. Found by the probe of the
+  targets a body or a query names
+  ([#396](https://github.com/linagora/ldap-rest/issues/396))
+
 - A directory search, add, modify, rename or delete made while serving an
   authenticated request is judged as its caller, even when the code making
   it did not hand the request down: a forgotten request used to let the
