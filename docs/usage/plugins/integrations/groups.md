@@ -68,8 +68,9 @@ What the caller may read is the authorization model's to say:
   With `core/ldap/organizations` loaded too, the organizations must lie under
   `--ldap-top-organization`, where it accepts a link.
 - A plugin judging every read made for the request, as
-  `core/auth/authzDynamic` does, refuses the organization check itself: 403
-  `REFUSED`, whether the organization exists or not.
+  `core/auth/authzDynamic` does, judges the organization check too: an
+  organization its token does not reach answers 404, as one that is not
+  there.
 
 A group reads:
 

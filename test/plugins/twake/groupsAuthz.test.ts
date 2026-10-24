@@ -1,11 +1,11 @@
 /**
  * The organization group routes answer what the caller may know.
  *
- * They read the directory as the server: any caller the authentication
- * plugins let in listed another organization's groups and their members'
- * profiles, and could probe which names, users and memberships exist there
- * through the routes' answers. They now read as the caller, and judge a
- * write before looking for anything.
+ * They used to read the directory as the server: any caller the
+ * authentication plugins let in listed another organization's groups and
+ * their members' profiles, and could probe which names, users and
+ * memberships exist there through the routes' answers. They read as the
+ * caller, and judge a write before looking for anything.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -46,6 +46,8 @@ describe('Twake group routes and the caller', function () {
   const NO_USERS = 'tgz.nousers';
   // Manages acme's groups, and only reads the organization
   const MANAGER = 'tgz.manager';
+  // Writes acme's groups, and reads none of its users
+  const BLIND_MANAGER = 'tgz.blindmanager';
   const NO_GROUPS = 'tgz.nogroups';
   let orgs: string;
   const orgDn = (org: string): string => `ou=${org},${orgs}`;
@@ -117,6 +119,11 @@ describe('Twake group routes and the caller', function () {
         [ADMIN]: { [orgs]: { read: true, write: true, delete: true } },
         // The narrower branch first: an entry below both takes the rule of
         // the first branch holding it
+        [BLIND_MANAGER]: {
+          [users('acme')]: { read: false, write: false, delete: false },
+          [groupBase('acme')]: { read: true, write: true, delete: true },
+          [orgDn('acme')]: { read: true, write: false, delete: false },
+        },
         [MANAGER]: {
           [groupBase('acme')]: { read: true, write: true, delete: true },
           [orgDn('acme')]: { read: true, write: false, delete: false },
@@ -328,6 +335,22 @@ describe('Twake group routes and the caller', function () {
     expect(answers[0].status, JSON.stringify(answers[0].body)).to.equal(403);
     sameAnswers(answers);
   });
+  it('tells a manager who cannot read the users none of them exists', async () => {
+    const answers: supertest.Response[] = [];
+    for (const user of [MEMBER, 'tgz-nobody'])
+      answers.push(
+        await request
+          .post(route('acme', `/${OTHER}/members`))
+          .set(as(BLIND_MANAGER))
+          .send({ usernames: [user] })
+      );
+    expect(answers[0].status, JSON.stringify(answers[0].body)).to.equal(404);
+    sameAnswers(answers);
+    // Nothing added
+    const group = await request.get(route('acme', `/${OTHER}`)).set(as(ADMIN));
+    expect(group.body.members).to.deep.equal([MEMBER]);
+  });
+
   it('leaves a group unlinked when no model judges by attachment, for a manager of the groups branch to create', async () => {
     const res = await request
       .post(route('acme'))

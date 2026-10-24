@@ -1143,7 +1143,8 @@ export default class TwakeGroups extends LdapGroups {
       this.opNumber(),
       req,
     ]);
-    const group = await this.readGroup(org, id);
+    // As the caller, as the users below
+    const group = await this.readGroup(org, id, req);
     if (!group) throw notFound('group');
     const found = new Map(
       // As the caller: users it may not read are users it does not find
