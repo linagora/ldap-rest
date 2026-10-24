@@ -198,7 +198,8 @@ one entry, or an empty one.
 A write giving the organization link (`--ldap-organization-link-attribute`)
 several values, or an empty value, is refused with a 400: only one of them
 was judged. Under any spelling of the attribute, adding a link to an entry
-that had none is judged as a move: read where it stands, write where it goes.
+that had none is judged as a move: write where it goes and, judged by
+branch, read where it stands.
 
 ### Smaller changes in answers
 
