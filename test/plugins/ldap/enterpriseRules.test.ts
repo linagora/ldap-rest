@@ -485,11 +485,10 @@ describe('Enterprise rules', () => {
             mail: 'RULES.UNIQ@example.com',
             mailAlternateAddress: 'rules.alias@example.com',
           } as never);
-          // The whole entry saved again, its values unchanged, in another
-          // case, or moved between the attributes the constraint spans
+          // The whole entry saved again, its values unchanged, or moved
+          // between the attributes the constraint spans
           for (const replace of [
             { mail: 'rules.uniq@example.com', sn: 'Changed' },
-            { mail: 'Rules.Uniq@Example.com' },
             {
               mail: 'rules.alias@example.com',
               mailAlternateAddress: ['rules.uniq@example.com'],

@@ -49,7 +49,12 @@ describe('Enterprise rules: what the checks actually cover', function () {
   });
 
   after(async () => {
-    for (const uid of ['scoped.one', 'scoped.two', 'scoped.date'])
+    for (const uid of [
+      'scoped.one',
+      'scoped.two',
+      'scoped.date',
+      'scoped.alias',
+    ])
       await server.ldap
         .delete(`uid=${uid},ou=users,${base}`)
         .catch(() => undefined);
@@ -71,6 +76,27 @@ describe('Enterprise rules: what the checks actually cover', function () {
       const second = await create('scoped.two', 'scoped.shared@example.com');
       expect(second.status, JSON.stringify(second.body)).to.equal(409);
       expect(second.body.error).to.match(/already used/);
+    });
+
+    // An alias is unique among the aliases only: one another entry holds as
+    // its mail was never looked for under `mail`, whose constraint spans both
+    it('should check a value moved from a narrower constraint (#402)', async () => {
+      const holder = await create('scoped.two', 'scoped.held@example.com');
+      expect(holder.status, JSON.stringify(holder.body)).to.equal(201);
+      const first = await create('scoped.alias', 'scoped.alias@example.com');
+      expect(first.status, JSON.stringify(first.body)).to.equal(201);
+      const alias = await request
+        .put('/api/v1/ldap/scopedUsers/scoped.alias')
+        .type('json')
+        .send({
+          replace: { mailAlternateAddress: ['scoped.held@example.com'] },
+        });
+      expect(alias.status, JSON.stringify(alias.body)).to.equal(200);
+      const moved = await request
+        .put('/api/v1/ldap/scopedUsers/scoped.alias')
+        .type('json')
+        .send({ replace: { mail: 'scoped.held@example.com' } });
+      expect(moved.status, JSON.stringify(moved.body)).to.equal(409);
     });
   });
 

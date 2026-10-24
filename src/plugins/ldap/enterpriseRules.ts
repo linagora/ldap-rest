@@ -708,14 +708,16 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * compared by content, and the entry being updated is excluded from the
    * search — so re-sending an unchanged name no longer conflicts with itself.
    *
+   * Nor with its copies: a value the entry already holds, as stored, is not
+   * looked for again, or the copies other plugins keep of the entry — the
+   * applicative accounts of `appAccountsConsistency` carry its mail — would
+   * hold it against it. Held under another attribute, it is skipped only
+   * when that attribute's own constraint looked for it wherever this one
+   * looks: a value accepted under a narrower one is checked here.
+   *
    * @param entity entity the entry belongs to
    * @param name attribute being checked
    * @param attr its schema definition
-   * A value the entry already holds, under one of the attributes the
-   * constraint spans, is not checked again: it was when it was set, and the
-   * copies other plugins keep of the entry — the applicative accounts of
-   * `appAccountsConsistency` carry its mail — would hold it against it.
-   *
    * @param values values submitted for it
    * @param dn entry being written
    * @param current entry as stored, on a modification; its DN is excluded
@@ -733,24 +735,39 @@ export default class LdapEnterpriseRules extends DmPlugin {
       typeof attr.unique === 'object' ? attr.unique : {};
     const attributes = [name, ...(constraint.attributes || [])];
     const selfDn = current ? dn : null;
-    const held = new Set(
-      current
-        ? attributes.flatMap(a =>
-            valueList(current[a]).map(v => v.toLowerCase())
-          )
-        : []
-    );
     // `branches` widens the search, it does not move it: it used to *replace*
     // the entity's own base, so a schema naming only a neighbouring branch —
     // the lists a mail address is also shared with, say — stopped enforcing
     // uniqueness where its own entries live, and two users could hold the
     // same address. The shipped schemas hid it by naming the whole base.
     const bases = uniquenessBases(entity.base, constraint.branches);
+    /** Whether a value accepted under `other` was looked for as here */
+    const covers = (other: string): boolean => {
+      if (other === name) return true;
+      const unique = entity.schema.attributes[other]?.unique;
+      if (!unique) return false;
+      const theirs: UniqueConstraint = typeof unique === 'object' ? unique : {};
+      const spanned = [other, ...(theirs.attributes || [])];
+      const wide = uniquenessBases(entity.base, theirs.branches);
+      return (
+        (!theirs.filter || theirs.filter === constraint.filter) &&
+        theirs.sentinel === constraint.sentinel &&
+        attributes.every(a => spanned.includes(a)) &&
+        bases.every(b => wide.some(w => isDnInBranch(b, w)))
+      );
+    };
+    // Compared as stored, exactly: whether two spellings are one value is
+    // the attribute's matching rule, which this cannot read
+    const held = new Set(
+      current
+        ? attributes.filter(covers).flatMap(a => valueList(current[a]))
+        : []
+    );
 
     for (const value of values) {
       if (constraint.sentinel !== undefined && value === constraint.sentinel)
         continue;
-      if (held.has(value.toLowerCase())) continue;
+      if (held.has(value)) continue;
       const terms = attributes
         .map(a => `(${a}=${escapeLdapFilter(value)})`)
         .join('');

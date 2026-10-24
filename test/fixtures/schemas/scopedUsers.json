@@ -24,7 +24,15 @@
     "mail": {
       "type": "string",
       "required": true,
-      "unique": { "branches": ["ou=lists,ou=groups,__LDAP_BASE__"] }
+      "unique": {
+        "attributes": ["mailAlternateAddress"],
+        "branches": ["ou=lists,ou=groups,__LDAP_BASE__"]
+      }
+    },
+    "mailAlternateAddress": {
+      "type": "array",
+      "items": { "type": "string" },
+      "unique": true
     },
     "twakeDeletionDate": {
       "type": "date",
