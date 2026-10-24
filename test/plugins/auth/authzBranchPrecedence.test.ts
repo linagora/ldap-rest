@@ -158,5 +158,139 @@ describe('Branch rule precedence', function () {
       expect(uids).to.include('prec-sales');
       expect(uids).to.not.include('prec-pay');
     });
+
+    it('lets every caller read the top organization by itself', async () => {
+      const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
+      const found = (await server.ldap.search(
+        { paged: false, scope: 'base' },
+        top,
+        { user: USER, headers: {} } as unknown as DmRequest
+      )) as SearchResult;
+      expect(found.searchEntries).to.have.length(1);
+    });
+
+    it('refuses to move, rename or modify the restricted branch', async () => {
+      const req = { user: USER, headers: {} } as unknown as DmRequest;
+      for (const write of [
+        () => server.ldap.rename(payroll, `ou=precmoved,${acme}`, req),
+        () =>
+          server.ldap.modify(
+            payroll,
+            { replace: { description: 'moved' } },
+            req
+          ),
+        () => server.ldap.delete(payroll, req),
+      ]) {
+        let error: unknown;
+        await write().catch((err: unknown) => (error = err));
+        expect(String(error)).to.match(/forbidden/i);
+      }
+      // A rule naming nothing below it does not get in the way
+      await server.ldap.rename(
+        `uid=prec-sales,${acme}`,
+        `uid=prec-sales2,${acme}`,
+        req
+      );
+      await server.ldap.rename(
+        `uid=prec-sales2,${acme}`,
+        `uid=prec-sales,${acme}`,
+        req
+      );
+    });
+
+    describe('with other rules', () => {
+      let saved: typeof plugin.authConfig;
+      let groups: unknown;
+
+      beforeEach(() => {
+        saved = plugin.authConfig;
+        groups = Object.getOwnPropertyDescriptor(plugin, 'getUserGroups');
+      });
+
+      afterEach(() => {
+        plugin.authConfig = saved;
+        if (groups)
+          Object.defineProperty(
+            plugin,
+            'getUserGroups',
+            groups as PropertyDescriptor
+          );
+        else
+          delete (plugin as unknown as Record<string, unknown>).getUserGroups;
+      });
+
+      it('takes the default only where no rule applies', async () => {
+        plugin.authConfig = {
+          default: { read: true, write: false, delete: false },
+          users: {
+            [USER]: { [payroll]: { read: false, write: false, delete: false } },
+          },
+          groups: {},
+        };
+        expect(
+          (await plugin.getUserPermissions(USER, `uid=prec-sales,${acme}`)).read
+        ).to.equal(true);
+        expect(
+          (await plugin.getUserPermissions(USER, `uid=prec-pay,${payroll}`))
+            .read
+        ).to.equal(false);
+      });
+
+      it('takes what the narrower rule leaves unset from the default', async () => {
+        plugin.authConfig = {
+          default: { read: true, write: false, delete: false },
+          users: {
+            [USER]: {
+              [acme]: { read: true, write: true, delete: false },
+              [payroll]: { read: false },
+            },
+          },
+          groups: {},
+        };
+        expect(
+          await plugin.getUserPermissions(USER, `uid=prec-pay,${payroll}`)
+        ).to.deep.equal({ read: false, write: false, delete: false });
+      });
+
+      it('lets a group grant what the user rule refuses', async () => {
+        const group = `cn=precgroup,${base}`;
+        (plugin as unknown as Record<string, unknown>).getUserGroups = () =>
+          Promise.resolve([group]);
+        plugin.authConfig = {
+          ...saved!,
+          groups: {
+            [group]: { [payroll]: { read: true, write: false, delete: false } },
+          },
+        };
+        expect(
+          await plugin.getUserPermissions(USER, `uid=prec-pay,${payroll}`)
+        ).to.deep.equal({ read: true, write: false, delete: false });
+      });
+
+      it('applies the narrower rule to the accounts attached there', async () => {
+        const previousMode = server.config.authz_filter_attached_entries;
+        server.config.authz_filter_attached_entries = true;
+        try {
+          const link = server.config.ldap_organization_link_attribute as string;
+          const result = {
+            searchEntries: [
+              { dn: `uid=a,${base}`, [link]: acme },
+              { dn: `uid=b,${base}`, [link]: payroll },
+            ],
+            searchReferences: [],
+          } as unknown as SearchResult;
+          const [filtered] = await plugin.hooks.ldapsearchfilter([
+            result,
+            { user: USER, headers: {} } as unknown as DmRequest,
+            { scope: 'sub' },
+          ]);
+          expect(filtered.searchEntries.map(entry => entry.dn)).to.deep.equal([
+            `uid=a,${base}`,
+          ]);
+        } finally {
+          server.config.authz_filter_attached_entries = previousMode;
+        }
+      });
+    });
   });
 });

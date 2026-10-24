@@ -10,7 +10,10 @@
   rule refuses. The first rule written used to win, so a restriction on a
   sub-branch written after the grant on its parent was ignored. Branches
   are compared as DNs in `authzPerBranch` and `authzLinid1`, whatever their
-  case and spacing,
+  case and spacing. `default` is a fallback rather than a floor: a rule
+  refusing a permission is no longer overridden by it. A branch a rule
+  names can no longer be renamed or moved out of that rule by a caller it
+  refuses,
   [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
   [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
   ([#388](https://github.com/linagora/ldap-rest/pull/388))

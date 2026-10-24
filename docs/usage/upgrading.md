@@ -11,10 +11,23 @@ decision or a configuration change appear here; see the
 **Who is affected:** a deployment of `core/auth/authzPerBranch` whose rules
 for one user, or one group, name a branch and a sub-branch of it.
 
-The rule of the sub-branch now applies below it, whatever order the two are
-written in; the first one written used to win. A sub-branch rule that was
-ignored, a restriction or a grant, now takes effect, in single reads and
-writes and in searches. Check such rules: they now mean what they say.
+The rule of the sub-branch now applies to everything below it, whatever
+order the two are written in. It used to apply to the sub-branch entry
+itself only, and below it the first rule written won. A sub-branch rule that
+was ignored, a restriction or a grant, now takes effect in single reads and
+writes and in searches: a search on the parent no longer lists what the
+sub-branch rule refuses, so a listing may now be shorter. Check such rules:
+they now mean what they say.
+
+`default` no longer adds to what the rules grant: it applies to a
+permission none of the rules that apply sets. A rule's `read`, `write` or
+`delete` set to `false` now refuses, where `"default": {"read": true}` used
+to grant it anyway. A permission a rule leaves unset is still the
+default's, not the broader rule's.
+
+Renaming or moving an entry a rule names, or one holding such an entry, now
+needs write permission there, and changing or deleting the entry itself
+needs that rule's write or delete permission.
 
 ### Organization groups need read access to the organization
 

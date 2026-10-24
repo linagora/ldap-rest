@@ -29,14 +29,11 @@ import {
   isDnInBranch,
   normalizeDn,
   organizationLink,
+  parseDn,
 } from '../utils';
 
 import { authzFor, servesRequest } from './composition';
 
-/**
- * Abstract base class for authorization plugins
- * Provides common utility methods and interface for LDAP-based authorization
- */
 /**
  * The rule of the most specific configured branch holding `target`.
  *
@@ -59,12 +56,17 @@ export function mostSpecificBranchRule<T>(
   let depth = -1;
   for (const [branch, rule] of rules) {
     if (!isDnInBranch(target, branch)) continue;
-    const parts = normalizeDn(branch).split(',').filter(Boolean).length;
+    // RDN by RDN: an escaped comma inside a value is not a separator
+    const parts = parseDn(branch).length;
     if (parts > depth) [found, depth] = [rule, parts];
   }
   return found;
 }
 
+/**
+ * Abstract base class for authorization plugins
+ * Provides common utility methods and interface for LDAP-based authorization
+ */
 export default abstract class AuthzBase extends DmPlugin {
   /**
    * Searches whose projection we widened to carry the organization link.
@@ -79,6 +81,17 @@ export default abstract class AuthzBase extends DmPlugin {
    * An object spread copies the key; a set would no longer know the copy.
    */
   private static readonly widenedForLink = Symbol('widened for the link');
+
+  /**
+   * The search of the top organization by itself, which every caller may
+   * make (`getOrganisationTop`): granted by `ldapsearchrequest` whatever the
+   * rules say, it is not filtered by them either. A symbol key, for the
+   * reason given at {@link widenedForLink}.
+   */
+  private static readonly topOrganizationRead = Symbol('top organization');
+
+  /** The base a search judged by branch was granted on. */
+  private static readonly judgedBase = Symbol('judged base');
 
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
@@ -433,6 +446,40 @@ export default abstract class AuthzBase extends DmPlugin {
    * Must be implemented by subclasses
    */
   abstract getAuthorizedBranches(user: string): Promise<string[]>;
+
+  /**
+   * Every branch one of the caller's rules names, whatever it grants: the
+   * branches where what applies differs from the branch above.
+   */
+  abstract ruleBranches(user: string): Promise<string[]>;
+
+  /**
+   * Judged by branch, an entry a rule names is under that rule as well as
+   * its parent's, and moving it takes along the rules naming what lies
+   * below it, which name nothing afterwards: the first of these branches
+   * where `user` lacks `permission`.
+   *
+   * Only those: an entry no rule names is under its parent's rule, which
+   * the caller judges.
+   *
+   * @param subtree whether the rules below `dn` count too: a move
+   */
+  private async refusingRule(
+    user: string,
+    dn: string,
+    permission: keyof BranchPermissions,
+    subtree: boolean
+  ): Promise<string | undefined> {
+    if (this.filtersAttachedEntries()) return undefined;
+    const target = normalizeDn(dn);
+    for (const branch of await this.ruleBranches(user)) {
+      const named = normalizeDn(branch) === target;
+      if (!named && !(subtree && isDnInBranch(branch, dn))) continue;
+      if (!(await this.getUserPermissions(user, branch))[permission])
+        return branch;
+    }
+    return undefined;
+  }
 
   /**
    * Whether this request is none of this plugin's business.
@@ -875,6 +922,11 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} does not have write permission for branch ${branchToCheck}`
           );
         }
+        const named = await this.refusingRule(user, dn, 'write', false);
+        if (named)
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+          );
       }
 
       const domainAttr = this.domainLinkAttribute();
@@ -966,7 +1018,11 @@ export default abstract class AuthzBase extends DmPlugin {
 
       // Allow base scope search on top organization (for getOrganisationTop)
       if (base === this.config.ldap_top_organization && opts.scope === 'base') {
-        return [base, opts, req];
+        return [
+          base,
+          { ...opts, [AuthzBase.topOrganizationRead]: true } as SearchOptions,
+          req,
+        ];
       }
 
       // Filtering, the search is granted broadly and `ldapsearchfilter`
@@ -999,7 +1055,11 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      return [base, opts, req];
+      return [
+        base,
+        { ...opts, [AuthzBase.judgedBase]: base } as SearchOptions,
+        req,
+      ];
     },
 
     /**
@@ -1038,14 +1098,45 @@ export default abstract class AuthzBase extends DmPlugin {
       // narrower than the base may refuse part of what it holds: each entry
       // is read only where the caller may read it.
       if (!this.filtersAttachedEntries()) {
+        if (
+          (opts as { [key: symbol]: unknown } | undefined)?.[
+            AuthzBase.topOrganizationRead
+          ]
+        )
+          return pass;
+        // The base was judged by `ldapsearchrequest`: when none of the
+        // caller's rules lies below it, every entry is under its rule too
+        const keys = await this.ruleBranches(user);
+        const base = (opts as { [key: symbol]: unknown } | undefined)?.[
+          AuthzBase.judgedBase
+        ];
+        if (
+          typeof base === 'string' &&
+          !keys.some(
+            key =>
+              isDnInBranch(key, base) && normalizeDn(key) !== normalizeDn(base)
+          )
+        )
+          return pass;
         const kept = [];
-        for (const entry of result.searchEntries)
-          if ((await this.getUserPermissions(user, String(entry.dn))).read)
-            kept.push(entry);
+        // An entry is under its parent's rule unless a rule names it
+        const byParent = new Map<string, boolean>();
+        const named = new Set(keys.map(normalizeDn));
+        for (const entry of result.searchEntries) {
+          const dn = String(entry.dn);
+          const parent = normalizeDn(getParentDn(dn));
+          const own = named.has(normalizeDn(dn));
+          let readable = own ? undefined : byParent.get(parent);
+          if (readable === undefined) {
+            readable = (await this.getUserPermissions(user, dn)).read === true;
+            if (!own) byParent.set(parent, readable);
+          }
+          if (readable) kept.push(entry);
           else
             this.logger.debug(
-              `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, refused by a narrower branch rule`
+              `${this.name}: hiding ${dn} from ${req!.user}, refused by a narrower branch rule`
             );
+        }
         result.searchEntries = kept;
         return pass;
       }
@@ -1090,15 +1181,42 @@ export default abstract class AuthzBase extends DmPlugin {
         branches.some(branch => isDnInBranch(dn, branch));
       const transitKey = this.transitKey();
 
-      result.searchEntries = result.searchEntries.filter(entry => {
+      // Within a branch the caller holds, a narrower rule may still refuse
+      // the organization: asked once per organization
+      const readable = new Map<string, boolean>();
+      const reads = async (value: string): Promise<boolean> => {
+        if (!within(value)) return false;
+        const key = normalizeDn(value);
+        if (!readable.has(key))
+          readable.set(
+            key,
+            (await this.getUserPermissions(user, value)).read === true
+          );
+        return readable.get(key)!;
+      };
+
+      const attached = [];
+      for (const entry of result.searchEntries) {
         const link = entry[linkAttr];
-        if (link === undefined || link === null) return true;
-        const values = (Array.isArray(link) ? link : [link]).map(String);
-        if (values.length === 0) return true;
-        if (values.some(within)) return true;
+        const values =
+          link === undefined || link === null
+            ? []
+            : (Array.isArray(link) ? link : [link]).map(String);
+        if (values.length === 0) {
+          attached.push(entry);
+          continue;
+        }
+        let shown = false;
+        for (const value of values)
+          if (await reads(value)) {
+            shown = true;
+            break;
+          }
         // In transit: every administrator sees it, so that one can claim it.
-        if (values.some(value => this.inTransit(value, transitKey)))
-          return true;
+        if (shown || values.some(value => this.inTransit(value, transitKey))) {
+          attached.push(entry);
+          continue;
+        }
         // Attached outside every branch this caller holds. A link that
         // matches nothing configured lands here too: hidden rather than
         // shown, since a wrong link would otherwise be a way to be seen by
@@ -1106,8 +1224,8 @@ export default abstract class AuthzBase extends DmPlugin {
         this.logger.debug(
           `${this.name}: hiding ${String(entry.dn)} from ${req!.user}, attached to ${values[0]}`
         );
-        return false;
-      });
+      }
+      result.searchEntries = attached;
 
       // The link was added to the projection so the judgement above could be
       // made; a caller that did not ask for it must not receive it.
@@ -1206,6 +1324,14 @@ export default abstract class AuthzBase extends DmPlugin {
         );
       }
 
+      // A branch a rule names, or holding one, is moved out of that rule:
+      // the caller must be able to write there
+      const named = await this.refusingRule(user, oldDn, 'write', true);
+      if (named)
+        throw new Error(
+          `[authz-forbidden] User ${req!.user} does not have write permission for branch ${named}`
+        );
+
       // Check write permission on destination
       const destPermissions = await this.getUserPermissions(user, destBranch);
       if (!destPermissions.write) {
@@ -1240,6 +1366,11 @@ export default abstract class AuthzBase extends DmPlugin {
             `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${branchToCheck}`
           );
         }
+        const named = await this.refusingRule(user, target, 'delete', false);
+        if (named)
+          throw new Error(
+            `[authz-forbidden] User ${req!.user} does not have delete permission for branch ${named}`
+          );
       }
 
       return [dn, req];

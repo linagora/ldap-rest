@@ -282,9 +282,11 @@ export default class AuthzLinid1 extends AuthzBase {
     return [];
   }
 
-  /**
-   * Find permissions for a branch (supports sub-branch matching)
-   */
+  /** The organizations naming the user an administrator */
+  ruleBranches(userDn: string): Promise<string[]> {
+    return this.getAuthorizedBranches(userDn);
+  }
+
   /**
    * The caller's rights on a branch: see {@link mostSpecificBranchRule}.
    */

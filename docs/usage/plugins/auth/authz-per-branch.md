@@ -106,17 +106,22 @@ Permissions applied to all group members:
 
 ## Permission Resolution
 
-Permissions are resolved in this order:
+The rules holding the target, the user's own and those of every group they
+belong to, are combined:
 
-1. **User-specific permissions** - If user has direct branch permissions, use them
-2. **Group permissions** - Check all groups user belongs to
-3. **Default permissions** - Fall back to defaults if no specific rules match
+1. **Within one source** (the user's own rules, or one group's), the rule of
+   the **most specific** branch holding the target applies, whatever order
+   the rules are written in, broader rules of that source aside. Branches
+   are compared as DNs, whatever their case and spacing.
+2. **Between sources**, for each permission type (read/write/delete), the
+   **most permissive** wins.
+3. **Default permissions** apply to a permission none of these rules sets. They are a fallback, not a floor: `"default": {"read": true}` does
+   not undo a rule refusing read.
 
-Within one source (the user's own rules, or one group's), the rule of the
-**most specific** branch holding the target applies, whatever order the rules
-are written in. Branches are compared as DNs, whatever their case and
-spacing. Between sources, for each permission type (read/write/delete), the
-**most permissive** wins.
+Writing an entry a rule names, or moving one holding such an entry, also
+asks for that rule's permission: a caller granted `ou=organization` cannot
+rename `ou=payroll` from under the rule refusing it, nor change or delete
+the `ou=payroll` entry itself.
 
 ## How It Works
 
@@ -435,8 +440,9 @@ Cache hit/miss logging:
 
 ### Permission Inheritance
 
-- Sub-branch permissions inherit from parent branches
-- Cannot grant more restrictive permissions on sub-branches
+- Sub-branch rules take over from parent branch rules, for what they set
+- A rule may restrict a sub-branch as well as widen it, but another source
+  (a group) granting more still wins
 - Plan branch structure carefully
 
 ### Default Permissions
