@@ -659,6 +659,10 @@ export function isChildOf(dn: string, parentDn: string): boolean {
   return beforeParent.endsWith(',');
 }
 
+/** The characters RFC 4518 maps to a space (§2.2). */
+const SPACES =
+  /^[\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$/;
+
 /** A DN value's escapes: a run of hex pairs, or one escaped character. */
 const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 
@@ -680,11 +684,15 @@ function canonicalValue(raw: string): string {
   if (raw.trimStart().startsWith('#')) return raw.trim();
   // LDAPv2: in double quotes, every character is the value's
   const trimmed = raw.trim();
+  // The closing quote is not escaped: an even run of backslashes before it
+  let backslashes = 0;
+  for (let i = trimmed.length - 2; i > 0 && trimmed[i] === '\\'; i--)
+    backslashes++;
   const quoted =
     trimmed.length >= 2 &&
     trimmed.startsWith('"') &&
     trimmed.endsWith('"') &&
-    !trimmed.endsWith('\\"');
+    backslashes % 2 === 0;
   if (quoted) raw = trimmed.slice(1, -1);
   // Each character, and whether the writer escaped it
   const chars: { char: string; escaped: boolean }[] = [];
@@ -722,12 +730,15 @@ function canonicalValue(raw: string): string {
   // A lone trailing backslash escapes nothing: it is one
   if (last < raw.length) plain(raw.slice(last));
 
-  // Insignificant space (RFC 4518 §2.6.1), as the matching rules of the
-  // naming attributes see it: none at either end, escaped or not, and one
-  // for a run of them. The same characters whether escaped or not.
-  const space = ({ char }: { char: string }): boolean => /\s/.test(char);
-  const folded = chars.filter(
-    (c, i) => !space(c) || (i > 0 && !space(chars[i - 1]))
+  // The space characters RFC 4518 (§2.2) maps to a space, escaped or not;
+  // then the insignificant ones (§2.6.1), as the matching rules of the
+  // naming attributes see them: none at either end, and one for a run
+  const spaced = chars.map(c =>
+    SPACES.test(c.char) ? { ...c, char: ' ' } : c
+  );
+  const space = ({ char }: { char: string }): boolean => char === ' ';
+  const folded = spaced.filter(
+    (c, i) => !space(c) || (i > 0 && !space(spaced[i - 1]))
   );
   let start = 0;
   let end = folded.length;

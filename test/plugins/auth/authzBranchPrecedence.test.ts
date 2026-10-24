@@ -449,19 +449,29 @@ describe('Branch rule precedence', function () {
             [USER]: {
               [acme]: { read: true, write: true, delete: true },
               [`ou=precnew,${acme}`]: { read: true, write: false },
+              [`ou=prec new,${acme}`]: { read: true, write: false },
             },
           },
           groups: {},
         };
-        let error: unknown;
-        await plugin.hooks
-          .ldapaddrequest([
-            `ou=precnew,${acme}`,
-            { objectClass: ['top', 'organizationalUnit'], ou: 'precnew' },
-            { user: USER, headers: {} } as unknown as DmRequest,
-          ])
-          .catch((err: unknown) => (error = err));
-        expect(String(error)).to.match(/forbidden/i);
+        // However the new RDN is spelled
+        for (const rdn of [
+          'ou=precnew',
+          'ou=\\20precnew',
+          'ou=prec\u00a0new',
+          'ou=prec  new',
+          'ou="prec new"',
+        ]) {
+          let error: unknown;
+          await plugin.hooks
+            .ldapaddrequest([
+              `${rdn},${acme}`,
+              { objectClass: ['top', 'organizationalUnit'], ou: 'precnew' },
+              { user: USER, headers: {} } as unknown as DmRequest,
+            ])
+            .catch((err: unknown) => (error = err));
+          expect(String(error), rdn).to.match(/forbidden/i);
+        }
       });
 
       it('lets a group grant what the user rule refuses', async () => {

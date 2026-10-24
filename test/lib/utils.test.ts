@@ -370,10 +370,12 @@ describe('LDAP Utils', () => {
       expect(normalizeDn('ou=Sales  \\20EMEA,dc=x')).to.equal(
         'ou=sales emea,dc=x'
       );
-      // A non-breaking space, raw or escaped alike
-      expect(normalizeDn('ou=a\u00a0b,dc=x')).to.equal(
-        normalizeDn('ou=a\\C2\\A0b,dc=x')
-      );
+      // A non-breaking space, raw or escaped, is a space
+      for (const spelled of ['ou=a\u00a0b,dc=x', 'ou=a\\C2\\A0b,dc=x'])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=a b,dc=x');
+      expect(normalizeDn('ou=a\u3000\u00a0 b,dc=x')).to.equal('ou=a b,dc=x');
+      // A tab is not
+      expect(normalizeDn('ou=a\\09b,dc=x')).to.not.equal('ou=a b,dc=x');
     });
 
     it('keeps the # that an escape protects', () => {
@@ -400,6 +402,12 @@ describe('LDAP Utils', () => {
 
     it('escapes the specials whether or not the writer did', () => {
       expect(normalizeDn('ou=a=b,dc=x')).to.equal(normalizeDn('ou=a\\=b,dc=x'));
+    });
+
+    it('reads a quoted value ending in an escaped backslash', () => {
+      expect(normalizeDn(String.raw`ou="a\\",dc=x`)).to.equal(
+        normalizeDn(String.raw`ou=a\\,dc=x`)
+      );
     });
 
     it('reads a quote as a value only where it opens one', () => {
