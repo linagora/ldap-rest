@@ -17,6 +17,7 @@ import type { Role } from '../../../src/abstract/plugin';
 import AuthzPerBranch from '../../../src/plugins/auth/authzPerBranch';
 import TwakeGroups from '../../../src/plugins/twake/groups';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+import { waitFor } from '../../helpers/waitFor';
 
 /** Authentication reduced to a header, so the test is about authorization */
 class TestAuthPlugin extends AuthBase {
@@ -64,6 +65,22 @@ describe('Twake group routes and the caller', function () {
         ...extra,
       })
       .catch(() => undefined);
+
+  /** The organization branches of the test, and plain groupOfNames attributes */
+  const twakeConfig = (): Record<string, unknown> => ({
+    twake_group_base: `ou=groups,ou={org},${orgs}`,
+    twake_group_user_base: `ou=users,ou={org},${orgs}`,
+    twake_group_organization_dn: `ou={org},${orgs}`,
+    twake_group_organization_status_attribute: 'description',
+    // groupOfNames attributes, so the test needs no extra schema
+    twake_group_display_name_attribute: 'o',
+    twake_group_color_attribute: 'businessCategory',
+    twake_group_created_at_attribute: 'ou',
+    twake_lifecycle_deleted_attribute: 'employeeType',
+    twake_lifecycle_deleted_value: 'deleted',
+    group_class: ['top', 'groupOfNames'],
+    group_schema: '',
+  });
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -139,20 +156,7 @@ describe('Twake group routes and the caller', function () {
       .catch(() => undefined);
 
     const server = new DM();
-    Object.assign(server.config, {
-      twake_group_base: `ou=groups,ou={org},${orgs}`,
-      twake_group_user_base: `ou=users,ou={org},${orgs}`,
-      twake_group_organization_dn: `ou={org},${orgs}`,
-      twake_group_organization_status_attribute: 'description',
-      // groupOfNames attributes, so the test needs no extra schema
-      twake_group_display_name_attribute: 'o',
-      twake_group_color_attribute: 'businessCategory',
-      twake_group_created_at_attribute: 'ou',
-      twake_lifecycle_deleted_attribute: 'employeeType',
-      twake_lifecycle_deleted_value: 'deleted',
-      group_class: ['top', 'groupOfNames'],
-      group_schema: '',
-    });
+    Object.assign(server.config, twakeConfig());
     await server.ready;
     await server.registerPlugin('testAuth', new TestAuthPlugin(server));
     await server.registerPlugin('core/twake/groups', new TwakeGroups(server));
@@ -308,5 +312,67 @@ describe('Twake group routes and the caller', function () {
       );
     expect(answers[0].status, JSON.stringify(answers[0].body)).to.equal(403);
     sameAnswers(answers);
+  });
+  // A model judging entries by their organization link: a group carrying
+  // none would be every administrator's
+  describe('judged by attachment', () => {
+    let server: DM;
+    let attached: ReturnType<typeof supertest>;
+    const linkOf = async (dn: string): Promise<unknown> =>
+      (
+        (await plain.ldap.search(
+          { paged: false, scope: 'base', attributes: ['twakeDepartmentLink'] },
+          dn
+        )) as { searchEntries: Record<string, unknown>[] }
+      ).searchEntries[0]?.twakeDepartmentLink;
+
+    before(async function () {
+      this.timeout(20000);
+      server = new DM();
+      Object.assign(server.config, twakeConfig(), {
+        authz_filter_attached_entries: true,
+      });
+      await server.ready;
+      await server.registerPlugin('testAuth', new TestAuthPlugin(server));
+      await server.registerPlugin('core/twake/groups', new TwakeGroups(server));
+      await server.registerPlugin('authzPerBranch', new AuthzPerBranch(server));
+      server.setupErrorMiddleware();
+      attached = supertest(server.app);
+    });
+
+    it('links a group made through the routes, and hides it from another organization', async () => {
+      const created = await attached
+        .post(route('acme'))
+        .set(as(ADMIN))
+        .send({ name: 'Linked group' });
+      expect(created.status, JSON.stringify(created.body)).to.equal(201);
+      const dn = `cn=${created.body.id},${groupBase('acme')}`;
+      expect(await linkOf(dn)).to.equal(orgDn('acme'));
+
+      const one = await attached
+        .get(route('acme', `/${created.body.id}`))
+        .set(as(OUTSIDER));
+      expect(one.status, JSON.stringify(one.body)).to.equal(404);
+      const list = await attached.get(route('acme')).set(as(OUTSIDER));
+      expect(JSON.stringify(list.body)).to.not.include(created.body.id);
+    });
+
+    it('links a group written without the routes, and moves its link with it', async () => {
+      const cn = 'tgz-hooked';
+      const dn = `cn=${cn},${groupBase('acme')}`;
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn,
+        o: 'Hooked',
+        member: `uid=${MEMBER},${users('acme')}`,
+      });
+      expect(await linkOf(dn)).to.equal(orgDn('acme'));
+
+      const moved = `cn=${cn},${groupBase('mine')}`;
+      await server.ldap.move(dn, moved);
+      await waitFor(async () => (await linkOf(moved)) === orgDn('mine'), {
+        what: 'the moved group to follow its organization',
+      });
+    });
   });
 });

@@ -327,7 +327,8 @@ describe('Twake groups plugin routes', function () {
 
   it('validates groups against the organization group schema', async () => {
     for (const [field, value] of [
-      ['twakeDepartmentLink', ORGS],
+      // An attribute the strict schema does not declare
+      ['mail', 'team@example.org'],
       ['cn', 'not-a-uuid'],
       ['BUSINESSCATEGORY', 'blue'],
     ]) {
@@ -350,7 +351,13 @@ describe('Twake groups plugin routes', function () {
     });
     expect(attributes).not.to.have.property('o');
     expect(attributes.O).to.deep.equal({ type: 'string', required: false });
-    expect(attributes).to.have.keys('O', 'BUSINESSCATEGORY', 'OU');
+    // The organization link too, which the server writes
+    expect(attributes).to.have.keys(
+      'O',
+      'BUSINESSCATEGORY',
+      'OU',
+      'twakeDepartmentLink'
+    );
   });
 
   it('gives a SCIM group a generated cn and keeps its name in the display name attribute', async () => {

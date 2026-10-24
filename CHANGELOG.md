@@ -8,7 +8,9 @@
   directory as the server, so any caller let in got the groups and member
   profiles of every organization, and could tell which names, users and
   memberships exist from the answers to writes. They read as the caller, and
-  judge a write before looking for anything,
+  judge a write before looking for anything. Groups written in an
+  organization's branch carry its link, so that a model judging by
+  attachment (`authzLinid1`) gives them to that organization only,
   [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
   ([#383](https://github.com/linagora/ldap-rest/pull/383))
 

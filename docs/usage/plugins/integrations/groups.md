@@ -54,8 +54,13 @@ What the caller may read is the authorization model's to say:
 - A model judging by branch (`core/auth/authzPerBranch`) gives an
   organization's groups and users to the callers granted its branch.
 - A model judging entries by their organization link (`core/auth/authzLinid1`,
-  or `--authz-filter-attached-entries`) gives every administrator the entries
-  carrying no link, and the groups made by these routes carry none.
+  or `--authz-filter-attached-entries`) gives a group to its organization's
+  administrators: every group written in an organization's branch, through
+  these routes, SCIM or another plugin, is given the organization link
+  (`--ldap-organization-link-attribute`, with the auxiliary class `twakeGroup`
+  when its classes do not allow it), and follows it when moved to another
+  organization. Entries carrying no link, users included, are every
+  administrator's: the link of the users is the provisioning tool's to set.
 - A plugin judging every read made for the request, as
   `core/auth/authzDynamic` does, refuses the organization check itself: 403
   `REFUSED`, whether the organization exists or not.

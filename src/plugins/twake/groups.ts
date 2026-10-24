@@ -195,6 +195,9 @@ export function movedInto(
     : undefined;
 }
 
+/** The auxiliary class a group is given to hold its organization link. */
+const LINK_CLASS = 'twakeGroup';
+
 /** Search options whose member lists keep the tombstones they hold. */
 const WHOLE = Symbol('whole member lists');
 
@@ -257,6 +260,10 @@ export default class TwakeGroups extends LdapGroups {
       [this.color]: { type: 'string', test: COLOR.source },
       [this.createdAt]: { type: 'string' },
     };
+    // Written by the server (see `linked`), never by a client
+    const link = this.config.ldap_organization_link_attribute;
+    if (link && this.orgPattern)
+      own[link] = { type: 'string', generated: true };
     for (const [name, spec] of Object.entries(own)) {
       const key = Object.keys(schema.attributes).find(
         k => k.toLowerCase() === name.toLowerCase()
@@ -275,17 +282,20 @@ export default class TwakeGroups extends LdapGroups {
    * would announce a member removed on an erase, which publishes nothing.
    */
   hooks: Hooks = {
-    ldapaddrequest: ([dn, entry, req]) => {
+    ldapaddrequest: async ([dn, entry, req]) => {
       this.checkMembers(dn, entry.member);
+      const org = this.organizationOf(dn);
       // A group written without the routes, through SCIM, is dated too. Only
       // one holding the display name: its classes then allow the date, which
       // a plain groupOfNames would refuse.
       if (
-        this.organizationOf(dn) !== undefined &&
+        org !== undefined &&
         valueOf(entry, this.displayName) !== undefined &&
         valueOf(entry, this.createdAt) === undefined
       )
         entry = { ...entry, [this.createdAt]: new Date().toISOString() };
+      // Linked to its organization, whatever wrote it
+      if (org !== undefined) entry = await this.linked(dn, org, entry);
       return [dn, entry, req];
     },
     ldapmodifyrequest: ([dn, changes, op, req]) => {
@@ -319,6 +329,24 @@ export default class TwakeGroups extends LdapGroups {
           `The group holds members of another organization than ${org}`
         );
       return [dn, newDn, req];
+    },
+    // A group moved to another organization's branch follows it: kept
+    // linked to the one it left, the administrators of that one would keep
+    // it under an authorization model judging by attachment
+    ldaprenamedone: async ([dn, newDn]) => {
+      const org = movedInto(this.groupPattern, dn, newDn);
+      const attribute = this.config.ldap_organization_link_attribute;
+      if (org === undefined || !attribute || !this.orgPattern) return;
+      const { searchEntries } = (await this.ldap.system.search(
+        { paged: false, scope: 'base', attributes: [attribute] },
+        newDn
+      )) as SearchResult;
+      if (valueOf(searchEntries[0] ?? {}, attribute) === undefined) return;
+      await this.ldap.system.modify(newDn, {
+        replace: {
+          [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
+        },
+      });
     },
     ldapsearchfilter: async ([result, req, opts]) => [
       (opts as { [WHOLE]?: boolean } | undefined)?.[WHOLE]
@@ -363,6 +391,57 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   /** The organization a group DN belongs to, if it is a group at all. */
+  /**
+   * A group of `org` with its organization link: what an authorization model
+   * judging by attachment (`authzLinid1`, `--authz-filter-attached-entries`)
+   * reads to tell whose it is. Without it, every administrator reads and
+   * changes the group.
+   *
+   * The auxiliary class allowing the attribute is added when the group's
+   * classes do not. Nothing changes when the directory defines no such
+   * attribute; a directory whose classes cannot hold it refuses the group
+   * rather than leave it to every administrator.
+   *
+   * @param dn the group's DN
+   * @param org its organization
+   * @param entry the group as written
+   * @returns the group, linked
+   */
+  async linked(
+    dn: string,
+    org: string,
+    entry: AttributesList
+  ): Promise<AttributesList> {
+    const attribute = this.config.ldap_organization_link_attribute;
+    if (
+      !attribute ||
+      !this.orgPattern ||
+      valueOf(entry, attribute) !== undefined
+    )
+      return entry;
+    const schema = await this.ldap.schemaIndex();
+    if (!schema.getAttributeType(attribute)) return entry;
+    const allows = (classes: string[]): boolean => {
+      const { must, may } = schema.resolveAttributes(classes);
+      return [...must, ...may].some(
+        name => name.toLowerCase() === attribute.toLowerCase()
+      );
+    };
+    let objectClass = values(entry.objectClass);
+    if (!allows(objectClass)) {
+      if (!allows([LINK_CLASS]))
+        throw new Error(
+          `${this.name}: no class of ${dn} allows ${attribute}, nor does ${LINK_CLASS}`
+        );
+      objectClass = [...objectClass, LINK_CLASS];
+    }
+    return {
+      ...entry,
+      objectClass,
+      [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
+    };
+  }
+
   organizationOf(dn: string): string | undefined {
     return organizationIn(this.groupPattern, dn);
   }
@@ -778,17 +857,20 @@ export default class TwakeGroups extends LdapGroups {
     };
     if (body.description) additional.description = body.description;
     if (body.color) additional[this.color] = body.color;
+    // The link the add hook would give it, so that the creation judged is
+    // the one written
+    const linked = await this.linked(this.groupDn(org, id), org, additional);
     // Judged before the name is looked for: whether it is taken is not for
     // a caller who may not create a group here
     await this.ldap.authorize('ldapaddrequest', [
       this.groupDn(org, id),
-      this.candidateGroup(id, [], additional),
+      this.candidateGroup(id, [], linked),
       req,
     ]);
     // Unique for groups made here only: a provider may push two of one name.
     if (await this.named(org, body.name))
       throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
-    await this.addGroup(this.groupDn(org, id), [], additional, req);
+    await this.addGroup(this.groupDn(org, id), [], linked, req);
     const group = await this.readGroup(org, id);
     res.status(201).json(group);
   }
