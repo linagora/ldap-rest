@@ -16,12 +16,12 @@ import { type DM } from '../bin';
 import type { Hooks } from '../hooks';
 
 import {
-  attributeTypeName,
   escapeDnValue,
   getParentDn,
   hookOwner,
   isAuthzRefusal,
   isDnInBranch,
+  knownAttributeName,
   launchHooks,
   launchHooksChained,
   normalizeDn,
@@ -501,6 +501,8 @@ class ldapActions {
    * configuration's, then the loaded schemas'. See {@link canonicalName}.
    */
   private spellings = new Map<string, string>();
+  /** The first name given for each attribute type, to warn of another. */
+  private spelledTypes = new Map<string, string>();
   /** Class problems already reported, per entry. See {@link warnOnce}. */
   private classWarnings = new LRUCache<string, true>({ max: 10000 });
 
@@ -1386,13 +1388,17 @@ class ldapActions {
     for (const name of names) {
       if (!name || name.includes(';')) continue;
       const key = name.toLowerCase();
-      const known = this.spellings.get(key);
-      if (known === undefined) this.spellings.set(key, name);
-      // A plugin comparing with the other spelling would miss the writes
+      if (!this.spellings.has(key)) this.spellings.set(key, name);
+      // A plugin comparing with the other spelling, or the other name of
+      // the type, would miss the writes. The aliases a deployment's own
+      // schema declares are not known here
+      const type = (knownAttributeName(name) ?? name).toLowerCase();
+      const known = this.spelledTypes.get(type);
+      if (known === undefined) this.spelledTypes.set(type, name);
       else if (known !== name)
         this.logger.warn(
-          `Attribute "${name}" is also spelled "${known}" in the configuration ` +
-            `or a schema: writes name it "${known}"`
+          `Attribute "${name}" is also named "${known}" in the configuration ` +
+            'or a schema: plugins comparing with one name miss the other'
         );
     }
   }
@@ -1458,8 +1464,9 @@ class ldapActions {
       if (!this.schemaUnavailable)
         this.logger.warn(
           `The directory schema could not be read (${String(err)}): ` +
-            'attribute names are not resolved, names given as OIDs are ' +
-            'refused, and object classes are not repaired'
+            'attribute names are resolved from the standard types only, a ' +
+            'name given as another OID is refused, and object classes are ' +
+            'not repaired'
         );
       this.schemaUnavailable = true;
     }
@@ -1492,21 +1499,20 @@ class ldapActions {
         `Attribute option "${option}" of "${key}" is not accepted`
       );
     const type = index?.getAttributeType(base);
-    if (!type && !index && /^\d+(\.\d+)+$/.test(attributeTypeName(base)))
+    // Without the schema, the names and OIDs this server knows of itself
+    const builtIn = index ? undefined : knownAttributeName(base);
+    if (!index && !builtIn && /^\d+(\.\d+)+$/.test(base))
       throw new BadRequestError(
         `Attribute "${key}" cannot be named by its OID here`
       );
-    // Without the schema, the names and OIDs this server knows of itself
     const known = type
       ? [...type.names, type.oid]
-      : [base, attributeTypeName(base)];
+      : [base, ...(builtIn ? [builtIn] : [])];
     const name =
       known.map(n => this.spellings.get(n.toLowerCase())).find(Boolean) ??
       type?.names[0] ??
-      // An alias of a name nobody spelled: the name, as `normalizeDn` reads it
-      (attributeTypeName(base) !== base.toLowerCase()
-        ? attributeTypeName(base)
-        : base);
+      builtIn ??
+      base;
     return options.length ? `${name};binary` : name;
   }
 

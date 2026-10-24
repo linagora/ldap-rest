@@ -80,10 +80,12 @@ describe('Attribute names of a write', function () {
     (
       other.ldap as unknown as { schemaIndex: () => Promise<never> }
     ).schemaIndex = () => Promise.reject(new Error('cn=Subschema unreadable'));
+    // Names no option spells, so the standard table answers them
     for (const [given, name] of [
-      ['commonName', 'cn'],
-      ['OID.2.5.4.3', 'cn'],
-      ['MAIL', 'mail'],
+      ['C', 'c'],
+      ['domainComponent', 'dc'],
+      ['OID.0.9.2342.19200300.100.1.25', 'dc'],
+      ['STATEORPROVINCENAME', 'st'],
     ]) {
       const entry: AttributesList = { [given]: 'x' };
       await other.ldap.canonicalAttributes(entry);
@@ -98,6 +100,23 @@ describe('Attribute names of a write', function () {
       status = (err as { statusCode?: number }).statusCode ?? 500;
     }
     expect(status).to.equal(400);
+  });
+
+  it('warns of a second name for one attribute', async () => {
+    const other = new DM();
+    await other.ready;
+    const warned: string[] = [];
+    const warn = other.logger.warn.bind(other.logger);
+    (other.logger as unknown as { warn: unknown }).warn = (
+      message: string,
+      ...rest: unknown[]
+    ) => {
+      warned.push(String(message));
+      return warn(message, ...rest);
+    };
+    // `mail` is the configuration's
+    other.ldap.knowAttributeNames(['rfc822Mailbox', 'Mail', 'mail']);
+    expect(warned.filter(m => /also named "mail"/.test(m))).to.have.length(2);
   });
 
   it('keeps ;binary, and refuses any other option', async () => {

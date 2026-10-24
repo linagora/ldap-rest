@@ -29,9 +29,10 @@ A rename gives the entry one value of the attribute it is already named by
 naming another attribute, is refused with a 400. The directory writes the
 values of the new RDN on the entry, where no check of a write saw them.
 
-When the directory schema cannot be read, the case is still set from the
-configuration and the schemas, a name given as an OID is refused, and an
-alias is written as given.
+When the directory schema cannot be read, the names, aliases and OIDs of
+the standard types (`cn`, `mail`, `uid`, `ou`…) are still resolved, as are
+the spellings of the configuration and the schemas. A name given as another
+OID is refused, and another alias is written as given.
 
 ### SCIM group members are looked up as the caller
 

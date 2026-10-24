@@ -830,6 +830,8 @@ function hexByte(byte: number): string {
  * directory schema at startup ({@link registerAttributeTypes}).
  */
 const attributeTypeNames = new Map<string, string>();
+/** The first name of each type, spelled as declared, by any of its names */
+const attributeTypeSpellings = new Map<string, string>();
 
 /**
  * Teach {@link normalizeDn} the names and OIDs of attribute types: each is
@@ -842,8 +844,10 @@ export function registerAttributeTypes(
 ): void {
   for (const { oid, names } of types) {
     const canonical = (names[0] ?? oid).toLowerCase();
-    for (const alias of [oid, ...names])
+    for (const alias of [oid, ...names]) {
       attributeTypeNames.set(alias.toLowerCase(), canonical);
+      attributeTypeSpellings.set(alias.toLowerCase(), names[0] ?? oid);
+    }
   }
 }
 
@@ -872,16 +876,16 @@ registerAttributeTypes([
   { oid: '1.3.6.1.1.1.1.1', names: ['gidNumber'] },
 ]);
 
-/** An attribute type of a DN as {@link normalizeDn} spells it. */
 /**
- * The name an attribute type is known by, in lower case, from the names and
- * OIDs {@link registerAttributeTypes} was given: `commonName` and `2.5.4.3`
- * are `cn`. A type it was not given is answered as written, in lower case.
+ * The name an attribute type is known by, spelled as declared, from the
+ * names and OIDs {@link registerAttributeTypes} was given: `COMMONNAME`,
+ * `2.5.4.3` and `OID.2.5.4.3` are `cn`.
  *
  * @param type attribute name or OID
+ * @returns the name, or undefined for a type it was not given
  */
-export function attributeTypeName(type: string): string {
-  return canonicalType(type);
+export function knownAttributeName(type: string): string | undefined {
+  return attributeTypeSpellings.get(type.toLowerCase().replace(/^oid\./, ''));
 }
 
 /**
@@ -897,6 +901,7 @@ export function rdnTypes(dn: string): string[] {
   });
 }
 
+/** An attribute type of a DN as {@link normalizeDn} spells it. */
 function canonicalType(type: string): string {
   // `OID.2.5.4.11`, the LDAPv2 spelling of an OID
   const name = type.toLowerCase().replace(/^oid\./, '');
