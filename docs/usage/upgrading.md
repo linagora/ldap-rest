@@ -6,6 +6,34 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### Attribute names in a write: one name per attribute, no option
+
+**Who is affected:** a client, a CSV of the bulk import or a plugin writing
+an attribute with an option other than `;binary` (`title;lang-fr`,
+`member;x-tag`), or naming one attribute twice in one part of a write
+(`mail` and `MAIL`, `mail` and `rfc822Mailbox`).
+
+Every add and modify now names its attributes as this server does before
+it is judged: the name is resolved through the directory schema, so `MAIL`,
+`rfc822Mailbox` and `0.9.2342.19200300.100.1.3` are all written `mail`.
+The spelling kept is the configuration's or a loaded schema's, else the
+first name the directory declares. An option other than `;binary` is
+refused with a 400: a tagged value is one of its own, which the rules
+guarding the attribute would not see. Two names for one attribute in one
+`add`, `replace` or `delete` are refused with a 400 too. Values already
+stored under an option are still read, but cannot be written or deleted
+through ldap-rest: clean them up in the directory.
+
+A rename gives the entry one value of the attribute it is already named by
+(`cn=new` for a group named by `cn`): a new RDN holding several values, or
+naming another attribute, is refused with a 400. The directory writes the
+values of the new RDN on the entry, where no check of a write saw them.
+
+When the directory schema cannot be read, the names, aliases and OIDs of
+the standard types (`cn`, `mail`, `uid`, `ou`…) are still resolved, as are
+the spellings of the configuration and the schemas. A name given as another
+OID is refused, and another alias is written as given.
+
 ### SCIM group members are looked up as the caller
 
 **Who is affected:** a SCIM client writing group members by DN, and one

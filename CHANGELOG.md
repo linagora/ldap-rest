@@ -4,6 +4,21 @@
 
 ### Security
 
+- Every add and modify names its attributes as the server does before it
+  is judged, through the directory schema: the organization link written
+  under its OID, or `mail` as `rfc822Mailbox`, escaped the authorization
+  plugins and the hooks reading them by name — an administrator moved an
+  account to an organization they may not write. An option other than
+  `;binary` and an attribute named twice in one part of a write are refused
+  (400). A rename to an RDN holding several values, or naming another
+  attribute, is refused too: `cn=x+twakeDepartmentLink=…` linked a group
+  past every check of a write. The route checks of the flat entities, groups and organizations
+  look schema attributes up whatever their case: a fixed attribute deleted
+  as `OBJECTCLASS`, and members added as `MEMBER` past the group's own
+  routes, went through,
+  [upgrading](docs/usage/upgrading.md#attribute-names-in-a-write-one-name-per-attribute-no-option)
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
+
 - `core/ldap/raw`: `GET /children/{dn}` answered the children of an entry
   the caller may not read, an empty list where an entry that is not there
   got a 404: it told whether the entry exists. It answers that 404. Found
@@ -122,6 +137,21 @@
   ([#381](https://github.com/linagora/ldap-rest/pull/381))
 
 ### Fixes
+
+- `core/ldap/groups`: `PUT /api/v1/ldap/groups/{cn}` meant to drop the
+  attributes the schema fixes, and filtered `add`, `replace` and `delete`
+  themselves, which no schema fixes: a fixed `objectClass` was written. They
+  are dropped from each part, as on a creation
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
+
+- `core/ldap/organizations`: an organization deleted as `OU=…` skipped the
+  check that it is empty
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
+
+- `core/twake/james`: a mailbox type pointer written `CN=TeamMailbox,…`
+  leads to the team mailbox entry, and was not read as one: the checks of
+  a team mailbox's members did not run
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
 
 - `core/ldap/enterpriseRules`: saving an account with its mail unchanged
   answered `409 … is already used` once `appAccountsConsistency` had made

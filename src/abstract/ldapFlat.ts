@@ -381,6 +381,7 @@ export default abstract class LdapFlat extends DmPlugin {
         this.schema = loadSchemaFile<Schema>(config.schemaPath, {
           config: this.config,
         });
+        this.ldap.knowAttributeNames(Object.keys(this.schema.attributes));
         this.logger.info(
           `${this.singularName} schema loaded from ${config.schemaPath}`
         );
@@ -639,7 +640,7 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   protected invalidValueMessage(field: string): string {
-    return invalidValueMessage(field, this.schema?.attributes[field]);
+    return invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1]);
   }
 
   /**
@@ -1445,6 +1446,8 @@ export default abstract class LdapFlat extends DmPlugin {
     additional: AttributesList = {},
     req?: Request
   ): Promise<boolean> {
+    // Checked below under the names the write will give them
+    await this.ldap.canonicalAttributes(additional);
     let dn: string;
     if (new RegExp(`^${this.mainAttribute}=`, 'i').test(id)) {
       // DN provided - validate it's in the correct flat branch
@@ -1533,6 +1536,9 @@ export default abstract class LdapFlat extends DmPlugin {
     changes: ModifyRequest,
     req?: Request
   ): Promise<boolean> {
+    // `UID` is `uid`, and a fixed attribute deleted as `OBJECTCLASS` is
+    // still fixed: the checks below compare names as the write gives them
+    await this.ldap.canonicalChanges(changes);
     let dn = this.resolveDn(id);
     const op = this.opNumber();
     [dn, changes] = await launchHooksChained(
@@ -1877,14 +1883,14 @@ export default abstract class LdapFlat extends DmPlugin {
     }
 
     for (const [field, value] of Object.entries(entry)) {
-      if (!this.schema.attributes[field]) {
+      const attr = schemaAttribute(this.schema, field)?.[1];
+      if (!attr) {
         if (this.schema.strict)
           throw new BadRequestError(
             `Unknown attribute "${field}" for ${this.singularName}`
           );
         continue;
       }
-      const attr = this.schema.attributes[field];
 
       // Check if trying to modify a fixed attribute
       if (attr.fixed && attr.default !== undefined) {
@@ -1924,7 +1930,7 @@ export default abstract class LdapFlat extends DmPlugin {
     // Check for fixed attributes in add/replace operations
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const checkFixed = (field: string, value: AttributeValue): void => {
-      const attr = this.schema?.attributes[field];
+      const attr = schemaAttribute(this.schema, field)?.[1];
       if (attr?.fixed) {
         throw new BadRequestError(
           `Attribute "${field}" is fixed and cannot be modified`
@@ -1953,7 +1959,7 @@ export default abstract class LdapFlat extends DmPlugin {
         ? changes.delete
         : Object.keys(changes.delete);
       for (const field of deleteFields) {
-        const attr = this.schema.attributes[field];
+        const attr = schemaAttribute(this.schema, field)?.[1];
         if (attr?.fixed) {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
@@ -1969,7 +1975,7 @@ export default abstract class LdapFlat extends DmPlugin {
     value: AttributeValue | null
   ): Promise<boolean> {
     if (!this.schema) return true;
-    const attr = this.schema.attributes[field];
+    const attr = schemaAttribute(this.schema, field)?.[1];
     if (!attr) {
       if (this.schema.strict) return false;
       return true;
