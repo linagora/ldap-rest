@@ -394,6 +394,32 @@ describe('Twake group routes and the caller', function () {
       });
     });
 
+    it('refuses to link a group elsewhere, or to unlink it', async () => {
+      const dn = `cn=tgz-relinked,${groupBase('acme')}`;
+      await server.ldap.add(dn, {
+        objectClass: ['top', 'groupOfNames'],
+        cn: 'tgz-relinked',
+        member: `uid=${MEMBER},${users('acme')}`,
+      });
+      for (const changes of [
+        { replace: { twakeDepartmentLink: orgDn('mine') } },
+        { delete: ['twakeDepartmentLink'] },
+        { replace: { twakeDepartmentLink: [] } },
+      ]) {
+        let refused: unknown;
+        await server.ldap.modify(dn, changes).catch(err => (refused = err));
+        expect(
+          (refused as { statusCode?: number })?.statusCode,
+          JSON.stringify(changes)
+        ).to.equal(400);
+      }
+      expect(await linkOf(dn)).to.equal(orgDn('acme'));
+      // Its own organization, spelled otherwise, is no change of owner
+      await server.ldap.modify(dn, {
+        replace: { twakeDepartmentLink: orgDn('acme').toUpperCase() },
+      });
+    });
+
     it('refuses a group linked to another organization than its branch', async () => {
       let refused: unknown;
       await server.ldap

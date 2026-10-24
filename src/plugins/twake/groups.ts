@@ -20,6 +20,7 @@ import { extractLdapCode } from '../../lib/ldapCodes';
 import type {
   AttributesList,
   AttributeValue,
+  ModifyRequest,
   SearchResult,
 } from '../../lib/ldapActions';
 import {
@@ -303,6 +304,7 @@ export default class TwakeGroups extends LdapGroups {
     ldapmodifyrequest: ([dn, changes, op, req]) => {
       this.checkMembers(dn, changes.add?.member);
       this.checkMembers(dn, changes.replace?.member);
+      this.checkLinkChange(dn, changes);
       return [dn, changes, op, req];
     },
     // A group moved to another organization takes its members along, the
@@ -439,6 +441,47 @@ export default class TwakeGroups extends LdapGroups {
     )
       objectClass.push(LINK_CLASS);
     return { ...entry, objectClass, [attribute]: orgDn };
+  }
+
+  /**
+   * Refuse a change taking a group's link away from its organization, under
+   * a model judging by attachment: as on a creation, a group in one
+   * organization's branch cannot belong to another, nor to none.
+   *
+   * @param dn the group's DN
+   * @param changes the modification
+   * @throws BadRequestError when the change links it elsewhere or unlinks it
+   */
+  private checkLinkChange(dn: string, changes: ModifyRequest): void {
+    const attribute = this.config.ldap_organization_link_attribute;
+    const org = this.organizationOf(dn);
+    if (
+      org === undefined ||
+      !attribute ||
+      !this.orgPattern ||
+      !this.judgedByAttachment()
+    )
+      return;
+    const orgDn = dnKey(this.orgPattern.replace(ORG, escapeDnValue(org)));
+    const named = (list?: AttributesList): string[] =>
+      Object.keys(list ?? {}).filter(
+        key => key.toLowerCase() === attribute.toLowerCase()
+      );
+    const written = [
+      ...named(changes.add).flatMap(key => values(changes.add![key])),
+      ...named(changes.replace).flatMap(key => values(changes.replace![key])),
+    ];
+    const removed = Array.isArray(changes.delete)
+      ? changes.delete.some(
+          key => key.toLowerCase() === attribute.toLowerCase()
+        )
+      : named(changes.delete).length > 0;
+    const replacedEmpty =
+      named(changes.replace).length > 0 && written.length === 0;
+    if (removed || replacedEmpty || written.some(v => dnKey(v) !== orgDn))
+      throw new BadRequestError(
+        `${dn} lies in the branch of ${org}, and must stay linked to it`
+      );
   }
 
   /**
