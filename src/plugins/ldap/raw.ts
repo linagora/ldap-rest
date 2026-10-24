@@ -403,6 +403,10 @@ export default class LdapRaw extends DmPlugin {
     req?: Request
   ): Promise<RawChildren> {
     this.checkDn(dn);
+    // The entry itself first: its children, even none, would say it is
+    // there to a caller who may not read it
+    if (!(await this.server.ldap.readableBy(dn, req)))
+      throw new NotFoundError(`Entry ${dn} not found`);
     // Ask for one entry more than the limit to detect truncation
     const result = await this.searchDirectory(
       dn,
