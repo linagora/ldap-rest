@@ -9,7 +9,7 @@
   got a 404: it told whether the entry exists. It answers that 404. Found
   by a new test probing every route for what it tells a caller without
   rights
-  ([#386](https://github.com/linagora/ldap-rest/issues/386))
+  ([#393](https://github.com/linagora/ldap-rest/pull/393))
 
 - A directory search, add, modify, rename or delete made while serving an
   authenticated request is judged as its caller, even when the code making
