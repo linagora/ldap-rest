@@ -1611,6 +1611,9 @@ export default class PasswordPolicy extends DmPlugin {
 
   private async deletePolicy(cn: string, req?: Request): Promise<void> {
     const entry = await this.findPolicy(cn, req);
+    // Judged before the checks below, which search the whole directory:
+    // which policies are in use is not for a caller who may not delete one
+    await this.server.ldap.authorize('ldapdeleterequest', [entry.dn, req]);
     const defaultDn = (await this.readPolicyConfig()).dn;
     if (defaultDn && normalizeDn(defaultDn) === normalizeDn(entry.dn)) {
       throw new ConflictError(`${entry.dn} is the default password policy`);

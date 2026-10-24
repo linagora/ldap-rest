@@ -18,6 +18,7 @@ import type { Response } from 'express';
 import { DM } from '../../../src/bin';
 import type { AttributesList } from '../../../src/lib/ldapActions';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
+import type DmPlugin from '../../../src/abstract/plugin';
 import type { Role } from '../../../src/abstract/plugin';
 import AuthzLinid1 from '../../../src/plugins/auth/authzLinid1';
 import AuthzScope from '../../../src/plugins/auth/authzScope';
@@ -352,6 +353,30 @@ describe('AuthzLinid1 by attachment', function () {
     it('does not let a caller administering no branch touch transit', async () => {
       const res = await move(T_LOOSE_B, transit, NOBODY);
       expect(res.status).to.equal(403);
+    });
+  });
+
+  // Authorization judges a search before any other plugin, and one may
+  // rewrite it after: `twake/tombstone` hands a copy of the options on.
+  describe('a search rewritten after it was judged', () => {
+    before(async () => {
+      await server.registerPlugin('copySearch', {
+        name: 'copySearch',
+        hooks: {
+          ldapsearchrequest: ([base, opts, req]: [string, object, unknown]) => [
+            base,
+            { ...opts },
+            req,
+          ],
+        },
+      } as unknown as DmPlugin);
+    });
+
+    it('still does not give the attachment to a caller that did not ask for it', async () => {
+      const res = await request.get('/api/v1/ldap/groups').set(as(ADMIN_A));
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property(GROUP_A);
+      expect(res.body[GROUP_A]).not.to.have.property('twakeDepartmentLink');
     });
   });
 });
