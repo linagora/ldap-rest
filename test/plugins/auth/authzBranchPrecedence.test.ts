@@ -181,6 +181,41 @@ describe('Branch rule precedence', function () {
       expect(uids).to.not.include('prec-pay');
     });
 
+    it('holds the restriction whatever the attribute type is called', async () => {
+      const req = { user: USER, headers: {} } as unknown as DmRequest;
+      for (const spelled of [
+        `organizationalUnitName=precpayroll,${acme}`,
+        `2.5.4.11=precpayroll,${acme}`,
+        // LDAPv2, which OpenLDAP still reads
+        `ou=precpayroll;${acme}`,
+        `ou="precpayroll",${acme}`,
+      ]) {
+        // Refused outright, as the same search spelled `ou=`
+        let refused: unknown;
+        await server.ldap
+          .search(
+            { paged: false, scope: 'sub', attributes: ['uid'] },
+            spelled,
+            req
+          )
+          .catch((err: unknown) => (refused = err));
+        expect(String(refused), spelled).to.match(/forbidden/i);
+        for (const write of [
+          () =>
+            server.ldap.modify(
+              `uid=prec-pay,${spelled}`,
+              { replace: { description: 'x' } },
+              req
+            ),
+          () => server.ldap.rename(spelled, `ou=precmoved,${acme}`, req),
+        ]) {
+          let error: unknown;
+          await write().catch((err: unknown) => (error = err));
+          expect(String(error), spelled).to.match(/forbidden/i);
+        }
+      }
+    });
+
     it('lets every caller read the top organization by itself', async () => {
       const top = process.env.DM_LDAP_TOP_ORGANIZATION as string;
       const found = (await server.ldap.search(

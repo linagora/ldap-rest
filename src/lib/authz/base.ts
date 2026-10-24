@@ -90,9 +90,6 @@ export default abstract class AuthzBase extends DmPlugin {
    */
   private static readonly topOrganizationRead = Symbol('top organization');
 
-  /** The base a search judged by branch was granted on. */
-  private static readonly judgedBase = Symbol('judged base');
-
   roles: Role[] = ['authz'] as const;
   cacheTTL!: number;
 
@@ -1098,11 +1095,7 @@ export default abstract class AuthzBase extends DmPlugin {
         return [base, opts, req];
       }
 
-      return [
-        base,
-        { ...opts, [AuthzBase.judgedBase]: base } as SearchOptions,
-        req,
-      ];
+      return [base, opts, req];
     },
 
     /**
@@ -1147,20 +1140,7 @@ export default abstract class AuthzBase extends DmPlugin {
           ]
         )
           return pass;
-        // The base was judged by `ldapsearchrequest`: when none of the
-        // caller's rules lies below it, every entry is under its rule too
         const keys = await this.ruleBranches(user);
-        const base = (opts as { [key: symbol]: unknown } | undefined)?.[
-          AuthzBase.judgedBase
-        ];
-        if (
-          typeof base === 'string' &&
-          !keys.some(
-            key =>
-              isDnInBranch(key, base) && normalizeDn(key) !== normalizeDn(base)
-          )
-        )
-          return pass;
         const kept = [];
         // An entry is under its parent's rule unless a rule names it
         const byParent = new Map<string, boolean>();

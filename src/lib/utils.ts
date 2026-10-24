@@ -463,8 +463,25 @@ export function validateDnValue(value: string, fieldName: string): void {
 // LDAP DN utilities
 
 /**
+ * Trim the whitespace around a DN component, but not a trailing space its
+ * backslash escapes: `ou=a\ ` names a value ending in a space.
+ */
+function trimUnescaped(part: string): string {
+  const start = part.trimStart();
+  let end = start.trimEnd();
+  if (end.length < start.length) {
+    let backslashes = 0;
+    for (let i = end.length - 1; i >= 0 && end[i] === '\\'; i--) backslashes++;
+    if (backslashes % 2 === 1) end += ' ';
+  }
+  return end;
+}
+
+/**
  * Parse a Distinguished Name (DN) into its component parts (RDNs)
- * Handles escaped commas and other special characters
+ * Handles escaped commas and other special characters, and what OpenLDAP
+ * still reads from LDAPv2 (RFC 1779): `;` separating RDNs as `,` does, and
+ * a value in double quotes holding either
  *
  * @param dn - The DN to parse
  * @returns Array of RDN components
@@ -495,6 +512,7 @@ export function parseDn(dn: string): string[] {
   const parts: string[] = [];
   let current = '';
   let escaped = false;
+  let quoted = false;
 
   for (let i = 0; i < dn.length; i++) {
     const char = dn[i];
@@ -505,8 +523,11 @@ export function parseDn(dn: string): string[] {
     } else if (char === '\\') {
       current += char;
       escaped = true;
-    } else if (char === ',') {
-      parts.push(current.trim());
+    } else if (char === '"') {
+      current += char;
+      quoted = !quoted;
+    } else if (!quoted && (char === ',' || char === ';')) {
+      parts.push(trimUnescaped(current));
       current = '';
     } else {
       current += char;
@@ -515,7 +536,7 @@ export function parseDn(dn: string): string[] {
 
   // Don't forget the last part
   if (current) {
-    parts.push(current.trim());
+    parts.push(trimUnescaped(current));
   }
 
   return parts;
@@ -627,47 +648,152 @@ export function isChildOf(dn: string, parentDn: string): boolean {
 const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
 
 /**
- * One spelling for an escaped character of a DN value: the directory
- * answers `ou=Sales\2C EMEA` for what a configuration writes
- * `ou=Sales\, EMEA`, `\20` for `\ `, and `\C3\A9` for `é`. A special
- * character keeps its backslash; any other, a space or `#` included, is
- * written plain. Hex pairs that are not UTF-8, or spell a control
- * character, are left as they are.
+ * One spelling for a DN value (RFC 4514 §2.4): every escape decoded — the
+ * directory answers `ou=Sales\2C EMEA` for what a configuration writes
+ * `ou=Sales\, EMEA`, `\20` for `\ `, `\C3\A9` for `é` — then the
+ * unescaped whitespace around it trimmed, and the characters that need it
+ * escaped again with a backslash: the specials anywhere, a `#` or a space
+ * at the start, a space at the end. A control character, or hex pairs that
+ * are not UTF-8, stay hex. A value starting with an unescaped `#` is the
+ * BER form, which is not decoded; one in double quotes (LDAPv2) is read
+ * as it stands.
+ *
+ * @param raw the value as written, after its `=`
  */
-function canonicalEscapes(value: string): string {
-  if (!value.includes('\\')) return value;
-  return value.replace(DN_ESCAPE, (whole, hex, char) => {
-    let decoded: string;
-    if (char !== undefined) decoded = char as string;
-    else {
-      const bytes = (hex as string)
-        .split('\\')
-        .filter(Boolean)
-        .map(pair => parseInt(pair, 16));
-      try {
-        decoded = new TextDecoder('utf-8', { fatal: true }).decode(
-          Uint8Array.from(bytes)
-        );
-      } catch {
-        // Not UTF-8: the ASCII pairs alone are read
-        return bytes
-          .map(byte =>
-            byte >= 0x20 && byte < 0x7f
-              ? plainOrEscaped(String.fromCharCode(byte))
-              : `\\${byte.toString(16).padStart(2, '0')}`
-          )
-          .join('');
-      }
-      // eslint-disable-next-line no-control-regex
-      if (/[\u0000-\u001f\u007f]/.test(decoded)) return whole.toLowerCase();
+function canonicalValue(raw: string): string {
+  if (raw.trimStart().startsWith('#')) return raw.trim();
+  // LDAPv2: in double quotes, every character is the value's
+  const trimmed = raw.trim();
+  const quoted =
+    trimmed.length >= 2 &&
+    trimmed.startsWith('"') &&
+    trimmed.endsWith('"') &&
+    !trimmed.endsWith('\\"');
+  if (quoted) raw = trimmed.slice(1, -1);
+  // Each character, and whether the writer escaped it
+  const chars: { char: string; escaped: boolean }[] = [];
+  let last = 0;
+  const plain = (text: string): void => {
+    for (const char of text) chars.push({ char, escaped: quoted });
+  };
+  for (const match of raw.matchAll(DN_ESCAPE)) {
+    plain(raw.slice(last, match.index));
+    last = match.index + match[0].length;
+    const [, hex, char] = match;
+    if (char !== undefined) {
+      chars.push({ char, escaped: true });
+      continue;
     }
-    return [...decoded].map(plainOrEscaped).join('');
-  });
+    const bytes = hex
+      .split('\\')
+      .filter(Boolean)
+      .map(pair => parseInt(pair, 16));
+    let decoded: string[];
+    try {
+      decoded = [
+        ...new TextDecoder('utf-8', { fatal: true }).decode(
+          Uint8Array.from(bytes)
+        ),
+      ];
+    } catch {
+      // Not UTF-8: each pair alone
+      decoded = bytes.map(byte =>
+        byte < 0x80 ? String.fromCharCode(byte) : `\\${hexByte(byte)}`
+      );
+    }
+    for (const char of decoded) chars.push({ char, escaped: true });
+  }
+  // A lone trailing backslash escapes nothing: it is one
+  if (last < raw.length) plain(raw.slice(last));
+
+  let start = 0;
+  let end = chars.length;
+  while (start < end && !chars[start].escaped && /\s/.test(chars[start].char))
+    start++;
+  while (
+    end > start &&
+    !chars[end - 1].escaped &&
+    /\s/.test(chars[end - 1].char)
+  )
+    end--;
+
+  let out = '';
+  for (let i = start; i < end; i++) {
+    const { char } = chars[i];
+    if (char.length > 1)
+      out += char; // a pair kept hex
+    else if (char.charCodeAt(0) < 0x20 || char.charCodeAt(0) === 0x7f)
+      out += `\\${hexByte(char.charCodeAt(0))}`;
+    else if (
+      ',+"\\<>;='.includes(char) ||
+      (i === start && (char === '#' || char === ' ')) ||
+      (i === end - 1 && char === ' ')
+    )
+      out += `\\${char}`;
+    else out += char;
+  }
+  return out;
 }
 
-/** A DN value's character as {@link canonicalEscapes} spells it. */
-function plainOrEscaped(char: string): string {
-  return ',+"\\<>;='.includes(char) ? `\\${char}` : char;
+function hexByte(byte: number): string {
+  return byte.toString(16).padStart(2, '0');
+}
+
+/**
+ * The attribute types of the directory by every name and OID they answer
+ * to, each to its first name: OpenLDAP reads `organizationalUnitName=x` and
+ * `2.5.4.11=x` as `ou=x`, so a DN must too, or a rule on `ou=x` would not
+ * hold `2.5.4.11=x`. Seeded with the usual types and completed from the
+ * directory schema at startup ({@link registerAttributeTypes}).
+ */
+const attributeTypeNames = new Map<string, string>();
+
+/**
+ * Teach {@link normalizeDn} the names and OIDs of attribute types: each is
+ * read as the type's first name.
+ *
+ * @param types attribute types, as `ldapSchema` parses them
+ */
+export function registerAttributeTypes(
+  types: Iterable<{ oid: string; names: string[] }>
+): void {
+  for (const { oid, names } of types) {
+    const canonical = (names[0] ?? oid).toLowerCase();
+    for (const alias of [oid, ...names])
+      attributeTypeNames.set(alias.toLowerCase(), canonical);
+  }
+}
+
+registerAttributeTypes([
+  { oid: '2.5.4.0', names: ['objectClass'] },
+  { oid: '2.5.4.3', names: ['cn', 'commonName'] },
+  { oid: '2.5.4.4', names: ['sn', 'surname'] },
+  { oid: '2.5.4.5', names: ['serialNumber'] },
+  { oid: '2.5.4.6', names: ['c', 'countryName'] },
+  { oid: '2.5.4.7', names: ['l', 'localityName'] },
+  { oid: '2.5.4.8', names: ['st', 'stateOrProvinceName'] },
+  { oid: '2.5.4.9', names: ['street', 'streetAddress'] },
+  { oid: '2.5.4.10', names: ['o', 'organizationName'] },
+  { oid: '2.5.4.11', names: ['ou', 'organizationalUnitName'] },
+  { oid: '2.5.4.12', names: ['title'] },
+  { oid: '2.5.4.42', names: ['givenName', 'gn'] },
+  { oid: '2.5.4.43', names: ['initials'] },
+  { oid: '2.5.4.46', names: ['dnQualifier'] },
+  { oid: '2.5.4.65', names: ['pseudonym'] },
+  { oid: '0.9.2342.19200300.100.1.1', names: ['uid', 'userid'] },
+  { oid: '0.9.2342.19200300.100.1.3', names: ['mail', 'rfc822Mailbox'] },
+  { oid: '0.9.2342.19200300.100.1.25', names: ['dc', 'domainComponent'] },
+  { oid: '2.16.840.1.113730.3.1.241', names: ['displayName'] },
+  { oid: '2.16.840.1.113730.3.1.3', names: ['employeeNumber'] },
+  { oid: '1.3.6.1.1.1.1.0', names: ['uidNumber'] },
+  { oid: '1.3.6.1.1.1.1.1', names: ['gidNumber'] },
+]);
+
+/** An attribute type of a DN as {@link normalizeDn} spells it. */
+function canonicalType(type: string): string {
+  // `OID.2.5.4.11`, the LDAPv2 spelling of an OID
+  const name = type.toLowerCase().replace(/^oid\./, '');
+  return attributeTypeNames.get(name) ?? name;
 }
 
 /**
@@ -678,10 +804,12 @@ function splitRdn(rdn: string): string[] {
   const parts: string[] = [];
   let current = '';
   let escaped = false;
+  let quoted = false;
   for (const char of rdn) {
     if (escaped) escaped = false;
     else if (char === '\\') escaped = true;
-    else if (char === '+') {
+    else if (char === '"') quoted = !quoted;
+    else if (char === '+' && !quoted) {
       parts.push(current);
       current = '';
       continue;
@@ -702,8 +830,9 @@ function splitRdn(rdn: string): string[] {
  * `,`. Empty components (e.g. from a trailing separator) are dropped.
  *
  * This makes equality / suffix comparisons robust to case, surrounding
- * whitespace, multi-valued RDN ordering and the hex escapes a directory
- * answers with ({@link canonicalEscapes}) — unlike a raw string match.
+ * whitespace, multi-valued RDN ordering, the escapes a directory answers
+ * with ({@link canonicalValue}) and the names and OIDs of an attribute type
+ * ({@link registerAttributeTypes}) — unlike a raw string match.
  *
  * @param dn - The DN to normalize
  * @returns The canonical form
@@ -732,11 +861,8 @@ function normalizedRdns(dn: string): string[] {
           // side. Done with indexOf rather than a `\s*=\s*` regex to avoid the
           // polynomial scan a regex incurs on untrusted DN strings (ReDoS).
           const eq = atav.indexOf('=');
-          const normalized =
-            eq === -1
-              ? atav.trim()
-              : `${atav.slice(0, eq).trim()}=${canonicalEscapes(atav.slice(eq + 1).trim())}`;
-          return normalized.toLowerCase();
+          if (eq === -1) return atav.trim().toLowerCase();
+          return `${canonicalType(atav.slice(0, eq).trim())}=${canonicalValue(atav.slice(eq + 1)).toLowerCase()}`;
         })
         .sort()
         .join('+')

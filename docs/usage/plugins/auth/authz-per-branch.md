@@ -131,9 +131,13 @@ leaves and joins; anything else it carries still needs write where the
 entry stands: its branch, or, judged by attachment, the organization it
 leaves.
 
-A rule's branch matches the DN the directory answers with whatever its
-spelling: case, spaces, and escapes (`\2C` and `\,`, `\20` and a space,
-`\C3\A9` and `é`).
+A rule's branch matches a DN however it is spelled, as OpenLDAP reads it:
+case, spaces, escapes (`\2C` and `\,`, `\20` and a space, `\C3\A9` and
+`é`), an attribute type by any of its names or its OID
+(`organizationalUnitName=` and `2.5.4.11=` are `ou=`, learned from the
+directory schema at startup), and the LDAPv2 forms (`;` between RDNs, a
+value in double quotes). A caller cannot step around a rule by spelling
+its branch another way.
 
 A move is judged on the mover's own rules. The rules of other users and
 groups name the branch by its DN: once a caller allowed to move it has done

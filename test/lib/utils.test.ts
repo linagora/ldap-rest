@@ -359,13 +359,66 @@ describe('LDAP Utils', () => {
         expect(normalizeDn(a), a).to.equal(normalizeDn(b));
     });
 
+    it('keeps the spaces and the # that an escape protects', () => {
+      expect(normalizeDn('ou=Sales\\ ,dc=x')).to.equal(
+        normalizeDn('ou=Sales\\20,dc=x')
+      );
+      expect(normalizeDn('ou=Sales\\ ,dc=x')).to.not.equal(
+        normalizeDn('ou=Sales,dc=x')
+      );
+      expect(normalizeDn('ou=\\23x,dc=x')).to.equal('ou=\\#x,dc=x');
+      // The BER form is another value
+      expect(normalizeDn('ou=#0c0178,dc=x')).to.not.equal(
+        normalizeDn('ou=\\#0c0178,dc=x')
+      );
+    });
+
+    it('is idempotent', () => {
+      for (const dn of [
+        'ou=Sales\\20,dc=x',
+        'ou=\\20Sales,dc=x',
+        'ou=\\23Sales,dc=x',
+        'cn=a\\2Bb+sn=c,dc=x',
+        'ou=a\\5c,dc=x',
+        'ou=x\\FF\\2C,dc=x',
+        'ou=caf\\C3\\A9,dc=x',
+        'ou=a=b;c,dc=x',
+      ])
+        expect(normalizeDn(normalizeDn(dn)), dn).to.equal(normalizeDn(dn));
+    });
+
+    it('escapes the specials whether or not the writer did', () => {
+      expect(normalizeDn('ou=a=b,dc=x')).to.equal(normalizeDn('ou=a\\=b,dc=x'));
+    });
+
+    it('reads the LDAPv2 separators and quotes OpenLDAP accepts', () => {
+      expect(normalizeDn('ou=a; dc=x;dc=y')).to.equal('ou=a,dc=x,dc=y');
+      expect(normalizeDn('ou="a,b;c",dc=x')).to.equal(
+        normalizeDn('ou=a\\,b\\;c,dc=x')
+      );
+      expect(normalizeDn('cn="a+b"+sn=c,dc=x')).to.equal(
+        normalizeDn('sn=c+cn=a\\+b,dc=x')
+      );
+    });
+
+    it('reads an attribute type by any of its names or its OID', () => {
+      for (const spelled of [
+        'organizationalUnitName=Payroll,dc=x',
+        '2.5.4.11=Payroll,dc=x',
+        'OID.2.5.4.11=Payroll,dc=x',
+        'OU=Payroll,domainComponent=x',
+      ])
+        expect(normalizeDn(spelled), spelled).to.equal('ou=payroll,dc=x');
+    });
+
     it('keeps an escaped backslash apart from the hex that follows', () => {
       expect(normalizeDn('ou=a\\5c2C')).to.equal(normalizeDn('ou=a\\\\2C'));
       expect(normalizeDn('ou=a\\5c2C')).to.not.equal(normalizeDn('ou=a\\,'));
     });
 
     it('splits a multi-valued RDN on unescaped plus signs only', () => {
-      expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn=b,dc=x');
+      // One assertion: its value holds the `+` and the `=`
+      expect(normalizeDn('cn=a\\+sn=b,dc=x')).to.equal('cn=a\\+sn\\=b,dc=x');
       expect(normalizeDn('sn=b+cn=a,dc=x')).to.equal('cn=a+sn=b,dc=x');
     });
   });

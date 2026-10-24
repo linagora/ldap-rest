@@ -36,7 +36,7 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
-import { recordHookOwner } from '../lib/utils';
+import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -240,6 +240,7 @@ export class DM {
             // judging the same requests is a configuration nobody decided,
             // and the server does not start on it.
             await assertAuthzComposition(this);
+            await this.learnAttributeTypes();
             this._composed = true;
             this.afterLoad();
             resolve();
@@ -251,6 +252,30 @@ export class DM {
         resolve();
       }
     });
+  }
+
+  /**
+   * Teach DN comparisons the names and OIDs of the directory's attribute
+   * types, when a plugin judges requests by DN: OpenLDAP reads
+   * `2.5.4.11=payroll` as `ou=payroll`, and a rule on the one must hold the
+   * other. Without the schema, the usual types are still known.
+   */
+  private async learnAttributeTypes(): Promise<void> {
+    if (
+      !Object.values(this.loadedPlugins).some(plugin =>
+        plugin.roles?.includes('authz')
+      )
+    )
+      return;
+    try {
+      registerAttributeTypes(
+        (await this.ldap.schemaIndex()).schema.attributeTypes
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Could not read the directory schema, DNs are compared with the usual attribute type names only: ${String(err)}`
+      );
+    }
   }
 
   /**
