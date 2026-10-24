@@ -1127,6 +1127,7 @@ const configArgs: ConfigTemplate = [
   // Applicative Accounts plugin
   ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
   ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
+  ['--app-accounts-user-attribute', 'DM_APP_ACCOUNTS_USER_ATTRIBUTE', ''],
   [
     '--applicative-account-attribute',
     'DM_APPLICATIVE_ACCOUNT_ATTRIBUTES',

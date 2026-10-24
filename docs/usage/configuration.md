@@ -511,12 +511,13 @@ Formerly `core/twake/calendarResources`, still accepted as a deprecated alias.
 
 #### `core/twake/applicativeAccounts`
 
-| CLI                               | Plural                             | Env                                 | Default       | Description                           |
-| --------------------------------- | ---------------------------------- | ----------------------------------- | ------------- | ------------------------------------- |
-| `--applicative-account-base`      |                                    | `DM_APPLICATIVE_ACCOUNT_BASE`       |               | Applicative accounts base DN          |
-| `--max-app-accounts`              |                                    | `DM_MAX_APP_ACCOUNTS`               | `5`           | Max accounts per user                 |
-| `--applicative-account-attribute` | `--applicative-account-attributes` | `DM_APPLICATIVE_ACCOUNT_ATTRIBUTES` | _(see below)_ | Attributes copied from the user entry |
-| `--ldap-operational-attribute`    | `--ldap-operational-attributes`    | `DM_LDAP_OPERATIONAL_ATTRIBUTES`    | _(see below)_ | Operational attributes to exclude     |
+| CLI                               | Plural                             | Env                                 | Default            | Description                                            |
+| --------------------------------- | ---------------------------------- | ----------------------------------- | ------------------ | ------------------------------------------------------ |
+| `--applicative-account-base`      |                                    | `DM_APPLICATIVE_ACCOUNT_BASE`       |                    | Applicative accounts base DN                           |
+| `--max-app-accounts`              |                                    | `DM_MAX_APP_ACCOUNTS`               | `5`                | Max accounts per user                                  |
+| `--app-accounts-user-attribute`   |                                    | `DM_APP_ACCOUNTS_USER_ATTRIBUTE`    | the mail attribute | Attribute the `:user` of the routes is matched against |
+| `--applicative-account-attribute` | `--applicative-account-attributes` | `DM_APPLICATIVE_ACCOUNT_ATTRIBUTES` | _(see below)_      | Attributes copied from the user entry                  |
+| `--ldap-operational-attribute`    | `--ldap-operational-attributes`    | `DM_LDAP_OPERATIONAL_ATTRIBUTES`    | _(see below)_      | Operational attributes to exclude                      |
 
 Default copied attributes: `objectClass`, `cn`, `sn`, `givenName`, `displayName`, `description` — plus the configured mail attribute, always.
 

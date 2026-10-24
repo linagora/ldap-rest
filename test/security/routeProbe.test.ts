@@ -364,6 +364,7 @@ for (const model of MODELS)
       'DM_ORGANIZATION_SCHEMA',
       'DM_SCIM_USER_BASE',
       'DM_SCIM_GROUP_BASE',
+      'DM_APP_ACCOUNTS_USER_ATTRIBUTE',
     ];
     let dir: string;
 
@@ -416,6 +417,8 @@ for (const model of MODELS)
         DM_BULK_IMPORT_SCHEMAS: `users:${bulkSchema}`,
         // Where the account routes find a user
         DM_LDAP_USERS_BASE: `ou=users,${base}`,
+        // And the app accounts find it by uid, as the probe names it
+        DM_APP_ACCOUNTS_USER_ATTRIBUTE: 'uid',
         ...model.env(orgs, base),
         DM_LDAP_FLAT_SCHEMA:
           './static/schemas/twake/users.json,./static/schemas/example/positions.json',
@@ -446,9 +449,6 @@ for (const model of MODELS)
 
       server = new DM();
       await server.ready;
-      // The app accounts find their user by uid, as the probe names it: no
-      // option sets it
-      server.config.app_accounts_user_attribute = 'uid';
       // An instance provider nobody answers at, and attributes the test
       // directory knows
       Object.assign(server.config, {
