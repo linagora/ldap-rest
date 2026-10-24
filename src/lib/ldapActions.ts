@@ -81,15 +81,13 @@ const SYSTEM_OPERATIONS = new Set<string | symbol>([
  * The directory as seen by one HTTP request.
  *
  * `ldapActions`'s own methods take the request as a trailing optional
- * argument, and the authorization plugins hook `ldap*request` and skip every
- * check when it is missing — so omitting it is an authorization bypass that
- * fails silently rather than loudly. Three shipped in the SCIM plugin alone.
+ * argument, which the authorization plugins judge by. One naming none is
+ * made for the request being served, if any (#385); this says which
+ * request is meant rather than leaving it to the context.
  *
  * These methods take no request parameter: it is captured once by
- * `ldapActions.forRequest()`, and forgetting it stops being expressible.
- * Request handlers should bind once and use this; the unbound methods remain
- * for work that genuinely belongs to no request, such as startup and cron
- * tasks, where passing nothing is the deliberate answer.
+ * `ldapActions.forRequest()`. Request handlers should bind once and use
+ * this; the server's own work goes through {@link ldapActions.system}.
  */
 export interface RequestBoundLdap {
   search(
@@ -898,10 +896,10 @@ class ldapActions {
   /**
    * The directory as the server itself, with no request behind it.
    *
-   * Every authorization plugin skips its check when a call carries no
-   * request, so an unbound call is a bypass — a deliberate one where the
-   * work belongs to nobody in particular: a startup task, a cron job, a
-   * uniqueness check, a referential-integrity check. Those must see the
+   * Every authorization plugin judges an operation by its request, and
+   * judges nothing without one. Some work belongs to nobody in particular:
+   * a startup task, a cron job, a uniqueness check, a referential-integrity
+   * check. Those must see the
    * whole directory to be correct: a caller who cannot *read* `uid=jdoe`
    * must still not be handed it as a free identifier, and a reference to an
    * organization they cannot read is still a valid reference.
@@ -998,8 +996,8 @@ class ldapActions {
    *
    * Only the hooks of the plugins with the `authz` role run, and what they
    * return is dropped: the operation, when it is made, runs every hook
-   * again. Without a request in the arguments nobody judges, as for the
-   * operation itself.
+   * again. Without a request in the arguments, the one being served is
+   * judged, as for the operation itself; outside any, nobody judges.
    *
    * @param hook the request hook the operation launches
    * @param args what the operation hands that hook
@@ -1890,6 +1888,10 @@ class ldapActions {
   /**
    * Move an entry to a new location (different parent)
    * Uses LDAP modifyDN with full DN to change both RDN and parent
+   *
+   * Not judged, request or not: a move is the server's, made for a write
+   * already judged — the trash turning a delete into one. A route moving an
+   * entry for its caller uses {@link rename}, which is judged.
    *
    * Note: ldapts provides a high-level API that accepts a full DN as the second parameter,
    * unlike the standard LDAP modifyDN which expects (newRDN, deleteOldRDN, newSuperior).

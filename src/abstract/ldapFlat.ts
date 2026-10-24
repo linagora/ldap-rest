@@ -1581,12 +1581,10 @@ export default abstract class LdapFlat extends DmPlugin {
   /**
    * Change the RDN of an entry.
    *
-   * The request is not optional in practice: `ldapActions` hands it to the
-   * `ldaprenamerequest` hook, and every authorization plugin skips its check
-   * when there is none (`AuthzBase.shouldSkipAuthorization`). Renaming
-   * without one therefore renames without authorization — silently. It stays
-   * optional in the signature for the callers that genuinely belong to no
-   * request, as the rest of this class does.
+   * `ldapActions` hands the request to the `ldaprenamerequest` hook, which
+   * the authorization plugins judge by. Without one, the request being
+   * served is judged; outside any, nobody judges, as for the startup or
+   * scheduled work the optional signature is for.
    *
    * @param id current identifier, or the entry's DN
    * @param newId new identifier, or the entry's new DN

@@ -49,6 +49,8 @@ describe('Twake group routes and the caller', function () {
   // Writes acme's groups, and reads none of its users
   const BLIND_MANAGER = 'tgz.blindmanager';
   const NO_GROUPS = 'tgz.nogroups';
+  /** Writes the groups and reads none of them */
+  const WRITE_ONLY = 'tgz.writeonly';
   let orgs: string;
   const orgDn = (org: string): string => `ou=${org},${orgs}`;
   const users = (org: string): string => `ou=users,${orgDn(org)}`;
@@ -130,6 +132,10 @@ describe('Twake group routes and the caller', function () {
         },
         [NO_USERS]: {
           [users('acme')]: { read: false, write: false, delete: false },
+          [orgDn('acme')]: { read: true, write: false, delete: false },
+        },
+        [WRITE_ONLY]: {
+          [groupBase('acme')]: { read: false, write: true, delete: false },
           [orgDn('acme')]: { read: true, write: false, delete: false },
         },
         [NO_GROUPS]: {
@@ -317,6 +323,15 @@ describe('Twake group routes and the caller', function () {
       .set(as(ADMIN))
       .send({ name: 'Taken name' });
     expect(admin.status).to.equal(409);
+  });
+
+  it('sees a name taken by a group the writer cannot read', async () => {
+    // The uniqueness check is the server's: the whole branch, whoever asks
+    const res = await request
+      .patch(route('acme', `/${OTHER}`))
+      .set(as(WRITE_ONLY))
+      .send({ name: 'Taken name' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(409);
   });
 
   it('refuses a reader to add members, whether they are there or not', async () => {

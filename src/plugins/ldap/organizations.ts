@@ -1554,9 +1554,8 @@ export default class LdapOrganizations extends DmPlugin {
    * The same two searches as `getOrganisationSubnodes`, narrowed by a query.
    *
    * Both go through the helpers that classify a failure rather than reading
-   * every one of them as emptiness (#179), and both now carry the request:
-   * they ran without one, and an authorization plugin skips its check when
-   * there is none — the same gap the flat routes had until 0.8.2. The
+   * every one of them as emptiness (#179), and both carry the request the
+   * authorization plugins judge them by. The
    * attached entries are capped like the other endpoint's, since an answer
    * the directory refuses to finish is what this is about.
    *

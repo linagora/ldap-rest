@@ -979,7 +979,8 @@ export default class TwakeGroups extends LdapGroups {
       req,
     ]);
     if (name !== undefined) {
-      const holder = await this.named(org, name);
+      // As the server: a name is taken whoever may read the group holding it
+      const holder = await outsideRequest(() => this.named(org, name));
       if (holder && holder !== id)
         throw new RouteError(409, 'Group already exists', 'GROUP_EXISTS');
     }

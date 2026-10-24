@@ -441,8 +441,8 @@ export class ScimUsers {
       // directory not at all. Answering 200 without it told a caller with no
       // write permission that its write had succeeded.
       //
-      // `req` must reach ldapActions: the authorization plugins hook
-      // `ldapmodifyrequest` and skip every check when it is missing.
+      // `req` reaches ldapActions bound: the authorization plugins judge
+      // `ldapmodifyrequest` by it.
       try {
         await this.ldap
           .forRequest(req)
