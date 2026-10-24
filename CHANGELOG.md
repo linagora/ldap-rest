@@ -13,9 +13,11 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
 - An operation made while serving a request is judged as its caller, even
   when the code did not hand the request down; `ldap.system` makes one as
   the server, hooks act as the server (`authzDynamic` included), and a lint
-  rule refuses an operation naming neither. The server refuses to start
-  with an authorization plugin and no authentication plugin, which let
-  every request through
+  rule refuses an operation naming neither,
+  [docs](docs/plugin-development/README.md#using-ldap-operations). The
+  server refuses to start with an authorization plugin and no
+  authentication plugin, which let every request through,
+  [docs](docs/usage/plugins/auth/README.md#what-is-refused-at-startup)
   ([#390](https://github.com/linagora/ldap-rest/pull/390),
   [#391](https://github.com/linagora/ldap-rest/pull/391))
 - The authorization plugins judge before any other plugin: the trash let a
@@ -25,8 +27,10 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
 - A write is judged before the route looks in the directory, so a caller
   without the right gets the same 403 whether the entry exists or not:
   renames, flat entries, groups, organizations, moves, tombstones, app
-  accounts, bulk import rows; creating a group no longer creates its
-  external members before it is judged
+  accounts; creating a group no longer creates its external members before
+  it is judged. A bulk import row the caller may not write reports that
+  refusal, whether its entry exists, in a dry run or not,
+  [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
   ([#381](https://github.com/linagora/ldap-rest/pull/381),
   [#384](https://github.com/linagora/ldap-rest/pull/384))
 - `authzPerBranch`: the most specific branch rule applies, whatever the
@@ -35,7 +39,8 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
   rule refusing a permission; a branch cannot be renamed or moved out of a
   rule, nor created, by a caller it refuses; setting the organization link
   along with other changes needs write where the entry stands (read was
-  enough); branches are compared as DNs, however spelled
+  enough); branches are compared as DNs, however spelled,
+  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution)
   ([#388](https://github.com/linagora/ldap-rest/pull/388))
 - The organization link escaped the move check when spelled in another
   case, under its OID or an alias, added rather than replaced, or given
@@ -43,8 +48,8 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
   organization the caller may not write. It is read under any name, adding
   one is judged as a move, and several or empty values are refused. Every
   write names its attributes as the server does: an option other than
-  `;binary`, one attribute named twice, or a rename to another or a
-  multi-valued RDN is refused (400); route checks find schema attributes
+  `;binary`, one attribute named twice, or a rename to an RDN naming
+  another attribute or holding several values is refused (400); route checks find schema attributes
   whatever their case (fixed attributes, group members)
   ([#384](https://github.com/linagora/ldap-rest/pull/384),
   [#405](https://github.com/linagora/ldap-rest/pull/405))
@@ -76,9 +81,10 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
   emptiness check
   ([#403](https://github.com/linagora/ldap-rest/issues/403),
   [#405](https://github.com/linagora/ldap-rest/pull/405))
-- `groups`: a name with a comma answered 500, a DN outside the groups
-  branch was read and written as a group (404 now); the update route wrote
-  fixed attributes
+- `groups`: a name with a comma that is no DN answers 400 (500 before); a
+  DN outside the groups branch answers 404, where it was read and written
+  as a group; the update route no longer writes the attributes the schema
+  fixes
   ([#399](https://github.com/linagora/ldap-rest/pull/399),
   [#405](https://github.com/linagora/ldap-rest/pull/405))
 - Shipped schemas: a mail domain or nomenclature value still referenced is
@@ -91,10 +97,12 @@ stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
 - `passwordPolicy`: unlocking a user that is not there answered 500 (404)
   ([#393](https://github.com/linagora/ldap-rest/pull/393))
 - `externalUsersInGroups` refuses an external member in any mail domain the
-  directory declares, listed in `GET /config` (`managedDomains`)
+  directory declares, listed in `GET /config` (`managedDomains`),
+  [docs](docs/usage/plugins/ldap/external-users.md#important-notes)
   ([#379](https://github.com/linagora/ldap-rest/pull/379))
 - The search cache no longer keeps `memberOf` stale after a membership
-  change ([#377](https://github.com/linagora/ldap-rest/pull/377)); UTF-8
+  change, [docs](docs/usage/configuration.md#the-search-cache)
+  ([#377](https://github.com/linagora/ldap-rest/pull/377)); UTF-8
   hex escapes in DNs are decoded
   ([#376](https://github.com/linagora/ldap-rest/pull/376))
 

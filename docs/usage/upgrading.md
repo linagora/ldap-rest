@@ -210,6 +210,17 @@ branch, read where it stands.
   applicative copy holds the old spelling, which the directory takes for
   the same address.
 
+### External members in a domain the directory declares
+
+**Who is affected:** a deployment of `core/ldap/externalUsersInGroups`
+adding as external members addresses in a mail domain the directory
+declares, without listing it in `--mail-domain`.
+
+Such a member is refused, as one in a `--mail-domain` already was. The
+managed domains are now also those of the directory's domain branches,
+[docs](plugins/ldap/external-users.md#important-notes); `GET /config` lists
+them in `managedDomains`.
+
 ### Quota and app accounts need read access to the account
 
 **Who is affected:** a deployment loading an authorization plugin

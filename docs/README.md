@@ -42,14 +42,16 @@ API, which a minor or a patch release does not break:
 - **Routes**: the paths, bodies and answers of the
   [REST API](client-development/api/rest-api.md) and the plugin pages,
   their statuses and their error `code`s.
-- **Plugin API**: `DmPlugin` and its roles (`auth`, `authz`, …), the
-  [hooks](plugin-development/hooks.md) and their arguments, and the
-  directory operations of [the development guide](plugin-development/README.md):
+- **Plugin API**: what `ldap-rest/plugin` exports — `DmPlugin` and its
+  roles (`auth`, `authz`, …), `asyncHandler`, the DN and filter escaping
+  helpers and the error classes —, the `DM` type of `ldap-rest` and the
+  `Hooks` of `ldap-rest/hooks`, whose arguments are those typed in
+  `src/hooks.ts` ([hooks](plugin-development/hooks.md)), and the directory
+  operations of [the development guide](plugin-development/README.md):
   `ldap.search`, `add`, `modify`, `rename`, `delete`, `ldap.forRequest`,
   `ldap.system`, `ldap.authorize`, `ldap.readableBy`,
   `ldap.canonicalAttributes`, `ldap.canonicalChanges` and
-  `ldap.knowAttributeNames`. The hooks' arguments are those typed in
-  `src/hooks.ts`.
+  `ldap.knowAttributeNames`.
 - **Schemas**: the JSON schema format and the shipped schemas' attributes.
 
 Everything else — other exports, internal helpers, log messages — may
