@@ -98,6 +98,22 @@ describe('LDAP Utils', () => {
       expect(unescapeDnValue('path\\5cname')).to.equal('path\\name');
     });
 
+    it('should decode hex escapes as UTF-8 bytes', () => {
+      expect(unescapeDnValue('ACME-\\C3\\A9')).to.equal('ACME-é');
+      expect(unescapeDnValue('\\E2\\82\\AC\\2C\\F0\\9F\\98\\80')).to.equal(
+        '€,😀'
+      );
+    });
+
+    it('should keep an escaped U+FEFF instead of stripping it as a BOM', () => {
+      expect(unescapeDnValue('a\\EF\\BB\\BFb')).to.equal('a\uFEFFb');
+      expect(unescapeDnValue('\\EF\\BB\\BFabc')).to.equal('\uFEFFabc');
+    });
+
+    it('should keep invalid UTF-8 hex escapes as one char per byte', () => {
+      expect(unescapeDnValue('caf\\E9')).to.equal('café');
+    });
+
     it('should handle normal strings without changes', () => {
       expect(unescapeDnValue('normaluser123')).to.equal('normaluser123');
     });

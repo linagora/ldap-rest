@@ -345,6 +345,8 @@ export function escapeDnValue(value: string): string {
     .replace(/^#/, '\\#'); // leading hash
 }
 
+const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+
 /**
  * Unescape special characters in LDAP DN attribute values according to RFC 4514
  * Reverses the escaping done by escapeDnValue
@@ -372,6 +374,21 @@ export function unescapeDnValue(value: string): string {
 
   let result = '';
   let i = 0;
+  // RFC 4514 hex escapes are the bytes of the value's UTF-8 encoding, so a run
+  // of them (e.g. \C3\A9 for é) must be decoded together, not byte by byte.
+  let bytes: number[] = [];
+  const flushBytes = (): void => {
+    if (bytes.length) {
+      try {
+        result += utf8Decoder.decode(new Uint8Array(bytes));
+      } catch {
+        // Not valid UTF-8 (e.g. a Latin-1 escape from a legacy writer): keep
+        // one char per byte rather than collapsing distinct values to U+FFFD.
+        result += bytes.map(b => String.fromCharCode(b)).join('');
+      }
+      bytes = [];
+    }
+  };
 
   while (i < value.length) {
     if (value[i] === '\\' && i + 1 < value.length) {
@@ -381,21 +398,24 @@ export function unescapeDnValue(value: string): string {
       if (/[0-9a-fA-F]/.test(next) && i + 2 < value.length) {
         const hex = value.substring(i + 1, i + 3);
         if (/^[0-9a-fA-F]{2}$/.test(hex)) {
-          result += String.fromCharCode(parseInt(hex, 16));
+          bytes.push(parseInt(hex, 16));
           i += 3;
           continue;
         }
       }
 
       // Handle standard escaped characters
+      flushBytes();
       result += next;
       i += 2;
     } else {
+      flushBytes();
       result += value[i];
       i++;
     }
   }
 
+  flushBytes();
   return result;
 }
 
