@@ -676,6 +676,12 @@ export default class LdapRaw extends DmPlugin {
      *     content:
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
+     *   '404':
+     *     description: |
+     *       No such base, or one the caller cannot read: both answer alike.
+     *     content:
+     *       application/json:
+     *         schema: { $ref: '#/components/schemas/Error' }
      */
     app.get(
       `${prefix}/search`,
