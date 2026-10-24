@@ -40,6 +40,12 @@
 
 ### Fixes
 
+- `core/ldap/externalUsersInGroups` refuses an external member in a mail
+  domain the directory declares, not only one `--mail-domain` names, and
+  `GET /config` lists those domains in `managedDomains`,
+  [docs](docs/usage/plugins/ldap/external-users.md#important-notes)
+  ([#379](https://github.com/linagora/ldap-rest/pull/379))
+
 - With the search cache on (`--ldap-cache-ttl`), a change of a group's
   members no longer leaves the accounts' `memberOf` stale until the TTL
   runs out, [docs](docs/usage/configuration.md#the-search-cache)

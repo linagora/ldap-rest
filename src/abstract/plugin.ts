@@ -84,7 +84,7 @@ export default abstract class DmPlugin {
   api?(app: Express): MaybePromise<void>;
 
   /* Function to provide configuration for config API */
-  getConfigApiData?(): Record<string, unknown> | undefined;
+  getConfigApiData?(): MaybePromise<Record<string, unknown> | undefined>;
 
   /** Key of that configuration under `features`; the instance name otherwise */
   configApiKey?: string;

@@ -37,7 +37,7 @@ This plugin intercepts group member validation and automatically creates missing
   the address escaped as any DN value (RFC 4514): `mail=a\+b@partner.com,…`
   creates an entry whose `mail` is `a+b@partner.com`. Only the direct children of the
   branch are external members.
-- **Domain Protection**: External users cannot be created if their mail are in managed domains (configured via `--mail-domain`, compared case-insensitively)
+- **Domain Protection**: External users cannot be created if their mail is in a managed domain, compared case-insensitively. The managed domains are those of `--mail-domain` and those the directory declares in its domain branches: the entries of a flat schema declaring the `domainName` role, or else `ou=domains,ou=nomenclature,<base>` with `--enterprise-domain-name-attribute` (`associatedDomain`). A subdomain of a managed domain is not managed: `user@sub.example.com` is external unless `sub.example.com` is declared itself
 - **Automatic Creation**: Users are created automatically when added to a group if they don't exist
 
 ### Config API
@@ -56,7 +56,8 @@ where to send them:
 
 A client turns an address into a member with
 `rdnAttribute=<escaped address>,<branch>`, and can refuse a `managedDomains`
-address before sending it.
+address before sending it. The list holds the domains declared in the
+directory as well as those of `--mail-domain`.
 
 ## How It Works
 
@@ -225,6 +226,9 @@ Protect multiple domains from external user creation:
 --mail-domain example.com,company.org,subsidiary.net
 ```
 
+The domains declared in the directory are protected without being listed
+here.
+
 ### Custom Attributes via Hooks
 
 Add organization-specific attributes to external users:
@@ -261,7 +265,8 @@ hooks: {
 **Solutions:**
 
 1. Use the correct branch for internal users: `ou=users,dc=example,dc=com`
-2. Remove domain from `--mail-domain` if it should allow external users
+2. Remove the domain from `--mail-domain`, or from the directory's domain
+   branches, if it should allow external users
 3. This is expected behavior for internal domains - create user in users branch instead
 
 ### Malformed Member DN
