@@ -191,6 +191,28 @@ function allValues(entry: AttributesList | null, name: string): string[] {
 }
 
 /**
+ * Respell, in place, the keys that name a schema attribute in another case
+ * (`MAIL` for `mail`) the way the schema does, so that the rewrites reading
+ * values by name — the path, the defaults, the sizes — find them. A key with
+ * options names a value of its own, and is left as sent, as is one whose
+ * schema spelling is sent too.
+ *
+ * @param schema the entity's schema
+ * @param values attributes as submitted; mutated
+ */
+function respell(schema: Schema, values: AttributesList | undefined): void {
+  if (!values) return;
+  const names = Object.keys(schema.attributes);
+  for (const key of Object.keys(values)) {
+    if (key.includes(';')) continue;
+    const name = names.find(n => n !== key && spells(key, n));
+    if (!name || name in values) continue;
+    values[name] = values[key];
+    delete values[key];
+  }
+}
+
+/**
  * Canonical form of a DN, or the value itself when it cannot be parsed as
  * one — an unparsable value is simply not the DN we are looking for.
  *
@@ -501,6 +523,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     ldapaddrequest: async ([dn, entry, req]) => {
       const entity = this.resolveEntity(dn);
       if (entity) {
+        respell(entity.schema, entry);
         await this.runChecks(entity, dn, entry, null);
         await this.runTransformations(entity, dn, entry, true);
       }
@@ -512,6 +535,8 @@ export default class LdapEnterpriseRules extends DmPlugin {
     ldapmodifyrequest: async ([dn, changes, op, req]) => {
       const entity = this.resolveEntity(dn);
       if (!entity) return [dn, changes, op, req];
+      respell(entity.schema, changes.add);
+      respell(entity.schema, changes.replace);
 
       // A modify only carries what changes; rules that need the rest of the
       // entry — the organization a mail address is checked against, say — read

@@ -136,7 +136,9 @@
   dates. A move spelled `TWAKEDEPARTMENTLINK` did not recheck the stored
   addresses against the new organization's domains, and a mail sent along
   with it was checked against the old one. The rules apply whatever the
-  spelling. The shipped schemas are strict, so the API refused such names
+  spelling, and a name sent in another case is written as the schema spells
+  it, so the organization path follows such a move and a size is counted in
+  bytes. The shipped schemas are strict, so the API refused such names
   already; the writes of other plugins did not
   ([#404](https://github.com/linagora/ldap-rest/pull/404))
 

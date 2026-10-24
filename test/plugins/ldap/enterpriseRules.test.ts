@@ -633,6 +633,36 @@ describe('Enterprise rules', () => {
           );
       });
 
+      it('should rewrite what is sent in another case of a name', async () => {
+        const res = await request.post('/api/v1/ldap/users').type('json').send({
+          cn: 'Rules Domain',
+          sn: 'Domain',
+          mail: 'rules.domain@example.com',
+          twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0052',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+        const self = `uid=rules.domain,ou=users,${base}`;
+        await server.ldap.modify(self, {
+          replace: { TWAKEDEPARTMENTLINK: orgDn, MAILQUOTASIZE: '5GB' },
+        } as never);
+        const stored = (
+          (await server.ldap.search(
+            {
+              paged: false,
+              scope: 'base',
+              attributes: ['twakeDepartmentPath', 'mailQuotaSize'],
+            },
+            self
+          )) as { searchEntries: Record<string, unknown>[] }
+        ).searchEntries[0];
+        // The path follows the move, the size is counted in bytes
+        expect(stored.twakeDepartmentPath).to.equal('RulesOrg');
+        expect(stored.mailQuotaSize).to.equal('5000000000');
+      });
+
       it('should list a domain linked at several levels once', async () => {
         // #350: the sub-organization links the domain its parent links too
         const link = `dc=example,ou=domains,ou=nomenclature,${base}`;
