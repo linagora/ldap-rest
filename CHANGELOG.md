@@ -4,6 +4,11 @@
 
 ### Fixes
 
+- With the search cache on (`--ldap-cache-ttl`), a change of a group's
+  members no longer leaves the accounts' `memberOf` stale until the TTL
+  runs out, [docs](docs/usage/configuration.md#the-search-cache)
+  ([#374](https://github.com/linagora/ldap-rest/issues/374))
+
 - DN values with UTF-8 hex escapes (`\C3\A9`) are decoded correctly
   (`é`) instead of one character per byte
   ([#376](https://github.com/linagora/ldap-rest/pull/376))

@@ -739,6 +739,94 @@ describe('ldapActions', function () {
         await mailOf(cached, `uid=cachechild,${renamedBranch}`)
       ).to.include('child@test.org');
     });
+
+    // The memberof overlay rewrites the members' `memberOf` when a group
+    // changes: entries the write did not name. The test directory runs it
+    // for `groupOfUniqueNames` only.
+    describe("and a member's memberOf", function () {
+      let groupDn: string;
+      let renamedGroupDn: string;
+
+      const group = (...members: string[]) => ({
+        objectClass: ['top', 'groupOfUniqueNames'],
+        cn: 'cachegroup',
+        uniqueMember: members,
+      });
+
+      const memberOf = async (
+        ldap: LdapActions,
+        dn: string
+      ): Promise<string[]> =>
+        [(await read(ldap, dn, ['memberOf'])).searchEntries[0]?.memberOf ?? []]
+          .flat()
+          .map(value => String(value).toLowerCase());
+
+      const wipeGroups = async () => {
+        const cleaner = build(0);
+        for (const dn of [groupDn, renamedGroupDn]) {
+          try {
+            await cleaner.delete(dn);
+          } catch {
+            /* not there, fine */
+          }
+        }
+      };
+
+      before(function () {
+        groupDn = `cn=cachegroup,${BASE}`;
+        renamedGroupDn = `cn=cachegroupbis,${BASE}`;
+      });
+
+      beforeEach(async () => {
+        await wipeGroups();
+        const direct = build(0);
+        await direct.add(dnA, person('cacheuser', 'a@test.org'));
+        await direct.add(dnB, person('cacheuserbis', 'b@test.org'));
+      });
+      afterEach(wipeGroups);
+
+      it('drops it for a member a modify adds', async () => {
+        const cached = build(60);
+        await build(0).add(groupDn, group(dnB));
+        expect(await memberOf(cached, dnA)).to.be.empty;
+
+        await cached.modify(groupDn, { add: { uniqueMember: dnA } });
+        expect(await memberOf(cached, dnA)).to.include(groupDn.toLowerCase());
+      });
+
+      it('drops it for a member a replace removes', async () => {
+        const cached = build(60);
+        await build(0).add(groupDn, group(dnA));
+        expect(await memberOf(cached, dnA)).to.include(groupDn.toLowerCase());
+
+        // The change names dnB only: dnA is found by what it cached
+        await cached.modify(groupDn, { replace: { uniqueMember: dnB } });
+        expect(await memberOf(cached, dnA)).to.be.empty;
+        expect(await memberOf(cached, dnB)).to.include(groupDn.toLowerCase());
+      });
+
+      it('drops it for the members of a group created, then deleted', async () => {
+        const cached = build(60);
+        expect(await memberOf(cached, dnA)).to.be.empty;
+
+        await cached.add(groupDn, group(dnA));
+        expect(await memberOf(cached, dnA)).to.include(groupDn.toLowerCase());
+
+        await cached.delete(groupDn);
+        expect(await memberOf(cached, dnA)).to.be.empty;
+      });
+
+      it('drops it for the members of a renamed group', async () => {
+        const cached = build(60);
+        await build(0).add(groupDn, group(dnA));
+        expect(await memberOf(cached, dnA)).to.include(groupDn.toLowerCase());
+
+        await cached.rename(groupDn, renamedGroupDn);
+        expect(await memberOf(cached, dnA)).to.deep.equal([
+          renamedGroupDn.toLowerCase(),
+        ]);
+      });
+    });
   });
 
   describe('the LDAP base', function () {
