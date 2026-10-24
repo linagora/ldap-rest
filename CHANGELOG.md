@@ -4,12 +4,28 @@
 
 ### Security
 
+- `core/twake/groups`: the `/organizations/{id}/groups` routes read the
+  directory as the server, so any caller let in got the groups and member
+  profiles of every organization, and could tell which names, users and
+  memberships exist from the answers to writes. They read as the caller, and
+  judge a write before looking for anything. Under a model judging by
+  attachment (`authzLinid1`), groups written in an organization's branch
+  carry its link, so that it gives them to that organization only; whether
+  an organization exists, its spaces and its unlinked users stay every
+  administrator's,
+  [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
+  ([#383](https://github.com/linagora/ldap-rest/pull/383))
 - `core/ldap/bulkImport` judges each row's write before looking in the
   directory for it. A row the caller may not write was reported skipped when
   its entry existed, counted created by a dry run, answered with its
   organization's absence, and refused with the branch the authorization
   plugin named; it now fails with the same refusal in every case,
   [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
+  ([#384](https://github.com/linagora/ldap-rest/pull/384))
+- The authorization plugins read the organization link whatever case a
+  write spells it in, and judge adding a link to an entry that had none as
+  a move: written `twakedepartmentlink`, a link escaped the move check, and
+  an entry could be attached to an organization the caller may not write
   ([#384](https://github.com/linagora/ldap-rest/pull/384))
 
 - The authorization plugins judge an LDAP operation before any other
@@ -35,6 +51,12 @@
   ([#381](https://github.com/linagora/ldap-rest/pull/381))
 
 ### Fixes
+
+- `core/ldap/externalUsersInGroups` refuses an external member in a mail
+  domain the directory declares, not only one `--mail-domain` names, and
+  `GET /config` lists those domains in `managedDomains`,
+  [docs](docs/usage/plugins/ldap/external-users.md#important-notes)
+  ([#379](https://github.com/linagora/ldap-rest/pull/379))
 
 - With the search cache on (`--ldap-cache-ttl`), a change of a group's
   members no longer leaves the accounts' `memberOf` stale until the TTL

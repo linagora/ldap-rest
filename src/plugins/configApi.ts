@@ -10,7 +10,7 @@
  */
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../abstract/plugin';
+import DmPlugin, { type Role, asyncHandler } from '../abstract/plugin';
 import { wantJson } from '../lib/expressFormatedResponses';
 
 interface ConfigApiResponse {
@@ -116,17 +116,20 @@ export default class ConfigApi extends DmPlugin {
      *                 schema: /static/schemas/:name
      *                 schemaInSubdir: /static/schemas/:dir/:name
      */
-    app.get(`${apiPrefix}/v1/config`, (req: Request, res: Response) => {
-      if (!wantJson(req, res)) return;
+    app.get(
+      `${apiPrefix}/v1/config`,
+      asyncHandler(async (req: Request, res: Response) => {
+        if (!wantJson(req, res)) return;
 
-      const config: ConfigApiResponse = {
-        apiPrefix: apiPrefix,
-        ldapBase: this.config.ldap_base || '',
-        features: this.collectPluginConfigs(),
-      };
+        const config: ConfigApiResponse = {
+          apiPrefix: apiPrefix,
+          ldapBase: this.config.ldap_base || '',
+          features: await this.collectPluginConfigs(),
+        };
 
-      res.json(config);
-    });
+        res.json(config);
+      })
+    );
 
     this.logger.info(`Configuration API registered at ${apiPrefix}/v1/config`);
   }
@@ -134,7 +137,7 @@ export default class ConfigApi extends DmPlugin {
   /**
    * Collect configuration from all plugins with 'configurable' role
    */
-  private collectPluginConfigs(): Record<string, unknown> {
+  private async collectPluginConfigs(): Promise<Record<string, unknown>> {
     const features: Record<string, unknown> = {};
 
     // Iterate through all loaded plugins
@@ -147,7 +150,7 @@ export default class ConfigApi extends DmPlugin {
       // Check if plugin has 'configurable' role
       if (plugin.roles?.includes('configurable') && plugin.getConfigApiData) {
         try {
-          const pluginConfig = plugin.getConfigApiData();
+          const pluginConfig = await plugin.getConfigApiData();
           if (pluginConfig) {
             features[plugin.configApiKey ?? pluginName] = pluginConfig;
           }

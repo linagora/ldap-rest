@@ -131,6 +131,14 @@ export default abstract class AuthzBase extends DmPlugin {
   }
 
   /**
+   * Whether this plugin judges entries by their organization link: a plugin
+   * writing entries in an organization's branch gives them one then.
+   */
+  judgesByAttachment(): boolean {
+    return this.filtersAttachedEntries();
+  }
+
+  /**
    * Branches the broad read of `filtersAttachedEntries` leaves out: there,
    * only a caller holding the branch reads. None unless a plugin names some.
    */
