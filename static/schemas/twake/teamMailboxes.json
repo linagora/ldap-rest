@@ -80,7 +80,9 @@
       }
     },
     "twakeMailboxType": {
-      "type": "string",
+      "type": "pointer",
+      "branch": ["ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__"],
+      "referentialIntegrity": "restrict",
       "default": "cn=teamMailbox,ou=twakeMailboxType,ou=nomenclature,__LDAP_BASE__",
       "fixed": true,
       "required": true,

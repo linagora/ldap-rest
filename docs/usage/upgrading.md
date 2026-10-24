@@ -16,7 +16,9 @@ entry holds (account status, delivery mode, personal title, list type,
 mailbox type), answers `409 still referenced` instead of leaving the
 reference naming nothing. Change the referrers first. A deployment with
 its own schemas marks its pointers `"referentialIntegrity": "restrict"` to
-get the same.
+get the same. References are looked for under the base each entity is
+configured with; a base the directory does not hold is logged once and
+holds none.
 
 ### Plugins: an operation naming no request is judged as the caller
 

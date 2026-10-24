@@ -1047,11 +1047,10 @@ export default class LdapEnterpriseRules extends DmPlugin {
       try {
         referrers = await this.searchReferrers(candidate, dn);
       } catch (err) {
-        // 32 noSuchObject: the branch to look in is gone, and nothing in it.
-        if (extractLdapCode(err) !== 32)
-          this.logger.error(
-            `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
-          );
+        // A branch that is gone holds nothing: searchReferrers answers that
+        this.logger.error(
+          `Delete of ${dn}: could not look for ${candidate.name} references: ${String(err)}`
+        );
         continue;
       }
       for (const entry of referrers) {
@@ -1137,6 +1136,9 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @param dn DN to look for
    * @returns the matching entries, carrying that attribute
    */
+  /** The bases found missing, said once each */
+  private readonly missingBases = new Set<string>();
+
   private async searchReferrers(
     candidate: ReferringAttribute,
     dn: string
@@ -1154,9 +1156,17 @@ export default class LdapEnterpriseRules extends DmPlugin {
       )
       .catch((err: unknown) => {
         // A branch the directory does not hold holds no reference: a schema
-        // loaded for an entity this deployment has none of
-        if (extractLdapCode(err) === 32) return { searchEntries: [] };
-        throw err;
+        // loaded for an entity this deployment has none of. Said once, as a
+        // base set wrong would turn the restriction off without a word.
+        if (extractLdapCode(err) !== 32) throw err;
+        const base = candidate.binding.base;
+        if (!this.missingBases.has(base)) {
+          this.missingBases.add(base);
+          this.logger.warn(
+            `${this.name}: ${base} is not in the directory: no reference to an entry is looked for there`
+          );
+        }
+        return { searchEntries: [] };
       })) as SearchResult;
     return (result.searchEntries || []) as Record<string, unknown>[];
   }
