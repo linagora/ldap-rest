@@ -63,8 +63,12 @@ check that justified it.
   non-individual entries.
 - `filter` narrows the search, e.g. `(objectClass=twakeAccount)`.
 
-On an update the entry being modified is excluded from the search, so
-re-sending an unchanged value never conflicts with itself.
+On an update, a value the entry already holds, under any of the attributes
+the constraint spans and whatever its case, is not checked again: it was
+when it was set. Re-sending an unchanged value never conflicts with the
+entry itself, nor with the copies other plugins keep of it — the
+applicative accounts of `appAccountsConsistency` carry the account's mail.
+Only the values the entry does not hold yet are looked for.
 
 ### Mail domains
 

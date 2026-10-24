@@ -123,6 +123,13 @@
 
 ### Fixes
 
+- `core/ldap/enterpriseRules`: saving an account with its mail unchanged
+  answered `409 … is already used` once `appAccountsConsistency` had made
+  its applicative entry, which carries the same mail. A value the entry
+  already holds is no longer checked again on an update; only the values it
+  does not hold yet are
+  ([#402](https://github.com/linagora/ldap-rest/issues/402))
+
 - `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
   and `…/subnodes/search` looked for the attached entries from the parent of
   the top organization only, and answered 403 to an administrator held to

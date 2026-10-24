@@ -1201,7 +1201,6 @@ for (const model of MODELS)
     });
     const ORG_EXISTS =
       'an organization carries no link: every administrator reads it';
-    let freeMail = 0;
     let created = 0;
     const TAKEN =
       'a name is taken whoever may read the entry holding it: uniqueness answers about the whole directory';
@@ -1278,8 +1277,9 @@ for (const model of MODELS)
         path: () => '/api/v1/ldap/users/probe-muser',
         vary: () => ({
           there: `probe-them@${SECRET}.example`,
-          // Another each time: an address given is held by the account
-          absent: `probe-free${++freeMail}@example.org`,
+          // Sent again by the administrator: the account's own copies do
+          // not hold it against it (#402)
+          absent: 'probe-free@example.org',
         }),
         body: target => ({ replace: { mail: target } }),
         attachedOnly: true,

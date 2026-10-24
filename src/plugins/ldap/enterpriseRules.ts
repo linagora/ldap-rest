@@ -574,7 +574,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
       if (list.length === 0) continue;
 
       if (attr.unique) {
-        await this.checkUnique(entity, name, attr, list, current ? dn : null);
+        await this.checkUnique(entity, name, attr, list, dn, current);
       }
       if (attr.mailDomainScope) {
         await this.checkMailDomains(entity, name, attr, list, values, current);
@@ -711,8 +711,14 @@ export default class LdapEnterpriseRules extends DmPlugin {
    * @param entity entity the entry belongs to
    * @param name attribute being checked
    * @param attr its schema definition
+   * A value the entry already holds, under one of the attributes the
+   * constraint spans, is not checked again: it was when it was set, and the
+   * copies other plugins keep of the entry — the applicative accounts of
+   * `appAccountsConsistency` carry its mail — would hold it against it.
+   *
    * @param values values submitted for it
-   * @param selfDn DN to exclude, on a modification
+   * @param dn entry being written
+   * @param current entry as stored, on a modification; its DN is excluded
    * @throws ConflictError naming the entry that already holds the value
    */
   private async checkUnique(
@@ -720,11 +726,20 @@ export default class LdapEnterpriseRules extends DmPlugin {
     name: string,
     attr: SchemaAttribute,
     values: string[],
-    selfDn: string | null
+    dn: string,
+    current: AttributesList | null
   ): Promise<void> {
     const constraint: UniqueConstraint =
       typeof attr.unique === 'object' ? attr.unique : {};
     const attributes = [name, ...(constraint.attributes || [])];
+    const selfDn = current ? dn : null;
+    const held = new Set(
+      current
+        ? attributes.flatMap(a =>
+            valueList(current[a]).map(v => v.toLowerCase())
+          )
+        : []
+    );
     // `branches` widens the search, it does not move it: it used to *replace*
     // the entity's own base, so a schema naming only a neighbouring branch —
     // the lists a mail address is also shared with, say — stopped enforcing
@@ -735,6 +750,7 @@ export default class LdapEnterpriseRules extends DmPlugin {
     for (const value of values) {
       if (constraint.sentinel !== undefined && value === constraint.sentinel)
         continue;
+      if (held.has(value.toLowerCase())) continue;
       const terms = attributes
         .map(a => `(${a}=${escapeLdapFilter(value)})`)
         .join('');

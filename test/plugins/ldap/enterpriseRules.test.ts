@@ -466,6 +466,56 @@ describe('Enterprise rules', () => {
           .send({ replace: { employeeNumber: 'E999', sn: 'Changed' } });
         expect(res.status).to.equal(200);
       });
+
+      it('should not hold a copy of the entry against it (#402)', async () => {
+        // What `appAccountsConsistency` keeps of an account: an entry of its
+        // own, elsewhere, carrying the account's mail
+        const copies = `ou=rulescopies,${base}`;
+        const copy = `uid=rules.uniq@example.com,${copies}`;
+        await server.ldap
+          .add(copies, { objectClass: ['top', 'organizationalUnit'] } as never)
+          .catch(() => undefined);
+        try {
+          await create('rules.uniq@example.com', {
+            mailAlternateAddress: ['rules.alias@example.com'],
+          }).expect(201);
+          await server.ldap.add(copy, {
+            objectClass: ['top', 'twakeAccount'],
+            uid: 'rules.uniq@example.com',
+            mail: 'RULES.UNIQ@example.com',
+            mailAlternateAddress: 'rules.alias@example.com',
+          } as never);
+          // The whole entry saved again, its values unchanged, in another
+          // case, or moved between the attributes the constraint spans
+          for (const replace of [
+            { mail: 'rules.uniq@example.com', sn: 'Changed' },
+            { mail: 'Rules.Uniq@Example.com' },
+            {
+              mail: 'rules.alias@example.com',
+              mailAlternateAddress: ['rules.uniq@example.com'],
+            },
+          ]) {
+            const res = await request
+              .put('/api/v1/ldap/users/rules.uniq')
+              .type('json')
+              .send({ replace });
+            expect(res.status, JSON.stringify(res.body)).to.equal(200);
+          }
+        } finally {
+          await server.ldap.delete(copy).catch(() => undefined);
+          await server.ldap.delete(copies).catch(() => undefined);
+        }
+      });
+
+      it('should still refuse a value the entry does not hold', async () => {
+        await create('rules.uniq@example.com').expect(201);
+        await create('rules.other@example.com').expect(201);
+        const res = await request
+          .put('/api/v1/ldap/users/rules.other')
+          .type('json')
+          .send({ replace: { mail: 'rules.uniq@example.com' } });
+        expect(res.status).to.equal(409);
+      });
     });
 
     describe('mail domains', () => {
