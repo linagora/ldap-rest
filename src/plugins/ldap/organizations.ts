@@ -1295,6 +1295,9 @@ export default class LdapOrganizations extends DmPlugin {
     entry: AttributesList,
     req?: Request
   ): Promise<boolean> {
+    // Before the checks reading the directory: a pointer leading nowhere is
+    // not for a caller who may not create here
+    await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
     // Validate with schema if available
     await this.validateNewOrganization(dn, entry);
     // Hooks will validate the organization link and path
@@ -1306,6 +1309,13 @@ export default class LdapOrganizations extends DmPlugin {
     changes: ModifyRequest,
     req?: Request
   ): Promise<boolean> {
+    // Before the checks reading the directory, as on a creation
+    await this.server.ldap.authorize('ldapmodifyrequest', [
+      dn,
+      changes,
+      this.opNumber(),
+      req,
+    ]);
     // Validate with schema if available
     await this.validateChanges(dn, changes);
     // Hooks will validate any changes to organization link and path
@@ -1443,6 +1453,17 @@ export default class LdapOrganizations extends DmPlugin {
     targetOrgDn: string,
     req?: Request
   ): Promise<{ newDn: string }> {
+    // Extract the RDN (relative DN) from the source DN
+    // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
+    const rdn = getRdn(dn);
+
+    // Construct the new DN
+    const newDn = `${rdn},${targetOrgDn}`;
+
+    // Judged before either organization is read, as the server: whether they
+    // are there is not for a caller who may not move one there
+    await this.server.ldap.authorize('ldaprenamerequest', [dn, newDn, req]);
+
     // Validate that target organization exists.
     // ldap.search throws on NoSuchObject; treat both that and an empty
     // result set as "not found" (404).
@@ -1466,13 +1487,6 @@ export default class LdapOrganizations extends DmPlugin {
         `Target ${targetOrgDn} is not an organizational unit`
       );
     }
-
-    // Extract the RDN (relative DN) from the source DN
-    // e.g., "ou=IT,ou=Departments,dc=example,dc=com" -> "ou=IT"
-    const rdn = getRdn(dn);
-
-    // Construct the new DN
-    const newDn = `${rdn},${targetOrgDn}`;
 
     // Verify the organization to move exists
     let sourceOrg: SearchResult;

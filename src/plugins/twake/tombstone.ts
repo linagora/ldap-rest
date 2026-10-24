@@ -219,6 +219,9 @@ export default class TwakeTombstone extends DmPlugin {
     dn: string,
     { force = false, req }: { force?: boolean; req?: Request } = {}
   ): Promise<void> {
+    // Judged before the tombstone is read, as the server: whether there is
+    // one, and since when, is not for a caller who may not erase it
+    await this.server.ldap.authorize('ldapdeleterequest', [dn, req]);
     const entry = await this.read(dn);
     if (!entry || !isTombstone(entry, this.attrs))
       throw new NotFoundError(`No tombstone at ${dn}`);
