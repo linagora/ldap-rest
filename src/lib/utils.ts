@@ -698,25 +698,14 @@ export function rdnValue(dn: string): string {
  * ```
  */
 export function isChildOf(dn: string, parentDn: string): boolean {
-  const dnLower = dn.toLowerCase();
-  const parentLower = parentDn.toLowerCase();
-
-  // DN must end with parent DN
-  if (!dnLower.endsWith(parentLower)) {
+  // RDN by RDN: a suffix of the text took `cn=a\,ou=users,…`, an entry
+  // beside `ou=users`, for one of its children. A DN that cannot be parsed
+  // is no child.
+  try {
+    return isDnInBranch(dn, parentDn) && !isDnInBranch(parentDn, dn);
+  } catch {
     return false;
   }
-
-  // DN must be longer than parent (it's a child, not the same)
-  if (dnLower.length === parentLower.length) {
-    return false;
-  }
-
-  // Check that there's a comma separator before the parent DN part
-  const beforeParent = dnLower.substring(
-    0,
-    dnLower.length - parentLower.length
-  );
-  return beforeParent.endsWith(',');
 }
 
 /** A DN value's escapes: a run of hex pairs, or one escaped character. */

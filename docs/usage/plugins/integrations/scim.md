@@ -322,7 +322,10 @@ included. A group left with no member the caller saw gets the
 
 A member is resolved as the caller sees the directory, whether it is given
 by id or by DN: an account the caller cannot read is left out of the group,
-as one that does not exist is. A DN outside the user base is left out too.
+as one that does not exist is. Under an authorization model judging by
+branch, a member in a branch the caller may not read refuses the whole write
+instead, whether the account exists or not. A DN outside the user base is
+left out.
 
 ### Schema advertisement
 

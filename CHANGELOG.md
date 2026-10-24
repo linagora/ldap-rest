@@ -19,8 +19,11 @@
 
 - `core/scim`: a group member given as a DN under the user base was taken
   as it stood, so a caller could put in its group an account it may not
-  read. It is looked up as the caller, as a member given by id is, and left
-  out when the caller cannot read it. A DN naming no entry is left out too
+  read. It is looked up as the caller, as a member given by id is: left
+  out when the caller cannot read it, or the write refused when its branch
+  is refused. A DN naming no entry is left out too. A DN is compared to the
+  base RDN by RDN: `cn=a\,ou=users,…` was taken for an entry of
+  `ou=users,…`
   ([#401](https://github.com/linagora/ldap-rest/pull/401))
 
 - `core/scim`: `PUT /Users/{id}` answered `User … not found` for a user
