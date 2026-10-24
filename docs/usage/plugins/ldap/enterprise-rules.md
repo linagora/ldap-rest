@@ -72,7 +72,9 @@ another attribute the constraint spans, an alias becoming the mail, is
 skipped only when that attribute's own constraint looks for it everywhere
 this one does; otherwise it is checked. A duplicate the directory already
 holds, from before the rule or another tool, is therefore not reported on a
-re-save.
+re-save. A value spelled differently is a new one, and looked for: changing
+only the case of an account's mail is refused while an applicative copy
+holds the old spelling, which the directory takes for the same address.
 
 ### Mail domains
 
