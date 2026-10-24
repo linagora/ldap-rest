@@ -43,9 +43,22 @@ it is deleted. Errors are `{ "error": "...", "code": "..." }`. A request an
 authorization plugin refuses answers 403 `REFUSED`.
 
 The routes read as the caller: the authorization plugins decide which groups
-and members it gets, and a group it cannot read answers 404. A write is
-judged before anything is looked for, so a caller who may not make it gets
-403 whether the name is taken, the users exist or they are already members.
+and members it gets. A group it cannot read answers 404, a user it cannot
+read is not found (404 `USER_NOT_FOUND` when adding it), and a member it
+cannot read lists as `{ "uid": "..." }`. A write is judged before anything
+is looked for, so a caller who may not make it gets 403 whether the name is
+taken, the users exist or they are already members.
+
+What the caller may read is the authorization model's to say:
+
+- A model judging by branch (`core/auth/authzPerBranch`) gives an
+  organization's groups and users to the callers granted its branch.
+- A model judging entries by their organization link (`core/auth/authzLinid1`,
+  or `--authz-filter-attached-entries`) gives every administrator the entries
+  carrying no link, and the groups made by these routes carry none.
+- A plugin judging every read made for the request, as
+  `core/auth/authzDynamic` does, refuses the organization check itself: 403
+  `REFUSED`, whether the organization exists or not.
 
 A group reads:
 

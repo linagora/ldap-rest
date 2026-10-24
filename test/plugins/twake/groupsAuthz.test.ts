@@ -39,6 +39,9 @@ describe('Twake group routes and the caller', function () {
   const OUTSIDER = 'tgz.outsider';
   const READER = 'tgz.reader';
   const ADMIN = 'tgz.admin';
+  // May read acme, but not its users, or not its groups
+  const NO_USERS = 'tgz.nousers';
+  const NO_GROUPS = 'tgz.nogroups';
   let orgs: string;
   const orgDn = (org: string): string => `ou=${org},${orgs}`;
   const users = (org: string): string => `ou=users,${orgDn(org)}`;
@@ -84,6 +87,16 @@ describe('Twake group routes and the caller', function () {
           [orgDn('acme')]: { read: true, write: false, delete: false },
         },
         [ADMIN]: { [orgs]: { read: true, write: true, delete: true } },
+        // The narrower branch first: an entry below both takes the rule of
+        // the first branch holding it
+        [NO_USERS]: {
+          [users('acme')]: { read: false, write: false, delete: false },
+          [orgDn('acme')]: { read: true, write: false, delete: false },
+        },
+        [NO_GROUPS]: {
+          [groupBase('acme')]: { read: false, write: false, delete: false },
+          [orgDn('acme')]: { read: true, write: false, delete: false },
+        },
       },
       groups: {},
     });
@@ -220,6 +233,27 @@ describe('Twake group routes and the caller', function () {
       .set(as(READER));
     expect(members.status).to.equal(200);
     expect(members.body.members[0]).to.include({ uid: MEMBER });
+  });
+
+  it('lists a member the caller cannot read by its uid only', async () => {
+    const res = await request
+      .get(route('acme', `/${GROUP}/members`))
+      .set(as(NO_USERS));
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(res.body.members).to.deep.equal([{ uid: MEMBER }]);
+  });
+
+  it('gives no group to a caller who cannot read them', async () => {
+    const group = await request
+      .get(route('acme', `/${GROUP}`))
+      .set(as(NO_GROUPS));
+    expect(group.status, JSON.stringify(group.body)).to.equal(404);
+    const members = await request
+      .get(route('acme', `/${GROUP}/members`))
+      .set(as(NO_GROUPS));
+    expect(members.status).to.equal(404);
+    const list = await request.get(route('acme')).set(as(NO_GROUPS));
+    expect(JSON.stringify(list.body)).to.not.include(GROUP);
   });
 
   it('refuses a reader a creation before saying the name is taken', async () => {

@@ -573,6 +573,9 @@ export default class TwakeGroups extends LdapGroups {
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
     const dn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    // First, so that an organization the caller cannot read costs the same
+    // as one that is not there
+    if (!(await this.ldap.readableBy(dn, req))) throw notFound('organization');
     let entry: AttributesList | undefined;
     try {
       const found = (await this.ldap.search(
@@ -583,8 +586,7 @@ export default class TwakeGroups extends LdapGroups {
     } catch (err) {
       if (extractLdapCode(err) !== 32) throw err;
     }
-    if (!entry || !(await this.ldap.readableBy(dn, req)))
-      throw notFound('organization');
+    if (!entry) throw notFound('organization');
     const deleted =
       this.config.twake_group_organization_deleted_value || 'deleted';
     if (read(entry, status) === deleted)
@@ -1005,7 +1007,8 @@ export default class TwakeGroups extends LdapGroups {
     const group = await this.readGroup(org, id);
     if (!group) throw notFound('group');
     const found = new Map(
-      (await this.users(org, wanted, [this.userAttribute])).map(e => {
+      // As the caller: users it may not read are users it does not find
+      (await this.users(org, wanted, [this.userAttribute], req)).map(e => {
         const name = read(e, this.userAttribute) || '';
         return [name.toLowerCase(), name];
       })
