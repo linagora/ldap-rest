@@ -3,18 +3,19 @@
 ## v1.0.0 (2026-10-24)
 
 Authorization fails closed: every operation made for a request is judged
-as its caller, before any other plugin and before a route looks in the
-directory. The public API is declared stable,
-[docs](docs/README.md#api-stability). Breaking changes since 0.26:
+as its caller unless made as the server (`ldap.system`), and a write is
+judged before the route looks in the directory. The public API is declared
+stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
 [upgrading](docs/usage/upgrading.md#from-026-to-100).
 
 ### Security
 
 - An operation made while serving a request is judged as its caller, even
   when the code did not hand the request down; `ldap.system` makes one as
-  the server, and a lint rule refuses an operation naming neither. The
-  server refuses to start with an authorization plugin and no
-  authentication plugin, which let every request through
+  the server, hooks act as the server (`authzDynamic` included), and a lint
+  rule refuses an operation naming neither. The server refuses to start
+  with an authorization plugin and no authentication plugin, which let
+  every request through
   ([#390](https://github.com/linagora/ldap-rest/pull/390),
   [#391](https://github.com/linagora/ldap-rest/pull/391))
 - The authorization plugins judge before any other plugin: the trash let a
@@ -24,27 +25,42 @@ directory. The public API is declared stable,
 - A write is judged before the route looks in the directory, so a caller
   without the right gets the same 403 whether the entry exists or not:
   renames, flat entries, groups, organizations, moves, tombstones, app
-  accounts, bulk import rows
+  accounts, bulk import rows; creating a group no longer creates its
+  external members before it is judged
   ([#381](https://github.com/linagora/ldap-rest/pull/381),
   [#384](https://github.com/linagora/ldap-rest/pull/384))
 - `authzPerBranch`: the most specific branch rule applies, whatever the
-  order the rules are written in; `default` is a fallback; branches are
-  compared as DNs, however spelled
+  order the rules are written in, in reads, writes and searches — a
+  restriction on a sub-branch was ignored; `default` no longer overrides a
+  rule refusing a permission; a branch cannot be renamed or moved out of a
+  rule, nor created, by a caller it refuses; setting the organization link
+  along with other changes needs write where the entry stands (read was
+  enough); branches are compared as DNs, however spelled
   ([#388](https://github.com/linagora/ldap-rest/pull/388))
-- The organization link is read under any case, alias or OID, and adding
-  one is judged as a move; a link naming several organizations, or empty,
-  is refused. Every write names its attributes as the server does: an
-  option other than `;binary`, one attribute named twice, or a rename to
-  another or a multi-valued RDN is refused (400). Route checks find schema
-  attributes whatever their case (fixed attributes, group members)
+- The organization link escaped the move check when spelled in another
+  case, under its OID or an alias, added rather than replaced, or given
+  several values: an account or a group could be attached to an
+  organization the caller may not write. It is read under any name, adding
+  one is judged as a move, and several or empty values are refused. Every
+  write names its attributes as the server does: an option other than
+  `;binary`, one attribute named twice, or a rename to another or a
+  multi-valued RDN is refused (400); route checks find schema attributes
+  whatever their case (fixed attributes, group members)
   ([#384](https://github.com/linagora/ldap-rest/pull/384),
   [#405](https://github.com/linagora/ldap-rest/pull/405))
-- Routes no longer tell what exists where the caller cannot read, nor
-  answer it: quota and app accounts, organization groups and their
-  members, `raw` children and search, SCIM users and group members given
-  by DN
+- `twake/groups`: any caller got the groups and member profiles of every
+  organization; the routes read as the caller, and under an attachment
+  model a group carries its organization's link
+  ([#383](https://github.com/linagora/ldap-rest/pull/383))
+- SCIM: a member given by DN was taken as it stood, so a caller could put
+  in its group an account it may not read; it is looked up as the caller.
+  A DN is compared to the user base RDN by RDN
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+- Routes no longer tell whether an entry exists where the caller cannot
+  read it: quota and app accounts, `raw` children and search, SCIM
+  `PUT /Users/{id}`. Uniqueness (409) and schema pointers still answer
+  about the whole directory, by design
   ([#381](https://github.com/linagora/ldap-rest/pull/381),
-  [#383](https://github.com/linagora/ldap-rest/pull/383),
   [#393](https://github.com/linagora/ldap-rest/pull/393),
   [#401](https://github.com/linagora/ldap-rest/pull/401))
 
@@ -66,7 +82,8 @@ directory. The public API is declared stable,
   ([#399](https://github.com/linagora/ldap-rest/pull/399),
   [#405](https://github.com/linagora/ldap-rest/pull/405))
 - Shipped schemas: a mail domain or nomenclature value still referenced is
-  not deleted (409)
+  not deleted (409); a schema whose branch is absent no longer refuses
+  every delete
   ([#398](https://github.com/linagora/ldap-rest/pull/398))
 - `james`: a mailbox type pointer written `CN=TeamMailbox,…` skipped the
   team mailbox checks
@@ -74,7 +91,7 @@ directory. The public API is declared stable,
 - `passwordPolicy`: unlocking a user that is not there answered 500 (404)
   ([#393](https://github.com/linagora/ldap-rest/pull/393))
 - `externalUsersInGroups` refuses an external member in any mail domain the
-  directory declares
+  directory declares, listed in `GET /config` (`managedDomains`)
   ([#379](https://github.com/linagora/ldap-rest/pull/379))
 - The search cache no longer keeps `memberOf` stale after a membership
   change ([#377](https://github.com/linagora/ldap-rest/pull/377)); UTF-8

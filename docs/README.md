@@ -46,7 +46,10 @@ API, which a minor or a patch release does not break:
   [hooks](plugin-development/hooks.md) and their arguments, and the
   directory operations of [the development guide](plugin-development/README.md):
   `ldap.search`, `add`, `modify`, `rename`, `delete`, `ldap.forRequest`,
-  `ldap.system`, `ldap.authorize`, `ldap.readableBy`.
+  `ldap.system`, `ldap.authorize`, `ldap.readableBy`,
+  `ldap.canonicalAttributes`, `ldap.canonicalChanges` and
+  `ldap.knowAttributeNames`. The hooks' arguments are those typed in
+  `src/hooks.ts`.
 - **Schemas**: the JSON schema format and the shipped schemas' attributes.
 
 Everything else — other exports, internal helpers, log messages — may

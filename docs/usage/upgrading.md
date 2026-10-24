@@ -190,6 +190,25 @@ for org in $(ldapsearch $OPTS -LLL -s one -b "$ORGS" '(ou=*)' ou |
 done | ldapmodify $OPTS
 ```
 
+### The organization link holds one organization
+
+**Who is affected:** a client or a CSV writing several organization links on
+one entry, or an empty one.
+
+A write giving the organization link (`--ldap-organization-link-attribute`)
+several values, or an empty value, is refused with a 400: only one of them
+was judged. Under any spelling of the attribute, adding a link to an entry
+that had none is judged as a move: read where it stands, write where it goes.
+
+### Smaller changes in answers
+
+- `GET /api/v1/ldap/raw/search` below a base the caller may not read
+  answers 404, as for a base that is not there; under `authzPerBranch`
+  judging by DN it answered 403.
+- Changing only the case of an account's mail is refused (409) while an
+  applicative copy holds the old spelling, which the directory takes for
+  the same address.
+
 ### Quota and app accounts need read access to the account
 
 **Who is affected:** a deployment loading an authorization plugin
