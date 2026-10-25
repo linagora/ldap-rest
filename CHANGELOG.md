@@ -1,34 +1,34 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 (2026-10-25)
+
+Two changes need a check before deploying,
+[upgrading](docs/usage/upgrading.md#from-10-to-110).
 
 ### Security
 
-- The files `core/static` serves, an administration console among them,
-  cannot be framed by another origin, another sub-domain or port included:
-  `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, set by
-  `--static-csp` and `--static-frame-options`. A portal that frames them
-  must now be named, [upgrading](docs/usage/upgrading.md#unreleased). Every
-  response carries `X-Content-Type-Options: nosniff`, and none names Express
-  in `X-Powered-By` (#407),
-  [docs](docs/usage/plugins/utilities/static.md#security-headers)
+- `core/static`: the files it serves cannot be framed by another origin
+  (`frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`); a portal that
+  frames them must be named with `--static-csp` and
+  `--static-frame-options`,
+  [docs](docs/usage/plugins/utilities/static.md#security-headers). Every
+  response carries `X-Content-Type-Options: nosniff`, none `X-Powered-By`
+  ([#407](https://github.com/linagora/ldap-rest/issues/407),
+  [#409](https://github.com/linagora/ldap-rest/pull/409))
 
 ### Breaking Changes
 
-- An empty `--static-name` is `static`, as the configuration API and SCIM
-  already announced, not the root; the slashes around it are left out, and
-  a name Express would not match as written stops the server at startup,
-  [upgrading](docs/usage/upgrading.md#--static-name-an-empty-value-is-static)
+- An empty `--static-name` is `static`, as announced, not the root; a name
+  Express would not match as written stops the server at startup
+  ([#409](https://github.com/linagora/ldap-rest/pull/409))
 
 ### Fixes
 
-- The configuration API gives SCIM's schema files (`schemaUrls`) the URL
-  of the static plugin that serves the very files SCIM reads. A static
-  plugin with a `--static-name` of its own had them announced under
-  `/static`, which answered 404; one loaded under another name had none;
-  with `--schemas-path` elsewhere, the shipped copies were announced.
-  `schemaUrls` is now left out when no static plugin serves them, and
-  `defaultMapping` when the template is not beside them (#411)
+- SCIM's schema files (`schemaUrls` in `GET /config`) are announced at the
+  URL of the static plugin serving them, which `--static-name` or
+  `--schemas-path` could make answer 404
+  ([#411](https://github.com/linagora/ldap-rest/issues/411),
+  [#412](https://github.com/linagora/ldap-rest/pull/412))
 
 ## v1.0.1 (2026-10-25)
 
