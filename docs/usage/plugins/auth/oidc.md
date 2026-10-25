@@ -121,6 +121,14 @@ A provider whose discovery document names no `end_session_endpoint` gets a
 local logout — the cookie is dropped, the browser goes to `--base-url` — and
 a warning saying the provider may log the caller back in.
 
+The session itself ends here only with [`core/bcl`](back-channel-logout.md)
+loaded. The cookie holds the whole session, so dropping it ends the
+browser's copy: a copy kept elsewhere — a shared computer, a backup of the
+browser profile, a stolen cookie — keeps working until its tokens expire.
+With `core/bcl`, `/logout` records the session it ends, named by an id given
+at login, and that copy is refused. Without it, the first `/logout` logs a
+warning saying so.
+
 `GET /v1/config` (with `core/configApi`) publishes the route, so a front-end
 knows it can offer a sign-out control. The key is `openidconnect` whatever
 the instance is named:

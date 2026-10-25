@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- `/logout` (`core/auth/openidconnect`) ends the session here, not only the
+  browser's copy: with `core/bcl` loaded, it records the session it ends,
+  and a copy of the cookie is refused instead of working until its tokens
+  expire. Without `core/bcl`, the first `/logout` warns that it cannot,
+  [docs](docs/usage/plugins/auth/oidc.md#logout)
+
 ## v1.0.0 (2026-10-24)
 
 Authorization fails closed: every operation made for a request is judged

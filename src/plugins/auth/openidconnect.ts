@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 import type { Express, RequestHandler, Response } from 'express';
 import oidc from 'express-openid-connect';
 import type { ConfigParams } from 'express-openid-connect';
@@ -37,6 +39,52 @@ const NO_END_SESSION = /^end_session_endpoint must be configured/;
 
 /** `/logout` as express matches a route: any case, trailing slash or not. */
 const LOGOUT = /^\/logout\/?$/i;
+
+/**
+ * Where the session keeps the id this server gave it at login, the one
+ * `/logout` ends it by.
+ */
+const SESSION_ID = 'dmSession';
+
+/** The session as the library holds it, once its router has run */
+type OidcRequest = {
+  oidc: {
+    isAuthenticated(): boolean;
+    idTokenClaims?: OidcSessionClaims;
+  };
+  appSession?: Record<string, unknown>;
+};
+
+/**
+ * What names the session in front of a request: the provider's claims, and
+ * the id given at login. A session from before that id existed has none.
+ */
+const sessionClaims = (req: DmRequest): OidcSessionClaims | undefined => {
+  const { oidc, appSession } = req as unknown as OidcRequest;
+  const claims = oidc?.idTokenClaims;
+  if (!claims) return undefined;
+  const id = appSession?.[SESSION_ID];
+  return typeof id === 'string' ? { ...claims, session: id } : claims;
+};
+
+/**
+ * The `sub` of an id token the library has just verified, or undefined.
+ *
+ * `afterCallback` receives the tokens as plain values, the claims method
+ * stripped off. Read without checking the signature, which holds because the
+ * library calls `afterCallback` only once `client.callback()` has verified the
+ * token: a version calling it earlier would hand this an unverified `sub`.
+ */
+const subjectOf = (idToken: unknown): string | undefined => {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(String(idToken).split('.')[1], 'base64url').toString()
+    ) as { sub?: unknown };
+    return typeof payload.sub === 'string' ? payload.sub : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * A hook list as `DM` holds it: whichever plugins registered under that name.
@@ -87,6 +135,10 @@ export default class OpenIDConnect extends AuthBase {
   private router?: RequestHandler;
   /** Set once the missing `end_session_endpoint` has been reported. */
   private warnedNoEndSession = false;
+  /** Set once a `/logout` with nothing to record it has been reported. */
+  private warnedNoRecord = false;
+  /** Set once a `/logout` of a session nothing names has been reported. */
+  private warnedUnnamed = false;
 
   constructor(server: DM) {
     super(server);
@@ -139,6 +191,18 @@ export default class OpenIDConnect extends AuthBase {
       // provider's own logout page is where the caller is done.
       idpLogout: true,
       routes: { logout: false },
+      // The id `/logout` ends this session by. The cookie holds the whole
+      // session, so dropping it ends only the browser's copy; a copy kept
+      // elsewhere stays valid until its tokens expire. Nothing else names
+      // one session: a provider may send no `sid` (Dex sends none), and a
+      // mark on the `sub` would end every session of that person.
+      afterCallback: async (req, _res, session) => ({
+        ...session,
+        [SESSION_ID]: await this.sessionId(
+          req as unknown as DmRequest,
+          subjectOf((session as { id_token?: unknown }).id_token)
+        ),
+      }),
       // Back-Channel Logout, handed to whoever subscribed. This plugin knows
       // how to receive a logout token and how to ask whether the session in
       // front of it is still alive; where that answer is kept is a plugin of
@@ -214,17 +278,7 @@ export default class OpenIDConnect extends AuthBase {
           }
         },
 
-        isLoggedOut: async (req: DmRequest): Promise<boolean> => {
-          if (!this.server.hooks.oidcsessionvalid) return false;
-          const claims = (
-            req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
-          ).oidc.idTokenClaims;
-          const [, valid] = await launchHooksChained(
-            this.server.hooks.oidcsessionvalid,
-            [claims, true]
-          );
-          return !valid;
-        },
+        isLoggedOut: (req: DmRequest): Promise<boolean> => this.loggedOut(req),
       },
     };
     return config;
@@ -333,13 +387,15 @@ export default class OpenIDConnect extends AuthBase {
         LOGOUT.test(req.path)
       )
         // A failure comes back through this same callback, as `err`.
-        return void (
-          res as unknown as {
-            oidc: { logout: (params: object) => Promise<void> };
-          }
-        ).oidc.logout({
-          logoutParams: { post_logout_redirect_uri: undefined },
-        });
+        return void this.endHere(req).then(() =>
+          (
+            res as unknown as {
+              oidc: { logout: (params: object) => Promise<void> };
+            }
+          ).oidc.logout({
+            logoutParams: { post_logout_redirect_uri: undefined },
+          })
+        );
       const guard = (): void =>
         // No session: a browser has already been sent to the provider, an
         // API client comes back here with the refusal as `err`.
@@ -416,6 +472,122 @@ export default class OpenIDConnect extends AuthBase {
         end();
       }
     );
+  }
+
+  /**
+   * Whether the session in front of a request was ended — by a logout token,
+   * or by `/logout`.
+   *
+   * @param req the request, after the library has read its session
+   * @returns true when a subscriber of `oidcsessionvalid` refuses it
+   */
+  private async loggedOut(req: DmRequest): Promise<boolean> {
+    if (!this.server.hooks.oidcsessionvalid) return false;
+    const claims = sessionClaims(req) as OidcSessionClaims;
+    const [, valid] = await launchHooksChained(
+      this.server.hooks.oidcsessionvalid,
+      [claims, true]
+    );
+    return !valid;
+  }
+
+  /**
+   * The id a session gets at login.
+   *
+   * The same person logging in again over a live session keeps its id: the
+   * library merges the new tokens into that session, and a copy of its
+   * cookie taken before would otherwise carry an id the next `/logout` no
+   * longer names. Anyone else, or a session already ended — the callback
+   * runs before the library asks — gets a new one.
+   *
+   * @param req the callback request, its session as the cookie brought it
+   * @param sub the `sub` of the id token just received
+   * @returns the id to keep in the session
+   */
+  private async sessionId(
+    req: DmRequest,
+    sub: string | undefined
+  ): Promise<string> {
+    const { oidc, appSession } = req as unknown as OidcRequest;
+    const kept = appSession?.[SESSION_ID];
+    if (
+      typeof kept === 'string' &&
+      sub !== undefined &&
+      oidc?.isAuthenticated() &&
+      oidc.idTokenClaims?.sub === sub &&
+      // A store that cannot answer is no proof the session is alive
+      !(await this.loggedOut(req).catch(() => true))
+    )
+      return kept;
+    return randomUUID();
+  }
+
+  /**
+   * Record that the session in front of `/logout` is dead, as a logout token
+   * naming it would.
+   *
+   * Dropping the cookie ends the browser's copy only: the cookie holds the
+   * whole session, and a copy kept elsewhere — a shared computer, a backup
+   * of the browser profile, a stolen cookie — stayed valid until its tokens
+   * expired. The provider ends the sessions of the other applications
+   * through Back-Channel Logout, but does not tell the one that asked it to.
+   *
+   * The session is named by the id given at login, or by the provider's
+   * `sid` for a session from before that id existed — never by the `sub`,
+   * which would end every session of that person.
+   *
+   * A failure to record is logged and the logout goes on: the caller asked
+   * to leave, and refusing would keep the browser's copy alive as well.
+   *
+   * @param req the request, after the library's router
+   * @returns once the subscribers have run; never rejects
+   */
+  private async endHere(req: DmRequest): Promise<void> {
+    if (!(req as unknown as OidcRequest).oidc?.isAuthenticated()) return;
+    const claims = sessionClaims(req);
+    if (!claims) return;
+    const { iss, sid, session } = claims;
+    const dead: OidcLogoutToken | undefined = session
+      ? { iss, session }
+      : sid
+        ? { iss, sid }
+        : undefined;
+    if (!dead) {
+      if (!this.warnedUnnamed) {
+        this.warnedUnnamed = true;
+        this.logger.warn(
+          `${this.name}: /logout ended a session nothing names — one ` +
+            'established before this version, from a provider that sends ' +
+            'no sid — so a copy of its cookie stays valid until its tokens ' +
+            'expire'
+        );
+      }
+      return;
+    }
+    if (!this.server.hooks.oidclogouttoken) {
+      if (!this.warnedNoRecord) {
+        this.warnedNoRecord = true;
+        this.logger.warn(
+          `${this.name}: no Back-Channel Logout plugin is loaded, so ` +
+            "/logout drops the browser's cookie and nothing else: a copy " +
+            'of it stays valid until its tokens expire. Load core/bcl to ' +
+            'end the session here as well'
+        );
+      }
+      return;
+    }
+    try {
+      await walkSubscribers(
+        this.server.hooks
+          .oidclogouttoken as unknown as Subscribers<OidcLogoutToken>,
+        dead
+      );
+    } catch (err) {
+      this.logger.error(
+        `${this.name}: /logout could not record the session it ends, so a ` +
+          `copy of its cookie stays valid until its tokens expire: ${String(err)}`
+      );
+    }
   }
 
   /**

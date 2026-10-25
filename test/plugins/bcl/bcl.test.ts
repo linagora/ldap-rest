@@ -144,6 +144,18 @@ describe('Back-Channel Logout, over the shared store', function () {
     expect(await alive({ iss: ISS, sid: 'S2' })).to.equal(true);
   });
 
+  it('should kill the one session /logout names, not its siblings', async () => {
+    // `/logout` names the session by the id given at login: the provider's
+    // `sid` and `sub` are shared by every session of that person in Dex.
+    await record({ iss: ISS, session: 'L1' });
+    expect(
+      await alive({ iss: ISS, sid: 'S9', sub: 'carol', session: 'L1' })
+    ).to.equal(false);
+    expect(
+      await alive({ iss: ISS, sid: 'S9', sub: 'carol', session: 'L2' })
+    ).to.equal(true);
+  });
+
   it('should kill every session of a sub when the token names one', async () => {
     await record({ iss: ISS, sub: 'alice' });
     // A session of alice's whose own sid was never named.
