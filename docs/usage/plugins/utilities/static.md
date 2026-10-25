@@ -24,8 +24,17 @@ DM_STATIC_NAME="static"
 ### Parameters
 
 - `--static-path`: Directory containing static files (required)
-- `--static-name`: the first segment of the URL the files are served under,
-  without a slash (default: `static`, for `/static/…`)
+- `--static-name`: the path the files are served under, without a slash
+  around it (default: `static`, for `/static/…`). Slashes around it are left
+  out and an empty value is `static`; a segment that is empty, `.` or `..`,
+  or that holds what a URL encodes or Express reads as route syntax (a
+  space, a letter outside ASCII, `:`, `*`, `?`, `#`, `%`, brackets, quotes…), stops the server at startup
+- `--static-csp` (`DM_STATIC_CSP`): the `Content-Security-Policy` of the
+  files it serves, default `frame-ancestors 'self'`; `off` sends none. See
+  [Security headers](#security-headers)
+- `--static-frame-options` (`DM_STATIC_FRAME_OPTIONS`): the
+  `X-Frame-Options` of the files it serves, default `SAMEORIGIN`; `off`
+  sends none
 
 ## How It Works
 
@@ -290,6 +299,43 @@ For restricted access:
 1. Use authentication plugins
 2. Implement custom middleware
 3. Use reverse proxy with access controls
+
+### Security headers
+
+The files served here are applications, an administration console among
+them. So that no other origin frames one signed in (clickjacking), another
+sub-domain or port of the same site included, the responses under the prefix
+carry:
+
+```
+Content-Security-Policy: frame-ancestors 'self'
+X-Frame-Options: SAMEORIGIN
+```
+
+`X-Frame-Options` is for browsers that ignore `frame-ancestors`. A page that
+must be framed by another origin names it:
+
+```bash
+--static-csp "frame-ancestors 'self' https://portal.example.com"
+--static-frame-options off
+```
+
+A full policy can be given the same way, for instance
+`default-src 'self'; frame-ancestors 'none'`, as long as the applications
+served allow it: the policy applies to every file under the prefix. One
+written on several lines, as a YAML block holds it, is sent as one line; a
+value a header cannot hold stops the server at startup. An empty value keeps
+the default, as a compose file expands an unset `${VAR:-}` to one; `off`
+sends no header (`false` in a plugin's JSON override), when the reverse
+proxy sets its own. Keeping both is harmless as long as they agree.
+
+A redirect or a 404 that Express answers itself (a directory without its
+slash, a missing file) carries `Content-Security-Policy: default-src 'none'`
+instead; `X-Frame-Options`, unless set to `off`, still keeps it from being
+framed, and it shows nothing to click.
+
+Every response of the server, API routes included, also carries
+`X-Content-Type-Options: nosniff`, and none says `X-Powered-By: Express`.
 
 ## MIME Types
 

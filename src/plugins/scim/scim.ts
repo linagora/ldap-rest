@@ -17,6 +17,7 @@ import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
+import { staticName } from '../../lib/schemaFile';
 import type { Config } from '../../config/args';
 
 import { BaseResolver } from './baseResolver';
@@ -1754,11 +1755,11 @@ export default class Scim extends DmPlugin {
     // clients can fetch them without going through the SCIM /Schemas endpoint.
     let schemaUrls: Record<string, string> | undefined;
     if (this.server.loadedPlugins['static']) {
-      const staticName = (this.config.static_name as string) || 'static';
+      const name = staticName(this.config);
       schemaUrls = {
-        user: `/${staticName}/schemas/scim/User.json`,
-        group: `/${staticName}/schemas/scim/Group.json`,
-        defaultMapping: `/${staticName}/schemas/scim/default-mapping.json`,
+        user: `/${name}/schemas/scim/User.json`,
+        group: `/${name}/schemas/scim/Group.json`,
+        defaultMapping: `/${name}/schemas/scim/default-mapping.json`,
       };
     }
 

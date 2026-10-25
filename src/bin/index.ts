@@ -152,6 +152,13 @@ export class DM {
     this.config = parseConfig(configArgs);
 
     this.app = express();
+    // Nothing tells which framework answers, and no script or style is
+    // read as another type than the one its response declares.
+    this.app.disable('x-powered-by');
+    this.app.use((_req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      next();
+    });
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
     this.app.use(this.bodyParsers);

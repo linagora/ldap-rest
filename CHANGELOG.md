@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- The files `core/static` serves, an administration console among them,
+  cannot be framed by another origin, another sub-domain or port included:
+  `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, set by
+  `--static-csp` and `--static-frame-options`. A portal that frames them
+  must now be named, [upgrading](docs/usage/upgrading.md#unreleased). Every
+  response carries `X-Content-Type-Options: nosniff`, and none names Express
+  in `X-Powered-By` (#407),
+  [docs](docs/usage/plugins/utilities/static.md#security-headers)
+
+### Breaking Changes
+
+- An empty `--static-name` is `static`, as the configuration API and SCIM
+  already announced, not the root; the slashes around it are left out, and
+  a name Express would not match as written stops the server at startup,
+  [upgrading](docs/usage/upgrading.md#--static-name-an-empty-value-is-static)
+
 ## v1.0.1 (2026-10-25)
 
 ### Security

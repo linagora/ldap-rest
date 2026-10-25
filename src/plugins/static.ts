@@ -10,20 +10,29 @@
  * outside of that directory.
  *
  * This permits to share the same schemas between server and JS embedded in web pages.
+ *
+ * Its responses carry `--static-csp` (by default `frame-ancestors 'self'`)
+ * and `--static-frame-options` (`SAMEORIGIN`), so that no other origin
+ * frames the applications it serves; `off` sends none. A redirect or a 404
+ * Express answers itself has its own `Content-Security-Policy:
+ * default-src 'none'` instead, and keeps `X-Frame-Options` when it is sent.
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import fs from 'fs';
 import { join, resolve } from 'path';
+import { validateHeaderValue } from 'http';
 
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 
 import DmPlugin, { type Role } from '../abstract/plugin';
+import { STATIC_CSP, STATIC_FRAME_OPTIONS } from '../config/args';
 import { notFound, serverError } from '../lib/expressFormatedResponses';
 import {
   configuredSchemaFiles,
   loadSchemaFileAsync,
   schemaUrl,
+  staticName,
 } from '../lib/schemaFile';
 
 /**
@@ -36,6 +45,42 @@ const decodedPath = (path: string): string => {
   } catch {
     return path;
   }
+};
+
+/**
+ * A header's value from its option: `off` (or `false`, in a plugin's JSON
+ * override) sends none, and an empty one is the default, as a compose file
+ * expands an unset `${VAR:-}` to one, which would otherwise drop the
+ * protection unseen. A policy written on several lines is joined into one,
+ * and one a header cannot hold is refused at startup: refused at each
+ * request, it made every file a 500 of a server that looked healthy.
+ *
+ * @param option the option, as its error names it
+ * @param header the header it sets
+ * @param value what the configuration holds
+ * @param fallback the default
+ * @returns the value to send, or undefined for none
+ */
+const headerValue = (
+  option: string,
+  header: string,
+  value: unknown,
+  fallback: string
+): string | undefined => {
+  if (value === false) return undefined;
+  if (value !== undefined && value !== null && typeof value !== 'string')
+    throw new Error(`${option}: a text is expected, or false for none`);
+  const given = (typeof value === 'string' ? value : '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!given) return fallback;
+  if (given.toLowerCase() === 'off') return undefined;
+  try {
+    validateHeaderValue(header, given);
+  } catch {
+    throw new Error(`${option}: "${given}" cannot be sent as ${header}`);
+  }
+  return given;
 };
 
 /**
@@ -87,7 +132,49 @@ export default class Static extends DmPlugin {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Bad directory ${rep}: ${e}`);
     }
+    const given: unknown = this.config.static_name;
+    if (given !== undefined && given !== null && typeof given !== 'string')
+      throw new Error('--static-name: a text is expected, such as static');
+    const name = staticName(this.config);
+    // Each segment a path that Express matches as written: no `.` or `..`,
+    // none empty, none holding its route syntax (`:`, `*`, braces…) or what
+    // a URL would have to encode, a letter outside ASCII included: sent
+    // encoded, it never matched.
+    if (
+      name
+        .split('/')
+        .some(
+          segment =>
+            !segment ||
+            /^\.+$/.test(segment) ||
+            /[^\x21-\x7e]|[:*?+!()[\]{}\\#%"<>|^`]/.test(segment)
+        )
+    )
+      throw new Error(
+        `--static-name: "${name}" is not a path to serve under, such as static`
+      );
+    const prefix = `/${name}`;
     const serve = this.schemaServer(rep);
+    // The pages served here are applications, an administration console
+    // among them: no other origin, another sub-domain or port included, may
+    // frame one signed in.
+    const csp = headerValue(
+      '--static-csp',
+      'Content-Security-Policy',
+      this.config.static_csp,
+      STATIC_CSP
+    );
+    const frameOptions = headerValue(
+      '--static-frame-options',
+      'X-Frame-Options',
+      this.config.static_frame_options,
+      STATIC_FRAME_OPTIONS
+    );
+    app.use(prefix, (_req, res, next) => {
+      if (csp) res.setHeader('Content-Security-Policy', csp);
+      if (frameOptions) res.setHeader('X-Frame-Options', frameOptions);
+      next();
+    });
     /**
      * @openapi
      * summary: Get JSON schema by name
@@ -131,7 +218,7 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(`/${this.config.static_name}/schemas/:name`, (req, res, next) =>
+    app.get(`${prefix}/schemas/:name`, (req, res, next) =>
       serve([req.params.name], req, res, next)
     );
     /**
@@ -173,10 +260,8 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(
-      `/${this.config.static_name}/schemas/:dir/:name`,
-      (req, res, next) =>
-        serve([req.params.dir, req.params.name], req, res, next)
+    app.get(`${prefix}/schemas/:dir/:name`, (req, res, next) =>
+      serve([req.params.dir, req.params.name], req, res, next)
     );
     /**
      * @openapi
@@ -210,10 +295,10 @@ export default class Static extends DmPlugin {
      *   '500':
      *     description: A schema it extends is missing or invalid.
      */
-    app.get(`/${this.config.static_name}/schemas/*path`, (req, res, next) =>
+    app.get(`${prefix}/schemas/*path`, (req, res, next) =>
       serve(req.params.path as unknown as string[], req, res, next)
     );
-    app.use(`/${this.config.static_name}`, express.static(rep));
+    app.use(prefix, express.static(rep));
   }
 
   /**
@@ -285,8 +370,7 @@ export default class Static extends DmPlugin {
    * Provide configuration for config API
    */
   getConfigApiData(): Record<string, unknown> {
-    const staticName = this.config.static_name || 'static';
-    const staticPath = `/${staticName}`;
+    const staticPath = `/${staticName(this.config)}`;
 
     return {
       enabled: true,

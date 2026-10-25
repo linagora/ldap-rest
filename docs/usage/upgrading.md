@@ -4,6 +4,32 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### The static files can no longer be framed by another origin
+
+`core/static` sends `Content-Security-Policy: frame-ancestors 'self'` and
+`X-Frame-Options: SAMEORIGIN`. A page of another origin, another sub-domain
+or port of the same site included, that showed one of its applications in an
+`<iframe>`, a portal for instance, now shows an empty frame. Name it:
+
+```bash
+--static-csp "frame-ancestors 'self' https://portal.example.com"
+--static-frame-options off
+```
+
+See [security headers](plugins/utilities/static.md#security-headers).
+
+### `--static-name`: an empty value is `static`
+
+With `DM_STATIC_NAME=` the files were served at the root while the
+configuration API and SCIM announced `/static`; they are now served under
+`/static`. Slashes around the name are left out (`/static/` is `static`). A
+name Express would not match as written, with an empty, `.` or `..` segment,
+or what a URL encodes or Express reads as route syntax in it (a space, a
+letter outside ASCII, `:`, `*`, `?`, `#`, `%`, brackets, quotes…), stops
+the server at startup.
+
 ## From 0.26 to 1.0.0
 
 Every breaking change since 0.26.0. Authorization fails closed in 1.0.0:

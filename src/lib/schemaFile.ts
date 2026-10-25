@@ -196,6 +196,26 @@ export async function loadSchemaFileAsync<T = unknown>(
 }
 
 /**
+ * The path the static plugin serves under: --static-name without the
+ * slashes around it, and `static` when that leaves nothing, as a compose
+ * file's unset `${VAR:-}` gives. The plugin refuses at startup one that is
+ * not a path to serve under.
+ *
+ * @param config server configuration
+ * @returns the path, with no slash at either end
+ */
+export function staticName(config: Config): string {
+  const given: unknown = config.static_name;
+  const text = (typeof given === 'string' ? given : '').trim();
+  // Counted, not matched: `/\/+$/` retries at each slash of a long run.
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === '/') start++;
+  while (end > start && text[end - 1] === '/') end--;
+  return text.slice(start, end) || 'static';
+}
+
+/**
  * URL the static plugin serves a schema file at: its path from the first
  * `schemas` directory it is in, under --static-name
  *
@@ -206,7 +226,7 @@ export async function loadSchemaFileAsync<T = unknown>(
 export function schemaUrl(config: Config, file: string): string | undefined {
   const index = file.indexOf('/schemas/');
   if (index === -1) return undefined;
-  return `/${config.static_name || 'static'}${file.substring(index)}`;
+  return `/${staticName(config)}${file.substring(index)}`;
 }
 
 const schemaOptions: [keyof Config, string][] = [
