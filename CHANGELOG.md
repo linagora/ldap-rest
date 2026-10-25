@@ -1,230 +1,115 @@
 # Changelog
 
-## Unreleased
+## v1.0.0 (2026-10-24)
+
+Authorization fails closed: every operation made for a request is judged
+as its caller unless made as the server (`ldap.system`), and a write is
+judged before the route looks in the directory. The public API is declared
+stable, [docs](docs/README.md#api-stability). Breaking changes since 0.26:
+[upgrading](docs/usage/upgrading.md#from-026-to-100).
 
 ### Security
 
-- Every add and modify names its attributes as the server does before it
-  is judged, through the directory schema: the organization link written
-  under its OID, or `mail` as `rfc822Mailbox`, escaped the authorization
-  plugins and the hooks reading them by name — an administrator moved an
-  account to an organization they may not write. An option other than
-  `;binary` and an attribute named twice in one part of a write are refused
-  (400). A rename to an RDN holding several values, or naming another
-  attribute, is refused too: `cn=x+twakeDepartmentLink=…` linked a group
-  past every check of a write. The route checks of the flat entities, groups and organizations
-  look schema attributes up whatever their case: a fixed attribute deleted
-  as `OBJECTCLASS`, and members added as `MEMBER` past the group's own
-  routes, went through,
-  [upgrading](docs/usage/upgrading.md#attribute-names-in-a-write-one-name-per-attribute-no-option)
-  ([#405](https://github.com/linagora/ldap-rest/pull/405))
-
-- `core/ldap/raw`: `GET /children/{dn}` answered the children of an entry
-  the caller may not read, an empty list where an entry that is not there
-  got a 404: it told whether the entry exists. It answers that 404. Found
-  by a new test probing every route for what it tells a caller without
-  rights
-  ([#393](https://github.com/linagora/ldap-rest/pull/393))
-
-- `core/ldap/raw`: `GET /search` below a base the caller may not read
-  answered an empty list, and a 404 for a base that is not there: it told
-  whether the base exists. It answers that 404. Found by the probe of the
-  targets a body or a query names
-  ([#401](https://github.com/linagora/ldap-rest/pull/401))
-
-- `core/scim`: a group member given as a DN under the user base was taken
-  as it stood, so a caller could put in its group an account it may not
-  read. It is looked up as the caller, as a member given by id is: left
-  out when the caller cannot read it, or the write refused when its branch
-  is refused. A DN naming no entry is left out too. A DN is compared to the
-  base RDN by RDN: `cn=a\,ou=users,…` was taken for an entry of
-  `ou=users,…`,
-  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
-  ([#401](https://github.com/linagora/ldap-rest/pull/401))
-
-- `core/scim`: `PUT /Users/{id}` answered `User … not found` for a user
-  the caller may not read and `Resource not found` for one that is not
-  there: it told whether the user exists. Both get the first answer,
-  [upgrading](docs/usage/upgrading.md#scim-group-members-are-looked-up-as-the-caller)
-  ([#401](https://github.com/linagora/ldap-rest/pull/401))
-
-- A directory search, add, modify, rename or delete made while serving an
-  authenticated request is judged as its caller, even when the code making
-  it did not hand the request down: a forgotten request used to let the
-  operation through unjudged. `ldap.system` makes an operation as the server, for every
-  authorization plugin, `authzDynamic` included; hooks act as the server.
-  A lint rule refuses an operation naming neither,
-  [docs](docs/plugin-development/README.md#using-ldap-operations),
-  [upgrading](docs/usage/upgrading.md#plugins-an-operation-naming-no-request-is-judged-as-the-caller)
-  ([#391](https://github.com/linagora/ldap-rest/pull/391))
-
-- The server refuses to start with an authorization plugin and no
-  authentication plugin: no request carried an identity, so the
-  authorization plugins stepped aside and every request passed. With
-  neither kind of plugin, or authentication alone, it starts and says that
-  every caller, or every authenticated caller, has every right,
-  [docs](docs/usage/plugins/auth/README.md#what-is-refused-at-startup),
-  [upgrading](docs/usage/upgrading.md#an-authorization-plugin-needs-an-authentication-plugin)
-  ([#390](https://github.com/linagora/ldap-rest/pull/390))
-
-- `core/auth/authzPerBranch`: among one user's or one group's rules, the
-  most specific branch now applies, whatever order the rules are written
-  in, and a search granted on a branch no longer returns what a narrower
-  rule refuses. The first rule written used to win, so a restriction on a
-  sub-branch written after the grant on its parent was ignored. Branches
-  are compared as DNs in `authzPerBranch` and `authzLinid1`, whatever their
-  case and spacing. `default` is a fallback rather than a floor: a rule
-  refusing a permission is no longer overridden by it. A branch a rule
-  names can no longer be renamed or moved out of that rule by a caller it
-  refuses, judged by branch or by attachment, nor created where it
-  refuses writing. A write setting the organization link and anything else
-  needs write where the entry stands: one carrying a password change went
-  through with read there. A DN matches a rule however it is spelled:
-  escapes (`\2C`, `\20`, `\C3\A9`), attribute type names and OIDs
-  (`2.5.4.11=payroll` is `ou=payroll`), insignificant spaces, and the
-  LDAPv2 `;` and quotes, which OpenLDAP accepts and a caller could use to
-  step around a rule; a write is judged on the DN the directory returns,
-  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution),
-  [upgrading](docs/usage/upgrading.md#nested-branch-rules-of-authzperbranch)
-  ([#388](https://github.com/linagora/ldap-rest/pull/388))
-
-- `core/twake/groups`: the `/organizations/{id}/groups` routes read the
-  directory as the server, so any caller let in got the groups and member
-  profiles of every organization, and could tell which names, users and
-  memberships exist from the answers to writes. They read as the caller, and
-  judge a write before looking for anything. Under a model judging by
-  attachment (`authzLinid1`), groups written in an organization's branch
-  carry its link, so that it gives them to that organization only; whether
-  an organization exists, its spaces and its unlinked users stay every
-  administrator's,
-  [upgrading](docs/usage/upgrading.md#organization-groups-need-read-access-to-the-organization)
-  ([#383](https://github.com/linagora/ldap-rest/pull/383))
-- `core/ldap/bulkImport` judges each row's write before looking in the
-  directory for it. A row the caller may not write was reported skipped when
-  its entry existed, counted created by a dry run, answered with its
-  organization's absence, and refused with the branch the authorization
-  plugin named; it now fails with the same refusal in every case,
-  [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
-  ([#384](https://github.com/linagora/ldap-rest/pull/384))
-- The authorization plugins read the organization link whatever case a
-  write spells it in, and judge adding a link to an entry that had none as
-  a move: written `twakedepartmentlink`, a link escaped the move check, and
-  an entry could be attached to an organization the caller may not write.
-  A link naming several organizations, or holding an empty value, is
-  refused (400): only one was judged
-  ([#384](https://github.com/linagora/ldap-rest/pull/384))
-
-- The authorization plugins judge an LDAP operation before any other
-  plugin, whatever order the plugins loaded in. When `core/ldap/trash`
-  loaded first, a caller with no right on an entry could delete it, as a
-  move to the trash. When `core/ldap/enterpriseRules` did, a caller who
-  may not write a branch got its 409 ("already used", "still referenced")
-  instead of a 403, and could learn which addresses the directory holds
-  outside their scope
+- An operation made while serving a request is judged as its caller, even
+  when the code did not hand the request down; `ldap.system` makes one as
+  the server, hooks act as the server (`authzDynamic` included), and a lint
+  rule refuses an operation naming neither,
+  [docs](docs/plugin-development/README.md#using-ldap-operations). The
+  server refuses to start with an authorization plugin and no
+  authentication plugin, which let every request through,
+  [docs](docs/usage/plugins/auth/README.md#what-is-refused-at-startup)
+  ([#390](https://github.com/linagora/ldap-rest/pull/390),
+  [#391](https://github.com/linagora/ldap-rest/pull/391))
+- The authorization plugins judge before any other plugin: the trash let a
+  caller delete what they could not write, `enterpriseRules` answered 409
+  where the caller had no right
   ([#378](https://github.com/linagora/ldap-rest/pull/378))
-- A caller who may not make a write is refused before the route looks in
-  the directory as the server, and gets the same 403 whether the entry is
-  there or not. These routes answered what they found first: the rename of
-  an entry, the creation and modification of a flat entry, a group or an
-  organization (a pointer leading nowhere), a group or organization move,
-  the erase of a tombstone, the deletion of an app account; and the
-  creation of a group created its external members before it was judged
-  ([#381](https://github.com/linagora/ldap-rest/pull/381))
-- `GET /users/{user}/quota-usage` and the app account routes answer 404
-  for an account the caller cannot read, as for one that is not there:
-  the quota of any account was served to any caller the route let in,
-  [upgrading](docs/usage/upgrading.md#quota-and-app-accounts-need-read-access-to-the-account)
-  ([#381](https://github.com/linagora/ldap-rest/pull/381))
+- A write is judged before the route looks in the directory, so a caller
+  without the right gets the same 403 whether the entry exists or not:
+  renames, flat entries, groups, organizations, moves, tombstones, app
+  accounts; creating a group no longer creates its external members before
+  it is judged. A bulk import row the caller may not write reports that
+  refusal, whether its entry exists, in a dry run or not,
+  [docs](docs/usage/plugins/ldap/bulk-import.md#authorization)
+  ([#381](https://github.com/linagora/ldap-rest/pull/381),
+  [#384](https://github.com/linagora/ldap-rest/pull/384))
+- `authzPerBranch`: the most specific branch rule applies, whatever the
+  order the rules are written in, in reads, writes and searches — a
+  restriction on a sub-branch was ignored; `default` no longer overrides a
+  rule refusing a permission; a branch cannot be renamed or moved out of a
+  rule, nor created, by a caller it refuses; setting the organization link
+  along with other changes needs write where the entry stands (read was
+  enough); branches are compared as DNs, however spelled,
+  [docs](docs/usage/plugins/auth/authz-per-branch.md#permission-resolution)
+  ([#388](https://github.com/linagora/ldap-rest/pull/388))
+- The organization link escaped the move check when spelled in another
+  case, under its OID or an alias, added rather than replaced, or given
+  several values: an account or a group could be attached to an
+  organization the caller may not write. It is read under any name, adding
+  one is judged as a move, and several or empty values are refused. Every
+  write names its attributes as the server does: an option other than
+  `;binary`, one attribute named twice, or a rename to an RDN naming
+  another attribute or holding several values is refused (400); route checks find schema attributes
+  whatever their case (fixed attributes, group members)
+  ([#384](https://github.com/linagora/ldap-rest/pull/384),
+  [#405](https://github.com/linagora/ldap-rest/pull/405))
+- `twake/groups`: any caller got the groups and member profiles of every
+  organization; the routes read as the caller, and under an attachment
+  model a group carries its organization's link
+  ([#383](https://github.com/linagora/ldap-rest/pull/383))
+- SCIM: a member given by DN was taken as it stood, so a caller could put
+  in its group an account it may not read; it is looked up as the caller.
+  A DN is compared to the user base RDN by RDN
+  ([#401](https://github.com/linagora/ldap-rest/pull/401))
+- Routes no longer tell whether an entry exists where the caller cannot
+  read it: quota and app accounts, `raw` children and search, SCIM
+  `PUT /Users/{id}`. Uniqueness (409) and schema pointers still answer
+  about the whole directory, by design
+  ([#381](https://github.com/linagora/ldap-rest/pull/381),
+  [#393](https://github.com/linagora/ldap-rest/pull/393),
+  [#401](https://github.com/linagora/ldap-rest/pull/401))
 
 ### Fixes
 
-- `core/ldap/groups`: `PUT /api/v1/ldap/groups/{cn}` meant to drop the
-  attributes the schema fixes, and filtered `add`, `replace` and `delete`
-  themselves, which no schema fixes: a fixed `objectClass` was written. They
-  are dropped from each part, as on a creation
-  ([#405](https://github.com/linagora/ldap-rest/pull/405))
-
-- `core/ldap/organizations`: an organization deleted as `OU=…` skipped the
-  check that it is empty
-  ([#405](https://github.com/linagora/ldap-rest/pull/405))
-
-- `core/twake/james`: a mailbox type pointer written `CN=TeamMailbox,…`
-  leads to the team mailbox entry, and was not read as one: the checks of
-  a team mailbox's members did not run
-  ([#405](https://github.com/linagora/ldap-rest/pull/405))
-
-- `core/ldap/enterpriseRules`: saving an account with its mail unchanged
-  answered `409 … is already used` once `appAccountsConsistency` had made
-  its applicative entry, which carries the same mail. A value the entry
-  already holds, as stored, is no longer looked for on an update; only the
-  values it does not hold yet are looked for
-  ([#402](https://github.com/linagora/ldap-rest/issues/402))
-
-- `core/ldap/enterpriseRules`: a write naming an attribute in another case
-  or with an option — `MAIL`, `mail;lang-en` — found no rule under that
-  name, and went through unchecked: uniqueness, mail domains, lifecycle
-  dates. A move spelled `TWAKEDEPARTMENTLINK` did not recheck the stored
-  addresses against the new organization's domains, and a mail sent along
-  with it was checked against the old one. The rules apply whatever the
-  spelling, and a name sent in another case is written as the schema spells
-  it, so the organization path follows such a move and a size is counted in
-  bytes. The shipped schemas are strict, so the API refused such names
-  already; the writes of other plugins did not
-  ([#404](https://github.com/linagora/ldap-rest/pull/404))
-
-- `core/ldap/organizations`: `GET /api/v1/ldap/organizations/{dn}/subnodes`
-  and `…/subnodes/search` looked for the attached entries from the parent of
-  the top organization only, and answered 403 to an administrator held to
-  their organization — `authzPerBranch` judging by DN, `authzDynamic`. Such
-  a caller now gets the entries attached within the organization's branch
-  ([#403](https://github.com/linagora/ldap-rest/issues/403))
-
-- `core/ldap/groups`: a group named with a comma is taken for a DN only
-  when it is one: `GET /api/v1/ldap/groups/a%2Cb` answered 500, it
-  answers 400. And the `/api/v1/ldap/groups/{cn}` routes, creation and
-  rename target included, answer 404 for a DN that is not a group below
-  the groups branch, named by the groups' main attribute: they read any
-  entry as a group, an
-  account included, and would have written or deleted it as one,
-  [upgrading](docs/usage/upgrading.md#the-group-routes-take-a-dn-for-a-group-only)
-  ([#399](https://github.com/linagora/ldap-rest/pull/399))
-
-- Shipped schemas (`twake`, `example`): a mail domain an organization
-  still links, and a nomenclature value — account status, delivery mode,
-  personal title, list type, mailbox type (team mailboxes' included) — an
-  entry still holds, can no
-  longer be deleted (`409 still referenced`). The mail domain used to go,
-  leaving the link naming nothing and no account creatable at it. The
-  check no longer refuses every delete when a schema with such a pointer
-  is loaded for a branch the directory does not hold
+- `enterpriseRules`: re-saving an unchanged value no longer conflicts with
+  the entry's applicative copy (409); a rule applies whatever the spelling
+  of the attribute, and a move rechecks the mail domains
+  ([#402](https://github.com/linagora/ldap-rest/issues/402),
+  [#404](https://github.com/linagora/ldap-rest/pull/404))
+- `organizations`: `/subnodes` and `/subnodes/search` answered 403 to an
+  administrator held to their organization; deleting `OU=…` skipped the
+  emptiness check
+  ([#403](https://github.com/linagora/ldap-rest/issues/403),
+  [#405](https://github.com/linagora/ldap-rest/pull/405))
+- `groups`: a name with a comma that is no DN answers 400 (500 before); a
+  DN outside the groups branch answers 404, where it was read and written
+  as a group; the update route no longer writes the attributes the schema
+  fixes
+  ([#399](https://github.com/linagora/ldap-rest/pull/399),
+  [#405](https://github.com/linagora/ldap-rest/pull/405))
+- Shipped schemas: a mail domain or nomenclature value still referenced is
+  not deleted (409); a schema whose branch is absent no longer refuses
+  every delete
   ([#398](https://github.com/linagora/ldap-rest/pull/398))
-
-- `core/ldap/passwordPolicy`: `POST /api/v1/users/{id}/unlock` for a user
-  that is not there answered 500; it answers 404, as for one the caller
-  may not read
+- `james`: a mailbox type pointer written `CN=TeamMailbox,…` skipped the
+  team mailbox checks
+  ([#405](https://github.com/linagora/ldap-rest/pull/405))
+- `passwordPolicy`: unlocking a user that is not there answered 500 (404)
   ([#393](https://github.com/linagora/ldap-rest/pull/393))
-
-- `core/ldap/externalUsersInGroups` refuses an external member in a mail
-  domain the directory declares, not only one `--mail-domain` names, and
-  `GET /config` lists those domains in `managedDomains`,
+- `externalUsersInGroups` refuses an external member in any mail domain the
+  directory declares, listed in `GET /config` (`managedDomains`),
   [docs](docs/usage/plugins/ldap/external-users.md#important-notes)
   ([#379](https://github.com/linagora/ldap-rest/pull/379))
-
-- With the search cache on (`--ldap-cache-ttl`), a change of a group's
-  members no longer leaves the accounts' `memberOf` stale until the TTL
-  runs out, [docs](docs/usage/configuration.md#the-search-cache)
-  ([#377](https://github.com/linagora/ldap-rest/pull/377))
-
-- DN values with UTF-8 hex escapes (`\C3\A9`) are decoded correctly
-  (`é`) instead of one character per byte
+- The search cache no longer keeps `memberOf` stale after a membership
+  change, [docs](docs/usage/configuration.md#the-search-cache)
+  ([#377](https://github.com/linagora/ldap-rest/pull/377)); UTF-8
+  hex escapes in DNs are decoded
   ([#376](https://github.com/linagora/ldap-rest/pull/376))
 
 ### Features
 
-- `core/twake/appAccountsApi`: `--app-accounts-user-attribute`
-  (`DM_APP_ACCOUNTS_USER_ATTRIBUTE`) sets the attribute the `:user` of the
-  routes is matched against, the mail attribute by default. It could only
-  be set in a plugin's own configuration
+- `--app-accounts-user-attribute` sets the attribute the app account routes
+  match `:user` against
   ([#400](https://github.com/linagora/ldap-rest/pull/400))
 
 ## v0.26.0 (2026-10-23)

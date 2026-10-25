@@ -4,7 +4,11 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## From 0.26 to 1.0.0
+
+Every breaking change since 0.26.0. Authorization fails closed in 1.0.0:
+what used to pass because a call site forgot the request, or because a
+name was spelled otherwise, is now judged, and may be refused.
 
 ### Attribute names in a write: one name per attribute, no option
 
@@ -185,6 +189,37 @@ for org in $(ldapsearch $OPTS -LLL -s one -b "$ORGS" '(ou=*)' ou |
       END { flush() }'
 done | ldapmodify $OPTS
 ```
+
+### The organization link holds one organization
+
+**Who is affected:** a client or a CSV writing several organization links on
+one entry, or an empty one.
+
+A write giving the organization link (`--ldap-organization-link-attribute`)
+several values, or an empty value, is refused with a 400: only one of them
+was judged. Under any spelling of the attribute, adding a link to an entry
+that had none is judged as a move: write where it goes and, judged by
+branch, read where it stands.
+
+### Smaller changes in answers
+
+- `GET /api/v1/ldap/raw/search` below a base the caller may not read
+  answers 404, as for a base that is not there; under `authzPerBranch`
+  judging by DN it answered 403.
+- Changing only the case of an account's mail is refused (409) while an
+  applicative copy holds the old spelling, which the directory takes for
+  the same address.
+
+### External members in a domain the directory declares
+
+**Who is affected:** a deployment of `core/ldap/externalUsersInGroups`
+adding as external members addresses in a mail domain the directory
+declares, without listing it in `--mail-domain`.
+
+Such a member is refused, as one in a `--mail-domain` already was. The
+managed domains are now also those of the directory's domain branches,
+[docs](plugins/ldap/external-users.md#important-notes); `GET /config` lists
+them in `managedDomains`.
 
 ### Quota and app accounts need read access to the account
 
