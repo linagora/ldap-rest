@@ -662,10 +662,14 @@ See [spaces](plugins/integrations/spaces.md).
 
 #### `core/static`
 
-| CLI             | Env              | Default  | Description            |
-| --------------- | ---------------- | -------- | ---------------------- |
-| `--static-path` | `DM_STATIC_PATH` | `static` | Static files directory |
-| `--static-name` | `DM_STATIC_NAME` | `static` | URL path prefix        |
+| CLI                      | Env                       | Default                  | Description                                            |
+| ------------------------ | ------------------------- | ------------------------ | ------------------------------------------------------ |
+| `--static-path`          | `DM_STATIC_PATH`          | `static`                 | Static files directory                                 |
+| `--static-name`          | `DM_STATIC_NAME`          | `static`                 | URL path prefix                                        |
+| `--static-csp`           | `DM_STATIC_CSP`           | `frame-ancestors 'self'` | `Content-Security-Policy` of the files; `off` for none |
+| `--static-frame-options` | `DM_STATIC_FRAME_OPTIONS` | `SAMEORIGIN`             | `X-Frame-Options` of the files; `off` for none         |
+
+See [security headers](plugins/utilities/static.md#security-headers).
 
 #### `core/weblogs`
 

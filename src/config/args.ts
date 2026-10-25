@@ -9,6 +9,10 @@ import { dirname, join } from 'path';
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 
+/** The headers `core/static` sends unless told otherwise: no framing by another site */
+export const STATIC_CSP = "frame-ancestors 'self'";
+export const STATIC_FRAME_OPTIONS = 'SAMEORIGIN';
+
 export interface BranchPermissions {
   read?: boolean;
   write?: boolean;
@@ -122,6 +126,8 @@ export interface Config {
   // Static
   static_path?: string;
   static_name?: string;
+  static_csp?: string;
+  static_frame_options?: string;
 
   // auth (all authentication plugins)
   // A single prefix is accepted as a bare string: plugin overrides are raw
@@ -688,6 +694,10 @@ const configArgs: ConfigTemplate = [
     join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'static'),
   ],
   ['--static-name', 'DM_STATIC_NAME', 'static'],
+  // An administration page is not to be framed by another site
+  // (clickjacking): see core/static, `off` sends no header
+  ['--static-csp', 'DM_STATIC_CSP', STATIC_CSP],
+  ['--static-frame-options', 'DM_STATIC_FRAME_OPTIONS', STATIC_FRAME_OPTIONS],
 
   // LDAP Flat generic plugin
   [
