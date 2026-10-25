@@ -11,20 +11,21 @@ The `static` plugin serves static files (HTML, CSS, JS, JSON, images) from a dir
 ```bash
 --plugin core/static \
 --static-path ./static \
---static-prefix /static
+--static-name static
 ```
 
 **Environment Variables:**
 
 ```bash
 DM_STATIC_PATH="./static"
-DM_STATIC_PREFIX="/static"
+DM_STATIC_NAME="static"
 ```
 
 ### Parameters
 
 - `--static-path`: Directory containing static files (required)
-- `--static-prefix`: URL prefix for serving files (default: `/static`)
+- `--static-name`: the first segment of the URL the files are served under,
+  without a slash (default: `static`, for `/static/…`)
 
 ## How It Works
 
@@ -105,7 +106,7 @@ Configuration keys are transformed:
 | `__LDAP_BASE__`             | `--ldap-base`             | `dc=example,dc=com`                 |
 | `__LDAP_TOP_ORGANIZATION__` | `--ldap-top-organization` | `ou=organization,dc=example,dc=com` |
 | `__API_PREFIX__`            | `--api-prefix`            | `/api`                              |
-| `__STATIC_PREFIX__`         | `--static-prefix`         | `/static`                           |
+| `__STATIC_NAME__`           | `--static-name`           | `static`                            |
 
 ## Use Cases
 
@@ -137,17 +138,17 @@ Serve web-based LDAP management interface:
 ```bash
 --plugin core/static \
 --static-path ./static \
---static-prefix /
+--static-name app
 ```
 
 Files:
 
 ```
 ./static/
-  index.html          → http://localhost:8081/
-  css/app.css         → http://localhost:8081/css/app.css
-  js/ldap-tree.js     → http://localhost:8081/js/ldap-tree.js
-  schemas/users.json  → http://localhost:8081/schemas/users.json
+  index.html          → http://localhost:8081/app/
+  css/app.css         → http://localhost:8081/app/css/app.css
+  js/ldap-tree.js     → http://localhost:8081/app/js/ldap-tree.js
+  schemas/users.json  → http://localhost:8081/app/schemas/users.json
 ```
 
 ### 3. API Documentation
@@ -157,7 +158,7 @@ Serve OpenAPI/Swagger documentation:
 ```bash
 --plugin core/static \
 --static-path ./api-docs \
---static-prefix /docs
+--static-name docs
 ```
 
 ```
@@ -172,7 +173,7 @@ GET /docs/swagger-ui/  → ./api-docs/swagger-ui/index.html
 ```bash
 --plugin core/static \
 --static-path ./public \
---static-prefix /static
+--static-name static
 ```
 
 **Directory structure:**
@@ -198,25 +199,17 @@ http://localhost:8081/static/js/app.js
 
 ### Example 2: Root Path Serving
 
-```bash
---plugin core/static \
---static-path ./web \
---static-prefix /
-```
-
-Serves files from root:
-
-```
-http://localhost:8081/index.html
-http://localhost:8081/about.html
-```
+Not supported: the files are always served under `/<static-name>/`, and
+the schema routes, which replace the placeholders, are built on that name.
+To show an application at `/`, have the reverse proxy redirect `/` to it,
+for instance to `/static/index.html`.
 
 ### Example 3: Schema Deployment
 
 ```bash
 --plugin core/static \
 --static-path ./static \
---static-prefix /static \
+--static-name static \
 --ldap-base "dc=example,dc=com"
 ```
 
@@ -374,9 +367,9 @@ GET /static/index.html → 404
    --static-path ./static
    ```
 
-3. Verify prefix matches URL:
+3. Verify that the name matches the first segment of the URL:
    ```bash
-   --static-prefix /static
+   --static-name static
    ```
 
 ### Problem: Placeholders Not Replaced
