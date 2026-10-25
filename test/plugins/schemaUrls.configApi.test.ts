@@ -1,7 +1,7 @@
 /**
  * Where the configuration API says the group, organization and flat entity
- * schema files are: at the URL of the static plugin that serves them,
- * whatever its name (#413).
+ * schema files are: at the URL where a static plugin serves the very file
+ * the plugin reads, merged, whatever the static plugin's name.
  */
 import fs from 'fs';
 import os from 'os';
@@ -18,6 +18,7 @@ import LdapOrganizations from '../../src/plugins/ldap/organizations';
 import Static from '../../src/plugins/static';
 
 const shipped = join(__dirname, '..', '..', 'static', 'schemas');
+const files = ['groups.json', 'organizations.json', 'positions.json'];
 type Urls = {
   group: string | undefined;
   organization: string | undefined;
@@ -33,26 +34,36 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
     'DM_ORGANIZATION_SCHEMA',
     'DM_LDAP_FLAT_SCHEMA',
   ];
+  let tmp: string;
   let empty: string;
   let own: string;
   let schemas: Partial<Config>;
 
+  /** Copies of the shipped schemas in dir/twake, told apart by `$comment` */
+  const copy = (dir: string, marker: string, to = files): void => {
+    fs.mkdirSync(join(dir, 'twake'), { recursive: true });
+    for (const [index, file] of files.entries()) {
+      const schema = JSON.parse(
+        fs.readFileSync(join(shipped, 'twake', file), 'utf8')
+      ) as Record<string, unknown>;
+      schema.$comment = marker;
+      fs.writeFileSync(join(dir, 'twake', to[index]), JSON.stringify(schema));
+    }
+  };
+
   before(() => {
     for (const name of names) saved[name] = process.env[name];
     for (const name of names) delete process.env[name];
-    empty = fs.mkdtempSync(join(os.tmpdir(), 'schema-urls-static-'));
+    tmp = fs.mkdtempSync(join(os.tmpdir(), 'schema-urls-'));
+    empty = join(tmp, 'empty');
+    fs.mkdirSync(empty);
     // A deployment's own schemas, outside any static directory
-    own = fs.mkdtempSync(join(os.tmpdir(), 'schema-urls-own-'));
-    fs.mkdirSync(join(own, 'schemas', 'twake'), { recursive: true });
-    for (const file of ['groups.json', 'organizations.json', 'positions.json'])
-      fs.copyFileSync(
-        join(shipped, 'twake', file),
-        join(own, 'schemas', 'twake', file)
-      );
+    own = join(tmp, 'etc', 'schemas');
+    copy(own, 'own');
     schemas = {
-      group_schema: join(own, 'schemas', 'twake', 'groups.json'),
-      organization_schema: join(own, 'schemas', 'twake', 'organizations.json'),
-      ldap_flat_schema: [join(own, 'schemas', 'twake', 'positions.json')],
+      group_schema: join(own, 'twake', 'groups.json'),
+      organization_schema: join(own, 'twake', 'organizations.json'),
+      ldap_flat_schema: [join(own, 'twake', 'positions.json')],
     };
   });
 
@@ -60,8 +71,7 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
     for (const name of names)
       if (saved[name] === undefined) delete process.env[name];
       else process.env[name] = saved[name];
-    fs.rmSync(empty, { recursive: true, force: true });
-    fs.rmSync(own, { recursive: true, force: true });
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 
   /** The announced URLs, with these static plugins loaded in this order */
@@ -94,13 +104,21 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
       dm,
     };
   };
-  /** Each URL answers a schema */
-  const served = async (dm: DM, urls: Urls): Promise<void> => {
+  /** Each URL answers the file the plugin reads, merged */
+  const served = async (
+    dm: DM,
+    urls: Partial<Urls>,
+    marker: string | null = 'own'
+  ): Promise<void> => {
     for (const [key, url] of Object.entries(urls)) {
       expect(url, key).to.be.a('string');
       const res = await supertest(dm.app).get(url as string);
       expect(res.status, url).to.equal(200);
-      expect(res.body).to.include.keys('entity', 'attributes');
+      expect(res.body, url).to.include.keys('entity', 'attributes');
+      expect(
+        (res.body as { $comment?: string }).$comment ?? null,
+        url
+      ).to.equal(marker);
     }
   };
   const under = (path: string): Urls => ({
@@ -115,14 +133,23 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
     await served(dm, urls);
   });
 
+  it('should name the shipped group schema by default', async () => {
+    const { urls, dm } = await announced([['static', {}]], {});
+    expect(urls.group).to.equal('/static/schemas/twake/groups.json');
+    await served(dm, { group: urls.group }, null);
+  });
+
   it('should follow the name the static plugin was given', async () => {
     // Announced under /static, they answered 404; loaded under another
     // name, none was announced.
-    for (const plugin of ['static', 'console']) {
-      const { urls, dm } = await announced([
-        [plugin, { static_name: 'console', static_path: empty }],
-      ]);
-      expect(urls).to.deep.equal(under('/console'));
+    for (const [plugin, override] of [
+      ['static', { static_name: 'console', static_path: empty }],
+      ['console', { static_name: 'console', static_path: empty }],
+      ['console', { static_path: empty }],
+    ] as [string, Partial<Config>][]) {
+      const { urls, dm } = await announced([[plugin, override]]);
+      const name = override.static_name ?? 'static';
+      expect(urls, plugin).to.deep.equal(under(`/${name}`));
       await served(dm, urls);
     }
   });
@@ -136,6 +163,16 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
     await served(dm, urls);
   });
 
+  it('should name none under the path of an earlier plugin', async () => {
+    // The earlier one's routes answer first, even for the one registered
+    // as static
+    const { urls } = await announced([
+      ['console', { static_name: 'console', static_path: empty }],
+      ['static', { static_name: 'console/inner', static_path: empty }],
+    ]);
+    expect(urls).to.deep.equal(under('/console'));
+  });
+
   it('should name none without a static plugin', async () => {
     const { urls } = await announced([]);
     expect(urls).to.deep.equal({
@@ -146,32 +183,104 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
   });
 
   it('should name none for a file no static plugin serves', async () => {
-    // Left at its default, --group-schema is the package's file, which a
-    // --static-path of the deployment's own does not serve.
-    const { urls } = await announced([['static', { static_path: empty }]], {});
-    expect(urls.group).to.equal(undefined);
+    // Left at its default, --group-schema is the package's file. A
+    // --static-path of the deployment's own serves its own copy at that
+    // URL, not the schema the server uses.
+    const site = join(tmp, 'site');
+    copy(join(site, 'schemas'), 'site');
+    for (const path of [empty, site]) {
+      const { urls, dm } = await announced(
+        [['static', { static_path: path }]],
+        {}
+      );
+      expect(urls.group, path).to.equal(undefined);
+      if (path === site)
+        await served(
+          dm,
+          { group: '/static/schemas/twake/groups.json' },
+          'site'
+        );
+    }
   });
 
-  it('should name none for a file served as it stands, outside schemas/', async () => {
-    // express.static would send it without its `extends` merged nor its
-    // placeholders replaced
-    const { urls } = await announced([['static', { static_path: own }]], {
-      group_schema: join(own, 'schemas', 'twake', 'groups.json'),
+  it('should name a file of its schemas/ directory, through a link too', async () => {
+    const site = join(tmp, 'linked');
+    fs.mkdirSync(site);
+    fs.symlinkSync(own, join(site, 'schemas'));
+    for (const config of [
+      schemas,
+      // the file as reached through the link
+      {
+        group_schema: join(site, 'schemas', 'twake', 'groups.json'),
+        organization_schema: join(
+          site,
+          'schemas',
+          'twake',
+          'organizations.json'
+        ),
+        ldap_flat_schema: [join(site, 'schemas', 'twake', 'positions.json')],
+      },
+    ]) {
+      const { urls, dm } = await announced(
+        [['static', { static_path: site }]],
+        config
+      );
+      expect(urls).to.deep.equal(under('/static'));
+      await served(dm, urls);
+    }
+  });
+
+  it('should name a configured file whatever its extension', async () => {
+    // The schema route serves a configured file before it looks at the name
+    const odd = join(tmp, 'odd', 'schemas');
+    copy(odd, 'odd', ['groups.JSON', 'organizations.schema', 'positions']);
+    const { urls, dm } = await announced([['static', { static_path: empty }]], {
+      group_schema: join(odd, 'twake', 'groups.JSON'),
+      organization_schema: join(odd, 'twake', 'organizations.schema'),
+      ldap_flat_schema: [join(odd, 'twake', 'positions')],
     });
-    expect(urls.group).to.equal('/static/schemas/twake/groups.json');
-    const raw = join(own, 'raw');
-    fs.mkdirSync(raw, { recursive: true });
-    fs.copyFileSync(
-      join(shipped, 'twake', 'groups.json'),
-      join(raw, 'groups.json')
-    );
-    const { urls: elsewhere, dm } = await announced(
-      [['static', { static_path: own }]],
-      { group_schema: join(raw, 'groups.json') }
-    );
-    expect(elsewhere.group).to.equal(undefined);
-    // express.static does serve it there
-    const res = await supertest(dm.app).get('/static/raw/groups.json');
+    expect(urls).to.deep.equal({
+      group: '/static/schemas/twake/groups.JSON',
+      organization: '/static/schemas/twake/organizations.schema',
+      flat: '/static/schemas/twake/positions',
+    });
+    await served(dm, urls, 'odd');
+  });
+
+  it('should name none for a file served as it stands', async () => {
+    // express.static sends it without its `extends` merged nor its
+    // placeholders replaced: outside schemas/, or not named .json
+    const site = join(tmp, 'raw');
+    copy(join(site, 'raw'), 'raw');
+    copy(join(site, 'schemas'), 'raw', [
+      'groups.JSON',
+      'organizations.json',
+      'positions.json',
+    ]);
+    for (const file of [
+      join(site, 'raw', 'twake', 'groups.json'),
+      join(site, 'schemas', 'twake', 'groups.JSON'),
+    ]) {
+      const { urls } = await announced([['static', { static_path: site }]], {
+        group_schema: file,
+      });
+      // Configured, but in the static directory at its URL: the schema
+      // route leaves that one to express.static
+      expect(urls.group, file).to.equal(undefined);
+    }
+    // Left at its default, a file of the static directory is not configured
+    const { dm } = await announced([['static', { static_path: site }]], {});
+    const res = await supertest(dm.app).get('/static/raw/twake/groups.json');
     expect(res.status).to.equal(200);
+    const plugin = dm.loadedPlugins.static as Static;
+    expect(
+      plugin.schemaUrlOf(join(site, 'raw', 'twake', 'groups.json'))
+    ).to.equal(undefined);
+    expect(
+      plugin.schemaUrlOf(join(site, 'schemas', 'twake', 'groups.JSON'))
+    ).to.equal(undefined);
+    expect(
+      plugin.schemaUrlOf(join(site, 'schemas', 'twake', 'positions.json'))
+    ).to.equal('/static/schemas/twake/positions.json');
   });
 });

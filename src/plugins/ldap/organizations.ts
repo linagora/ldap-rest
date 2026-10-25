@@ -1715,7 +1715,7 @@ export default class LdapOrganizations extends DmPlugin {
   getConfigApiData(): Record<string, unknown> {
     const apiPrefix = this.config.api_prefix || '/api';
 
-    // Where a static plugin serves the file, whatever its name (#413)
+    // Where a static plugin serves the file, whatever its name
     const schemaUrl = this.config.organization_schema
       ? staticSchemaUrl(this.server, this.config.organization_schema)
       : undefined;

@@ -1661,7 +1661,7 @@ export default class LdapGroups extends DmPlugin {
   getConfigApiData(): Record<string, unknown> {
     const apiPrefix = this.config.api_prefix || '/api';
 
-    // Where a static plugin serves the file, whatever its name (#413)
+    // Where a static plugin serves the file, whatever its name
     const schemaUrl = this.config.group_schema
       ? staticSchemaUrl(this.server, this.config.group_schema)
       : undefined;

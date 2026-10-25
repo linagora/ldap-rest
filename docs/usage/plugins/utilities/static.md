@@ -242,12 +242,7 @@ for instance to `/static/index.html`.
 
 ### Example 4: Multiple Static Plugins
 
-Not directly supported, but you can nest directories:
-
-```bash
---plugin core/static \
---static-path ./static
-```
+One plugin serves several applications from sub-directories:
 
 ```
 ./static/
@@ -259,13 +254,26 @@ Not directly supported, but you can nest directories:
     users.json
 ```
 
-Access via:
-
 ```
 /static/docs/index.html
 /static/app/index.html
 /static/schemas/users.json
 ```
+
+A second directory takes a second instance, loaded under a name of its own
+with its own `static_name` and `static_path`
+([`module:name:{json}`](../auth/README.md#serving-several-populations-from-one-server)):
+
+```bash
+--plugin core/static --static-path ./static \
+--plugin 'core/static:console:{"static_name":"console","static_path":"./console"}'
+```
+
+Give them paths that do not nest: `console` and `console/app` would have the
+first one answer requests meant for the second. The plugins that announce a
+schema URL (groups, organizations, flat entities, SCIM) ask every instance,
+the one registered as `static` first, and leave out one whose path lies under
+an earlier one's.
 
 ## Security Considerations
 

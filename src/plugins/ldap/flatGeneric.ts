@@ -256,7 +256,7 @@ export default class LdapFlatGeneric extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     const flatResources = this.instances.map((instance, index) => {
-      // Where a static plugin serves the file, whatever its name (#413)
+      // Where a static plugin serves the file, whatever its name
       const schemaUrl = this.schemaPaths[index]
         ? staticSchemaUrl(this.server, this.schemaPaths[index])
         : undefined;

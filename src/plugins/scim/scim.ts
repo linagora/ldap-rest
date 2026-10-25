@@ -17,7 +17,7 @@ import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
-import { schemaUrlOf, staticPlugins } from '../../lib/staticFiles';
+import { staticPlugins } from '../../lib/staticFiles';
 import type { Config } from '../../config/args';
 
 import { BaseResolver } from './baseResolver';
@@ -1766,7 +1766,7 @@ export default class Scim extends DmPlugin {
       | undefined;
     for (const plugin of staticPlugins(this.server)) {
       const [user, group, defaultMapping] = files.map(file =>
-        schemaUrlOf(plugin, file)
+        plugin.schemaUrlOf(file)
       );
       // The mapping is a template beside them, which SCIM does not read
       if (user && group) {

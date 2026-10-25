@@ -448,6 +448,79 @@ export default class Static extends DmPlugin {
     return url(segments);
   }
 
+  /**
+   * The URL its schema routes serve a schema file at, merged with what it
+   * extends and its placeholders replaced, for another plugin to announce
+   * it: one of the configuration's schema files it serves, or a file its
+   * `schemas/` directory reaches, through a link included. One that
+   * express.static would send as it stands, outside `schemas/` or not named
+   * `.json`, has none.
+   *
+   * @param file the schema file, as the other plugin reads it
+   * @returns its URL, or undefined when its schema routes do not serve it
+   */
+  schemaUrlOf(file: string): string | undefined {
+    const realOf = (path: string): string | undefined => {
+      try {
+        return fs.statSync(path).isFile() ? fs.realpathSync(path) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const real = realOf(file);
+    if (!real) return undefined;
+    const prefix = this.servedPath();
+    const url = (segments: string[]): string =>
+      `${prefix}/${segments.map(encodeURIComponent).join('/')}`;
+    for (const [served, path] of this.configured)
+      if (realOf(path) === real) {
+        // A client drops `.` and `..` from a URL, and misses the one it
+        // holds: the file may still be served from the directory.
+        const segments = served.slice(prefix.length + 1).split('/');
+        if (segments.some(segment => ['', '.', '..'].includes(segment)))
+          continue;
+        return url(segments);
+      }
+    const rep = this.config.static_path;
+    if (!rep) return undefined;
+    const schemasDir = join(rep, 'schemas');
+    // What follows a `schemas` directory of its path, as given or real, or
+    // the real `schemas/` directory: either may be a link.
+    const tails: string[][] = [];
+    for (const path of [resolve(file), real]) {
+      const parts = path.split(sep);
+      parts.forEach((part, index) => {
+        if (part === 'schemas') tails.push(parts.slice(index + 1));
+      });
+    }
+    try {
+      const inside = relative(fs.realpathSync(schemasDir), real);
+      if (
+        inside &&
+        inside !== '..' &&
+        !inside.startsWith(`..${sep}`) &&
+        !isAbsolute(inside)
+      )
+        tails.push(inside.split(sep));
+    } catch {
+      // no schemas/ directory
+    }
+    for (const tail of tails) {
+      // The names the schema route reads; another is sent as it stands
+      if (
+        !tail.length ||
+        !tail[tail.length - 1].endsWith('.json') ||
+        !tail.every(segment => /^[\w-]+(\.[\w-]+)*$/.test(segment))
+      )
+        continue;
+      const segments = ['schemas', ...tail];
+      // A configured file of that URL is served there instead
+      if (this.configured.has(`${prefix}/${segments.join('/')}`)) continue;
+      if (realOf(join(schemasDir, ...tail)) === real) return url(segments);
+    }
+    return undefined;
+  }
+
   /** The path it serves under, which an earlier plugin may have taken */
   servedPath(): string {
     return `/${staticName(this.config)}`;
