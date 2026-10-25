@@ -51,12 +51,13 @@ export const cookies = (res: supertest.Response): string =>
 
 /**
  * Log in as a browser does, through `/login` and `/callback`, so the session
- * cookie is the library's own.
+ * cookie is the library's own — over the session `cookie` holds, if given.
  */
 export const login = async (
   request: ReturnType<typeof supertest>,
   issuer: string,
-  tokens: Record<string, unknown> = {}
+  tokens: Record<string, unknown> = {},
+  cookie?: string
 ): Promise<{ cookie: string; idToken: string }> => {
   const start = await request.get('/login');
   const authorize = new URL(start.headers.location);
@@ -88,7 +89,7 @@ export const login = async (
   const back = await request
     .get('/callback')
     .query({ code: 'code', state: authorize.searchParams.get('state') })
-    .set('Cookie', cookies(start));
+    .set('Cookie', [cookies(start), cookie].filter(Boolean).join('; '));
   expect(back.status, 'the login completes').to.equal(302);
   return { cookie: cookies(back), idToken };
 };

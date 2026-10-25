@@ -24,11 +24,22 @@ A provider sends logout tokens to the other applications, not to the one
 that asked it to log out. So `core/auth/openidconnect` records the session
 its own `/logout` ends, as a logout token naming it would: by the id it gave
 that session at login, kept in the cookie, which ends that one session and
-leaves the person's others alone. A session from before that id existed is
-named by the provider's `sid`, when it sent one.
+leaves the person's others alone. The same person logging in again over a
+live session keeps its id, so a copy taken before is ended with it.
+
+A session from before that id existed is named by the provider's `sid`, when
+it sent one. A provider that sends none (Dex) leaves such a session
+unnamed: its copies keep working until its tokens expire, and the first
+`/logout` of one logs a warning. That lasts until those sessions have
+expired, a week at most.
 
 Without `core/bcl`, `/logout` drops the browser's cookie and nothing else,
 and a copy of it keeps working until its tokens expire.
+
+A plugin subscribing to `oidclogouttoken` receives `{ iss, session }` from
+`/logout`, with neither `sid` nor `sub`: `session` names one session of this
+server, and is matched against the `session` that `oidcsessionvalid`
+carries.
 
 ## Configuration
 
@@ -56,6 +67,11 @@ https://ldap-rest.example.com/backchannel-logout
 A tombstone has to outlive the session it kills, or a cookie older than the
 mark would be honoured again. The default matches `express-openid-connect`'s
 own seven-day session; shorten it only alongside the session lifetime.
+
+A copy of a session `/logout` ended is refused, so no longer renewed: it
+dies a day after its last use at the latest, the cookie's rolling lifetime.
+While the store cannot answer, though, a copy is still renewed, up to the
+week; keep the retention at the session lifetime.
 
 Expiry is enforced when the mark is read, not only when the sweeper passes,
 so a late sweeper never keeps out someone who has since logged in again.

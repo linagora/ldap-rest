@@ -182,6 +182,31 @@ describe('OpenID Connect, /logout and a copy of the cookie', function () {
     expect((await ping(request, second.cookie)).status).to.equal(200);
   });
 
+  it('should end a copy taken before the same person logged in again', async () => {
+    // The library merges a login over a live session of the same `sub`: a
+    // new id there would leave the copy with one `/logout` no longer names.
+    const issuer = 'http://logout-relogin.example.test';
+    const { request } = await withBcl(issuer);
+    const copy = (await login(request, issuer)).cookie;
+    const again = (await login(request, issuer, {}, copy)).cookie;
+    expect(again).to.match(/appSession=/);
+
+    await request.get('/logout').set('Cookie', again);
+
+    expect((await ping(request, copy)).status).to.equal(401);
+  });
+
+  it('should give a new id to a login over a session already ended', async () => {
+    const issuer = 'http://logout-dead.example.test';
+    const { request } = await withBcl(issuer);
+    const dead = (await login(request, issuer)).cookie;
+    await request.get('/logout').set('Cookie', dead);
+
+    const fresh = (await login(request, issuer, {}, dead)).cookie;
+
+    expect((await ping(request, fresh)).status).to.equal(200);
+  });
+
   it('should log out all the same when the session cannot be recorded', async () => {
     const issuer = 'http://logout-failing.example.test';
     const { request, server } = await withBcl(issuer);
