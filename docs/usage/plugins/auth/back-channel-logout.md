@@ -18,6 +18,18 @@ saying that one `sid`, or every session of one `sub`, is dead. Sessions stay
 in their cookie, and the storage holds only what died — which is what keeps
 it small.
 
+## The Server's Own `/logout`
+
+A provider sends logout tokens to the other applications, not to the one
+that asked it to log out. So `core/auth/openidconnect` records the session
+its own `/logout` ends, as a logout token naming it would: by the id it gave
+that session at login, kept in the cookie, which ends that one session and
+leaves the person's others alone. A session from before that id existed is
+named by the provider's `sid`, when it sent one.
+
+Without `core/bcl`, `/logout` drops the browser's cookie and nothing else,
+and a copy of it keeps working until its tokens expire.
+
 ## Configuration
 
 ```bash

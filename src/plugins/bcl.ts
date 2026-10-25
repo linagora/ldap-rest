@@ -87,12 +87,14 @@ export default class Bcl extends DmPlugin {
    * The keys a token kills.
    *
    * A provider sends `sid`, or `sub`, or both: `sid` ends one session, `sub`
-   * ends every session of that person.
+   * ends every session of that person. `/logout` sends `session`, the id
+   * this server gave the one session it ends.
    */
   private static keys(claims: OidcSessionClaims): string[] {
     const out: string[] = [];
     if (claims.sid) out.push(`${claims.iss}|sid|${claims.sid}`);
     if (claims.sub) out.push(`${claims.iss}|sub|${claims.sub}`);
+    if (claims.session) out.push(`${claims.iss}|session|${claims.session}`);
     return out;
   }
 

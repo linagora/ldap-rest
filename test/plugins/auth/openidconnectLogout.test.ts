@@ -7,8 +7,15 @@
  * caller could see.
  */
 import { expect } from 'chai';
+import type { Response } from 'express';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import nock from 'nock';
 
+import type { DM } from '../../../src/bin';
+import Bcl from '../../../src/plugins/bcl';
+import Storage from '../../../src/plugins/storage';
 import {
   BASE_URL,
   build,
@@ -87,5 +94,107 @@ describe('OpenID Connect, RP-Initiated Logout', function () {
       enabled: true,
       endpoints: { logout: '/logout' },
     });
+  });
+});
+
+/**
+ * `/logout` ends the session here too, not only the browser's copy.
+ *
+ * The cookie holds the whole session, so dropping it left any copy of it —
+ * a shared computer, a backup of the browser profile, a stolen cookie —
+ * working until its tokens expired, and each answer renewed it. The provider
+ * tells the other applications through Back-Channel Logout, not the one that
+ * asked it to log out, and Dex tells nobody.
+ */
+describe('OpenID Connect, /logout and a copy of the cookie', function () {
+  let dir: string;
+  let storage: Storage | undefined;
+
+  /** A provider, a guarded route, and `core/bcl` over a file store */
+  const withBcl = async (
+    issuer: string
+  ): Promise<{ request: Awaited<ReturnType<typeof build>>; server: DM }> => {
+    let server: DM | undefined;
+    const request = await build(issuer, true, undefined, s => {
+      server = s;
+      s.app.get('/api/admin/ping', (req, res: Response) =>
+        res.json({ user: (req as { user?: string }).user })
+      );
+    });
+    const dm = server as DM;
+    dm.config.storage_backend = 'file';
+    dm.config.storage_file_directory = dir;
+    dm.config.storage_sweep_interval = 0;
+    storage = new Storage(dm);
+    await dm.registerPlugin('storage', storage);
+    await dm.registerPlugin('bcl', new Bcl(dm));
+    return { request, server: dm };
+  };
+
+  const ping = (
+    request: Awaited<ReturnType<typeof build>>,
+    cookie: string
+  ): Promise<{ status: number }> =>
+    request
+      .get('/api/admin/ping')
+      .set('Cookie', cookie)
+      .set('Accept', 'application/json')
+      .then(res => res);
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'oidc-logout-'));
+  });
+
+  afterEach(() => {
+    nock.cleanAll();
+    if (storage) {
+      storage.store.stopSweeping();
+      Storage.release(storage);
+      storage = undefined;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('should refuse a copy of the cookie once /logout has ended it', async () => {
+    const issuer = 'http://logout-copy.example.test';
+    const { request } = await withBcl(issuer);
+    const { cookie } = await login(request, issuer);
+    expect((await ping(request, cookie)).status).to.equal(200);
+
+    const res = await request.get('/logout').set('Cookie', cookie);
+    expect(res.status).to.equal(302);
+    expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
+
+    expect((await ping(request, cookie)).status).to.equal(401);
+  });
+
+  it('should leave the other sessions of that person alone', async () => {
+    // The helper's provider gives both the same `sid` and `sub`: only the id
+    // given at login tells them apart.
+    const issuer = 'http://logout-other.example.test';
+    const { request } = await withBcl(issuer);
+    const first = await login(request, issuer);
+    const second = await login(request, issuer);
+
+    await request.get('/logout').set('Cookie', first.cookie);
+
+    expect((await ping(request, first.cookie)).status).to.equal(401);
+    expect((await ping(request, second.cookie)).status).to.equal(200);
+  });
+
+  it('should log out all the same when the session cannot be recorded', async () => {
+    const issuer = 'http://logout-failing.example.test';
+    const { request, server } = await withBcl(issuer);
+    const { cookie } = await login(request, issuer);
+    const hooks = server.hooks as unknown as Record<string, unknown[]>;
+    hooks.oidclogouttoken = [
+      () => Promise.reject(new Error('store unreachable')),
+    ];
+
+    const res = await request.get('/logout').set('Cookie', cookie);
+
+    expect(res.status).to.equal(302);
+    expect(new URL(res.headers.location).pathname).to.equal('/logout');
+    expect(clearsSession(res.headers['set-cookie'])).to.equal(true);
   });
 });

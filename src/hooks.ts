@@ -20,13 +20,19 @@ export type ChainedHook<T> = (arg: T) => MaybePromise<T>;
 /**
  * What identifies an OpenID Connect session on both sides of a Back-Channel
  * Logout: the issuer, plus whichever of `sid` and `sub` the provider sends.
- * At least one of the two is present — the specification requires it, and
- * `express-openid-connect` refuses the token otherwise.
+ * At least one of the two is present in a logout token — the specification
+ * requires it, and `express-openid-connect` refuses the token otherwise.
+ *
+ * `session` is the id `core/auth/openidconnect` gave the session at login and
+ * keeps in its cookie. `/logout` ends a session by it: a provider that sends
+ * no `sid` leaves nothing else naming that one session, and a mark on the
+ * `sub` would end every session of that person.
  */
 export interface OidcSessionClaims {
   iss: string;
   sid?: string;
   sub?: string;
+  session?: string;
 }
 export type OidcLogoutToken = OidcSessionClaims;
 
@@ -135,7 +141,10 @@ export interface Hooks {
    */
   oidcsessionvalid?: ChainedHook<[OidcSessionClaims, boolean]>;
 
-  /** A logout token arrived and verified; subscribers record what it kills. */
+  /**
+   * A logout token arrived and verified, or `/logout` ended a session here;
+   * subscribers record what it kills.
+   */
   oidclogouttoken?: VoidHook<[OidcLogoutToken]>;
 
   /**
