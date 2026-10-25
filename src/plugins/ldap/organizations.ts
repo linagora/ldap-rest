@@ -38,10 +38,8 @@ import {
   HttpError,
 } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import {
-  loadSchemaFileAsync,
-  schemaUrl as schemaFileUrl,
-} from '../../lib/schemaFile';
+import { loadSchemaFileAsync } from '../../lib/schemaFile';
+import { staticSchemaUrl } from '../../lib/staticFiles';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
@@ -1717,11 +1715,10 @@ export default class LdapOrganizations extends DmPlugin {
   getConfigApiData(): Record<string, unknown> {
     const apiPrefix = this.config.api_prefix || '/api';
 
-    // Generate schema URL if static plugin is loaded
-    const schemaUrl =
-      this.server.loadedPlugins['static'] && this.config.organization_schema
-        ? schemaFileUrl(this.config, this.config.organization_schema)
-        : undefined;
+    // Where a static plugin serves the file, whatever its name (#413)
+    const schemaUrl = this.config.organization_schema
+      ? staticSchemaUrl(this.server, this.config.organization_schema)
+      : undefined;
 
     return {
       enabled: true,

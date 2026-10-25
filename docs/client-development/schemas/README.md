@@ -1131,18 +1131,22 @@ it with a 500.
 ### Served Schemas
 
 `core/static` serves the merged schema. The configuration API gives each
-entity its merged schema inline (`schema`) and, with `core/static`, a
-`schemaUrl` made of the file path from its first `schemas` directory:
-`/etc/ldap-rest/schemas/users.json` gets `/static/schemas/users.json`.
-`core/static` serves a configured schema file at that URL even when it is
-outside `--static-path`, and before a shipped schema of the same URL:
-`/etc/ldap-rest/schemas/twake/users.json` is what
-`/static/schemas/twake/users.json` returns. An option left at its default
-does not count: without `--group-schema`, a `--static-path` of your own
-still serves its `schemas/twake/groups.json`. If two configured files get
+entity its merged schema inline (`schema`) and, where a static plugin serves
+the file, its `schemaUrl`: under the plugin's `--static-name`, the file path
+from its first `schemas` directory, `/etc/ldap-rest/schemas/users.json`
+getting `/static/schemas/users.json`. `core/static` serves a configured
+schema file at that URL even when it is outside `--static-path`, and before a
+shipped schema of the same URL: `/etc/ldap-rest/schemas/twake/users.json` is
+what `/static/schemas/twake/users.json` returns. An option left at its
+default does not count: without `--group-schema`, a `--static-path` of your
+own still serves its `schemas/twake/groups.json`, which is not the schema
+the server uses, and no `schemaUrl` is given. If two configured files get
 the same URL, the first one is served there and a warning names the other.
-A file outside any `schemas` directory has no `schemaUrl`; its schema is
-still inline.
+
+A static plugin loaded under another name, or with a `static_name` of its
+own, is asked as well, the one registered as `static` first. A file no
+static plugin serves, one outside any `schemas` directory for instance, has
+no `schemaUrl`; its schema is still inline.
 
 ---
 

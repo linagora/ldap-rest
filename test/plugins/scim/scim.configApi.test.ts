@@ -173,19 +173,26 @@ describe('SCIM schema URLs in the configuration API', () => {
     await served(dm, urls);
   });
 
+  it('should name none served as they stand, outside schemas/', async () => {
+    // express.static would send them without their `extends` merged
+    const { dm } = await announced([]);
+    (dm.loadedPlugins as Record<string, unknown>).other = {
+      name: 'other',
+      servedPath: () => '/other',
+      urlOf: (file: string) => `/other/scim/${file.split('/').pop()}`,
+    };
+    expect(new Scim(dm).getConfigApiData().schemaUrls).to.equal(undefined);
+  });
+
   it('should ask any plugin that says where it serves, whatever its class', async () => {
     // Another copy of ldap-rest has a class of its own.
     const { dm } = await announced([]);
     (dm.loadedPlugins as Record<string, unknown>).other = {
       name: 'other',
       servedPath: () => '/other',
-      urlOf: (file: string) => `/other/${file.split('/').pop()}`,
+      urlOf: (file: string) => `/other/schemas/scim/${file.split('/').pop()}`,
     };
     const urls = new Scim(dm).getConfigApiData().schemaUrls;
-    expect(urls).to.deep.equal({
-      user: '/other/User.json',
-      group: '/other/Group.json',
-      defaultMapping: '/other/default-mapping.json',
-    });
+    expect(urls).to.deep.equal(under('/other'));
   });
 });

@@ -17,6 +17,7 @@ import type ldapActions from '../../lib/ldapActions';
 import type { DmRequest } from '../../lib/auth/base';
 import { setChangeSource } from '../../lib/changeContext';
 import { jsonBodyParser } from '../../lib/rawBody';
+import { schemaUrlOf, staticPlugins } from '../../lib/staticFiles';
 import type { Config } from '../../config/args';
 
 import { BaseResolver } from './baseResolver';
@@ -42,17 +43,6 @@ import {
   projectList,
   projectResource,
 } from './projection';
-
-/** A static plugin, as SCIM asks it where it serves a file */
-interface StaticFiles {
-  urlOf(file: string): string | undefined;
-  servedPath(): string;
-}
-
-/** Told by its methods, not its class: another copy of ldap-rest has its own */
-const isStaticFiles = (plugin: unknown): plugin is StaticFiles =>
-  typeof (plugin as Partial<StaticFiles>).urlOf === 'function' &&
-  typeof (plugin as Partial<StaticFiles>).servedPath === 'function';
 
 /**
  * Reusable SCIM 2.0 schemas surfaced by this plugin.
@@ -1766,36 +1756,17 @@ export default class Scim extends DmPlugin {
 
     // Expose SCIM core schema files via the static plugin when loaded, so
     // clients can fetch them without going through the SCIM /Schemas endpoint:
-    // the very files SCIM reads, which --schemas-path may have moved. Asked
-    // of the static plugins themselves, whatever their class or name: one
-    // loaded under another name, or with a name or a directory of its own,
-    // serves them elsewhere or not at all. One plugin serves them all, the
-    // one registered as `static` first; one whose path an earlier plugin
-    // took answers nothing, the earlier one's schema route answering first.
+    // the very files SCIM reads, which --schemas-path may have moved. One
+    // plugin serves them all, asked in the order of staticPlugins().
     const files = ['User.json', 'Group.json', 'default-mapping.json'].map(
       file => join(this.scimSchemaDir, file)
-    );
-    const taken = new Set<string>();
-    const statics: StaticFiles[] = [];
-    for (const plugin of Object.values(this.server.loadedPlugins)) {
-      if (!isStaticFiles(plugin)) continue;
-      // Express matches paths regardless of case
-      const path = plugin.servedPath().toLowerCase();
-      if (taken.has(path)) continue;
-      taken.add(path);
-      statics.push(plugin);
-    }
-    statics.sort(
-      (a, b) =>
-        Number((b as { name?: string }).name === 'static') -
-        Number((a as { name?: string }).name === 'static')
     );
     let schemaUrls:
       | { user: string; group: string; defaultMapping?: string }
       | undefined;
-    for (const plugin of statics) {
+    for (const plugin of staticPlugins(this.server)) {
       const [user, group, defaultMapping] = files.map(file =>
-        plugin.urlOf(file)
+        schemaUrlOf(plugin, file)
       );
       // The mapping is a template beside them, which SCIM does not read
       if (user && group) {
