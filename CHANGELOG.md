@@ -20,6 +20,16 @@
   a name Express would not match as written stops the server at startup,
   [upgrading](docs/usage/upgrading.md#--static-name-an-empty-value-is-static)
 
+### Fixes
+
+- The configuration API gives SCIM's schema files (`schemaUrls`) the URL
+  of the static plugin that serves the very files SCIM reads. A static
+  plugin with a `--static-name` of its own had them announced under
+  `/static`, which answered 404; one loaded under another name had none;
+  with `--schemas-path` elsewhere, the shipped copies were announced.
+  `schemaUrls` is now left out when no static plugin serves them, and
+  `defaultMapping` when the template is not beside them (#411)
+
 ## v1.0.1 (2026-10-25)
 
 ### Security

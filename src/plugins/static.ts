@@ -19,7 +19,7 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import fs from 'fs';
-import { join, resolve } from 'path';
+import { isAbsolute, join, relative, resolve, sep } from 'path';
 import { validateHeaderValue } from 'http';
 
 import type { Express, NextFunction, Request, Response } from 'express';
@@ -120,6 +120,8 @@ const headerValue = (
 export default class Static extends DmPlugin {
   name: string = 'static';
   roles: Role[] = ['api', 'configurable'] as const;
+  /** The configuration's schema files it serves outside its directory, by URL */
+  private configured = new Map<string, string>();
 
   api(app: Express): void {
     const rep = this.config.static_path;
@@ -315,7 +317,7 @@ export default class Static extends DmPlugin {
     res: Response,
     next: NextFunction
   ) => void {
-    const configured = this.configuredSchemas(rep);
+    const configured = (this.configured = this.configuredSchemas(rep));
     const schemasDir = resolve(join(rep, 'schemas'));
     return (segments, req, res, next) => {
       const file = configured.get(decodedPath(req.path));
@@ -367,10 +369,95 @@ export default class Static extends DmPlugin {
   }
 
   /**
+   * The URL it serves a file at, for another plugin to announce it: under
+   * its own name, which a plugin override may have changed, from its
+   * directory or among the configuration's schema files it serves. One its
+   * routes would not answer with that file is none: a hidden one, which
+   * express.static ignores, a schema whose path the schema route refuses,
+   * or one whose URL a configured schema holds.
+   *
+   * @param file the file, as the other plugin reads it
+   * @returns its URL, or undefined when this plugin does not serve it
+   */
+  urlOf(file: string): string | undefined {
+    const wanted = resolve(file);
+    let real: string;
+    try {
+      if (!fs.statSync(wanted).isFile()) return undefined;
+      real = fs.realpathSync(wanted);
+    } catch {
+      return undefined;
+    }
+    const same = (other: string): boolean => {
+      if (resolve(other) === wanted) return true;
+      try {
+        return fs.realpathSync(other) === real;
+      } catch {
+        return false;
+      }
+    };
+    const prefix = this.servedPath();
+    const url = (segments: string[]): string =>
+      `${prefix}/${segments.map(encodeURIComponent).join('/')}`;
+    for (const [served, path] of this.configured)
+      if (same(path)) {
+        // A client drops `.` and `..` from a URL, and misses the one it
+        // holds: the file may still be served from the directory.
+        const segments = served.slice(prefix.length + 1).split('/');
+        if (segments.some(segment => ['', '.', '..'].includes(segment)))
+          continue;
+        return url(segments);
+      }
+    const rep = this.config.static_path;
+    if (!rep) return undefined;
+    // From the resolved paths, then the real ones for a directory reached
+    // through a link: no `..` is left to take the URL out of its prefix,
+    // and a directory of `/` holds every file.
+    const inside = (path: string): boolean =>
+      !!path &&
+      path !== '..' &&
+      !path.startsWith(`..${sep}`) &&
+      !isAbsolute(path);
+    let root: string;
+    try {
+      root = fs.realpathSync(rep);
+    } catch {
+      return undefined;
+    }
+    const path = [relative(resolve(rep), wanted), relative(root, real)].find(
+      inside
+    );
+    if (!path) return undefined;
+    const segments = path.split(sep);
+    if (segments.some(segment => segment.startsWith('.'))) return undefined;
+    // Matched regardless of case, the schema route reads `schemas/` itself
+    if (
+      segments[0].toLowerCase() === 'schemas' &&
+      segments[0] !== 'schemas' &&
+      path.endsWith('.json')
+    )
+      return undefined;
+    if (
+      segments[0] === 'schemas' &&
+      path.endsWith('.json') &&
+      !segments.slice(1).every(segment => /^[\w-]+(\.[\w-]+)*$/.test(segment))
+    )
+      return undefined;
+    if (this.configured.has(`${prefix}/${segments.join('/')}`))
+      return undefined;
+    return url(segments);
+  }
+
+  /** The path it serves under, which an earlier plugin may have taken */
+  servedPath(): string {
+    return `/${staticName(this.config)}`;
+  }
+
+  /**
    * Provide configuration for config API
    */
   getConfigApiData(): Record<string, unknown> {
-    const staticPath = `/${staticName(this.config)}`;
+    const staticPath = this.servedPath();
 
     return {
       enabled: true,

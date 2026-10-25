@@ -1,4 +1,6 @@
 import fs from 'fs';
+import os from 'os';
+import { join, sep } from 'path';
 import supertest from 'supertest';
 
 import { DM } from '../../src/bin';
@@ -241,6 +243,97 @@ describe('static', () => {
           '--static-name'
         );
       expect(await refused({}, { static_name: 0 })).to.include('--static-name');
+    });
+
+    it('should say where it serves a file, and nothing for one it does not', async () => {
+      // For another plugin to announce it (#411)
+      const tmp = fs.mkdtempSync(join(os.tmpdir(), 'static-url-'));
+      const write = (path: string): string => {
+        fs.mkdirSync(join(tmp, path, '..'), { recursive: true });
+        fs.writeFileSync(join(tmp, path), '{}');
+        return join(tmp, path);
+      };
+      try {
+        const spaced = write('my files/a b.json');
+        const odd = write('schemas/my schemas/x.json');
+        const hidden = write('.conf/x.json');
+        const dotted = write('..archive/x.json');
+        const configured = write('elsewhere/schemas/extra/thing.json');
+        const odder = write('elsewhere/schemas/a#b?c/x y.json');
+        const dotted2 = write('elsewhere/schemas/sub/z.json');
+        const capital = write('Schemas/x.json');
+        // a file of its own at the URL a configured one holds
+        const masked = write('schemas/other/thing.json');
+        const holder = write('elsewhere/schemas/other/thing.json');
+        let request = await serve(
+          { DM_STATIC_PATH: tmp, DM_STATIC_NAME: 'console' },
+          {
+            ldap_flat_schema: [
+              configured,
+              odder,
+              `${tmp}/elsewhere/schemas/sub/./z.json`,
+              holder,
+            ],
+          }
+        );
+        const plugin = dm.loadedPlugins.static as Static;
+        const answers = async (url: string | undefined): Promise<void> => {
+          expect(url).to.be.a('string');
+          expect((await request.get(url as string)).status, url).to.equal(200);
+        };
+        // from its directory, named as a URL writes it
+        expect(plugin.urlOf(spaced)).to.equal('/console/my%20files/a%20b.json');
+        await answers(plugin.urlOf(spaced));
+        // a path that goes out and back in is the file's own
+        await answers(plugin.urlOf(`${tmp}/my files/../my files/a b.json`));
+        // a configured schema, at the URL the schema route gives
+        expect(plugin.urlOf(configured)).to.equal(
+          '/console/schemas/extra/thing.json'
+        );
+        await answers(plugin.urlOf(configured));
+        expect(plugin.urlOf(odder)).to.equal(
+          '/console/schemas/a%23b%3Fc/x%20y.json'
+        );
+        await answers(plugin.urlOf(odder));
+        // configured at a URL a client would rewrite: from the directory
+        expect(plugin.urlOf(dotted2)).to.equal(
+          '/console/elsewhere/schemas/sub/z.json'
+        );
+        await answers(plugin.urlOf(dotted2));
+        // nothing its routes would not answer with it: a directory, a
+        // missing file, one outside, a hidden one, a schema path refused
+        for (const file of [
+          join(tmp, 'my files'),
+          join(tmp, 'none.json'),
+          __filename,
+          hidden,
+          dotted,
+          odd,
+          // a case the schema route reads otherwise, a URL a configured
+          // schema holds
+          capital,
+          masked,
+        ])
+          expect(plugin.urlOf(file), file).to.equal(undefined);
+        for (const path of ['/console/.conf/x.json', '/console/Schemas/x.json'])
+          expect((await request.get(path)).status, path).to.equal(404);
+        // a directory reached through a link
+        const link = `${tmp}-link`;
+        fs.symlinkSync(tmp, link);
+        try {
+          request = await serve({ DM_STATIC_PATH: link });
+          await answers((dm.loadedPlugins.static as Static).urlOf(spaced));
+        } finally {
+          fs.rmSync(link, { force: true });
+        }
+        // a directory of / holds every file
+        request = await serve({ DM_STATIC_PATH: '/', DM_STATIC_NAME: 'root' });
+        expect((dm.loadedPlugins.static as Static).urlOf(spaced)).to.equal(
+          `/root${spaced.split(sep).map(encodeURIComponent).join('/')}`
+        );
+      } finally {
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
     });
 
     it('should serve under its name, the slashes around it left out', async () => {
