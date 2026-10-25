@@ -738,8 +738,8 @@ Notable fields:
   its own `--static-name` (editor
   UIs typically fetch them to render attribute pickers). Among plugins
   serving different paths, the one registered as `static` is preferred; a
-  path an earlier plugin already serves, or lies under, is left to that
-  one. Absent when
+  path an earlier plugin already serves, lies under or holds, is left to
+  that one. Absent when
   none serves them: read it with a guard.
 - `resourceTypes[].mapping` — the live SCIM↔LDAP mapping used server-side, so
   UI builders can render filter helpers / attribute selectors without second

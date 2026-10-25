@@ -186,22 +186,18 @@ describe('SCIM schema URLs in the configuration API', () => {
   });
 
   it('should name none served as they stand, outside schemas/', async () => {
-    // express.static would send them without their `extends` merged
-    const { urls, dm } = await announced(
-      [['own', { static_name: 'own', static_path: copy }]],
-      { schemas_path: join(copy, 'schemas') }
-    );
-    expect(urls).to.deep.equal(under('/own'));
+    // express.static sends them without their `extends` merged
     const raw = fs.mkdtempSync(join(os.tmpdir(), 'scim-raw-'));
     try {
       fs.cpSync(join(copy, 'schemas'), join(raw, 'defs'), { recursive: true });
-      const { urls: none } = await announced(
+      const { urls, dm } = await announced(
         [['own', { static_name: 'own', static_path: raw }]],
         { schemas_path: join(raw, 'defs') }
       );
-      expect(none).to.equal(undefined);
-      const res = await supertest(dm.app).get(under('/own').user);
+      expect(urls).to.equal(undefined);
+      const res = await supertest(dm.app).get('/own/defs/scim/User.json');
       expect(res.status).to.equal(200);
+      expect((res.body as { $comment?: string }).$comment).to.equal('copy');
     } finally {
       fs.rmSync(raw, { recursive: true, force: true });
     }

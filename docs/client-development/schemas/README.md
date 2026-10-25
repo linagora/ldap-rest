@@ -1148,8 +1148,8 @@ schema routes serve that very file, its `schemaUrl`, under the plugin's own
 
 An option left at its default does not count as configured: without
 `--group-schema`, a `--static-path` of your own still serves its
-`schemas/twake/groups.json`, which is not the schema the server uses, and no
-`schemaUrl` is given. A static plugin loaded under another name, or with a
+`schemas/twake/groups.json`, and no `schemaUrl` is given unless that file is
+the package's, through a link. A static plugin loaded under another name, or with a
 `static_name` of its own, is asked as well, the one registered as `static`
 first. A file no static plugin serves merged has no `schemaUrl`, one
 express.static would send as it stands included (outside `schemas/`, or not

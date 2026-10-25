@@ -273,7 +273,7 @@ Give them paths that do not nest: `console` and `console/app` would have the
 first one answer requests meant for the second. The plugins that announce a
 schema URL (groups, organizations, flat entities, SCIM) ask every instance,
 the one registered as `static` first, and leave out one whose path lies under
-an earlier one's.
+an earlier one's, or holds it.
 
 ## Security Considerations
 

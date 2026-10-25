@@ -46,7 +46,7 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
       const schema = JSON.parse(
         fs.readFileSync(join(shipped, 'twake', file), 'utf8')
       ) as Record<string, unknown>;
-      schema.$comment = marker;
+      schema.$comment = `${marker} ${file}`;
       fs.writeFileSync(join(dir, 'twake', to[index]), JSON.stringify(schema));
     }
   };
@@ -104,6 +104,11 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
       dm,
     };
   };
+  const shippedName: Record<string, string> = {
+    group: 'groups.json',
+    organization: 'organizations.json',
+    flat: 'positions.json',
+  };
   /** Each URL answers the file the plugin reads, merged */
   const served = async (
     dm: DM,
@@ -115,10 +120,11 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
       const res = await supertest(dm.app).get(url as string);
       expect(res.status, url).to.equal(200);
       expect(res.body, url).to.include.keys('entity', 'attributes');
+      // the copy of this very file, not another one of the same directory
       expect(
         (res.body as { $comment?: string }).$comment ?? null,
         url
-      ).to.equal(marker);
+      ).to.equal(marker && `${marker} ${shippedName[key]}`);
     }
   };
   const under = (path: string): Urls => ({
@@ -171,6 +177,16 @@ describe('Schema URLs of groups, organizations and flat entities', () => {
       ['static', { static_name: 'console/inner', static_path: empty }],
     ]);
     expect(urls).to.deep.equal(under('/console'));
+    // Nor over it: the earlier one's express.static sends its own
+    // twake/groups.json, as it stands, at /console/schemas/twake/groups.json
+    const inner = join(tmp, 'inner');
+    copy(join(inner, 'twake'), 'inner');
+    const { urls: outer, dm } = await announced([
+      ['inner', { static_name: 'console/schemas', static_path: inner }],
+      ['static', { static_name: 'console', static_path: empty }],
+    ]);
+    expect(outer).to.deep.equal(under('/console/schemas'));
+    await served(dm, outer);
   });
 
   it('should name none without a static plugin', async () => {

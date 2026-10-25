@@ -20,8 +20,8 @@ export const isStaticFiles = (plugin: unknown): plugin is StaticFiles =>
  * The static plugins loaded, whatever their class or name: one loaded under
  * another name, or with a name or a directory of its own, serves files
  * elsewhere or not at all. The one registered as `static` comes first; one
- * whose path an earlier plugin took, or lies under it, is left out, the
- * earlier one's routes answering first.
+ * whose path an earlier plugin took, lies under it or holds it, is left
+ * out, the earlier one's routes answering first.
  *
  * @param server the server whose plugins are asked
  * @returns the plugins, in the order to ask them
@@ -35,7 +35,15 @@ export function staticPlugins(
     if (!isStaticFiles(plugin)) continue;
     // Express matches paths regardless of case
     const path = plugin.servedPath().toLowerCase();
-    if (taken.some(other => (path + '/').startsWith(other + '/'))) continue;
+    // Nested either way, the earlier one's routes answer some of its URLs
+    if (
+      taken.some(
+        other =>
+          (path + '/').startsWith(other + '/') ||
+          (other + '/').startsWith(path + '/')
+      )
+    )
+      continue;
     taken.push(path);
     statics.push(plugin);
   }
