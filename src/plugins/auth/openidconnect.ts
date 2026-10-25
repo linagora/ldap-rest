@@ -71,7 +71,9 @@ const sessionClaims = (req: DmRequest): OidcSessionClaims | undefined => {
  * The `sub` of an id token the library has just verified, or undefined.
  *
  * `afterCallback` receives the tokens as plain values, the claims method
- * stripped off.
+ * stripped off. Read without checking the signature, which holds because the
+ * library calls `afterCallback` only once `client.callback()` has verified the
+ * token: a version calling it earlier would hand this an unverified `sub`.
  */
 const subjectOf = (idToken: unknown): string | undefined => {
   try {
