@@ -734,10 +734,12 @@ Notable fields:
 - `schemaUrls` — direct download URLs of the schema files SCIM reads
   (`User.json` and `Group.json` under `--schemas-path`, with the
   `default-mapping.json` template beside them when it is there), when a
-  `core/static` plugin serves them, under its own `--static-name` (editor
+  `core/static` plugin serves them merged, through its schema routes, under
+  its own `--static-name` (editor
   UIs typically fetch them to render attribute pickers). Among plugins
   serving different paths, the one registered as `static` is preferred; a
-  path an earlier plugin already serves is left to that one. Absent when
+  path an earlier plugin already serves, lies under or holds, is left to
+  that one. Absent when
   none serves them: read it with a guard.
 - `resourceTypes[].mapping` — the live SCIM↔LDAP mapping used server-side, so
   UI builders can render filter helpers / attribute selectors without second

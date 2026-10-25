@@ -28,10 +28,8 @@ import {
   wantJson,
 } from '../../lib/expressFormatedResponses';
 import { extractLdapCode } from '../../lib/ldapCodes';
-import {
-  loadSchemaFileAsync,
-  schemaUrl as schemaFileUrl,
-} from '../../lib/schemaFile';
+import { loadSchemaFileAsync } from '../../lib/schemaFile';
+import { staticSchemaUrl } from '../../lib/staticFiles';
 import {
   asyncHandler,
   escapeDnValue,
@@ -1663,11 +1661,10 @@ export default class LdapGroups extends DmPlugin {
   getConfigApiData(): Record<string, unknown> {
     const apiPrefix = this.config.api_prefix || '/api';
 
-    // Generate schema URL if static plugin is loaded
-    const schemaUrl =
-      this.server.loadedPlugins['static'] && this.config.group_schema
-        ? schemaFileUrl(this.config, this.config.group_schema)
-        : undefined;
+    // Where a static plugin serves the file, whatever its name
+    const schemaUrl = this.config.group_schema
+      ? staticSchemaUrl(this.server, this.config.group_schema)
+      : undefined;
 
     return {
       enabled: true,

@@ -1131,18 +1131,29 @@ it with a 500.
 ### Served Schemas
 
 `core/static` serves the merged schema. The configuration API gives each
-entity its merged schema inline (`schema`) and, with `core/static`, a
-`schemaUrl` made of the file path from its first `schemas` directory:
-`/etc/ldap-rest/schemas/users.json` gets `/static/schemas/users.json`.
-`core/static` serves a configured schema file at that URL even when it is
-outside `--static-path`, and before a shipped schema of the same URL:
-`/etc/ldap-rest/schemas/twake/users.json` is what
-`/static/schemas/twake/users.json` returns. An option left at its default
-does not count: without `--group-schema`, a `--static-path` of your own
-still serves its `schemas/twake/groups.json`. If two configured files get
-the same URL, the first one is served there and a warning names the other.
-A file outside any `schemas` directory has no `schemaUrl`; its schema is
-still inline.
+entity its merged schema inline (`schema`) and, where a static plugin's
+schema routes serve that very file, its `schemaUrl`, under the plugin's own
+`--static-name`:
+
+- a schema file of the configuration gets the file path from its first
+  `schemas` directory, `/etc/ldap-rest/schemas/users.json` getting
+  `/static/schemas/users.json`. `core/static` serves it at that URL even
+  when it is outside `--static-path`, and before a shipped schema of the
+  same URL: `/etc/ldap-rest/schemas/twake/users.json` is what
+  `/static/schemas/twake/users.json` returns. If two configured files get
+  the same URL, the first one is served there and a warning names the
+  other;
+- a file the `schemas/` directory of `--static-path` holds, that directory
+  being a link or not, gets its path in it, if it is named `.json`.
+
+An option left at its default does not count as configured: without
+`--group-schema`, a `--static-path` of your own still serves its
+`schemas/twake/groups.json`, and no `schemaUrl` is given unless that file is
+the package's, through a link. A static plugin loaded under another name, or with a
+`static_name` of its own, is asked as well, the one registered as `static`
+first. A file no static plugin serves merged has no `schemaUrl`, one
+express.static would send as it stands included (outside `schemas/`, or not
+named `.json`); its schema is still inline.
 
 ---
 

@@ -32,11 +32,17 @@ describe('SCIM schema URLs in the configuration API', () => {
     // A deployment's own copy of the SCIM schemas, in a directory of its own
     copy = fs.mkdtempSync(join(os.tmpdir(), 'scim-schemas-'));
     fs.mkdirSync(join(copy, 'schemas', 'scim'), { recursive: true });
-    for (const file of files)
-      fs.copyFileSync(
-        join(shipped, 'scim', file),
-        join(copy, 'schemas', 'scim', file)
+    // told apart from the shipped files by `$comment`
+    for (const file of files) {
+      const schema = JSON.parse(
+        fs.readFileSync(join(shipped, 'scim', file), 'utf8')
+      ) as Record<string, unknown>;
+      schema.$comment = 'copy';
+      fs.writeFileSync(
+        join(copy, 'schemas', 'scim', file),
+        JSON.stringify(schema)
       );
+    }
   });
 
   after(() => {
@@ -171,6 +177,30 @@ describe('SCIM schema URLs in the configuration API', () => {
     ));
     expect(urls).to.deep.equal(under('/own'));
     await served(dm, urls);
+    for (const url of Object.values(urls as Urls)) {
+      const res = await supertest(dm.app).get(url as string);
+      expect((res.body as { $comment?: string }).$comment, url).to.equal(
+        'copy'
+      );
+    }
+  });
+
+  it('should name none served as they stand, outside schemas/', async () => {
+    // express.static sends them without their `extends` merged
+    const raw = fs.mkdtempSync(join(os.tmpdir(), 'scim-raw-'));
+    try {
+      fs.cpSync(join(copy, 'schemas'), join(raw, 'defs'), { recursive: true });
+      const { urls, dm } = await announced(
+        [['own', { static_name: 'own', static_path: raw }]],
+        { schemas_path: join(raw, 'defs') }
+      );
+      expect(urls).to.equal(undefined);
+      const res = await supertest(dm.app).get('/own/defs/scim/User.json');
+      expect(res.status).to.equal(200);
+      expect((res.body as { $comment?: string }).$comment).to.equal('copy');
+    } finally {
+      fs.rmSync(raw, { recursive: true, force: true });
+    }
   });
 
   it('should ask any plugin that says where it serves, whatever its class', async () => {
@@ -179,13 +209,10 @@ describe('SCIM schema URLs in the configuration API', () => {
     (dm.loadedPlugins as Record<string, unknown>).other = {
       name: 'other',
       servedPath: () => '/other',
-      urlOf: (file: string) => `/other/${file.split('/').pop()}`,
+      schemaUrlOf: (file: string) =>
+        `/other/schemas/scim/${file.split('/').pop()}`,
     };
     const urls = new Scim(dm).getConfigApiData().schemaUrls;
-    expect(urls).to.deep.equal({
-      user: '/other/User.json',
-      group: '/other/Group.json',
-      defaultMapping: '/other/default-mapping.json',
-    });
+    expect(urls).to.deep.equal(under('/other'));
   });
 });

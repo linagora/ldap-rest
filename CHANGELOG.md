@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `groups`, `organizations` and `flatGeneric` give their schema file
+  (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
+  merged, as SCIM does since 1.1.0: a static plugin with a `static_name`
+  override had it announced under `/static`, which answered 404; one loaded
+  under another name had none. It is left out where no static plugin
+  serves the very file, as a `--group-schema` left at its default under a
+  `--static-path` of your own holding its own copy, and, for SCIM too, where
+  express.static
+  would send it as it stands, outside `schemas/` or not named `.json`
+  ([#413](https://github.com/linagora/ldap-rest/issues/413))
+
 ## v1.1.0 (2026-10-25)
 
 Two changes need a check before deploying,

@@ -10,10 +10,8 @@ import type { Express } from 'express';
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import LdapFlat from '../../abstract/ldapFlat';
 import type { DM } from '../../bin';
-import {
-  loadSchemaFile,
-  schemaUrl as schemaFileUrl,
-} from '../../lib/schemaFile';
+import { loadSchemaFile } from '../../lib/schemaFile';
+import { staticSchemaUrl } from '../../lib/staticFiles';
 import type { LocalizedText, Schema } from '../../config/schema';
 import type { AttributesList } from '../../lib/ldapActions';
 
@@ -258,11 +256,10 @@ export default class LdapFlatGeneric extends DmPlugin {
     const apiPrefix = this.config.api_prefix || '/api';
 
     const flatResources = this.instances.map((instance, index) => {
-      // Generate schema URL if static plugin is loaded
-      const schemaUrl =
-        this.server.loadedPlugins['static'] && this.schemaPaths[index]
-          ? schemaFileUrl(this.config, this.schemaPaths[index])
-          : undefined;
+      // Where a static plugin serves the file, whatever its name
+      const schemaUrl = this.schemaPaths[index]
+        ? staticSchemaUrl(this.server, this.schemaPaths[index])
+        : undefined;
 
       return {
         name: instance.name.replace('ldapFlat:', ''),
