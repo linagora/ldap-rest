@@ -96,7 +96,10 @@ resources:
 
 # -- Container lifecycle hooks. A `preStop` sleeping a few seconds lets the
 # proxies stop routing to the pod before the server closes its socket:
-# `preStop: { sleep: { seconds: 5 } }`. Set to {} for none.
+# `preStop: { sleep: { seconds: 5 } }` (Kubernetes 1.30 and later; before,
+# `preStop: { exec: { command: [sleep, "5"] } }`). The sleep and
+# `--shutdown-timeout` together stay under terminationGracePeriodSeconds.
+# Set to {} for none.
 lifecycle: {}
 
 # -- Liveness probe: `GET /healthz` answers as long as the process serves.

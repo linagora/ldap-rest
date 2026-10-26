@@ -16,7 +16,11 @@ state nobody knew. The binary now shuts down and exits with 1. On
 `SIGTERM` it also drains what is in flight within `--shutdown-timeout`
 (20 s) and closes its connections before the signal ends it, where the
 signal ended the process at once. A host assembling the server in its own
-process gets neither unless it asks, see [shutdown](operations.md#shutdown).
+process gets neither unless it asks: `run()` no longer installs the handlers
+that logged an uncaught exception or an unhandled rejection and kept the
+process alive, so without `exitOnCrash()` or handlers of its own, Node's
+action applies and the process ends on either. See
+[shutdown](operations.md#shutdown).
 
 ### The readiness of a pod follows the directory
 

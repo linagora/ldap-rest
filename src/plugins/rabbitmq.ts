@@ -170,6 +170,11 @@ export default class RabbitMq extends DmPlugin {
       try {
         // Outside the request it may be opened for: the client outlives it
         const client = await outsideAnyRequest(() => this.connect());
+        // Closed while it was opening: nothing outlives the shutdown
+        if (this.closed) {
+          await client.close().catch(() => undefined);
+          return null;
+        }
         this.client = client;
         this.logger.info(
           `${this.name}: connected to RabbitMQ at ${redactAmqpUrl(
