@@ -1,0 +1,13 @@
+{
+  "strict": false,
+  "attributes": {
+    "ou": { "type": "string", "required": true, "role": "identifier" },
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "fixed": true,
+      "default": ["top", "organizationalUnit", "twakeDepartment"]
+    },
+    "description": { "type": "string" }
+  }
+}

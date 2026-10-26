@@ -4,6 +4,10 @@
 
 ### Fixes
 
+- Organizations enforce the `fixed` attributes of their schema as the flat
+  routes and groups do: on a creation a fixed attribute takes its default,
+  and a change naming one answers 400
+  ([#430](https://github.com/linagora/ldap-rest/issues/430))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

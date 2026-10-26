@@ -1346,6 +1346,12 @@ export default class LdapOrganizations extends DmPlugin {
       return true;
     }
 
+    // A fixed attribute is written as its schema says, whatever the request
+    // carried, as on the flat routes; groups drop it from the body. Nothing
+    // enforced it here.
+    for (const [field, attr] of Object.entries(this.schema.attributes))
+      if (attr.fixed && attr.default !== undefined) entry[field] = attr.default;
+
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
@@ -1381,6 +1387,12 @@ export default class LdapOrganizations extends DmPlugin {
       toDirectoryChanges(undefined, changes);
       return true;
     }
+
+    for (const field of modifiedAttributeNames(changes))
+      if (schemaAttribute(this.schema, field)?.[1]?.fixed)
+        throw new BadRequestError(
+          `Attribute "${field}" is fixed and cannot be modified`
+        );
 
     if (changes.add) {
       for (const [field, value] of Object.entries(changes.add)) {
