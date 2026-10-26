@@ -65,6 +65,7 @@ secrets:
 | `externalFileConfig`               | `""`                         | Inline JS plugin mounted at `/app/external/cnb-plugin.js`.  |
 | `resources`                        | see `values.yaml`            | CPU/memory requests and limits.                             |
 | `livenessProbe` / `readinessProbe` | `/healthz`, `/readyz`        | HTTP probes on `http` (`{}` disables).                      |
+| `lifecycle`                        | `{}`                         | Container lifecycle hooks, a `preStop` sleep for a rollout. |
 
 See [`values.yaml`](./values.yaml) for the full list.
 

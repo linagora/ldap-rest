@@ -4,6 +4,10 @@
 
 ### Breaking Changes
 
+- An exception nothing caught shuts the server down and exits with 1,
+  where the process kept serving,
+  [upgrading](docs/usage/upgrading.md#the-process-stops-on-an-uncaught-exception)
+  ([#423](https://github.com/linagora/ldap-rest/issues/423))
 - `--ldap-dn` and `--ldap-pwd` have no default: the server stops at startup
   without them, where it bound as `cn=admin,dc=example,dc=com` / `admin`,
   and the Docker image no longer carries that password in its `ENV`,
@@ -27,6 +31,12 @@
 
 ### Features
 
+- On `SIGTERM` and `SIGINT`, the server leaves the endpoints, finishes what
+  is in flight within `--shutdown-timeout` (20 s), closes the broker, the
+  storage backend and the directory connections, then ends;
+  `/readyz` answers `stopping` meanwhile,
+  [docs](docs/usage/operations.md#shutdown)
+  ([#423](https://github.com/linagora/ldap-rest/issues/423))
 - `GET /healthz` and `GET /readyz`, outside the API prefix and without
   authentication: the first answers as long as the process serves, the
   second 200 once the plugins are loaded and the directory answers, 503

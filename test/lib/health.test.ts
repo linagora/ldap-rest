@@ -29,6 +29,7 @@ const probed = (
 ): Probed & { pings: number } => {
   const server = {
     composed,
+    stopping: false,
     pings: 0,
     loadedPlugins: plugins,
     ldap: {
@@ -48,6 +49,13 @@ describe('Readiness', () => {
     const server = probed([true], {}, false);
     expect(await readiness(server)).to.deep.equal({ status: 'starting' });
     expect(server.pings, 'no directory probe before').to.equal(0);
+  });
+
+  it('is stopping once told to, whatever it answered before', async () => {
+    const server = probed([true]);
+    expect((await readiness(server)).status).to.equal('ok');
+    (server as { stopping: boolean }).stopping = true;
+    expect(await readiness(server)).to.deep.equal({ status: 'stopping' });
   });
 
   it('is unavailable when the directory does not answer', async () => {

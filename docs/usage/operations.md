@@ -15,6 +15,7 @@ never cached:
 | `status`      | Code | Meaning                                                                                                |
 | ------------- | ---- | ------------------------------------------------------------------------------------------------------ |
 | `starting`    | 503  | The plugins are still loading (a host serving before `ready`; the shipped binary opens the port after) |
+| `stopping`    | 503  | The server was told to stop and finishes what is in flight; a new connection is refused                |
 | `unavailable` | 503  | The directory does not answer a read of its root DSE in 2 s (`ldap: failed`)                           |
 | `ok`          | 200  | Everything answers                                                                                     |
 | `degraded`    | 200  | The directory answers, a plugin reports a resource of its own down                                     |
@@ -78,3 +79,47 @@ it too. A line without one was written outside any request: at startup, by
 a scheduled task, by a message consumer, by a connection the server keeps.
 Work shared between requests, a schema load or a readiness answer, logs
 under the request that started it.
+
+## Shutdown
+
+On `SIGTERM` or `SIGINT`, the binary stops in order:
+
+1. the listening socket closes: a new connection is refused, and
+   `/readyz` answers 503 `stopping` on the connections still open;
+2. idle keep-alive connections close at once; the others close with the
+   response they carry, sent with `Connection: close`, or are cut when the
+   drain is spent: `--shutdown-timeout` (20 s) less the 5 s kept for the
+   steps below, 1 s at least;
+3. every plugin's `close()` runs, at once: the broker connection, the
+   storage backend;
+4. the directory connections are closed;
+5. the signal ends the process, with its usual code (143 on `SIGTERM`).
+
+The whole takes `--shutdown-timeout` at most: a `close()` that does not
+settle in what remains of the budget is logged and left behind, by
+`shutdown()` itself, so a host gets the same bound, and the directory
+connections are closed anyway. The drain and the closes get 1 s each at
+least, so a budget under 2 s is exceeded. Kubernetes takes the pod out
+of its endpoints as it sends the signal, and the proxies follow a moment
+later: a request routed meanwhile is refused. A `preStop` hook sleeping a
+few seconds, before the signal, closes that window; the chart's `lifecycle`
+value takes one. The sleep and `--shutdown-timeout` together must stay
+under `terminationGracePeriodSeconds`, 30 s by default, which the chart
+leaves to Kubernetes: 5 s and 20 s fit.
+
+A host assembling the server in its own process calls `shutdown()` itself,
+`shutdownOnSignals()` when it wants the same behaviour on a signal, and
+`exitOnCrash()` for the policy below; without the latter, Node's own action
+on an uncaught exception applies.
+
+An exception nothing caught leaves the process in a state nobody knows: it
+is logged, the shutdown above runs, and the process exits with 1, within
+`--shutdown-timeout` whatever hangs, for its supervisor to start it again.
+A promise rejection nothing handled is logged and counted, and the process
+keeps serving.
+
+### For plugin authors
+
+A plugin holding a connection, a timer or a queue implements `close()`,
+called once after the server stopped serving; it must settle, a failure is
+logged and does not hold the others.

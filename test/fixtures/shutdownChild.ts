@@ -1,12 +1,12 @@
 /**
  * A process that registers a shutdown callback and waits for a signal; the
  * mode in argv[2] decides how the callback behaves. Run by
- * test/plugins/rabbitmqShutdown.test.ts.
+ * test/lib/processShutdown.test.ts.
  */
 import {
   registerProcessShutdown,
   shutdownTimeout,
-} from '../../../src/plugins/rabbitmq';
+} from '../../src/lib/shutdown';
 
 const mode = process.argv[2] ?? 'closes';
 const say = (what: string): void => {
@@ -21,7 +21,12 @@ if (mode === 'host')
     setTimeout(() => process.exit(7), 100);
   });
 
+// Alive until the signal, and no longer: a callback that hangs must not be
+// the only thing left holding the process
+const alive = setInterval(() => undefined, 1000);
+
 registerProcessShutdown(async () => {
+  clearInterval(alive);
   say('closing');
   if (mode === 'throws') throw new Error('broker already gone');
   if (mode === 'hangs') await new Promise(() => undefined);
@@ -34,5 +39,4 @@ registerProcessShutdown(async () => {
   say('closed');
 });
 
-setInterval(() => undefined, 1000);
 say('ready');

@@ -488,7 +488,7 @@ class ldapActions {
   private currentUrlIndex: number = 0;
   // LRU cache for attribute signatures to prevent unbounded memory growth
   private attrSignatureCache: LRUCache<string, string>;
-  private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
+  private waitingResolvers: Array<(conn?: PooledConnection) => void> = [];
   private availableConnections: PooledConnection[] = [];
   private isCleaningUp = false;
   /** See {@link declareObjectClasses}. */
@@ -725,6 +725,7 @@ class ldapActions {
    * @throws when no URL answers in time
    */
   async ping(timeoutMs: number): Promise<void> {
+    if (this.closed) throw new Error('LDAP connections closed');
     const errors: string[] = [];
     for (let i = 0; i < this.ldapUrls.length; i++) {
       const url =
@@ -751,11 +752,28 @@ class ldapActions {
     throw new Error(`No directory answered: ${errors.join(', ')}`);
   }
 
+  /** Set by `close`: no connection is handed out any more */
+  private closed = false;
+
+  /**
+   * Close every pooled connection, the ones in use included: an operation
+   * still running on one is rejected by the client, and a waiter is refused
+   * rather than kept.
+   */
+  async close(): Promise<void> {
+    this.closed = true;
+    for (const waiter of this.waitingResolvers.splice(0)) waiter(undefined);
+    const pooled = this.connectionPool.splice(0);
+    this.availableConnections.length = 0;
+    await Promise.allSettled(pooled.map(conn => conn.client.unbind()));
+  }
+
   /**
    * Acquire a connection from the pool or create a new one
    * Optimized for O(1) lookup using separate available connections queue
    */
   private async acquireConnection(): Promise<PooledConnection> {
+    if (this.closed) throw new Error('LDAP connections closed');
     // Clean up expired connections
     this.cleanupExpiredConnections();
 
@@ -771,6 +789,10 @@ class ldapActions {
     if (this.connectionPool.length < this.poolSize) {
       // Outside the request it is opened for: the connection outlives it
       const client = await outsideAnyRequest(() => this.createConnection());
+      if (this.closed) {
+        await client.unbind().catch(() => undefined);
+        throw new Error('LDAP connections closed');
+      }
       const pooled: PooledConnection = {
         client,
         createdAt: Date.now(),
@@ -794,9 +816,10 @@ class ldapActions {
         reject(new Error('LDAP connection pool timeout after 30s'));
       }, 30000);
 
-      const resolveWrapper = (conn: PooledConnection) => {
+      const resolveWrapper = (conn?: PooledConnection) => {
         globalThis.clearTimeout(timeoutId);
-        resolve(conn);
+        if (conn) resolve(conn);
+        else reject(new Error('LDAP connections closed'));
       };
       this.waitingResolvers.push(resolveWrapper);
     });

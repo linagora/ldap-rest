@@ -111,8 +111,12 @@ export default abstract class Store {
     // Nothing to reach for a backend that shares the server's own resources.
   }
 
+  /** Set by `close`: a backend opens nothing past it */
+  protected closed = false;
+
   /** Stop sweeping and let go of any connection. */
   close(): Promise<void> {
+    this.closed = true;
     this.stopSweeping();
     return Promise.resolve();
   }

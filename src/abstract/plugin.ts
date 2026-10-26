@@ -122,6 +122,13 @@ export default abstract class DmPlugin {
    */
   health?(): MaybePromise<HealthStatus>;
 
+  /**
+   * Called once by the shutdown, after the server stopped serving: let go
+   * of what this plugin holds, a connection, a timer, a queue. See
+   * `docs/usage/operations.md#shutdown`.
+   */
+  close?(): MaybePromise<void>;
+
   /* Uniq name of this plugin */
   abstract name: string;
 

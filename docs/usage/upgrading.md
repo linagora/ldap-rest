@@ -6,6 +6,23 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### The process stops on an uncaught exception
+
+**Who is affected:** every deployment; a supervisor, Kubernetes or systemd,
+restarts the process, as it should.
+
+An exception nothing caught was logged and the process kept serving in a
+state nobody knew. The binary now shuts down and exits with 1. On
+`SIGTERM` it also drains what is in flight within `--shutdown-timeout`
+(20 s) and closes its connections before the signal ends it, where the
+signal ended the process at once, the broker connection closed first when
+`core/rabbitmq` was loaded. A host assembling the server in its own
+process gets neither unless it asks: `run()` no longer installs the handlers
+that logged an uncaught exception or an unhandled rejection and kept the
+process alive, so without `exitOnCrash()` or handlers of its own, Node's
+action applies and the process ends on either. See
+[shutdown](operations.md#shutdown).
+
 ### The readiness of a pod follows the directory
 
 **Who is affected:** a deployment of the Helm chart, whose probes now call

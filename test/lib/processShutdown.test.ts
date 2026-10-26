@@ -1,20 +1,14 @@
 /**
  * A SIGTERM listener replaces Node's default action, which is to exit. The
- * one `core/rabbitmq` installs must end the process once the broker is
- * closed, whatever the callbacks do. Checked on a real child process, as
+ * one the shutdown installs must end the process once the callbacks are
+ * done, whatever they do. Checked on a real child process, as
  * `process.emit` applies no default action.
  */
 import { expect } from 'chai';
 import { spawn } from 'child_process';
 import path from 'path';
 
-const child = path.join(
-  __dirname,
-  '..',
-  'fixtures',
-  'rabbitmq',
-  'shutdownChild.ts'
-);
+const child = path.join(__dirname, '..', 'fixtures', 'shutdownChild.ts');
 
 interface Outcome {
   code: number | null;
@@ -50,7 +44,7 @@ const run = (mode: string, signal: 'SIGTERM' | 'SIGINT'): Promise<Outcome> =>
     );
   });
 
-describe('core/rabbitmq process shutdown', function () {
+describe('Process shutdown', function () {
   this.timeout(30000);
 
   it('closes, then ends the process by the signal it got', async () => {

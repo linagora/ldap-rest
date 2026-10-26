@@ -45,6 +45,7 @@ import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
+import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -109,7 +110,13 @@ export class DM {
   app: express.Express;
   config: Config;
   ready: Promise<void>;
-  server?: import('http').Server;
+  /** The listener, once `run()` opened it; shared by the `withConfig` views */
+  get server(): import('http').Server | undefined {
+    return this.life.server;
+  }
+  set server(server: import('http').Server | undefined) {
+    this.life.server = server;
+  }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   hooks: { [K in keyof Hooks]?: Function[] } = {};
   loadedPlugins: { [key: string]: DmPlugin } = {};
@@ -143,6 +150,31 @@ export class DM {
   get composed(): boolean {
     return this._composed;
   }
+
+  /**
+   * The listener, the shutdown once started, and the rejections nobody
+   * handled since the start. In an object, shared by the `withConfig` views
+   * as `_authState` is: a view with a flag of its own would stop on its own,
+   * and one without the listener would not close it.
+   */
+  private readonly life: {
+    server?: import('http').Server;
+    shutdown?: Promise<void>;
+    unhandledRejections: number;
+  } = { unhandledRejections: 0 };
+
+  /** The responses not sent yet, told to close their connection on a stop */
+  private readonly inFlight = new Set<Response>();
+
+  /** Told to stop: the readiness says so, what is in flight finishes */
+  get stopping(): boolean {
+    return this.life.shutdown !== undefined;
+  }
+
+  /** Rejections nobody handled since the start, logged and counted */
+  get unhandledRejections(): number {
+    return this.life.unhandledRejections;
+  }
   private _errorMiddleware?: express.ErrorRequestHandler;
   /**
    * The loads of `--plugin` entries without overrides, keyed by resolved
@@ -168,6 +200,17 @@ export class DM {
     this.app.disable('x-powered-by');
     this.app.use((_req, res, next) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // A stopping server closes the connection with the response: a
+      // keep-alive connection would otherwise bring requests until it is
+      // cut. The header does it for a response not sent yet; a response
+      // whose headers went out before the stop leaves an idle connection
+      // once sent, which `closeIdleConnections` closes.
+      if (this.stopping) res.setHeader('Connection', 'close');
+      this.inFlight.add(res);
+      res.once('finish', () => {
+        if (this.stopping) this.server?.closeIdleConnections();
+      });
+      res.once('close', () => this.inFlight.delete(res));
       next();
     });
     // Every answer names its request, and every line logged while serving
@@ -631,27 +674,35 @@ export class DM {
     this._errorMiddlewareSetup = true;
   }
 
-  run(): Promise<void> {
-    // Handle uncaught exceptions
+  /**
+   * Exit on a failure nothing caught: an exception leaves the process in a
+   * state nobody knows, so it shuts down as cleanly as it can, within the
+   * shutdown budget, and exits with 1 for its supervisor to start it again.
+   * A rejection nothing handled is logged and counted; the request that
+   * owned it has been answered or will time out.
+   *
+   * For the binary; a host assembling the server decides for itself, and
+   * without it Node's own action applies.
+   */
+  exitOnCrash(): void {
     process.on('uncaughtException', (err: Error) => {
       this.logger.error(`Uncaught exception: ${err.message}`, {
         stack: err.stack,
       });
-      // Don't exit the process, just log the error
+      // Referenced: an empty event loop must not end the process with 0
+      setTimeout(() => process.exit(1), this.config.shutdown_timeout as number);
+      void this.shutdown().finally(() => process.exit(1));
     });
+    process.on('unhandledRejection', (reason: unknown) => {
+      this.life.unhandledRejections++;
+      this.logger.error(
+        `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}`,
+        { stack: reason instanceof Error ? reason.stack : undefined }
+      );
+    });
+  }
 
-    // Handle unhandled promise rejections
-    process.on(
-      'unhandledRejection',
-      (reason: unknown, promise: Promise<unknown>) => {
-        this.logger.error(`Unhandled promise rejection: ${reason as string}`, {
-          reason,
-          promise,
-        });
-        // Don't exit the process, just log the error
-      }
-    );
-
+  run(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(this.config.port, err => {
         if (err) {
@@ -669,6 +720,93 @@ export class DM {
     this.app.removeAllListeners();
     this.server?.close();
     this.logger.debug('Server stopped');
+  }
+
+  /**
+   * Stop serving: the readiness answers 503, the listening socket closes,
+   * what is in flight finishes, then every plugin's `close()` runs and the
+   * directory connections are closed, the whole within `--shutdown-timeout`
+   * whatever hangs. Called once; a second call waits for the first.
+   *
+   * @returns when everything let go, resolved whatever failed on the way
+   */
+  shutdown(): Promise<void> {
+    this.life.shutdown ??= this.letGo();
+    return this.life.shutdown;
+  }
+
+  private async letGo(): Promise<void> {
+    const budget = this.config.shutdown_timeout as number;
+    const started = Date.now();
+    // The last seconds are for the plugins and the directory to let go
+    const drain = Math.max(1000, budget - 5000);
+    this.logger.notice(`Shutting down, ${drain} ms for what is in flight`);
+    const server = this.server;
+    if (server) {
+      // Idle keep-alive connections close now; the others with the response
+      // they carry, which closes them, or when the drain is spent
+      const closed = new Promise<void>(resolve =>
+        server.close(() => resolve())
+      );
+      server.closeIdleConnections();
+      for (const res of this.inFlight)
+        if (!res.headersSent) res.setHeader('Connection', 'close');
+      await DM.within(closed, drain);
+      server.closeAllConnections();
+    }
+    const closing = new Map<string, Promise<void>>();
+    for (const [name, plugin] of Object.entries(this.loadedPlugins)) {
+      closing.set(
+        name,
+        Promise.resolve()
+          .then(() => plugin.close?.())
+          .catch((err: unknown) => {
+            this.logger.warn(
+              `${name}: close failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+          })
+          .finally(() => closing.delete(name))
+      );
+    }
+    const letGo = Promise.all(closing.values()).then(() =>
+      this.ldap.close().catch(() => undefined)
+    );
+    // A second short of the budget: the crash and signal timers end the
+    // process at the budget, and what gave up is logged before they do
+    const left = Math.max(1000, budget - (Date.now() - started) - 1000);
+    if (!(await DM.within(letGo, left))) {
+      this.logger.warn(
+        `Shut down with a close still pending: ${[...closing.keys()].join(', ') || 'the directory connections'}`
+      );
+      // Closed whatever plugin still holds the others back
+      void this.ldap.close().catch(() => undefined);
+    }
+    this.logger.notice('Shut down');
+  }
+
+  /** @returns whether `done` settled before `ms` passed */
+  private static async within(
+    done: Promise<void>,
+    ms: number
+  ): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const spent = new Promise<boolean>(resolve => {
+      timer = setTimeout(() => resolve(false), ms);
+    });
+    try {
+      return await Promise.race([done.then(() => true), spent]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Shut down on SIGTERM and SIGINT, then let the signal end the process.
+   * For the binary; a host assembling the server decides for itself.
+   */
+  shutdownOnSignals(): void {
+    shutdownTimeout.ms = this.config.shutdown_timeout as number;
+    registerProcessShutdown(() => this.shutdown());
   }
 
   /**
