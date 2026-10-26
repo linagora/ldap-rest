@@ -1903,11 +1903,13 @@ export default abstract class LdapFlat extends DmPlugin {
         }
       }
 
-      if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(this.invalidValueMessage(field));
-      }
+      // Before the value checks: an empty required value is missing, not
+      // invalid
       if (attr.required && !value && !attr.generated) {
         throw new BadRequestError(`Attribute "${field}" is required`);
+      }
+      if (!(await this._validateOneChange(field, value))) {
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
     }
     // Check required fields, granting a `generated` attribute the exemption
@@ -1980,9 +1982,9 @@ export default abstract class LdapFlat extends DmPlugin {
       if (this.schema.strict) return false;
       return true;
     }
-    // No value clears the attribute. `''` and `0` are values, and are checked
-    // as groups and organizations check them: skipping every falsy value let
-    // a `0` through a pattern, and an empty string through a pointer's branch
+    // No value clears the attribute. An empty string is a value, checked as
+    // groups and organizations check it: against the pattern, and for a
+    // pointer against its branch
     if (value === null || value === undefined) return true;
     // An empty list is no value, as for groups and organizations: a replace
     // clears the attribute with it

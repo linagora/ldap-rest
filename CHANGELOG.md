@@ -4,8 +4,8 @@
 
 ### Fixes
 
-- The flat routes check an empty string and a `0` against the schema, as
-  the group and organization routes do: they were accepted unchecked, and
+- The flat routes check an empty string against the schema, as the group
+  and organization routes do: it was accepted unchecked, and
   `{"replace":{"mail":""}}` stored an empty value, a pointer attribute
   included. A replace with `[]` is still how an attribute is cleared
   ([#429](https://github.com/linagora/ldap-rest/issues/429))
