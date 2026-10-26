@@ -30,6 +30,7 @@
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type Store from '../lib/storage/store';
+import type { HealthStatus } from '../lib/health';
 
 import FileStore from './storage/file';
 import LdapStore from './storage/ldap';
@@ -159,6 +160,15 @@ export default class Storage extends DmPlugin {
    * For a test building several servers in one process; a running one has no
    * reason to call it.
    */
+  /** The backend's own answer; a backend that cannot answer is degraded */
+  async health(): Promise<HealthStatus> {
+    try {
+      return await this.store.health();
+    } catch {
+      return 'degraded';
+    }
+  }
+
   static release(instance: Storage): void {
     if (onlyInstance === instance) onlyInstance = undefined;
   }

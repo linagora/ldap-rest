@@ -110,6 +110,11 @@ answer "absent" with a warning and writes fail at once instead of waiting.
 does not answer or a package that is not installed; the server starts anyway,
 and every operation tries to connect again.
 
+## Readiness
+
+`GET /readyz` lists the plugin as `degraded` when the backend does not
+answer, see [operations](../../operations.md#health-and-readiness).
+
 ## Expiry
 
 Two rules the backends do not get to reinterpret:

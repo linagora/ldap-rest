@@ -15,6 +15,7 @@
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
+import type { HealthStatus } from '../../lib/health';
 import { outsideRequest } from '../../lib/requestContext';
 
 type Pg = typeof import('pg');
@@ -48,6 +49,11 @@ export default class PostgresStore extends Store {
 
   async open(): Promise<void> {
     await this.pool();
+  }
+
+  async health(): Promise<HealthStatus> {
+    await (await this.pool()).query('SELECT 1');
+    return 'ok';
   }
 
   async close(): Promise<void> {

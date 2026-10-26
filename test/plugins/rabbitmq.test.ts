@@ -87,6 +87,16 @@ describe('RabbitMq plugin', () => {
       expect(plugin.isAvailable()).to.equal(true);
     });
 
+    it('is healthy with a client, degraded without one', async () => {
+      expect(await plugin.health()).to.equal('ok');
+      const unreachable = new (class extends RabbitMq {
+        protected async getClient(): Promise<null> {
+          return null;
+        }
+      })(dm);
+      expect(await unreachable.health()).to.equal('degraded');
+    });
+
     it('delegates publish to the client', async () => {
       await plugin.publish('auth', 'user.created', { twakeId: 'alice' });
       expect(plugin.stub.publishCalls).to.have.length(1);

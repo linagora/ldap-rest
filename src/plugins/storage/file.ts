@@ -19,12 +19,13 @@
  * @group Plugins
  */
 import { createHash } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { constants, promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
+import type { HealthStatus } from '../../lib/health';
 
 const errorText = (err: unknown): string =>
   err instanceof Error ? err.message : JSON.stringify(err);
@@ -50,6 +51,12 @@ export default class FileStore extends Store {
   /** The directory is created on demand, readable by this user alone. */
   async ready(): Promise<void> {
     await fs.mkdir(this.dir, { recursive: true, mode: 0o700 });
+  }
+
+  /** The directory is there and writable; `ready` makes it, once */
+  async health(): Promise<HealthStatus> {
+    await fs.access(this.dir, constants.W_OK);
+    return 'ok';
   }
 
   private path(key: string): string {

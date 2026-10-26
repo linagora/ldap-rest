@@ -42,6 +42,14 @@ the server to the internet, keep the two paths to the cluster.
 The Helm chart probes both routes over HTTP (`livenessProbe` and
 `readinessProbe` in `values.yaml`).
 
+### What the shipped plugins report
+
+| Plugin        | `degraded` when                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `storage`     | the backend does not answer: a `SELECT 1`, a `PING`, the directory not writable; the `ldap` backend answers with the directory |
+| `rabbitmq`    | a broker is configured and cannot be reached                                                                                   |
+| `twake/james` | James's `GET /healthcheck` does not answer 2xx within 2 s                                                                      |
+
 ### For plugin authors
 
 A plugin reports its own resources with an optional `health()` method

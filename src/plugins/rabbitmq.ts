@@ -22,6 +22,7 @@ import { constants as osConstants } from 'os';
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { outsideRequest } from '../lib/requestContext';
+import type { HealthStatus } from '../lib/health';
 
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;
@@ -96,6 +97,15 @@ export default class RabbitMq extends DmPlugin {
    */
   isAvailable(): boolean {
     return this.rabbitmqUrl.length > 0;
+  }
+
+  /**
+   * Degraded when a broker is configured and cannot be reached; a plugin
+   * without a broker has nothing to report
+   */
+  async health(): Promise<HealthStatus> {
+    if (!this.rabbitmqUrl) return 'ok';
+    return (await this.getClient()) ? 'ok' : 'degraded';
   }
 
   /**
