@@ -74,7 +74,9 @@ Each schema file must include an `entity` metadata section and attribute definit
 
 - **name**: Internal name used for hooks (e.g., `ldap{name}add`)
 - **mainAttribute**: DN attribute (e.g., `uid`, `cn`)
-- **objectClass**: LDAP objectClass values
+- **objectClass**: the classes of every entry created, whatever `objectClass`
+  the request carried; the schema's `objectClass` attribute only describes
+  them
 - **singularName**: Used in API paths and messages (e.g., "user")
 - **pluralName**: Used in API paths (e.g., "users")
 - **base**: LDAP base DN, supports config placeholders like `{ldap_base}`
@@ -138,7 +140,8 @@ never what it holds.
 
 Fixed attributes:
 
-- Auto-provisioned with default value on creation
+- Auto-provisioned with default value on creation; `objectClass` takes the
+  classes of the entity metadata instead
 - Cannot be modified after creation
 - Cannot be deleted
 
