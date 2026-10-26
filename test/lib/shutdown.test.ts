@@ -215,16 +215,27 @@ describe('Shutdown', function () {
     expect(responses[1]).to.match(/^Connection: close$/m);
   });
 
-  it('cuts what has not finished when the drain is spent', async () => {
-    const { server, port } = await serve(2000);
+  it('cuts what has not finished when the budget is spent', async () => {
+    class Hanging extends DmPlugin {
+      name = 'hanging';
+      close(): Promise<void> {
+        return new Promise(() => undefined);
+      }
+    }
+    const { server, port } = await serve(2000, new Hanging({} as DM));
+    await server.ldap.search({ scope: 'one', sizeLimit: 1 });
     const slow = get(port, '/slow');
     await pause(100);
     const asked = Date.now();
     await server.shutdown();
-    expect(Date.now() - asked).to.be.within(900, 3000);
+    expect(Date.now() - asked).to.be.within(1900, 4000);
     await slow.then(
       () => expect.fail('the held request was answered'),
       () => undefined
+    );
+    await server.ldap.search({ scope: 'one', sizeLimit: 1 }).then(
+      () => expect.fail('the directory connections outlived the plugin'),
+      (err: Error) => expect(err.message).to.match(/closed/)
     );
   });
 });

@@ -95,10 +95,11 @@ On `SIGTERM` or `SIGINT`, the binary stops in order:
 4. the directory connections are closed;
 5. the signal ends the process, with its usual code (143 on `SIGTERM`).
 
-The whole takes `--shutdown-timeout` at most, 2 s at least: a `close()`
-that does not settle in what remains of the budget is logged and left
-behind, by `shutdown()` itself, so a host gets the same bound, and the
-directory connections are closed anyway. Kubernetes takes the pod out
+The whole takes `--shutdown-timeout` at most: a `close()` that does not
+settle in what remains of the budget is logged and left behind, by
+`shutdown()` itself, so a host gets the same bound, and the directory
+connections are closed anyway. The drain and the closes get 1 s each at
+least, so a budget under 2 s is exceeded. Kubernetes takes the pod out
 of its endpoints as it sends the signal, and the proxies follow a moment
 later: a request routed meanwhile is refused. A `preStop` hook sleeping a
 few seconds, before the signal, closes that window; the chart's `lifecycle`
