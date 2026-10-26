@@ -66,6 +66,8 @@ secrets:
 | `resources`                        | see `values.yaml`            | CPU/memory requests and limits.                             |
 | `livenessProbe` / `readinessProbe` | `/healthz`, `/readyz`        | HTTP probes on `http` (`{}` disables).                      |
 | `lifecycle`                        | `{}`                         | Container lifecycle hooks, a `preStop` sleep for a rollout. |
+| `metrics.enabled` / `metrics.port` | `false` / `9464`             | Expose the port of `core/metrics` (in `DM_PLUGINS`).        |
+| `metrics.serviceMonitor.enabled`   | `false`                      | Render a ServiceMonitor for the Prometheus operator.        |
 
 See [`values.yaml`](./values.yaml) for the full list.
 

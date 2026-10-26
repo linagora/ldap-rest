@@ -679,6 +679,15 @@ See [security headers](plugins/utilities/static.md#security-headers).
 
 Web access logging plugin. No configuration options - just add the plugin to enable access logs.
 
+#### `core/metrics`
+
+Prometheus metrics on a port of their own, see
+[metrics](operations.md#metrics).
+
+| CLI              | Env               | Default | Description                                                |
+| ---------------- | ----------------- | ------- | ---------------------------------------------------------- |
+| `--metrics-port` | `DM_METRICS_PORT` | `9464`  | Port `GET /metrics` is served on; keep it off the internet |
+
 #### `core/storage`
 
 Keyed storage with a deadline, for the plugins that need to keep something —

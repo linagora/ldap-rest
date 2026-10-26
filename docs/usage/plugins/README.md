@@ -70,6 +70,7 @@ Connect to external systems:
 | ------------------------------- | ------------------------------------------------------------------- |
 | [static](utilities/static.md)   | Static file server                                                  |
 | [weblogs](utilities/weblogs.md) | HTTP logging                                                        |
+| [metrics](utilities/metrics.md) | Prometheus metrics on a port of their own                           |
 | [storage](utilities/storage.md) | Keyed storage with a deadline, in LDAP, files, PostgreSQL or Valkey |
 
 ## Plugin Dependencies

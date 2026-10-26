@@ -79,6 +79,8 @@ export interface Config {
    * configures that one.
    */
   storage_backend?: string;
+  /** Where core/metrics serves `GET /metrics` */
+  metrics_port?: number;
   storage_sweep_interval?: number;
   storage_ldap_base?: string;
   storage_ldap_object_class?: string;
@@ -608,6 +610,8 @@ const configArgs: ConfigTemplate = [
   // Which sub-plugin keeps the records: `ldap`, `file`, `postgres` or
   // `valkey`. Empty means none is loaded, and a consumer asking for one says
   // so.
+  // Metrics plugin
+  ['--metrics-port', 'DM_METRICS_PORT', 9464, 'number'],
   ['--storage-backend', 'DM_STORAGE_BACKEND', ''],
   // Reads enforce expiry whatever the sweeper has done, so a long interval
   // costs storage rather than correctness — with one exception: `file` will

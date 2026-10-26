@@ -46,8 +46,17 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          {{- if or .Values.env .Values.secrets }}
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
+          {{- if or .Values.env .Values.secrets .Values.metrics.enabled }}
           env:
+            {{- if .Values.metrics.enabled }}
+            - name: DM_METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

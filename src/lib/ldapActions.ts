@@ -34,6 +34,13 @@ import {
   outsideAnyRequest,
   outsideRequest,
 } from './requestContext';
+import {
+  ldapOperationDuration,
+  ldapPoolWait,
+  ldapSearchCache,
+  secondsSince,
+  timedLdap,
+} from './metrics';
 import { BadRequestError, ConflictError, NotFoundError } from './errors';
 import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
@@ -641,7 +648,7 @@ class ldapActions {
         };
 
         const client: Client = new Client(options);
-        await client.bind(this.dn, this.pwd);
+        await timedLdap('bind', () => client.bind(this.dn, this.pwd));
 
         // Connection successful
         if (urlIndex !== this.currentUrlIndex) {
@@ -773,6 +780,25 @@ class ldapActions {
    * Optimized for O(1) lookup using separate available connections queue
    */
   private async acquireConnection(): Promise<PooledConnection> {
+    const started = process.hrtime.bigint();
+    try {
+      return await this.takeConnection();
+    } finally {
+      ldapPoolWait.observe(secondsSince(started));
+    }
+  }
+
+  /** The pool as it is, for the metrics */
+  poolStats(): { busy: number; idle: number; waiting: number; max: number } {
+    return {
+      busy: this.connectionPool.length - this.availableConnections.length,
+      idle: this.availableConnections.length,
+      waiting: this.waitingResolvers.length,
+      max: this.poolSize,
+    };
+  }
+
+  private async takeConnection(): Promise<PooledConnection> {
     if (this.closed) throw new Error('LDAP connections closed');
     // Clean up expired connections
     this.cleanupExpiredConnections();
@@ -1650,6 +1676,7 @@ class ldapActions {
     const generation = this.cacheGeneration;
     if (cacheable) {
       const cached = this.searchCache.get(cacheKey);
+      ldapSearchCache.inc({ result: cached ? 'hit' : 'miss' });
       if (cached) {
         this.logger.debug(`LDAP search cache hit: ${digestKey(cacheKey)}`);
         return this.filterForCaller(cloneSearchResult(cached), req, opts);
@@ -1661,7 +1688,9 @@ class ldapActions {
     try {
       let res = opts.paged
         ? dropSelectorsPaged(pooled.client.searchPaginated(base, opts))
-        : pooled.client.search(base, opts).then(dropSelectors);
+        : timedLdap('search', () => pooled.client.search(base, opts)).then(
+            dropSelectors
+          );
       res = (await launchHooksChained(
         this.parent.hooks.ldapsearchresult,
         res
@@ -1722,11 +1751,18 @@ class ldapActions {
     generator: AsyncGenerator<SearchResult>,
     pooled: PooledConnection
   ): AsyncGenerator<SearchResult> {
+    const started = process.hrtime.bigint();
+    let result = 'error';
     try {
-      for await (const result of generator) {
-        yield result;
+      for await (const page of generator) {
+        yield page;
       }
+      result = 'ok';
     } finally {
+      ldapOperationDuration.observe(
+        { operation: 'search', result },
+        secondsSince(started)
+      );
       this.releaseConnection(pooled);
     }
   }
@@ -1798,7 +1834,7 @@ class ldapActions {
       this.invalidateCache(dn);
       // A group created with members changes their `memberOf`
       for (const member of members) this.invalidateCache(member);
-      await pooled.client.add(dn, attributes);
+      await timedLdap('add', () => pooled.client.add(dn, attributes));
       // Drop any cached read of this DN.
       //
       // Not to lift a negative result: a base-scope read of a DN that is not
@@ -1947,7 +1983,9 @@ class ldapActions {
       const send = async (): Promise<void> => {
         const pooled = await this.acquireConnection();
         try {
-          await pooled.client.modify(dn, ldapChanges, controls);
+          await timedLdap('modify', () =>
+            pooled.client.modify(dn, ldapChanges, controls)
+          );
         } finally {
           this.releaseConnection(pooled);
         }
@@ -2099,7 +2137,7 @@ class ldapActions {
       this.invalidateCache(dn);
       this.invalidateCache(newRdn);
       this.invalidateReferences(dn);
-      await pooled.client.modifyDN(dn, newRdn);
+      await timedLdap('rename', () => pooled.client.modifyDN(dn, newRdn));
       // Invalidate both ends. A base-scope read of the old DN would
       // otherwise keep answering the entry that is no longer there, and a
       // read cached under the new DN — of whatever used to carry it — would
@@ -2159,7 +2197,7 @@ class ldapActions {
       this.invalidateCache(dn);
       this.invalidateCache(newDn);
       this.invalidateReferences(dn);
-      await pooled.client.modifyDN(dn, newDn);
+      await timedLdap('rename', () => pooled.client.modifyDN(dn, newDn));
       // Invalidate both ends — see rename() above for why both matter.
       this.invalidateCache(dn);
       this.invalidateCache(newDn);
@@ -2234,7 +2272,7 @@ class ldapActions {
           // overtook from putting it back.
           this.invalidateCache(entry);
           this.invalidateReferences(entry);
-          await pooled.client.del(entry);
+          await timedLdap('delete', () => pooled.client.del(entry));
           // Invalidate cache for this DN, and for what named it: a deleted
           // group leaves its members' `memberOf`
           this.invalidateCache(entry);

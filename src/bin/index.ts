@@ -45,6 +45,11 @@ import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
+import {
+  httpRequestDuration,
+  routeTemplate,
+  secondsSince,
+} from '../lib/metrics';
 import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
 
@@ -198,7 +203,8 @@ export class DM {
     // Nothing tells which framework answers, and no script or style is
     // read as another type than the one its response declares.
     this.app.disable('x-powered-by');
-    this.app.use((_req, res, next) => {
+    this.app.use((req, res, next) => {
+      const started = process.hrtime.bigint();
       res.setHeader('X-Content-Type-Options', 'nosniff');
       // A stopping server closes the connection with the response: a
       // keep-alive connection would otherwise bring requests until it is
@@ -208,6 +214,14 @@ export class DM {
       if (this.stopping) res.setHeader('Connection', 'close');
       this.inFlight.add(res);
       res.once('finish', () => {
+        httpRequestDuration.observe(
+          {
+            method: req.method,
+            route: routeTemplate(req),
+            status: String(res.statusCode),
+          },
+          secondsSince(started)
+        );
         if (this.stopping) this.server?.closeIdleConnections();
       });
       res.once('close', () => this.inFlight.delete(res));
