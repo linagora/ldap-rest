@@ -1,6 +1,7 @@
 import winston from 'winston';
 
 import { Config } from '../bin';
+import { currentLogContext } from '../lib/requestContext';
 
 // Define custom log levels with notice between info and warn (like syslog)
 const customLevels = {
@@ -29,6 +30,13 @@ declare module 'winston' {
 
 const LOGGERS = ['console', 'file'] as const;
 
+/** The request a line is written for, when one is being served */
+const withRequestId = winston.format(info => {
+  const context = currentLogContext();
+  if (context) info.requestId = context.requestId;
+  return info;
+});
+
 /**
  * @throws when `--logger` names no known logger, or `--logger file` has no
  * file: never a file nobody asked for
@@ -49,9 +57,11 @@ export const buildLogger = (config: Config): winston.Logger => {
     level: config.log_level,
     format: winston.format.combine(
       winston.format.timestamp(),
-      winston.format.printf(({ timestamp, level, message }) => {
+      withRequestId(),
+      winston.format.printf(({ timestamp, level, message, requestId }) => {
+        const request = typeof requestId === 'string' ? ` [${requestId}]` : '';
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        return `${timestamp} [${level}]: ${message}`;
+        return `${timestamp} [${level}]${request}: ${message}`;
       })
     ),
     transports: [

@@ -29,7 +29,11 @@ import {
 } from './utils';
 import { changeContext, type ChangeContext } from './changeContext';
 import { outsideOperation, runOperation } from './operation';
-import { currentRequest, outsideRequest } from './requestContext';
+import {
+  currentRequest,
+  outsideAnyRequest,
+  outsideRequest,
+} from './requestContext';
 import { BadRequestError, ConflictError, NotFoundError } from './errors';
 import { extractLdapCode, isSchemaRefusal } from './ldapCodes';
 import { parseSchema, SchemaIndex } from './ldapSchema';
@@ -766,7 +770,7 @@ class ldapActions {
     // If pool is not full, create a new connection
     if (this.connectionPool.length < this.poolSize) {
       // Outside the request it is opened for: the connection outlives it
-      const client = await outsideRequest(() => this.createConnection());
+      const client = await outsideAnyRequest(() => this.createConnection());
       const pooled: PooledConnection = {
         client,
         createdAt: Date.now(),

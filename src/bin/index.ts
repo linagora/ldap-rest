@@ -42,7 +42,8 @@ import {
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
-import { runForRequest } from '../lib/requestContext';
+import { runForRequest, runWithLogContext } from '../lib/requestContext';
+import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
 import pluginPriority from '../plugins/priority.json';
 
@@ -168,6 +169,14 @@ export class DM {
     this.app.use((_req, res, next) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       next();
+    });
+    // Every answer names its request, and every line logged while serving
+    // it carries the name, a body refused by a parser included; see
+    // docs/usage/operations.md#request-id
+    this.app.use((req, res, next) => {
+      const id = requestId(req);
+      res.setHeader('X-Request-Id', id);
+      runWithLogContext({ requestId: id }, next);
     });
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.

@@ -18,6 +18,9 @@ No additional configuration required.
 
 ### Request Logging
 
+Each line carries the `requestId` of the answer's `X-Request-Id`, see
+[operations](../../operations.md#request-id).
+
 Each request is logged when it arrives:
 
 ```
@@ -31,26 +34,31 @@ Each response is logged when completed at **notice** level (between info and war
 ```json
 {
   "level": "notice",
-  "message": "GET /api/v1/ldap/users 200 45ms",
-  "user": "admin",
-  "method": "GET",
-  "url": "/api/v1/ldap/users",
-  "status": 200,
-  "responseTime": "45ms"
+  "message": {
+    "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+    "method": "GET",
+    "url": "/api/v1/ldap/users",
+    "status": 200,
+    "duration": 45,
+    "ip": "10.0.9.12",
+    "user": "admin"
+  },
+  "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+  "timestamp": "2026-10-26T18:07:03.286Z"
 }
 ```
 
 ## Log Fields
 
-| Field          | Description                     | Example                           |
-| -------------- | ------------------------------- | --------------------------------- |
-| `message`      | Summary line                    | `GET /api/v1/ldap/users 200 45ms` |
-| `user`         | Authenticated user (if any)     | `admin`                           |
-| `method`       | HTTP method                     | `GET`, `POST`, `PUT`, `DELETE`    |
-| `url`          | Full URL including query params | `/api/v1/ldap/users?match=*`      |
-| `status`       | HTTP status code                | `200`, `404`, `500`               |
-| `responseTime` | Request duration                | `45ms`, `123ms`                   |
-| `error`        | Error message (if applicable)   | `Connection timeout`              |
+| Field       | Description                     | Example                        |
+| ----------- | ------------------------------- | ------------------------------ |
+| `user`      | Authenticated user (if any)     | `admin`                        |
+| `requestId` | The answer's `X-Request-Id`     | `6effd260-b079-…`              |
+| `method`    | HTTP method                     | `GET`, `POST`, `PUT`, `DELETE` |
+| `url`       | Full URL including query params | `/api/v1/ldap/users?match=*`   |
+| `status`    | HTTP status code                | `200`, `404`, `500`            |
+| `duration`  | Request duration, in ms         | `45`, `123`                    |
+| `error`     | Error message (if applicable)   | `Connection timeout`           |
 
 ## Enriching the Log Line From Another Plugin
 
@@ -77,6 +85,7 @@ Output:
   "level": "notice",
   "message": {
     "uids": ["jdoe", "asmith"],
+    "requestId": "6effd260-b079-4335-b727-544189ed33a6",
     "method": "POST",
     "url": "/api/_getldapentries",
     "status": 200,
@@ -89,7 +98,7 @@ Output:
 
 Notes:
 
-- Core fields (`method`, `url`, `status`, `duration`, `ip`, `user`, `error`)
+- Core fields (`requestId`, `method`, `url`, `status`, `duration`, `ip`, `user`, `error`)
   always take precedence: a plugin cannot overwrite them.
 - The value must be set **before** the response completes (i.e. before
   `res.json()` / `res.end()`), since the entry is written on the `finish` event.
@@ -319,19 +328,32 @@ res.on('close', () => {
 Logs are in JSON format for easy parsing:
 
 ```bash
-cat app.log | jq 'select(.status >= 400)'
+cat app.log | jq 'select(.message.status? >= 400)'
 ```
 
 Filters 4xx and 5xx responses:
 
 ```json
 {
-  "level": "info",
-  "message": "GET /api/v1/ldap/users/notfound 404 12ms",
-  "status": 404,
-  "method": "GET",
-  "url": "/api/v1/ldap/users/notfound"
+  "level": "notice",
+  "message": {
+    "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+    "method": "GET",
+    "url": "/api/v1/ldap/users/notfound",
+    "status": 404,
+    "duration": 12,
+    "ip": "10.0.9.12"
+  },
+  "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+  "timestamp": "2026-10-26T18:07:03.286Z"
 }
+```
+
+The lines of one request, the access line and what the server logged while
+serving it:
+
+```bash
+cat app.log | jq 'select(.requestId == "6effd260-b079-4335-b727-544189ed33a6")'
 ```
 
 ### Statistics
@@ -339,7 +361,7 @@ Filters 4xx and 5xx responses:
 Generate request statistics:
 
 ```bash
-cat app.log | jq -r '.message' | awk '{print $1}' | sort | uniq -c
+cat app.log | jq -r 'select(.message.method?) | .message.method' | sort | uniq -c
 ```
 
 Output:
@@ -356,8 +378,7 @@ Output:
 Average response time per endpoint:
 
 ```bash
-cat app.log | jq -r 'select(.responseTime) | "\(.url) \(.responseTime)"' | \
-  sed 's/ms$//' | \
+cat app.log | jq -r 'select(.message.duration?) | "\(.message.url) \(.message.duration)"' | \
   awk '{sum[$1]+=$2; count[$1]++} END {for (url in sum) print url, sum[url]/count[url] "ms"}'
 ```
 

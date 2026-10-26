@@ -59,3 +59,22 @@ returning `ok` or `degraded`, called at most once every 5 seconds; it must
 answer within 2 s and never throw for an ordinary outage. The probe stops
 waiting at 2 s but cancels nothing: a plugin bounds its own call, as
 `james` does with its 1.5 s.
+
+## Request id
+
+Every response the API sends carries an `X-Request-Id` header: an
+identifier the server generates for the request, the same one its writes
+hand to the plugins and its log lines carry. An `X-Request-Id` the client sends is not taken: a
+caller could otherwise make the writes of two requests look like one.
+
+A proxy or an ingress generating an identifier of its own does not pass
+it on either: log the answer's `X-Request-Id` there to match its lines with
+the server's.
+
+Every line logged while a request is served carries `requestId`, the lines
+of the hooks it ran included, as a field of the JSON console output and as
+`[<id>]` after the level in the log file. The line of `core/weblogs` carries
+it too. A line without one was written outside any request: at startup, by
+a scheduled task, by a message consumer, by a connection the server keeps.
+Work shared between requests, a schema load or a readiness answer, logs
+under the request that started it.

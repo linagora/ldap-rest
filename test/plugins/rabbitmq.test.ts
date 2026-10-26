@@ -2,6 +2,10 @@ import { expect } from 'chai';
 
 import { DM } from '../../src/bin';
 import RabbitMq from '../../src/plugins/rabbitmq';
+import {
+  currentLogContext,
+  runWithLogContext,
+} from '../../src/lib/requestContext';
 
 interface PublishCall {
   exchange: string;
@@ -106,6 +110,25 @@ describe('RabbitMq plugin', () => {
       expect(reachable.health()).to.equal('ok');
       reachable.stub.connected = false;
       expect(reachable.health()).to.equal('degraded');
+    });
+
+    it('opens its connection outside the request that needs it first', async () => {
+      let opened: string | undefined = 'not opened';
+      class Recording extends RabbitMq {
+        stub = new StubClient();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        protected async connect(): Promise<any> {
+          opened = currentLogContext()?.requestId;
+          return this.stub;
+        }
+      }
+      const recording = new Recording(dm);
+      await runWithLogContext({ requestId: 'A' }, () =>
+        recording.publish('auth', 'user.created', { twakeId: 'alice' })
+      );
+      expect(opened, "the lines of the connection are no request's").to.equal(
+        undefined
+      );
     });
 
     it('delegates publish to the client', async () => {

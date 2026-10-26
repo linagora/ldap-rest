@@ -1,5 +1,6 @@
 /**
- * The request a directory operation is made for
+ * The request a directory operation is made for, and the one a log line is
+ * written for
  * @module lib/requestContext
  */
 import { AsyncLocalStorage } from 'async_hooks';
@@ -45,4 +46,44 @@ export function outsideRequest<T>(fn: () => T): T {
  */
 export function currentRequest(): Request | undefined {
   return requests.getStore();
+}
+
+/** What every log line written while serving a request carries */
+export interface LogContext {
+  requestId: string;
+}
+
+/**
+ * Kept apart from the request above: a line written as the server, through
+ * `outsideRequest`, is still about the request that made the server act.
+ */
+const logContexts = new AsyncLocalStorage<LogContext>();
+
+/**
+ * Run something that outlives the request being served, a connection
+ * opened for the pool or a client kept for the process: its operations are
+ * judged by nobody, and what it logs later is nobody's request.
+ *
+ * @param fn what to run
+ * @returns what it returns
+ */
+export function outsideAnyRequest<T>(fn: () => T): T {
+  return requests.exit(() => logContexts.exit(fn));
+}
+
+/**
+ * Serve a request with its log context: what runs inside, synchronously or
+ * not, logs with it.
+ *
+ * @param context what the lines carry
+ * @param fn what serves the request
+ * @returns what `fn` returns
+ */
+export function runWithLogContext<T>(context: LogContext, fn: () => T): T {
+  return logContexts.run(context, fn);
+}
+
+/** The log context of the request being served, if any */
+export function currentLogContext(): LogContext | undefined {
+  return logContexts.getStore();
 }
