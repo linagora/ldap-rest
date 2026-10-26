@@ -18,6 +18,9 @@ No additional configuration required.
 
 ### Request Logging
 
+Each line carries the `requestId` of the answer's `X-Request-Id`, see
+[operations](../../operations.md#request-id).
+
 Each request is logged when it arrives:
 
 ```

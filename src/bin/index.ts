@@ -42,7 +42,8 @@ import {
 } from '../lib/authz/composition';
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
-import { runForRequest } from '../lib/requestContext';
+import { runForRequest, runWithLogContext } from '../lib/requestContext';
+import { requestId } from '../lib/changeContext';
 import { HEALTH_PATHS, mountHealth } from '../lib/health';
 import pluginPriority from '../plugins/priority.json';
 
@@ -176,6 +177,13 @@ export class DM {
     this.app.use(
       bodyParser.urlencoded({ extended: true, verify: keepRawBody })
     );
+    // Every answer names its request, and every line logged while serving
+    // it carries the name; see docs/usage/operations.md#request-id
+    this.app.use((req, res, next) => {
+      const id = requestId(req);
+      res.setHeader('X-Request-Id', id);
+      runWithLogContext({ requestId: id }, next);
+    });
     // Before the authentication: a probe carries no identity
     mountHealth(this.app, this);
     this.logger = buildLogger(this.config);

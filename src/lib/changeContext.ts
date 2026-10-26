@@ -31,6 +31,25 @@ export function setChangeSource(req: Request, source: string): void {
 }
 
 /**
+ * The identifier of a request, shared by its writes, its log lines and the
+ * `X-Request-Id` of its answer.
+ *
+ * Generated rather than read from an `X-Request-Id` header: a client could
+ * otherwise make the writes of two requests look like one.
+ *
+ * @param req the request
+ * @returns its identifier, the same on every call
+ */
+export function requestId(req: Request): string {
+  let id = requestIds.get(req);
+  if (!id) {
+    id = randomUUID();
+    requestIds.set(req, id);
+  }
+  return id;
+}
+
+/**
  * The context of a write, handed to the "done" hooks.
  *
  * @param req the request behind the write; none for a scheduled task or a
@@ -39,17 +58,10 @@ export function setChangeSource(req: Request, source: string): void {
  */
 export function changeContext(req?: Request): ChangeContext {
   if (!req) return {};
-  // Generated rather than read from an X-Request-Id header: a client could
-  // otherwise make the writes of two requests look like one
-  let requestId = requestIds.get(req);
-  if (!requestId) {
-    requestId = randomUUID();
-    requestIds.set(req, requestId);
-  }
   const { user, userName } = req as DmRequest;
   return {
     actor: userName ?? user,
-    requestId,
+    requestId: requestId(req),
     source: sources.get(req) ?? 'rest',
   };
 }

@@ -96,6 +96,7 @@ describe('weblogs', () => {
       'duration',
       'ip',
       'method',
+      'requestId',
       'status',
       'url',
     ]);
