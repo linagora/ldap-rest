@@ -22,7 +22,9 @@ describe('metrics', function () {
   const sample = (text: string, name: string, labels: string): number => {
     const line = text
       .split('\n')
-      .find(l => l.startsWith(`${name}{${labels}} `) || l === `${name} `);
+      .find(l =>
+        labels ? l.startsWith(`${name}{${labels}} `) : l.startsWith(`${name} `)
+      );
     expect(line, `${name}{${labels}}`).to.not.equal(undefined);
     return Number(line!.slice(line!.lastIndexOf(' ') + 1));
   };
@@ -58,7 +60,7 @@ describe('metrics', function () {
     );
     expect(text).to.match(/^ldap_rest_ldap_pool_waiting 0$/m);
     expect(text).to.match(/^ldap_rest_ldap_pool_max \d/m);
-    expect(text).to.match(/^ldap_rest_unhandled_rejections 0$/m);
+    expect(text).to.match(/^ldap_rest_unhandled_rejections_total 0$/m);
   });
 
   it('answers nothing else', async () => {
@@ -71,24 +73,20 @@ describe('metrics', function () {
   });
 
   it('times each request by route template and status, never by URL', async () => {
+    // The instruments are the process's: what other suites counted stays
+    const count = (text: string, labels: string): number =>
+      text.includes(`{${labels}}`)
+        ? sample(text, 'ldap_rest_http_request_duration_seconds_count', labels)
+        : 0;
+    const before = await scrape();
     await supertest(dm.app).get('/things/42').expect(200);
     await supertest(dm.app).get('/things/43').expect(200);
     await supertest(dm.app).get('/nowhere/at/all').expect(404);
     const text = await scrape();
-    expect(
-      sample(
-        text,
-        'ldap_rest_http_request_duration_seconds_count',
-        'method="GET",route="/things/:id",status="200"'
-      )
-    ).to.equal(2);
-    expect(
-      sample(
-        text,
-        'ldap_rest_http_request_duration_seconds_count',
-        'method="GET",route="none",status="404"'
-      )
-    ).to.equal(1);
+    const matched = 'method="GET",route="/things/:id",status="200"';
+    const unmatched = 'method="GET",route="none",status="404"';
+    expect(count(text, matched) - count(before, matched)).to.equal(2);
+    expect(count(text, unmatched) - count(before, unmatched)).to.equal(1);
     expect(text).to.not.include('/things/42');
     expect(text).to.not.include('/nowhere');
   });
@@ -122,9 +120,75 @@ describe('metrics', function () {
       .then(() => undefined)
       .catch(() => undefined);
     const failed = await scrape();
-    expect(count(failed, 'operation="search",result="error"')).to.be.at.least(
+    expect(
+      count(failed, 'operation="search",result="32"'),
+      'a refusal is the directory answering, by its code'
+    ).to.be.at.least(1);
+    expect(failed).to.not.include('operation="search",result="error"');
+  });
+
+  /** The operation count under `labels`, 0 before the first sample */
+  const operations = (text: string, labels: string): number =>
+    text.includes(`{${labels}}`)
+      ? sample(text, 'ldap_rest_ldap_operation_duration_seconds_count', labels)
+      : 0;
+
+  it('times each write by operation, a refusal by its code', async () => {
+    const base = dm.config.ldap_base as string;
+    const dn = `cn=metrics-probe,${base}`;
+    const moved = `cn=metrics-probe-2,${base}`;
+    const before = await scrape();
+    await dm.ldap.add(dn, {
+      objectClass: ['organizationalRole'],
+      cn: 'metrics-probe',
+    });
+    await dm.ldap.modify(dn, { replace: { description: 'probe' } });
+    await dm.ldap.rename(dn, 'cn=metrics-probe-2');
+    await dm.ldap.delete(moved);
+    await dm.ldap.delete(moved).then(
+      () => expect.fail('deleted twice'),
+      () => undefined
+    );
+    const after = await scrape();
+    for (const operation of ['add', 'modify', 'rename', 'delete']) {
+      const labels = `operation="${operation}",result="ok"`;
+      expect(
+        operations(after, labels) - operations(before, labels),
+        operation
+      ).to.equal(1);
+    }
+    const refused = 'operation="delete",result="32"';
+    expect(operations(after, refused) - operations(before, refused)).to.equal(
       1
     );
+  });
+
+  it('times a paged search by its pages, walked through or left early', async () => {
+    const before = await scrape();
+    const left = (await dm.ldap.search({
+      scope: 'sub',
+      paged: { pageSize: 1 },
+      attributes: ['1.1'],
+    })) as AsyncGenerator<unknown>;
+    for await (const page of left) {
+      expect(page).to.not.equal(undefined);
+      break;
+    }
+    const walked = (await dm.ldap.search({
+      scope: 'one',
+      paged: { pageSize: 2 },
+      attributes: ['1.1'],
+    })) as AsyncGenerator<unknown>;
+    let pages = 0;
+    for await (const page of walked) {
+      expect(page).to.not.equal(undefined);
+      pages++;
+    }
+    expect(pages).to.be.at.least(1);
+    const after = await scrape();
+    const ok = 'operation="search",result="ok"';
+    expect(operations(after, ok) - operations(before, ok)).to.equal(2);
+    expect(after).to.not.include('operation="search",result="error"');
   });
 
   it('counts a hook that throws, by plugin and hook', async () => {

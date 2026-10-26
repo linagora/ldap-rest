@@ -8,9 +8,8 @@ Prometheus metrics of the server, on a port of their own.
 --plugin core/metrics --metrics-port 9464
 ```
 
-| CLI              | Env               | Default | Description                      |
-| ---------------- | ----------------- | ------- | -------------------------------- |
-| `--metrics-port` | `DM_METRICS_PORT` | `9464`  | Port `GET /metrics` is served on |
+`--metrics-port` (`DM_METRICS_PORT`, 9464) is the port `GET /metrics` is
+served on, see [configuration](../../configuration.md#coremetrics).
 
 The port is separate from the API's: nothing on it goes through the
 authentication, the rate limiting or the request id, so it must not be

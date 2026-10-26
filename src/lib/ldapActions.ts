@@ -37,6 +37,7 @@ import {
 import {
   ldapOperationDuration,
   ldapPoolWait,
+  ldapResult,
   ldapSearchCache,
   secondsSince,
   timedLdap,
@@ -1751,18 +1752,29 @@ class ldapActions {
     generator: AsyncGenerator<SearchResult>,
     pooled: PooledConnection
   ): AsyncGenerator<SearchResult> {
-    const started = process.hrtime.bigint();
-    let result = 'error';
+    // Timed page by page: between two pages the generator waits on the
+    // caller, whose work is not the directory's. A walk the caller leaves
+    // early is a walk the directory answered.
+    let spent = 0;
+    let result = 'ok';
     try {
-      for await (const page of generator) {
-        yield page;
+      for (;;) {
+        const started = process.hrtime.bigint();
+        let page: IteratorResult<SearchResult>;
+        try {
+          page = await generator.next();
+        } catch (err) {
+          result = ldapResult(err);
+          throw err;
+        } finally {
+          spent += secondsSince(started);
+        }
+        if (page.done) return;
+        yield page.value;
       }
-      result = 'ok';
     } finally {
-      ldapOperationDuration.observe(
-        { operation: 'search', result },
-        secondsSince(started)
-      );
+      await generator.return(undefined).catch(() => undefined);
+      ldapOperationDuration.observe({ operation: 'search', result }, spent);
       this.releaseConnection(pooled);
     }
   }

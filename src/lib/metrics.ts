@@ -6,6 +6,8 @@
 import type { Request } from 'express';
 import { Counter, Histogram, Registry } from 'prom-client';
 
+import { extractLdapCode } from './ldapCodes';
+
 /** The instruments below register here; `core/metrics` adds its own */
 export const registry = new Registry();
 
@@ -29,7 +31,7 @@ export type LdapOperation =
 
 export const ldapOperationDuration = new Histogram({
   name: 'ldap_rest_ldap_operation_duration_seconds',
-  help: 'Time the directory takes to answer, by operation and result',
+  help: 'Time the directory takes to answer, by operation and result: ok, the LDAP result code of a refusal, or error when it did not answer',
   labelNames: ['operation', 'result'] as const,
   buckets: SECONDS,
   registers: [registry],
@@ -56,6 +58,22 @@ export const hookFailures = new Counter({
   registers: [registry],
 });
 
+export const unhandledRejections = new Counter({
+  name: 'ldap_rest_unhandled_rejections_total',
+  help: 'Promise rejections nothing handled',
+  registers: [registry],
+});
+
+/**
+ * The `result` label of a directory call that threw: a refusal is the
+ * directory answering, by its result code (32 for an entry that is not
+ * there); `error` is for not answering.
+ */
+export const ldapResult = (err: unknown): string => {
+  const code = extractLdapCode(err);
+  return code === undefined ? 'error' : String(code);
+};
+
 /** @returns the seconds since `started`, a `process.hrtime.bigint()` */
 export const secondsSince = (started: bigint): number =>
   Number(process.hrtime.bigint() - started) / 1e9;
@@ -69,11 +87,12 @@ export async function timedLdap<T>(
   call: () => Promise<T>
 ): Promise<T> {
   const started = process.hrtime.bigint();
-  let result = 'error';
+  let result = 'ok';
   try {
-    const answer = await call();
-    result = 'ok';
-    return answer;
+    return await call();
+  } catch (err) {
+    result = ldapResult(err);
+    throw err;
   } finally {
     ldapOperationDuration.observe({ operation, result }, secondsSince(started));
   }
@@ -81,7 +100,8 @@ export async function timedLdap<T>(
 
 /**
  * The template of the route that answered, `/api/v1/users/:id`, never the
- * URL: a label per URL would grow without bound.
+ * URL: a label per URL would grow without bound. Under a mounted router
+ * the mount is `*`, as what Express keeps of it is the URL it matched.
  *
  * @returns the template, `none` when no route matched
  */
@@ -92,5 +112,5 @@ export const routeTemplate = (req: Request): string => {
     typeof p === 'string' ? p : p instanceof RegExp ? p.source : 'other';
   if (path === undefined) return 'none';
   const template = Array.isArray(path) ? path.map(one).join('|') : one(path);
-  return `${req.baseUrl ?? ''}${template}`;
+  return `${req.baseUrl ? '*' : ''}${template}`;
 };

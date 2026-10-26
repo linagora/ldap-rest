@@ -49,6 +49,7 @@ import {
   httpRequestDuration,
   routeTemplate,
   secondsSince,
+  unhandledRejections,
 } from '../lib/metrics';
 import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
@@ -709,6 +710,7 @@ export class DM {
     });
     process.on('unhandledRejection', (reason: unknown) => {
       this.life.unhandledRejections++;
+      unhandledRejections.inc();
       this.logger.error(
         `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}`,
         { stack: reason instanceof Error ? reason.stack : undefined }

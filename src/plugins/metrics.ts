@@ -53,14 +53,6 @@ export default class Metrics extends DmPlugin {
         max.set(this.server.ldap.poolStats().max);
       },
     });
-    const rejections = new Gauge({
-      name: 'ldap_rest_unhandled_rejections',
-      help: 'Promise rejections nothing handled since the start',
-      registers: [this.own],
-      collect: (): void => {
-        rejections.set(this.server.unhandledRejections);
-      },
-    });
     this.exposed = Registry.merge([registry, this.own]);
   }
 
