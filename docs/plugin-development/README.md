@@ -64,12 +64,14 @@ export default class MyPlugin extends DmPlugin {
 
 ### Error Handling and Server Resilience
 
-An error a route handler or a hook throws is logged with its stack and
-answered with a 5xx; the server keeps serving. An exception nothing
-catches, in a timer or an event handler, is not: the binary shuts down and
-exits with 1, see [shutdown](../usage/operations.md#shutdown). An unhandled
-promise rejection is logged and counted, and the server keeps serving. A
-plugin holding a connection, a timer or a queue implements `close()`, see
+An error a route handler or a hook throws is logged with its stack; the
+request is answered with a 5xx when the hook ran before the operation, and
+the server keeps serving. An exception nothing catches, in a timer or an
+event handler, is not: the binary shuts down and exits with 1, and a
+promise rejection nothing handles is logged and counted, see
+[shutdown](../usage/operations.md#shutdown); a host assembling the server
+chooses with `exitOnCrash()`. A plugin holding a connection, a timer or a
+queue implements `close()`, see
 [for plugin authors](../usage/operations.md#for-plugin-authors).
 
 #### Using asyncHandler

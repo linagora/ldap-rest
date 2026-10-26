@@ -64,10 +64,15 @@ class Holding extends DmPlugin {
   }
 }
 
+/**
+ * A listening server, and a view of it as a plugin configured with
+ * overrides gets, built before the listener: what the view does must act
+ * on the whole
+ */
 const serve = async (
   timeout: number,
   ...more: DmPlugin[]
-): Promise<{ server: DM; port: number; holding: Holding }> => {
+): Promise<{ server: DM; view: DM; port: number; holding: Holding }> => {
   const server = new DM();
   await server.ready;
   server.config.port = 0;
@@ -76,9 +81,11 @@ const serve = async (
   await server.registerPlugin('holding', holding);
   for (const plugin of more) await server.registerPlugin(plugin.name, plugin);
   server.setupErrorMiddleware();
+  const view = server.withConfig(server.config);
   await server.run();
   return {
     server,
+    view,
     port: (server.server!.address() as { port: number }).port,
     holding,
   };
@@ -97,13 +104,16 @@ describe('Shutdown', function () {
         throw new Error('nothing to let go');
       }
     }
-    const { server, port, holding } = await serve(8000, new Failing({} as DM));
+    const { server, view, port, holding } = await serve(
+      8000,
+      new Failing({} as DM)
+    );
     // A pooled directory connection, to be closed with the rest
     await server.ldap.search({ scope: 'one', sizeLimit: 1 });
     const slow = get(port, '/slow');
     // The request is in: the route holds it until released
     await pause(100);
-    const stopping = server.shutdown();
+    const stopping = view.shutdown();
     expect(server.stopping).to.equal(true);
     const probe = await supertest(server.app).get('/readyz');
     expect(probe.status).to.equal(503);
@@ -147,6 +157,7 @@ describe('Shutdown', function () {
   ): Promise<{
     write: (path: string) => void;
     received: () => string;
+    got: (what: string) => Promise<void>;
     ended: Promise<void>;
   }> => {
     const socket = connect(port);
@@ -157,6 +168,9 @@ describe('Shutdown', function () {
       write: path =>
         socket.write(`GET ${path} HTTP/1.1\r\nHost: localhost\r\n\r\n`),
       received: () => received,
+      got: async what => {
+        while (!received.includes(what)) await pause(10);
+      },
       ended: new Promise<void>(resolve => socket.once('close', resolve)),
     };
   };
@@ -165,7 +179,7 @@ describe('Shutdown', function () {
     const { server, port, holding } = await serve(8000);
     const socket = await open(port);
     socket.write('/stream');
-    await pause(100);
+    await socket.got('first');
     const stopping = server.shutdown();
     await pause(100);
     holding.releaseStream();
@@ -183,7 +197,7 @@ describe('Shutdown', function () {
     const { server, port, holding } = await serve(8000);
     const socket = await open(port);
     socket.write('/stream');
-    await pause(100);
+    await socket.got('first');
     const stopping = server.shutdown();
     socket.write('/readyz');
     await pause(100);
