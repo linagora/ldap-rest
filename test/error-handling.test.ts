@@ -160,13 +160,15 @@ describe('Error Handling', () => {
 
   describe('under --debug', () => {
     let debugServer: DM;
+    const previous = process.env.DM_DEBUG;
 
     before(async () => {
       process.env.DM_DEBUG = 'true';
       try {
         debugServer = new DM();
       } finally {
-        delete process.env.DM_DEBUG;
+        if (previous === undefined) delete process.env.DM_DEBUG;
+        else process.env.DM_DEBUG = previous;
       }
       await debugServer.ready;
       debugServer.app.get('/boom', () => {
@@ -176,20 +178,29 @@ describe('Error Handling', () => {
     });
 
     after(() => {
+      debugServer?.stop();
       setDebug(false);
     });
 
     it('names the failure on both paths', async () => {
       expect(debugServer.config.debug).to.equal(true);
+      const err = new Error('the directory is down');
+      expect(serverErrorBody(err)).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'the directory is down',
+      });
+      // The middleware reads its own server's flag, not the module default
+      setDebug(false);
       const res = await request(debugServer.app).get('/boom');
       expect(res.status).to.equal(500);
       expect(res.body).to.deep.equal({
         error: 'Internal Server Error',
         message: 'the directory is down',
       });
-      expect(serverErrorBody(new Error('the directory is down'))).to.deep.equal(
-        res.body
-      );
+      expect(serverErrorBody(err)).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'An error occurred',
+      });
     });
   });
 });
