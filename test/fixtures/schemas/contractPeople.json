@@ -3,7 +3,7 @@
   "entity": {
     "name": "contractPerson",
     "mainAttribute": "uid",
-    "objectClass": ["top", "inetOrgPerson"],
+    "objectClass": ["top", "inetOrgPerson", "extensibleObject"],
     "singularName": "contractPerson",
     "pluralName": "contractPeople",
     "base": "ou=users,__LDAP_BASE__"
@@ -11,12 +11,12 @@
   "attributes": {
     "objectClass": {
       "type": "array",
-      "required": true,
-      "fixed": true,
-      "default": ["top", "inetOrgPerson"],
       "items": {
         "type": "string"
-      }
+      },
+      "required": true,
+      "fixed": true,
+      "default": ["top", "inetOrgPerson", "extensibleObject"]
     },
     "uid": {
       "type": "string",
@@ -38,9 +38,24 @@
       "type": "string",
       "test": "^[a-z]+$"
     },
+    "l": {
+      "type": "string",
+      "fixed": true,
+      "default": "paris"
+    },
+    "employeeNumber": {
+      "type": "number"
+    },
     "seeAlso": {
       "type": "pointer",
       "branch": ["ou=users,__LDAP_BASE__"]
+    },
+    "secretary": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      }
     }
   }
 }

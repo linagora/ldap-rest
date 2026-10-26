@@ -3,12 +3,12 @@
   "attributes": {
     "objectClass": {
       "type": "array",
-      "required": true,
-      "fixed": true,
-      "default": ["top", "groupOfNames"],
       "items": {
         "type": "string"
-      }
+      },
+      "required": true,
+      "fixed": true,
+      "default": ["top", "groupOfNames", "extensibleObject"]
     },
     "cn": {
       "type": "string",
@@ -28,9 +28,24 @@
       "type": "string",
       "test": "^[a-z]+$"
     },
+    "l": {
+      "type": "string",
+      "fixed": true,
+      "default": "paris"
+    },
+    "employeeNumber": {
+      "type": "number"
+    },
     "seeAlso": {
       "type": "pointer",
       "branch": ["ou=users,__LDAP_BASE__"]
+    },
+    "secretary": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      }
     }
   }
 }
