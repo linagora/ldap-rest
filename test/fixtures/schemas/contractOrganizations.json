@@ -1,0 +1,56 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true,
+      "fixed": true
+    },
+    "ou": {
+      "type": "string",
+      "required": true,
+      "role": "identifier"
+    },
+    "description": {
+      "type": "string",
+      "required": true
+    },
+    "businessCategory": {
+      "type": "string",
+      "test": "^[a-z]+$"
+    },
+    "l": {
+      "type": "string",
+      "fixed": true,
+      "default": "paris"
+    },
+    "employeeNumber": {
+      "type": "number"
+    },
+    "seeAlso": {
+      "type": "pointer",
+      "branch": ["ou=users,__LDAP_BASE__"]
+    },
+    "secretary": {
+      "type": "array",
+      "items": {
+        "type": "pointer",
+        "branch": ["ou=users,__LDAP_BASE__"]
+      }
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+$"
+    },
+    "pwdReset": {
+      "type": "boolean"
+    },
+    "employeeType": {
+      "type": "string",
+      "readOnly": true
+    }
+  }
+}
