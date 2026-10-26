@@ -24,8 +24,9 @@ several values for an attribute the schema does not type `array`, text that
 is not a number for a `number` or `integer`, a `delete` of a `required`
 attribute as a whole, or a change naming an attribute a strict schema does
 not declare; the server wrote them as sent and now answers 400, naming the
-attribute. The shipped LSC connector sends shapes that stay accepted: a
-list of one in a `replace`, one value for an `array` on a creation.
+attribute. The shipped LSC connector sends shapes that stay accepted, a
+list of one in a `replace` and one value for an `array` on a creation; its
+whole-attribute delete is refused for a `required` attribute, as any.
 
 Send one value for a single-valued attribute, a list for an `array` (one
 value, or a list of one, is taken either way), numbers as numbers or digits,

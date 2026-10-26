@@ -13,15 +13,17 @@
   single-valued attribute, text that is not a number for a `number`, and
   deleting a `required` attribute as a whole answer 400, where they were
   written as sent; `null` clears an attribute in a `replace` and is refused
-  elsewhere, instead of answering 500; an attribute the schema does not
-  declare is refused by name in a change too. On every route, a `required`
-  number takes `0` and a `required` boolean `false`,
+  in an `add` and on a creation, instead of answering 500; an attribute the
+  schema does not declare is refused by name in a change too,
   [upgrading](docs/usage/upgrading.md#the-flat-routes-check-the-shape-of-a-value)
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
 
 ### Fixes
 
+- On every route, a `required` number takes `0` and a `required` boolean
+  `false`; they were refused as missing
+  ([#416](https://github.com/linagora/ldap-rest/issues/416))
 - `ldap/bulkImport`: a row with a value under a fixed attribute of the
   schema, such as `objectClass`, fails with "is fixed and cannot be
   imported"; the value replaced the fixed one,

@@ -385,9 +385,9 @@ attribute with `normalize` takes any text, read after validation. In a
 they are refused as no value. A `delete` naming the attribute, or naming it
 with no value, removes it, unless it is `required`; naming values removes
 those, every value it holds included, as the server does not read what
-remains. An empty string is a value: checked against `test`, refused for a
-pointer, and missing for a `required` attribute. Every refusal answers 400
-with the attribute's name.
+remains, and `''` names no value. An empty string sent as a value is
+checked against `test`, refused for a pointer, and missing for a `required`
+attribute. Every refusal answers 400 with the attribute's name.
 
 The flat routes apply these rules in full; what the group and organization
 routes still answer otherwise is listed in
