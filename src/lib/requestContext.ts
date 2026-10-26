@@ -59,6 +59,18 @@ export interface LogContext {
 const logContexts = new AsyncLocalStorage<LogContext>();
 
 /**
+ * Run something that outlives the request being served, a connection
+ * opened for the pool or a client kept for the process: its operations are
+ * judged by nobody, and what it logs later is nobody's request.
+ *
+ * @param fn what to run
+ * @returns what it returns
+ */
+export function outsideAnyRequest<T>(fn: () => T): T {
+  return requests.exit(() => logContexts.exit(fn));
+}
+
+/**
  * Serve a request with its log context: what runs inside, synchronously or
  * not, logs with it.
  *

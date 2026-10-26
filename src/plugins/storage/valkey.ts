@@ -13,11 +13,13 @@
  *
  * @group Plugins
  */
+import { AsyncResource } from 'node:async_hooks';
+
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
 import type { HealthStatus } from '../../lib/health';
-import { outsideRequest } from '../../lib/requestContext';
+import { outsideAnyRequest } from '../../lib/requestContext';
 
 type IoValkey = typeof import('iovalkey');
 type Client = InstanceType<IoValkey['Valkey']>;
@@ -68,7 +70,7 @@ export default class ValkeyStore extends Store {
    */
   private client(): Promise<Client> {
     // Outside the request it may be opened for: the connection outlives it
-    this.connection ??= outsideRequest(() => this.connect()).catch(err => {
+    this.connection ??= outsideAnyRequest(() => this.connect()).catch(err => {
       this.connection = undefined;
       throw err;
     });
@@ -98,16 +100,24 @@ export default class ValkeyStore extends Store {
     // `connect()` with a bare "Connection is closed".
     let cause: unknown;
     let connected = false;
-    client.on('error', (err: unknown) => {
-      cause = err;
-      if (!connected || this.down) return;
-      this.down = true;
-      this.logger.warn(`${this.name}: connection lost: ${errorText(err)}`);
-    });
-    client.on('ready', () => {
-      if (this.down) this.logger.info(`${this.name}: connection back`);
-      this.down = false;
-    });
+    // Bound to this moment: the client reconnects from whatever it was
+    // doing, and a connection lost or back is no request's
+    client.on(
+      'error',
+      AsyncResource.bind((err: unknown) => {
+        cause = err;
+        if (!connected || this.down) return;
+        this.down = true;
+        this.logger.warn(`${this.name}: connection lost: ${errorText(err)}`);
+      })
+    );
+    client.on(
+      'ready',
+      AsyncResource.bind(() => {
+        if (this.down) this.logger.info(`${this.name}: connection back`);
+        this.down = false;
+      })
+    );
     try {
       await client.connect();
       connected = true;

@@ -170,6 +170,14 @@ export class DM {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       next();
     });
+    // Every answer names its request, and every line logged while serving
+    // it carries the name, a body refused by a parser included; see
+    // docs/usage/operations.md#request-id
+    this.app.use((req, res, next) => {
+      const id = requestId(req);
+      res.setHeader('X-Request-Id', id);
+      runWithLogContext({ requestId: id }, next);
+    });
     // Each parser keeps the bytes it read: core/auth/hmac hashes those, as
     // the client signed them, not the body re-serialized.
     this.app.use(this.bodyParsers);
@@ -177,13 +185,6 @@ export class DM {
     this.app.use(
       bodyParser.urlencoded({ extended: true, verify: keepRawBody })
     );
-    // Every answer names its request, and every line logged while serving
-    // it carries the name; see docs/usage/operations.md#request-id
-    this.app.use((req, res, next) => {
-      const id = requestId(req);
-      res.setHeader('X-Request-Id', id);
-      runWithLogContext({ requestId: id }, next);
-    });
     // Before the authentication: a probe carries no identity
     mountHealth(this.app, this);
     this.logger = buildLogger(this.config);

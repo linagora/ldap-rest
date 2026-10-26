@@ -12,11 +12,13 @@
  *
  * @group Plugins
  */
+import { AsyncResource } from 'node:async_hooks';
+
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
 import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health';
-import { outsideRequest } from '../../lib/requestContext';
+import { outsideAnyRequest } from '../../lib/requestContext';
 
 type Pg = typeof import('pg');
 type Pool = InstanceType<Pg['Pool']>;
@@ -89,7 +91,7 @@ export default class PostgresStore extends Store {
    */
   private pool(): Promise<Pool> {
     // Outside the request it may be opened for: the connection outlives it
-    this.connection ??= outsideRequest(() => this.connect()).catch(err => {
+    this.connection ??= outsideAnyRequest(() => this.connect()).catch(err => {
       this.connection = undefined;
       throw err;
     });
@@ -113,9 +115,14 @@ export default class PostgresStore extends Store {
       allowExitOnIdle: true,
     });
     // An idle connection the server drops is reported here; without a
-    // listener, that event takes the whole process down.
-    pool.on('error', err =>
-      this.logger.warn(`${this.name}: connection lost: ${errorText(err)}`)
+    // listener, that event takes the whole process down. Bound to this
+    // moment: the pool grows its connections while serving requests, and a
+    // drop is none of theirs.
+    pool.on(
+      'error',
+      AsyncResource.bind((err: Error) =>
+        this.logger.warn(`${this.name}: connection lost: ${errorText(err)}`)
+      )
     );
     try {
       await this.ensureTable(pool);

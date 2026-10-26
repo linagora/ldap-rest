@@ -36,6 +36,7 @@ Each response is logged when completed at **notice** level (between info and war
   "level": "notice",
   "message": "GET /api/v1/ldap/users 200 45ms",
   "user": "admin",
+  "requestId": "6effd260-b079-4335-b727-544189ed33a6",
   "method": "GET",
   "url": "/api/v1/ldap/users",
   "status": 200,
@@ -49,6 +50,7 @@ Each response is logged when completed at **notice** level (between info and war
 | -------------- | ------------------------------- | --------------------------------- |
 | `message`      | Summary line                    | `GET /api/v1/ldap/users 200 45ms` |
 | `user`         | Authenticated user (if any)     | `admin`                           |
+| `requestId`    | The answer's `X-Request-Id`     | `6effd260-b079-…`                 |
 | `method`       | HTTP method                     | `GET`, `POST`, `PUT`, `DELETE`    |
 | `url`          | Full URL including query params | `/api/v1/ldap/users?match=*`      |
 | `status`       | HTTP status code                | `200`, `404`, `500`               |
@@ -92,7 +94,7 @@ Output:
 
 Notes:
 
-- Core fields (`method`, `url`, `status`, `duration`, `ip`, `user`, `error`)
+- Core fields (`requestId`, `method`, `url`, `status`, `duration`, `ip`, `user`, `error`)
   always take precedence: a plugin cannot overwrite them.
 - The value must be set **before** the response completes (i.e. before
   `res.json()` / `res.end()`), since the entry is written on the `finish` event.

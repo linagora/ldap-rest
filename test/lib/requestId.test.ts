@@ -1,3 +1,5 @@
+import { createServer, connect, type AddressInfo } from 'node:net';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 import Transport from 'winston-transport';
@@ -7,7 +9,12 @@ import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
 import { changeContext, requestId } from '../../src/lib/changeContext';
 import { launchHooks } from '../../src/lib/utils';
-import { outsideRequest } from '../../src/lib/requestContext';
+import {
+  currentLogContext,
+  outsideAnyRequest,
+  outsideRequest,
+  runWithLogContext,
+} from '../../src/lib/requestContext';
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -89,6 +96,42 @@ describe('Request id', () => {
       request.get('/probe'),
     ]);
     expect(a.headers['x-request-id']).not.to.equal(b.headers['x-request-id']);
+  });
+
+  it('names a body a parser refused', async () => {
+    captured.lines = [];
+    const res = await request.post('/probe').type('json').send('{"not": json');
+    expect(res.status).to.equal(400);
+    const id = res.headers['x-request-id'];
+    expect(id).to.match(UUID);
+    const refusal = captured.lines.find(l => /400/.test(l.message));
+    expect(refusal?.requestId, JSON.stringify(captured.lines)).to.equal(id);
+  });
+
+  it('leaves no id to a connection opened for the process', async () => {
+    const listener = createServer(socket => socket.end('hello'));
+    await new Promise<void>(resolve =>
+      listener.listen(0, '127.0.0.1', resolve)
+    );
+    const { port } = listener.address() as AddressInfo;
+    try {
+      const seen = await runWithLogContext({ requestId: 'A' }, () =>
+        outsideAnyRequest(
+          () =>
+            new Promise<string | undefined>(resolve => {
+              const socket = connect(port, '127.0.0.1');
+              socket.on('data', () => resolve(currentLogContext()?.requestId));
+            })
+        )
+      );
+      expect(seen).to.equal(undefined);
+      const kept = await runWithLogContext({ requestId: 'A' }, () =>
+        outsideRequest(() => currentLogContext()?.requestId)
+      );
+      expect(kept, 'as the server, still the request').to.equal('A');
+    } finally {
+      listener.close();
+    }
   });
 
   it('writes no id outside a request', () => {
