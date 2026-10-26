@@ -30,6 +30,35 @@ export const setLogger = (logger: winston.Logger | undefined): void => {
 /** @returns the installed logger, or undefined before any `DM` exists */
 export const getLogger = (): winston.Logger | undefined => _logger;
 
+let _debug = false;
+
+/**
+ * Whether a 5xx answer carries the failure's message. Off by default: the
+ * failure is for the logs, and `--debug` turns it on.
+ *
+ * @param debug true to name the failure in the response
+ */
+export const setDebug = (debug: boolean): void => {
+  _debug = debug;
+};
+
+/**
+ * The body of every 5xx answer, whichever path writes it: the error
+ * middleware of `DM` and `serverError` below answered two different ones.
+ *
+ * @param err what failed
+ */
+export const serverErrorBody = (
+  err: unknown
+): { error: string; message: string } => ({
+  error: 'Internal Server Error',
+  message: _debug
+    ? err instanceof Error
+      ? err.message
+      : String(err)
+    : 'An error occurred',
+});
+
 // Utility that generates standard responses depending on the success of the method
 export const tryMethod = async (
   res: Response,
@@ -125,8 +154,6 @@ export const tooManyRequests = (
 
 // 50x responses
 
-// We don't want to publish the real error in server responses.
-//
 // The logger is read guarded, as `_rejectResponse` reads it: `setLogger`
 // runs in the `DM` constructor, and anything reaching here without one —
 // a library, a test — would otherwise throw `Cannot read properties of
@@ -166,7 +193,7 @@ export const serverError = (res: Response, err: unknown): void => {
   } else {
     _logger?.error('Server error', err);
   }
-  res.status(statusCode).json({ error: 'check logs' });
+  res.status(statusCode).json(serverErrorBody(err));
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>
   _rejectResponse(502, res, message);

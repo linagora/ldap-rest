@@ -4,6 +4,10 @@
 
 ### Fixes
 
+- Every 5xx answer has the same body, `{"error":"Internal Server Error",
+"message":"An error occurred"}`: the routes answering through
+  `serverError` sent `{"error":"check logs"}`
+  ([#426](https://github.com/linagora/ldap-rest/issues/426))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

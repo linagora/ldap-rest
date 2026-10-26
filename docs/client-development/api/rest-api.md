@@ -1335,19 +1335,13 @@ no `limit` was given —
 
 #### 500 Internal Server Error
 
-**LDAP Connection Error:**
+The failure is in the server's logs, not in the response; the message names
+it only when the server runs with `--debug`:
 
 ```json
 {
-  "error": "LDAP bind error"
-}
-```
-
-**General Server Error:**
-
-```json
-{
-  "error": "Internal server error: <details>"
+  "error": "Internal Server Error",
+  "message": "An error occurred"
 }
 ```
 
