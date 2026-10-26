@@ -46,7 +46,7 @@ import {
   modifiedAttributeNames,
   toDirectoryEntry,
   neverReturnAttributes,
-  schemaAttribute,
+  assertClientMaySet,
 } from '../config/schema';
 import {
   applyFixedDefaults,
@@ -384,28 +384,6 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   /**
-   * Attributes a client is not allowed to supply: those the server computes
-   * (`generated`) and those it only ever derives from elsewhere (`readOnly`,
-   * such as `memberOf`, which is driven from the group side).
-   *
-   * The core and its plugins still write them — the restriction is on the
-   * request body, not on the entry.
-   *
-   * @returns lowercased attribute names
-   */
-  protected clientForbiddenAttributes(): Set<string> {
-    const forbidden = new Set<string>();
-    if (!this.schema) return forbidden;
-    for (const [name, attr] of Object.entries(this.schema.attributes)) {
-      // A `generated` identifier with no derivation rule has nothing to be
-      // generated from: the client still has to supply it.
-      if (name === this.mainAttribute && !attr.generatedFrom) continue;
-      if (attr.generated || attr.readOnly) forbidden.add(name.toLowerCase());
-    }
-    return forbidden;
-  }
-
-  /**
    * Attributes never sent back over the API. A manager may reset a password
    * without being able to read it back: the asymmetry is a projection, not an
    * authorization rule, so it lives with the schema.
@@ -472,18 +450,7 @@ export default abstract class LdapFlat extends DmPlugin {
    * @throws BadRequestError naming the first offending attribute
    */
   protected rejectForbiddenInput(names: string[]): void {
-    const forbidden = this.clientForbiddenAttributes();
-    if (forbidden.size === 0) return;
-    for (const name of names) {
-      if (name === 'dn') continue;
-      if (!forbidden.has(name.split(';')[0].toLowerCase())) continue;
-      const attr = schemaAttribute(this.schema, name)?.[1];
-      throw new BadRequestError(
-        attr?.readOnly
-          ? `Attribute "${name}" is read-only and cannot be set`
-          : `Attribute "${name}" is computed by the server and cannot be set`
-      );
-    }
+    assertClientMaySet(this.schema, names, this.mainAttribute);
   }
 
   /**
