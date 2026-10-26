@@ -196,9 +196,22 @@ describe('Health routes', function () {
     });
 
     it('leaves the probes out of the unauthenticated routes it warns about', () => {
-      const unguarded = server.warnUnauthenticatedRoutes();
-      expect(unguarded).not.to.include('/healthz');
-      expect(unguarded).not.to.include('/readyz');
+      // Scoped to the API: the probes are the only routes outside it here
+      class Scoped extends Refusing {
+        name = 'scoped';
+        get pathPrefixes(): string[] {
+          return ['/api'];
+        }
+      }
+      const refusing = server.loadedPlugins.refusing;
+      delete server.loadedPlugins.refusing;
+      server.loadedPlugins.scoped = new Scoped(server);
+      try {
+        expect(server.warnUnauthenticatedRoutes()).to.deep.equal([]);
+      } finally {
+        delete server.loadedPlugins.scoped;
+        server.loadedPlugins.refusing = refusing;
+      }
     });
   });
 });

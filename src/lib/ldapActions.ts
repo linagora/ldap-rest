@@ -710,10 +710,6 @@ class ldapActions {
   }
 
   /**
-   * Acquire a connection from the pool or create a new one
-   * Optimized for O(1) lookup using separate available connections queue
-   */
-  /**
    * Ask the directory for its base entry on a pooled connection, nothing
    * read: the readiness probe. Straight to the client, so that neither the
    * search cache nor the hooks answer for a directory that does not.
@@ -733,6 +729,10 @@ class ldapActions {
     }
   }
 
+  /**
+   * Acquire a connection from the pool or create a new one
+   * Optimized for O(1) lookup using separate available connections queue
+   */
   private async acquireConnection(): Promise<PooledConnection> {
     // Clean up expired connections
     this.cleanupExpiredConnections();
