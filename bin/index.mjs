@@ -37,8 +37,8 @@ Environment Variables:
 
 Examples:
   # Start against a directory
-  npx ldap-rest --ldap-url ldap://localhost:389 \
-    --ldap-base dc=example,dc=com \
+  npx ldap-rest --ldap-url ldap://localhost:389 \\
+    --ldap-base dc=example,dc=com \\
     --ldap-dn cn=admin,dc=example,dc=com --ldap-pwd secret
 
   # Load specific plugins
