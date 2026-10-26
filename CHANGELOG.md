@@ -12,6 +12,11 @@
 
 ### Fixes
 
+- `ldap/bulkImport`: a row with a value under a fixed attribute of the
+  schema, such as `objectClass`, fails with "is fixed and cannot be
+  imported"; the value replaced the fixed one,
+  [docs](docs/usage/plugins/ldap/bulk-import.md#fixed-attributes)
+  ([#445](https://github.com/linagora/ldap-rest/issues/445))
 - The flat routes store the classes of the entity on a creation whatever
   `objectClass` the request carried, and whatever the schema says of that
   attribute, as the organization routes do: a body naming other classes had

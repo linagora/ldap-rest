@@ -393,6 +393,39 @@ describe('LDAP Bulk Import Plugin', function () {
       expect(res.body).to.include({ created: 1, failed: 0 });
     });
 
+    it('should refuse a row with a value under a fixed attribute', async () => {
+      // A class the fixed value does not carry, under the schema's own
+      // spelling: the one the directory's duplicate check does not catch
+      const csvContent = [
+        'uid,cn,sn,givenName,objectClass,mail,organizationDn',
+        `bulkuser1,Bulk User 1,User1,Bulk,top;twakeAccount;twakeWhitePages;extensibleObject,bulkuser1@test.org,"${getTestOrg1Dn()}"`,
+        `bulkuser2,Bulk User 2,User2,Bulk,,bulkuser2@test.org,"${getTestOrg1Dn()}"`,
+      ].join('\n');
+
+      const res = await request
+        .post('/api/v1/ldap/bulk-import/testusers')
+        .attach('file', Buffer.from(csvContent), 'test.csv');
+
+      expect(res.status).to.equal(200);
+      expect(res.body).to.include({ created: 1, failed: 1 });
+      expect(res.body.errors).to.deep.equal([
+        {
+          line: 2,
+          identifier: 'bulkuser1',
+          error: 'Attribute "objectClass" is fixed and cannot be imported',
+        },
+      ]);
+      const stored = await server.ldap.search(
+        { paged: false, scope: 'base', attributes: ['objectClass'] },
+        `uid=bulkuser2,${process.env.DM_LDAP_BASE}`
+      );
+      expect((stored as any).searchEntries[0].objectClass).to.have.members([
+        'top',
+        'twakeAccount',
+        'twakeWhitePages',
+      ]);
+    });
+
     it('should refuse a row naming an attribute option', async () => {
       // `title;lang-fr` is a value of its own, which the rules guarding
       // `title` would not see
