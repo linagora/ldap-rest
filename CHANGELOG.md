@@ -4,9 +4,10 @@
 
 ### Fixes
 
-- Every 5xx answer has the same body, `{"error":"Internal Server Error",
-"message":"An error occurred"}`: the routes answering through
-  `serverError` sent `{"error":"check logs"}`
+- The error middleware and the routes answering through `serverError` send
+  the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
+  the latter sent `{"error":"check logs"}`. `--debug` (`DM_DEBUG`) is a
+  declared option, and names the failure in the message on both paths
   ([#426](https://github.com/linagora/ldap-rest/issues/426))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it

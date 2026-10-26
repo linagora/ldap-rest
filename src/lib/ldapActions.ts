@@ -359,7 +359,7 @@ function assertHasValue(name: string, value: unknown): void {
 /**
  * Wrap a write failure, turning a refusal of the request's content (see
  * `isSchemaRefusal`) into a 400: the mistake is the client's, and a 500
- * tells it to check logs it cannot read.
+ * would hide it in logs it cannot read.
  */
 function ldapWriteError(context: string, dn: string, error: unknown): Error {
   const code = extractLdapCode(error);

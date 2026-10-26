@@ -1410,8 +1410,8 @@ export default class LdapOrganizations extends DmPlugin {
   ): Promise<boolean> {
     if (!this.schema) return true;
     // Every refusal here is the client's value, so a 400: a plain Error
-    // reached the client as a 500 "check logs", which also left the hint-
-    // quoting message of the callers unreachable.
+    // would be a 500, and would leave the hint-quoting message of the
+    // callers unreachable.
     const fieldTest = schemaAttribute(this.schema, field)?.[1];
     if (!fieldTest) {
       if (this.schema.strict)

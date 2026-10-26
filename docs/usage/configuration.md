@@ -154,6 +154,7 @@ to keep the default.
 | `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                             |
 | `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug |
 | `--logger`       |                  | `DM_LOGGER`       | `console`        | Logger type                                 |
+| `--debug`        |                  | `DM_DEBUG`        | `false`          | Name the failure in 5xx answers             |
 | `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                              |
 | `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                |
 | `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                        |

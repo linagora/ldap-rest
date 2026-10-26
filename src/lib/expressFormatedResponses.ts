@@ -33,8 +33,8 @@ export const getLogger = (): winston.Logger | undefined => _logger;
 let _debug = false;
 
 /**
- * Whether a 5xx answer carries the failure's message. Off by default: the
- * failure is for the logs, and `--debug` turns it on.
+ * Whether `serverError` names the failure in its answer: the `--debug` of
+ * the server, installed as its logger is.
  *
  * @param debug true to name the failure in the response
  */
@@ -43,16 +43,19 @@ export const setDebug = (debug: boolean): void => {
 };
 
 /**
- * The body of every 5xx answer, whichever path writes it: the error
- * middleware of `DM` and `serverError` below answered two different ones.
+ * The body of a 5xx answer, for the error middleware of `DM` and
+ * `serverError` alike. The failure is for the logs: the message names it
+ * only under `--debug`.
  *
  * @param err what failed
+ * @param debug whether to name the failure; `serverError`'s setting by default
  */
 export const serverErrorBody = (
-  err: unknown
+  err: unknown,
+  debug = _debug
 ): { error: string; message: string } => ({
   error: 'Internal Server Error',
-  message: _debug
+  message: debug
     ? err instanceof Error
       ? err.message
       : String(err)
@@ -185,7 +188,7 @@ export const serverError = (res: Response, err: unknown): void => {
     return;
   }
 
-  // Server error (5xx) - log as error and hide details
+  // Server error (5xx): logged, named in the answer only under --debug
   if (err instanceof Error) {
     _logger?.error(err.message, err);
   } else if (typeof err === 'string') {

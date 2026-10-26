@@ -173,7 +173,7 @@ export class DM {
     this.logger = buildLogger(this.config);
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
-    setDebug(Boolean(this.config.debug));
+    setDebug(this.config.debug);
     this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
@@ -594,7 +594,7 @@ export class DM {
         return;
       }
 
-      // Server error (5xx) - log as error and hide details
+      // Server error (5xx): logged, named in the answer only under --debug
       this.logger.error(
         `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
         {
@@ -604,7 +604,8 @@ export class DM {
         }
       );
 
-      if (!res.headersSent) res.status(statusCode).json(serverErrorBody(err));
+      if (!res.headersSent)
+        res.status(statusCode).json(serverErrorBody(err, this.config.debug));
     };
 
     this.app.use(this._errorMiddleware);
