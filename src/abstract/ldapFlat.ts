@@ -34,7 +34,6 @@ import {
   escapeRegex,
   getCompiledRegex,
   getParentDn,
-  isDnInBranch,
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
@@ -44,15 +43,12 @@ import {
 } from '../lib/utils';
 import type { Schema } from '../config/schema';
 import {
-  checkDnValues,
-  invalidValueMessage,
-  missingRequiredAttribute,
   modifiedAttributeNames,
-  toDirectoryChanges,
   toDirectoryEntry,
   neverReturnAttributes,
   schemaAttribute,
 } from '../config/schema';
+import { EntityValidator } from '../lib/entitySchema/validator';
 import {
   BadRequestError,
   ConflictError,
@@ -64,16 +60,6 @@ import { extractLdapCode } from '../lib/ldapCodes';
 import { loadSchemaFile } from '../lib/schemaFile';
 
 import DmPlugin from './plugin';
-
-/**
- * One attribute value or many, always as a list of strings.
- *
- * @param value value as the client sent it
- * @returns its elements
- */
-function asList(value: AttributeValue): string[] {
-  return (Array.isArray(value) ? value : [value]).map(item => String(item));
-}
 
 /** RFC 4511 `maxInt`: the most a search request's size limit can say. */
 const LDAP_MAX_INT = 2147483647;
@@ -640,8 +626,23 @@ export default abstract class LdapFlat extends DmPlugin {
     }
   }
 
-  protected invalidValueMessage(field: string): string {
-    return invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1]);
+  /** The schema's rules; the pointer lookups run as the server */
+  protected validator(): EntityValidator {
+    return new EntityValidator(this.schema, {
+      entryExists: async (dn): Promise<boolean> => {
+        try {
+          const result = (await this.ldap.system.search(
+            { paged: false, scope: 'base', attributes: ['dn'] },
+            dn
+          )) as SearchResult;
+          return result.searchEntries.length > 0;
+        } catch {
+          return false;
+        }
+      },
+      loadedPlugins: this.server.loadedPlugins,
+      singularName: this.singularName,
+    });
   }
 
   /**
@@ -1299,12 +1300,8 @@ export default abstract class LdapFlat extends DmPlugin {
         err instanceof Error ? err.message : 'Invalid newId'
       );
     }
-    // The schema's own rule, the one a creation applies. `renameEntry` checked
-    // only for emptiness and control characters, so a value the schema refuses
-    // on the way in was accepted on the way past.
-    if (!(await this._validateOneChange(this.mainAttribute, newId))) {
-      throw new BadRequestError(this.invalidValueMessage(this.mainAttribute));
-    }
+    // The schema's own rule, the one a creation applies
+    await this.validator().validateValue(this.mainAttribute, newId);
 
     const id = decodeURIComponent(req.params.id as string);
     const dn = this.resolveDn(id);
@@ -1871,200 +1868,12 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async validateNewEntry(dn: string, entry: AttributesList): Promise<boolean> {
-    // Converts in place, so what is checked below is what the directory gets
-    toDirectoryEntry(this.schema, entry);
-    if (!this.schema) return true;
-
-    // A fixed attribute with a default is checked at that default, not at
-    // what was sent; `objectClass` is the entity's, see `candidateEntry`
-    for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
-        entry[field] = attr.default;
-    }
-
-    for (const [field, value] of Object.entries(entry)) {
-      const attr = schemaAttribute(this.schema, field)?.[1];
-      if (!attr) {
-        if (this.schema.strict)
-          throw new BadRequestError(
-            `Unknown attribute "${field}" for ${this.singularName}`
-          );
-        continue;
-      }
-
-      // Before the value checks: an empty required value is missing, not
-      // invalid
-      if (attr.required && !value && !attr.generated) {
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      }
-      if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(this.invalidValueMessage(field));
-      }
-    }
-    // Check required fields, granting a `generated` attribute the exemption
-    // only when something will honour it. See `missingRequiredAttribute`.
-    const missing = missingRequiredAttribute(
-      this.schema,
-      entry,
-      this.server.loadedPlugins
-    );
-    if (missing)
-      throw new BadRequestError(`Attribute "${missing}" is required`);
+    await this.validator().validateNew(entry);
     return true;
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    // Converts in place: what is validated is what gets written
-    toDirectoryChanges(this.schema, changes);
-    if (!this.schema) return true;
-
-    // Check for fixed attributes in add/replace operations
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const checkFixed = (field: string, value: AttributeValue): void => {
-      const attr = schemaAttribute(this.schema, field)?.[1];
-      if (attr?.fixed) {
-        throw new BadRequestError(
-          `Attribute "${field}" is fixed and cannot be modified`
-        );
-      }
-    };
-
-    if (changes.add) {
-      for (const [field, value] of Object.entries(changes.add)) {
-        checkFixed(field, value);
-        if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(this.invalidValueMessage(field));
-        }
-      }
-    }
-    if (changes.replace) {
-      for (const [field, value] of Object.entries(changes.replace)) {
-        checkFixed(field, value);
-        if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(this.invalidValueMessage(field));
-        }
-      }
-    }
-    if (changes.delete) {
-      const deleteFields = Array.isArray(changes.delete)
-        ? changes.delete
-        : Object.keys(changes.delete);
-      for (const field of deleteFields) {
-        const attr = schemaAttribute(this.schema, field)?.[1];
-        if (attr?.fixed) {
-          throw new BadRequestError(
-            `Attribute "${field}" is fixed and cannot be deleted`
-          );
-        }
-      }
-    }
-    return true;
-  }
-
-  async _validateOneChange(
-    field: string,
-    value: AttributeValue | null
-  ): Promise<boolean> {
-    if (!this.schema) return true;
-    const attr = schemaAttribute(this.schema, field)?.[1];
-    if (!attr) {
-      if (this.schema.strict) return false;
-      return true;
-    }
-    // No value clears the attribute. An empty string is a value, checked as
-    // groups and organizations check it: against the pattern, and for a
-    // pointer against its branch
-    if (value === null || value === undefined) return true;
-    // An empty list is no value, as for groups and organizations: a replace
-    // clears the attribute with it
-    if (Array.isArray(value) && value.length === 0) {
-      if (attr.required)
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      return true;
-    }
-
-    // Handle pointer type
-    if (attr.type === 'pointer') {
-      if (typeof value !== 'string') {
-        throw new BadRequestError(
-          `Attribute "${field}" must be a string (DN pointer)`
-        );
-      }
-
-      const dnValue: string = value;
-      // A base search of '' answers the root DSE, so an empty DN would pass
-      // as existing
-      if (dnValue === '')
-        throw new BadRequestError(`Attribute "${field}" must point to a DN`);
-
-      // Check branch restriction if provided. Asked RDN by RDN: a suffix
-      // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`
-      // as being inside `ou=users,dc=example,dc=com`, so a pointer could name
-      // an entry of a branch the schema never allowed.
-      if (attr.branch && attr.branch.length > 0) {
-        const isInBranch = attr.branch.some(branch =>
-          isDnInBranch(dnValue, branch)
-        );
-        if (!isInBranch) {
-          throw new BadRequestError(
-            `Attribute "${field}" must point to a DN within allowed branches: ${attr.branch.join(', ')}`
-          );
-        }
-      }
-
-      // Verify that the DN exists in LDAP.
-      //
-      // As the server: a reference to an entry the caller cannot read is
-      // still a valid reference, and refusing it would make a schema rule
-      // mean "points at something you may read" — which is not what
-      // referential integrity is.
-      try {
-        const result = (await this.ldap.system.search(
-          { paged: false, scope: 'base' },
-          dnValue
-        )) as SearchResult;
-        if (
-          !result ||
-          !result.searchEntries ||
-          result.searchEntries.length === 0
-        )
-          throw new BadRequestError(
-            `Attribute "${field}" points to non-existent DN: ${dnValue}`
-          );
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (err) {
-        throw new BadRequestError(
-          `Attribute "${field}" points to invalid or non-existent DN: ${dnValue}`
-        );
-      }
-    }
-
-    // An array declares the rules of its *elements* under `items`, which is
-    // where the shipped schemas put them — `mailAlternateAddress` has carried
-    // `items.test` since v0.7.0 and `twakeDelegatedUsers` an `items.branch`.
-    // Neither was read here, so the flat routes accepted anything in them
-    // while the console's form refused it client-side and `groups` refused
-    // `items.test` server-side. The rule is the same rule; it applies here
-    // too.
-    // Same rule as a pointer's own branch, and asked the same way; an array
-    // of pointers has each element's target looked up too, as a single
-    // pointer's is.
-    if (attr.type !== 'pointer')
-      await checkDnValues(field, attr, value, async dn => {
-        // As the server, for the reason the single pointer above gives.
-        const result = (await this.ldap.system.search(
-          { paged: false, scope: 'base', attributes: ['dn'] },
-          dn
-        )) as SearchResult;
-        return result.searchEntries.length > 0;
-      });
-
-    const pattern = attr.test ?? attr.items?.test;
-    if (pattern) {
-      const regex =
-        typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
-      return asList(value).every(v => regex.test(v));
-    }
+    await this.validator().validateChanges(changes);
     return true;
   }
 }
