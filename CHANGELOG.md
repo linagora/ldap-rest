@@ -5,7 +5,7 @@
 ### Fixes
 
 - `--logger` takes `console` or `file`, with `--log-file` naming the file;
-  any other value stops the server at startup,
+  an empty value is `console`, any other stops the server at startup,
   [upgrading](docs/usage/upgrading.md#--logger-console-or-file)
   ([#432](https://github.com/linagora/ldap-rest/issues/432))
 - `groups`, `organizations` and `flatGeneric` give their schema file

@@ -377,7 +377,7 @@ For high-traffic deployments:
 
 ## Log Rotation
 
-Configure log rotation using environment or external tools:
+Rotate the log file with external tools:
 
 ### Writing to a file
 

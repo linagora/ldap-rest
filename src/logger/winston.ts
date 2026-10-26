@@ -31,10 +31,10 @@ const LOGGERS = ['console', 'file'] as const;
 
 /**
  * @throws when `--logger` names no known logger, or `--logger file` has no
- * file: never a silent fallback
+ * file: never a file nobody asked for
  */
 export const buildLogger = (config: Config): winston.Logger => {
-  // An empty value is unset, as for the other options
+  // parseConfig keeps an empty DM_LOGGER as '': it means the default
   const logger = config.logger || 'console';
   if (!(LOGGERS as readonly string[]).includes(logger))
     throw new Error(
