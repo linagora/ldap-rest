@@ -20,6 +20,7 @@ Point a server at them with:
 ```sh
 node bin/index.mjs \
   --ldap-base dc=example,dc=org \
+  --ldap-dn cn=admin,dc=example,dc=org --ldap-pwd secret \
   --ldap-top-organization ou=organization,dc=example,dc=org \
   --ldap-group-base ou=lists,ou=groups,dc=example,dc=org \
   --group-schema static/schemas/example/groups.json \

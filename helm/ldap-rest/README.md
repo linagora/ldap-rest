@@ -38,6 +38,8 @@ env:
     value: 'ldap://openldap'
   - name: DM_LDAP_BASE
     value: 'dc=example,dc=com'
+  - name: DM_LDAP_DN
+    value: 'cn=admin,dc=example,dc=com'
   - name: DM_PLUGINS
     value: 'core/static,core/ldap/flatGeneric'
 
