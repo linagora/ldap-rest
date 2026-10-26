@@ -12,6 +12,11 @@
 
 ### Fixes
 
+- Organizations enforce the `fixed` attributes of their schema: on a
+  creation a fixed attribute takes its default and `objectClass` the classes
+  of `--ldap-organization-class`, whatever the request carried, as for
+  groups; a change naming a fixed attribute answers 400, as on the flat
+  routes ([#430](https://github.com/linagora/ldap-rest/issues/430))
 - The flat routes check an empty string against the schema, as the group
   and organization routes do: it was accepted unchecked, and
   `{"replace":{"mail":""}}` stored an empty value. An empty DN is refused

@@ -28,13 +28,13 @@ This plugin manages hierarchical organizations stored as `organizationalUnit` (o
 
 ### Configuration Options
 
-| Argument                                                    | Environment Variable                  | Default                         | Description                                         |
-| ----------------------------------------------------------- | ------------------------------------- | ------------------------------- | --------------------------------------------------- |
-| `--ldap-top-organization`                                   | `DM_LDAP_TOP_ORGANIZATION`            | _Required_                      | DN of the top-level organization                    |
-| `--ldap-organization-class` / `--ldap-organization-classes` | `DM_LDAP_ORGANIZATION_CLASSES`        | `["top", "organizationalUnit"]` | Object classes for organizations                    |
-| `--ldap-organization-link-attribute`                        | `DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE` | `twakeDepartmentLink`           | Attribute for linking users/groups to organizations |
-| `--ldap-organization-path-attribute`                        | `DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE` | `twakeDepartmentPath`           | Attribute for the organizational path               |
-| `--ldap-organization-path-separator`                        | `DM_LDAP_ORGANIZATION_PATH_SEPARATOR` | `" / "`                         | Separator for path components                       |
+| Argument                                                    | Environment Variable                  | Default                                  | Description                                         |
+| ----------------------------------------------------------- | ------------------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| `--ldap-top-organization`                                   | `DM_LDAP_TOP_ORGANIZATION`            | _Required_                               | DN of the top-level organization                    |
+| `--ldap-organization-class` / `--ldap-organization-classes` | `DM_LDAP_ORGANIZATION_CLASSES`        | `top,organizationalUnit,twakeDepartment` | Object classes for organizations                    |
+| `--ldap-organization-link-attribute`                        | `DM_LDAP_ORGANIZATION_LINK_ATTRIBUTE` | `twakeDepartmentLink`                    | Attribute for linking users/groups to organizations |
+| `--ldap-organization-path-attribute`                        | `DM_LDAP_ORGANIZATION_PATH_ATTRIBUTE` | `twakeDepartmentPath`                    | Attribute for the organizational path               |
+| `--ldap-organization-path-separator`                        | `DM_LDAP_ORGANIZATION_PATH_SEPARATOR` | `" / "`                                  | Separator for path components                       |
 
 ### Important Notes
 
