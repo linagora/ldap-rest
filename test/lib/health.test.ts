@@ -1,12 +1,14 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import express from 'express';
 import type { Response } from 'express';
 
 import { DM } from '../../src/bin';
 import DmPlugin, { type Role } from '../../src/abstract/plugin';
 import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
 import {
-  LDAP_PROBE_TTL_MS,
+  PROBE_TTL_MS,
+  mountHealth,
   readiness,
   type HealthStatus,
   type Probed,
@@ -14,6 +16,8 @@ import {
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../helpers/env';
 
 const never = (): Promise<never> => new Promise(() => undefined);
+const later = <T>(ms: number, value: T): Promise<T> =>
+  new Promise(resolve => setTimeout(() => resolve(value), ms));
 
 /** A server whose directory answers as `answers` says, probe after probe */
 const probed = (
@@ -94,22 +98,44 @@ describe('Readiness', () => {
     });
   });
 
-  it('asks the directory once per interval, whatever it answered', async () => {
+  it('asks the directory and the plugins at once, within the one timeout', async () => {
+    const slow = { health: (): Promise<HealthStatus> => later(30, 'ok') };
+    const server = probed([true], { a: slow, b: slow, c: slow });
+    const started = Date.now();
+    const answer = await readiness(server, started, 50);
+    expect(answer.status).to.equal('ok');
+    expect(Date.now() - started, 'three slow plugins, one wait').to.be.below(
+      80
+    );
+  });
+
+  it('serves one answer per interval, whatever it was', async () => {
     const server = probed([false, true]);
     const now = Date.now();
     expect((await readiness(server, now)).status).to.equal('unavailable');
-    expect(
-      (await readiness(server, now + LDAP_PROBE_TTL_MS - 1)).status
-    ).to.equal('unavailable');
-    expect(server.pings).to.equal(1);
-    expect((await readiness(server, now + LDAP_PROBE_TTL_MS)).status).to.equal(
-      'ok'
+    expect((await readiness(server, now + PROBE_TTL_MS - 1)).status).to.equal(
+      'unavailable'
     );
+    expect(server.pings).to.equal(1);
+    expect((await readiness(server, now + PROBE_TTL_MS)).status).to.equal('ok');
     expect(server.pings).to.equal(2);
   });
 
-  it('shares one directory probe between the probes arriving meanwhile', async () => {
-    const server = probed(['hangs']);
+  it('asks again when the clock stepped back', async () => {
+    const server = probed([false, true]);
+    const now = Date.now();
+    expect((await readiness(server, now)).status).to.equal('unavailable');
+    expect((await readiness(server, now - 3_600_000)).status).to.equal('ok');
+    expect(server.pings).to.equal(2);
+  });
+
+  it('shares one probe between the probes arriving meanwhile', async () => {
+    const counting = { calls: 0, health: (): HealthStatus => 'ok' };
+    counting.health = (): HealthStatus => {
+      counting.calls++;
+      return 'ok';
+    };
+    const server = probed(['hangs'], { counting });
     const now = Date.now();
     const answers = await Promise.all([
       readiness(server, now, 20),
@@ -122,6 +148,35 @@ describe('Readiness', () => {
       'unavailable',
     ]);
     expect(server.pings).to.equal(1);
+    expect(counting.calls).to.equal(1);
+  });
+});
+
+describe('Readiness route on a bare application', () => {
+  const mounted = (server: Probed): ReturnType<typeof supertest> => {
+    const app = express();
+    mountHealth(app, server);
+    return supertest(app);
+  };
+
+  it('answers 503 while starting', async () => {
+    const res = await mounted(probed([true], {}, false)).get('/readyz');
+    expect(res.status).to.equal(503);
+    expect(res.body).to.deep.equal({ status: 'starting' });
+  });
+
+  it('answers 503 when the directory does not answer', async () => {
+    const res = await mounted(probed([false])).get('/readyz');
+    expect(res.status).to.equal(503);
+    expect(res.body).to.deep.equal({ status: 'unavailable', ldap: 'failed' });
+  });
+
+  it('answers 200 when degraded', async () => {
+    const res = await mounted(
+      probed([true], { queue: { health: (): HealthStatus => 'degraded' } })
+    ).get('/readyz');
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal('degraded');
   });
 });
 
@@ -147,28 +202,37 @@ describe('Health routes', function () {
     expect(res.headers['cache-control']).to.equal('no-store');
   });
 
-  it('answers /readyz 200 on a directory that answers', async () => {
-    const res = await request.get('/readyz');
-    expect(res.status, JSON.stringify(res.body)).to.equal(200);
-    expect(res.body.status).to.equal('ok');
-    expect(res.body.ldap).to.equal('ok');
-  });
-
-  it('lists a plugin reporting its health', async () => {
+  it('answers /readyz 200 on a directory that answers, with what the plugins report', async () => {
     class Degraded extends DmPlugin {
       name = 'degraded';
       health(): HealthStatus {
         return 'degraded';
       }
     }
+    // Before the first probe: its answer serves the tests that follow
     await server.registerPlugin('degraded', new Degraded(server));
     try {
       const res = await request.get('/readyz');
       expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(res.body.ldap).to.equal('ok');
       expect(res.body.status).to.equal('degraded');
       expect(res.body.plugins).to.deep.equal({ degraded: 'degraded' });
     } finally {
       delete server.loadedPlugins.degraded;
+    }
+  });
+
+  it('pings the directory on a connection of its own, and fails on a closed port', async () => {
+    await server.ldap.ping(2000);
+    const urls = server.ldap['ldapUrls'];
+    server.ldap['ldapUrls'] = ['ldap://127.0.0.1:1'];
+    try {
+      await server.ldap.ping(2000).then(
+        () => expect.fail('answered on a closed port'),
+        (err: Error) => expect(err.message).to.match(/No directory answered/)
+      );
+    } finally {
+      server.ldap['ldapUrls'] = urls;
     }
   });
 

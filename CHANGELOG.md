@@ -31,7 +31,8 @@
   authentication: the first answers as long as the process serves, the
   second 200 once the plugins are loaded and the directory answers, 503
   otherwise; a plugin may report itself `degraded`. The Helm chart probes
-  them over HTTP, [docs](docs/usage/operations.md)
+  them over HTTP, so a pod leaves the endpoints while the directory does not
+  answer, [upgrading](docs/usage/upgrading.md#the-readiness-of-a-pod-follows-the-directory)
   ([#423](https://github.com/linagora/ldap-rest/issues/423))
 
 ### Fixes

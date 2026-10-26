@@ -35,6 +35,8 @@ export {
   GatewayTimeoutError,
 } from '../lib/errors';
 
+export type { HealthStatus };
+
 export type Role =
   | 'auth'
   | 'authz'

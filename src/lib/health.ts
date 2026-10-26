@@ -8,12 +8,13 @@ export type HealthStatus = 'ok' | 'degraded';
 /** The paths of the two probes, served before authentication */
 export const HEALTH_PATHS = ['/healthz', '/readyz'] as const;
 
-/** How long one directory probe answers for */
-export const LDAP_PROBE_TTL_MS = 5_000;
+/** How long one readiness answer serves */
+export const PROBE_TTL_MS = 5_000;
 
 /**
- * How long the directory and each plugin have to answer: under the 3 s a
- * kubelet waits, so that a hanging resource is reported, not timed out
+ * How long a readiness answer may take, the directory and every plugin
+ * asked at once: under the 3 s a kubelet waits, so that a hanging resource
+ * is reported, not timed out
  */
 export const PROBE_TIMEOUT_MS = 2_000;
 
@@ -21,7 +22,7 @@ export const PROBE_TIMEOUT_MS = 2_000;
 export interface Probed {
   /** Every plugin loaded and the composition checked */
   readonly composed: boolean;
-  readonly ldap: { ping: () => Promise<void> };
+  readonly ldap: { ping: (timeoutMs: number) => Promise<void> };
   readonly loadedPlugins: {
     [name: string]: { health?: () => MaybePromise<HealthStatus> };
   };
@@ -35,8 +36,11 @@ export interface Readiness {
   plugins?: { [name: string]: HealthStatus | 'failed' };
 }
 
-/** The last directory probe of each server: its moment and its answer */
-const probes = new WeakMap<Probed, { at: number; ok: Promise<boolean> }>();
+/** The last answer of each server: its moment and the answer, maybe pending */
+const answers = new WeakMap<
+  Probed,
+  { at: number; answer: Promise<Readiness> }
+>();
 
 /** Rejects once `ms` have passed without an answer */
 const withTimeout = async <T>(answer: Promise<T>, ms: number): Promise<T> => {
@@ -51,25 +55,32 @@ const withTimeout = async <T>(answer: Promise<T>, ms: number): Promise<T> => {
   }
 };
 
-/**
- * Whether the directory answers, asked as the server. One answer serves
- * `LDAP_PROBE_TTL_MS`, and the probes arriving meanwhile share it: a probe
- * every few seconds from every replica must not become a load on the
- * directory, nor open a connection each while it does not answer.
- */
-function directoryAnswers(
-  server: Probed,
-  now: number,
-  timeoutMs: number
-): Promise<boolean> {
-  const last = probes.get(server);
-  if (last && now - last.at < LDAP_PROBE_TTL_MS) return last.ok;
-  const ok = withTimeout(server.ldap.ping(), timeoutMs).then(
+/** The directory and every plugin asked at once, each within `timeoutMs` */
+async function probe(server: Probed, timeoutMs: number): Promise<Readiness> {
+  // The client bounds its own socket; the race bounds a ping that does not
+  const directory = withTimeout(server.ldap.ping(timeoutMs), timeoutMs).then(
     () => true,
     () => false
   );
-  probes.set(server, { at: now, ok });
-  return ok;
+  const reports = Object.entries(server.loadedPlugins)
+    .filter(([, plugin]) => plugin.health)
+    .map(async ([name, plugin]): Promise<[string, HealthStatus | 'failed']> => {
+      try {
+        const status = await withTimeout(
+          Promise.resolve(plugin.health!()),
+          timeoutMs
+        );
+        return [name, status];
+      } catch {
+        return [name, 'failed'];
+      }
+    });
+  const [ok, results] = await Promise.all([directory, Promise.all(reports)]);
+  if (!ok) return { status: 'unavailable', ldap: 'failed' };
+  const plugins: NonNullable<Readiness['plugins']> = {};
+  for (const [name, status] of results) plugins[name] = status;
+  const degraded = Object.values(plugins).some(status => status !== 'ok');
+  return { status: degraded ? 'degraded' : 'ok', ldap: 'ok', plugins };
 }
 
 /**
@@ -78,32 +89,28 @@ function directoryAnswers(
  * so that one broken outbound service does not take every replica out of
  * rotation.
  *
+ * One answer serves `PROBE_TTL_MS`, and the probes arriving while it is
+ * made share it: a probe every few seconds from every replica, or a flood
+ * on an unauthenticated route, must not become a load on the directory nor
+ * on what the plugins ask.
+ *
  * @param server what is probed
- * @param now the moment, for the directory probe's age
- * @param timeoutMs how long the directory and each plugin may take
+ * @param now the moment, for the answer's age
+ * @param timeoutMs how long the whole answer may take
  */
-export async function readiness(
+export function readiness(
   server: Probed,
   now = Date.now(),
   timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<Readiness> {
-  if (!server.composed) return { status: 'starting' };
-  if (!(await directoryAnswers(server, now, timeoutMs)))
-    return { status: 'unavailable', ldap: 'failed' };
-  const plugins: NonNullable<Readiness['plugins']> = {};
-  for (const [name, plugin] of Object.entries(server.loadedPlugins)) {
-    if (!plugin.health) continue;
-    try {
-      plugins[name] = await withTimeout(
-        Promise.resolve(plugin.health()),
-        timeoutMs
-      );
-    } catch {
-      plugins[name] = 'failed';
-    }
-  }
-  const degraded = Object.values(plugins).some(status => status !== 'ok');
-  return { status: degraded ? 'degraded' : 'ok', ldap: 'ok', plugins };
+  if (!server.composed) return Promise.resolve({ status: 'starting' });
+  const last = answers.get(server);
+  // A clock stepping back would keep an answer for the whole step
+  if (last && now >= last.at && now - last.at < PROBE_TTL_MS)
+    return last.answer;
+  const answer = probe(server, timeoutMs);
+  answers.set(server, { at: now, answer });
+  return answer;
 }
 
 /**
@@ -115,14 +122,15 @@ export async function readiness(
  * @param server what the readiness probe reads
  */
 export function mountHealth(app: Express, server: Probed): void {
-  app.get('/healthz', (_req: Request, res: Response) => {
+  const [live, ready] = HEALTH_PATHS;
+  app.get(live, (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
     res.json({ status: 'ok' });
   });
-  app.get('/readyz', async (_req: Request, res: Response) => {
+  app.get(ready, async (_req: Request, res: Response) => {
     const answer = await readiness(server);
     res.setHeader('Cache-Control', 'no-store');
-    const ready = answer.status === 'ok' || answer.status === 'degraded';
-    res.status(ready ? 200 : 503).json(answer);
+    const serving = answer.status === 'ok' || answer.status === 'degraded';
+    res.status(serving ? 200 : 503).json(answer);
   });
 }

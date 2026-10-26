@@ -15,7 +15,7 @@ never cached:
 | `status`      | Code | Meaning                                                                                                |
 | ------------- | ---- | ------------------------------------------------------------------------------------------------------ |
 | `starting`    | 503  | The plugins are still loading (a host serving before `ready`; the shipped binary opens the port after) |
-| `unavailable` | 503  | The directory does not answer a base search of its root entry in 2 s (`ldap: failed`)                  |
+| `unavailable` | 503  | The directory does not answer a read of its root DSE in 2 s (`ldap: failed`)                           |
 | `ok`          | 200  | Everything answers                                                                                     |
 | `degraded`    | 200  | The directory answers, a plugin reports a resource of its own down                                     |
 
@@ -24,14 +24,15 @@ never cached:
 ```
 
 `plugins` lists the plugins that report their health; `failed` means the
-report threw or took more than 2 s. Only the directory takes a replica out
-of rotation: a broken outbound service is visible in the body, and the
+report threw or did not answer in time. Only the directory takes a replica
+out of rotation: a broken outbound service is visible in the body, and the
 server keeps serving what does not need it.
 
-The directory is probed on a pooled connection, outside the search cache,
-at most once every 5 seconds whatever the number of probes; the probes
-arriving meanwhile share the answer. A replica whose connection pool stays
-saturated for 2 s answers `unavailable`.
+The directory and the plugins are asked at once, so the answer takes 2 s at
+most. The directory is probed on a connection of its own, bound as the
+server, outside the connection pool and the search cache. One answer serves
+5 seconds whatever the number of probes; the probes arriving meanwhile
+share it.
 
 Both routes are served before the authentication and the rate limiting,
 and `/readyz` names the loaded plugins that report: on an ingress exposing
@@ -43,5 +44,5 @@ The Helm chart probes both routes over HTTP (`livenessProbe` and
 ### For plugin authors
 
 A plugin reports its own resources with an optional `health()` method
-returning `ok` or `degraded`; it is called on every readiness probe, so it
-must answer quickly, within 2 s, and never throw for an ordinary outage.
+returning `ok` or `degraded`, called at most once every 5 seconds; it must
+answer within 2 s and never throw for an ordinary outage.

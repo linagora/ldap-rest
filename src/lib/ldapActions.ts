@@ -710,23 +710,41 @@ class ldapActions {
   }
 
   /**
-   * Ask the directory for its base entry on a pooled connection, nothing
-   * read: the readiness probe. Straight to the client, so that neither the
-   * search cache nor the hooks answer for a directory that does not.
+   * Ask the directory for its root DSE on a connection of its own, bound
+   * as the server and closed after: the readiness probe. Neither the pool
+   * nor the search cache nor the hooks answer for a directory that does
+   * not, and a directory that stops answering holds nothing of the pool.
+   * The URLs are tried as `createConnection` tries them.
    *
-   * @throws when the directory does not answer
+   * @param timeoutMs how long the connection, the bind and the search may
+   *   each take; the client closes the socket when it passes
+   * @throws when no URL answers in time
    */
-  async ping(): Promise<void> {
-    const pooled = await this.acquireConnection();
-    try {
-      await pooled.client.search(this.base, {
-        scope: 'base',
-        attributes: ['1.1'],
-        sizeLimit: 1,
+  async ping(timeoutMs: number): Promise<void> {
+    const errors: string[] = [];
+    for (let i = 0; i < this.ldapUrls.length; i++) {
+      const url =
+        this.ldapUrls[(this.currentUrlIndex + i) % this.ldapUrls.length];
+      const client = new Client({
+        ...this.options,
+        url,
+        timeout: timeoutMs,
+        connectTimeout: timeoutMs,
+        tlsOptions: url.startsWith('ldaps://')
+          ? { minVersion: 'TLSv1.2' }
+          : undefined,
       });
-    } finally {
-      this.releaseConnection(pooled);
+      try {
+        await client.bind(this.dn, this.pwd);
+        await client.search('', { scope: 'base', attributes: ['1.1'] });
+        return;
+      } catch (error) {
+        errors.push(`${url}: ${String(error)}`);
+      } finally {
+        await client.unbind().catch(() => undefined);
+      }
     }
+    throw new Error(`No directory answered: ${errors.join(', ')}`);
   }
 
   /**
