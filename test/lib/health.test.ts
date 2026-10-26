@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import type { Response } from 'express';
 
 import { DM } from '../../src/bin';
-import DmPlugin from '../../src/abstract/plugin';
+import DmPlugin, { type Role } from '../../src/abstract/plugin';
+import AuthBase, { type DmRequest } from '../../src/lib/auth/base';
 import {
   LDAP_PROBE_TTL_MS,
   readiness,
@@ -11,25 +13,24 @@ import {
 } from '../../src/lib/health';
 import { LDAP_ENV_VARS, skipIfMissingEnvVars } from '../helpers/env';
 
+const never = (): Promise<never> => new Promise(() => undefined);
+
 /** A server whose directory answers as `answers` says, probe after probe */
 const probed = (
-  answers: boolean[],
+  answers: Array<boolean | 'hangs'>,
   plugins: Probed['loadedPlugins'] = {},
   composed = true
-): Probed & { searches: number } => {
+): Probed & { pings: number } => {
   const server = {
     composed,
-    config: { ldap_base: 'dc=example,dc=com' },
-    searches: 0,
+    pings: 0,
     loadedPlugins: plugins,
     ldap: {
-      system: {
-        search: async (): Promise<unknown> => {
-          const ok = answers[Math.min(server.searches, answers.length - 1)];
-          server.searches++;
-          if (!ok) throw new Error('connection refused');
-          return { searchEntries: [{}] };
-        },
+      ping: async (): Promise<void> => {
+        const answer = answers[Math.min(server.pings, answers.length - 1)];
+        server.pings++;
+        if (answer === 'hangs') return never();
+        if (!answer) throw new Error('connection refused');
       },
     },
   };
@@ -40,11 +41,18 @@ describe('Readiness', () => {
   it('is starting until the plugins are loaded', async () => {
     const server = probed([true], {}, false);
     expect(await readiness(server)).to.deep.equal({ status: 'starting' });
-    expect(server.searches, 'no directory probe before').to.equal(0);
+    expect(server.pings, 'no directory probe before').to.equal(0);
   });
 
   it('is unavailable when the directory does not answer', async () => {
     expect(await readiness(probed([false]))).to.deep.equal({
+      status: 'unavailable',
+      ldap: 'failed',
+    });
+  });
+
+  it('is unavailable when the directory does not answer in time', async () => {
+    expect(await readiness(probed(['hangs']), Date.now(), 20)).to.deep.equal({
       status: 'unavailable',
       ldap: 'failed',
     });
@@ -58,7 +66,7 @@ describe('Readiness', () => {
     });
   });
 
-  it('is degraded when a plugin says so or cannot say', async () => {
+  it('is degraded when a plugin says so, cannot say or does not answer in time', async () => {
     const answer = await readiness(
       probed([true], {
         fine: { health: (): HealthStatus => 'ok' },
@@ -68,13 +76,21 @@ describe('Readiness', () => {
             throw new Error('no answer');
           },
         },
+        stuck: { health: never },
         silent: {},
-      })
+      }),
+      Date.now(),
+      20
     );
     expect(answer).to.deep.equal({
       status: 'degraded',
       ldap: 'ok',
-      plugins: { fine: 'ok', queue: 'degraded', broken: 'failed' },
+      plugins: {
+        fine: 'ok',
+        queue: 'degraded',
+        broken: 'failed',
+        stuck: 'failed',
+      },
     });
   });
 
@@ -85,11 +101,27 @@ describe('Readiness', () => {
     expect(
       (await readiness(server, now + LDAP_PROBE_TTL_MS - 1)).status
     ).to.equal('unavailable');
-    expect(server.searches).to.equal(1);
+    expect(server.pings).to.equal(1);
     expect((await readiness(server, now + LDAP_PROBE_TTL_MS)).status).to.equal(
       'ok'
     );
-    expect(server.searches).to.equal(2);
+    expect(server.pings).to.equal(2);
+  });
+
+  it('shares one directory probe between the probes arriving meanwhile', async () => {
+    const server = probed(['hangs']);
+    const now = Date.now();
+    const answers = await Promise.all([
+      readiness(server, now, 20),
+      readiness(server, now + 1, 20),
+      readiness(server, now + 2, 20),
+    ]);
+    expect(answers.map(a => a.status)).to.deep.equal([
+      'unavailable',
+      'unavailable',
+      'unavailable',
+    ]);
+    expect(server.pings).to.equal(1);
   });
 });
 
@@ -140,10 +172,33 @@ describe('Health routes', function () {
     }
   });
 
-  it('leaves the probes out of the unauthenticated routes it warns about', () => {
-    expect(server.warnUnauthenticatedRoutes()).not.to.include.members([
-      '/healthz',
-      '/readyz',
-    ]);
+  describe('behind an authentication guarding every path', () => {
+    class Refusing extends AuthBase {
+      name = 'refusing';
+      roles: Role[] = ['auth'];
+      authMethod(_req: DmRequest, res: Response): void {
+        res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+
+    before(async () => {
+      await server.registerPlugin('refusing', new Refusing(server));
+    });
+
+    after(() => {
+      delete server.loadedPlugins.refusing;
+    });
+
+    it('still answers the probes, and nothing else', async () => {
+      expect((await request.get('/healthz')).status).to.equal(200);
+      expect((await request.get('/readyz')).status).to.equal(200);
+      expect((await request.get('/api/v1/ldap/users')).status).to.equal(401);
+    });
+
+    it('leaves the probes out of the unauthenticated routes it warns about', () => {
+      const unguarded = server.warnUnauthenticatedRoutes();
+      expect(unguarded).not.to.include('/healthz');
+      expect(unguarded).not.to.include('/readyz');
+    });
   });
 });

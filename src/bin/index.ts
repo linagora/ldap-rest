@@ -528,7 +528,7 @@ export class DM {
         path.forEach(p => typeof p === 'string' && paths.add(p));
     }
 
-    // The probes answer nothing of the directory: unguarded by design
+    // The probes carry no identity by design: a kubelet has none
     const unguarded = [...paths].filter(
       path =>
         !(HEALTH_PATHS as readonly string[]).includes(path) &&

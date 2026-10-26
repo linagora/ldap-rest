@@ -11,19 +11,17 @@ export const HEALTH_PATHS = ['/healthz', '/readyz'] as const;
 /** How long one directory probe answers for */
 export const LDAP_PROBE_TTL_MS = 5_000;
 
+/**
+ * How long the directory and each plugin have to answer: under the 3 s a
+ * kubelet waits, so that a hanging resource is reported, not timed out
+ */
+export const PROBE_TIMEOUT_MS = 2_000;
+
 /** What the readiness probe reads of the server */
 export interface Probed {
   /** Every plugin loaded and the composition checked */
   readonly composed: boolean;
-  readonly config: { ldap_base?: string };
-  readonly ldap: {
-    readonly system: {
-      search: (
-        options: { paged: false; scope: 'base'; attributes: string[] },
-        base: string
-      ) => Promise<unknown>;
-    };
-  };
+  readonly ldap: { ping: () => Promise<void> };
   readonly loadedPlugins: {
     [name: string]: { health?: () => MaybePromise<HealthStatus> };
   };
@@ -33,31 +31,43 @@ export interface Readiness {
   /** `starting` and `unavailable` answer 503, the two others 200 */
   status: 'starting' | 'ok' | 'degraded' | 'unavailable';
   ldap?: 'ok' | 'failed';
-  /** The plugins implementing `health()`; `failed` when it threw */
+  /** The plugins implementing `health()`; `failed` when it threw or hung */
   plugins?: { [name: string]: HealthStatus | 'failed' };
 }
 
 /** The last directory probe of each server: its moment and its answer */
-const probes = new WeakMap<Probed, { at: number; ok: boolean }>();
+const probes = new WeakMap<Probed, { at: number; ok: Promise<boolean> }>();
+
+/** Rejects once `ms` have passed without an answer */
+const withTimeout = async <T>(answer: Promise<T>, ms: number): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('timed out')), ms);
+  });
+  try {
+    return await Promise.race([answer, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 /**
- * Whether the directory answers a base search of the root entry, asked as
- * the server. One answer serves `LDAP_PROBE_TTL_MS`: a probe every few
- * seconds from every replica must not become a load on the directory.
+ * Whether the directory answers, asked as the server. One answer serves
+ * `LDAP_PROBE_TTL_MS`, and the probes arriving meanwhile share it: a probe
+ * every few seconds from every replica must not become a load on the
+ * directory, nor open a connection each while it does not answer.
  */
-async function directoryAnswers(server: Probed, now: number): Promise<boolean> {
+function directoryAnswers(
+  server: Probed,
+  now: number,
+  timeoutMs: number
+): Promise<boolean> {
   const last = probes.get(server);
   if (last && now - last.at < LDAP_PROBE_TTL_MS) return last.ok;
-  let ok: boolean;
-  try {
-    await server.ldap.system.search(
-      { paged: false, scope: 'base', attributes: ['1.1'] },
-      server.config.ldap_base ?? ''
-    );
-    ok = true;
-  } catch {
-    ok = false;
-  }
+  const ok = withTimeout(server.ldap.ping(), timeoutMs).then(
+    () => true,
+    () => false
+  );
   probes.set(server, { at: now, ok });
   return ok;
 }
@@ -70,19 +80,24 @@ async function directoryAnswers(server: Probed, now: number): Promise<boolean> {
  *
  * @param server what is probed
  * @param now the moment, for the directory probe's age
+ * @param timeoutMs how long the directory and each plugin may take
  */
 export async function readiness(
   server: Probed,
-  now = Date.now()
+  now = Date.now(),
+  timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<Readiness> {
   if (!server.composed) return { status: 'starting' };
-  if (!(await directoryAnswers(server, now)))
+  if (!(await directoryAnswers(server, now, timeoutMs)))
     return { status: 'unavailable', ldap: 'failed' };
   const plugins: NonNullable<Readiness['plugins']> = {};
   for (const [name, plugin] of Object.entries(server.loadedPlugins)) {
     if (!plugin.health) continue;
     try {
-      plugins[name] = await plugin.health();
+      plugins[name] = await withTimeout(
+        Promise.resolve(plugin.health()),
+        timeoutMs
+      );
     } catch {
       plugins[name] = 'failed';
     }
