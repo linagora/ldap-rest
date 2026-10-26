@@ -575,10 +575,14 @@ class ldapActions {
       throw new Error('LDAP URL is not defined');
     }
     if (!server.config.ldap_dn) {
-      throw new Error('LDAP DN is not defined');
+      throw new Error(
+        'LDAP bind DN is not defined, please set --ldap-dn (or DM_LDAP_DN)'
+      );
     }
     if (!server.config.ldap_pwd) {
-      throw new Error('LDAP password is not defined');
+      throw new Error(
+        'LDAP password is not defined, please set --ldap-pwd (or DM_LDAP_PWD)'
+      );
     }
     // The base is the default search base (`search(options, base =
     // this.base)`) and the suffix `setDn()` builds DNs from, so a guessed one

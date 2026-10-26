@@ -27,8 +27,8 @@ ENV NODE_ENV=production \
  DM_API_PREFIX="/api" \
  DM_MAIL_DOMAIN= \
  DM_LDAP_BASE= \
- DM_LDAP_DN="cn=admin,dc=example,dc=com" \
- DM_LDAP_PWD="admin" \
+ DM_LDAP_DN= \
+ DM_LDAP_PWD= \
  DM_LDAP_URL=ldap://localhost \
  DM_LDAP_USER_ATTRIBUTE="uid" \
  DM_LDAP_CACHE_MAX="1000" \
