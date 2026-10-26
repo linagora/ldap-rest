@@ -15,8 +15,7 @@
         "type": "string"
       },
       "required": true,
-      "fixed": true,
-      "default": ["top", "inetOrgPerson", "extensibleObject"]
+      "fixed": true
     },
     "uid": {
       "type": "string",
@@ -56,6 +55,17 @@
         "type": "pointer",
         "branch": ["ou=users,__LDAP_BASE__"]
       }
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+$"
+    },
+    "pwdReset": {
+      "type": "boolean"
+    },
+    "employeeType": {
+      "type": "string",
+      "readOnly": true
     }
   }
 }

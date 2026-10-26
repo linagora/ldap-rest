@@ -1,13 +1,13 @@
 /**
  * One schema, one answer: the same attribute rules, written in a schema of
  * each kind, are enforced alike by the flat routes, the group routes and the
- * organization routes. The three fixtures declare the same attributes; every
- * case below is sent to the three entities, and a refusal has to come from
- * the schema, before the write, not from the directory.
+ * organization routes. The three fixtures declare the same attributes under
+ * test; every case below is sent to the three entities, and a refusal has to
+ * come from the schema, before the write, not from the directory.
  *
  * `divergences` lists what one kind still answers otherwise, by entity, phase
- * and case; those cases are skipped there with the reason, and the list is
- * meant to shrink.
+ * and case, with the status it answers today: such a case asserts that
+ * answer instead of the contract, so that a fix shows and removes the entry.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -22,6 +22,7 @@ import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
 
 type Body = Record<string, unknown>;
 type Phase = 'creation' | 'replace' | 'add' | 'delete';
+type Response = supertest.Response;
 
 interface Entity {
   name: string;
@@ -35,43 +36,84 @@ interface Entity {
   modifyUrl: () => string;
 }
 
-/** What one kind still answers otherwise, by `<entity>: <phase>: <case>` */
-const divergences: Record<string, string> = {
-  'users: creation: refuses an array for a string': 'stores every value',
-  'users: replace: refuses an array for a string': 'stores every value',
-  'users: add: refuses an array for a string': 'stores every value',
-  'users: creation: refuses a string that is not a number for a number':
+/** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
+const divergences: Record<string, [status: number, reason: string]> = {
+  'users: creation: refuses an array for a string': [201, 'stores every value'],
+  'users: replace: refuses an array for a string': [200, 'stores every value'],
+  'users: add: refuses an array for a string': [200, 'stores every value'],
+  'users: creation: refuses a string that is not a number for a number': [
+    201,
     'stores it',
-  'users: replace: refuses a string that is not a number for a number':
+  ],
+  'users: replace: refuses a string that is not a number for a number': [
+    200,
     'stores it',
-  'users: add: refuses a string that is not a number for a number': 'stores it',
-  'users: creation: refuses a string for an array of pointers': 'stores it',
-  'users: replace: refuses a string for an array of pointers': 'stores it',
-  'users: add: refuses a string for an array of pointers': 'stores it',
-  'users: replace: refuses null for a required attribute': 'answers 500',
-  'users: delete: refuses deleting a required attribute': 'deletes it',
-  'users: delete: refuses deleting an attribute the schema does not declare':
-    'answers 404',
-  'groups: creation: writes a fixed attribute as the schema says':
+  ],
+  'users: add: refuses a string that is not a number for a number': [
+    200,
+    'stores it',
+  ],
+  'users: creation: refuses a string for an array of pointers': [
+    201,
+    'stores it',
+  ],
+  'users: replace: refuses a string for an array of pointers': [
+    200,
+    'stores it',
+  ],
+  'users: add: refuses a string for an array of pointers': [200, 'stores it'],
+  'users: replace: refuses null for a required attribute': [500, 'crashes'],
+  'users: replace: clears an optional attribute with null': [500, 'crashes'],
+  'users: delete: refuses deleting a required attribute': [200, 'deletes it'],
+  'users: delete: refuses deleting an attribute the schema does not declare': [
+    200,
+    'deletes it',
+  ],
+  'groups: creation: writes a fixed attribute as the schema says': [
+    200,
     'writes nothing',
-  'groups: replace: refuses a replace of the classes': 'drops it, answers 200',
-  'groups: replace: refuses a fixed attribute': 'drops it, answers 200',
-  'groups: add: refuses a fixed attribute': 'drops it, answers 200',
-  'groups: delete: refuses deleting a fixed attribute': 'drops it, answers 200',
+  ],
+  'groups: replace: refuses a replace of the classes': [
+    200,
+    'drops it, answers 200',
+  ],
+  'groups: replace: refuses a fixed attribute': [200, 'drops it, answers 200'],
+  'groups: add: refuses a fixed attribute': [200, 'drops it, answers 200'],
+  'groups: delete: refuses deleting a fixed attribute': [
+    200,
+    'drops it, answers 200',
+  ],
+  'groups: replace: clears an optional attribute with null': [500, 'crashes'],
   'organizations: creation: refuses a string that is not a number for a number':
-    'stores it',
+    [200, 'stores it'],
   'organizations: replace: refuses a string that is not a number for a number':
+    [200, 'stores it'],
+  'organizations: add: refuses a string that is not a number for a number': [
+    200,
     'stores it',
-  'organizations: add: refuses a string that is not a number for a number':
+  ],
+  'organizations: creation: refuses a string for an array of pointers': [
+    200,
     'stores it',
-  'organizations: creation: refuses a string for an array of pointers':
+  ],
+  'organizations: replace: refuses a string for an array of pointers': [
+    200,
     'stores it',
-  'organizations: replace: refuses a string for an array of pointers':
+  ],
+  'organizations: add: refuses a string for an array of pointers': [
+    200,
     'stores it',
-  'organizations: add: refuses a string for an array of pointers': 'stores it',
-  'organizations: delete: refuses deleting a required attribute': 'deletes it',
+  ],
+  'organizations: replace: clears an optional attribute with null': [
+    500,
+    'crashes',
+  ],
+  'organizations: delete: refuses deleting a required attribute': [
+    200,
+    'deletes it',
+  ],
   'organizations: delete: refuses deleting an attribute the schema does not declare':
-    'answers 404',
+    [200, 'deletes it'],
 };
 
 describe('Entity schema contract', function () {
@@ -118,7 +160,8 @@ describe('Entity schema contract', function () {
       .be.true;
     server.setupErrorMiddleware();
     request = supertest(server.app);
-    await server.ldap.delete(pointee).catch(() => undefined);
+    for (const dn of [pointee, ...entities.map(entity => entity.dn())])
+      await server.ldap.delete(dn).catch(() => undefined);
     await server.ldap.add(pointee, {
       objectClass: ['top', 'inetOrgPerson'],
       uid: 'contract-pointee',
@@ -134,6 +177,13 @@ describe('Entity schema contract', function () {
       else process.env[name] = value;
     }
     await server?.ldap.delete(pointee).catch(() => undefined);
+  });
+
+  const held = (): AttributesList => ({
+    description: 'Held',
+    businessCategory: 'valid',
+    l: 'paris',
+    telephoneNumber: '+33 9 99 99 99 99',
   });
 
   const entities: Entity[] = [
@@ -155,9 +205,7 @@ describe('Entity schema contract', function () {
         uid: 'contract-alice',
         cn: 'Alice',
         sn: 'Contract',
-        description: 'A person',
-        businessCategory: 'valid',
-        l: 'paris',
+        ...held(),
       }),
       modifyUrl: () => '/api/v1/ldap/contractPeople/contract-alice',
     },
@@ -177,9 +225,7 @@ describe('Entity schema contract', function () {
         objectClass: server.config.group_class as string[],
         cn: 'contract-group',
         member: [pointee],
-        description: 'A group',
-        businessCategory: 'valid',
-        l: 'paris',
+        ...held(),
       }),
       modifyUrl: () => '/api/v1/ldap/groups/contract-group',
     },
@@ -197,9 +243,7 @@ describe('Entity schema contract', function () {
       stored: () => ({
         objectClass: server.config.ldap_organization_class as string[],
         ou: 'ContractOrg',
-        description: 'An organization',
-        businessCategory: 'valid',
-        l: 'paris',
+        ...held(),
       }),
       modifyUrl: () =>
         `/api/v1/ldap/organizations/${encodeURIComponent(
@@ -210,8 +254,9 @@ describe('Entity schema contract', function () {
 
   /**
    * Values refused on a creation, in a `replace` and in an `add`. The
-   * directory would take `telephoneNumber` (extensibleObject), `'abc'` in
-   * `employeeNumber` and a string in `secretary`: only the schema refuses them.
+   * directory would take every one of them (`telephoneNumber` through
+   * extensibleObject, an empty IA5 string in `mail`, `'abc'` in
+   * `employeeNumber`, a string in `secretary`): only the schema refuses them.
    */
   const refusedValues: Array<{ title: string; attributes: () => Body }> = [
     {
@@ -223,6 +268,10 @@ describe('Entity schema contract', function () {
       attributes: () => ({ TELEPHONENUMBER: '+33 1 00 00 00 00' }),
     },
     {
+      title: 'a read-only attribute',
+      attributes: () => ({ employeeType: 'contractor' }),
+    },
+    {
       title: 'a value failing the pattern',
       attributes: () => ({ businessCategory: 'Not Valid' }),
     },
@@ -230,7 +279,7 @@ describe('Entity schema contract', function () {
       title: 'a value failing the pattern, under the name in another case',
       attributes: () => ({ BUSINESSCATEGORY: 'Not Valid' }),
     },
-    { title: 'an empty string', attributes: () => ({ businessCategory: '' }) },
+    { title: 'an empty string', attributes: () => ({ mail: '' }) },
     {
       title: 'an array for a string',
       attributes: () => ({ description: ['a', 'b'] }),
@@ -259,13 +308,10 @@ describe('Entity schema contract', function () {
         secretary: [pointee, `uid=contract-nobody,ou=users,${base}`],
       }),
     },
-    {
-      title: 'a fixed attribute',
-      attributes: () => ({ l: 'lyon' }),
-    },
+    { title: 'a fixed attribute', attributes: () => ({ l: 'lyon' }) },
   ];
 
-  /** Deletions refused: the schema knows what is required, fixed or absent */
+  /** Deletions refused: the schema knows what is required, fixed or undeclared */
   const refusedDeletes: Array<{ title: string; attributes: string[] }> = [
     { title: 'a required attribute', attributes: ['description'] },
     { title: 'a fixed attribute', attributes: ['l'] },
@@ -275,15 +321,32 @@ describe('Entity schema contract', function () {
     },
   ];
 
-  const refusedBySchema = (res: supertest.Response): void => {
+  /** The valid values written under a name in another case */
+  const otherCase: Body = { BUSINESSCATEGORY: 'changed', PWDRESET: true };
+
+  const lower = (name: string): string => name.toLowerCase();
+  const sameName = (a: string, b: string): boolean => lower(a) === lower(b);
+  /** `create()` without the attributes `attributes` names in another case */
+  const createWith = (entity: Entity, attributes: Body): Body => {
+    const body = entity.create({});
+    for (const name of Object.keys(body))
+      if (Object.keys(attributes).some(other => sameName(name, other)))
+        delete body[name];
+    return { ...body, ...attributes };
+  };
+
+  const refusedBySchema = (res: Response): void => {
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
     expect(
       res.body.error,
       'refused by the directory, not the schema'
     ).not.to.match(/directory refused/);
+    expect(res.body.error, 'refused as unknown, not as invalid').not.to.match(
+      /name the same attribute/
+    );
   };
 
-  const created = (res: supertest.Response): void => {
+  const created = (res: Response): void => {
     expect([200, 201], JSON.stringify(res.body)).to.include(res.status);
   };
 
@@ -306,14 +369,28 @@ describe('Entity schema contract', function () {
   };
 
   for (const entity of entities) {
+    /**
+     * A case under contract runs `check` on the answer; a divergent one
+     * asserts the status it answers today, and fails once that changes
+     */
     const define = (
       phase: Phase,
       title: string,
-      fn: () => Promise<void>
+      send: () => Promise<Response>,
+      check: (res: Response) => Promise<void>
     ): void => {
-      const reason = divergences[`${entity.name}: ${phase}: ${title}`];
-      if (reason) it.skip(`${title} (${reason})`, fn);
-      else it(title, fn);
+      const divergence = divergences[`${entity.name}: ${phase}: ${title}`];
+      if (!divergence) it(title, async () => check(await send()));
+      else {
+        const [status, reason] = divergence;
+        it(`${title}: still ${reason}`, async () => {
+          const res = await send();
+          expect(
+            res.status,
+            `no longer ${status}, remove the divergence: ${JSON.stringify(res.body)}`
+          ).to.equal(status);
+        });
+      }
     };
 
     describe(entity.name, () => {
@@ -322,33 +399,65 @@ describe('Entity schema contract', function () {
       });
 
       describe('on a creation', () => {
-        define('creation', 'accepts a valid body', async () => {
-          created(await request.post(entity.route).send(entity.create({})));
-          expect(await stored(entity.dn(), 'objectClass')).to.have.members(
-            entity.classes()
-          );
-        });
+        define(
+          'creation',
+          'accepts a valid body',
+          () => request.post(entity.route).send(entity.create({})),
+          async res => {
+            created(res);
+            expect(await stored(entity.dn(), 'objectClass')).to.have.members(
+              entity.classes()
+            );
+          }
+        );
 
-        define('creation', 'keeps its own classes', async () => {
-          created(
-            await request
+        define(
+          'creation',
+          'accepts a boolean',
+          () =>
+            request.post(entity.route).send(entity.create({ pwdReset: true })),
+          async res => {
+            created(res);
+            expect(await stored(entity.dn(), 'pwdReset')).to.equal('TRUE');
+          }
+        );
+
+        define(
+          'creation',
+          'accepts valid values under names in another case',
+          () => request.post(entity.route).send(createWith(entity, otherCase)),
+          async res => {
+            created(res);
+            expect(await stored(entity.dn(), 'businessCategory')).to.equal(
+              'changed'
+            );
+            expect(await stored(entity.dn(), 'pwdReset')).to.equal('TRUE');
+          }
+        );
+
+        define(
+          'creation',
+          'keeps its own classes',
+          () =>
+            request
               .post(entity.route)
-              .send(entity.create({ objectClass: ['top', 'extensibleObject'] }))
-          );
-          expect(await stored(entity.dn(), 'objectClass')).to.have.members(
-            entity.classes()
-          );
-        });
+              .send(
+                entity.create({ objectClass: ['top', 'extensibleObject'] })
+              ),
+          async res => {
+            created(res);
+            expect(await stored(entity.dn(), 'objectClass')).to.have.members(
+              entity.classes()
+            );
+          }
+        );
 
         define(
           'creation',
           'writes a fixed attribute as the schema says',
-          async () => {
-            created(
-              await request
-                .post(entity.route)
-                .send(entity.create({ l: 'lyon' }))
-            );
+          () => request.post(entity.route).send(entity.create({ l: 'lyon' })),
+          async res => {
+            created(res);
             expect(await stored(entity.dn(), 'l')).to.equal('paris');
           }
         );
@@ -358,25 +467,34 @@ describe('Entity schema contract', function () {
           ['refuses an empty required attribute', ''],
           ['refuses an empty array for a required attribute', []],
         ] as Array<[string, unknown]>) {
-          define('creation', title, async () => {
-            const body = entity.create({});
-            if (value === undefined) delete body.description;
-            else body.description = value;
-            const res = await request.post(entity.route).send(body);
-            refusedBySchema(res);
-            expect(res.body.error).to.match(/description.*required/);
-          });
+          define(
+            'creation',
+            title,
+            () => {
+              const body = entity.create({});
+              if (value === undefined) delete body.description;
+              else body.description = value;
+              return request.post(entity.route).send(body);
+            },
+            async res => {
+              refusedBySchema(res);
+              expect(res.body.error).to.match(/description.*required/);
+            }
+          );
         }
 
         for (const { title, attributes } of refusedValues) {
           if (title === 'a fixed attribute') continue;
-          define('creation', `refuses ${title}`, async () => {
-            const res = await request
-              .post(entity.route)
-              .send(entity.create(attributes()));
-            refusedBySchema(res);
-            expect(await stored(entity.dn(), 'objectClass')).to.be.undefined;
-          });
+          define(
+            'creation',
+            `refuses ${title}`,
+            () =>
+              request.post(entity.route).send(createWith(entity, attributes())),
+            async res => {
+              refusedBySchema(res);
+              expect(await stored(entity.dn(), 'objectClass')).to.be.undefined;
+            }
+          );
         }
       });
 
@@ -385,86 +503,130 @@ describe('Entity schema contract', function () {
           await server.ldap.add(entity.dn(), entity.stored());
         });
 
-        define('replace', 'accepts a valid replace', async () => {
-          const res = await request.put(entity.modifyUrl()).send({
-            replace: {
-              description: 'Changed',
-              businessCategory: 'changed',
-              seeAlso: pointee,
-              secretary: [pointee],
-              employeeNumber: 42,
-            },
-          });
-          expect(res.status, JSON.stringify(res.body)).to.equal(200);
-          expect(await stored(entity.dn(), 'description')).to.equal('Changed');
-        });
+        const unchanged = async (names: string[]): Promise<void> => {
+          for (const [name, value] of Object.entries(entity.stored()))
+            if (names.some(other => sameName(name, other)) || name === 'l')
+              expect(await stored(entity.dn(), name), name).to.deep.equal(
+                value
+              );
+        };
 
         define(
           'replace',
-          'clears an optional attribute with an empty array',
-          async () => {
-            const res = await request
-              .put(entity.modifyUrl())
-              .send({ replace: { businessCategory: [] } });
+          'accepts a valid replace',
+          () =>
+            request.put(entity.modifyUrl()).send({
+              replace: {
+                description: 'Changed',
+                businessCategory: 'changed',
+                seeAlso: pointee,
+                secretary: [pointee],
+                employeeNumber: 42,
+                pwdReset: true,
+              },
+            }),
+          async res => {
             expect(res.status, JSON.stringify(res.body)).to.equal(200);
-            expect(await stored(entity.dn(), 'businessCategory')).to.be
-              .undefined;
+            expect(await stored(entity.dn(), 'description')).to.equal(
+              'Changed'
+            );
+            expect(await stored(entity.dn(), 'pwdReset')).to.equal('TRUE');
           }
         );
+
+        define(
+          'replace',
+          'accepts valid values under names in another case',
+          () => request.put(entity.modifyUrl()).send({ replace: otherCase }),
+          async res => {
+            expect(res.status, JSON.stringify(res.body)).to.equal(200);
+            expect(await stored(entity.dn(), 'businessCategory')).to.equal(
+              'changed'
+            );
+            expect(await stored(entity.dn(), 'pwdReset')).to.equal('TRUE');
+          }
+        );
+
+        for (const [title, value] of [
+          ['clears an optional attribute with an empty array', []],
+          ['clears an optional attribute with null', null],
+        ] as Array<[string, unknown]>) {
+          define(
+            'replace',
+            title,
+            () =>
+              request
+                .put(entity.modifyUrl())
+                .send({ replace: { businessCategory: value } }),
+            async res => {
+              expect(res.status, JSON.stringify(res.body)).to.equal(200);
+              expect(await stored(entity.dn(), 'businessCategory')).to.be
+                .undefined;
+            }
+          );
+        }
 
         for (const [title, value] of [
           ['refuses an empty array for a required attribute', []],
           ['refuses null for a required attribute', null],
         ] as Array<[string, unknown]>) {
-          define('replace', title, async () => {
-            const res = await request
-              .put(entity.modifyUrl())
-              .send({ replace: { description: value } });
-            refusedBySchema(res);
-            expect(await stored(entity.dn(), 'description')).to.equal(
-              entity.stored().description
-            );
-          });
+          define(
+            'replace',
+            title,
+            () =>
+              request
+                .put(entity.modifyUrl())
+                .send({ replace: { description: value } }),
+            async res => {
+              refusedBySchema(res);
+              await unchanged(['description']);
+            }
+          );
         }
 
-        define('replace', 'refuses a replace of the classes', async () => {
-          // labeledURIObject: an auxiliary class the directory would accept
-          const res = await request.put(entity.modifyUrl()).send({
-            replace: { objectClass: [...entity.classes(), 'labeledURIObject'] },
-          });
-          refusedBySchema(res);
-          expect(await stored(entity.dn(), 'objectClass')).to.have.members(
-            entity.classes()
-          );
-        });
+        define(
+          'replace',
+          'refuses a replace of the classes',
+          () =>
+            // labeledURIObject: an auxiliary class the directory would accept
+            request.put(entity.modifyUrl()).send({
+              replace: {
+                objectClass: [...entity.classes(), 'labeledURIObject'],
+              },
+            }),
+          async res => {
+            refusedBySchema(res);
+            expect(await stored(entity.dn(), 'objectClass')).to.have.members(
+              entity.classes()
+            );
+          }
+        );
 
         for (const phase of ['replace', 'add'] as Phase[]) {
           for (const { title, attributes } of refusedValues) {
-            define(phase, `refuses ${title}`, async () => {
-              const res = await request
-                .put(entity.modifyUrl())
-                .send({ [phase]: attributes() });
-              refusedBySchema(res);
-              for (const [name, value] of Object.entries(entity.stored()))
-                if (name in attributes() || name === 'l')
-                  expect(await stored(entity.dn(), name), name).to.deep.equal(
-                    value
-                  );
-            });
+            define(
+              phase,
+              `refuses ${title}`,
+              () =>
+                request.put(entity.modifyUrl()).send({ [phase]: attributes() }),
+              async res => {
+                refusedBySchema(res);
+                await unchanged(Object.keys(attributes()));
+              }
+            );
           }
         }
 
         for (const { title, attributes } of refusedDeletes) {
-          define('delete', `refuses deleting ${title}`, async () => {
-            const res = await request
-              .put(entity.modifyUrl())
-              .send({ delete: attributes });
-            refusedBySchema(res);
-            for (const name of attributes)
-              expect(await stored(entity.dn(), name), name).to.deep.equal(
-                entity.stored()[name]
-              );
-          });
+          define(
+            'delete',
+            `refuses deleting ${title}`,
+            () => request.put(entity.modifyUrl()).send({ delete: attributes }),
+            async res => {
+              refusedBySchema(res);
+              await unchanged(attributes);
+            }
+          );
         }
       });
     });

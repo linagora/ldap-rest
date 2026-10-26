@@ -7,8 +7,7 @@
         "type": "string"
       },
       "required": true,
-      "fixed": true,
-      "default": ["top", "organizationalUnit", "extensibleObject"]
+      "fixed": true
     },
     "ou": {
       "type": "string",
@@ -41,6 +40,17 @@
         "type": "pointer",
         "branch": ["ou=users,__LDAP_BASE__"]
       }
+    },
+    "mail": {
+      "type": "string",
+      "test": "^[^@\\s]+@[^@\\s]+$"
+    },
+    "pwdReset": {
+      "type": "boolean"
+    },
+    "employeeType": {
+      "type": "string",
+      "readOnly": true
     }
   }
 }
