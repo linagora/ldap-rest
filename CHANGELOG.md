@@ -4,6 +4,11 @@
 
 ### Fixes
 
+- The flat routes check an empty string and a `0` against the schema, as
+  the group and organization routes do: they were accepted unchecked, and
+  `{"replace":{"mail":""}}` stored an empty value, a pointer attribute
+  included. A replace with `[]` is still how an attribute is cleared
+  ([#429](https://github.com/linagora/ldap-rest/issues/429))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

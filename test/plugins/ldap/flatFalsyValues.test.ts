@@ -1,0 +1,89 @@
+/**
+ * `LdapFlat._validateOneChange` returned true for every falsy value before
+ * any check, so a `0` passed a pattern and an empty string a pointer's
+ * branch on the flat routes, while groups and organizations refused them.
+ */
+import { expect } from 'chai';
+import supertest from 'supertest';
+import type { SearchResult } from 'ldapts';
+
+import { DM } from '../../../src/bin';
+import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
+import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../../helpers/env';
+
+describe('Falsy values on the flat routes', function () {
+  let server: DM;
+  let request: ReturnType<typeof supertest>;
+  let base: string;
+  const route = '/api/v1/ldap/falsyPeople';
+  const dn = (): string => `uid=falsy-alice,ou=users,${base}`;
+
+  before(function () {
+    skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
+  });
+
+  before(async () => {
+    base = process.env.DM_LDAP_BASE as string;
+    server = new DM();
+    await server.ready;
+    server.config.ldap_flat_schema = [
+      './test/fixtures/schemas/falsyPeople.json',
+    ];
+    await server.registerPlugin('ldapFlatGeneric', new LdapFlatGeneric(server));
+    server.setupErrorMiddleware();
+    request = supertest(server.app);
+  });
+
+  beforeEach(async () => {
+    await server.ldap.add(dn(), {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'falsy-alice',
+      cn: 'Alice',
+      sn: 'Falsy',
+      mail: 'alice@example.org',
+    });
+  });
+
+  afterEach(async () => {
+    await server.ldap.delete(dn()).catch(() => undefined);
+  });
+
+  const stored = async (attribute: string): Promise<unknown> => {
+    const result = (await server.ldap.search(
+      { paged: false, scope: 'base', attributes: [attribute] },
+      dn()
+    )) as SearchResult;
+    return result.searchEntries[0]?.[attribute];
+  };
+
+  for (const [attribute, value] of [
+    ['employeeNumber', 0],
+    ['mail', ''],
+    ['manager', ''],
+  ] as const) {
+    it(`refuses ${JSON.stringify(value)} for ${attribute} on a modify`, async () => {
+      const res = await request
+        .put(`${route}/falsy-alice`)
+        .send({ replace: { [attribute]: value } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.match(new RegExp(attribute));
+      expect(await stored('mail')).to.equal('alice@example.org');
+    });
+  }
+
+  it('refuses 0 for an attribute with a pattern on a creation', async () => {
+    const res = await request
+      .post(route)
+      .send({ uid: 'falsy-bob', cn: 'Bob', sn: 'Falsy', employeeNumber: 0 });
+    expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/employeeNumber/);
+  });
+
+  it('still accepts a value matching the pattern', async () => {
+    const res = await request
+      .put(`${route}/falsy-alice`)
+      .send({ replace: { employeeNumber: '42' } });
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    expect(await stored('employeeNumber')).to.equal('42');
+  });
+});

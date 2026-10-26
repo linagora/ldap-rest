@@ -1980,7 +1980,10 @@ export default abstract class LdapFlat extends DmPlugin {
       if (this.schema.strict) return false;
       return true;
     }
-    if (!value) return true;
+    // No value clears the attribute. `''` and `0` are values, and are checked
+    // as groups and organizations check them: skipping every falsy value let
+    // a `0` through a pattern, and an empty string through a pointer's branch
+    if (value === null || value === undefined) return true;
     // An empty list is no value, as for groups and organizations: a replace
     // clears the attribute with it
     if (Array.isArray(value) && value.length === 0) {
