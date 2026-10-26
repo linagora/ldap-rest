@@ -586,6 +586,10 @@ export async function checkDnValues(
   const dns = (Array.isArray(value) ? value : [value]).map(item =>
     String(item)
   );
+  // A base search of '' answers the root DSE, so an empty DN would pass as
+  // existing
+  if (dns.includes(''))
+    throw new BadRequestError(`Attribute "${field}" must point to a DN`);
   for (const dn of dns) {
     if (branches?.length && !branches.some(branch => isDnInBranch(dn, branch)))
       throw new BadRequestError(

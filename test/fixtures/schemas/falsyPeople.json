@@ -19,6 +19,8 @@
     "sn": { "type": "string", "required": true },
     "mail": { "type": "string", "test": "^[^@\\s]+@[^@\\s]+$" },
     "employeeNumber": { "type": "string", "test": "^[1-9][0-9]*$" },
-    "manager": { "type": "pointer", "branch": ["ou=users,__LDAP_BASE__"] }
+    "manager": { "type": "pointer", "branch": ["ou=users,__LDAP_BASE__"] },
+    "secretary": { "type": "pointer" },
+    "seeAlso": { "type": "array", "items": { "type": "pointer" } }
   }
 }

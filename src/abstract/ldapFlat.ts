@@ -2003,6 +2003,10 @@ export default abstract class LdapFlat extends DmPlugin {
       }
 
       const dnValue: string = value;
+      // A base search of '' answers the root DSE, so an empty DN would pass
+      // as existing
+      if (dnValue === '')
+        throw new BadRequestError(`Attribute "${field}" must point to a DN`);
 
       // Check branch restriction if provided. Asked RDN by RDN: a suffix
       // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`

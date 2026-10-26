@@ -78,6 +78,22 @@ describe('Falsy values on the flat routes', function () {
     });
   }
 
+  for (const [attribute, value] of [
+    ['secretary', ''],
+    ['seeAlso', ['']],
+  ] as const) {
+    it(`refuses ${JSON.stringify(value)} for ${attribute}, a pointer with no branch`, async () => {
+      const res = await request
+        .put(`${route}/falsy-alice`)
+        .send({ replace: { [attribute]: value } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.match(
+        new RegExp(`${attribute}.*must point to a DN`)
+      );
+      expect(await stored(attribute)).to.deep.equal([]);
+    });
+  }
+
   it('names an empty required attribute as missing on a creation', async () => {
     const res = await request
       .post(route)
