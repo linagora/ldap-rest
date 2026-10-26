@@ -31,6 +31,23 @@ jobs:
     #   image: node:22-bookworm
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s
+          --health-retries 10
+      valkey:
+        image: mirror.gcr.io/valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,9 +66,11 @@ jobs:
         run: npm run build
 
       # From mirror.gcr.io, as in test.yml: Docker Hub limits anonymous pulls
-      - name: Run tests
-        run: npm test
+      - name: Run tests and check coverage
+        run: npm run coverage:check
         env:
+          DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
+          DM_TEST_VALKEY_URL: redis://localhost:6379
           DM_TEST_LDAP_IMAGE: mirror.gcr.io/osixia/openldap:1.5.0
 
   # Build and push the amd64 image (fast, runs first).

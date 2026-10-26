@@ -20,6 +20,45 @@ describe('ldapActions', function () {
     ldapActions = new LdapActions(new DM());
   });
 
+  describe('bind credentials', () => {
+    const without = (key: 'ldap_dn' | 'ldap_pwd'): DM => {
+      const server = new DM();
+      server.config = { ...server.config, [key]: '' };
+      return server;
+    };
+
+    it('has no default bind DN or password', () => {
+      const { DM_LDAP_DN, DM_LDAP_PWD } = process.env;
+      delete process.env.DM_LDAP_DN;
+      delete process.env.DM_LDAP_PWD;
+      try {
+        const config = parseConfig(configTemplate, []);
+        expect(config.ldap_dn).to.equal('');
+        expect(config.ldap_pwd).to.equal('');
+      } finally {
+        for (const [name, value] of [
+          ['DM_LDAP_DN', DM_LDAP_DN],
+          ['DM_LDAP_PWD', DM_LDAP_PWD],
+        ] as const) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+      }
+    });
+
+    it('refuses to start without a bind DN, naming the option', () => {
+      expect(() => new LdapActions(without('ldap_dn'))).to.throw(
+        /--ldap-dn \(or DM_LDAP_DN\)/
+      );
+    });
+
+    it('refuses to start without a password, naming the option', () => {
+      expect(() => new LdapActions(without('ldap_pwd'))).to.throw(
+        /--ldap-pwd \(or DM_LDAP_PWD\)/
+      );
+    });
+  });
+
   describe('search', () => {
     it('should perform a search and return results', async () => {
       const options = {

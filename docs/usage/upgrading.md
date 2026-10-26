@@ -6,6 +6,17 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### `--ldap-dn` and `--ldap-pwd` are required
+
+**Who is affected:** a deployment that left one of them unset, and so bound
+as `cn=admin,dc=example,dc=com` or with the password `admin`; the published
+Docker image carried both in its `ENV`, and the Helm chart's example only set
+the password.
+
+The server now stops at startup naming the missing option. Set `DM_LDAP_DN`
+and `DM_LDAP_PWD` (or `--ldap-dn` and `--ldap-pwd`) to the values that were
+implied.
+
 ### `--logger`: `console` or `file`
 
 A `DM_LOGGER` set to anything else wrote `error.log` in the working
