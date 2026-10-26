@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- `--ldap-dn` and `--ldap-pwd` have no default: the server stops at startup
+  without them, where it bound as `cn=admin,dc=example,dc=com` / `admin`,
+  and the Docker image no longer carries that password in its `ENV`,
+  [upgrading](docs/usage/upgrading.md#unreleased)
+  ([#431](https://github.com/linagora/ldap-rest/issues/431))
+
 ### Fixes
 
 - The flat routes check an empty string against the schema, as the group
