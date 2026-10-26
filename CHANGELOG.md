@@ -6,8 +6,10 @@
 
 - The flat routes check an empty string against the schema, as the group
   and organization routes do: it was accepted unchecked, and
-  `{"replace":{"mail":""}}` stored an empty value, a pointer attribute
-  included. A replace with `[]` is still how an attribute is cleared
+  `{"replace":{"mail":""}}` stored an empty value. An empty DN is refused
+  for every pointer attribute, on the group and organization routes too: a
+  pointer without a branch stored it. A replace with `[]` is still how an
+  attribute is cleared
   ([#429](https://github.com/linagora/ldap-rest/issues/429))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it

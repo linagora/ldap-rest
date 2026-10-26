@@ -1,7 +1,7 @@
 /**
  * An empty string is a value on the flat routes, as on groups and
- * organizations: checked against the pattern, and for a pointer against its
- * branch, never stored as an empty attribute.
+ * organizations: checked against the pattern, and refused for a pointer,
+ * whether or not it declares a branch.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -45,7 +45,10 @@ describe('Falsy values on the flat routes', function () {
   });
 
   afterEach(async () => {
-    await server.ldap.delete(dn()).catch(() => undefined);
+    for (const id of ['falsy-alice', 'falsy-bob'])
+      await server.ldap
+        .delete(`uid=${id},ou=users,${base}`)
+        .catch(() => undefined);
   });
 
   const stored = async (attribute: string): Promise<unknown> => {
@@ -63,7 +66,9 @@ describe('Falsy values on the flat routes', function () {
         .send({ replace: { [attribute]: '' } });
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
       expect(res.body.error).to.match(new RegExp(attribute));
-      expect(await stored('mail')).to.equal('alice@example.org');
+      expect(await stored(attribute)).to.deep.equal(
+        attribute === 'mail' ? 'alice@example.org' : []
+      );
     });
 
     it(`refuses an empty ${attribute} on a creation`, async () => {
