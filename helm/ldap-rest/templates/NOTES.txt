@@ -23,9 +23,8 @@ Useful commands:
 
 {{- if not .Values.env }}
 
-⚠️  No `env` values set — ldap-rest is running with image defaults
-   (DM_LDAP_URL=ldap://localhost, empty DM_LDAP_BASE). Configure at least
-   DM_LDAP_URL / DM_LDAP_BASE (and DM_LDAP_PWD via `secrets`) for real use.
+⚠️  No `env` values set — ldap-rest will not start: it needs DM_LDAP_URL,
+   DM_LDAP_BASE and DM_LDAP_DN in `env`, and DM_LDAP_PWD in `secrets`.
 {{- end }}
 
 For configuration options, see: https://github.com/linagora/ldap-rest

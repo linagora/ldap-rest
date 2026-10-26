@@ -780,6 +780,7 @@ twake/
 ```bash
 npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
+  --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd secret \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/twake/users.json \
   --plugin core/ldap/groups \
@@ -842,6 +843,7 @@ ad/
 ```bash
 npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
+  --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd secret \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/ad/users.json \
   --plugin core/ldap/groups \
@@ -910,6 +912,7 @@ standard/
 ```bash
 npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
+  --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd secret \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./static/schemas/standard/users.json \
   --plugin core/ldap/groups \
@@ -1055,6 +1058,7 @@ Save your schema and reference it when starting LDAP-Rest:
 ```bash
 npx ldap-rest \
   --ldap-base 'dc=example,dc=com' \
+  --ldap-dn 'cn=admin,dc=example,dc=com' --ldap-pwd secret \
   --plugin core/ldap/flatGeneric \
   --ldap-flat-schema ./path/to/custom-users.json
 ```

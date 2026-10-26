@@ -36,8 +36,13 @@ describe('ldapActions', function () {
         expect(config.ldap_dn).to.equal('');
         expect(config.ldap_pwd).to.equal('');
       } finally {
-        process.env.DM_LDAP_DN = DM_LDAP_DN;
-        process.env.DM_LDAP_PWD = DM_LDAP_PWD;
+        for (const [name, value] of [
+          ['DM_LDAP_DN', DM_LDAP_DN],
+          ['DM_LDAP_PWD', DM_LDAP_PWD],
+        ] as const) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
       }
     });
 
