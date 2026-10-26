@@ -35,8 +35,9 @@ const schema = {
   },
 } as unknown as Schema;
 
-const validator = (loaded: Schema | undefined = schema): EntityValidator =>
-  new EntityValidator(loaded, {
+/** On `schema`, or on none for `null` */
+const validator = (loaded: Schema | null = schema): EntityValidator =>
+  new EntityValidator(loaded ?? undefined, {
     entryExists: async dn => dn === bob,
     loadedPlugins: {},
     singularName: 'person',
@@ -171,9 +172,9 @@ describe('EntityValidator', () => {
   });
 
   it('checks nothing without a schema', async () => {
-    expect(await refusal(validator(undefined).validateNew(entry({ x: 'y' }))))
-      .to.be.undefined;
-    expect(await refusal(validator(undefined).validateValue('x', ''))).to.be
+    expect(await refusal(validator(null).validateNew(entry({ x: 'y' })))).to.be
+      .undefined;
+    expect(await refusal(validator(null).validateValue('x', ''))).to.be
       .undefined;
   });
 });
