@@ -1,7 +1,7 @@
 /**
- * A `fixed` schema attribute is set by the server and refused in a change on
- * the flat routes and on groups. Organizations enforced neither: a fixed
- * attribute could be set on creation and changed afterwards.
+ * A `fixed` schema attribute is the server's: on a creation it takes its
+ * default, `objectClass` the configured classes, whatever the request
+ * carried, and a change naming it answers 400, as on the flat routes.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -18,9 +18,9 @@ describe('Fixed attributes on organizations', function () {
   let server: DM;
   let request: ReturnType<typeof supertest>;
   let orgDn: string;
-  let previousSchema: string | undefined;
+  const previousSchema = process.env.DM_ORGANIZATION_SCHEMA;
   const route = '/api/v1/ldap/organizations';
-  const fixedClasses = ['top', 'organizationalUnit', 'twakeDepartment'];
+  const configuredClasses = ['top', 'organizationalUnit', 'twakeDepartment'];
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
@@ -28,7 +28,6 @@ describe('Fixed attributes on organizations', function () {
 
   before(async () => {
     orgDn = `ou=FixedOrg,${process.env.DM_LDAP_TOP_ORGANIZATION}`;
-    previousSchema = process.env.DM_ORGANIZATION_SCHEMA;
     process.env.DM_ORGANIZATION_SCHEMA =
       './test/fixtures/schemas/fixedOrganizations.json';
     server = new DM();
@@ -38,6 +37,9 @@ describe('Fixed attributes on organizations', function () {
     for (let i = 0; i < 50 && !organizations.schema; i++)
       await new Promise(r => setTimeout(r, 100));
     expect(organizations.schema?.attributes.objectClass?.fixed).to.be.true;
+    expect(server.config.ldap_organization_class).to.deep.equal(
+      configuredClasses
+    );
     server.setupErrorMiddleware();
     request = supertest(server.app);
   });
@@ -51,27 +53,36 @@ describe('Fixed attributes on organizations', function () {
     await server.ldap.delete(orgDn).catch(() => undefined);
   });
 
-  const storedClasses = async (): Promise<unknown> => {
+  const stored = async (): Promise<Record<string, unknown>> => {
     const result = (await server.ldap.search(
-      { paged: false, scope: 'base', attributes: ['objectClass'] },
+      {
+        paged: false,
+        scope: 'base',
+        attributes: ['objectClass', 'businessCategory'],
+      },
       orgDn
     )) as SearchResult;
-    return result.searchEntries[0]?.objectClass;
+    return result.searchEntries[0] as Record<string, unknown>;
   };
 
-  it('writes a fixed attribute as the schema says on a creation', async () => {
-    const res = await request
-      .post(route)
-      .send({ ou: 'FixedOrg', objectClass: ['top', 'organizationalUnit'] });
+  it('writes a fixed attribute as the schema says, and the configured classes, on a creation', async () => {
+    const res = await request.post(route).send({
+      ou: 'FixedOrg',
+      objectClass: ['top', 'organizationalUnit', 'extensibleObject'],
+      businessCategory: 'other',
+    });
     expect(res.status, JSON.stringify(res.body)).to.equal(200);
-    expect(await storedClasses()).to.have.members(fixedClasses);
+    const entry = await stored();
+    expect(entry.objectClass).to.have.members(configuredClasses);
+    expect(entry.businessCategory).to.equal('department');
   });
 
   describe('on a change', () => {
     beforeEach(async () => {
       await server.ldap.add(orgDn, {
-        objectClass: fixedClasses,
+        objectClass: configuredClasses,
         ou: 'FixedOrg',
+        businessCategory: 'department',
       });
     });
 
@@ -80,14 +91,19 @@ describe('Fixed attributes on organizations', function () {
       { add: { objectClass: 'extensibleObject' } },
       { delete: ['objectClass'] },
       { delete: { objectClass: ['twakeDepartment'] } },
+      { replace: { businessCategory: 'other' } },
     ]) {
       it(`refuses ${JSON.stringify(changes)}`, async () => {
         const res = await request
           .put(`${route}/${encodeURIComponent(orgDn)}`)
           .send(changes);
         expect(res.status, JSON.stringify(res.body)).to.equal(400);
-        expect(res.body.error).to.match(/objectClass.*fixed/);
-        expect(await storedClasses()).to.have.members(fixedClasses);
+        expect(res.body.error).to.match(
+          /(objectClass|businessCategory).*fixed/
+        );
+        const entry = await stored();
+        expect(entry.objectClass).to.have.members(configuredClasses);
+        expect(entry.businessCategory).to.equal('department');
       });
     }
 

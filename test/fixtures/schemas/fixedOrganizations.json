@@ -1,12 +1,17 @@
 {
-  "strict": false,
+  "strict": true,
   "attributes": {
     "ou": { "type": "string", "required": true, "role": "identifier" },
     "objectClass": {
       "type": "array",
       "required": true,
       "fixed": true,
-      "default": ["top", "organizationalUnit", "twakeDepartment"]
+      "default": ["top", "organizationalUnit"]
+    },
+    "businessCategory": {
+      "type": "string",
+      "fixed": true,
+      "default": "department"
     },
     "description": { "type": "string" }
   }

@@ -4,9 +4,10 @@
 
 ### Fixes
 
-- Organizations enforce the `fixed` attributes of their schema as the flat
-  routes and groups do: on a creation a fixed attribute takes its default,
-  and a change naming one answers 400
+- Organizations enforce the `fixed` attributes of their schema, as the flat
+  routes do: on a creation a fixed attribute takes its default and
+  `objectClass` the classes of `--ldap-organization-class`, whatever the
+  request carried, and a change naming a fixed attribute answers 400
   ([#430](https://github.com/linagora/ldap-rest/issues/430))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it

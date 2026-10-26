@@ -612,14 +612,16 @@ export default class LdapOrganizations extends DmPlugin {
     validateDnValue(body.ou, 'ou');
     const parentDn = body.parentDn || this.config.ldap_top_organization;
     const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
+    // The classes are the server's, from --ldap-organization-class, as on
+    // the flat routes and groups: a body naming them does not choose them
     const entry: AttributesList = {
-      objectClass: this.config.ldap_organization_class as string[],
       ou: body.ou,
       ...Object.fromEntries(
         Object.entries(body).filter(
           ([key]) => key !== 'ou' && key !== 'parentDn'
         )
       ),
+      objectClass: this.config.ldap_organization_class as string[],
     };
 
     await tryMethod(res, this.addOrganization.bind(this), dn, entry, req);
@@ -1310,6 +1312,8 @@ export default class LdapOrganizations extends DmPlugin {
     entry: AttributesList,
     req?: Request
   ): Promise<boolean> {
+    // Before the authorization, which judges the entry as it will be written
+    this.applyFixedDefaults(entry);
     // Before the checks reading the directory: a pointer leading nowhere is
     // not for a caller who may not create here
     await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
@@ -1346,12 +1350,6 @@ export default class LdapOrganizations extends DmPlugin {
       return true;
     }
 
-    // A fixed attribute is written as its schema says, whatever the request
-    // carried, as on the flat routes; groups drop it from the body. Nothing
-    // enforced it here.
-    for (const [field, attr] of Object.entries(this.schema.attributes))
-      if (attr.fixed && attr.default !== undefined) entry[field] = attr.default;
-
     // Check each field
     for (const [field, value] of Object.entries(entry)) {
       if (!(await this._validateOneChange(field, value))) {
@@ -1380,6 +1378,20 @@ export default class LdapOrganizations extends DmPlugin {
 
   invalidValueMessage(field: string): string {
     return invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1]);
+  }
+
+  /**
+   * Write a fixed attribute as its schema says, whatever the request carried.
+   * `objectClass` is left to `--ldap-organization-class`, as on the flat
+   * routes and groups.
+   *
+   * @param entry entry about to be created, changed in place
+   */
+  private applyFixedDefaults(entry: AttributesList): void {
+    if (!this.schema) return;
+    for (const [field, attr] of Object.entries(this.schema.attributes))
+      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
+        entry[field] = attr.default;
   }
 
   async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
