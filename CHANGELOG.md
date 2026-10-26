@@ -9,13 +9,14 @@
   and the Docker image no longer carries that password in its `ENV`,
   [upgrading](docs/usage/upgrading.md#unreleased)
   ([#431](https://github.com/linagora/ldap-rest/issues/431))
-- The flat routes check the shape of a value: two values or more for a
-  single-valued attribute, text that is not a number for a `number`, and
-  deleting a `required` attribute as a whole answer 400, where they were
-  written as sent; `null` clears an attribute in a `replace` and is refused
-  in an `add` and on a creation, instead of answering 500; an attribute the
-  schema does not declare is refused by name in a change too,
-  [upgrading](docs/usage/upgrading.md#the-flat-routes-check-the-shape-of-a-value)
+- The flat and organization routes check the shape of a value: two values
+  or more for a single-valued attribute, text that is not a number for a
+  `number`, and deleting a `required` attribute as a whole answer 400, where
+  they were written as sent; `null` clears an attribute in a `replace` and
+  is refused in an `add` and on a creation, instead of answering 500; an
+  attribute the schema does not declare is refused by name in a change too,
+  and the organization routes take a list of one for a single value,
+  [upgrading](docs/usage/upgrading.md#the-flat-and-organization-routes-check-the-shape-of-a-value)
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
 

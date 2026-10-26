@@ -39,21 +39,9 @@ interface Entity {
 /** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
 const divergences: Record<string, [status: number, reason: string]> = {
   'groups: creation: refuses null for an optional attribute': [500, 'crashes'],
-  'organizations: creation: refuses null for an optional attribute': [
-    500,
-    'crashes',
-  ],
-  'organizations: delete: refuses deleting a required attribute, named with no value':
-    [200, 'deletes it'],
-  'organizations: delete: refuses deleting a required attribute, named with null':
-    [200, 'deletes it'],
   'groups: creation: accepts a list of one for a single value and one value for a list':
     [400, 'refuses the list of one'],
   'groups: replace: accepts a list of one for a single value and one value for a list':
-    [400, 'refuses the list of one'],
-  'organizations: creation: accepts a list of one for a single value and one value for a list':
-    [400, 'refuses the list of one'],
-  'organizations: replace: accepts a list of one for a single value and one value for a list':
     [400, 'refuses the list of one'],
   'groups: creation: writes a fixed attribute as the schema says': [
     200,
@@ -70,24 +58,6 @@ const divergences: Record<string, [status: number, reason: string]> = {
     'drops it, answers 200',
   ],
   'groups: replace: clears an optional attribute with null': [500, 'crashes'],
-  'organizations: creation: refuses a string that is not a number for a number':
-    [200, 'stores it'],
-  'organizations: replace: refuses a string that is not a number for a number':
-    [200, 'stores it'],
-  'organizations: add: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'organizations: replace: clears an optional attribute with null': [
-    500,
-    'crashes',
-  ],
-  'organizations: delete: refuses deleting a required attribute': [
-    200,
-    'deletes it',
-  ],
-  'organizations: delete: refuses deleting an attribute the schema does not declare':
-    [200, 'deletes it'],
 };
 
 describe('Entity schema contract', function () {

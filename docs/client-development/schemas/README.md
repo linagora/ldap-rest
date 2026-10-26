@@ -389,7 +389,7 @@ remains, and `''` names no value. An empty string sent as a value is
 checked against `test`, refused for a pointer, and missing for a `required`
 attribute. Every refusal answers 400 with the attribute's name.
 
-The flat routes apply these rules in full; what the group and organization
+The flat and organization routes apply these rules in full; what the group
 routes still answer otherwise is listed in
 `test/lib/entitySchema.contract.test.ts`.
 

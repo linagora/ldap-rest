@@ -17,14 +17,16 @@ The server now stops at startup naming the missing option. Set `DM_LDAP_DN`
 and `DM_LDAP_PWD` (or `--ldap-dn` and `--ldap-pwd`) to the values that were
 implied.
 
-### The flat routes check the shape of a value
+### The flat and organization routes check the shape of a value
 
 **Who is affected:** a script or connector writing through `/api/v1/ldap/<entity>`
-several values for an attribute the schema does not type `array`, text that
-is not a number for a `number` or `integer`, a `delete` of a `required`
-attribute as a whole, or a change naming an attribute a strict schema does
-not declare; the server wrote them as sent and now answers 400, naming the
-attribute. The shipped LSC connector sends shapes that stay accepted, a
+or `/api/v1/ldap/organizations` several values for an attribute the schema
+does not type `array`, text that is not a number for a `number` or
+`integer`, a `delete` of a `required` attribute as a whole, or a change
+naming an attribute a strict schema does not declare; the server wrote them
+as sent and now answers 400, naming the attribute. A client that was refused
+a list of one for a single-valued attribute of an organization is now
+accepted. The shipped LSC connector sends shapes that stay accepted, a
 list of one in a `replace` and one value for an `array` on a creation; its
 whole-attribute delete is refused for a `required` attribute, as any.
 
