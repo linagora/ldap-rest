@@ -4,6 +4,14 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### `--logger`: `console` or `file`
+
+A `DM_LOGGER` set to anything else wrote `error.log` in the working
+directory; the server now stops at startup. Set `DM_LOGGER=file` to keep
+that file, and `DM_LOG_FILE` to name another one.
+
 ## From 1.0 to 1.1.0
 
 ### The static files can no longer be framed by another origin

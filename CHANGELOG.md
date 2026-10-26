@@ -4,6 +4,11 @@
 
 ### Fixes
 
+- `--logger` takes `console` or `file`, and `file` writes to `--log-file`
+  (`error.log` in the working directory by default, as before). Any other
+  value stops the server at startup: it silently selected that file,
+  [docs](docs/usage/configuration.md#logger---logger)
+  ([#432](https://github.com/linagora/ldap-rest/issues/432))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

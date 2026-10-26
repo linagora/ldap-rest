@@ -27,7 +27,17 @@ declare module 'winston' {
   }
 }
 
+export const LOGGERS = ['console', 'file'] as const;
+
+/**
+ * @throws when `--logger` names no known logger: any other value wrote
+ * `error.log` in the working directory without a word
+ */
 export const buildLogger = (config: Config): winston.Logger => {
+  if (!(LOGGERS as readonly string[]).includes(config.logger))
+    throw new Error(
+      `Unknown logger "${String(config.logger)}": --logger takes ${LOGGERS.join(' or ')}`
+    );
   return winston.createLogger({
     levels: customLevels.levels,
     level: config.log_level,
@@ -44,7 +54,7 @@ export const buildLogger = (config: Config): winston.Logger => {
             stderrLevels: ['error', 'warn'],
             format: winston.format.json(),
           })
-        : new winston.transports.File({ filename: 'error.log' }),
+        : new winston.transports.File({ filename: config.log_file }),
     ],
   });
 };

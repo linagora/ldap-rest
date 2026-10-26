@@ -50,6 +50,7 @@ All LDAP-Rest configuration options.
 - [Configuration File](#configuration-file)
 - [LDAP Failover](#ldap-failover)
 - [Log Levels (`--log-level`)](#log-levels---log-level)
+- [Logger (`--logger`)](#logger---logger)
 
 ## Environment Variables
 
@@ -148,15 +149,16 @@ to keep the default.
 
 ## General Options
 
-| CLI              | Plural           | Env               | Default          | Description                                 |
-| ---------------- | ---------------- | ----------------- | ---------------- | ------------------------------------------- |
-| `--port`         |                  | `DM_PORT`         | `8081`           | Listen port                                 |
-| `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                             |
-| `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug |
-| `--logger`       |                  | `DM_LOGGER`       | `console`        | Logger type                                 |
-| `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                              |
-| `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                |
-| `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                        |
+| CLI              | Plural           | Env               | Default          | Description                                         |
+| ---------------- | ---------------- | ----------------- | ---------------- | --------------------------------------------------- |
+| `--port`         |                  | `DM_PORT`         | `8081`           | Listen port                                         |
+| `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                                     |
+| `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug         |
+| `--logger`       |                  | `DM_LOGGER`       | `console`        | `console` or `file`, see [Logger](#logger---logger) |
+| `--log-file`     |                  | `DM_LOG_FILE`     | `error.log`      | File `--logger file` writes to                      |
+| `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                                      |
+| `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                        |
+| `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                                |
 
 A schema file named by an option may extend another one, shipped or not, and
 hold only the differences:
@@ -743,3 +745,12 @@ The system will:
 | `debug`  | Everything, including debug output           |
 
 The `notice` level is ideal for production as it shows web access logs without flooding with general info messages.
+
+## Logger _(`--logger`)_
+
+| Logger    | Output                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| `console` | One JSON object per line on standard output (errors and warnings on standard error)                  |
+| `file`    | Text lines appended to `--log-file` (`DM_LOG_FILE`), `error.log` in the working directory by default |
+
+Any other value stops the server at startup.
