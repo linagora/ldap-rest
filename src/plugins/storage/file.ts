@@ -53,7 +53,10 @@ export default class FileStore extends Store {
     await fs.mkdir(this.dir, { recursive: true, mode: 0o700 });
   }
 
-  /** The directory is there and writable; `ready` makes it, once */
+  async open(): Promise<void> {
+    await this.ready();
+  }
+
   async health(): Promise<HealthStatus> {
     await fs.access(this.dir, constants.W_OK);
     return 'ok';

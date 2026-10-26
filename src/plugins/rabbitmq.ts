@@ -66,6 +66,7 @@ interface RabbitClient {
   ): Promise<void>;
   unsubscribe(queue: string): Promise<void>;
   close(clearSubscriptions?: boolean): Promise<void>;
+  isConnected(): boolean;
 }
 
 export default class RabbitMq extends DmPlugin {
@@ -100,12 +101,14 @@ export default class RabbitMq extends DmPlugin {
   }
 
   /**
-   * Degraded when a broker is configured and cannot be reached; a plugin
-   * without a broker has nothing to report
+   * Degraded when a broker is configured and no connection to it stands:
+   * the state as it is, nothing opened for the probe, which would run the
+   * client's connection attempts on every probe while the broker is away.
+   * A plugin without a broker has nothing to report.
    */
-  async health(): Promise<HealthStatus> {
+  health(): HealthStatus {
     if (!this.rabbitmqUrl) return 'ok';
-    return (await this.getClient()) ? 'ok' : 'degraded';
+    return this.client?.isConnected() ? 'ok' : 'degraded';
   }
 
   /**

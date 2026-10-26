@@ -44,11 +44,14 @@ The Helm chart probes both routes over HTTP (`livenessProbe` and
 
 ### What the shipped plugins report
 
-| Plugin        | `degraded` when                                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `storage`     | the backend does not answer: a `SELECT 1`, a `PING`, the directory not writable; the `ldap` backend answers with the directory |
-| `rabbitmq`    | a broker is configured and cannot be reached                                                                                   |
-| `twake/james` | James's `GET /healthcheck` does not answer 2xx within 2 s                                                                      |
+| Plugin        | `degraded` when                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `storage`     | the backend refuses a `SELECT 1` or a `PING`, or the directory is not writable; the `ldap` backend answers with the directory                    |
+| `rabbitmq`    | a broker is configured and no connection to it stands: until the first publish or subscription opens one, and while the client reconnects        |
+| `twake/james` | James answers its `GET /healthcheck` with 503, one of its own checks unhealthy; a James whose checks are only degraded answers 200, so `ok` here |
+
+A check that does not answer within 2 s, a database host that drops the
+packets for instance, reads as `failed`.
 
 ### For plugin authors
 

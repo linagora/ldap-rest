@@ -154,21 +154,32 @@ export default class Storage extends DmPlugin {
     );
   }
 
+  /** Set while the backend fails the probe, so the reason is logged once */
+  private degraded = false;
+
+  /** The backend's own answer; a backend that cannot answer is degraded */
+  async health(): Promise<HealthStatus> {
+    try {
+      const status = await this.store.health();
+      if (this.degraded) this.logger.info(`${this.store.name}: answers again`);
+      this.degraded = false;
+      return status;
+    } catch (err) {
+      if (!this.degraded)
+        this.logger.warn(
+          `${this.store.name}: does not answer: ${err instanceof Error ? err.message : String(err)}`
+        );
+      this.degraded = true;
+      return 'degraded';
+    }
+  }
+
   /**
    * Release the single-instance hold.
    *
    * For a test building several servers in one process; a running one has no
    * reason to call it.
    */
-  /** The backend's own answer; a backend that cannot answer is degraded */
-  async health(): Promise<HealthStatus> {
-    try {
-      return await this.store.health();
-    } catch {
-      return 'degraded';
-    }
-  }
-
   static release(instance: Storage): void {
     if (onlyInstance === instance) onlyInstance = undefined;
   }

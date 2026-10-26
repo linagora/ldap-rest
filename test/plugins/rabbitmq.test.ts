@@ -22,8 +22,12 @@ class StubClient {
   subscribeCalls: SubscribeCall[] = [];
   unsubscribeCalls: string[] = [];
   closed = false;
+  connected = true;
 
   async init(): Promise<void> {}
+  isConnected(): boolean {
+    return this.connected;
+  }
   async publish(
     exchange: string,
     routingKey: string,
@@ -87,14 +91,21 @@ describe('RabbitMq plugin', () => {
       expect(plugin.isAvailable()).to.equal(true);
     });
 
-    it('is healthy with a client, degraded without one', async () => {
-      expect(await plugin.health()).to.equal('ok');
-      const unreachable = new (class extends RabbitMq {
-        protected async getClient(): Promise<null> {
-          return null;
+    it('reports the connection as it stands, opening none', async () => {
+      class Reachable extends RabbitMq {
+        stub = new StubClient();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        protected async connect(): Promise<any> {
+          return this.stub;
         }
-      })(dm);
-      expect(await unreachable.health()).to.equal('degraded');
+      }
+      const reachable = new Reachable(dm);
+      // The client is lazy: nothing stands before the first publish
+      expect(reachable.health()).to.equal('degraded');
+      await reachable.publish('auth', 'user.created', { twakeId: 'alice' });
+      expect(reachable.health()).to.equal('ok');
+      reachable.stub.connected = false;
+      expect(reachable.health()).to.equal('degraded');
     });
 
     it('delegates publish to the client', async () => {

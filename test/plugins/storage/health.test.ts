@@ -46,6 +46,9 @@ describe('Storage health', () => {
     try {
       const store = new FileStore(logger, dir, 600);
       expect(await store.health()).to.equal('ok');
+      const fresh = new FileStore(logger, join(dir, 'fresh'), 600);
+      await fresh.open();
+      expect(await fresh.health(), 'made at open').to.equal('ok');
       const gone = new FileStore(logger, join(dir, 'missing'), 600);
       await gone.health().then(
         () => expect.fail('a missing directory answered'),
@@ -68,11 +71,16 @@ describe('Storage health', () => {
     }
     const fine = new Stubbed(async () => ({ rows: [{ t: 'records' }] }));
     expect(await fine.health()).to.equal('ok');
-    const down = new Stubbed(async () => {
-      throw new Error('connection refused');
+    // A pool once opened whose database went away
+    let away = false;
+    const lost = new Stubbed(async () => {
+      if (away) throw new Error('connection terminated');
+      return { rows: [{ t: 'records' }] };
     });
-    await down.health().then(
-      () => expect.fail('a database down answered'),
+    await lost.open();
+    away = true;
+    await lost.health().then(
+      () => expect.fail('a database gone answered'),
       () => undefined
     );
   });
@@ -100,6 +108,7 @@ describe('Storage health', () => {
 
   it('is degraded, not failed, when the backend cannot answer', async () => {
     const plugin = Object.create(Storage.prototype) as Storage;
+    plugin.logger = logger;
     plugin.store = {
       health: async (): Promise<'ok'> => 'ok',
     } as unknown as Store;
