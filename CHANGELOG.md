@@ -9,15 +9,19 @@
   and the Docker image no longer carries that password in its `ENV`,
   [upgrading](docs/usage/upgrading.md#unreleased)
   ([#431](https://github.com/linagora/ldap-rest/issues/431))
-- The flat and organization routes check the shape of a value: two values
-  or more for a single-valued attribute, text that is not a number for a
-  `number`, and deleting a `required` attribute as a whole answer 400, where
-  they were written as sent; `null` clears an attribute in a `replace` and
-  is refused in an `add` and on a creation, instead of answering 500; an
-  attribute the schema does not declare is refused by name in a change too;
-  the organization routes take a list of one for a single value and word
-  their refusals as the flat routes do,
-  [upgrading](docs/usage/upgrading.md#the-flat-and-organization-routes-check-the-shape-of-a-value)
+- Every entity route, flat, group and organization, checks the shape of a
+  value the same way: two values or more for a single-valued attribute,
+  text that is not a number for a `number`, and deleting a `required`
+  attribute as a whole answer 400, where they were written as sent; `null`
+  clears an attribute in a `replace` and is refused in an `add` and on a
+  creation, instead of answering 500; an attribute the schema does not
+  declare is refused by name in a change too; the group routes refuse a
+  fixed attribute in a change, which they dropped, and write a fixed
+  attribute on a creation, at its default, which they left out; the group
+  and organization routes take a list of one for a single value, the group
+  routes one value for an `array`, and both word their refusals as the flat
+  routes do,
+  [upgrading](docs/usage/upgrading.md#every-entity-route-checks-the-shape-of-a-value)
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
 
@@ -26,6 +30,10 @@
 - On every route, a `required` number takes `0` and a `required` boolean
   `false`; they were refused as missing
   ([#416](https://github.com/linagora/ldap-rest/issues/416))
+- A group schema declaring an `array` attribute without `items` no longer
+  makes every creation answer 500; its values are checked as strings, as
+  on the other routes
+  ([#448](https://github.com/linagora/ldap-rest/issues/448))
 - `ldap/bulkImport`: a row with a value under a fixed attribute of the
   schema, such as `objectClass`, fails with "is fixed and cannot be
   imported"; the value replaced the fixed one,

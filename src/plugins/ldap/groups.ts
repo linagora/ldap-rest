@@ -56,15 +56,13 @@ import {
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
-  checkDnValues,
-  invalidValueMessage,
-  matchesPattern,
   modifiedAttributeNames,
-  missingRequiredAttribute,
-  toDirectoryChanges,
   toDirectoryEntry,
-  schemaAttribute,
 } from '../../config/schema';
+import {
+  applyFixedDefaults,
+  EntityValidator,
+} from '../../lib/entitySchema/validator';
 
 export interface postAdd {
   cn?: string;
@@ -746,15 +744,20 @@ export default class LdapGroups extends DmPlugin {
       (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
     )
       this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
-    const members = body.member ? body.member : [];
+    // One member is a list of one, as for any `array`
+    const members: string[] = !body.member
+      ? []
+      : Array.isArray(body.member)
+        ? (body.member as string[])
+        : [body.member as string];
+    // The classes are the plugin's, whatever was sent, as on the flat routes
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
         ([key, _value]) =>
           key !== this.cn &&
           key !== 'member' &&
-          _value !== undefined &&
-          // Filter out fixed fields from schema
-          !(schemaAttribute(this.schema, key)?.[1]?.fixed === true)
+          key !== 'objectClass' &&
+          _value !== undefined
       )
     ) as AttributesList;
     await tryMethod(
@@ -792,35 +795,10 @@ export default class LdapGroups extends DmPlugin {
         body as Parameters<typeof modifiedAttributeNames>[0]
       )
     );
-    // Fixed fields are dropped from each part, as from a creation: the
-    // filter used to run on `add`, `replace` and `delete` themselves
-    const fixed = (key: string): boolean =>
-      schemaAttribute(this.schema, key)?.[1]?.fixed === true;
-    const keep = (part?: AttributesList): AttributesList | undefined =>
-      part &&
-      (Object.fromEntries(
-        Object.entries(part).filter(([key]) => !fixed(key))
-      ) as AttributesList);
-    const filteredBody: postModify = {
-      ...(body.add ? { add: keep(body.add) } : {}),
-      ...(body.replace ? { replace: keep(body.replace) } : {}),
-      ...(body.delete
-        ? {
-            delete: Array.isArray(body.delete)
-              ? body.delete.filter(key => !fixed(key))
-              : keep(body.delete),
-          }
-        : {}),
-    };
     await this.judgedGroup(dn, () =>
-      this.ldap.authorize('ldapmodifyrequest', [
-        dn,
-        filteredBody,
-        this.opNumber(),
-        req,
-      ])
+      this.ldap.authorize('ldapmodifyrequest', [dn, body, this.opNumber(), req])
     );
-    await tryMethod(res, this.modifyGroup.bind(this), dn, filteredBody, req);
+    await tryMethod(res, this.modifyGroup.bind(this), dn, body, req);
   }
 
   /**
@@ -855,14 +833,17 @@ export default class LdapGroups extends DmPlugin {
     // one may set the organization link.
     await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
     await this.validateMembers(dn, members, req);
-    await this.validateNewGroup(dn, {
-      objectClass: this.config.group_class as string[],
-      cn,
+    const candidate = await this.validateNewGroup(dn, {
+      objectClass: entry.objectClass,
+      [this.cn]: cn,
       member: members,
       ...additional,
     });
-
-    // validateNewGroup converted the copy it was handed, not this one
+    // The entry holds the placeholder member too; what else was validated
+    // is written in the shape it was given, over the entry judged, and the
+    // defaults `candidateGroup` added on top are converted here
+    delete candidate.member;
+    Object.assign(entry, candidate);
     toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,
@@ -926,6 +907,7 @@ export default class LdapGroups extends DmPlugin {
       ...additional,
     };
     if (members.length) (entry.member as string[]).push(...members);
+    applyFixedDefaults(this.schema, entry);
     return entry;
   }
 
@@ -978,7 +960,7 @@ export default class LdapGroups extends DmPlugin {
 
     // Before the checks reading the directory, as on a creation
     await this.ldap.authorize('ldapmodifyrequest', [dn, changes, op, req]);
-    await this.validateChanges(dn, changes);
+    changes = await this.validateChanges(dn, changes);
     const res = await this.ldap.modify(dn, changes, req);
     void launchHooks(this.registeredHooks.ldapgroupmodifydone, [
       dn,
@@ -1517,141 +1499,60 @@ export default class LdapGroups extends DmPlugin {
     }
   }
 
-  async validateNewGroup(dn: string, entry: AttributesList): Promise<boolean> {
-    if (!this.schema) {
-      toDirectoryEntry(undefined, entry);
-      return true;
-    }
+  /**
+   * Check a new group's entry, after the `ldapgroupvalidatenew` hooks, and
+   * convert it in place.
+   *
+   * @returns the entry the hooks handed on; `addGroup` writes its
+   *   attributes over the entry it judged, the members aside
+   */
+  async validateNewGroup(
+    dn: string,
+    entry: AttributesList
+  ): Promise<AttributesList> {
     [dn, entry] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatenew,
       [dn, entry]
     );
-    // Check each field
-    for (const [field, value] of Object.entries(entry)) {
-      if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(
-          invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
-        );
-      }
-    }
-    // Check required fields. A `generated` attribute is exempt, as it is on
-    // the flat and organization paths: it is filled by a hook *after*
-    // validation, so demanding it here would refuse the very payload the hook
-    // expects — the client sending nothing. The shipped group schema marks
-    // the organization path required and generated, so without this a
-    // schema-conformant creation could not succeed at all. The exemption
-    // holds only while a loaded plugin says it fills the attribute: with none,
-    // the group would be written without a path nobody could ever add back.
-    const missing = missingRequiredAttribute(
-      this.schema,
-      entry,
-      this.server.loadedPlugins
-    );
-    if (missing)
-      throw new BadRequestError(`Attribute "${missing}" is required`);
-    // After the checks above, whose refusals quote the schema's hint: this
-    // converts in place what they let through, the value written included
-    toDirectoryEntry(this.schema, entry);
-    return true;
+    await this.validator().validateNew(entry);
+    return entry;
   }
 
-  async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    if (!this.schema) {
-      toDirectoryChanges(undefined, changes);
-      return true;
-    }
+  /**
+   * Check a change, after the `ldapgroupvalidatechanges` hooks, and convert
+   * it in place.
+   *
+   * @returns the change the hooks handed on
+   */
+  async validateChanges(
+    dn: string,
+    changes: ModifyRequest
+  ): Promise<ModifyRequest> {
     [dn, changes] = await launchHooksChained(
       this.server.hooks.ldapgroupvalidatechanges,
       [dn, changes]
     );
-    if (changes.add) {
-      for (const [field, value] of Object.entries(changes.add)) {
-        if (!(await this._validateOneChange(field, value)))
-          throw new BadRequestError(
-            invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
-          );
-      }
-    }
-    if (changes.replace) {
-      for (const [field, value] of Object.entries(changes.replace)) {
-        if (!(await this._validateOneChange(field, value)))
-          throw new BadRequestError(
-            invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1])
-          );
-      }
-    }
-    if (changes.delete && changes.delete instanceof Object) {
-      for (const v of Array.isArray(changes.delete)
-        ? changes.delete
-        : Object.keys(changes.delete)) {
-        await this._validateOneChange(v, null);
-      }
-    }
-    // After the checks above, whose refusals quote the schema's hint: this
-    // converts in place what they let through, the value written included
-    toDirectoryChanges(this.schema, changes);
-    return true;
+    await this.validator().validateChanges(changes);
+    return changes;
   }
 
-  async _validateOneChange(
-    field: string,
-    value: AttributeValue | null
-  ): Promise<boolean> {
-    if (!this.schema) return true;
-    // Every refusal of a value is a 400, not the 500 a plain Error gives
-    const test = schemaAttribute(this.schema, field)?.[1];
-    if (!test) {
-      if (this.schema.strict)
-        throw new BadRequestError(`Attribute "${field}" is not allowed`);
-      return true;
-    }
-    // An empty list is no value: a replace clears the attribute with it, and
-    // ldapActions refuses it on an add or a creation
-    if (
-      value === null ||
-      value === undefined ||
-      (Array.isArray(value) && value.length === 0)
-    ) {
-      if (test.required)
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      return true;
-    }
-    if (test.type === 'array') {
-      if (!Array.isArray(value))
-        throw new BadRequestError(`Attribute "${field}" must be an array`);
-      if (!test.items)
-        throw new Error(`Schema error: no item for array ${field}`);
-      if (test.items.type === 'array')
-        throw new Error(
-          `Schema error: array of array not supported for ${field}`
-        );
-      // Element types are checked where they always were: alongside a
-      // pattern. Doing it for every array tightened what groups accept.
-      if (test.items.test && test.items.type !== 'pointer')
-        for (const v of value)
-          if (typeof v !== test.items.type)
-            throw new BadRequestError(
-              `Attribute "${field}" must be of type ${test.items.type}`
-            );
-    } else if (test.type !== 'pointer' && typeof value !== test.type) {
-      return false;
-    }
-    // A pointer, or the elements of an array of them, checked the way the
-    // flat entities check theirs: branch compared RDN by RDN — the `,?<branch>$`
-    // pattern read `uid=x,xou=users,…` as inside `ou=users,…` — and the target
-    // looked up. `items.branch` and the existence of array elements were not
-    // read at all here.
-    await checkDnValues(field, test, value, async dn => {
-      // As the server: a pointer must lead to an entry, whoever may read it
-      const result = (await this.ldap.system.search(
-        { paged: false, scope: 'base', attributes: ['dn'] },
-        dn
-      )) as SearchResult;
-      return result.searchEntries.length > 0;
+  /** The schema's rules; the pointer lookups run as the server */
+  validator(): EntityValidator {
+    return new EntityValidator(this.schema, {
+      entryExists: async (dn): Promise<boolean> => {
+        try {
+          const result = (await this.ldap.system.search(
+            { paged: false, scope: 'base', attributes: ['dn'] },
+            dn
+          )) as SearchResult;
+          return result.searchEntries.length > 0;
+        } catch {
+          return false;
+        }
+      },
+      loadedPlugins: this.server.loadedPlugins,
+      singularName: 'group',
     });
-    if (!matchesPattern(test, value))
-      throw new BadRequestError(invalidValueMessage(field, test));
-    return true;
   }
 
   /**

@@ -332,16 +332,21 @@ describe('Twake groups plugin routes', function () {
       ['cn', 'not-a-uuid'],
       ['BUSINESSCATEGORY', 'blue'],
     ]) {
-      const refused = await groups._validateOneChange(field, value).then(
-        () => false,
-        () => true
-      );
+      const refused = await groups
+        .validator()
+        .validateValue(field, value)
+        .then(
+          () => false,
+          () => true
+        );
       expect(refused, field).to.equal(true);
     }
-    expect(await groups._validateOneChange('O', 'Team')).to.equal(true);
+    expect(await groups.validator().validateValue('O', 'Team')).to.equal(
+      'Team'
+    );
     expect(
-      await groups._validateOneChange('BUSINESSCATEGORY', '#abc')
-    ).to.equal(true);
+      await groups.validator().validateValue('BUSINESSCATEGORY', '#abc')
+    ).to.equal('#abc');
   });
 
   it('declares its attributes under their configured names, whatever the schema case', () => {

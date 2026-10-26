@@ -4,7 +4,7 @@
  * messages are English: the English text is quoted, not the map.
  */
 import { expect } from 'chai';
-import supertest from 'supertest';
+import supertest, { type Response } from 'supertest';
 
 import { DM } from '../../../src/bin';
 import { localizedText } from '../../../src/config/schema';
@@ -157,7 +157,7 @@ describe('Translated hints in refusals', function () {
     );
   });
 
-  it('should refuse a value of the wrong type on a group modify', async () => {
+  it('should refuse a value of the wrong shape on a group modify before reading it', async () => {
     const dn = `cn=hint-modify,${process.env.DM_LDAP_GROUP_BASE || `ou=groups,${base}`}`;
     await server.ldap.delete(dn).catch(() => undefined);
     await server.ldap.add(dn, {
@@ -166,10 +166,15 @@ describe('Translated hints in refusals', function () {
       member: userDn,
     });
     try {
-      const res = await request
-        .put('/api/v1/ldap/groups/hint-modify')
-        .type('json')
-        .send({ replace: { mail: 42 } });
+      const modify = (mail: unknown): Promise<Response> =>
+        request
+          .put('/api/v1/ldap/groups/hint-modify')
+          .type('json')
+          .send({ replace: { mail } });
+      let res = await modify(42);
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.equal('Attribute "mail" must be a string');
+      res = await modify('nope');
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
       expect(res.body.error).to.equal(
         'Invalid value for attribute "mail": Expected an email address, e.g. all-staff@lists.example.org'

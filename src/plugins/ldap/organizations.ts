@@ -45,7 +45,10 @@ import {
   assertClientMaySet,
   modifiedAttributeNames,
 } from '../../config/schema';
-import { EntityValidator } from '../../lib/entitySchema/validator';
+import {
+  applyFixedDefaults,
+  EntityValidator,
+} from '../../lib/entitySchema/validator';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -1306,8 +1309,7 @@ export default class LdapOrganizations extends DmPlugin {
     entry: AttributesList,
     req?: Request
   ): Promise<boolean> {
-    // Before the authorization, which judges the entry as it will be written
-    this.applyFixedDefaults(entry);
+    applyFixedDefaults(this.schema, entry);
     // Before the checks reading the directory: a pointer leading nowhere is
     // not for a caller who may not create here
     await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
@@ -1331,19 +1333,6 @@ export default class LdapOrganizations extends DmPlugin {
     await this.validator().validateChanges(changes);
     // Hooks will validate any changes to organization link and path
     return await this.server.ldap.modify(dn, changes, req);
-  }
-
-  /**
-   * Write a fixed attribute as its schema says, whatever the request carried.
-   * `objectClass` is left to `--ldap-organization-class`, as for groups.
-   *
-   * @param entry entry about to be created, changed in place
-   */
-  private applyFixedDefaults(entry: AttributesList): void {
-    if (!this.schema) return;
-    for (const [field, attr] of Object.entries(this.schema.attributes))
-      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
-        entry[field] = attr.default;
   }
 
   /** The schema's rules; the pointer lookups run as the server */
