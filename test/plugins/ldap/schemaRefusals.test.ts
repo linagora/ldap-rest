@@ -2,7 +2,7 @@
  * A write the directory refuses for what it asks — an attribute its schema
  * does not define, a value of the wrong syntax, an entry missing what its
  * class requires — is the client's mistake: it answers 400 with the
- * directory's diagnostic, not a 500 telling the client to check logs.
+ * directory's diagnostic, not a 500 hiding it.
  *
  * The fixture schema offers `noSuchQuota`, which the test directory does not
  * define, as the Twake user schema offered `mailQuota`, and leaves `sn`
@@ -119,7 +119,7 @@ describe('Writes the directory refuses for their content', function () {
           .put(`${route}/refused-alice`)
           .send({ replace: { cn: 'Changed' } });
         expect(res.status).to.equal(500);
-        expect(res.body.error).to.equal('check logs');
+        expect(res.body.error).to.equal('Internal Server Error');
         expect(JSON.stringify(res.body)).to.not.match(/connection lost/);
       } finally {
         server.ldap.modify = modify;
