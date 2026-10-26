@@ -394,10 +394,10 @@ describe('LDAP Bulk Import Plugin', function () {
     });
 
     it('should refuse a row with a value under a fixed attribute', async () => {
-      // Classes the directory would accept, under a column name compared as
-      // the directory would: case apart
+      // Classes the directory would accept, under the column name of the
+      // schema: another spelling is already refused as a duplicate
       const csvContent = [
-        'uid,cn,sn,givenName,OBJECTCLASS,mail,organizationDn',
+        'uid,cn,sn,givenName,objectClass,mail,organizationDn',
         `bulkuser1,Bulk User 1,User1,Bulk,top;twakeAccount;twakeWhitePages;extensibleObject,bulkuser1@test.org,"${getTestOrg1Dn()}"`,
         `bulkuser2,Bulk User 2,User2,Bulk,,bulkuser2@test.org,"${getTestOrg1Dn()}"`,
       ].join('\n');
@@ -412,7 +412,7 @@ describe('LDAP Bulk Import Plugin', function () {
         {
           line: 2,
           identifier: 'bulkuser1',
-          error: 'Attribute "OBJECTCLASS" is fixed and cannot be imported',
+          error: 'Attribute "objectClass" is fixed and cannot be imported',
         },
       ]);
       const stored = await server.ldap.search(
