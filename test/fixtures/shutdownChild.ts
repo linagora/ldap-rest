@@ -1,12 +1,12 @@
 /**
  * A process that registers a shutdown callback and waits for a signal; the
  * mode in argv[2] decides how the callback behaves. Run by
- * test/plugins/rabbitmqShutdown.test.ts.
+ * test/lib/processShutdown.test.ts.
  */
 import {
   registerProcessShutdown,
   shutdownTimeout,
-} from '../../../src/plugins/rabbitmq';
+} from '../../src/lib/shutdown';
 
 const mode = process.argv[2] ?? 'closes';
 const say = (what: string): void => {

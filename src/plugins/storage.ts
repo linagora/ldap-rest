@@ -154,6 +154,10 @@ export default class Storage extends DmPlugin {
     );
   }
 
+  async close(): Promise<void> {
+    await this.store.close();
+  }
+
   /** Set while the backend fails the probe, so the reason is logged once */
   private degraded = false;
   /** Counts the probes: only the latest says what the log lines say */

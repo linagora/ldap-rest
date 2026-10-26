@@ -6,6 +6,17 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### The process stops on an uncaught exception
+
+**Who is affected:** every deployment; a supervisor, Kubernetes or systemd,
+restarts the process, as it should.
+
+An exception nothing caught was logged and the process kept serving in a
+state nobody knew. It now shuts down and exits with 1. On `SIGTERM` the
+server also drains what is in flight within `--shutdown-timeout` (20 s)
+before closing its connections, where it closed the listening socket and
+left the rest to the signal. See [shutdown](operations.md#shutdown).
+
 ### The readiness of a pod follows the directory
 
 **Who is affected:** a deployment of the Helm chart, whose probes now call

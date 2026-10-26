@@ -44,6 +44,7 @@ export interface Config {
   plugin?: string[];
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
+  shutdown_timeout?: number;
   debug: boolean;
   logger: 'console' | 'file';
   log_file?: string;
@@ -484,6 +485,7 @@ export interface Config {
 const configArgs: ConfigTemplate = [
   // Global options
   ['--port', 'DM_PORT', 8081, 'number'],
+  ['--shutdown-timeout', 'DM_SHUTDOWN_TIMEOUT', 20000, 'number'],
   ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins', 'identifiers'],
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],

@@ -22,6 +22,8 @@ export const PROBE_TIMEOUT_MS = 2_000;
 export interface Probed {
   /** Every plugin loaded and the composition checked */
   readonly composed: boolean;
+  /** Told to stop: what is in flight finishes, nothing new is taken */
+  readonly stopping: boolean;
   readonly ldap: { ping: (timeoutMs: number) => Promise<void> };
   readonly loadedPlugins: {
     [name: string]: { health?: () => MaybePromise<HealthStatus> };
@@ -29,8 +31,8 @@ export interface Probed {
 }
 
 export interface Readiness {
-  /** `starting` and `unavailable` answer 503, the two others 200 */
-  status: 'starting' | 'ok' | 'degraded' | 'unavailable';
+  /** `starting`, `stopping` and `unavailable` answer 503, the two others 200 */
+  status: 'starting' | 'stopping' | 'ok' | 'degraded' | 'unavailable';
   ldap?: 'ok' | 'failed';
   /** The plugins implementing `health()`; `failed` when it threw or hung */
   plugins?: { [name: string]: HealthStatus | 'failed' };
@@ -103,6 +105,8 @@ export function readiness(
   now = Date.now(),
   timeoutMs = PROBE_TIMEOUT_MS
 ): Promise<Readiness> {
+  // Before the cached answer: a replica leaving says so at once
+  if (server.stopping) return Promise.resolve({ status: 'stopping' });
   if (!server.composed) return Promise.resolve({ status: 'starting' });
   const last = answers.get(server);
   // A clock stepping back would keep an answer for the whole step

@@ -751,11 +751,29 @@ class ldapActions {
     throw new Error(`No directory answered: ${errors.join(', ')}`);
   }
 
+  /** Set by `close`: no connection is handed out any more */
+  private closed = false;
+
+  /**
+   * Close every pooled connection, the ones in use included: what was
+   * still running has been given its time by the shutdown, and a waiter is
+   * refused rather than kept.
+   */
+  async close(): Promise<void> {
+    this.closed = true;
+    for (const waiter of this.waitingResolvers.splice(0))
+      waiter(undefined as unknown as PooledConnection);
+    const pooled = this.connectionPool.splice(0);
+    this.availableConnections.length = 0;
+    await Promise.allSettled(pooled.map(conn => conn.client.unbind()));
+  }
+
   /**
    * Acquire a connection from the pool or create a new one
    * Optimized for O(1) lookup using separate available connections queue
    */
   private async acquireConnection(): Promise<PooledConnection> {
+    if (this.closed) throw new Error('LDAP connections closed');
     // Clean up expired connections
     this.cleanupExpiredConnections();
 
@@ -796,7 +814,8 @@ class ldapActions {
 
       const resolveWrapper = (conn: PooledConnection) => {
         globalThis.clearTimeout(timeoutId);
-        resolve(conn);
+        if (conn) resolve(conn);
+        else reject(new Error('LDAP connections closed'));
       };
       this.waitingResolvers.push(resolveWrapper);
     });
