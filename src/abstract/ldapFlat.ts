@@ -598,8 +598,8 @@ export default abstract class LdapFlat extends DmPlugin {
     id: string,
     additional: AttributesList
   ): AttributesList {
-    // Whatever was sent: the classes are the entity's, as for groups and
-    // organizations, and a fixed attribute takes the default of the schema
+    // Whatever was sent: the classes are the entity's, as for organizations,
+    // and every other fixed attribute with a default takes it from the schema
     const entry: AttributesList = {
       ...this.defaultAttributes,
       [this.mainAttribute]: id,
@@ -1875,8 +1875,8 @@ export default abstract class LdapFlat extends DmPlugin {
     toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
-    // A fixed attribute is checked at its default, not at what was sent;
-    // `objectClass` is the entity's, see `candidateEntry`
+    // A fixed attribute with a default is checked at that default, not at
+    // what was sent; `objectClass` is the entity's, see `candidateEntry`
     for (const [field, attr] of Object.entries(this.schema.attributes)) {
       if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
         entry[field] = attr.default;

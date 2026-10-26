@@ -77,6 +77,9 @@ describe('Fixed attributes validation', function () {
           'extensibleObject',
         ],
         ['top', 'person'],
+        // Not even checked against the schema
+        ['not valid!'],
+        [],
       ]) {
         await plugin.addEntry('testfixed', {
           cn: 'Test Fixed',
