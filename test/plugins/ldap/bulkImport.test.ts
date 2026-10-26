@@ -394,8 +394,8 @@ describe('LDAP Bulk Import Plugin', function () {
     });
 
     it('should refuse a row with a value under a fixed attribute', async () => {
-      // Classes the directory would accept, under the column name of the
-      // schema: another spelling is already refused as a duplicate
+      // A class the fixed value does not carry, under the schema's own
+      // spelling: the one the directory's duplicate check does not catch
       const csvContent = [
         'uid,cn,sn,givenName,objectClass,mail,organizationDn',
         `bulkuser1,Bulk User 1,User1,Bulk,top;twakeAccount;twakeWhitePages;extensibleObject,bulkuser1@test.org,"${getTestOrg1Dn()}"`,

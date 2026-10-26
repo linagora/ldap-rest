@@ -556,10 +556,10 @@ export default class LdapBulkImport extends DmPlugin {
     const fixed = new Set<string>();
     for (const [attr, def] of Object.entries(schema.properties || {})) {
       if (def.fixed === true) {
-        fixed.add(attr.toLowerCase());
         const value = def.default || def.const;
         if (value !== undefined) {
           entry[attr] = value;
+          fixed.add(attr.toLowerCase());
         }
       }
     }
@@ -567,7 +567,7 @@ export default class LdapBulkImport extends DmPlugin {
     // 3. Add fields from CSV. Empty cells are skipped whatever their column
     // is called, so a spreadsheet's comment column or a trailing comma still
     // imports; only a value under a name that is not an attribute, or that
-    // is a fixed one, fails.
+    // is a fixed value written above, fails.
     for (const [attr, value] of Object.entries(csvLine)) {
       if (value && value.trim() !== '') {
         if (!CSV_COLUMN_NAME.test(attr)) {
