@@ -62,7 +62,7 @@ export class EntityValidator {
       // invalid
       if (attr.required && isMissing(value) && !attr.generated)
         throw new BadRequestError(`Attribute "${field}" is required`);
-      await this.validateValue(field, value);
+      entry[field] = asStored(await this.validateValue(field, value));
     }
     // A `generated` attribute is exempt only when something will fill it,
     // see `missingRequiredAttribute`
@@ -96,13 +96,15 @@ export class EntityValidator {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be modified`
           );
-        await this.validateValue(field, value);
-        if (value === null || value === undefined) values[field] = [];
+        values[field] = asStored(await this.validateValue(field, value));
       }
     }
     if (changes.delete) {
-      const fields = Array.isArray(changes.delete)
-        ? changes.delete
+      // Named by itself, a required attribute would be left missing; named
+      // with values, some may remain
+      const byName = Array.isArray(changes.delete);
+      const fields = byName
+        ? (changes.delete as string[])
         : Object.keys(changes.delete);
       for (const field of fields) {
         const attr = this.attribute(field);
@@ -110,7 +112,7 @@ export class EntityValidator {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
           );
-        if (attr?.required)
+        if (byName && attr?.required)
           throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
@@ -123,37 +125,46 @@ export class EntityValidator {
    *
    * @param field attribute name, as the client wrote it
    * @param value value sent; no value clears the attribute
+   * @returns the value in the shape of the type: one value for a
+   *   single-valued attribute, a list for an `array`
    */
   async validateValue(
     field: string,
     value: AttributeValue | null | undefined
-  ): Promise<void> {
-    if (!this.schema) return;
+  ): Promise<AttributeValue | null | undefined> {
+    if (!this.schema) return value;
     const attr = this.attribute(field);
-    if (!attr) return;
+    if (!attr) return value;
     // No value clears the attribute. An empty string is a value: checked
     // against the pattern, refused as an empty DN for a pointer
     if (isNoValue(value)) {
       if (attr.required)
         throw new BadRequestError(`Attribute "${field}" is required`);
-      return;
+      return value;
     }
+    // A list of one value is that value and one value a list of one: what a
+    // read answers for one value can be sent back as is
+    let shaped: AttributeValue = value;
     if (attr.type === 'array') {
-      if (!Array.isArray(value))
-        throw new BadRequestError(`Attribute "${field}" must be an array`);
-      for (const item of value) assertScalar(field, item, attr.items?.type);
+      if (!Array.isArray(value)) shaped = [value] as AttributeValue;
+      for (const item of shaped as unknown[])
+        assertScalar(field, item, attr.items?.type);
     } else {
-      if (Array.isArray(value))
-        throw new BadRequestError(
-          `Attribute "${field}" must be a single value`
-        );
+      if (Array.isArray(value)) {
+        if (value.length > 1)
+          throw new BadRequestError(
+            `Attribute "${field}" must be a single value`
+          );
+        shaped = value[0];
+      }
       // A normalised value may arrive as text (`5GB`), read after this
-      if (!(attr.normalize && typeof value === 'string'))
-        assertScalar(field, value, attr.type);
+      if (!(attr.normalize && typeof shaped === 'string'))
+        assertScalar(field, shaped, attr.type);
     }
-    await checkDnValues(field, attr, value, this.deps.entryExists);
-    if (!matchesPattern(attr, value))
+    await checkDnValues(field, attr, shaped, this.deps.entryExists);
+    if (!matchesPattern(attr, shaped))
       throw new BadRequestError(invalidValueMessage(field, attr));
+    return shaped;
   }
 
   /**
@@ -171,14 +182,18 @@ export class EntityValidator {
   }
 }
 
-/** What clears an attribute in a change */
+/** No value: clears an attribute in a change, leaves it out of a creation */
 const isNoValue = (value: unknown): value is null | undefined | [] =>
   value === null ||
   value === undefined ||
   (Array.isArray(value) && value.length === 0);
 
-/** What leaves a required attribute missing on a creation */
+/** What leaves a required attribute missing, an empty string included */
 const isMissing = (value: unknown): boolean => isNoValue(value) || value === '';
+
+/** No value is the empty list for the directory layer, never `null` */
+const asStored = (value: AttributeValue | null | undefined): AttributeValue =>
+  isNoValue(value) ? [] : value;
 
 const NUMBER = /^-?\d+(\.\d+)?$/;
 const INTEGER = /^-?\d+$/;
@@ -192,7 +207,10 @@ function assertScalar(field: string, value: unknown, type?: string): void {
   const ok = (): boolean => {
     switch (type) {
       case 'number':
-        return typeof value === 'number' || (text && NUMBER.test(value));
+        return (
+          (typeof value === 'number' && Number.isFinite(value)) ||
+          (text && NUMBER.test(value))
+        );
       case 'integer':
         return (
           (typeof value === 'number' && Number.isInteger(value)) ||

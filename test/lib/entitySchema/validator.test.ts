@@ -81,6 +81,28 @@ describe('EntityValidator', () => {
       ).to.equal('Attribute "uid" is required');
     });
 
+    it('takes 0 and false for a required number and boolean', async () => {
+      const numeric = {
+        ...schema,
+        attributes: {
+          ...schema.attributes,
+          n: { type: 'number', required: true },
+          b: { type: 'boolean', required: true },
+        },
+      } as unknown as Schema;
+      const candidate = entry({ n: 0, b: false });
+      expect(await refusal(validator(numeric).validateNew(candidate))).to.be
+        .undefined;
+      expect(candidate.n).to.equal('0');
+      expect(candidate.b).to.equal('FALSE');
+    });
+
+    it('leaves no null in the entry', async () => {
+      const candidate = entry({ businessCategory: null });
+      expect(await refusal(validator().validateNew(candidate))).to.be.undefined;
+      expect(candidate.businessCategory).to.deep.equal([]);
+    });
+
     it('names the first required attribute left out', async () => {
       const candidate = entry();
       delete candidate.description;
@@ -117,10 +139,15 @@ describe('EntityValidator', () => {
         );
     });
 
-    it('refuses deleting a required attribute', async () => {
+    it('refuses deleting a required attribute by name, not some of its values', async () => {
       expect(
         await refusal(validator().validateChanges({ delete: ['description'] }))
       ).to.equal('Attribute "description" is required');
+      expect(
+        await refusal(
+          validator().validateChanges({ delete: { description: ['old'] } })
+        )
+      ).to.be.undefined;
     });
 
     it('clears an optional attribute with null, as the directory reads []', async () => {
@@ -156,7 +183,7 @@ describe('EntityValidator', () => {
 
   describe('validateValue, on a pointer', () => {
     for (const [value, message] of [
-      [[bob], 'Attribute "manager" must be a single value'],
+      [[bob, nobody], 'Attribute "manager" must be a single value'],
       ['', 'Attribute "manager" must point to a DN'],
       [
         'uid=bob,ou=groups,dc=example,dc=com',
@@ -186,10 +213,19 @@ describe('EntityValidator', () => {
   });
 
   describe('validateValue, on a shape', () => {
+    it('takes a list of one for a single value and one value for a list', async () => {
+      expect(await validator().validateValue('description', ['a'])).to.equal(
+        'a'
+      );
+      expect(await validator().validateValue('manager', [bob])).to.equal(bob);
+      expect(
+        await validator().validateValue('secretary', bob as unknown as string[])
+      ).to.deep.equal([bob]);
+    });
+
     for (const [field, value, message] of [
       ['description', ['a', 'b'], 'must be a single value'],
       ['description', 42, 'must be a string'],
-      ['secretary', bob, 'must be an array'],
       ['secretary', [42], 'must be a string'],
     ] as Array<[string, unknown, string]>) {
       it(`answers ${message} for ${JSON.stringify(value)} in ${field}`, async () => {
@@ -199,7 +235,7 @@ describe('EntityValidator', () => {
       });
     }
 
-    it('takes a number as a number or as its text', async () => {
+    it('takes a number, an integer or a boolean as such or as its text', async () => {
       const numeric = {
         ...schema,
         attributes: {
@@ -222,6 +258,7 @@ describe('EntityValidator', () => {
           .be.undefined;
       for (const [field, value, message] of [
         ['n', 'abc', 'a number'],
+        ['n', Infinity, 'a number'],
         ['i', 4.2, 'an integer'],
         ['i', '4.2', 'an integer'],
         ['b', 'yes', 'a boolean'],

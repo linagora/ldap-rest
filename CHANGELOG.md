@@ -9,18 +9,17 @@
   and the Docker image no longer carries that password in its `ENV`,
   [upgrading](docs/usage/upgrading.md#unreleased)
   ([#431](https://github.com/linagora/ldap-rest/issues/431))
+- The flat routes check the shape of a value: two values or more for a
+  single-valued attribute, text that is not a number for a `number`, and
+  deleting a `required` attribute by name answer 400, where they were
+  written as sent; `null` clears an attribute instead of answering 500; an
+  attribute the schema does not declare is refused by name in a change too,
+  [upgrading](docs/usage/upgrading.md#the-flat-routes-check-the-shape-of-a-value)
+  ([#416](https://github.com/linagora/ldap-rest/issues/416),
+  [#448](https://github.com/linagora/ldap-rest/issues/448))
 
 ### Fixes
 
-- The flat routes check the shape of a value as the group and organization
-  routes do: a list for a single-valued attribute, a single value for an
-  `array`, text that is not a number for a `number`, and deleting a
-  `required` attribute answer 400, where they were written as sent; `null`
-  clears an attribute instead of answering 500; an attribute the schema does
-  not declare is refused by name in a change too,
-  [schemas](docs/client-development/schemas/README.md#what-a-value-must-look-like)
-  ([#416](https://github.com/linagora/ldap-rest/issues/416),
-  [#448](https://github.com/linagora/ldap-rest/issues/448))
 - `ldap/bulkImport`: a row with a value under a fixed attribute of the
   schema, such as `objectClass`, fails with "is fixed and cannot be
   imported"; the value replaced the fixed one,

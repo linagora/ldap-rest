@@ -1,7 +1,7 @@
 /**
- * The directory stores text. A JSON number or boolean reached ldapts as is,
- * which threw while encoding the request: a 500. A modify body without
- * `add`, `replace` or `delete` changed nothing and answered success.
+ * The directory stores text: a JSON number or boolean is written as text
+ * where the schema declares one, refused by name elsewhere. A modify body
+ * without `add`, `replace` or `delete` is refused.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
