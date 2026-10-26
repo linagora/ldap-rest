@@ -174,7 +174,9 @@ mail: jdoe@company.com
 
 ### Fixed Attributes
 
-Attributes marked as `"fixed": true` in the schema are automatically added and should NOT be included in the CSV:
+Attributes marked as `"fixed": true` in the schema are automatically added. A
+row with a value under such a column fails, whatever the case of the column
+name; an empty cell is ignored as any other:
 
 **Schema**:
 
