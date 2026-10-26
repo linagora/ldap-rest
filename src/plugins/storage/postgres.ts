@@ -15,7 +15,7 @@
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
-import type { HealthStatus } from '../../lib/health';
+import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health';
 import { outsideRequest } from '../../lib/requestContext';
 
 type Pg = typeof import('pg');
@@ -51,9 +51,25 @@ export default class PostgresStore extends Store {
     await this.pool();
   }
 
+  /**
+   * On a client of its own, closed after, with the budget as its timeouts:
+   * a query the pool never got an answer to would hold one of its
+   * connections for as long as the socket lives
+   */
   async health(): Promise<HealthStatus> {
-    await (await this.pool()).query('SELECT 1');
-    return 'ok';
+    const pg = await this.driver();
+    const client = new pg.Client({
+      connectionString: this.url,
+      connectionTimeoutMillis: PROBE_TIMEOUT_MS,
+      query_timeout: PROBE_TIMEOUT_MS,
+    });
+    try {
+      await client.connect();
+      await client.query('SELECT 1');
+      return 'ok';
+    } finally {
+      await client.end().catch(() => undefined);
+    }
   }
 
   async close(): Promise<void> {

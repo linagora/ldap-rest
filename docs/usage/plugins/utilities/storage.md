@@ -113,7 +113,9 @@ and every operation tries to connect again.
 ## Readiness
 
 `GET /readyz` lists the plugin as `degraded` when the backend does not
-answer, see [operations](../../operations.md#health-and-readiness).
+answer; the `ldap` backend keeps its records in the directory the probe
+checks on its own, see
+[operations](../../operations.md#what-the-shipped-plugins-report).
 
 ## Expiry
 

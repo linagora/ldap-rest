@@ -27,6 +27,9 @@ import {
   parseDn,
 } from '../../lib/utils';
 
+/** Under the probe's budget, so that a mute James reads as degraded */
+const HEALTHCHECK_TIMEOUT_MS = PROBE_TIMEOUT_MS - 500;
+
 /**
  * What James WebAdmin answers about a user missing from its users
  * repository. Read through LDAP, that repository can lag behind the write
@@ -219,7 +222,7 @@ export default class James extends TwakePlugin {
     try {
       const res = await fetch(`${this.webadminUrl}/healthcheck`, {
         headers: this.createHeaders(),
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
       });
       return res.ok ? 'ok' : 'degraded';
     } catch {

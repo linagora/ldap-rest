@@ -30,8 +30,11 @@
 - `GET /healthz` and `GET /readyz`, outside the API prefix and without
   authentication: the first answers as long as the process serves, the
   second 200 once the plugins are loaded and the directory answers, 503
-  otherwise; `storage`, `rabbitmq` and `twake/james` report themselves
-  `degraded` when their backend does not answer. The Helm chart probes
+  otherwise; the `storage`, `rabbitmq` and `james` plugins report their
+  own backend there, `degraded` when it cannot be reached (a configured
+  broker until the first publish opens it),
+  [what they report](docs/usage/operations.md#what-the-shipped-plugins-report).
+  The Helm chart probes
   them over HTTP, so a pod leaves the endpoints while the directory does not
   answer, [upgrading](docs/usage/upgrading.md#the-readiness-of-a-pod-follows-the-directory)
   ([#423](https://github.com/linagora/ldap-rest/issues/423))

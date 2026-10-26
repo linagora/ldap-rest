@@ -42,6 +42,13 @@ describe('James Plugin - health', () => {
     expect(await james.health()).to.equal('degraded');
   });
 
+  it('is degraded when James takes too long', async () => {
+    nock(url).get('/healthcheck').delayConnection(2500).reply(200);
+    const started = Date.now();
+    expect(await james.health()).to.equal('degraded');
+    expect(Date.now() - started).to.be.below(2000);
+  });
+
   it('is degraded when James does not answer', async () => {
     nock(url).get('/healthcheck').replyWithError('connection refused');
     expect(await james.health()).to.equal('degraded');

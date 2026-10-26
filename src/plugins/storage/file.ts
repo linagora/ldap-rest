@@ -57,8 +57,11 @@ export default class FileStore extends Store {
     await this.ready();
   }
 
+  /** A directory this user may write a record in: entered and written */
   async health(): Promise<HealthStatus> {
-    await fs.access(this.dir, constants.W_OK);
+    if (!(await fs.stat(this.dir)).isDirectory())
+      throw new Error(`${this.dir} is not a directory`);
+    await fs.access(this.dir, constants.W_OK | constants.X_OK);
     return 'ok';
   }
 
