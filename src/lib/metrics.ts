@@ -53,7 +53,7 @@ export const ldapSearchCache = new Counter({
 
 export const hookFailures = new Counter({
   name: 'ldap_rest_hook_failures_total',
-  help: 'Hooks that threw, by hook and plugin',
+  help: 'Notification hooks that threw, by hook and plugin',
   labelNames: ['hook', 'plugin'] as const,
   registers: [registry],
 });
