@@ -25,6 +25,15 @@
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
 
+### Features
+
+- `GET /healthz` and `GET /readyz`, outside the API prefix and without
+  authentication: the first answers as long as the process serves, the
+  second 200 once the plugins are loaded and the directory answers, 503
+  otherwise; a plugin may report itself `degraded`. The Helm chart probes
+  them over HTTP, [docs](docs/usage/operations.md)
+  ([#423](https://github.com/linagora/ldap-rest/issues/423))
+
 ### Fixes
 
 - On every route, a `required` number takes `0` and a `required` boolean

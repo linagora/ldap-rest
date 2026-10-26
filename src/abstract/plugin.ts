@@ -7,6 +7,7 @@ import type winston from 'winston';
 
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
+import type { HealthStatus } from '../lib/health';
 import {
   neverReturnAttributes,
   withoutAttributes,
@@ -111,6 +112,13 @@ export default abstract class DmPlugin {
    * there, or a service it cannot work without.
    */
   assertComposition?(): MaybePromise<void>;
+
+  /**
+   * Asked by `GET /readyz`: `degraded` when a resource this plugin depends
+   * on does not answer while the server still serves. Only the directory
+   * makes the server not ready, see `docs/usage/operations.md`.
+   */
+  health?(): MaybePromise<HealthStatus>;
 
   /* Uniq name of this plugin */
   abstract name: string;
