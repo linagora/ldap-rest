@@ -148,15 +148,16 @@ to keep the default.
 
 ## General Options
 
-| CLI              | Plural           | Env               | Default          | Description                                 |
-| ---------------- | ---------------- | ----------------- | ---------------- | ------------------------------------------- |
-| `--port`         |                  | `DM_PORT`         | `8081`           | Listen port                                 |
-| `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                             |
-| `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug |
-| `--logger`       |                  | `DM_LOGGER`       | `console`        | Logger type                                 |
-| `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                              |
-| `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                |
-| `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                        |
+| CLI              | Plural           | Env               | Default          | Description                                                                                       |
+| ---------------- | ---------------- | ----------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
+| `--port`         |                  | `DM_PORT`         | `8081`           | Listen port                                                                                       |
+| `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                                                                                   |
+| `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug                                                       |
+| `--logger`       |                  | `DM_LOGGER`       | `console`        | Logger type                                                                                       |
+| `--debug`        |                  | `DM_DEBUG`        | `false`          | Name the failure in the 5xx answers of the error middleware and `serverError`; not for production |
+| `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                                                                                    |
+| `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                                                                      |
+| `--schemas-path` |                  | `DM_SCHEMAS_PATH` | `static/schemas` | Path to JSON schemas                                                                              |
 
 A schema file named by an option may extend another one, shipped or not, and
 hold only the differences:

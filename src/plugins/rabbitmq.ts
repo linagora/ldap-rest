@@ -17,6 +17,8 @@
  *   const rmq = this.server.loadedPlugins['rabbitmq'] as RabbitMq;
  *   await rmq.publish('auth', 'user.created', message);
  */
+import { constants as osConstants } from 'os';
+
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { outsideRequest } from '../lib/requestContext';
@@ -199,14 +201,14 @@ export default class RabbitMq extends DmPlugin {
   }
 
   private registerShutdown(): void {
-    const shutdown = (): void => {
+    const shutdown = async (): Promise<void> => {
       const client = this.client;
       // Clear both: a closed client must not be returned by a still-pending
       // initialisation promise.
       this.client = null;
       this.clientInit = null;
       if (!client) return;
-      client.close().catch((err: unknown) => {
+      await client.close().catch((err: unknown) => {
         this.logger.warn({
           plugin: this.name,
           event: 'shutdown',
@@ -235,28 +237,77 @@ function redactAmqpUrl(url: string): string {
   }
 }
 
-/**
- * Registers a single SIGTERM/SIGINT handler at the process level. Each plugin
- * instance contributes one callback that fans out from the shared handler, so
- * we don't accumulate per-instance listeners (which would trip
- * MaxListenersExceededWarning when many DM instances are created in tests).
- */
-const shutdownCallbacks: Array<() => void> = [];
-let processShutdownInstalled = false;
+type ShutdownSignal = 'SIGTERM' | 'SIGINT';
+const SHUTDOWN_SIGNALS: ShutdownSignal[] = ['SIGTERM', 'SIGINT'];
+type ShutdownCallback = () => void | Promise<void>;
 
-function registerProcessShutdown(cb: () => void): void {
+/**
+ * How long the shutdown callbacks get before the signal is raised again:
+ * shorter than a pod's termination grace period. Mutable for the tests.
+ */
+export const shutdownTimeout = { ms: 10_000 };
+
+const shutdownCallbacks: ShutdownCallback[] = [];
+const listeners = new Map<ShutdownSignal, () => void>();
+let pending: Promise<void>[] = [];
+let shuttingDown = false;
+
+const settle = (fn: ShutdownCallback): Promise<void> =>
+  Promise.resolve()
+    .then(fn)
+    .catch(() => undefined);
+
+/**
+ * Close the broker connections on SIGTERM/SIGINT, then end the process.
+ *
+ * One listener per signal for the process, fanning out to every plugin
+ * instance. A listener replaces Node's default action, which is to exit:
+ * once every callback has settled, or the timeout has passed, the signal is
+ * raised again with no listener of ours left, so the process ends as it
+ * would have without this plugin. A listener someone else installed is left
+ * to decide, as it would be without us: ours runs first, so it counts them
+ * before a `once` listener removes itself; only one prepended after ours
+ * goes unseen, and must exit on its own.
+ *
+ * @param cb what to close; run at once during a shutdown
+ */
+export function registerProcessShutdown(cb: ShutdownCallback): void {
+  if (shuttingDown) {
+    pending.push(settle(cb));
+    return;
+  }
   shutdownCallbacks.push(cb);
-  if (processShutdownInstalled) return;
-  processShutdownInstalled = true;
-  const fanOut = (): void => {
-    for (const fn of shutdownCallbacks.splice(0)) {
-      try {
-        fn();
-      } catch {
-        // Hooks must never throw during shutdown.
-      }
-    }
-  };
-  process.once('SIGTERM', fanOut);
-  process.once('SIGINT', fanOut);
+  if (listeners.size > 0) return;
+  for (const signal of SHUTDOWN_SIGNALS) {
+    const listener = (): void => fanOut(signal);
+    listeners.set(signal, listener);
+    process.prependListener(signal, listener);
+  }
+}
+
+function fanOut(signal: ShutdownSignal): void {
+  const others = process.listenerCount(signal) - 1;
+  shuttingDown = true;
+  for (const [name, listener] of listeners)
+    process.removeListener(name, listener);
+  listeners.clear();
+  pending = shutdownCallbacks.splice(0).map(settle);
+  const drained = (async (): Promise<void> => {
+    while (pending.length > 0) await Promise.allSettled(pending.splice(0));
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<void>(resolve => {
+    timer = setTimeout(resolve, shutdownTimeout.ms);
+    timer.unref();
+  });
+  const exitCode = 128 + osConstants.signals[signal];
+  void Promise.race([drained, expired])
+    .then(() => {
+      clearTimeout(timer);
+      if (others > 0) return;
+      process.kill(process.pid, signal);
+      // Reached only where the default action does not apply, as for PID 1
+      process.exit(exitCode);
+    })
+    .catch(() => process.exit(exitCode));
 }

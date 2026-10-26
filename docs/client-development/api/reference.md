@@ -93,11 +93,13 @@ Complete technical reference for the LDAP-Rest REST API including detailed speci
 | 500  | Internal Server Error | Server-side failure            | LDAP connection issues, database errors, plugin failures |
 | 503  | Service Unavailable   | Server temporarily unavailable | LDAP server down, maintenance mode                       |
 
-**Example 500 Response:**
+**Example 500 Response** (the failure is in the server's logs; `message`
+names it only when the server runs with `--debug`):
 
 ```json
 {
-  "error": "LDAP bind error"
+  "error": "Internal Server Error",
+  "message": "An error occurred"
 }
 ```
 
@@ -805,13 +807,7 @@ Failed to fetch
 
 #### Problem: LDAP Connection Failed
 
-**Error:**
-
-```json
-{
-  "error": "LDAP bind error"
-}
-```
+**Error:** a 500 answer, with `LDAP bind error` in the server's logs.
 
 **Checklist:**
 
