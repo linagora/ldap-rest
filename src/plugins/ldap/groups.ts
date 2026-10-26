@@ -744,7 +744,12 @@ export default class LdapGroups extends DmPlugin {
       (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
     )
       this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
-    const members = body.member ? body.member : [];
+    // One member is a list of one, as for any `array`
+    const members: string[] = !body.member
+      ? []
+      : Array.isArray(body.member)
+        ? (body.member as string[])
+        : [body.member as string];
     // The classes are the plugin's, whatever was sent, as on the flat routes
     const additional: AttributesList = Object.fromEntries(
       Object.entries(body).filter(
@@ -830,13 +835,13 @@ export default class LdapGroups extends DmPlugin {
     await this.validateMembers(dn, members, req);
     const candidate = await this.validateNewGroup(dn, {
       objectClass: entry.objectClass,
-      cn,
+      [this.cn]: cn,
       member: members,
       ...additional,
     });
     // The entry holds the placeholder member too; what else was validated
-    // is written in the shape it was given, and the defaults `candidateGroup`
-    // added on top are converted here
+    // is written in the shape it was given, over the entry judged, and the
+    // defaults `candidateGroup` added on top are converted here
     delete candidate.member;
     Object.assign(entry, candidate);
     toDirectoryEntry(this.schema, entry);
@@ -1498,7 +1503,8 @@ export default class LdapGroups extends DmPlugin {
    * Check a new group's entry, after the `ldapgroupvalidatenew` hooks, and
    * convert it in place.
    *
-   * @returns the entry the hooks handed on
+   * @returns the entry the hooks handed on; `addGroup` writes its
+   *   attributes over the entry it judged, the members aside
    */
   async validateNewGroup(
     dn: string,

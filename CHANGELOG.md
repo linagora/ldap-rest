@@ -17,7 +17,7 @@
   creation, instead of answering 500; an attribute the schema does not
   declare is refused by name in a change too; the group routes refuse a
   fixed attribute in a change, which they dropped, and write a fixed
-  attribute with a default on a creation, which they left out; the group
+  attribute on a creation, at its default, which they left out; the group
   and organization routes take a list of one for a single value, the group
   routes one value for an `array`, and both word their refusals as the flat
   routes do,

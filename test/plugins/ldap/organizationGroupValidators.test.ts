@@ -1,14 +1,8 @@
 /**
- * The organization and group routes validate with validators of their own,
- * which had fallen behind the flat one:
- *
- * - organizations read neither `items.branch` nor `items.type: pointer`, so a
- *   domain link to a DN outside the domains branch, or to no entry at all,
- *   was stored — and the organization lost its mail-domain restriction;
- * - groups compared a pointer's branch as a text suffix;
- * - both answered a refused value with a plain Error, which reaches the client
- *   as a 500, and organizations refused with a 500 the string an existing
- *   client still sends for an attribute the schema turned into an array.
+ * The organization and group routes check a pointer as the flat routes do:
+ * its branch RDN by RDN, `items.branch` and `items.type: pointer` read, the
+ * entry looked up. A domain link outside the domains branch, or to no entry,
+ * would cost the organization its mail-domain restriction.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
@@ -177,6 +171,17 @@ describe('Organization and group validators', function () {
 
     after(async () => {
       await server.ldap.delete(groupDn()).catch(() => undefined);
+    });
+
+    it('should refuse an attribute the schema does not know, naming the group', async () => {
+      const res = await request
+        .put('/api/v1/ldap/groups/validatorsgroup')
+        .type('json')
+        .send({ replace: { notAnAttribute: 'x' } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Unknown attribute "notAnAttribute" for group'
+      );
     });
 
     it('should compare the branch RDN by RDN, and answer 400', async () => {

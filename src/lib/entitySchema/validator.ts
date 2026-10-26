@@ -199,7 +199,11 @@ export function applyFixedDefaults(
 ): void {
   if (!schema) return;
   for (const [field, attr] of Object.entries(schema.attributes))
-    if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
+    if (
+      attr.fixed &&
+      attr.default !== undefined &&
+      field.toLowerCase() !== 'objectclass'
+    )
       entry[field] = attr.default;
 }
 

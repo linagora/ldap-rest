@@ -285,6 +285,9 @@ describe('Entity schema contract', function () {
     );
   };
 
+  /** The entry the last creation handed its authorization */
+  let judged: AttributesList | undefined;
+
   const created = (res: Response): void => {
     expect([200, 201], JSON.stringify(res.body)).to.include(res.status);
   };
@@ -420,6 +423,31 @@ describe('Entity schema contract', function () {
           async res => {
             created(res);
             expect(await stored(entity.dn(), 'l')).to.equal('paris');
+          }
+        );
+
+        define(
+          'creation',
+          'judges a creation with a fixed attribute at its default',
+          async () => {
+            const authorize = server.ldap.authorize.bind(server.ldap);
+            judged = undefined;
+            server.ldap.authorize = (async (hook, args) => {
+              if (hook === 'ldapaddrequest')
+                judged = (args as unknown[])[1] as AttributesList;
+              return authorize(hook, args);
+            }) as typeof server.ldap.authorize;
+            try {
+              return await request
+                .post(entity.route)
+                .send(entity.create({ l: 'lyon' }));
+            } finally {
+              server.ldap.authorize = authorize;
+            }
+          },
+          async res => {
+            created(res);
+            expect(judged?.l, 'the entry judged').to.equal('paris');
           }
         );
 
@@ -631,4 +659,20 @@ describe('Entity schema contract', function () {
       });
     });
   }
+
+  describe("a group's members", () => {
+    const group = entities.find(entity => entity.name === 'groups') as Entity;
+
+    afterEach(async () => {
+      await server.ldap.delete(group.dn()).catch(() => undefined);
+    });
+
+    it('takes one member for the list on a creation', async () => {
+      const res = await request
+        .post(group.route)
+        .send(group.create({ member: pointee }));
+      created(res);
+      expect(await stored(group.dn(), 'member')).to.include(pointee);
+    });
+  });
 });

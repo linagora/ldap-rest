@@ -101,9 +101,9 @@ describe('Generated attributes', function () {
   });
 
   describe('on the routes that validate for themselves', function () {
-    // Organizations and groups have their own validator instead of the flat
-    // one, and both shipped schemas mark the organization path required *and*
-    // generated. Exempting it whatever is loaded wrote an entry missing the
+    // Organizations and groups ask the shared validator from their own
+    // routes, and both shipped schemas mark the organization path required
+    // *and* generated. Exempting it whatever is loaded wrote an entry missing the
     // path its own schema demands — and no client could repair it afterwards,
     // since a generated attribute is refused as input.
     let server: DM;

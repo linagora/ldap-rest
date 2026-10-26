@@ -26,10 +26,14 @@ a whole, or a change naming an attribute a strict schema does not declare;
 one writing through `/api/v1/ldap/<entity>` several values for an attribute
 the schema does not type `array`; and one changing a `fixed` attribute of a
 group, which the server dropped from the change and answered 200. The
-server now answers 400, naming the attribute. The shipped LSC connector
-sends shapes that stay accepted, a list of one in a `replace` and one value
-for an `array` on a creation; its whole-attribute delete is refused for a
-`required` attribute, as any.
+server now answers 400, naming the attribute. A group creation sending a
+value under a `fixed` attribute now writes the schema's default, or the
+value when the schema gives none, where it wrote nothing. The shipped LSC connector sends shapes that stay
+accepted, a list of one in a `replace` and one value for an `array` on a
+creation; its whole-attribute delete is refused for a `required` attribute,
+as any, and a group synchronisation that forces `objectClass` or another
+`fixed` attribute now has the whole update refused: keep those attributes
+out of the group updates.
 
 Send one value for a single-valued attribute, a list for an `array` (one
 value, or a list of one, is taken either way), numbers as numbers or digits,
