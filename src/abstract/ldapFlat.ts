@@ -1903,11 +1903,13 @@ export default abstract class LdapFlat extends DmPlugin {
         }
       }
 
-      if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(this.invalidValueMessage(field));
-      }
+      // Before the value checks: an empty required value is missing, not
+      // invalid
       if (attr.required && !value && !attr.generated) {
         throw new BadRequestError(`Attribute "${field}" is required`);
+      }
+      if (!(await this._validateOneChange(field, value))) {
+        throw new BadRequestError(this.invalidValueMessage(field));
       }
     }
     // Check required fields, granting a `generated` attribute the exemption
@@ -1980,7 +1982,10 @@ export default abstract class LdapFlat extends DmPlugin {
       if (this.schema.strict) return false;
       return true;
     }
-    if (!value) return true;
+    // No value clears the attribute. An empty string is a value, checked as
+    // groups and organizations check it: against the pattern, and for a
+    // pointer against its branch
+    if (value === null || value === undefined) return true;
     // An empty list is no value, as for groups and organizations: a replace
     // clears the attribute with it
     if (Array.isArray(value) && value.length === 0) {
@@ -1998,6 +2003,10 @@ export default abstract class LdapFlat extends DmPlugin {
       }
 
       const dnValue: string = value;
+      // A base search of '' answers the root DSE, so an empty DN would pass
+      // as existing
+      if (dnValue === '')
+        throw new BadRequestError(`Attribute "${field}" must point to a DN`);
 
       // Check branch restriction if provided. Asked RDN by RDN: a suffix
       // match with an optional comma reads `uid=x,xou=users,dc=example,dc=com`

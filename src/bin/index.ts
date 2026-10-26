@@ -29,7 +29,11 @@ import type { Hooks } from '../hooks';
 import ldapActions from '../lib/ldapActions';
 import type DmPlugin from '../abstract/plugin';
 import { buildLogger } from '../logger/winston';
-import { setLogger } from '../lib/expressFormatedResponses';
+import {
+  serverErrorBody,
+  setDebug,
+  setLogger,
+} from '../lib/expressFormatedResponses';
 import AuthBase, { prefixCoversPath, type DmRequest } from '../lib/auth/base';
 import {
   assertAuthzComposition,
@@ -169,6 +173,7 @@ export class DM {
     this.logger = buildLogger(this.config);
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
+    setDebug(this.config.debug);
     this.operationSequence = 0;
     const promises: Promise<void | boolean>[] = [];
 
@@ -589,7 +594,7 @@ export class DM {
         return;
       }
 
-      // Server error (5xx) - log as error and hide details
+      // Server error (5xx): logged, named in the answer only under --debug
       this.logger.error(
         `Server error ${statusCode} in request ${req.method} ${req.path}: ${err.message}`,
         {
@@ -599,12 +604,8 @@ export class DM {
         }
       );
 
-      if (!res.headersSent) {
-        res.status(statusCode).json({
-          error: 'Internal Server Error',
-          message: this.config.debug ? err.message : 'An error occurred',
-        });
-      }
+      if (!res.headersSent)
+        res.status(statusCode).json(serverErrorBody(err, this.config.debug));
     };
 
     this.app.use(this._errorMiddleware);

@@ -1598,8 +1598,7 @@ export default class LdapGroups extends DmPlugin {
     value: AttributeValue | null
   ): Promise<boolean> {
     if (!this.schema) return true;
-    // Every refusal of a value is a 400: a plain Error reached the client as
-    // a 500 "check logs".
+    // Every refusal of a value is a 400, not the 500 a plain Error gives
     const test = schemaAttribute(this.schema, field)?.[1];
     if (!test) {
       if (this.schema.strict)
