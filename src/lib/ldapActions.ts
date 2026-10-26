@@ -789,6 +789,10 @@ class ldapActions {
     if (this.connectionPool.length < this.poolSize) {
       // Outside the request it is opened for: the connection outlives it
       const client = await outsideAnyRequest(() => this.createConnection());
+      if (this.closed) {
+        await client.unbind().catch(() => undefined);
+        throw new Error('LDAP connections closed');
+      }
       const pooled: PooledConnection = {
         client,
         createdAt: Date.now(),

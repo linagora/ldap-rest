@@ -4,6 +4,10 @@
 
 ### Breaking Changes
 
+- An exception nothing caught shuts the server down and exits with 1,
+  where the process kept serving,
+  [upgrading](docs/usage/upgrading.md#the-process-stops-on-an-uncaught-exception)
+  ([#423](https://github.com/linagora/ldap-rest/issues/423))
 - `--ldap-dn` and `--ldap-pwd` have no default: the server stops at startup
   without them, where it bound as `cn=admin,dc=example,dc=com` / `admin`,
   and the Docker image no longer carries that password in its `ENV`,
@@ -24,13 +28,6 @@
   [upgrading](docs/usage/upgrading.md#every-entity-route-checks-the-shape-of-a-value)
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
-
-### Breaking Changes
-
-- An exception nothing caught shuts the server down and exits with 1,
-  where the process kept serving,
-  [upgrading](docs/usage/upgrading.md#the-process-stops-on-an-uncaught-exception)
-  ([#423](https://github.com/linagora/ldap-rest/issues/423))
 
 ### Features
 

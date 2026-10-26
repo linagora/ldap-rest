@@ -52,3 +52,4 @@ const server = new DM();
 await server.ready;
 await server.run();
 server.shutdownOnSignals();
+server.exitOnCrash();

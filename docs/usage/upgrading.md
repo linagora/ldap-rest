@@ -12,10 +12,11 @@ decision or a configuration change appear here; see the
 restarts the process, as it should.
 
 An exception nothing caught was logged and the process kept serving in a
-state nobody knew. It now shuts down and exits with 1. On `SIGTERM` the
-server also drains what is in flight within `--shutdown-timeout` (20 s)
-before closing its connections, where it closed the listening socket and
-left the rest to the signal. See [shutdown](operations.md#shutdown).
+state nobody knew. The binary now shuts down and exits with 1. On
+`SIGTERM` it also drains what is in flight within `--shutdown-timeout`
+(20 s) and closes its connections before the signal ends it, where the
+signal ended the process at once. A host assembling the server in its own
+process gets neither unless it asks, see [shutdown](operations.md#shutdown).
 
 ### The readiness of a pod follows the directory
 

@@ -22,6 +22,7 @@ class Holding extends DmPlugin {
 }
 await server.registerPlugin('holding', new Holding(server));
 await server.run();
+server.exitOnCrash();
 say('ready');
 setTimeout(() => {
   throw new Error('boom');

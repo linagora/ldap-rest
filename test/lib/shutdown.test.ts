@@ -1,4 +1,4 @@
-import { request as httpRequest } from 'node:http';
+import { Agent, request as httpRequest } from 'node:http';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
@@ -9,19 +9,33 @@ import type { Express, Request, Response } from 'express';
 import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
 
-/** A request to the listening server, answered when the server answers */
-const get = (port: number, url: string): Promise<number> =>
+/** A request on a keep-alive connection, answered when the server answers */
+const get = (
+  port: number,
+  url: string
+): Promise<{ status: number; connection?: string }> =>
   new Promise((resolve, reject) => {
-    const req = httpRequest({ port, path: url, method: 'GET' }, res => {
-      res.resume();
-      res.on('end', () => resolve(res.statusCode ?? 0));
-    });
+    const req = httpRequest(
+      { port, path: url, method: 'GET', agent: keepAlive },
+      res => {
+        res.resume();
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            connection: res.headers.connection,
+          })
+        );
+      }
+    );
     req.on('error', reject);
     req.end();
   });
 
+const keepAlive = new Agent({ keepAlive: true });
+
 describe('Shutdown', function () {
   this.timeout(20000);
+  after(() => keepAlive.destroy());
   let server: DM;
   let port: number;
   const closed: string[] = [];
@@ -31,7 +45,7 @@ describe('Shutdown', function () {
     server = new DM();
     await server.ready;
     server.config.port = 0;
-    server.config.shutdown_timeout = 3000;
+    server.config.shutdown_timeout = 8000;
     class Holding extends DmPlugin {
       name = 'holding';
       api(app: Express): void {
@@ -76,8 +90,17 @@ describe('Shutdown', function () {
     );
     expect(closed, 'nothing let go before the drain').to.deep.equal([]);
     release();
-    expect(await slow).to.equal(200);
+    const { status, connection } = await slow;
+    expect(status).to.equal(200);
+    expect(connection, 'the connection closes with the response').to.equal(
+      'close'
+    );
+    const released = Date.now();
     await stopping;
+    expect(
+      Date.now() - released,
+      'the drain ends with the response'
+    ).to.be.below(1500);
     expect(closed.sort()).to.deep.equal(['failing', 'holding']);
     expect(
       await server.shutdown(),

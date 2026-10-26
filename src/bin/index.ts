@@ -147,6 +147,9 @@ export class DM {
 
   private _shutdown?: Promise<void>;
 
+  /** The responses not sent yet, told to close their connection on a stop */
+  private readonly inFlight = new Set<Response>();
+
   /** Told to stop: the readiness says so, what is in flight finishes */
   get stopping(): boolean {
     return this._shutdown !== undefined;
@@ -179,6 +182,12 @@ export class DM {
     this.app.disable('x-powered-by');
     this.app.use((_req, res, next) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
+      // A stopping server closes the connection with the response: a
+      // keep-alive connection would otherwise bring requests until it is
+      // cut
+      if (this.stopping) res.setHeader('Connection', 'close');
+      this.inFlight.add(res);
+      res.once('close', () => this.inFlight.delete(res));
       next();
     });
     // Every answer names its request, and every line logged while serving
@@ -642,35 +651,37 @@ export class DM {
     this._errorMiddlewareSetup = true;
   }
 
-  private crashPolicyInstalled = false;
-
   /**
-   * What the process does with a failure nothing caught: an exception
-   * leaves it in a state nobody knows, so it stops as cleanly as it can and
-   * exits with 1; a rejection is logged and counted, the request that owned
-   * it has been answered or will time out. Installed once, whatever the
-   * number of servers a host runs.
+   * Exit on a failure nothing caught: an exception leaves the process in a
+   * state nobody knows, so it shuts down as cleanly as it can, within the
+   * shutdown budget, and exits with 1 for its supervisor to start it again.
+   * A rejection nothing handled is logged and counted; the request that
+   * owned it has been answered or will time out.
+   *
+   * For the binary; a host assembling the server decides for itself, and
+   * without it Node's own action applies.
    */
-  private installCrashPolicy(): void {
-    if (this.crashPolicyInstalled) return;
-    this.crashPolicyInstalled = true;
+  exitOnCrash(): void {
     process.on('uncaughtException', (err: Error) => {
       this.logger.error(`Uncaught exception: ${err.message}`, {
         stack: err.stack,
       });
+      setTimeout(
+        () => process.exit(1),
+        this.config.shutdown_timeout as number
+      ).unref();
       void this.shutdown().finally(() => process.exit(1));
     });
     process.on('unhandledRejection', (reason: unknown) => {
       this.unhandledRejections++;
       this.logger.error(
         `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}`,
-        { reason }
+        { stack: reason instanceof Error ? reason.stack : undefined }
       );
     });
   }
 
   run(): Promise<void> {
-    this.installCrashPolicy();
     return new Promise((resolve, reject) => {
       this.server = this.app.listen(this.config.port, err => {
         if (err) {
@@ -705,18 +716,22 @@ export class DM {
 
   private async letGo(): Promise<void> {
     const budget = this.config.shutdown_timeout as number;
-    this.logger.notice(`Shutting down, ${budget} ms for what is in flight`);
+    // The last seconds are for the plugins and the directory to let go
+    const drain = Math.max(1000, budget - 5000);
+    this.logger.notice(`Shutting down, ${drain} ms for what is in flight`);
     const server = this.server;
     if (server) {
-      // Idle keep-alive connections close now; the others when their
-      // response is sent, or when the budget is spent
+      // Idle keep-alive connections close now; the others with the response
+      // they carry, which closes them, or when the drain is spent
       const closed = new Promise<void>(resolve =>
         server.close(() => resolve())
       );
       server.closeIdleConnections();
+      for (const res of this.inFlight)
+        if (!res.headersSent) res.setHeader('Connection', 'close');
       let timer: ReturnType<typeof setTimeout> | undefined;
       const spent = new Promise<void>(resolve => {
-        timer = setTimeout(resolve, Math.max(0, budget - 1000));
+        timer = setTimeout(resolve, drain);
       });
       await Promise.race([closed, spent]);
       clearTimeout(timer);

@@ -163,7 +163,7 @@ export default class RabbitMq extends DmPlugin {
    */
   protected async getClient(): Promise<RabbitClient | null> {
     if (this.client) return this.client;
-    if (!this.rabbitmqUrl) return null;
+    if (!this.rabbitmqUrl || this.closed) return null;
     if (this.clientInit) return this.clientInit;
 
     this.clientInit = (async (): Promise<RabbitClient | null> => {
@@ -210,8 +210,12 @@ export default class RabbitMq extends DmPlugin {
     return client;
   }
 
-  /** Close the broker connection; a client still opening is let go */
+  /** Set by `close`: a publish of what outlives the drain opens nothing */
+  private closed = false;
+
+  /** Close the broker connection; nothing opens one after */
   async close(): Promise<void> {
+    this.closed = true;
     const client = this.client;
     // Clear both: a closed client must not be returned by a still-pending
     // initialisation promise.
