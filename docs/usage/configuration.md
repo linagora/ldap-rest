@@ -753,4 +753,5 @@ The `notice` level is ideal for production as it shows web access logs without f
 | `console` | One JSON object per line on standard output (errors and warnings on standard error)                  |
 | `file`    | Text lines appended to `--log-file` (`DM_LOG_FILE`), `error.log` in the working directory by default |
 
-Any other value stops the server at startup.
+An empty value is `console`. Any other value, or `file` with an empty
+`--log-file`, stops the server at startup.

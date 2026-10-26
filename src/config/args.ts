@@ -45,7 +45,7 @@ export interface Config {
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   logger: 'console' | 'file';
-  log_file: string;
+  log_file?: string;
   api_prefix: string;
   mail_domain?: string[];
   // LDAP

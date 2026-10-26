@@ -10,7 +10,8 @@ decision or a configuration change appear here; see the
 
 A `DM_LOGGER` set to anything else wrote `error.log` in the working
 directory; the server now stops at startup. Set `DM_LOGGER=file` to keep
-that file, and `DM_LOG_FILE` to name another one.
+that file, and `DM_LOG_FILE` to name another one. An empty `DM_LOGGER` is
+`console`.
 
 ## From 1.0 to 1.1.0
 
