@@ -9,7 +9,7 @@ those typed in [hooks.ts](../../src/hooks.ts), which is the reference.
 
 ## [LDAP](../../src/lib/ldapActions.ts) hooks
 
-- **ldapopts**: called before any ldapsearch to modify search options
+- **ldapsearchopts**: called before any ldapsearch to modify search options
 - **ldapsearchresult**: called after any ldapsearch to modify search result
 - **ldapaddrequest**: called before any ldapadd
 - **ldapadddone**: launched once an ldapadd has written the entry, not awaited

@@ -47,7 +47,7 @@ anonymous pulls).
 
 ## Documentation
 
-See [Testing with Embedded LDAP](../docs/testing-with-embedded-ldap.md) for complete documentation.
+See [the testing guide](../docs/plugin-development/testing.md) for complete documentation.
 
 ## Test Structure
 
