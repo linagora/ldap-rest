@@ -1,81 +1,93 @@
 /**
  * A SIGTERM listener replaces Node's default action, which is to exit. The
- * listener `core/rabbitmq` installs closed the broker connection and
- * returned, so the process lived on until it was killed.
+ * one `core/rabbitmq` installs must end the process once the broker is
+ * closed, whatever the callbacks do. Checked on a real child process, as
+ * `process.emit` applies no default action.
  */
 import { expect } from 'chai';
+import { spawn } from 'child_process';
+import path from 'path';
 
-import { registerProcessShutdown } from '../../src/plugins/rabbitmq';
+const child = path.join(
+  __dirname,
+  '..',
+  'fixtures',
+  'rabbitmq',
+  'shutdownChild.ts'
+);
 
-type Kill = typeof process.kill;
+interface Outcome {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  lines: string[];
+  ms: number;
+}
 
-describe('core/rabbitmq process shutdown', () => {
-  let kill: Kill;
-  let killed: Array<[number, string | number | undefined]>;
-
-  beforeEach(() => {
-    kill = process.kill;
-    killed = [];
-    process.kill = ((pid: number, signal?: string | number) => {
-      killed.push([pid, signal]);
-      return true;
-    }) as Kill;
-  });
-
-  afterEach(() => {
-    process.kill = kill;
-  });
-
-  const settled = (): Promise<void> =>
-    new Promise(resolve => setImmediate(resolve));
-
-  it('raises the signal again once every callback has settled', async () => {
-    const order: string[] = [];
-    registerProcessShutdown(() => {
-      order.push('sync');
+const run = (mode: string, signal: 'SIGTERM' | 'SIGINT'): Promise<Outcome> =>
+  new Promise((resolve, reject) => {
+    const proc = spawn(process.execPath, ['--import', 'tsx', child, mode], {
+      stdio: ['ignore', 'pipe', 'inherit'],
     });
-    registerProcessShutdown(async () => {
-      await settled();
-      order.push('async');
+    const lines: string[] = [];
+    let sent: number | undefined;
+    proc.stdout.on('data', (chunk: Buffer) => {
+      for (const line of chunk.toString().split('\n').filter(Boolean)) {
+        lines.push(line);
+        if (line === 'ready') {
+          sent = Date.now();
+          proc.kill(signal);
+        }
+      }
     });
-    const before = process.listenerCount('SIGTERM');
-
-    process.emit('SIGTERM', 'SIGTERM');
-    expect(order).to.deep.equal(['sync']);
-    expect(killed).to.deep.equal([]);
-
-    await settled();
-    await settled();
-    expect(order).to.deep.equal(['sync', 'async']);
-    expect(killed).to.deep.equal([[process.pid, 'SIGTERM']]);
-    expect(process.listenerCount('SIGTERM')).to.equal(before - 1);
-    expect(process.listenerCount('SIGINT')).to.equal(
-      process.listenerCount('SIGTERM')
+    proc.on('error', reject);
+    proc.on('exit', (code, exitSignal) =>
+      resolve({
+        code,
+        signal: exitSignal,
+        lines,
+        ms: sent === undefined ? -1 : Date.now() - sent,
+      })
     );
   });
 
-  it('raises the signal again when a callback throws', async () => {
-    registerProcessShutdown(() => {
-      throw new Error('broker already gone');
-    });
+describe('core/rabbitmq process shutdown', function () {
+  this.timeout(30000);
 
-    process.emit('SIGINT', 'SIGINT');
-    await settled();
-    await settled();
-    expect(killed).to.deep.equal([[process.pid, 'SIGINT']]);
+  it('closes, then ends the process by the signal it got', async () => {
+    const out = await run('closes', 'SIGTERM');
+    expect(out.lines).to.deep.equal(['ready', 'closing', 'closed']);
+    expect(out.signal).to.equal('SIGTERM');
+  });
+
+  it('does the same on SIGINT', async () => {
+    const out = await run('closes', 'SIGINT');
+    expect(out.lines).to.include('closed');
+    expect(out.signal).to.equal('SIGINT');
+  });
+
+  it('ends the process when a callback throws', async () => {
+    const out = await run('throws', 'SIGTERM');
+    expect(out.lines).to.deep.equal(['ready', 'closing']);
+    expect(out.signal).to.equal('SIGTERM');
+  });
+
+  it('ends the process after the timeout when a callback hangs', async () => {
+    const out = await run('hangs', 'SIGTERM');
+    expect(out.lines).to.deep.equal(['ready', 'closing']);
+    expect(out.signal).to.equal('SIGTERM');
+    expect(out.ms).to.be.within(250, 5000);
+  });
+
+  it('runs a callback registered during the shutdown', async () => {
+    const out = await run('late', 'SIGTERM');
+    expect(out.lines).to.deep.equal(['ready', 'closing', 'late', 'closed']);
+    expect(out.signal).to.equal('SIGTERM');
   });
 
   it('leaves the decision to another listener of the signal', async () => {
-    const other = (): void => undefined;
-    process.on('SIGTERM', other);
-    try {
-      registerProcessShutdown(() => undefined);
-      process.emit('SIGTERM', 'SIGTERM');
-      await settled();
-      await settled();
-      expect(killed).to.deep.equal([]);
-    } finally {
-      process.removeListener('SIGTERM', other);
-    }
+    const out = await run('host', 'SIGTERM');
+    expect(out.lines).to.deep.equal(['ready', 'closing', 'closed']);
+    expect(out.signal).to.equal(null);
+    expect(out.code).to.equal(7);
   });
 });

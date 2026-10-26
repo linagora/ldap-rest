@@ -17,6 +17,8 @@
  *   const rmq = this.server.loadedPlugins['rabbitmq'] as RabbitMq;
  *   await rmq.publish('auth', 'user.created', message);
  */
+import { constants as osConstants } from 'os';
+
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { outsideRequest } from '../lib/requestContext';
@@ -237,34 +239,74 @@ function redactAmqpUrl(url: string): string {
 
 type ShutdownSignal = 'SIGTERM' | 'SIGINT';
 const SHUTDOWN_SIGNALS: ShutdownSignal[] = ['SIGTERM', 'SIGINT'];
+type ShutdownCallback = () => void | Promise<void>;
 
 /**
- * One SIGTERM/SIGINT listener for the process, fanning out to every plugin
- * instance: one listener per instance tripped MaxListenersExceededWarning
- * when tests created many servers.
- *
- * A listener replaces Node's default action for the signal, which is to
- * exit. Once every callback has settled, the signal is raised again with no
- * listener of ours left, so the process ends as it would have without this
- * plugin; a pod no longer sits through its termination grace period. A
- * listener someone else installed is left to decide, as it would be
- * without us.
+ * How long the shutdown callbacks get before the signal is raised again:
+ * shorter than a pod's termination grace period. Mutable for the tests.
  */
-const shutdownCallbacks: Array<() => void | Promise<void>> = [];
-let processShutdownInstalled = false;
+export const shutdownTimeout = { ms: 10_000 };
 
-export function registerProcessShutdown(cb: () => void | Promise<void>): void {
+const shutdownCallbacks: ShutdownCallback[] = [];
+const listeners = new Map<ShutdownSignal, () => void>();
+let pending: Promise<void>[] = [];
+let shuttingDown = false;
+
+const settle = (fn: ShutdownCallback): Promise<void> =>
+  Promise.resolve()
+    .then(fn)
+    .catch(() => undefined);
+
+/**
+ * Close the broker connections on SIGTERM/SIGINT, then end the process.
+ *
+ * One listener per signal for the process, fanning out to every plugin
+ * instance. A listener replaces Node's default action, which is to exit:
+ * once every callback has settled, or the timeout has passed, the signal is
+ * raised again with no listener of ours left, so the process ends as it
+ * would have without this plugin. A listener someone else installed is left
+ * to decide, as it would be without us; one that removes itself before
+ * running is not seen, and must exit on its own.
+ *
+ * @param cb what to close; run at once during a shutdown
+ */
+export function registerProcessShutdown(cb: ShutdownCallback): void {
+  if (shuttingDown) {
+    pending.push(settle(cb));
+    return;
+  }
   shutdownCallbacks.push(cb);
-  if (processShutdownInstalled) return;
-  processShutdownInstalled = true;
-  const fanOut = (signal: ShutdownSignal): void => {
-    processShutdownInstalled = false;
-    for (const other of SHUTDOWN_SIGNALS) process.removeListener(other, fanOut);
-    const pending = shutdownCallbacks.splice(0).map(async fn => fn());
-    void Promise.allSettled(pending).then(() => {
-      if (process.listenerCount(signal) === 0)
-        process.kill(process.pid, signal);
-    });
-  };
-  for (const signal of SHUTDOWN_SIGNALS) process.on(signal, fanOut);
+  if (listeners.size > 0) return;
+  for (const signal of SHUTDOWN_SIGNALS) {
+    const listener = (): void => fanOut(signal);
+    listeners.set(signal, listener);
+    process.on(signal, listener);
+  }
+}
+
+function fanOut(signal: ShutdownSignal): void {
+  const others = process.listenerCount(signal) - 1;
+  shuttingDown = true;
+  for (const [name, listener] of listeners)
+    process.removeListener(name, listener);
+  listeners.clear();
+  pending = shutdownCallbacks.splice(0).map(settle);
+  const drained = (async (): Promise<void> => {
+    while (pending.length > 0) await Promise.allSettled(pending.splice(0));
+  })();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<void>(resolve => {
+    timer = setTimeout(resolve, shutdownTimeout.ms);
+    timer.unref();
+  });
+  const exitCode = 128 + osConstants.signals[signal];
+  void Promise.race([drained, expired])
+    .then(() => {
+      clearTimeout(timer);
+      if (others > 0) return;
+      process.kill(process.pid, signal);
+      // Reached only where the default action does not apply, as for PID 1
+      process.exit(exitCode);
+    })
+    .catch(() => process.exit(exitCode));
 }
