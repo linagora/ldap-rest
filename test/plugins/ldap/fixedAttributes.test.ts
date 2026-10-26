@@ -64,19 +64,34 @@ describe('Fixed attributes validation', function () {
       await plugin.deleteEntry('testfixed');
     });
 
-    it('should reject creation with different objectClass value', async function () {
-      this.timeout(5000);
+    it('should store the entity classes whatever objectClass was sent', async function () {
+      this.timeout(10000);
 
-      try {
+      const dn = `${plugin.mainAttribute}=testfixed,${plugin.base}`;
+      for (const objectClass of [
+        [
+          'top',
+          'inetOrgPerson',
+          'organizationalPerson',
+          'person',
+          'extensibleObject',
+        ],
+        ['top', 'person'],
+      ]) {
         await plugin.addEntry('testfixed', {
           cn: 'Test Fixed',
           sn: 'Fixed',
-          objectClass: ['top', 'person'], // Wrong objectClass
+          objectClass,
         });
-        expect.fail('Should have thrown an error');
-      } catch (err: any) {
-        // Error message should indicate the objectClass is fixed
-        expect(err.message).to.match(/fixed|objectClass/i);
+        const searchResult = await plugin.ldap.search(
+          { paged: false, scope: 'base', attributes: ['objectClass'] },
+          dn
+        );
+        expect(searchResult.searchEntries).to.have.lengthOf(1);
+        expect(searchResult.searchEntries[0].objectClass).to.have.members(
+          plugin.objectClass
+        );
+        await plugin.deleteEntry('testfixed');
       }
     });
 

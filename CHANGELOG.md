@@ -12,6 +12,10 @@
 
 ### Fixes
 
+- The flat routes store the classes of the entity on a creation whatever
+  `objectClass` the request carried, as the group and organization routes
+  do: a body naming other classes had them written
+  ([#441](https://github.com/linagora/ldap-rest/issues/441))
 - `--logger` takes `console` or `file`, with `--log-file` naming the file;
   an empty value is `console`, any other stops the server at startup,
   [upgrading](docs/usage/upgrading.md#--logger-console-or-file)
