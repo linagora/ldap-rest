@@ -38,37 +38,6 @@ interface Entity {
 
 /** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
 const divergences: Record<string, [status: number, reason: string]> = {
-  'users: creation: refuses an array for a string': [201, 'stores every value'],
-  'users: replace: refuses an array for a string': [200, 'stores every value'],
-  'users: add: refuses an array for a string': [200, 'stores every value'],
-  'users: creation: refuses a string that is not a number for a number': [
-    201,
-    'stores it',
-  ],
-  'users: replace: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'users: add: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'users: creation: refuses a string for an array of pointers': [
-    201,
-    'stores it',
-  ],
-  'users: replace: refuses a string for an array of pointers': [
-    200,
-    'stores it',
-  ],
-  'users: add: refuses a string for an array of pointers': [200, 'stores it'],
-  'users: replace: refuses null for a required attribute': [500, 'crashes'],
-  'users: replace: clears an optional attribute with null': [500, 'crashes'],
-  'users: delete: refuses deleting a required attribute': [200, 'deletes it'],
-  'users: delete: refuses deleting an attribute the schema does not declare': [
-    200,
-    'deletes it',
-  ],
   'groups: creation: writes a fixed attribute as the schema says': [
     200,
     'writes nothing',

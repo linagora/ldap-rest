@@ -101,20 +101,18 @@ describe('Write bodies the directory cannot take as they are', function () {
       ...extra,
     });
 
-    for (const [name, value] of [
-      ['employeeNumber', 12345],
-      ['mobile', true],
-      ['mobile', { number: '1' }],
-      ['mobile', ['+33600000001', 2]],
+    for (const [name, value, shape] of [
+      ['employeeNumber', 12345, 'a string'],
+      ['mobile', true, 'a string'],
+      ['mobile', { number: '1' }, 'a string'],
+      ['mobile', ['+33600000001', 2], 'a single value'],
     ] as const) {
       it(`should refuse ${JSON.stringify(value)} for ${name} on a creation`, async () => {
         const res = await request
           .post('/api/v1/ldap/users')
           .send(newUser({ [name]: value }));
         expect(res.status, JSON.stringify(res.body)).to.equal(400);
-        expect(res.body.error).to.equal(
-          `Attribute "${name}" must be a string or an array of strings`
-        );
+        expect(res.body.error).to.equal(`Attribute "${name}" must be ${shape}`);
       });
     }
 

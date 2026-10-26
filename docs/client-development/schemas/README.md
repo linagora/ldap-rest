@@ -169,7 +169,10 @@ This will be replaced with the actual LDAP base at runtime (e.g., `ou=users,dc=e
 
 ## Attribute Types
 
-LDAP-Rest supports three main attribute types: `string`, `array`, and `pointer`.
+LDAP-Rest supports three main attribute types: `string`, `array`, and `pointer`,
+plus `number`, `integer`, `boolean` and `date` for single values. What a
+client sends has to have the shape of the type, see
+[what a value must look like](#what-a-value-must-look-like).
 
 ### String Type
 
@@ -364,6 +367,17 @@ Defines the data type of the attribute. Supported values:
 - `"pointer"`: Reference to another LDAP entry (DN)
 - `"number"`: Numeric value (integer or float)
 - `"integer"`: Integer value only
+
+#### What a value must look like
+
+A single-valued attribute takes one value, an `array` a list; a list for the
+former or a single value for the latter is refused. A `number` or `integer`
+is a JSON number or its text (`42`, `"42"`), a `boolean` a JSON boolean or
+the directory's `TRUE` / `FALSE`; anything else for them, and anything but
+text for a `string`, `date` or `pointer`, is refused. On a change, `null` or
+`[]` clears an attribute, as does deleting it, unless it is `required`. An
+empty string is a value: checked against `test`, and refused for a pointer.
+Every refusal answers 400 with the attribute's name.
 
 #### `required` (Optional, default: `false`)
 
