@@ -612,8 +612,8 @@ export default class LdapOrganizations extends DmPlugin {
     validateDnValue(body.ou, 'ou');
     const parentDn = body.parentDn || this.config.ldap_top_organization;
     const dn = `ou=${escapeDnValue(body.ou)},${parentDn}`;
-    // The classes are the server's, from --ldap-organization-class, as on
-    // the flat routes and groups: a body naming them does not choose them
+    // The classes are the server's, from --ldap-organization-class, as for
+    // groups: a body naming them does not choose them
     const entry: AttributesList = {
       ou: body.ou,
       ...Object.fromEntries(
@@ -1382,8 +1382,7 @@ export default class LdapOrganizations extends DmPlugin {
 
   /**
    * Write a fixed attribute as its schema says, whatever the request carried.
-   * `objectClass` is left to `--ldap-organization-class`, as on the flat
-   * routes and groups.
+   * `objectClass` is left to `--ldap-organization-class`, as for groups.
    *
    * @param entry entry about to be created, changed in place
    */

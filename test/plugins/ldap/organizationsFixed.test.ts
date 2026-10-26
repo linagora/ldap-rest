@@ -1,7 +1,8 @@
 /**
  * A `fixed` schema attribute is the server's: on a creation it takes its
- * default, `objectClass` the configured classes, whatever the request
- * carried, and a change naming it answers 400, as on the flat routes.
+ * default, and `objectClass` the configured classes, whatever the request
+ * carried (as for groups); a change naming it answers 400, as on the flat
+ * routes.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
