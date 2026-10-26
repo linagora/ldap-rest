@@ -1,0 +1,36 @@
+{
+  "strict": true,
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "required": true,
+      "fixed": true,
+      "default": ["top", "groupOfNames"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "cn": {
+      "type": "string",
+      "required": true
+    },
+    "member": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "type": "string",
+      "required": true
+    },
+    "businessCategory": {
+      "type": "string",
+      "test": "^[a-z]+$"
+    },
+    "seeAlso": {
+      "type": "pointer",
+      "branch": ["ou=users,__LDAP_BASE__"]
+    }
+  }
+}
