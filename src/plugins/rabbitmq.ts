@@ -265,8 +265,9 @@ const settle = (fn: ShutdownCallback): Promise<void> =>
  * once every callback has settled, or the timeout has passed, the signal is
  * raised again with no listener of ours left, so the process ends as it
  * would have without this plugin. A listener someone else installed is left
- * to decide, as it would be without us; one that removes itself before
- * running is not seen, and must exit on its own.
+ * to decide, as it would be without us: ours runs first, so it counts them
+ * before a `once` listener removes itself; only one prepended after ours
+ * goes unseen, and must exit on its own.
  *
  * @param cb what to close; run at once during a shutdown
  */
@@ -280,7 +281,7 @@ export function registerProcessShutdown(cb: ShutdownCallback): void {
   for (const signal of SHUTDOWN_SIGNALS) {
     const listener = (): void => fanOut(signal);
     listeners.set(signal, listener);
-    process.on(signal, listener);
+    process.prependListener(signal, listener);
   }
 }
 

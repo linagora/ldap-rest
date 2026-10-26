@@ -14,8 +14,10 @@ const say = (what: string): void => {
 };
 shutdownTimeout.ms = 300;
 
+// Registered before ours, and self-removing: the case a listener that ran
+// first would no longer see
 if (mode === 'host')
-  process.on('SIGTERM', () => {
+  process.once('SIGTERM', () => {
     setTimeout(() => process.exit(7), 100);
   });
 
@@ -23,7 +25,11 @@ registerProcessShutdown(async () => {
   say('closing');
   if (mode === 'throws') throw new Error('broker already gone');
   if (mode === 'hangs') await new Promise(() => undefined);
-  if (mode === 'late') registerProcessShutdown(() => say('late'));
+  if (mode === 'late')
+    registerProcessShutdown(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      say('late');
+    });
   await new Promise(resolve => setTimeout(resolve, 50));
   say('closed');
 });

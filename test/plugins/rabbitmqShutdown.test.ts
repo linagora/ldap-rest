@@ -80,7 +80,7 @@ describe('core/rabbitmq process shutdown', function () {
 
   it('runs a callback registered during the shutdown', async () => {
     const out = await run('late', 'SIGTERM');
-    expect(out.lines).to.deep.equal(['ready', 'closing', 'late', 'closed']);
+    expect(out.lines).to.deep.equal(['ready', 'closing', 'closed', 'late']);
     expect(out.signal).to.equal('SIGTERM');
   });
 
