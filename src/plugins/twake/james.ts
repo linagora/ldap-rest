@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
+import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health';
 import { type Role, asyncHandler } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type {
@@ -25,6 +26,9 @@ import {
   normalizeDn,
   parseDn,
 } from '../../lib/utils';
+
+/** Under the probe's budget, so that a mute James reads as degraded */
+const HEALTHCHECK_TIMEOUT_MS = PROBE_TIMEOUT_MS - 500;
 
 /**
  * What James WebAdmin answers about a user missing from its users
@@ -212,6 +216,19 @@ export default class James extends TwakePlugin {
     onLdapChange: 'core/ldap/onChange',
     ldapGroups: 'core/ldap/groups',
   };
+
+  /** James's own health check, asked by the readiness probe outside the request queue */
+  async health(): Promise<HealthStatus> {
+    try {
+      const res = await fetch(`${this.webadminUrl}/healthcheck`, {
+        headers: this.createHeaders(),
+        signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
+      });
+      return res.ok ? 'ok' : 'degraded';
+    } catch {
+      return 'degraded';
+    }
+  }
 
   // James-specific configuration attributes
   private quotaAttr: string;

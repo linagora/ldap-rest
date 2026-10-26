@@ -30,6 +30,7 @@
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import type Store from '../lib/storage/store';
+import type { HealthStatus } from '../lib/health';
 
 import FileStore from './storage/file';
 import LdapStore from './storage/ldap';
@@ -151,6 +152,34 @@ export default class Storage extends DmPlugin {
     this.store.startSweeping(
       (server.config.storage_sweep_interval as number) || 0
     );
+  }
+
+  /** Set while the backend fails the probe, so the reason is logged once */
+  private degraded = false;
+  /** Counts the probes: only the latest says what the log lines say */
+  private probes = 0;
+
+  /** The backend's own answer; a backend that cannot answer is degraded */
+  async health(): Promise<HealthStatus> {
+    const probe = ++this.probes;
+    try {
+      const status = await this.store.health();
+      if (probe === this.probes) {
+        if (this.degraded)
+          this.logger.info(`${this.store.name}: answers again`);
+        this.degraded = false;
+      }
+      return status;
+    } catch (err) {
+      if (probe === this.probes) {
+        if (!this.degraded)
+          this.logger.warn(
+            `${this.store.name}: does not answer: ${err instanceof Error ? err.message : String(err)}`
+          );
+        this.degraded = true;
+      }
+      return 'degraded';
+    }
   }
 
   /**

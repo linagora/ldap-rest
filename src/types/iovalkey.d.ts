@@ -39,6 +39,7 @@ declare module 'iovalkey' {
       time: number
     ): Promise<unknown>;
     del(...keys: string[]): Promise<number>;
+    ping(): Promise<string>;
     exists(...keys: string[]): Promise<number>;
     keys(pattern: string): Promise<string[]>;
     pttl(key: string): Promise<number>;

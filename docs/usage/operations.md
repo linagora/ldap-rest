@@ -42,8 +42,20 @@ the server to the internet, keep the two paths to the cluster.
 The Helm chart probes both routes over HTTP (`livenessProbe` and
 `readinessProbe` in `values.yaml`).
 
+### What the shipped plugins report
+
+| Plugin     | `degraded` when                                                                                                                                                                                             |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storage`  | the backend refuses a `SELECT 1` or a `PING`, or the `file` backend's directory is not a directory this user may write in; the `ldap` backend has no answer of its own, the directory check above covers it |
+| `rabbitmq` | a broker is configured and no connection to it stands: until the first publish or subscription opens one, and while the client reconnects                                                                   |
+| `james`    | James answers its `GET /healthcheck` with 503, one of its own checks unhealthy, or not within 1.5 s; a James whose checks are only degraded answers 200, so `ok` here                                       |
+
+A check that leaves the probe to time out reads as `failed`.
+
 ### For plugin authors
 
 A plugin reports its own resources with an optional `health()` method
 returning `ok` or `degraded`, called at most once every 5 seconds; it must
-answer within 2 s and never throw for an ordinary outage.
+answer within 2 s and never throw for an ordinary outage. The probe stops
+waiting at 2 s but cancels nothing: a plugin bounds its own call, as
+`james` does with its 1.5 s.

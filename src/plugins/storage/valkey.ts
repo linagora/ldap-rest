@@ -16,6 +16,7 @@
 import type winston from 'winston';
 
 import Store, { type StoredRecord } from '../../lib/storage/store';
+import type { HealthStatus } from '../../lib/health';
 import { outsideRequest } from '../../lib/requestContext';
 
 type IoValkey = typeof import('iovalkey');
@@ -45,6 +46,11 @@ export default class ValkeyStore extends Store {
 
   async open(): Promise<void> {
     await this.client();
+  }
+
+  async health(): Promise<HealthStatus> {
+    await (await this.client()).ping();
+    return 'ok';
   }
 
   async close(): Promise<void> {

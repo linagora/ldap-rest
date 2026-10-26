@@ -27,6 +27,8 @@
  */
 import type winston from 'winston';
 
+import type { HealthStatus } from '../health';
+
 /** What a backend keeps: a value, and when it stops counting. */
 export interface StoredRecord {
   value: string;
@@ -53,6 +55,14 @@ export default abstract class Store {
   protected abstract drop(key: string): Promise<void>;
   /** Drop every expired record. Returns how many went. */
   abstract sweep(): Promise<number>;
+
+  /**
+   * Whether the backend answers, asked by the readiness probe; a backend
+   * with a resource of its own asks it and throws when it does not answer.
+   */
+  health(): Promise<HealthStatus> {
+    return Promise.resolve('ok');
+  }
 
   /**
    * The key a backend actually sees, namespaced so two consumers cannot

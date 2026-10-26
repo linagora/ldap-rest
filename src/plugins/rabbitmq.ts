@@ -22,6 +22,7 @@ import { constants as osConstants } from 'os';
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
 import { outsideRequest } from '../lib/requestContext';
+import type { HealthStatus } from '../lib/health';
 
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;
@@ -65,6 +66,7 @@ interface RabbitClient {
   ): Promise<void>;
   unsubscribe(queue: string): Promise<void>;
   close(clearSubscriptions?: boolean): Promise<void>;
+  isConnected(): boolean;
 }
 
 export default class RabbitMq extends DmPlugin {
@@ -96,6 +98,17 @@ export default class RabbitMq extends DmPlugin {
    */
   isAvailable(): boolean {
     return this.rabbitmqUrl.length > 0;
+  }
+
+  /**
+   * Degraded when a broker is configured and no connection to it stands:
+   * the state as it is, nothing opened for the probe, which would run the
+   * client's connection attempts on every probe while the broker is away.
+   * A plugin without a broker has nothing to report.
+   */
+  health(): HealthStatus {
+    if (!this.rabbitmqUrl) return 'ok';
+    return this.client?.isConnected() ? 'ok' : 'degraded';
   }
 
   /**
