@@ -4,6 +4,10 @@
 
 ### Fixes
 
+- `core/rabbitmq`: SIGTERM and SIGINT end the process once the broker
+  connection is closed. Its signal listener replaced Node's default action
+  and returned, so a pod lived on until the end of its termination grace
+  period ([#425](https://github.com/linagora/ldap-rest/issues/425))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

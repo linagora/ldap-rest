@@ -199,14 +199,14 @@ export default class RabbitMq extends DmPlugin {
   }
 
   private registerShutdown(): void {
-    const shutdown = (): void => {
+    const shutdown = async (): Promise<void> => {
       const client = this.client;
       // Clear both: a closed client must not be returned by a still-pending
       // initialisation promise.
       this.client = null;
       this.clientInit = null;
       if (!client) return;
-      client.close().catch((err: unknown) => {
+      await client.close().catch((err: unknown) => {
         this.logger.warn({
           plugin: this.name,
           event: 'shutdown',
@@ -235,28 +235,36 @@ function redactAmqpUrl(url: string): string {
   }
 }
 
+type ShutdownSignal = 'SIGTERM' | 'SIGINT';
+const SHUTDOWN_SIGNALS: ShutdownSignal[] = ['SIGTERM', 'SIGINT'];
+
 /**
- * Registers a single SIGTERM/SIGINT handler at the process level. Each plugin
- * instance contributes one callback that fans out from the shared handler, so
- * we don't accumulate per-instance listeners (which would trip
- * MaxListenersExceededWarning when many DM instances are created in tests).
+ * One SIGTERM/SIGINT listener for the process, fanning out to every plugin
+ * instance: one listener per instance tripped MaxListenersExceededWarning
+ * when tests created many servers.
+ *
+ * A listener replaces Node's default action for the signal, which is to
+ * exit. Once every callback has settled, the signal is raised again with no
+ * listener of ours left, so the process ends as it would have without this
+ * plugin; a pod no longer sits through its termination grace period. A
+ * listener someone else installed is left to decide, as it would be
+ * without us.
  */
-const shutdownCallbacks: Array<() => void> = [];
+const shutdownCallbacks: Array<() => void | Promise<void>> = [];
 let processShutdownInstalled = false;
 
-function registerProcessShutdown(cb: () => void): void {
+export function registerProcessShutdown(cb: () => void | Promise<void>): void {
   shutdownCallbacks.push(cb);
   if (processShutdownInstalled) return;
   processShutdownInstalled = true;
-  const fanOut = (): void => {
-    for (const fn of shutdownCallbacks.splice(0)) {
-      try {
-        fn();
-      } catch {
-        // Hooks must never throw during shutdown.
-      }
-    }
+  const fanOut = (signal: ShutdownSignal): void => {
+    processShutdownInstalled = false;
+    for (const other of SHUTDOWN_SIGNALS) process.removeListener(other, fanOut);
+    const pending = shutdownCallbacks.splice(0).map(async fn => fn());
+    void Promise.allSettled(pending).then(() => {
+      if (process.listenerCount(signal) === 0)
+        process.kill(process.pid, signal);
+    });
   };
-  process.once('SIGTERM', fanOut);
-  process.once('SIGINT', fanOut);
+  for (const signal of SHUTDOWN_SIGNALS) process.on(signal, fanOut);
 }
