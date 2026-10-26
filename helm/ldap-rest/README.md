@@ -64,9 +64,10 @@ secrets:
 | `secrets`                          | `[]`                         | Sensitive env vars (list, prefer `valueFrom.secretKeyRef`). |
 | `externalFileConfig`               | `""`                         | Inline JS plugin mounted at `/app/external/cnb-plugin.js`.  |
 | `resources`                        | see `values.yaml`            | CPU/memory requests and limits.                             |
-| `livenessProbe` / `readinessProbe` | TCP on `http`                | Probes (no HTTP health route exists; `{}` disables).        |
+| `livenessProbe` / `readinessProbe` | `/healthz`, `/readyz`        | HTTP probes on `http` (`{}` disables).                      |
 
 See [`values.yaml`](./values.yaml) for the full list.
 
-> No dedicated HTTP health endpoint exists, so the probes use a TCP check on the
-> listen port.
+> `/healthz` and `/readyz` are served without authentication, and an Ingress
+> routing `/` exposes them: keep the two paths to the cluster there. See
+> [operations](../../docs/usage/operations.md).

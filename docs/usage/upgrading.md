@@ -6,6 +6,17 @@ decision or a configuration change appear here; see the
 
 ## Unreleased
 
+### The readiness of a pod follows the directory
+
+**Who is affected:** a deployment of the Helm chart, whose probes now call
+`GET /healthz` and `GET /readyz` instead of opening the listen port.
+
+A pod leaves the endpoints while the directory does not answer, where it
+kept receiving requests and answering 500; a rollout started during a
+directory outage waits for the directory. Both routes are served without
+authentication: an Ingress routing `/` exposes them, keep the two paths to
+the cluster. See [operations](operations.md#health-and-readiness).
+
 ### `--ldap-dn` and `--ldap-pwd` are required
 
 **Who is affected:** a deployment that left one of them unset, and so bound

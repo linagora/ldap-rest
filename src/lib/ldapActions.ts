@@ -710,6 +710,44 @@ class ldapActions {
   }
 
   /**
+   * Ask the directory for its root DSE on a connection of its own, bound
+   * as the server and closed after: the readiness probe. Neither the pool
+   * nor the search cache nor the hooks answer for a directory that does
+   * not, and a directory that stops answering holds nothing of the pool.
+   * The URLs are tried as `createConnection` tries them.
+   *
+   * @param timeoutMs how long the connection, the bind and the search may
+   *   each take; the client closes the socket when it passes
+   * @throws when no URL answers in time
+   */
+  async ping(timeoutMs: number): Promise<void> {
+    const errors: string[] = [];
+    for (let i = 0; i < this.ldapUrls.length; i++) {
+      const url =
+        this.ldapUrls[(this.currentUrlIndex + i) % this.ldapUrls.length];
+      const client = new Client({
+        ...this.options,
+        url,
+        timeout: timeoutMs,
+        connectTimeout: timeoutMs,
+        tlsOptions: url.startsWith('ldaps://')
+          ? { minVersion: 'TLSv1.2' }
+          : undefined,
+      });
+      try {
+        await client.bind(this.dn, this.pwd);
+        await client.search('', { scope: 'base', attributes: ['1.1'] });
+        return;
+      } catch (error) {
+        errors.push(`${url}: ${String(error)}`);
+      } finally {
+        await client.unbind().catch(() => undefined);
+      }
+    }
+    throw new Error(`No directory answered: ${errors.join(', ')}`);
+  }
+
+  /**
    * Acquire a connection from the pool or create a new one
    * Optimized for O(1) lookup using separate available connections queue
    */

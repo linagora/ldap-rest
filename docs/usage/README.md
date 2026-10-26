@@ -88,4 +88,5 @@ The system will:
 - **[Plugins](plugins/README.md)** - Choose and configure plugins
 - **[Upgrading](upgrading.md)** - What to check before deploying a new version
 - **[Directory audit](directory-audit.md)** - What a schema would refuse in an existing directory
+- **[Operations](operations.md)** - Health and readiness probes
 - **[Troubleshooting](troubleshooting.md)** - Problem resolution

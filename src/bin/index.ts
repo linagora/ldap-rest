@@ -43,6 +43,7 @@ import {
 import { AUTHZ_REFUSED, errorBody } from '../lib/errors';
 import { recordHookOwner, registerAttributeTypes } from '../lib/utils';
 import { runForRequest } from '../lib/requestContext';
+import { HEALTH_PATHS, mountHealth } from '../lib/health';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
@@ -136,6 +137,11 @@ export class DM {
    * assembled by hand — is checked on its own as it arrives.
    */
   private _composed: boolean = false;
+
+  /** Every plugin loaded and the composition checked */
+  get composed(): boolean {
+    return this._composed;
+  }
   private _errorMiddleware?: express.ErrorRequestHandler;
   /**
    * The loads of `--plugin` entries without overrides, keyed by resolved
@@ -170,6 +176,8 @@ export class DM {
     this.app.use(
       bodyParser.urlencoded({ extended: true, verify: keepRawBody })
     );
+    // Before the authentication: a probe carries no identity
+    mountHealth(this.app, this);
     this.logger = buildLogger(this.config);
     this.ldap = new ldapActions(this);
     setLogger(this.logger);
@@ -520,8 +528,10 @@ export class DM {
         path.forEach(p => typeof p === 'string' && paths.add(p));
     }
 
+    // The probes carry no identity by design: a kubelet has none
     const unguarded = [...paths].filter(
       path =>
+        !(HEALTH_PATHS as readonly string[]).includes(path) &&
         !prefixes.some(
           prefix => path === prefix || path.startsWith(`${prefix}/`)
         )
