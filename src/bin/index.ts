@@ -145,18 +145,28 @@ export class DM {
     return this._composed;
   }
 
-  private _shutdown?: Promise<void>;
+  /**
+   * The shutdown once started, and the rejections nobody handled since the
+   * start. In an object, shared by the `withConfig` views as `_authState`
+   * is: a view with a flag of its own would stop on its own.
+   */
+  private readonly life: {
+    shutdown?: Promise<void>;
+    unhandledRejections: number;
+  } = { unhandledRejections: 0 };
 
   /** The responses not sent yet, told to close their connection on a stop */
   private readonly inFlight = new Set<Response>();
 
   /** Told to stop: the readiness says so, what is in flight finishes */
   get stopping(): boolean {
-    return this._shutdown !== undefined;
+    return this.life.shutdown !== undefined;
   }
 
   /** Rejections nobody handled since the start, logged and counted */
-  unhandledRejections = 0;
+  get unhandledRejections(): number {
+    return this.life.unhandledRejections;
+  }
   private _errorMiddleware?: express.ErrorRequestHandler;
   /**
    * The loads of `--plugin` entries without overrides, keyed by resolved
@@ -184,9 +194,14 @@ export class DM {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       // A stopping server closes the connection with the response: a
       // keep-alive connection would otherwise bring requests until it is
-      // cut
+      // cut. The header does it for a response not sent yet; a response
+      // whose headers went out before the stop leaves an idle connection
+      // once sent, which `closeIdleConnections` closes.
       if (this.stopping) res.setHeader('Connection', 'close');
       this.inFlight.add(res);
+      res.once('finish', () => {
+        if (this.stopping) this.server?.closeIdleConnections();
+      });
       res.once('close', () => this.inFlight.delete(res));
       next();
     });
@@ -666,14 +681,12 @@ export class DM {
       this.logger.error(`Uncaught exception: ${err.message}`, {
         stack: err.stack,
       });
-      setTimeout(
-        () => process.exit(1),
-        this.config.shutdown_timeout as number
-      ).unref();
+      // Referenced: an empty event loop must not end the process with 0
+      setTimeout(() => process.exit(1), this.config.shutdown_timeout as number);
       void this.shutdown().finally(() => process.exit(1));
     });
     process.on('unhandledRejection', (reason: unknown) => {
-      this.unhandledRejections++;
+      this.life.unhandledRejections++;
       this.logger.error(
         `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}`,
         { stack: reason instanceof Error ? reason.stack : undefined }
@@ -703,19 +716,20 @@ export class DM {
 
   /**
    * Stop serving: the readiness answers 503, the listening socket closes,
-   * what is in flight finishes within `--shutdown-timeout`, then every
-   * plugin's `close()` runs and the directory connections are closed.
-   * Called once; a second call waits for the first.
+   * what is in flight finishes, then every plugin's `close()` runs and the
+   * directory connections are closed, the whole within `--shutdown-timeout`
+   * whatever hangs. Called once; a second call waits for the first.
    *
    * @returns when everything let go, resolved whatever failed on the way
    */
   shutdown(): Promise<void> {
-    this._shutdown ??= this.letGo();
-    return this._shutdown;
+    this.life.shutdown ??= this.letGo();
+    return this.life.shutdown;
   }
 
   private async letGo(): Promise<void> {
     const budget = this.config.shutdown_timeout as number;
+    const started = Date.now();
     // The last seconds are for the plugins and the directory to let go
     const drain = Math.max(1000, budget - 5000);
     this.logger.notice(`Shutting down, ${drain} ms for what is in flight`);
@@ -729,28 +743,49 @@ export class DM {
       server.closeIdleConnections();
       for (const res of this.inFlight)
         if (!res.headersSent) res.setHeader('Connection', 'close');
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const spent = new Promise<void>(resolve => {
-        timer = setTimeout(resolve, drain);
-      });
-      await Promise.race([closed, spent]);
-      clearTimeout(timer);
+      await DM.within(closed, drain);
       server.closeAllConnections();
     }
-    await Promise.all(
-      Object.entries(this.loadedPlugins).map(async ([name, plugin]) => {
-        if (!plugin.close) return;
-        try {
-          await plugin.close();
-        } catch (err) {
-          this.logger.warn(
-            `${name}: close failed: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
-      })
+    const closing = new Map<string, Promise<void>>();
+    for (const [name, plugin] of Object.entries(this.loadedPlugins)) {
+      if (!plugin.close) continue;
+      closing.set(
+        name,
+        Promise.resolve()
+          .then(() => plugin.close!())
+          .catch((err: unknown) => {
+            this.logger.warn(
+              `${name}: close failed: ${err instanceof Error ? err.message : String(err)}`
+            );
+          })
+          .finally(() => closing.delete(name))
+      );
+    }
+    const letGo = Promise.all(closing.values()).then(() =>
+      this.ldap.close().catch(() => undefined)
     );
-    await this.ldap.close().catch(() => undefined);
+    const left = Math.max(1000, budget - (Date.now() - started));
+    if (!(await DM.within(letGo, left)))
+      this.logger.warn(
+        `Shut down with a close still pending: ${[...closing.keys()].join(', ') || 'the directory connections'}`
+      );
     this.logger.notice('Shut down');
+  }
+
+  /** @returns whether `done` settled before `ms` passed */
+  private static async within(
+    done: Promise<void>,
+    ms: number
+  ): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const spent = new Promise<boolean>(resolve => {
+      timer = setTimeout(() => resolve(false), ms);
+    });
+    try {
+      return await Promise.race([done.then(() => true), spent]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**

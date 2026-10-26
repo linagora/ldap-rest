@@ -64,17 +64,13 @@ export default class MyPlugin extends DmPlugin {
 
 ### Error Handling and Server Resilience
 
-LDAP-Rest includes robust error handling to ensure the server remains operational even when plugins encounter errors:
-
-#### Global Error Handling
-
-The server automatically catches and handles:
-
-- **Uncaught exceptions** in plugin code
-- **Unhandled promise rejections**
-- **Errors in async route handlers**
-
-All errors are logged with full stack traces without crashing the server.
+An error a route handler or a hook throws is logged with its stack and
+answered with a 5xx; the server keeps serving. An exception nothing
+catches, in a timer or an event handler, is not: the binary shuts down and
+exits with 1, see [shutdown](../usage/operations.md#shutdown). An unhandled
+promise rejection is logged and counted, and the server keeps serving. A
+plugin holding a connection, a timer or a queue implements `close()`, see
+[for plugin authors](../usage/operations.md#for-plugin-authors).
 
 #### Using asyncHandler
 

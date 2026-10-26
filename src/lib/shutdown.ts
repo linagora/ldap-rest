@@ -10,8 +10,8 @@ const SHUTDOWN_SIGNALS: ShutdownSignal[] = ['SIGTERM', 'SIGINT'];
 export type ShutdownCallback = () => void | Promise<void>;
 
 /**
- * How long the shutdown callbacks get before the signal is raised again:
- * shorter than a pod's termination grace period. Mutable for the tests.
+ * How long the shutdown callbacks get before the signal is raised again.
+ * The binary sets it from `--shutdown-timeout`.
  */
 export const shutdownTimeout = { ms: 20_000 };
 
@@ -60,10 +60,11 @@ function fanOut(signal: ShutdownSignal): void {
   const drained = (async (): Promise<void> => {
     while (pending.length > 0) await Promise.allSettled(pending.splice(0));
   })();
+  // Referenced: a callback that hangs on an empty event loop would
+  // otherwise end the process with 0 before the signal is raised again
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<void>(resolve => {
     timer = setTimeout(resolve, shutdownTimeout.ms);
-    timer.unref();
   });
   const exitCode = 128 + osConstants.signals[signal];
   void Promise.race([drained, expired])

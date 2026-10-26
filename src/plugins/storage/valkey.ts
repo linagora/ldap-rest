@@ -69,6 +69,7 @@ export default class ValkeyStore extends Store {
    * own.
    */
   private client(): Promise<Client> {
+    if (this.closed) return Promise.reject(new Error(`${this.name}: closed`));
     // Outside the request it may be opened for: the connection outlives it
     this.connection ??= outsideAnyRequest(() => this.connect()).catch(err => {
       this.connection = undefined;

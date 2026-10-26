@@ -89,13 +89,15 @@ On `SIGTERM` or `SIGINT`, the binary stops in order:
 2. idle keep-alive connections close at once; the others close with the
    response they carry, sent with `Connection: close`, or are cut when the
    drain is spent: `--shutdown-timeout` (20 s) less the 5 s kept for the
-   steps below;
+   steps below, 1 s at least;
 3. every plugin's `close()` runs, at once: the broker connection, the
    storage backend;
 4. the directory connections are closed;
 5. the signal ends the process, with its usual code (143 on `SIGTERM`).
 
-The whole takes `--shutdown-timeout` at most. Kubernetes takes the pod out
+The whole takes `--shutdown-timeout` at most: a `close()` that does not
+settle in what remains of it is logged and left behind, by `shutdown()`
+itself, so a host gets the same bound. Kubernetes takes the pod out
 of its endpoints as it sends the signal, and the proxies follow a moment
 later: a request routed meanwhile is refused. A `preStop` hook sleeping a
 few seconds, before the signal, closes that window; the chart's `lifecycle`

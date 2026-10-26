@@ -488,7 +488,7 @@ class ldapActions {
   private currentUrlIndex: number = 0;
   // LRU cache for attribute signatures to prevent unbounded memory growth
   private attrSignatureCache: LRUCache<string, string>;
-  private waitingResolvers: Array<(conn: PooledConnection) => void> = [];
+  private waitingResolvers: Array<(conn?: PooledConnection) => void> = [];
   private availableConnections: PooledConnection[] = [];
   private isCleaningUp = false;
   /** See {@link declareObjectClasses}. */
@@ -725,6 +725,7 @@ class ldapActions {
    * @throws when no URL answers in time
    */
   async ping(timeoutMs: number): Promise<void> {
+    if (this.closed) throw new Error('LDAP connections closed');
     const errors: string[] = [];
     for (let i = 0; i < this.ldapUrls.length; i++) {
       const url =
@@ -755,14 +756,13 @@ class ldapActions {
   private closed = false;
 
   /**
-   * Close every pooled connection, the ones in use included: what was
-   * still running has been given its time by the shutdown, and a waiter is
-   * refused rather than kept.
+   * Close every pooled connection, the ones in use included: an operation
+   * still running on one is rejected by the client, and a waiter is refused
+   * rather than kept.
    */
   async close(): Promise<void> {
     this.closed = true;
-    for (const waiter of this.waitingResolvers.splice(0))
-      waiter(undefined as unknown as PooledConnection);
+    for (const waiter of this.waitingResolvers.splice(0)) waiter(undefined);
     const pooled = this.connectionPool.splice(0);
     this.availableConnections.length = 0;
     await Promise.allSettled(pooled.map(conn => conn.client.unbind()));
@@ -816,7 +816,7 @@ class ldapActions {
         reject(new Error('LDAP connection pool timeout after 30s'));
       }, 30000);
 
-      const resolveWrapper = (conn: PooledConnection) => {
+      const resolveWrapper = (conn?: PooledConnection) => {
         globalThis.clearTimeout(timeoutId);
         if (conn) resolve(conn);
         else reject(new Error('LDAP connections closed'));

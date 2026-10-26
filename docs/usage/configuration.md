@@ -152,7 +152,7 @@ to keep the default.
 | CLI                  | Plural           | Env                   | Default          | Description                                                                                       |
 | -------------------- | ---------------- | --------------------- | ---------------- | ------------------------------------------------------------------------------------------------- |
 | `--port`             |                  | `DM_PORT`             | `8081`           | Listen port                                                                                       |
-| `--shutdown-timeout` |                  | `DM_SHUTDOWN_TIMEOUT` | `20000`          | How long a stopping server gives what is in flight, in ms, see [shutdown](operations.md#shutdown) |
+| `--shutdown-timeout` |                  | `DM_SHUTDOWN_TIMEOUT` | `20000`          | How long a stop may take, in ms, see [shutdown](operations.md#shutdown)                           |
 | `--plugin`           | `--plugins`      | `DM_PLUGINS`          | `[]`             | Plugins to load                                                                                   |
 | `--log-level`        |                  | `DM_LOG_LEVEL`        | `notice`         | Log level: error, warn, notice, info, debug                                                       |
 | `--logger`           |                  | `DM_LOGGER`           | `console`        | `console` or `file`, see [Logger](#logger---logger)                                               |

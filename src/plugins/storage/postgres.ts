@@ -90,6 +90,7 @@ export default class PostgresStore extends Store {
    * leave the store unusable once it is back.
    */
   private pool(): Promise<Pool> {
+    if (this.closed) return Promise.reject(new Error(`${this.name}: closed`));
     // Outside the request it may be opened for: the connection outlives it
     this.connection ??= outsideAnyRequest(() => this.connect()).catch(err => {
       this.connection = undefined;
