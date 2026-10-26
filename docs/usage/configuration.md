@@ -45,6 +45,7 @@ All LDAP-Rest configuration options.
   - [Utility Plugins](#utility-plugins)
     - [core/static](#corestatic)
     - [core/weblogs](#coreweblogs)
+    - [core/metrics](#coremetrics)
     - [core/storage](#corestorage)
     - [core/configApi](#coreconfigapi)
 - [Configuration File](#configuration-file)

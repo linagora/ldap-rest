@@ -1773,9 +1773,14 @@ class ldapActions {
         yield page.value;
       }
     } finally {
-      await generator.return(undefined).catch(() => undefined);
-      ldapOperationDuration.observe({ operation: 'search', result }, spent);
-      this.releaseConnection(pooled);
+      try {
+        await generator.return(undefined);
+      } catch {
+        // A hook may hand back something that is no generator
+      } finally {
+        ldapOperationDuration.observe({ operation: 'search', result }, spent);
+        this.releaseConnection(pooled);
+      }
     }
   }
 

@@ -99,9 +99,8 @@ export async function timedLdap<T>(
 }
 
 /**
- * The template of the route that answered, `/api/v1/users/:id`, never the
- * URL: a label per URL would grow without bound. Under a mounted router
- * the mount is `*`, as what Express keeps of it is the URL it matched.
+ * The template of the route that answered, never the URL: a label per URL
+ * would grow without bound. See docs/usage/operations.md#metrics.
  *
  * @returns the template, `none` when no route matched
  */

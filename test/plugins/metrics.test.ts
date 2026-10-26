@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
+import { Router } from 'express';
 
 import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
@@ -43,6 +44,11 @@ describe('metrics', function () {
     dm.app.get('/things/:id', (_req, res) => {
       res.json({});
     });
+    const mounted = Router();
+    mounted.get('/x', (_req, res) => {
+      res.json({});
+    });
+    dm.app.use('/t/:tenant', mounted);
     dm.setupErrorMiddleware();
   });
 
@@ -74,21 +80,36 @@ describe('metrics', function () {
 
   it('times each request by route template and status, never by URL', async () => {
     // The instruments are the process's: what other suites counted stays
-    const count = (text: string, labels: string): number =>
+    const http = (text: string, suffix: string, labels: string): number =>
       text.includes(`{${labels}}`)
-        ? sample(text, 'ldap_rest_http_request_duration_seconds_count', labels)
+        ? sample(
+            text,
+            `ldap_rest_http_request_duration_seconds_${suffix}`,
+            labels
+          )
         : 0;
+    const count = (text: string, labels: string): number =>
+      http(text, 'count', labels);
     const before = await scrape();
     await supertest(dm.app).get('/things/42').expect(200);
     await supertest(dm.app).get('/things/43').expect(200);
     await supertest(dm.app).get('/nowhere/at/all').expect(404);
+    await supertest(dm.app).get('/t/acme/x').expect(200);
+    await supertest(dm.app).get('/T/other/x').expect(200);
     const text = await scrape();
     const matched = 'method="GET",route="/things/:id",status="200"';
     const unmatched = 'method="GET",route="none",status="404"';
+    const mounted = 'method="GET",route="*/x",status="200"';
     expect(count(text, matched) - count(before, matched)).to.equal(2);
     expect(count(text, unmatched) - count(before, unmatched)).to.equal(1);
+    expect(count(text, mounted) - count(before, mounted)).to.equal(2);
+    expect(
+      http(text, 'sum', matched) - http(before, 'sum', matched),
+      'the time taken'
+    ).to.be.above(0);
     expect(text).to.not.include('/things/42');
     expect(text).to.not.include('/nowhere');
+    expect(text).to.not.include('acme');
   });
 
   it('times the directory operations and counts the cache', async () => {
@@ -134,6 +155,7 @@ describe('metrics', function () {
     const base = dm.config.ldap_base as string;
     const dn = `cn=metrics-probe,${base}`;
     const moved = `cn=metrics-probe-2,${base}`;
+    const gone = `cn=metrics-probe-3,${base}`;
     const before = await scrape();
     await dm.ldap.add(dn, {
       objectClass: ['organizationalRole'],
@@ -141,18 +163,20 @@ describe('metrics', function () {
     });
     await dm.ldap.modify(dn, { replace: { description: 'probe' } });
     await dm.ldap.rename(dn, 'cn=metrics-probe-2');
-    await dm.ldap.delete(moved);
-    await dm.ldap.delete(moved).then(
+    await dm.ldap.move(moved, gone);
+    await dm.ldap.delete(gone);
+    await dm.ldap.delete(gone).then(
       () => expect.fail('deleted twice'),
       () => undefined
     );
     const after = await scrape();
-    for (const operation of ['add', 'modify', 'rename', 'delete']) {
+    const expected = { add: 1, modify: 1, rename: 2, delete: 1 };
+    for (const [operation, times] of Object.entries(expected)) {
       const labels = `operation="${operation}",result="ok"`;
       expect(
         operations(after, labels) - operations(before, labels),
         operation
-      ).to.equal(1);
+      ).to.equal(times);
     }
     const refused = 'operation="delete",result="32"';
     expect(operations(after, refused) - operations(before, refused)).to.equal(
@@ -162,6 +186,7 @@ describe('metrics', function () {
 
   it('times a paged search by its pages, walked through or left early', async () => {
     const before = await scrape();
+    const busy = dm.ldap.poolStats().busy;
     const left = (await dm.ldap.search({
       scope: 'sub',
       paged: { pageSize: 1 },
@@ -171,6 +196,7 @@ describe('metrics', function () {
       expect(page).to.not.equal(undefined);
       break;
     }
+    expect(dm.ldap.poolStats().busy, 'released on the break').to.equal(busy);
     const walked = (await dm.ldap.search({
       scope: 'one',
       paged: { pageSize: 2 },
@@ -182,11 +208,46 @@ describe('metrics', function () {
       pages++;
     }
     expect(pages).to.be.at.least(1);
+    expect(dm.ldap.poolStats().busy, 'released at the end').to.equal(busy);
     const after = await scrape();
     const ok = 'operation="search",result="ok"';
     expect(operations(after, ok) - operations(before, ok)).to.equal(2);
     const error = 'operation="search",result="error"';
     expect(operations(after, error) - operations(before, error)).to.equal(0);
+  });
+
+  it('reads the pool at scrape time, full and with a waiter', async () => {
+    const max = dm.ldap.poolStats().max;
+    expect(max).to.equal(dm.config.ldap_pool_size);
+    const page = {
+      scope: 'base' as const,
+      paged: { pageSize: 1 },
+      attributes: ['1.1'],
+    };
+    const held: AsyncGenerator<unknown>[] = [];
+    for (let i = 0; i < max; i++) {
+      const walk = (await dm.ldap.search(page)) as AsyncGenerator<unknown>;
+      await walk.next();
+      held.push(walk);
+    }
+    const waiting = dm.ldap.search(page);
+    await new Promise(resolve => setImmediate(resolve));
+    const full = await scrape();
+    const pool = (text: string, name: string, labels = ''): number =>
+      sample(text, `ldap_rest_ldap_pool_${name}`, labels);
+    expect(pool(full, 'connections', 'state="busy"')).to.equal(max);
+    expect(pool(full, 'connections', 'state="idle"')).to.equal(0);
+    expect(pool(full, 'waiting')).to.equal(1);
+    expect(pool(full, 'max')).to.equal(max);
+    for (const walk of held) await walk.return(undefined);
+    // A walk never started holds its connection: the generator's own
+    // release runs only once it ran
+    const served = (await waiting) as AsyncGenerator<unknown>;
+    await served.next();
+    await served.return(undefined);
+    const after = await scrape();
+    expect(pool(after, 'waiting')).to.equal(0);
+    expect(pool(after, 'connections', 'state="busy"')).to.equal(0);
   });
 
   it('counts a hook that throws, by plugin and hook', async () => {

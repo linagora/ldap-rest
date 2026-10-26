@@ -92,21 +92,26 @@ the rate limiting and the request id, to keep to the cluster or the host.
 
 | Metric                                      | Type      | Labels                      | Meaning                                                                                                                                                                        |
 | ------------------------------------------- | --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ldap_rest_http_request_duration_seconds`   | histogram | `method`, `route`, `status` | Time to answer, by route template (`/api/v1/users/:id`; `none` unmatched)                                                                                                      |
+| `ldap_rest_http_request_duration_seconds`   | histogram | `method`, `route`, `status` | Time to answer, by route template (`/api/v1/users/:id`; `none` unmatched or answered by a middleware, `core/static` included)                                                  |
 | `ldap_rest_ldap_operation_duration_seconds` | histogram | `operation`, `result`       | Time the directory takes: `bind`, `search`, `add`, `modify`, `rename`, `delete`; `ok`, the LDAP result code of a refusal (`32`: no such entry), `error` when it did not answer |
 | `ldap_rest_ldap_pool_wait_seconds`          | histogram |                             | Time to get a pooled connection, opening one included                                                                                                                          |
 | `ldap_rest_ldap_pool_connections`           | gauge     | `state`                     | Pooled connections, `busy` or `idle`                                                                                                                                           |
 | `ldap_rest_ldap_pool_waiting`               | gauge     |                             | Operations waiting for a connection, the pool being full                                                                                                                       |
 | `ldap_rest_ldap_pool_max`                   | gauge     |                             | `--ldap-pool-size`                                                                                                                                                             |
 | `ldap_rest_ldap_search_cache_total`         | counter   | `result`                    | Cacheable searches, `hit` or `miss`; nothing when the cache is off                                                                                                             |
-| `ldap_rest_hook_failures_total`             | counter   | `hook`, `plugin`            | Hooks that threw after an operation, which the server logs and goes on                                                                                                         |
-| `ldap_rest_unhandled_rejections_total`      | counter   |                             | Promise rejections nothing handled                                                                                                                                             |
+| `ldap_rest_hook_failures_total`             | counter   | `hook`, `plugin`            | Notification hooks (`*done`) that threw, which the server logs and goes on                                                                                                     |
+| `ldap_rest_unhandled_rejections_total`      | counter   |                             | Promise rejections nothing handled; counted by the binary, a host skipping `exitOnCrash()` leaves it at zero                                                                   |
 | `process_*`, `nodejs_*`                     |           |                             | The process: CPU, memory, event loop lag, handles, GC                                                                                                                          |
 
 A search the caller pages is timed page by page, what the caller does
-between two pages left out. The route label is the template a route was
-declared with, never the URL: a label per URL would grow without bound;
-under a router a plugin mounted, the mount reads `*`.
+between two pages left out; the readiness ping is not timed. The route
+label is the template a route was declared with, never the URL: a label
+per URL would grow without bound; under a router a plugin mounted, the
+mount reads `*`.
+
+The instruments come from `prom-client` 15, kept while the server supports
+Node 20, which its successor `@prometheus-io/client` dropped: the
+deprecation notice `npm install` prints is expected.
 
 The port listens on every interface. What to alert on: `/readyz` for a
 replica out of rotation, `result="error"` in
@@ -114,7 +119,7 @@ replica out of rotation, `result="error"` in
 a refusal is a result code), a
 `ldap_rest_ldap_pool_waiting` that stays above zero (raise
 `--ldap-pool-size`), `ldap_rest_hook_failures_total` rising (a
-synchronization that fails silently otherwise), the 5xx share of the
+synchronization that fails only in the log otherwise), the 5xx share of the
 requests.
 
 The Helm chart exposes the port on the Service with `metrics.enabled`, and
