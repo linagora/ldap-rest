@@ -536,7 +536,8 @@ This plugin only handles **authorization**. Combine with an authentication plugi
 
 ```json
 {
-  "error": "check logs"
+  "error": "Internal Server Error",
+  "message": "An error occurred"
 }
 ```
 

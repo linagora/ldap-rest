@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import request from 'supertest';
 import { DM } from '../src/bin/index';
+import { serverErrorBody, setDebug } from '../src/lib/expressFormatedResponses';
 
 describe('Error Handling', () => {
   let server: DM | null;
@@ -20,8 +21,10 @@ describe('Error Handling', () => {
       '/api/error-handled'
     );
     expect(res.status).to.equal(500);
-    expect(res.body).to.have.property('error');
-    expect(res.body.error).to.equal('Internal Server Error');
+    expect(res.body).to.deep.equal({
+      error: 'Internal Server Error',
+      message: 'An error occurred',
+    });
   });
 
   it('should handle unhandled async errors via error middleware and return 500', async () => {
@@ -153,5 +156,51 @@ describe('Error Handling', () => {
     delete process.env.DM_PORT;
     delete process.env.DM_PLUGINS;
     server?.stop();
+  });
+
+  describe('under --debug', () => {
+    let debugServer: DM;
+    const previous = process.env.DM_DEBUG;
+
+    before(async () => {
+      process.env.DM_DEBUG = 'true';
+      try {
+        debugServer = new DM();
+      } finally {
+        if (previous === undefined) delete process.env.DM_DEBUG;
+        else process.env.DM_DEBUG = previous;
+      }
+      await debugServer.ready;
+      debugServer.app.get('/boom', () => {
+        throw new Error('the directory is down');
+      });
+      debugServer.setupErrorMiddleware();
+    });
+
+    after(() => {
+      debugServer?.stop();
+      setDebug(false);
+    });
+
+    it('names the failure on both paths', async () => {
+      expect(debugServer.config.debug).to.equal(true);
+      const err = new Error('the directory is down');
+      expect(serverErrorBody(err)).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'the directory is down',
+      });
+      // The middleware reads its own server's flag, not the module default
+      setDebug(false);
+      const res = await request(debugServer.app).get('/boom');
+      expect(res.status).to.equal(500);
+      expect(res.body).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'the directory is down',
+      });
+      expect(serverErrorBody(err)).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'An error occurred',
+      });
+    });
   });
 });

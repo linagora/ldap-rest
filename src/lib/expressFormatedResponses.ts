@@ -30,6 +30,38 @@ export const setLogger = (logger: winston.Logger | undefined): void => {
 /** @returns the installed logger, or undefined before any `DM` exists */
 export const getLogger = (): winston.Logger | undefined => _logger;
 
+let _debug = false;
+
+/**
+ * Whether `serverError` names the failure in its answer: the `--debug` of
+ * the server, installed as its logger is.
+ *
+ * @param debug true to name the failure in the response
+ */
+export const setDebug = (debug: boolean): void => {
+  _debug = debug;
+};
+
+/**
+ * The body of a 5xx answer, for the error middleware of `DM` and
+ * `serverError` alike. The failure is for the logs: the message names it
+ * only under `--debug`.
+ *
+ * @param err what failed
+ * @param debug whether to name the failure; `serverError`'s setting by default
+ */
+export const serverErrorBody = (
+  err: unknown,
+  debug = _debug
+): { error: string; message: string } => ({
+  error: 'Internal Server Error',
+  message: debug
+    ? err instanceof Error
+      ? err.message
+      : String(err)
+    : 'An error occurred',
+});
+
 // Utility that generates standard responses depending on the success of the method
 export const tryMethod = async (
   res: Response,
@@ -125,8 +157,6 @@ export const tooManyRequests = (
 
 // 50x responses
 
-// We don't want to publish the real error in server responses.
-//
 // The logger is read guarded, as `_rejectResponse` reads it: `setLogger`
 // runs in the `DM` constructor, and anything reaching here without one —
 // a library, a test — would otherwise throw `Cannot read properties of
@@ -158,7 +188,7 @@ export const serverError = (res: Response, err: unknown): void => {
     return;
   }
 
-  // Server error (5xx) - log as error and hide details
+  // Server error (5xx): logged, named in the answer only under --debug
   if (err instanceof Error) {
     _logger?.error(err.message, err);
   } else if (typeof err === 'string') {
@@ -166,7 +196,7 @@ export const serverError = (res: Response, err: unknown): void => {
   } else {
     _logger?.error('Server error', err);
   }
-  res.status(statusCode).json({ error: 'check logs' });
+  res.status(statusCode).json(serverErrorBody(err));
 };
 export const badGateway = (res: Response, message = 'Bad Gateway'): void =>
   _rejectResponse(502, res, message);

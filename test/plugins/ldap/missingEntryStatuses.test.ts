@@ -1,7 +1,7 @@
 /**
  * A write to an entry or a value the directory does not hold, and a DN it
  * cannot parse, are the client's mistakes: they answer 404 and 400, not a
- * 500 telling the client to check logs.
+ * 500 hiding it.
  */
 import { expect } from 'chai';
 import supertest from 'supertest';
