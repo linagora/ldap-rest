@@ -29,7 +29,8 @@ out of rotation: a broken outbound service is visible in the body, and the
 server keeps serving what does not need it.
 
 The directory and the plugins are asked at once, so the answer takes 2 s at
-most. The directory is probed on a connection of its own, bound as the
+most. The probe reads the root DSE, which any bound account may: a wrong
+`--ldap-base` is not what it reports. The directory is probed on a connection of its own, bound as the
 server, outside the connection pool and the search cache. One answer serves
 5 seconds whatever the number of probes; the probes arriving meanwhile
 share it.

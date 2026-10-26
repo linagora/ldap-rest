@@ -1,3 +1,5 @@
+import { createServer, type AddressInfo } from 'net';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 import express from 'express';
@@ -99,13 +101,14 @@ describe('Readiness', () => {
   });
 
   it('asks the directory and the plugins at once, within the one timeout', async () => {
-    const slow = { health: (): Promise<HealthStatus> => later(30, 'ok') };
+    // One after the other, three of them would take 150 ms
+    const slow = { health: (): Promise<HealthStatus> => later(50, 'ok') };
     const server = probed([true], { a: slow, b: slow, c: slow });
     const started = Date.now();
-    const answer = await readiness(server, started, 50);
+    const answer = await readiness(server, started, 1000);
     expect(answer.status).to.equal('ok');
     expect(Date.now() - started, 'three slow plugins, one wait').to.be.below(
-      80
+      140
     );
   });
 
@@ -233,6 +236,25 @@ describe('Health routes', function () {
       );
     } finally {
       server.ldap['ldapUrls'] = urls;
+    }
+  });
+
+  it('gives up on a directory that accepts the connection and never answers', async () => {
+    const mute = createServer(() => undefined);
+    await new Promise<void>(resolve => mute.listen(0, '127.0.0.1', resolve));
+    const { port } = mute.address() as AddressInfo;
+    const urls = server.ldap['ldapUrls'];
+    server.ldap['ldapUrls'] = [`ldap://127.0.0.1:${port}`];
+    const started = Date.now();
+    try {
+      await server.ldap.ping(300).then(
+        () => expect.fail('answered by a mute directory'),
+        (err: Error) => expect(err.message).to.match(/No directory answered/)
+      );
+      expect(Date.now() - started, 'within the budget').to.be.below(2000);
+    } finally {
+      server.ldap['ldapUrls'] = urls;
+      mute.close();
     }
   });
 
