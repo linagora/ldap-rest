@@ -31,8 +31,6 @@ jobs:
     #   image: node:22-bookworm
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # The same services as test.yml: without them the storage backend suites
-    # skip, and a release is gated on fewer tests than a pull request.
     services:
       postgres:
         image: mirror.gcr.io/library/postgres:17-alpine
@@ -68,8 +66,8 @@ jobs:
         run: npm run build
 
       # From mirror.gcr.io, as in test.yml: Docker Hub limits anonymous pulls
-      - name: Run tests
-        run: npm test
+      - name: Run tests and check coverage
+        run: npm run coverage:check
         env:
           DM_TEST_POSTGRES_URL: postgres://postgres:postgres@localhost:5432/postgres
           DM_TEST_VALKEY_URL: redis://localhost:6379
