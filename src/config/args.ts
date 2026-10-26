@@ -45,7 +45,8 @@ export interface Config {
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
   debug: boolean;
-  logger: 'console';
+  logger: 'console' | 'file';
+  log_file?: string;
   api_prefix: string;
   mail_domain?: string[];
   // LDAP
@@ -487,6 +488,7 @@ const configArgs: ConfigTemplate = [
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
   ['--debug', 'DM_DEBUG', false, 'boolean'],
+  ['--log-file', 'DM_LOG_FILE', 'error.log'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
   [
     '--mail-domain',

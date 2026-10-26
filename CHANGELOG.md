@@ -12,6 +12,10 @@
 
 ### Fixes
 
+- `--logger` takes `console` or `file`, with `--log-file` naming the file;
+  an empty value is `console`, any other stops the server at startup,
+  [upgrading](docs/usage/upgrading.md#--logger-console-or-file)
+  ([#432](https://github.com/linagora/ldap-rest/issues/432))
 - Organizations enforce the `fixed` attributes of their schema: on a
   creation a fixed attribute takes its default and `objectClass` the classes
   of `--ldap-organization-class`, whatever the request carried, as for

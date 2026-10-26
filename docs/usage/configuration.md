@@ -50,6 +50,7 @@ All LDAP-Rest configuration options.
 - [Configuration File](#configuration-file)
 - [LDAP Failover](#ldap-failover)
 - [Log Levels (`--log-level`)](#log-levels---log-level)
+- [Logger (`--logger`)](#logger---logger)
 
 ## Environment Variables
 
@@ -153,7 +154,8 @@ to keep the default.
 | `--port`         |                  | `DM_PORT`         | `8081`           | Listen port                                                                                       |
 | `--plugin`       | `--plugins`      | `DM_PLUGINS`      | `[]`             | Plugins to load                                                                                   |
 | `--log-level`    |                  | `DM_LOG_LEVEL`    | `notice`         | Log level: error, warn, notice, info, debug                                                       |
-| `--logger`       |                  | `DM_LOGGER`       | `console`        | Logger type                                                                                       |
+| `--logger`       |                  | `DM_LOGGER`       | `console`        | `console` or `file`, see [Logger](#logger---logger)                                               |
+| `--log-file`     |                  | `DM_LOG_FILE`     | `error.log`      | File `--logger file` writes to                                                                    |
 | `--debug`        |                  | `DM_DEBUG`        | `false`          | Name the failure in the 5xx answers of the error middleware and `serverError`; not for production |
 | `--api-prefix`   |                  | `DM_API_PREFIX`   | `/api`           | API URL prefix                                                                                    |
 | `--mail-domain`  | `--mail-domains` | `DM_MAIL_DOMAIN`  | `[]`             | Mail domains                                                                                      |
@@ -744,3 +746,13 @@ The system will:
 | `debug`  | Everything, including debug output           |
 
 The `notice` level is ideal for production as it shows web access logs without flooding with general info messages.
+
+## Logger _(`--logger`)_
+
+| Logger    | Output                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------- |
+| `console` | One JSON object per line on standard output (errors and warnings on standard error)                  |
+| `file`    | Text lines appended to `--log-file` (`DM_LOG_FILE`), `error.log` in the working directory by default |
+
+An empty value is `console`. Any other value, or `file` with an empty
+`--log-file`, stops the server at startup.

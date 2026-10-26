@@ -17,6 +17,13 @@ The server now stops at startup naming the missing option. Set `DM_LDAP_DN`
 and `DM_LDAP_PWD` (or `--ldap-dn` and `--ldap-pwd`) to the values that were
 implied.
 
+### `--logger`: `console` or `file`
+
+A `DM_LOGGER` set to anything else wrote `error.log` in the working
+directory; the server now stops at startup. Set `DM_LOGGER=file` to keep
+that file, and `DM_LOG_FILE` to name another one. An empty `DM_LOGGER` is
+`console`.
+
 ## From 1.0 to 1.1.0
 
 ### The static files can no longer be framed by another origin

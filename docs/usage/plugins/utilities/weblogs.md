@@ -377,15 +377,15 @@ For high-traffic deployments:
 
 ## Log Rotation
 
-Configure log rotation using environment or external tools:
+Rotate the log file with external tools:
 
-### Using Winston File Transport
+### Writing to a file
 
 ```bash
---log-file ./logs/ldap-rest.log \
---log-max-size 10485760 \    # 10MB
---log-max-files 5
+--logger file --log-file ./logs/ldap-rest.log
 ```
+
+The server does not rotate the file itself.
 
 ### Using logrotate (Linux)
 
