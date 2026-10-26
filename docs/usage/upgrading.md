@@ -4,6 +4,18 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## Unreleased
+
+### `--ldap-dn` and `--ldap-pwd` are required
+
+**Who is affected:** a deployment that set neither, and so bound as
+`cn=admin,dc=example,dc=com` with the password `admin`; the published Docker
+image carried both in its `ENV`.
+
+The server now stops at startup naming the missing option. Set `DM_LDAP_DN`
+and `DM_LDAP_PWD` (or `--ldap-dn` and `--ldap-pwd`) to the values that were
+implied.
+
 ## From 1.0 to 1.1.0
 
 ### The static files can no longer be framed by another origin

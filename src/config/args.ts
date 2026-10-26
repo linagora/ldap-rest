@@ -497,8 +497,8 @@ const configArgs: ConfigTemplate = [
 
   // LDAP options
   ['--ldap-base', 'DM_LDAP_BASE', ''],
-  ['--ldap-dn', 'DM_LDAP_DN', 'cn=admin,dc=example,dc=com'],
-  ['--ldap-pwd', 'DM_LDAP_PWD', 'admin'],
+  ['--ldap-dn', 'DM_LDAP_DN', ''],
+  ['--ldap-pwd', 'DM_LDAP_PWD', ''],
   [
     '--ldap-url',
     'DM_LDAP_URL',
