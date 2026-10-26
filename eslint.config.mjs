@@ -165,7 +165,12 @@ export default [
         {
           patterns: [
             {
-              group: ['**/config/schema'],
+              group: [
+                '**/config/schema',
+                '**/config/schema.js',
+                './schema',
+                './schema.js',
+              ],
               importNames: [
                 'schemaAttribute',
                 'matchesPattern',

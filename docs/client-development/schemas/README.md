@@ -392,7 +392,7 @@ attribute. Every refusal answers 400 with the attribute's name.
 Every entity route applies these rules; `test/lib/entitySchema.contract.test.ts`
 asserts them on a flat entity, a group and an organization alike. In the
 server they are enforced by `EntityValidator` (`src/lib/entitySchema/validator.ts`)
-alone: ESLint refuses the import of its schema helpers anywhere else.
+alone: ESLint refuses the import of the schema helpers anywhere else.
 
 #### `required` (Optional, default: `false`)
 
