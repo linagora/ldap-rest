@@ -141,18 +141,32 @@ describe('Shutdown', function () {
     expect(holding.closed, 'and lets go once').to.deep.equal(['holding']);
   });
 
-  it('closes a connection whose response had started with that response', async () => {
-    const { server, port, holding } = await serve(8000);
+  /** A raw keep-alive connection: what it received, and when it closed */
+  const open = async (
+    port: number
+  ): Promise<{
+    write: (path: string) => void;
+    received: () => string;
+    ended: Promise<void>;
+  }> => {
     const socket = connect(port);
     await new Promise(resolve => socket.once('connect', resolve));
     let received = '';
     socket.on('data', chunk => (received += chunk.toString()));
-    const ended = new Promise<void>(resolve => socket.once('close', resolve));
-    socket.write(`GET /stream HTTP/1.1\r\nHost: localhost\r\n\r\n`);
+    return {
+      write: path =>
+        socket.write(`GET ${path} HTTP/1.1\r\nHost: localhost\r\n\r\n`),
+      received: () => received,
+      ended: new Promise<void>(resolve => socket.once('close', resolve)),
+    };
+  };
+
+  it('closes the connection of a response that had started once it ends', async () => {
+    const { server, port, holding } = await serve(8000);
+    const socket = await open(port);
+    socket.write('/stream');
     await pause(100);
     const stopping = server.shutdown();
-    // Pipelined on the connection the stream holds: answered after it
-    socket.write(`GET /readyz HTTP/1.1\r\nHost: localhost\r\n\r\n`);
     await pause(100);
     holding.releaseStream();
     const released = Date.now();
@@ -160,11 +174,29 @@ describe('Shutdown', function () {
     expect(Date.now() - released, 'the drain ends with the stream').to.be.below(
       1500
     );
-    await ended;
-    const responses = received.split(/(?=HTTP\/1\.1 )/);
-    expect(responses, received).to.have.length(2);
+    await socket.ended;
+    expect(socket.received()).to.match(/^HTTP\/1\.1 200/);
+    expect(socket.received()).to.include('last');
+  });
+
+  it('answers a request pipelined behind it with Connection: close', async () => {
+    const { server, port, holding } = await serve(8000);
+    const socket = await open(port);
+    socket.write('/stream');
+    await pause(100);
+    const stopping = server.shutdown();
+    socket.write('/readyz');
+    await pause(100);
+    holding.releaseStream();
+    const released = Date.now();
+    await stopping;
+    expect(Date.now() - released, 'the drain ends with the stream').to.be.below(
+      1500
+    );
+    await socket.ended;
+    const responses = socket.received().split(/(?=HTTP\/1\.1 )/);
+    expect(responses, socket.received()).to.have.length(2);
     expect(responses[0]).to.match(/^HTTP\/1\.1 200/);
-    expect(responses[0]).to.include('last');
     expect(responses[1]).to.match(/^HTTP\/1\.1 503/);
     expect(responses[1]).to.match(/^Connection: close$/m);
   });
@@ -242,7 +274,11 @@ describe('Crash policy', function () {
     const out = await runChild('crash-hangs');
     expect(out.code, out.lines.join('\n')).to.equal(1);
     expect(out.lines).to.include('closing');
-    expect(out.ms).to.be.within(900, 6000);
+    expect(
+      out.lines.some(l => /still pending: holding/.test(l)),
+      'the shutdown gave up on the close'
+    ).to.equal(true);
+    expect(out.ms).to.be.within(1500, 6000);
   });
 });
 

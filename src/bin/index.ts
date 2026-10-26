@@ -764,7 +764,9 @@ export class DM {
     const letGo = Promise.all(closing.values()).then(() =>
       this.ldap.close().catch(() => undefined)
     );
-    const left = Math.max(1000, budget - (Date.now() - started));
+    // A second short of the budget: the crash and signal timers end the
+    // process at the budget, and what gave up is logged before they do
+    const left = Math.max(1000, budget - (Date.now() - started) - 1000);
     if (!(await DM.within(letGo, left)))
       this.logger.warn(
         `Shut down with a close still pending: ${[...closing.keys()].join(', ') || 'the directory connections'}`

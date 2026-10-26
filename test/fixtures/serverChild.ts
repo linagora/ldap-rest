@@ -16,7 +16,7 @@ const say = (what: string): void => {
 const server = new DM();
 await server.ready;
 server.config.port = 0;
-server.config.shutdown_timeout = 2000;
+server.config.shutdown_timeout = 3000;
 class Holding extends DmPlugin {
   name = 'holding';
   close(): Promise<void> {
