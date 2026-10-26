@@ -154,6 +154,37 @@ export default [
     },
   },
 
+  // One validator enforces the entity schemas, see
+  // docs/client-development/schemas/README.md#what-a-value-must-look-like
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/config/schema.ts', 'src/lib/entitySchema/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/config/schema',
+                '**/config/schema.js',
+                './schema',
+                './schema.js',
+              ],
+              importNames: [
+                'schemaAttribute',
+                'matchesPattern',
+                'checkDnValues',
+              ],
+              message:
+                'Validate through EntityValidator (src/lib/entitySchema/validator.ts); the schema helpers are its own.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // The SCIM plugin serves identity providers, and every operation it makes
   // is judged by the request it is made for. Bind the request once with
   // `ldap.forRequest(req)`, so each operation names the request it means
