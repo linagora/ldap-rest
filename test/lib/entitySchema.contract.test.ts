@@ -292,6 +292,10 @@ describe('Entity schema contract', function () {
     },
     { title: 'an empty pointer', attributes: () => ({ seeAlso: '' }) },
     {
+      title: 'an array for a pointer',
+      attributes: () => ({ seeAlso: [pointee] }),
+    },
+    {
       title: 'a pointer outside its branch',
       attributes: () => ({ seeAlso: process.env.DM_LDAP_TOP_ORGANIZATION }),
     },
