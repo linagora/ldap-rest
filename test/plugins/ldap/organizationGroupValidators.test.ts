@@ -144,9 +144,12 @@ describe('Organization and group validators', function () {
       expect(await stored('telephoneNumber')).to.equal('+1234567890');
     });
 
-    it('should answer 400, not 500, to an attribute the schema does not know', async () => {
+    it('should refuse an attribute the schema does not know, naming the organization', async () => {
       const res = await putOrg({ replace: { notAnAttribute: 'x' } });
       expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Unknown attribute "notAnAttribute" for organization'
+      );
     });
 
     it('should answer 400, not 500, to several values for a single one', async () => {

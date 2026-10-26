@@ -43,15 +43,9 @@ import { staticSchemaUrl } from '../../lib/staticFiles';
 import type { Schema } from '../../config/schema';
 import {
   assertClientMaySet,
-  checkDnValues,
-  invalidValueMessage,
-  matchesPattern,
   modifiedAttributeNames,
-  missingRequiredAttribute,
-  toDirectoryChanges,
-  toDirectoryEntry,
-  schemaAttribute,
 } from '../../config/schema';
+import { EntityValidator } from '../../lib/entitySchema/validator';
 
 /**
  * Shared OpenAPI schemas surfaced by this plugin. Picked up by
@@ -1317,8 +1311,7 @@ export default class LdapOrganizations extends DmPlugin {
     // Before the checks reading the directory: a pointer leading nowhere is
     // not for a caller who may not create here
     await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
-    // Validate with schema if available
-    await this.validateNewOrganization(dn, entry);
+    await this.validator().validateNew(entry);
     // Hooks will validate the organization link and path
     return await this.server.ldap.add(dn, entry, req);
   }
@@ -1335,49 +1328,9 @@ export default class LdapOrganizations extends DmPlugin {
       this.opNumber(),
       req,
     ]);
-    // Validate with schema if available
-    await this.validateChanges(dn, changes);
+    await this.validator().validateChanges(changes);
     // Hooks will validate any changes to organization link and path
     return await this.server.ldap.modify(dn, changes, req);
-  }
-
-  async validateNewOrganization(
-    dn: string,
-    entry: AttributesList
-  ): Promise<boolean> {
-    if (!this.schema) {
-      toDirectoryEntry(undefined, entry);
-      return true;
-    }
-
-    // Check each field
-    for (const [field, value] of Object.entries(entry)) {
-      if (!(await this._validateOneChange(field, value))) {
-        throw new BadRequestError(this.invalidValueMessage(field));
-      }
-    }
-
-    // Check required fields. A `generated` attribute is exempt — it is filled
-    // by a hook after validation, so demanding it here would refuse the very
-    // payload the hook expects — but only when a loaded plugin says it will
-    // fill it. Exempting it unconditionally wrote an organization missing the
-    // path its own schema calls required, which no client could ever repair:
-    // a generated attribute is refused as input. Same check as the flat path.
-    const missing = missingRequiredAttribute(
-      this.schema,
-      entry,
-      this.server.loadedPlugins
-    );
-    if (missing)
-      throw new BadRequestError(`Attribute "${missing}" is required`);
-    // After the checks above, whose refusals quote the schema's hint: this
-    // converts in place what they let through, the value written included
-    toDirectoryEntry(this.schema, entry);
-    return true;
-  }
-
-  invalidValueMessage(field: string): string {
-    return invalidValueMessage(field, schemaAttribute(this.schema, field)?.[1]);
   }
 
   /**
@@ -1393,75 +1346,13 @@ export default class LdapOrganizations extends DmPlugin {
         entry[field] = attr.default;
   }
 
-  async validateChanges(dn: string, changes: ModifyRequest): Promise<boolean> {
-    if (!this.schema) {
-      toDirectoryChanges(undefined, changes);
-      return true;
-    }
-
-    for (const field of modifiedAttributeNames(changes))
-      if (schemaAttribute(this.schema, field)?.[1]?.fixed)
-        throw new BadRequestError(
-          `Attribute "${field}" is fixed and cannot be modified`
-        );
-
-    if (changes.add) {
-      for (const [field, value] of Object.entries(changes.add)) {
-        if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(this.invalidValueMessage(field));
-        }
-      }
-    }
-
-    if (changes.replace) {
-      for (const [field, value] of Object.entries(changes.replace)) {
-        if (!(await this._validateOneChange(field, value))) {
-          throw new BadRequestError(this.invalidValueMessage(field));
-        }
-      }
-    }
-
-    // After the checks above, whose refusals quote the schema's hint: this
-    // converts in place what they let through, the value written included
-    toDirectoryChanges(this.schema, changes);
-    return true;
-  }
-
-  async _validateOneChange(
-    field: string,
-    value: AttributeValue | null
-  ): Promise<boolean> {
-    if (!this.schema) return true;
-    // Every refusal here is the client's value, so a 400: a plain Error
-    // would be a 500, and would leave the hint-quoting message of the
-    // callers unreachable.
-    const fieldTest = schemaAttribute(this.schema, field)?.[1];
-    if (!fieldTest) {
-      if (this.schema.strict)
-        throw new BadRequestError(`Attribute "${field}" is not allowed`);
-      return true;
-    }
-    // An empty list is no value: a replace clears the attribute with it, and
-    // ldapActions refuses it on an add or a creation
-    if (
-      value === null ||
-      value === undefined ||
-      (Array.isArray(value) && value.length === 0)
-    ) {
-      if (fieldTest.required)
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      return true;
-    }
-
-    // A single-valued attribute takes one value. A multi-valued one takes one
-    // value or several, as on the flat routes and in LDAP itself: requiring a
-    // list refused, with a 500, the string an existing client still sends for
-    // an attribute a schema turned into an array (`telephoneNumber`).
-    if (fieldTest.type === 'string' && Array.isArray(value))
-      throw new BadRequestError(`Attribute "${field}" must be a single value`);
-
-    await checkDnValues(field, fieldTest, value, dn => this.entryExists(dn));
-    return matchesPattern(fieldTest, value);
+  /** The schema's rules; the pointer lookups run as the server */
+  private validator(): EntityValidator {
+    return new EntityValidator(this.schema, {
+      entryExists: dn => this.entryExists(dn),
+      loadedPlugins: this.server.loadedPlugins,
+      singularName: 'organization',
+    });
   }
 
   /**
