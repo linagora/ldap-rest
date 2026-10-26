@@ -121,16 +121,17 @@ describe('Entity schema contract', function () {
   let request: ReturnType<typeof supertest>;
   let base: string;
   let pointee: string;
-  const previous = {
-    group: process.env.DM_GROUP_SCHEMA,
-    organization: process.env.DM_ORGANIZATION_SCHEMA,
-  };
+  // Read once the embedded directory has set the environment, not when the
+  // file loads: restoring an earlier reading would drop the suite's schemas
+  const previous: Record<string, string | undefined> = {};
 
   before(function () {
     skipIfMissingEnvVars(this, [...LDAP_ENV_VARS_WITH_ORG]);
   });
 
   before(async () => {
+    previous.group = process.env.DM_GROUP_SCHEMA;
+    previous.organization = process.env.DM_ORGANIZATION_SCHEMA;
     base = process.env.DM_LDAP_BASE as string;
     pointee = `uid=contract-pointee,ou=users,${base}`;
     process.env.DM_GROUP_SCHEMA = './test/fixtures/schemas/contractGroups.json';
