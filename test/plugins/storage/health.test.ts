@@ -22,18 +22,28 @@ const logger = {
 } as unknown as winston.Logger;
 
 /** A PostgreSQL driver whose clients answer every query as `answer` says */
-const fakePg = (answer: (text: string) => Promise<unknown>) => ({
-  Pool: class {
-    on(): void {}
-    query = answer;
-    async end(): Promise<void> {}
-  },
-  Client: class {
-    async connect(): Promise<void> {}
-    query = answer;
-    async end(): Promise<void> {}
-  },
-});
+const fakePg = (answer: (text: string) => Promise<unknown>) => {
+  const driver = {
+    /** Clients closed */
+    ended: 0,
+    Pool: class {
+      on(): void {}
+      query = answer;
+      async end(): Promise<void> {}
+    },
+    Client: class {
+      on(): this {
+        return this;
+      }
+      async connect(): Promise<void> {}
+      query = answer;
+      async end(): Promise<void> {
+        driver.ended++;
+      }
+    },
+  };
+  return driver;
+};
 
 /** A Valkey driver whose client answers PING as `answer` says */
 const fakeValkey = (answer: () => Promise<string>) => ({
@@ -83,12 +93,14 @@ describe('Storage health', () => {
 
   it('asks PostgreSQL for a row on a client of its own', async () => {
     class Stubbed extends PostgresStore {
-      constructor(public answer: (text: string) => Promise<unknown>) {
+      fake: ReturnType<typeof fakePg>;
+      constructor(answer: (text: string) => Promise<unknown>) {
         super(logger, 'postgres://health', 'records');
+        this.fake = fakePg(answer);
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       protected async driver(): Promise<any> {
-        return fakePg(this.answer);
+        return this.fake;
       }
     }
     const asked: string[] = [];
@@ -98,6 +110,7 @@ describe('Storage health', () => {
     });
     expect(await fine.health()).to.equal('ok');
     expect(asked).to.deep.equal(['SELECT 1']);
+    expect(fine.fake.ended, 'closed after').to.equal(1);
     const gone = new Stubbed(async () => {
       throw new Error('connection terminated');
     });
@@ -105,6 +118,7 @@ describe('Storage health', () => {
       () => expect.fail('a database gone answered'),
       () => undefined
     );
+    expect(gone.fake.ended, 'closed after a refusal').to.equal(1);
   });
 
   it('has nothing of its own to ask with the ldap backend', async () => {
@@ -165,6 +179,23 @@ describe('Storage health', () => {
       'warn stub: does not answer: connection refused',
       'info stub: answers again',
     ]);
+    // A late refusal, overtaken by a probe that was answered, says nothing
+    lines.length = 0;
+    let refuse: (err: Error) => void = () => undefined;
+    const late = {
+      name: 'stub',
+      health: (): Promise<never> =>
+        new Promise((_, reject) => {
+          refuse = reject;
+        }),
+    };
+    plugin.store = late as unknown as Store;
+    const first = plugin.health();
+    plugin.store = answering as unknown as Store;
+    expect(await plugin.health()).to.equal('ok');
+    refuse(new Error('too late'));
+    expect(await first).to.equal('degraded');
+    expect(lines).to.deep.equal([]);
     await rm(dir, { recursive: true, force: true });
   });
 });

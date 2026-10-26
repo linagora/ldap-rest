@@ -63,6 +63,9 @@ export default class PostgresStore extends Store {
       connectionTimeoutMillis: PROBE_TIMEOUT_MS,
       query_timeout: PROBE_TIMEOUT_MS,
     });
+    // A socket the server drops is reported here as well as to the query;
+    // without a listener, that event takes the whole process down
+    client.on('error', () => undefined);
     try {
       await client.connect();
       await client.query('SELECT 1');
