@@ -169,7 +169,10 @@ This will be replaced with the actual LDAP base at runtime (e.g., `ou=users,dc=e
 
 ## Attribute Types
 
-LDAP-Rest supports three main attribute types: `string`, `array`, and `pointer`.
+LDAP-Rest supports three main attribute types: `string`, `array`, and `pointer`,
+plus `number`, `integer`, `boolean` and `date` for single values. What a
+client sends has to have the shape of the type, see
+[what a value must look like](#what-a-value-must-look-like).
 
 ### String Type
 
@@ -337,7 +340,7 @@ Complete reference for all attribute properties.
 
 | Property   | Type            | Applies To          | Description                                                                           | Example                             |
 | ---------- | --------------- | ------------------- | ------------------------------------------------------------------------------------- | ----------------------------------- |
-| `type`     | string          | All                 | Attribute data type: `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"`      | `"string"`                          |
+| `type`     | string          | All                 | `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"`, `"boolean"`, `"date"`    | `"string"`                          |
 | `required` | boolean         | All                 | Whether the attribute must be present                                                 | `true`                              |
 | `fixed`    | boolean         | All                 | Whether the attribute value cannot be changed after creation                          | `true`                              |
 | `role`     | string/string[] | String              | Semantic role, or roles, for special handling (see [Semantic Roles](#semantic-roles)) | `"identifier"`                      |
@@ -364,6 +367,31 @@ Defines the data type of the attribute. Supported values:
 - `"pointer"`: Reference to another LDAP entry (DN)
 - `"number"`: Numeric value (integer or float)
 - `"integer"`: Integer value only
+- `"boolean"`: `true` or `false`, stored as `TRUE` / `FALSE`
+- `"date"`: LDAP generalized time, as text
+
+#### What a value must look like
+
+A single-valued attribute takes one value, an `array` a list. A list of one
+value stands for that value and one value for a list of one, so what a read
+answers, one value where the attribute holds one, can be sent back as is;
+two values or more for a single-valued attribute are refused. Each element
+of an `array` follows `items.type`, text without `items`. A `number` or
+`integer` is a JSON number or its text (`42`, `"42"`), a `boolean` a JSON
+boolean or the directory's `TRUE` / `FALSE`; anything else for them, and
+anything but text for a `string`, `date` or `pointer`, is refused; an
+attribute with `normalize` takes any text, read after validation. In a
+`replace`, `null` or `[]` clears an attribute; in an `add` or on a creation
+they are refused as no value. A `delete` naming the attribute, or naming it
+with no value, removes it, unless it is `required`; naming values removes
+those, every value it holds included, as the server does not read what
+remains, and `''` names no value. An empty string sent as a value is
+checked against `test`, refused for a pointer, and missing for a `required`
+attribute. Every refusal answers 400 with the attribute's name.
+
+The flat routes apply these rules in full; what the group and organization
+routes still answer otherwise is listed in
+`test/lib/entitySchema.contract.test.ts`.
 
 #### `required` (Optional, default: `false`)
 
@@ -674,13 +702,8 @@ Common validation patterns:
 
 ### Type Validation
 
-Attribute values must match their declared type:
-
-- **String**: Single text value
-- **Array**: Multiple values (may be empty unless required)
-- **Number**: Numeric value (integer or float)
-- **Integer**: Integer value only
-- **Pointer**: Valid DN string
+Attribute values must have the shape of their declared type, see
+[what a value must look like](#what-a-value-must-look-like).
 
 ### Fixed Attributes
 

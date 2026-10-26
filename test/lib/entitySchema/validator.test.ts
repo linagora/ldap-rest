@@ -81,6 +81,28 @@ describe('EntityValidator', () => {
       ).to.equal('Attribute "uid" is required');
     });
 
+    it('takes 0 and false for a required number and boolean', async () => {
+      const numeric = {
+        ...schema,
+        attributes: {
+          ...schema.attributes,
+          n: { type: 'number', required: true },
+          b: { type: 'boolean', required: true },
+        },
+      } as unknown as Schema;
+      const candidate = entry({ n: 0, b: false });
+      expect(await refusal(validator(numeric).validateNew(candidate))).to.be
+        .undefined;
+      expect(candidate.n).to.equal('0');
+      expect(candidate.b).to.equal('FALSE');
+    });
+
+    it('leaves no null in the entry', async () => {
+      const candidate = entry({ businessCategory: null });
+      expect(await refusal(validator().validateNew(candidate))).to.be.undefined;
+      expect(candidate.businessCategory).to.deep.equal([]);
+    });
+
     it('names the first required attribute left out', async () => {
       const candidate = entry();
       delete candidate.description;
@@ -110,10 +132,36 @@ describe('EntityValidator', () => {
       ).to.equal('Attribute "l" is fixed and cannot be deleted');
     });
 
-    it('calls an unknown attribute invalid, as the flat routes do', async () => {
+    it('names an unknown attribute of a strict schema', async () => {
+      for (const changes of [{ replace: { x: 'y' } }, { delete: ['x'] }])
+        expect(await refusal(validator().validateChanges(changes))).to.equal(
+          'Unknown attribute "x" for person'
+        );
+    });
+
+    it('refuses deleting a required attribute as a whole, not some of its values', async () => {
+      for (const changes of [
+        { delete: ['description'] },
+        { delete: { description: [] } },
+        { delete: { description: null } },
+        { delete: { description: '' } },
+      ] as any[])
+        expect(
+          await refusal(validator().validateChanges(changes)),
+          JSON.stringify(changes)
+        ).to.equal('Attribute "description" is required');
       expect(
-        await refusal(validator().validateChanges({ replace: { x: 'y' } }))
-      ).to.equal('Invalid value for attribute "x"');
+        await refusal(
+          validator().validateChanges({ delete: { description: ['old'] } })
+        )
+      ).to.be.undefined;
+    });
+
+    it('clears an optional attribute with null, as the directory reads []', async () => {
+      const changes = { replace: { businessCategory: null } } as any;
+      expect(await refusal(validator().validateChanges(changes))).to.be
+        .undefined;
+      expect(changes.replace.businessCategory).to.deep.equal([]);
     });
 
     it('clears an optional attribute with no value, not a required one', async () => {
@@ -142,7 +190,7 @@ describe('EntityValidator', () => {
 
   describe('validateValue, on a pointer', () => {
     for (const [value, message] of [
-      [[bob], 'Attribute "manager" must be a string (DN pointer)'],
+      [[bob, nobody], 'Attribute "manager" must be a single value'],
       ['', 'Attribute "manager" must point to a DN'],
       [
         'uid=bob,ou=groups,dc=example,dc=com',
@@ -168,6 +216,63 @@ describe('EntityValidator', () => {
       );
       expect(await refusal(validator().validateValue('secretary', [bob]))).to.be
         .undefined;
+    });
+  });
+
+  describe('validateValue, on a shape', () => {
+    it('takes a list of one for a single value and one value for a list', async () => {
+      expect(await validator().validateValue('description', ['a'])).to.equal(
+        'a'
+      );
+      expect(await validator().validateValue('manager', [bob])).to.equal(bob);
+      expect(
+        await validator().validateValue('secretary', bob as unknown as string[])
+      ).to.deep.equal([bob]);
+    });
+
+    for (const [field, value, message] of [
+      ['description', ['a', 'b'], 'must be a single value'],
+      ['description', 42, 'must be a string'],
+      ['secretary', [42], 'must be a string'],
+    ] as Array<[string, unknown, string]>) {
+      it(`answers ${message} for ${JSON.stringify(value)} in ${field}`, async () => {
+        expect(
+          await refusal(validator().validateValue(field, value as string))
+        ).to.equal(`Attribute "${field}" ${message}`);
+      });
+    }
+
+    it('takes a number, an integer or a boolean as such or as its text', async () => {
+      const numeric = {
+        ...schema,
+        attributes: {
+          ...schema.attributes,
+          n: { type: 'number' },
+          i: { type: 'integer' },
+          b: { type: 'boolean' },
+        },
+      } as unknown as Schema;
+      const v = validator(numeric);
+      for (const [field, value] of [
+        ['n', 42],
+        ['n', '4.2'],
+        ['i', 7],
+        ['i', '-7'],
+        ['b', true],
+        ['b', 'FALSE'],
+      ] as Array<[string, unknown]>)
+        expect(await refusal(v.validateValue(field, value as string)), field).to
+          .be.undefined;
+      for (const [field, value, message] of [
+        ['n', 'abc', 'a number'],
+        ['n', Infinity, 'a number'],
+        ['i', 4.2, 'an integer'],
+        ['i', '4.2', 'an integer'],
+        ['b', 'yes', 'a boolean'],
+      ] as Array<[string, unknown, string]>)
+        expect(await refusal(v.validateValue(field, value as string))).to.equal(
+          `Attribute "${field}" must be ${message}`
+        );
     });
   });
 

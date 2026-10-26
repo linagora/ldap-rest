@@ -724,7 +724,13 @@ export function missingRequiredAttribute(
       );
     });
   for (const [field, attr] of Object.entries(schema.attributes)) {
-    if (!attr.required || entry[field]) continue;
+    const value = entry[field];
+    const missing =
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0);
+    if (!attr.required || !missing) continue;
     if (attr.generated && (attr.generatedFrom || filledByAPlugin(field, attr)))
       continue;
     return field;

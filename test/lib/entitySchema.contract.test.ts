@@ -38,37 +38,23 @@ interface Entity {
 
 /** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
 const divergences: Record<string, [status: number, reason: string]> = {
-  'users: creation: refuses an array for a string': [201, 'stores every value'],
-  'users: replace: refuses an array for a string': [200, 'stores every value'],
-  'users: add: refuses an array for a string': [200, 'stores every value'],
-  'users: creation: refuses a string that is not a number for a number': [
-    201,
-    'stores it',
+  'groups: creation: refuses null for an optional attribute': [500, 'crashes'],
+  'organizations: creation: refuses null for an optional attribute': [
+    500,
+    'crashes',
   ],
-  'users: replace: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'users: add: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'users: creation: refuses a string for an array of pointers': [
-    201,
-    'stores it',
-  ],
-  'users: replace: refuses a string for an array of pointers': [
-    200,
-    'stores it',
-  ],
-  'users: add: refuses a string for an array of pointers': [200, 'stores it'],
-  'users: replace: refuses null for a required attribute': [500, 'crashes'],
-  'users: replace: clears an optional attribute with null': [500, 'crashes'],
-  'users: delete: refuses deleting a required attribute': [200, 'deletes it'],
-  'users: delete: refuses deleting an attribute the schema does not declare': [
-    200,
-    'deletes it',
-  ],
+  'organizations: delete: refuses deleting a required attribute, named with no value':
+    [200, 'deletes it'],
+  'organizations: delete: refuses deleting a required attribute, named with null':
+    [200, 'deletes it'],
+  'groups: creation: accepts a list of one for a single value and one value for a list':
+    [400, 'refuses the list of one'],
+  'groups: replace: accepts a list of one for a single value and one value for a list':
+    [400, 'refuses the list of one'],
+  'organizations: creation: accepts a list of one for a single value and one value for a list':
+    [400, 'refuses the list of one'],
+  'organizations: replace: accepts a list of one for a single value and one value for a list':
+    [400, 'refuses the list of one'],
   'groups: creation: writes a fixed attribute as the schema says': [
     200,
     'writes nothing',
@@ -89,18 +75,6 @@ const divergences: Record<string, [status: number, reason: string]> = {
   'organizations: replace: refuses a string that is not a number for a number':
     [200, 'stores it'],
   'organizations: add: refuses a string that is not a number for a number': [
-    200,
-    'stores it',
-  ],
-  'organizations: creation: refuses a string for an array of pointers': [
-    200,
-    'stores it',
-  ],
-  'organizations: replace: refuses a string for an array of pointers': [
-    200,
-    'stores it',
-  ],
-  'organizations: add: refuses a string for an array of pointers': [
     200,
     'stores it',
   ],
@@ -292,20 +266,12 @@ describe('Entity schema contract', function () {
     },
     { title: 'an empty pointer', attributes: () => ({ seeAlso: '' }) },
     {
-      title: 'an array for a pointer',
-      attributes: () => ({ seeAlso: [pointee] }),
-    },
-    {
       title: 'a pointer outside its branch',
       attributes: () => ({ seeAlso: process.env.DM_LDAP_TOP_ORGANIZATION }),
     },
     {
       title: 'a pointer to a missing entry',
       attributes: () => ({ seeAlso: `uid=contract-nobody,ou=users,${base}` }),
-    },
-    {
-      title: 'a string for an array of pointers',
-      attributes: () => ({ secretary: pointee }),
     },
     {
       title: 'a missing entry in an array of pointers',
@@ -317,11 +283,30 @@ describe('Entity schema contract', function () {
   ];
 
   /** Deletions refused: the schema knows what is required, fixed or undeclared */
-  const refusedDeletes: Array<{ title: string; attributes: string[] }> = [
-    { title: 'a required attribute', attributes: ['description'] },
-    { title: 'a fixed attribute', attributes: ['l'] },
+  const refusedDeletes: Array<{
+    title: string;
+    body: unknown;
+    attributes: string[];
+  }> = [
+    {
+      title: 'a required attribute',
+      body: ['description'],
+      attributes: ['description'],
+    },
+    {
+      title: 'a required attribute, named with no value',
+      body: { description: [] },
+      attributes: ['description'],
+    },
+    {
+      title: 'a required attribute, named with null',
+      body: { description: null },
+      attributes: ['description'],
+    },
+    { title: 'a fixed attribute', body: ['l'], attributes: ['l'] },
     {
       title: 'an attribute the schema does not declare',
+      body: ['telephoneNumber'],
       attributes: ['telephoneNumber'],
     },
   ];
@@ -442,6 +427,28 @@ describe('Entity schema contract', function () {
 
         define(
           'creation',
+          'accepts a list of one for a single value and one value for a list',
+          () =>
+            request.post(entity.route).send(
+              entity.create({
+                description: ['A person'],
+                seeAlso: [pointee],
+                secretary: pointee,
+              })
+            ),
+          async res => {
+            created(res);
+            expect(await stored(entity.dn(), 'description')).to.equal(
+              'A person'
+            );
+            expect(await stored(entity.dn(), 'seeAlso')).to.equal(pointee);
+            // One value comes back bare
+            expect(await stored(entity.dn(), 'secretary')).to.equal(pointee);
+          }
+        );
+
+        define(
+          'creation',
           'keeps its own classes',
           () =>
             request
@@ -484,6 +491,24 @@ describe('Entity schema contract', function () {
             async res => {
               refusedBySchema(res);
               expect(res.body.error).to.match(/description.*required/);
+            }
+          );
+        }
+
+        for (const [title, value] of [
+          ['refuses no value for an optional attribute', []],
+          ['refuses null for an optional attribute', null],
+        ] as Array<[string, unknown]>) {
+          define(
+            'creation',
+            title,
+            () =>
+              request
+                .post(entity.route)
+                .send(entity.create({ businessCategory: value })),
+            async res => {
+              refusedBySchema(res);
+              expect(await stored(entity.dn(), 'objectClass')).to.be.undefined;
             }
           );
         }
@@ -536,6 +561,27 @@ describe('Entity schema contract', function () {
               'Changed'
             );
             expect(await stored(entity.dn(), 'pwdReset')).to.equal('TRUE');
+          }
+        );
+
+        define(
+          'replace',
+          'accepts a list of one for a single value and one value for a list',
+          () =>
+            request.put(entity.modifyUrl()).send({
+              replace: {
+                description: ['Changed'],
+                seeAlso: [pointee],
+                secretary: pointee,
+              },
+            }),
+          async res => {
+            expect(res.status, JSON.stringify(res.body)).to.equal(200);
+            expect(await stored(entity.dn(), 'description')).to.equal(
+              'Changed'
+            );
+            // One value comes back bare
+            expect(await stored(entity.dn(), 'secretary')).to.equal(pointee);
           }
         );
 
@@ -622,11 +668,11 @@ describe('Entity schema contract', function () {
           }
         }
 
-        for (const { title, attributes } of refusedDeletes) {
+        for (const { title, body, attributes } of refusedDeletes) {
           define(
             'delete',
             `refuses deleting ${title}`,
-            () => request.put(entity.modifyUrl()).send({ delete: attributes }),
+            () => request.put(entity.modifyUrl()).send({ delete: body }),
             async res => {
               refusedBySchema(res);
               await unchanged(attributes);

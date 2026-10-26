@@ -1464,12 +1464,15 @@ export default abstract class LdapFlat extends DmPlugin {
     // Before the checks reading the directory: a pointer leading nowhere, a
     // value already taken, are not for a caller who may not create here
     await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
-    await this.validateNewEntry(dn, {
+    const candidate: AttributesList = {
       [this.mainAttribute]: id,
       ...additional,
       objectClass: this.objectClass,
-    });
-    // validateNewEntry converted the copy it was handed, not this one
+    };
+    await this.validateNewEntry(dn, candidate);
+    // What was validated is written in the shape it was given; the defaults
+    // `candidateEntry` added on top are converted here
+    Object.assign(entry, candidate);
     toDirectoryEntry(this.schema, entry);
 
     // Note: LDAP attribute values with DNs do NOT need escaping
