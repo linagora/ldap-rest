@@ -20,13 +20,12 @@ implied.
 ### The flat and organization routes check the shape of a value
 
 **Who is affected:** a script or connector writing through `/api/v1/ldap/<entity>`
-or `/api/v1/ldap/organizations` several values for an attribute the schema
-does not type `array`, text that is not a number for a `number` or
+or `/api/v1/ldap/organizations` text that is not a number for a `number` or
 `integer`, a `delete` of a `required` attribute as a whole, or a change
-naming an attribute a strict schema does not declare; the server wrote them
-as sent and now answers 400, naming the attribute. A client that was refused
-a list of one for a single-valued attribute of an organization is now
-accepted. The shipped LSC connector sends shapes that stay accepted, a
+naming an attribute a strict schema does not declare, and one writing
+through `/api/v1/ldap/<entity>` several values for an attribute the schema
+does not type `array`; the server wrote them as sent and now answers 400,
+naming the attribute. The shipped LSC connector sends shapes that stay accepted, a
 list of one in a `replace` and one value for an `array` on a creation; its
 whole-attribute delete is refused for a `required` attribute, as any.
 

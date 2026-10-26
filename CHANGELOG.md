@@ -14,8 +14,9 @@
   `number`, and deleting a `required` attribute as a whole answer 400, where
   they were written as sent; `null` clears an attribute in a `replace` and
   is refused in an `add` and on a creation, instead of answering 500; an
-  attribute the schema does not declare is refused by name in a change too,
-  and the organization routes take a list of one for a single value,
+  attribute the schema does not declare is refused by name in a change too;
+  the organization routes take a list of one for a single value and word
+  their refusals as the flat routes do,
   [upgrading](docs/usage/upgrading.md#the-flat-and-organization-routes-check-the-shape-of-a-value)
   ([#416](https://github.com/linagora/ldap-rest/issues/416),
   [#448](https://github.com/linagora/ldap-rest/issues/448))
