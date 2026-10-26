@@ -110,7 +110,13 @@ export class DM {
   app: express.Express;
   config: Config;
   ready: Promise<void>;
-  server?: import('http').Server;
+  /** The listener, once `run()` opened it; shared by the `withConfig` views */
+  get server(): import('http').Server | undefined {
+    return this.life.server;
+  }
+  set server(server: import('http').Server | undefined) {
+    this.life.server = server;
+  }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   hooks: { [K in keyof Hooks]?: Function[] } = {};
   loadedPlugins: { [key: string]: DmPlugin } = {};
@@ -146,11 +152,13 @@ export class DM {
   }
 
   /**
-   * The shutdown once started, and the rejections nobody handled since the
-   * start. In an object, shared by the `withConfig` views as `_authState`
-   * is: a view with a flag of its own would stop on its own.
+   * The listener, the shutdown once started, and the rejections nobody
+   * handled since the start. In an object, shared by the `withConfig` views
+   * as `_authState` is: a view with a flag of its own would stop on its own,
+   * and one without the listener would not close it.
    */
   private readonly life: {
+    server?: import('http').Server;
     shutdown?: Promise<void>;
     unhandledRejections: number;
   } = { unhandledRejections: 0 };
@@ -748,11 +756,10 @@ export class DM {
     }
     const closing = new Map<string, Promise<void>>();
     for (const [name, plugin] of Object.entries(this.loadedPlugins)) {
-      if (!plugin.close) continue;
       closing.set(
         name,
         Promise.resolve()
-          .then(() => plugin.close!())
+          .then(() => plugin.close?.())
           .catch((err: unknown) => {
             this.logger.warn(
               `${name}: close failed: ${err instanceof Error ? err.message : String(err)}`
@@ -767,10 +774,13 @@ export class DM {
     // A second short of the budget: the crash and signal timers end the
     // process at the budget, and what gave up is logged before they do
     const left = Math.max(1000, budget - (Date.now() - started) - 1000);
-    if (!(await DM.within(letGo, left)))
+    if (!(await DM.within(letGo, left))) {
       this.logger.warn(
         `Shut down with a close still pending: ${[...closing.keys()].join(', ') || 'the directory connections'}`
       );
+      // Closed whatever plugin still holds the others back
+      void this.ldap.close().catch(() => undefined);
+    }
     this.logger.notice('Shut down');
   }
 
