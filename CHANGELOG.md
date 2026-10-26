@@ -16,6 +16,12 @@
   connection is closed, or after 10 seconds. Its signal listener returned
   without exiting, so a pod lived on until the end of its termination grace
   period ([#425](https://github.com/linagora/ldap-rest/issues/425))
+- The error middleware and the routes answering through `serverError` send
+  the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
+  the latter sent `{"error":"check logs"}`. `--debug` names the failure in
+  that message on both paths; `DM_DEBUG` is now read, and `--debug` no
+  longer takes the next argument as its value
+  ([#426](https://github.com/linagora/ldap-rest/issues/426))
 - `groups`, `organizations` and `flatGeneric` give their schema file
   (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
   merged, as SCIM does since 1.1.0: a static plugin with a `static_name`

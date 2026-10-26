@@ -44,6 +44,7 @@ export interface Config {
   plugin?: string[];
   schemas_path: string;
   log_level: 'error' | 'warn' | 'notice' | 'info' | 'debug';
+  debug: boolean;
   logger: 'console';
   api_prefix: string;
   mail_domain?: string[];
@@ -485,6 +486,7 @@ const configArgs: ConfigTemplate = [
   ['--plugin', 'DM_PLUGINS', [], 'array', '--plugins', 'identifiers'],
   ['--log-level', 'DM_LOG_LEVEL', 'notice'],
   ['--logger', 'DM_LOGGER', 'console'],
+  ['--debug', 'DM_DEBUG', false, 'boolean'],
   ['--api-prefix', 'DM_API_PREFIX', '/api'],
   [
     '--mail-domain',

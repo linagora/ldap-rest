@@ -9,6 +9,8 @@ import {
   getLogger,
   jsonBody,
   serverError,
+  serverErrorBody,
+  setDebug,
   setLogger,
 } from '../../src/lib/expressFormatedResponses';
 
@@ -59,7 +61,26 @@ describe('serverError', () => {
 
     serverError(res, new Error('the directory is down'));
 
-    expect(sent).to.deep.equal({ status: 500, body: { error: 'check logs' } });
+    expect(sent).to.deep.equal({
+      status: 500,
+      body: { error: 'Internal Server Error', message: 'An error occurred' },
+    });
+  });
+
+  it('answers the body of the error middleware, naming the failure under --debug', () => {
+    const err = new Error('the directory is down');
+    try {
+      setDebug(true);
+      const { res, sent } = fakeResponse();
+      serverError(res, err);
+      expect(sent.body).to.deep.equal(serverErrorBody(err));
+      expect(sent.body).to.deep.equal({
+        error: 'Internal Server Error',
+        message: 'the directory is down',
+      });
+    } finally {
+      setDebug(false);
+    }
   });
 
   it('answers 500 without a logger when the thrown value is not an Error', () => {
