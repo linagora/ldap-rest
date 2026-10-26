@@ -28,7 +28,8 @@ side:
 says who made the write, and through which door:
 
 - `actor`: the caller's `userName`, or its `user` when it has none;
-- `requestId`: generated, the same for every write of one request;
+- `requestId`: the answer's `X-Request-Id`, the same for every write of one
+  request, see [operations](../../operations.md#request-id);
 - `source`: `scim` for the SCIM API, `rest` otherwise.
 
 A write no request is behind, such as a scheduled task's, gets `{}`. The LDAP

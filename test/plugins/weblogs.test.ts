@@ -90,7 +90,8 @@ describe('weblogs', () => {
   });
 
   it('should log nothing extra when req.logDetails is unset', async () => {
-    await supertest(dm.app).get('/test/plain').expect(200);
+    const res = await supertest(dm.app).get('/test/plain').expect(200);
+    expect(notices[0].requestId).to.equal(res.headers['x-request-id']);
 
     expect(Object.keys(notices[0]).sort()).to.deep.equal([
       'duration',

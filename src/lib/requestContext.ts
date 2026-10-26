@@ -1,5 +1,6 @@
 /**
- * The request a directory operation is made for
+ * The request a directory operation is made for, and the one a log line is
+ * written for
  * @module lib/requestContext
  */
 import { AsyncLocalStorage } from 'async_hooks';

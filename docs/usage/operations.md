@@ -62,9 +62,9 @@ waiting at 2 s but cancels nothing: a plugin bounds its own call, as
 
 ## Request id
 
-Every answer carries an `X-Request-Id` header: an identifier the server
-generates for the request, the same one its writes hand to the plugins and
-its log lines carry. An `X-Request-Id` the client sends is not taken: a
+Every answer the server serves carries an `X-Request-Id` header: an
+identifier the server generates for the request, the same one its writes
+hand to the plugins and its log lines carry. An `X-Request-Id` the client sends is not taken: a
 caller could otherwise make the writes of two requests look like one.
 
 A proxy or an ingress generating an identifier of its own does not pass
@@ -76,3 +76,5 @@ of the hooks it ran included, as a field of the JSON console output and as
 `[<id>]` after the level in the log file. The line of `core/weblogs` carries
 it too. A line without one was written outside any request: at startup, by
 a scheduled task, by a message consumer, by a connection the server keeps.
+Work shared between requests, a schema load or a readiness answer, logs
+under the request that started it.

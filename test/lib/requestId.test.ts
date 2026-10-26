@@ -7,6 +7,9 @@ import type { Express, Request, Response } from 'express';
 
 import { DM } from '../../src/bin';
 import DmPlugin from '../../src/abstract/plugin';
+import WebLogs from '../../src/plugins/weblogs';
+import PostgresStore from '../../src/plugins/storage/postgres';
+import ValkeyStore from '../../src/plugins/storage/valkey';
 import { changeContext, requestId } from '../../src/lib/changeContext';
 import { launchHooks } from '../../src/lib/utils';
 import {
@@ -53,7 +56,9 @@ describe('Request id', () => {
       };
       api(app: Express): void {
         app.get('/probe', async (req: Request, res: Response) => {
-          this.logger.info('serving the probe');
+          this.logger.info(
+            `serving the probe${req.query.who ? ` for ${String(req.query.who)}` : ''}`
+          );
           // As the server, the line is still the request's
           outsideRequest(() => this.logger.info('as the server'));
           await launchHooks(
@@ -90,12 +95,101 @@ describe('Request id', () => {
     expect(served.map(l => l.requestId)).to.deep.equal([id, id, id]);
   });
 
-  it('gives each request its own id', async () => {
+  it('gives each request its own id, on its own lines', async () => {
+    captured.lines = [];
     const [a, b] = await Promise.all([
-      request.get('/probe'),
-      request.get('/probe'),
+      request.get('/probe?who=a'),
+      request.get('/probe?who=b'),
     ]);
-    expect(a.headers['x-request-id']).not.to.equal(b.headers['x-request-id']);
+    const ids = [a, b].map(r => r.headers['x-request-id'] as string);
+    expect(ids[0]).not.to.equal(ids[1]);
+    const line = (who: string): string | undefined =>
+      captured.lines.find(l => l.message === `serving the probe for ${who}`)
+        ?.requestId;
+    expect([line('a'), line('b')]).to.deep.equal(ids);
+  });
+
+  it('names the weblogs line of a response closed before its end', () => {
+    captured.lines = [];
+    const req = {
+      method: 'GET',
+      originalUrl: '/gone',
+      headers: {},
+      socket: { remoteAddress: '10.0.0.1' },
+    } as unknown as Request;
+    const weblogs = new WebLogs(server);
+    // From the socket, outside any context
+    weblogs.log(req, { statusCode: 499 } as Response, Date.now(), {
+      error: 'Connection closed before response was sent',
+    });
+    expect(captured.lines[0].requestId).to.equal(requestId(req));
+  });
+
+  describe('a connection the server keeps', () => {
+    type Handlers = Record<string, (arg?: unknown) => void>;
+
+    it('reports a lost PostgreSQL connection under no request', async () => {
+      const handlers: Handlers = {};
+      class Stubbed extends PostgresStore {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        protected async driver(): Promise<any> {
+          return {
+            Pool: class {
+              on(event: string, handler: (arg?: unknown) => void): void {
+                handlers[event] = handler;
+              }
+              async query(): Promise<unknown> {
+                return { rows: [{ t: 'records' }] };
+              }
+              async end(): Promise<void> {}
+            },
+          };
+        }
+      }
+      const store = new Stubbed(server.logger, 'postgres://ctx', 'records');
+      await runWithLogContext({ requestId: 'A' }, () => store.open());
+      captured.lines = [];
+      runWithLogContext({ requestId: 'B' }, () =>
+        handlers.error(new Error('idle connection dropped'))
+      );
+      expect(captured.lines[0].message).to.match(/connection lost/);
+      expect(captured.lines[0].requestId).to.equal(undefined);
+    });
+
+    it('reports a Valkey connection lost and back under no request', async () => {
+      const handlers: Handlers = {};
+      class Stubbed extends ValkeyStore {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        protected async driver(): Promise<any> {
+          return {
+            Valkey: class {
+              on(event: string, handler: (arg?: unknown) => void): this {
+                handlers[event] = handler;
+                return this;
+              }
+              async connect(): Promise<void> {}
+              async quit(): Promise<void> {}
+              disconnect(): void {}
+            },
+          };
+        }
+      }
+      const store = new Stubbed(server.logger, 'valkey://ctx', '');
+      await runWithLogContext({ requestId: 'A' }, () => store.open());
+      captured.lines = [];
+      runWithLogContext({ requestId: 'B' }, () => {
+        handlers.error(new Error('read ECONNRESET'));
+        handlers.ready();
+      });
+      expect(captured.lines.map(l => l.message)).to.deep.equal([
+        'storage/valkey: connection lost: read ECONNRESET',
+        'storage/valkey: connection back',
+      ]);
+      expect(captured.lines.map(l => l.requestId)).to.deep.equal([
+        undefined,
+        undefined,
+      ]);
+    });
   });
 
   it('names a body a parser refused', async () => {

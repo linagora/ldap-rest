@@ -3,12 +3,13 @@ import type { Express, Request, Response } from 'express';
 import DmPlugin, { type Role } from '../abstract/plugin';
 import { DmRequest } from '../lib/auth/base';
 import { requestId } from '../lib/changeContext';
+import { runWithLogContext } from '../lib/requestContext';
 
 // Extend Express Request so any plugin can enrich the access log line.
 // A handler sets `req.logDetails = { … }` (usually the parameters it received)
 // and those fields are merged into the single "notice" entry emitted when the
-// response completes. Core fields (method, url, status, …) always win, so a
-// plugin cannot overwrite them.
+// response completes. Core fields (requestId, method, url, status, …) always
+// win, so a plugin cannot overwrite them.
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
@@ -72,7 +73,11 @@ export default class WebLogs extends DmPlugin {
       ip: this.getClientIp(req),
       ...log,
     };
-    this.logger.notice(_log);
+    // A response closed or failed is reported from the socket, outside the
+    // request's context: the line is still the request's
+    runWithLogContext({ requestId: _log.requestId }, () =>
+      this.logger.notice(_log)
+    );
   }
 
   private getClientIp(req: Request): string {
