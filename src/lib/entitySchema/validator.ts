@@ -128,8 +128,8 @@ export class EntityValidator {
       if (this.schema.strict) throw invalid();
       return;
     }
-    // No value clears the attribute. An empty string is a value, checked
-    // against the pattern, and for a pointer against its branch
+    // No value clears the attribute. An empty string is a value: checked
+    // against the pattern, refused as an empty DN for a pointer
     if (value === null || value === undefined) return;
     // An empty list is no value either: a replace clears the attribute with it
     if (Array.isArray(value) && value.length === 0) {

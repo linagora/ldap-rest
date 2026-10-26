@@ -626,7 +626,7 @@ export default abstract class LdapFlat extends DmPlugin {
     }
   }
 
-  /** The schema's rules, on the schema as loaded now */
+  /** The schema's rules; the pointer lookups run as the server */
   protected validator(): EntityValidator {
     return new EntityValidator(this.schema, {
       entryExists: async (dn): Promise<boolean> => {
@@ -1300,9 +1300,7 @@ export default abstract class LdapFlat extends DmPlugin {
         err instanceof Error ? err.message : 'Invalid newId'
       );
     }
-    // The schema's own rule, the one a creation applies. `renameEntry` checked
-    // only for emptiness and control characters, so a value the schema refuses
-    // on the way in was accepted on the way past.
+    // The schema's own rule, the one a creation applies
     await this.validator().validateValue(this.mainAttribute, newId);
 
     const id = decodeURIComponent(req.params.id as string);
