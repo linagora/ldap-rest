@@ -11,6 +11,7 @@ import type { Config } from '../bin';
 import type { AttributeValue } from './ldapActions';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
+import { hookFailures } from './metrics';
 import { outsideRequest } from './requestContext';
 
 // Regex caching utilities - shared across plugins to avoid duplication
@@ -130,6 +131,11 @@ export const launchHooks = async (
           // `ldapActions` each named their hook, and a bare `Hook error`
           // left the reader to guess among every plugin subscribed.
           const where = hookLabel(hook);
+          const owner = hookOwner(hook);
+          hookFailures.inc({
+            hook: owner?.hook ?? (hook.name || 'anonymous'),
+            plugin: owner?.plugin ?? 'none',
+          });
           if (e instanceof Error) {
             getLogger()?.error(`Hook error${where}`, e);
           } else {

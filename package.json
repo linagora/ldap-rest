@@ -160,6 +160,10 @@
       "types": "./dist/src/plugins/ldap/trash.d.ts",
       "import": "./dist/plugins/ldap/trash.js"
     },
+    "./plugin-metrics": {
+      "types": "./dist/src/plugins/metrics.d.ts",
+      "import": "./dist/plugins/metrics.js"
+    },
     "./plugin-rabbitmq": {
       "types": "./dist/src/plugins/rabbitmq.d.ts",
       "import": "./dist/plugins/rabbitmq.js"
@@ -754,6 +758,7 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "p-limit": "^7.1.1",
+    "prom-client": "^15.1.3",
     "winston": "^3.17.0"
   },
   "devDependencies": {

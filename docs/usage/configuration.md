@@ -45,6 +45,7 @@ All LDAP-Rest configuration options.
   - [Utility Plugins](#utility-plugins)
     - [core/static](#corestatic)
     - [core/weblogs](#coreweblogs)
+    - [core/metrics](#coremetrics)
     - [core/storage](#corestorage)
     - [core/configApi](#coreconfigapi)
 - [Configuration File](#configuration-file)
@@ -678,6 +679,15 @@ See [security headers](plugins/utilities/static.md#security-headers).
 #### `core/weblogs`
 
 Web access logging plugin. No configuration options - just add the plugin to enable access logs.
+
+#### `core/metrics`
+
+Prometheus metrics on a port of their own, see
+[metrics](operations.md#metrics).
+
+| CLI              | Env               | Default | Description                                                |
+| ---------------- | ----------------- | ------- | ---------------------------------------------------------- |
+| `--metrics-port` | `DM_METRICS_PORT` | `9464`  | Port `GET /metrics` is served on; keep it off the internet |
 
 #### `core/storage`
 

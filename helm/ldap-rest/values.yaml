@@ -124,6 +124,21 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
+metrics:
+  # -- Expose the port of `core/metrics` on the container and the Service,
+  # and set DM_METRICS_PORT. The plugin itself is loaded through DM_PLUGINS
+  # (`core/metrics`), see docs/usage/operations.md#metrics.
+  enabled: false
+  # -- The port `GET /metrics` is served on
+  port: 9464
+  serviceMonitor:
+    # -- Render a ServiceMonitor for the Prometheus operator
+    enabled: false
+    # -- Scrape interval
+    interval: 30s
+    # -- Extra labels, where the operator selects the monitors it watches
+    labels: {}
+
 # -- Node selector
 nodeSelector: {}
 # -- Tolerations

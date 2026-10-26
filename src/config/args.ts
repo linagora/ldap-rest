@@ -73,6 +73,9 @@ export interface Config {
   group_dummy_user?: string;
   group_schema?: string;
 
+  /** Where core/metrics serves `GET /metrics` */
+  metrics_port?: number;
+
   /**
    * Keyed storage, shared by whoever needs to keep something with a
    * deadline. `storage_backend` names the sub-plugin that keeps it; the rest
@@ -602,6 +605,9 @@ const configArgs: ConfigTemplate = [
     'DM_ENTERPRISE_DOMAIN_LINK_ATTRIBUTE',
     '',
   ],
+
+  // Metrics plugin
+  ['--metrics-port', 'DM_METRICS_PORT', 9464, 'number'],
 
   // Keyed storage
   //
