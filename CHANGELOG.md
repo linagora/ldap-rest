@@ -12,6 +12,13 @@
 
 ### Fixes
 
+- The flat routes check an empty string against the schema, as the group
+  and organization routes do: it was accepted unchecked, and
+  `{"replace":{"mail":""}}` stored an empty value. An empty DN is refused
+  for every pointer attribute, on the group and organization routes too: a
+  pointer without a branch stored it. A replace with `[]` is still how an
+  attribute is cleared
+  ([#429](https://github.com/linagora/ldap-rest/issues/429))
 - `core/rabbitmq`: SIGTERM and SIGINT end the process once the broker
   connection is closed, or after 10 seconds. Its signal listener returned
   without exiting, so a pod lived on until the end of its termination grace
