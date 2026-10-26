@@ -62,7 +62,7 @@ waiting at 2 s but cancels nothing: a plugin bounds its own call, as
 
 ## Request id
 
-Every answer the server serves carries an `X-Request-Id` header: an
+Every response the API sends carries an `X-Request-Id` header: an
 identifier the server generates for the request, the same one its writes
 hand to the plugins and its log lines carry. An `X-Request-Id` the client sends is not taken: a
 caller could otherwise make the writes of two requests look like one.

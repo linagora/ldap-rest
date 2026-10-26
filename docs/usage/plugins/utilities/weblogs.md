@@ -328,19 +328,32 @@ res.on('close', () => {
 Logs are in JSON format for easy parsing:
 
 ```bash
-cat app.log | jq 'select(.status >= 400)'
+cat app.log | jq 'select(.message.status? >= 400)'
 ```
 
 Filters 4xx and 5xx responses:
 
 ```json
 {
-  "level": "info",
-  "message": "GET /api/v1/ldap/users/notfound 404 12ms",
-  "status": 404,
-  "method": "GET",
-  "url": "/api/v1/ldap/users/notfound"
+  "level": "notice",
+  "message": {
+    "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+    "method": "GET",
+    "url": "/api/v1/ldap/users/notfound",
+    "status": 404,
+    "duration": 12,
+    "ip": "10.0.9.12"
+  },
+  "requestId": "6effd260-b079-4335-b727-544189ed33a6",
+  "timestamp": "2026-10-26T18:07:03.286Z"
 }
+```
+
+The lines of one request, the access line and what the server logged while
+serving it:
+
+```bash
+cat app.log | jq 'select(.requestId == "6effd260-b079-4335-b727-544189ed33a6")'
 ```
 
 ### Statistics
@@ -348,7 +361,7 @@ Filters 4xx and 5xx responses:
 Generate request statistics:
 
 ```bash
-cat app.log | jq -r '.message' | awk '{print $1}' | sort | uniq -c
+cat app.log | jq -r 'select(.message.method?) | .message.method' | sort | uniq -c
 ```
 
 Output:
@@ -365,8 +378,7 @@ Output:
 Average response time per endpoint:
 
 ```bash
-cat app.log | jq -r 'select(.responseTime) | "\(.url) \(.responseTime)"' | \
-  sed 's/ms$//' | \
+cat app.log | jq -r 'select(.message.duration?) | "\(.message.url) \(.message.duration)"' | \
   awk '{sum[$1]+=$2; count[$1]++} END {for (url in sum) print url, sum[url]/count[url] "ms"}'
 ```
 
