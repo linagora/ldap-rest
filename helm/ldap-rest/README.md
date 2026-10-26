@@ -67,9 +67,13 @@ secrets:
 | `livenessProbe` / `readinessProbe` | `/healthz`, `/readyz`        | HTTP probes on `http` (`{}` disables).                      |
 | `lifecycle`                        | `{}`                         | Container lifecycle hooks, a `preStop` sleep for a rollout. |
 | `metrics.enabled` / `metrics.port` | `false` / `9464`             | Expose the port of `core/metrics` (in `DM_PLUGINS`).        |
-| `metrics.serviceMonitor.enabled`   | `false`                      | Render a ServiceMonitor for the Prometheus operator.        |
+| `metrics.serviceMonitor.enabled`   | `false`                      | Render a ServiceMonitor where its CRD is installed.         |
 
 See [`values.yaml`](./values.yaml) for the full list.
+
+> The ServiceMonitor is skipped, silently, when the cluster does not serve
+> `monitoring.coreos.com/v1`; a `helm template` run needs
+> `--api-versions monitoring.coreos.com/v1` to render it.
 
 > `/healthz` and `/readyz` are served without authentication, and an Ingress
 > routing `/` exposes them: keep the two paths to the cluster there. See

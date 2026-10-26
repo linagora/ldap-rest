@@ -93,21 +93,17 @@ describe('metrics', function () {
 
   it('times the directory operations and counts the cache', async () => {
     const before = await scrape();
-    const count = (text: string, labels: string): number =>
-      sample(text, 'ldap_rest_ldap_operation_duration_seconds_count', labels);
     const read = (): Promise<unknown> =>
       dm.ldap.search({ scope: 'base', paged: false, attributes: ['1.1'] });
     await read();
     await read();
     const after = await scrape();
+    const ok = 'operation="search",result="ok"';
     expect(
-      count(after, 'operation="search",result="ok"') -
-        (before.includes('operation="search",result="ok"')
-          ? count(before, 'operation="search",result="ok"')
-          : 0),
+      operations(after, ok) - operations(before, ok),
       'one search sent, the second served by the cache'
     ).to.equal(1);
-    expect(count(after, 'operation="bind",result="ok"')).to.be.at.least(1);
+    expect(operations(after, 'operation="bind",result="ok"')).to.be.at.least(1);
     expect(
       sample(after, 'ldap_rest_ldap_search_cache_total', 'result="miss"')
     ).to.be.at.least(1);
@@ -121,10 +117,11 @@ describe('metrics', function () {
       .catch(() => undefined);
     const failed = await scrape();
     expect(
-      count(failed, 'operation="search",result="32"'),
+      operations(failed, 'operation="search",result="32"'),
       'a refusal is the directory answering, by its code'
     ).to.be.at.least(1);
-    expect(failed).to.not.include('operation="search",result="error"');
+    const error = 'operation="search",result="error"';
+    expect(operations(failed, error) - operations(before, error)).to.equal(0);
   });
 
   /** The operation count under `labels`, 0 before the first sample */
@@ -188,7 +185,8 @@ describe('metrics', function () {
     const after = await scrape();
     const ok = 'operation="search",result="ok"';
     expect(operations(after, ok) - operations(before, ok)).to.equal(2);
-    expect(after).to.not.include('operation="search",result="error"');
+    const error = 'operation="search",result="error"';
+    expect(operations(after, error) - operations(before, error)).to.equal(0);
   });
 
   it('counts a hook that throws, by plugin and hook', async () => {
