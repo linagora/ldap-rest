@@ -598,11 +598,13 @@ export default abstract class LdapFlat extends DmPlugin {
     id: string,
     additional: AttributesList
   ): AttributesList {
+    // The classes are the entity's, as on organizations and groups: a body
+    // naming them does not choose them
     const entry: AttributesList = {
-      objectClass: this.objectClass,
       ...this.defaultAttributes,
       [this.mainAttribute]: id,
       ...additional,
+      objectClass: this.objectClass,
     };
     // The fixed values of the schema, whatever was sent
     for (const [field, attr] of Object.entries(this.schema?.attributes ?? {}))
@@ -1467,9 +1469,9 @@ export default abstract class LdapFlat extends DmPlugin {
     // value already taken, are not for a caller who may not create here
     await this.ldap.authorize('ldapaddrequest', [dn, { ...entry }, req]);
     await this.validateNewEntry(dn, {
-      objectClass: this.objectClass,
       [this.mainAttribute]: id,
       ...additional,
+      objectClass: this.objectClass,
     });
     // validateNewEntry converted the copy it was handed, not this one
     toDirectoryEntry(this.schema, entry);
@@ -1874,10 +1876,9 @@ export default abstract class LdapFlat extends DmPlugin {
     toDirectoryEntry(this.schema, entry);
     if (!this.schema) return true;
 
-    // First, enforce fixed attributes
+    // First, enforce fixed attributes (`objectClass` comes from `this.objectClass`)
     for (const [field, attr] of Object.entries(this.schema.attributes)) {
-      if (attr.fixed && attr.default !== undefined) {
-        // Force the default value for fixed attributes
+      if (attr.fixed && attr.default !== undefined && field !== 'objectClass') {
         entry[field] = attr.default;
       }
     }
@@ -1890,17 +1891,6 @@ export default abstract class LdapFlat extends DmPlugin {
             `Unknown attribute "${field}" for ${this.singularName}`
           );
         continue;
-      }
-
-      // Check if trying to modify a fixed attribute
-      if (attr.fixed && attr.default !== undefined) {
-        const defaultStr = JSON.stringify(attr.default);
-        const valueStr = JSON.stringify(value);
-        if (defaultStr !== valueStr) {
-          throw new BadRequestError(
-            `Attribute "${field}" is fixed and cannot be modified. Expected: ${defaultStr}`
-          );
-        }
       }
 
       if (!(await this._validateOneChange(field, value))) {
