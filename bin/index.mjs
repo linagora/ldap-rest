@@ -21,8 +21,8 @@ Main options:
   --help, -h                Show this help message
   --port PORT               Server port (default: 8080)
   --ldap-url URL            LDAP server URL
-  --ldap-dn DN              LDAP bind DN
-  --ldap-pwd PASSWORD       LDAP bind password
+  --ldap-dn DN              LDAP bind DN (required)
+  --ldap-pwd PASSWORD       LDAP bind password (required)
   --ldap-base BASE          LDAP base DN (required)
   --plugin PLUGIN           Load plugin (can be specified multiple times)
   --api-prefix PREFIX       API prefix (default: /api)
@@ -36,11 +36,10 @@ Environment Variables:
   Example: --ldap-url becomes DM_LDAP_URL
 
 Examples:
-  # Start server with default configuration
-  npx ldap-rest
-
-  # Start with specific LDAP server
-  npx ldap-rest --ldap-url ldap://localhost:389
+  # Start against a directory
+  npx ldap-rest --ldap-url ldap://localhost:389 \
+    --ldap-base dc=example,dc=com \
+    --ldap-dn cn=admin,dc=example,dc=com --ldap-pwd secret
 
   # Load specific plugins
   npx ldap-rest --plugin ldapGroups --plugin ldapOrganization
