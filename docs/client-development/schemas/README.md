@@ -381,10 +381,17 @@ of an `array` follows `items.type`, text without `items`. A `number` or
 boolean or the directory's `TRUE` / `FALSE`; anything else for them, and
 anything but text for a `string`, `date` or `pointer`, is refused; an
 attribute with `normalize` takes any text, read after validation. In a
-`replace`, `null` or `[]` clears an attribute, as does deleting it by name,
-unless it is `required`; deleting some of its values names them. An empty
-string is a value: checked against `test`, and refused for a pointer. Every
-refusal answers 400 with the attribute's name.
+`replace`, `null` or `[]` clears an attribute; in an `add` or on a creation
+they are refused as no value. A `delete` naming the attribute, or naming it
+with no value, removes it, unless it is `required`; naming values removes
+those, every value it holds included, as the server does not read what
+remains. An empty string is a value: checked against `test`, refused for a
+pointer, and missing for a `required` attribute. Every refusal answers 400
+with the attribute's name.
+
+The flat routes apply these rules in full; what the group and organization
+routes still answer otherwise is listed in
+`test/lib/entitySchema.contract.test.ts`.
 
 #### `required` (Optional, default: `false`)
 
@@ -695,13 +702,8 @@ Common validation patterns:
 
 ### Type Validation
 
-Attribute values must match their declared type:
-
-- **String**: Single text value
-- **Array**: Multiple values (may be empty unless required)
-- **Number**: Numeric value (integer or float)
-- **Integer**: Integer value only
-- **Pointer**: Valid DN string
+Attribute values must have the shape of their declared type, see
+[what a value must look like](#what-a-value-must-look-like).
 
 ### Fixed Attributes
 

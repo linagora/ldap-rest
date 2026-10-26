@@ -20,15 +20,16 @@ implied.
 ### The flat routes check the shape of a value
 
 **Who is affected:** a script or connector writing through `/api/v1/ldap/<entity>`
-several values for an attribute the schema types `string`, text that is not
-a number for a `number` or `integer`, or deleting a `required` attribute by
-name; the server wrote them as sent and now answers 400, naming the
-attribute. The shipped LSC connector and the console send what the schema
-says and are not affected.
+several values for an attribute the schema does not type `array`, text that
+is not a number for a `number` or `integer`, a `delete` of a `required`
+attribute as a whole, or a change naming an attribute a strict schema does
+not declare; the server wrote them as sent and now answers 400, naming the
+attribute. The shipped LSC connector sends shapes that stay accepted: a
+list of one in a `replace`, one value for an `array` on a creation.
 
 Send one value for a single-valued attribute, a list for an `array` (one
 value, or a list of one, is taken either way), numbers as numbers or digits,
-and `null` or `[]` to clear an attribute. The rules are in
+and `null` or `[]` in a `replace` to clear an attribute. The rules are in
 [what a value must look like](../client-development/schemas/README.md#what-a-value-must-look-like).
 
 ### `--logger`: `console` or `file`

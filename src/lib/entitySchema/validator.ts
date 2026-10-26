@@ -78,8 +78,8 @@ export class EntityValidator {
 
   /**
    * Check the parts of a change, then convert them in place. No value under
-   * a name clears the attribute: `null` becomes the empty list the directory
-   * layer reads so.
+   * a name is the empty list for the directory layer, which clears the
+   * attribute in a `replace` and refuses it in an `add`.
    *
    * @param changes change as the client sent it
    */
@@ -100,11 +100,16 @@ export class EntityValidator {
       }
     }
     if (changes.delete) {
-      // Named by itself, a required attribute would be left missing; named
-      // with values, some may remain
-      const byName = Array.isArray(changes.delete);
-      const fields = byName
-        ? (changes.delete as string[])
+      // A required attribute is refused to a delete of the whole attribute:
+      // named in the list, or under a name with no value, as the directory
+      // layer reads it. Named with values, some may remain.
+      const whole = (field: string): boolean => {
+        if (Array.isArray(changes.delete)) return true;
+        const value = (changes.delete as AttributesList)[field];
+        return !value || isNoValue(value);
+      };
+      const fields = Array.isArray(changes.delete)
+        ? changes.delete
         : Object.keys(changes.delete);
       for (const field of fields) {
         const attr = this.attribute(field);
@@ -112,7 +117,7 @@ export class EntityValidator {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
           );
-        if (byName && attr?.required)
+        if (attr?.required && whole(field))
           throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
@@ -182,7 +187,7 @@ export class EntityValidator {
   }
 }
 
-/** No value: clears an attribute in a change, leaves it out of a creation */
+/** No value: what clears an attribute in a `replace` */
 const isNoValue = (value: unknown): value is null | undefined | [] =>
   value === null ||
   value === undefined ||
@@ -191,7 +196,7 @@ const isNoValue = (value: unknown): value is null | undefined | [] =>
 /** What leaves a required attribute missing, an empty string included */
 const isMissing = (value: unknown): boolean => isNoValue(value) || value === '';
 
-/** No value is the empty list for the directory layer, never `null` */
+/** The directory layer reads no value as the empty list, never as `null` */
 const asStored = (value: AttributeValue | null | undefined): AttributeValue =>
   isNoValue(value) ? [] : value;
 

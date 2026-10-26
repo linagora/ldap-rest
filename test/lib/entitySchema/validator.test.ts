@@ -139,10 +139,17 @@ describe('EntityValidator', () => {
         );
     });
 
-    it('refuses deleting a required attribute by name, not some of its values', async () => {
-      expect(
-        await refusal(validator().validateChanges({ delete: ['description'] }))
-      ).to.equal('Attribute "description" is required');
+    it('refuses deleting a required attribute as a whole, not some of its values', async () => {
+      for (const changes of [
+        { delete: ['description'] },
+        { delete: { description: [] } },
+        { delete: { description: null } },
+        { delete: { description: '' } },
+      ] as any[])
+        expect(
+          await refusal(validator().validateChanges(changes)),
+          JSON.stringify(changes)
+        ).to.equal('Attribute "description" is required');
       expect(
         await refusal(
           validator().validateChanges({ delete: { description: ['old'] } })

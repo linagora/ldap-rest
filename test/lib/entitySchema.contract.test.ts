@@ -38,6 +38,15 @@ interface Entity {
 
 /** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
 const divergences: Record<string, [status: number, reason: string]> = {
+  'groups: creation: refuses null for an optional attribute': [500, 'crashes'],
+  'organizations: creation: refuses null for an optional attribute': [
+    500,
+    'crashes',
+  ],
+  'organizations: delete: refuses deleting a required attribute, named with no value':
+    [200, 'deletes it'],
+  'organizations: delete: refuses deleting a required attribute, named with null':
+    [200, 'deletes it'],
   'groups: creation: accepts a list of one for a single value and one value for a list':
     [400, 'refuses the list of one'],
   'groups: replace: accepts a list of one for a single value and one value for a list':
@@ -274,11 +283,30 @@ describe('Entity schema contract', function () {
   ];
 
   /** Deletions refused: the schema knows what is required, fixed or undeclared */
-  const refusedDeletes: Array<{ title: string; attributes: string[] }> = [
-    { title: 'a required attribute', attributes: ['description'] },
-    { title: 'a fixed attribute', attributes: ['l'] },
+  const refusedDeletes: Array<{
+    title: string;
+    body: unknown;
+    attributes: string[];
+  }> = [
+    {
+      title: 'a required attribute',
+      body: ['description'],
+      attributes: ['description'],
+    },
+    {
+      title: 'a required attribute, named with no value',
+      body: { description: [] },
+      attributes: ['description'],
+    },
+    {
+      title: 'a required attribute, named with null',
+      body: { description: null },
+      attributes: ['description'],
+    },
+    { title: 'a fixed attribute', body: ['l'], attributes: ['l'] },
     {
       title: 'an attribute the schema does not declare',
+      body: ['telephoneNumber'],
       attributes: ['telephoneNumber'],
     },
   ];
@@ -467,6 +495,24 @@ describe('Entity schema contract', function () {
           );
         }
 
+        for (const [title, value] of [
+          ['refuses no value for an optional attribute', []],
+          ['refuses null for an optional attribute', null],
+        ] as Array<[string, unknown]>) {
+          define(
+            'creation',
+            title,
+            () =>
+              request
+                .post(entity.route)
+                .send(entity.create({ businessCategory: value })),
+            async res => {
+              refusedBySchema(res);
+              expect(await stored(entity.dn(), 'objectClass')).to.be.undefined;
+            }
+          );
+        }
+
         for (const { title, attributes } of refusedValues) {
           if (title === 'a fixed attribute') continue;
           define(
@@ -622,11 +668,11 @@ describe('Entity schema contract', function () {
           }
         }
 
-        for (const { title, attributes } of refusedDeletes) {
+        for (const { title, body, attributes } of refusedDeletes) {
           define(
             'delete',
             `refuses deleting ${title}`,
-            () => request.put(entity.modifyUrl()).send({ delete: attributes }),
+            () => request.put(entity.modifyUrl()).send({ delete: body }),
             async res => {
               refusedBySchema(res);
               await unchanged(attributes);
