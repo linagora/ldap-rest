@@ -17,17 +17,19 @@ The server now stops at startup naming the missing option. Set `DM_LDAP_DN`
 and `DM_LDAP_PWD` (or `--ldap-dn` and `--ldap-pwd`) to the values that were
 implied.
 
-### The flat and organization routes check the shape of a value
+### Every entity route checks the shape of a value
 
-**Who is affected:** a script or connector writing through `/api/v1/ldap/<entity>`
-or `/api/v1/ldap/organizations` text that is not a number for a `number` or
-`integer`, a `delete` of a `required` attribute as a whole, or a change
-naming an attribute a strict schema does not declare, and one writing
-through `/api/v1/ldap/<entity>` several values for an attribute the schema
-does not type `array`; the server wrote them as sent and now answers 400,
-naming the attribute. The shipped LSC connector sends shapes that stay accepted, a
-list of one in a `replace` and one value for an `array` on a creation; its
-whole-attribute delete is refused for a `required` attribute, as any.
+**Who is affected:** a script or connector writing through `/api/v1/ldap/<entity>`,
+`/api/v1/ldap/groups` or `/api/v1/ldap/organizations` text that is not a
+number for a `number` or `integer`, a `delete` of a `required` attribute as
+a whole, or a change naming an attribute a strict schema does not declare;
+one writing through `/api/v1/ldap/<entity>` several values for an attribute
+the schema does not type `array`; and one changing a `fixed` attribute of a
+group, which the server dropped from the change and answered 200. The
+server now answers 400, naming the attribute. The shipped LSC connector
+sends shapes that stay accepted, a list of one in a `replace` and one value
+for an `array` on a creation; its whole-attribute delete is refused for a
+`required` attribute, as any.
 
 Send one value for a single-valued attribute, a list for an `array` (one
 value, or a list of one, is taken either way), numbers as numbers or digits,

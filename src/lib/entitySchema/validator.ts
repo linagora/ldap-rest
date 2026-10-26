@@ -49,11 +49,8 @@ export class EntityValidator {
       toDirectoryEntry(undefined, entry);
       return;
     }
-    // A fixed attribute with a default is checked at that default, not at
-    // what was sent; `objectClass` is the entity's
-    for (const [field, attr] of Object.entries(this.schema.attributes))
-      if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
-        entry[field] = attr.default;
+    // Checked at the default, not at what was sent
+    applyFixedDefaults(this.schema, entry);
 
     for (const [field, value] of Object.entries(entry)) {
       const attr = this.attribute(field);
@@ -185,6 +182,25 @@ export class EntityValidator {
       );
     return attr;
   }
+}
+
+/**
+ * Write every fixed attribute with a default as the schema says, whatever
+ * the request carried. `objectClass` is left to the entity's configuration.
+ * Run on the entry an authorization judges, so that it judges the entry
+ * written.
+ *
+ * @param schema entity schema, nothing to apply without one
+ * @param entry entry about to be created, changed in place
+ */
+export function applyFixedDefaults(
+  schema: Schema | undefined,
+  entry: AttributesList
+): void {
+  if (!schema) return;
+  for (const [field, attr] of Object.entries(schema.attributes))
+    if (attr.fixed && attr.default !== undefined && field !== 'objectClass')
+      entry[field] = attr.default;
 }
 
 /** No value: what clears an attribute in a `replace` */

@@ -160,35 +160,6 @@ describe('Organization and group validators', function () {
     });
   });
 
-  describe('an array on a group', () => {
-    it('should not check element types an array declares no pattern for', async () => {
-      // Groups checked element types alongside `items.test` only; checking
-      // them for every array would tighten what the route accepts, unasked.
-      const groups = server.loadedPlugins['ldapGroups'] as LdapGroups;
-      const saved = groups.schema;
-      groups.schema = {
-        strict: false,
-        attributes: {
-          tags: { type: 'array', items: { type: 'string' } },
-          codes: { type: 'array', items: { type: 'string', test: '^\\d+$' } },
-        },
-      };
-      try {
-        expect(
-          await groups._validateOneChange('tags', [1 as unknown as string])
-        ).to.be.true;
-        try {
-          await groups._validateOneChange('codes', [1 as unknown as string]);
-          expect.fail('an element of the wrong type passed a pattern check');
-        } catch (e) {
-          expect((e as Error).message).to.match(/must be of type string/);
-        }
-      } finally {
-        groups.schema = saved;
-      }
-    });
-  });
-
   describe('a pointer on a group', () => {
     // The group written, there for the pointer to be what is checked
     const groupDn = (): string =>

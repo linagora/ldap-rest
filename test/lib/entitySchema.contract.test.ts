@@ -37,28 +37,7 @@ interface Entity {
 }
 
 /** What one kind still answers otherwise: `<entity>: <phase>: <case>` */
-const divergences: Record<string, [status: number, reason: string]> = {
-  'groups: creation: refuses null for an optional attribute': [500, 'crashes'],
-  'groups: creation: accepts a list of one for a single value and one value for a list':
-    [400, 'refuses the list of one'],
-  'groups: replace: accepts a list of one for a single value and one value for a list':
-    [400, 'refuses the list of one'],
-  'groups: creation: writes a fixed attribute as the schema says': [
-    200,
-    'writes nothing',
-  ],
-  'groups: replace: refuses a replace of the classes': [
-    200,
-    'drops it, answers 200',
-  ],
-  'groups: replace: refuses a fixed attribute': [200, 'drops it, answers 200'],
-  'groups: add: refuses a fixed attribute': [200, 'drops it, answers 200'],
-  'groups: delete: refuses deleting a fixed attribute': [
-    200,
-    'drops it, answers 200',
-  ],
-  'groups: replace: clears an optional attribute with null': [500, 'crashes'],
-};
+const divergences: Record<string, [status: number, reason: string]> = {};
 
 describe('Entity schema contract', function () {
   let server: DM;
