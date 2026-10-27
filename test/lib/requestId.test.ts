@@ -11,7 +11,7 @@ import WebLogs from '../../src/plugins/weblogs';
 import PostgresStore from '../../src/plugins/storage/postgres';
 import ValkeyStore from '../../src/plugins/storage/valkey';
 import { changeContext, requestId } from '../../src/lib/changeContext';
-import { launchHooks } from '../../src/lib/utils';
+import { launchHooks, launchHooksChained } from '../../src/lib/utils';
 import {
   currentLogContext,
   outsideAnyRequest,
@@ -58,10 +58,20 @@ describe('Request id', () => {
     class Probe extends DmPlugin {
       name = 'probe';
       hooks = {
-        probedone: (): void => {
+        probedone: async (): Promise<void> => {
           this.logger.info('in the hook');
           this.logger.info({ message: 'as another plugin', plugin: 'other' });
+          this.logger.info({ message: 'as itself', plugin: 'probe' });
+          await launchHooks([
+            function unregistered(): void {
+              server.logger.info('in a hook no plugin registered');
+            },
+          ]);
           throw new Error('a hook failing');
+        },
+        proberequest: (dn: string): string => {
+          this.logger.info('in the chained hook');
+          return dn;
         },
       };
       api(app: Express): void {
@@ -74,6 +84,10 @@ describe('Request id', () => {
           await launchHooks(
             (server.hooks as Record<string, unknown[]>).probedone as never,
             []
+          );
+          await launchHooksChained(
+            (server.hooks as Record<string, unknown[]>).proberequest as never,
+            'cn=x'
           );
           res.json({
             id: requestId(req),
@@ -117,11 +131,20 @@ describe('Request id', () => {
     };
     expect(fields('serving the probe')).to.deep.equal([undefined, undefined]);
     expect(fields('in the hook')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('in the chained hook')).to.deep.equal([
+      'probe',
+      'proberequest',
+    ]);
     expect(fields('Hook error')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('as itself')).to.deep.equal(['probe', 'probedone']);
     expect(fields('as another plugin'), 'its own name kept').to.deep.equal([
       'other',
       undefined,
     ]);
+    expect(
+      fields('in a hook no plugin registered'),
+      'not the hook it was launched from'
+    ).to.deep.equal([undefined, undefined]);
   });
 
   it('gives each request its own id, on its own lines', async () => {

@@ -84,7 +84,7 @@ const hookLabel = (hook: Function): string => {
 /** Run a hook under its plugin's name and its own, for the lines it logs */
 const asOwner = <T>(hook: Function, fn: () => T): T => {
   const owner = hookOwner(hook);
-  return owner ? runAsPlugin(owner.plugin, owner.hook, fn) : fn();
+  return runAsPlugin(owner?.plugin, owner?.hook, fn);
 };
 
 // launchHooks launches hooks asynchroniously, errors are reported and ignored.

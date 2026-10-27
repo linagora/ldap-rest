@@ -185,6 +185,31 @@ export default [
     },
   },
 
+  // docs/usage/operations.md#metrics: a call to another service is timed
+  // under its caller, which `DmPlugin.fetch` and the instance providers do
+  {
+    files: ['src/**/*.ts'],
+    ignores: [
+      'src/browser/**',
+      'src/abstract/plugin.ts',
+      'src/lib/instanceProviders.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'node-fetch',
+              message:
+                'Call other services through this.fetch (DmPlugin), which times them.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // The SCIM plugin serves identity providers, and every operation it makes
   // is judged by the request it is made for. Bind the request once with
   // `ldap.forRequest(req)`, so each operation names the request it means

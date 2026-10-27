@@ -4,6 +4,8 @@ import type winston from 'winston';
 
 import { DM } from '../../../src/bin';
 import James from '../../../src/plugins/twake/james';
+import { outboundRequestDuration } from '../../../src/lib/metrics';
+import { outboundCalls } from '../../helpers/metrics';
 
 /**
  * James reads its users from an LDAP replica that can lag behind the write
@@ -158,6 +160,38 @@ describe('James Plugin - replication lag', () => {
     expect(at('error')).to.have.length(1);
     expect(at('error')[0].entry).to.include({ http_status: 401 });
     expect(at('error')[0].entry).to.not.have.property('attempts');
+  });
+
+  it('counts each attempt under its status, the wait between them left out', async () => {
+    const before = {
+      refused: await outboundCalls('james', '404'),
+      done: await outboundCalls('james', '204'),
+    };
+    nock(url)
+      .put('/address/aliases/lag@test.org/sources/a@test.org')
+      .reply(404)
+      .put('/address/aliases/lag@test.org/sources/a@test.org')
+      .delay(50)
+      .reply(204);
+    const started = Date.now();
+    await james.hooks.onLdapAliasChange!(
+      dn,
+      'lag@test.org',
+      [],
+      ['a@test.org']
+    );
+    expect(Date.now() - started).to.be.at.least(50);
+    expect(await outboundCalls('james', '404')).to.equal(before.refused + 1);
+    expect(await outboundCalls('james', '204')).to.equal(before.done + 1);
+    const sum = (await outboundRequestDuration.get()).values.find(
+      v =>
+        v.metricName === 'ldap_rest_outbound_request_duration_seconds_sum' &&
+        v.labels.target === 'james' &&
+        v.labels.status === '404'
+    )!.value;
+    expect(sum, 'the retry delay is not the call').to.be.below(
+      Date.now() - started
+    );
   });
 
   it('does not retry a server error', async () => {

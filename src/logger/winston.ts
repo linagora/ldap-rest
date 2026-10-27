@@ -31,16 +31,19 @@ declare module 'winston' {
 const LOGGERS = ['console', 'file'] as const;
 
 /**
- * The request a line is written for, and the plugin's hook writing it; a
- * `plugin` the line names itself is kept.
+ * The request a line is written for, and the plugin's hook writing it. A
+ * line naming another plugin is that plugin's: it gets no `op`.
  */
 const withContext = winston.format(info => {
   const context = currentLogContext();
   if (!context) return info;
   if (context.requestId) info.requestId = context.requestId;
-  if (context.plugin && info.plugin === undefined) {
+  if (
+    context.plugin &&
+    (info.plugin === undefined || info.plugin === context.plugin)
+  ) {
     info.plugin = context.plugin;
-    info.op = context.op;
+    info.op ??= context.op;
   }
   return info;
 });

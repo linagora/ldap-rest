@@ -89,19 +89,24 @@ export function runWithLogContext<T>(context: LogContext, fn: () => T): T {
 }
 
 /**
- * Run a plugin's hook: what it logs names the plugin and the hook, under the
- * request being served.
+ * Run a hook: what it logs names its plugin and itself, under the request
+ * being served; a hook no plugin registered names none, even inside
+ * another's.
  *
- * @param plugin the plugin's instance name
+ * @param plugin the plugin's instance name, none for an unregistered hook
  * @param op the hook
  * @param fn the hook's run
  * @returns what `fn` returns
  */
-export function runAsPlugin<T>(plugin: string, op: string, fn: () => T): T {
+export function runAsPlugin<T>(
+  plugin: string | undefined,
+  op: string | undefined,
+  fn: () => T
+): T {
   return logContexts.run({ ...logContexts.getStore(), plugin, op }, fn);
 }
 
-/** The log context of the request being served, if any */
+/** The log context of what is running, if any: request, plugin, hook */
 export function currentLogContext(): LogContext | undefined {
   return logContexts.getStore();
 }
