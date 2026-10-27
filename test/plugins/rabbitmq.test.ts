@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import Transport from 'winston-transport';
 
 import { DM } from '../../src/bin';
 import RabbitMq from '../../src/plugins/rabbitmq';
@@ -215,6 +216,83 @@ describe('RabbitMq plugin', () => {
 
     it('no-ops unsubscribe without throwing', async () => {
       await plugin.unsubscribe('q');
+    });
+  });
+
+  describe('the client it opens', () => {
+    /** Keeps what the logger wrote, as the console transport would see it */
+    class Captured extends Transport {
+      lines: Array<Record<string, unknown>> = [];
+      log(info: Record<string, unknown>, next: () => void): void {
+        const { level, message, plugin, error, attempt } = info;
+        this.lines.push({ level, message, plugin, error, attempt });
+        next();
+      }
+    }
+
+    interface ClientOptions {
+      url: string;
+      logger: {
+        warn(message: string, context?: unknown): void;
+        error(message: string, context?: unknown): void;
+      };
+    }
+
+    it('logs through the plugin logger, under the plugin name, an error as text', async () => {
+      const dm = new DM();
+      dm.config.rabbitmq_url = 'amqp://guest:guest@rabbitmq:5672/';
+      await dm.ready;
+      const captured = new Captured();
+      dm.logger.add(captured);
+      let built: ClientOptions | undefined;
+      class Recording {
+        constructor(options: ClientOptions) {
+          built = options;
+        }
+        async init(): Promise<void> {}
+      }
+      class Opening extends RabbitMq {
+        openWith(Client: typeof Recording): Promise<unknown> {
+          return this.open(Client);
+        }
+      }
+
+      await new Opening(dm).openWith(Recording);
+
+      expect(built?.url).to.equal(dm.config.rabbitmq_url);
+      built?.logger.error('Channel error', {
+        error: new Error(
+          "PRECONDITION_FAILED - inequivalent arg 'x-queue-type'"
+        ),
+      });
+      built?.logger.warn('Connection attempt failed, retrying...', {
+        attempt: 1,
+      });
+      built?.logger.warn('Connection closed');
+      dm.logger.remove(captured);
+      expect(captured.lines).to.deep.equal([
+        {
+          level: 'error',
+          message: 'Channel error',
+          plugin: 'rabbitmq',
+          error: "Error: PRECONDITION_FAILED - inequivalent arg 'x-queue-type'",
+          attempt: undefined,
+        },
+        {
+          level: 'warn',
+          message: 'Connection attempt failed, retrying...',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: 1,
+        },
+        {
+          level: 'warn',
+          message: 'Connection closed',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: undefined,
+        },
+      ]);
     });
   });
 });

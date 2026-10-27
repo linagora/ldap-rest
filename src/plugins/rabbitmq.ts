@@ -68,6 +68,19 @@ interface RabbitClient {
   isConnected(): boolean;
 }
 
+/** The logging contract of `@linagora/rabbitmq-client`: message first, then a context */
+interface ClientLogger {
+  debug(message: string, context?: unknown): void;
+  info(message: string, context?: unknown): void;
+  warn(message: string, context?: unknown): void;
+  error(message: string, context?: unknown): void;
+}
+
+interface RabbitClientOptions {
+  url: string;
+  logger: ClientLogger;
+}
+
 export default class RabbitMq extends DmPlugin {
   name = 'rabbitmq';
 
@@ -207,12 +220,54 @@ export default class RabbitMq extends DmPlugin {
    * retry policy in `getClient()` can be tested without a live broker.
    */
   protected async connect(): Promise<RabbitClient> {
-    const mod = await import('@linagora/rabbitmq-client');
-    const client = new mod.RabbitMQClient({
+    const { RabbitMQClient } = await import('@linagora/rabbitmq-client');
+    return this.open(RabbitMQClient);
+  }
+
+  /**
+   * Build and initialise a client of the given class: a test hands in a stub
+   * to see what the client is built with.
+   */
+  protected async open(
+    Client: new (options: RabbitClientOptions) => unknown
+  ): Promise<RabbitClient> {
+    const client = new Client({
       url: this.rabbitmqUrl,
-    }) as unknown as RabbitClient;
+      logger: this.clientLogger(),
+    }) as RabbitClient;
     await client.init();
     return client;
+  }
+
+  /**
+   * The client's lines go through the plugin's logger, under its name, so
+   * they follow `--logger` and `--log-level`; without one the client writes
+   * to the console. An `Error` in the context is written as text: the JSON
+   * format keeps only its enumerable fields, which for a channel error is
+   * the code without the broker's message.
+   */
+  private clientLogger(): ClientLogger {
+    const write =
+      (level: keyof ClientLogger) =>
+      (message: string, context?: unknown): void => {
+        const { error, ...rest } =
+          typeof context === 'object' && context !== null
+            ? (context as Record<string, unknown>)
+            : {};
+        this.logger.log(level, message, {
+          plugin: this.name,
+          ...rest,
+          ...(error !== undefined && {
+            error: error instanceof Error ? String(error) : error,
+          }),
+        });
+      };
+    return {
+      debug: write('debug'),
+      info: write('info'),
+      warn: write('warn'),
+      error: write('error'),
+    };
   }
 
   /** Set by `close`: a publish of what outlives the drain opens nothing */
