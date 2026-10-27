@@ -6,6 +6,7 @@ import type { Express } from 'express';
 import { DM } from '../../../src/bin';
 import CrowdSec from '../../../src/plugins/auth/crowdsec';
 import DmPlugin from '../../../src/abstract/plugin';
+import { outboundCalls } from '../../helpers/metrics';
 
 // Simple plugin to test CrowdSec blocking
 class TestPlugin extends DmPlugin {
@@ -55,12 +56,14 @@ describe('CrowdSec Plugin', () => {
       .matchHeader('X-Api-Key', apiKey)
       .reply(200, 'null');
 
+    const asked = await outboundCalls('crowdsec', '200');
     const response = await request(app)
       .get('/api/test')
       .set('X-Forwarded-For', clientIp);
 
     expect(response.status).to.equal(200);
     expect(response.body.message).to.equal('Success');
+    expect(await outboundCalls('crowdsec', '200')).to.equal(asked + 1);
   });
 
   it('should block requests from banned IPs', async () => {

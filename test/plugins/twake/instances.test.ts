@@ -5,6 +5,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import { ForbiddenError } from '../../../src/lib/errors';
+import { outboundCalls } from '../../helpers/metrics';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -292,10 +293,12 @@ describe('Twake instances plugin', function () {
     });
 
     it('answers the add when the Cloudery refuses, the entry left pending', async () => {
+      const refusals = await outboundCalls('cloudery', '500');
       search('in-alice.example.org').reply(200, { items: [] });
       nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
       expect(await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest())).to
         .be.true;
+      expect(await outboundCalls('cloudery', '500')).to.equal(refusals + 1);
       const entry = await read(dm, dnOf('in-alice'));
       expect(entry).to.have.property('uid', 'in-alice');
       expect(entry).not.to.have.property('description');
@@ -1743,6 +1746,7 @@ describe('Twake instances plugin', function () {
     });
 
     it('finishes the onboarding of an instance found unfinished', async () => {
+      const answered = await outboundCalls('cozy-stack', '200');
       const scope = nock(COZY)
         .get('/instances/in-alice.example.org')
         .reply(200, instance('in-alice@example.org', 'in-alice', false))
@@ -1751,6 +1755,7 @@ describe('Twake instances plugin', function () {
         .reply(200, {});
       await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
       expect(scope.isDone()).to.equal(true);
+      expect(await outboundCalls('cozy-stack', '200')).to.equal(answered + 2);
       expect(await read(dm, dnOf('in-alice'))).to.have.property(
         'description',
         'in-alice.example.org'

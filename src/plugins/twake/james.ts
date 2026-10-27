@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
@@ -220,7 +219,7 @@ export default class James extends TwakePlugin {
   /** James's own health check, asked by the readiness probe outside the request queue */
   async health(): Promise<HealthStatus> {
     try {
-      const res = await fetch(`${this.webadminUrl}/healthcheck`, {
+      const res = await this.fetch(`${this.webadminUrl}/healthcheck`, {
         headers: this.createHeaders(),
         signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
       });
@@ -384,7 +383,7 @@ export default class James extends TwakePlugin {
       // Get quota from James WebAdmin API
       const quotaUrl = `${this.webadminUrl}/quota/users/${mailStr}`;
       const quotaRes = await this.requestLimit(() =>
-        fetch(quotaUrl, {
+        this.fetch(quotaUrl, {
           method: 'GET',
           headers: this.createHeaders(),
         })
@@ -1621,7 +1620,7 @@ export default class James extends TwakePlugin {
         // Step 1: the default identity, if the user has one
         const identitiesUrl = `${this.webadminUrl}/users/${mail}/identities`;
         const getRes = await this.requestLimit(() =>
-          fetch(`${identitiesUrl}?default=true`, {
+          this.fetch(`${identitiesUrl}?default=true`, {
             method: 'GET',
             headers: this.createHeaders(),
           })
@@ -1666,7 +1665,7 @@ export default class James extends TwakePlugin {
           ? 'update_identity'
           : 'create_identity';
         const res = await this.requestLimit(() =>
-          fetch(
+          this.fetch(
             defaultIdentity?.id
               ? `${identitiesUrl}/${defaultIdentity.id}`
               : identitiesUrl,
@@ -1712,10 +1711,13 @@ export default class James extends TwakePlugin {
   private async defaultSignatures(mail: string): Promise<Signatures> {
     try {
       const res = await this.requestLimit(() =>
-        fetch(`${this.webadminUrl}/users/${mail}/identities?default=true`, {
-          method: 'GET',
-          headers: this.createHeaders(),
-        })
+        this.fetch(
+          `${this.webadminUrl}/users/${mail}/identities?default=true`,
+          {
+            method: 'GET',
+            headers: this.createHeaders(),
+          }
+        )
       );
       if (!res.ok) return {};
       const identity = pickDefaultIdentity(
@@ -1761,7 +1763,7 @@ export default class James extends TwakePlugin {
     let targets: string[];
     try {
       const res = await this.requestLimit(() =>
-        fetch(`${this.webadminUrl}/address/forwards/${address}`, {
+        this.fetch(`${this.webadminUrl}/address/forwards/${address}`, {
           method: 'GET',
           headers: this.createHeaders(),
         })
@@ -1845,7 +1847,7 @@ export default class James extends TwakePlugin {
       }
 
       const response = await this.requestLimit(() =>
-        fetch(url.toString(), {
+        this.fetch(url.toString(), {
           method: 'POST',
           headers: this.createHeaders(),
         })

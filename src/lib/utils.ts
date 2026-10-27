@@ -12,7 +12,7 @@ import type { AttributeValue } from './ldapActions';
 import { BadRequestError } from './errors';
 import { getLogger } from './expressFormatedResponses';
 import { hookFailures } from './metrics';
-import { outsideRequest } from './requestContext';
+import { outsideRequest, runAsPlugin } from './requestContext';
 
 // Regex caching utilities - shared across plugins to avoid duplication
 // NOTE: This cache is designed for static patterns from schemas, NOT for user input.
@@ -81,6 +81,19 @@ const hookLabel = (hook: Function): string => {
   return hook.name ? ` in ${hook.name}` : '';
 };
 
+/**
+ * Run a hook under its plugin's name and its own, for the lines it logs:
+ * what `launchHooks` does, for a caller walking the hooks itself.
+ *
+ * @param hook the registered function
+ * @param fn its run
+ * @returns what `fn` returns
+ */
+export const runAsHookOwner = <T>(hook: Function, fn: () => T): T => {
+  const owner = hookOwner(hook);
+  return runAsPlugin(owner?.plugin, owner?.hook, fn);
+};
+
 // launchHooks launches hooks asynchroniously, errors are reported and ignored.
 //
 // Calling convention: VARIADIC. The trailing args are spread into each hook:
@@ -106,7 +119,8 @@ export const launchHooks = async (
 ): Promise<void> => {
   if (hooks) {
     for (const hook of hooks) {
-      if (hook) {
+      if (!hook) continue;
+      await runAsHookOwner(hook, async () => {
         try {
           await outsideRequest(() =>
             (hook as (...a: unknown[]) => unknown)(...args)
@@ -142,7 +156,7 @@ export const launchHooks = async (
             getLogger()?.error(`Hook error${where}: ${describeThrown(e)}`);
           }
         }
-      }
+      });
     }
   }
 };
@@ -220,26 +234,28 @@ export const launchHooksChained = async <T>(
   if (hooks) {
     for (const hook of hooks) {
       if (!hook) continue;
-      try {
-        args = await outsideRequest(() =>
-          (hook as (a: T) => T | Promise<T>)(args)
-        );
-      } catch (err) {
-        // A hook pushed onto the list directly — through
-        // `registeredHooks`, or replaced by a wrapper — has no owner on
-        // record. Its refusal is still said, with what can be said of it.
-        if (isRefusal(err)) {
-          const owner = hookOwner(hook);
-          getLogger()?.warn(
-            `${
-              owner
-                ? `${owner.plugin} refused ${owner.hook}`
-                : `a hook no plugin registered (${hook.name || 'anonymous'}) refused`
-            }: ${(err as Error).message}`
+      args = await runAsHookOwner(hook, async () => {
+        try {
+          return await outsideRequest(() =>
+            (hook as (a: T) => T | Promise<T>)(args)
           );
+        } catch (err) {
+          // A hook pushed onto the list directly — through
+          // `registeredHooks`, or replaced by a wrapper — has no owner on
+          // record. Its refusal is still said, with what can be said of it.
+          if (isRefusal(err)) {
+            const owner = hookOwner(hook);
+            getLogger()?.warn(
+              `${
+                owner
+                  ? `${owner.plugin} refused ${owner.hook}`
+                  : `a hook no plugin registered (${hook.name || 'anonymous'}) refused`
+              }: ${(err as Error).message}`
+            );
+          }
+          throw err;
         }
-        throw err;
-      }
+      });
     }
   }
   return args;

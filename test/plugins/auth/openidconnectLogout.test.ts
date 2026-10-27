@@ -14,6 +14,11 @@ import { join } from 'node:path';
 import nock from 'nock';
 
 import type { DM } from '../../../src/bin';
+import {
+  currentLogContext,
+  type LogContext,
+} from '../../../src/lib/requestContext';
+import { recordHookOwner } from '../../../src/lib/utils';
 import Bcl from '../../../src/plugins/bcl';
 import Storage from '../../../src/plugins/storage';
 import {
@@ -205,6 +210,28 @@ describe('OpenID Connect, /logout and a copy of the cookie', function () {
     const fresh = (await login(request, issuer, {}, dead)).cookie;
 
     expect((await ping(request, fresh)).status).to.equal(200);
+  });
+
+  it('should run a logout subscriber under its plugin and hook', async () => {
+    const issuer = 'http://logout-named.example.test';
+    const { request, server } = await withBcl(issuer);
+    const { cookie } = await login(request, issuer);
+    let seen: LogContext | undefined;
+    const subscriber = (): void => {
+      seen = currentLogContext();
+    };
+    recordHookOwner(subscriber, 'probe', 'oidclogouttoken');
+    (server.hooks as unknown as Record<string, unknown[]>).oidclogouttoken = [
+      subscriber,
+    ];
+
+    await request.get('/logout').set('Cookie', cookie);
+
+    expect(seen?.requestId).to.be.a('string');
+    expect([seen?.plugin, seen?.op]).to.deep.equal([
+      'probe',
+      'oidclogouttoken',
+    ]);
   });
 
   it('should log out all the same when the session cannot be recorded', async () => {

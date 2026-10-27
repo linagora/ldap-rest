@@ -30,10 +30,21 @@ declare module 'winston' {
 
 const LOGGERS = ['console', 'file'] as const;
 
-/** The request a line is written for, when one is being served */
-const withRequestId = winston.format(info => {
+/**
+ * The request a line is written for, and the plugin's hook writing it. A
+ * line naming another plugin is that plugin's: it gets no `op`.
+ */
+const withContext = winston.format(info => {
   const context = currentLogContext();
-  if (context) info.requestId = context.requestId;
+  if (!context) return info;
+  if (context.requestId) info.requestId = context.requestId;
+  if (
+    context.plugin &&
+    (info.plugin === undefined || info.plugin === context.plugin)
+  ) {
+    info.plugin = context.plugin;
+    info.op ??= context.op;
+  }
   return info;
 });
 
@@ -57,12 +68,19 @@ export const buildLogger = (config: Config): winston.Logger => {
     level: config.log_level,
     format: winston.format.combine(
       winston.format.timestamp(),
-      withRequestId(),
-      winston.format.printf(({ timestamp, level, message, requestId }) => {
-        const request = typeof requestId === 'string' ? ` [${requestId}]` : '';
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        return `${timestamp} [${level}]${request}: ${message}`;
-      })
+      withContext(),
+      winston.format.printf(
+        ({ timestamp, level, message, requestId, plugin, op }) => {
+          const request =
+            typeof requestId === 'string' ? ` [${requestId}]` : '';
+          const where =
+            typeof plugin === 'string'
+              ? ` [${plugin}${typeof op === 'string' ? ` ${op}` : ''}]`
+              : '';
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          return `${timestamp} [${level}]${request}${where}: ${message}`;
+        }
+      )
     ),
     transports: [
       logger === 'console'

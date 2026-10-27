@@ -5,6 +5,7 @@ import path from 'path';
 import winston from 'winston';
 
 import { buildLogger } from '../../src/logger/winston';
+import { runAsPlugin, runWithLogContext } from '../../src/lib/requestContext';
 import type { Config } from '../../src/bin';
 
 const config = (over: Partial<Config>): Config =>
@@ -55,6 +56,23 @@ describe('buildLogger', () => {
       .transports[0] as winston.transports.FileTransportInstance;
     expect(transport).to.be.instanceOf(winston.transports.File);
     expect(path.join(transport.dirname, transport.filename)).to.equal(file);
+  });
+
+  it('writes the request, the plugin and the hook before the message', async () => {
+    const file = path.join(dir, 'dm-fields.log');
+    const logger = build({ logger: 'file', log_file: file, log_level: 'info' });
+    runWithLogContext({ requestId: 'R1' }, () => {
+      logger.info('serving');
+      runAsPlugin('james', 'ldapadddone', () => logger.info('in the hook'));
+    });
+    logger.info({ message: 'named', plugin: 'drive' });
+    await new Promise<void>(resolve => logger.on('finish', resolve).end());
+    const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
+    expect(lines.map(l => l.replace(/^\S+ /, ''))).to.deep.equal([
+      '[info] [R1]: serving',
+      '[info] [R1] [james ldapadddone]: in the hook',
+      '[info] [drive]: named',
+    ]);
   });
 
   it('refuses a logger it does not know', () => {

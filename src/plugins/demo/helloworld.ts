@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
+import { runAsHookOwner } from '../../lib/utils';
 
 /**
  * @openapi-component
@@ -59,8 +60,8 @@ export default class HelloWorld extends DmPlugin {
         const response = { message: 'Hello', hookResults: [] as unknown[] };
         if (this.server.hooks && this.server.hooks['hello']) {
           for (const hook of this.server.hooks['hello']) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-            response.hookResults.push(await hook());
+            const run = hook as () => unknown;
+            response.hookResults.push(await runAsHookOwner(hook, () => run()));
           }
         }
         res.json(response);

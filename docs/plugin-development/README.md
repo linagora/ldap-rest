@@ -61,6 +61,10 @@ export default class MyPlugin extends DmPlugin {
 - **this.config**: Complete configuration object
 - **this.logger**: Winston logger instance
 - **this.registeredHooks**: Access to global hook registry
+- **this.fetch**: `fetch` timed into the
+  [outbound metrics](../usage/operations.md#metrics) under the plugin's
+  name; the lint refuses a bare `fetch` or `node-fetch` under `src`, and a
+  plugin with a `fetch` member of its own has to rename it
 
 ### Error Handling and Server Resilience
 
@@ -173,7 +177,7 @@ export default class WebhookNotifier extends DmPlugin {
   // Private methods
   private async sendWebhook(event: string, data: unknown): Promise<void> {
     try {
-      await fetch(this.config.webhook_url as string, {
+      await this.fetch(this.config.webhook_url as string, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event, data }),
@@ -1151,7 +1155,7 @@ export default class NotificationPlugin extends DmPlugin {
     const timeoutId = setTimeout(() => controller.abort(), this.webhookTimeout);
 
     try {
-      const response = await fetch(this.webhookUrl, {
+      const response = await this.fetch(this.webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

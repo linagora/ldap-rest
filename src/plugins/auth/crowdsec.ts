@@ -14,7 +14,6 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express, Request, Response, NextFunction } from 'express';
-import fetch from 'node-fetch';
 
 import DmPlugin, { Role } from '../../abstract/plugin';
 
@@ -101,7 +100,7 @@ export default class CrowdSec extends DmPlugin {
     const url = `${this.apiUrl}?ip=${encodeURIComponent(ip)}`;
     this.logger.debug(`Querying CrowdSec API: ${url}`);
 
-    const response = await fetch(url, {
+    const response = await this.fetch(url, {
       headers: {
         'X-Api-Key': this.apiKey,
       },

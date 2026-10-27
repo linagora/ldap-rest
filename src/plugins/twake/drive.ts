@@ -6,7 +6,6 @@
  *
  * @see https://docs.cozy.io/en/cozy-stack/admin/
  */
-import fetch from 'node-fetch';
 
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
@@ -188,7 +187,7 @@ export default class Drive extends TwakePlugin {
       };
 
       try {
-        const res = await fetch(url.toString(), {
+        const res = await this.fetch(url.toString(), {
           method: 'PATCH',
           headers: this.createHeaders('application/json'),
         });
@@ -537,7 +536,7 @@ export default class Drive extends TwakePlugin {
 
     return this.requestLimit(async () => {
       try {
-        const res = await fetch(url, {
+        const res = await this.fetch(url, {
           method: 'DELETE',
           headers: this.createHeaders(),
         });

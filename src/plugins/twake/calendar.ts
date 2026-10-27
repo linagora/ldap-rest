@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 import TwakePlugin from '../../abstract/twakePlugin';
 import { type Role } from '../../abstract/plugin';
 import type { AttributesList } from '../../lib/ldapActions';
@@ -387,7 +385,7 @@ export default class Calendar extends TwakePlugin {
     const url = new URL(`${this.webadminUrl}/registeredUsers`);
     url.searchParams.set('email', email);
     const res = await this.requestLimit(() =>
-      fetch(url.toString(), {
+      this.fetch(url.toString(), {
         method: 'GET',
         headers: this.createHeaders(),
       })
@@ -512,7 +510,7 @@ export default class Calendar extends TwakePlugin {
       if (lastname) payload.lastname = lastname;
 
       const patchRes = await this.requestLimit(() =>
-        fetch(patchUrl.toString(), {
+        this.fetch(patchUrl.toString(), {
           method: 'PATCH',
           headers: this.createHeaders('application/json'),
           body: JSON.stringify(payload),
@@ -566,7 +564,7 @@ export default class Calendar extends TwakePlugin {
       url.searchParams.set('action', 'deleteData');
 
       const response = await this.requestLimit(() =>
-        fetch(url.toString(), {
+        this.fetch(url.toString(), {
           method: 'POST',
           headers: this.createHeaders(),
         })

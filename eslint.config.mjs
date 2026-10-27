@@ -126,6 +126,8 @@ export default [
   // made for, or `ldap.system` for the server's own work, with the reason.
   // An operation naming neither is judged as the request being served, if
   // any — but which one was meant is for the code to say, not the context.
+  // A later block for the same files replaces this rule's options rather
+  // than adding to them: the SCIM block below repeats the fetch selector.
   {
     files: ['src/**/*.ts'],
     ignores: ['src/browser/**', 'src/lib/ldapActions.ts'],
@@ -149,6 +151,11 @@ export default [
             "CallExpression[callee.object.property.name=/^(ldap|system)$/][callee.property.name='move']",
           message:
             'ldap.move is never judged, request or not: it is the trash moving what a judged delete removed. Move for a caller with ldap.rename.',
+        },
+        {
+          selector: "ImportExpression[source.value='node-fetch']",
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
         },
       ],
     },
@@ -185,6 +192,44 @@ export default [
     },
   },
 
+  // docs/usage/operations.md#metrics: a call to another service is timed
+  // under its caller, which `DmPlugin.fetch` and the instance providers do
+  {
+    files: ['src/**/*.ts'],
+    ignores: [
+      'src/browser/**',
+      'src/abstract/plugin.ts',
+      'src/lib/instanceProviders.ts',
+    ],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      // Its own rule key: `no-restricted-imports` above is replaced, not
+      // merged, by a later block
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'node-fetch',
+              message:
+                'Call other services through this.fetch (DmPlugin), which times them.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
+        },
+      ],
+    },
+  },
+
   // The SCIM plugin serves identity providers, and every operation it makes
   // is judged by the request it is made for. Bind the request once with
   // `ldap.forRequest(req)`, so each operation names the request it means
@@ -199,6 +244,11 @@ export default [
             "CallExpression[callee.object.property.name='ldap'][callee.property.name=/^(search|add|modify|delete|rename)$/]",
           message:
             'Use ldap.forRequest(req).<method>() so the authorization hooks see the request.',
+        },
+        {
+          selector: "ImportExpression[source.value='node-fetch']",
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
         },
       ],
     },
