@@ -8,6 +8,7 @@
 import fetch, { type RequestInit, type Response } from 'node-fetch';
 
 import { BadGatewayError, ConflictError, GatewayTimeoutError } from './errors';
+import { timedOutbound } from './metrics';
 
 /**
  * Reduce a name to what the Cloudery takes in a slug; it refused `_` or `@`
@@ -105,6 +106,9 @@ async function refused(what: string, res: Response): Promise<Error> {
  * The deadline covers the answer's body too.
  */
 abstract class HttpProvider {
+  /** The `target` label of this provider's calls in the outbound metrics */
+  protected abstract readonly target: string;
+
   constructor(
     protected readonly domain: string,
     protected readonly timeout: number
@@ -116,10 +120,9 @@ abstract class HttpProvider {
 
   protected async call(url: string, init: RequestInit = {}): Promise<Response> {
     try {
-      return await fetch(url, {
-        ...init,
-        signal: AbortSignal.timeout(this.timeout),
-      });
+      return await timedOutbound(this.target, () =>
+        fetch(url, { ...init, signal: AbortSignal.timeout(this.timeout) })
+      );
     } catch (err) {
       throw this.timedOut(err, url);
     }
@@ -144,6 +147,8 @@ abstract class HttpProvider {
 }
 
 export class ClouderyProvider extends HttpProvider implements InstanceProvider {
+  protected readonly target = 'cloudery';
+
   constructor(
     private readonly url: string,
     private readonly token: string,
@@ -277,6 +282,7 @@ export class CozyStackProvider
   extends HttpProvider
   implements InstanceProvider
 {
+  protected readonly target = 'cozy-stack';
   private readonly auth: string;
 
   constructor(

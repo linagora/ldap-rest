@@ -24,12 +24,20 @@ const UUID =
 
 /** Keeps what the logger wrote, as the console transport would see it */
 class Captured extends Transport {
-  lines: Array<{ level: string; message: string; requestId?: string }> = [];
+  lines: Array<{
+    level: string;
+    message: string;
+    requestId?: string;
+    plugin?: string;
+    op?: string;
+  }> = [];
   log(info: Record<string, unknown>, next: () => void): void {
     this.lines.push({
       level: String(info.level),
       message: String(info.message),
       requestId: info.requestId as string | undefined,
+      plugin: info.plugin as string | undefined,
+      op: info.op as string | undefined,
     });
     next();
   }
@@ -51,6 +59,8 @@ describe('Request id', () => {
       name = 'probe';
       hooks = {
         probedone: (): void => {
+          this.logger.info('in the hook');
+          this.logger.info({ message: 'as another plugin', plugin: 'other' });
           throw new Error('a hook failing');
         },
       };
@@ -90,9 +100,28 @@ describe('Request id', () => {
     expect(id, 'not the header sent').not.to.equal('forged');
     expect(res.body).to.deep.equal({ id, context: id });
     const served = captured.lines.filter(l =>
-      /serving the probe|as the server|Hook error/.test(l.message)
+      /serving the probe|as the server|in the hook|as another|Hook error/.test(
+        l.message
+      )
     );
-    expect(served.map(l => l.requestId)).to.deep.equal([id, id, id]);
+    expect(served.map(l => l.requestId)).to.deep.equal([id, id, id, id, id]);
+  });
+
+  it('names the plugin and the hook on the lines a hook writes', async () => {
+    captured.lines = [];
+    await request.get('/probe').expect(200);
+    const fields = (start: string): [string?, string?] => {
+      const line = captured.lines.find(l => l.message.startsWith(start));
+      expect(line, start).to.not.equal(undefined);
+      return [line!.plugin, line!.op];
+    };
+    expect(fields('serving the probe')).to.deep.equal([undefined, undefined]);
+    expect(fields('in the hook')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('Hook error')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('as another plugin'), 'its own name kept').to.deep.equal([
+      'other',
+      undefined,
+    ]);
   });
 
   it('gives each request its own id, on its own lines', async () => {
@@ -235,6 +264,8 @@ describe('Request id', () => {
       level: 'info',
       message: 'at rest',
       requestId: undefined,
+      plugin: undefined,
+      op: undefined,
     });
   });
 });

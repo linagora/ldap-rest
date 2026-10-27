@@ -3,7 +3,6 @@
  * Provides common HTTP request handling, concurrency control, and LDAP utilities
  * @author Xavier Guimard <xguimard@linagora.com>
  */
-import fetch from 'node-fetch';
 import pLimit from 'p-limit';
 
 import type { DM } from '../bin';
@@ -146,7 +145,7 @@ export abstract class TwakePlugin extends DmPlugin {
       try {
         // The limiter holds a slot for the request only: a call waiting to
         // be retried must not keep the others from running
-        const res = await this.requestLimit(() => fetch(url, opts));
+        const res = await this.requestLimit(() => this.fetch(url, opts));
 
         if (res.ok) {
           this.logger.info({

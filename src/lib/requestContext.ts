@@ -48,9 +48,14 @@ export function currentRequest(): Request | undefined {
   return requests.getStore();
 }
 
-/** What every log line written while serving a request carries */
+/** What a log line carries beside what it says */
 export interface LogContext {
-  requestId: string;
+  /** The request being served */
+  requestId?: string;
+  /** The plugin whose hook is running */
+  plugin?: string;
+  /** That hook */
+  op?: string;
 }
 
 /**
@@ -81,6 +86,19 @@ export function outsideAnyRequest<T>(fn: () => T): T {
  */
 export function runWithLogContext<T>(context: LogContext, fn: () => T): T {
   return logContexts.run(context, fn);
+}
+
+/**
+ * Run a plugin's hook: what it logs names the plugin and the hook, under the
+ * request being served.
+ *
+ * @param plugin the plugin's instance name
+ * @param op the hook
+ * @param fn the hook's run
+ * @returns what `fn` returns
+ */
+export function runAsPlugin<T>(plugin: string, op: string, fn: () => T): T {
+  return logContexts.run({ ...logContexts.getStore(), plugin, op }, fn);
 }
 
 /** The log context of the request being served, if any */

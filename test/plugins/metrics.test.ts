@@ -1,3 +1,6 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import { expect } from 'chai';
 import supertest from 'supertest';
 import { Router } from 'express';
@@ -269,6 +272,65 @@ describe('metrics', function () {
         'hook="ldapadddone",plugin="broken"'
       )
     ).to.equal(1);
+  });
+
+  it('times the calls to other services by target and status, never by URL', async () => {
+    class Caller extends DmPlugin {
+      name = 'caller';
+      call(url: string): Promise<{ status: number }> {
+        return this.fetch(url);
+      }
+    }
+    const caller = new Caller(dm);
+    const listen = (server: Server): Promise<string> =>
+      new Promise(resolve =>
+        server.listen(0, '127.0.0.1', () =>
+          resolve(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+        )
+      );
+    const service = createServer((req, res) => {
+      res.statusCode = req.url === '/fine' ? 200 : 503;
+      res.end();
+    });
+    const gone = createServer();
+    const url = await listen(service);
+    const closed = await listen(gone);
+    await new Promise(resolve => gone.close(resolve));
+    const calls = (text: string, status: string): number => {
+      const labels = `target="caller",status="${status}"`;
+      return text.includes(`{${labels}}`)
+        ? sample(
+            text,
+            'ldap_rest_outbound_request_duration_seconds_count',
+            labels
+          )
+        : 0;
+    };
+    try {
+      const before = await scrape();
+      expect((await caller.call(`${url}/fine`)).status).to.equal(200);
+      expect((await caller.call(`${url}/fine`)).status).to.equal(200);
+      expect((await caller.call(`${url}/down`)).status).to.equal(503);
+      let refused: unknown;
+      await caller.call(`${closed}/fine`).catch(e => (refused = e));
+      expect(refused, 'the closed port').to.be.instanceOf(Error);
+      const text = await scrape();
+      expect(calls(text, '200') - calls(before, '200')).to.equal(2);
+      expect(calls(text, '503') - calls(before, '503')).to.equal(1);
+      expect(calls(text, 'error') - calls(before, 'error')).to.equal(1);
+      expect(
+        sample(
+          text,
+          'ldap_rest_outbound_request_duration_seconds_sum',
+          'target="caller",status="200"'
+        ),
+        'the time taken'
+      ).to.be.above(0);
+      expect(text).to.not.include('/fine');
+      expect(text).to.not.include(url);
+    } finally {
+      await new Promise(resolve => service.close(resolve));
+    }
   });
 
   it('refuses to start on a port in use', async () => {

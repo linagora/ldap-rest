@@ -5,6 +5,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import { ForbiddenError } from '../../../src/lib/errors';
+import { outboundCalls } from '../../helpers/metrics';
 import {
   ClouderyProvider,
   CozyStackProvider,
@@ -292,10 +293,12 @@ describe('Twake instances plugin', function () {
     });
 
     it('answers the add when the Cloudery refuses, the entry left pending', async () => {
+      const refusals = await outboundCalls('cloudery', '500');
       search('in-alice.example.org').reply(200, { items: [] });
       nock(CLOUDERY).post('/api/v1/instances').reply(500, 'down');
       expect(await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest())).to
         .be.true;
+      expect(await outboundCalls('cloudery', '500')).to.equal(refusals + 1);
       const entry = await read(dm, dnOf('in-alice'));
       expect(entry).to.have.property('uid', 'in-alice');
       expect(entry).not.to.have.property('description');

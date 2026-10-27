@@ -58,6 +58,14 @@ export const hookFailures = new Counter({
   registers: [registry],
 });
 
+export const outboundRequestDuration = new Histogram({
+  name: 'ldap_rest_outbound_request_duration_seconds',
+  help: 'Time a service the server calls takes to answer, by target and status: the HTTP status, or error when it did not answer',
+  labelNames: ['target', 'status'] as const,
+  buckets: SECONDS,
+  registers: [registry],
+});
+
 export const unhandledRejections = new Counter({
   name: 'ldap_rest_unhandled_rejections_total',
   help: 'Promise rejections nothing handled',
@@ -95,6 +103,25 @@ export async function timedLdap<T>(
     throw err;
   } finally {
     ldapOperationDuration.observe({ operation, result }, secondsSince(started));
+  }
+}
+
+/**
+ * Time a call to another service into the outbound histogram, to its
+ * answer's headers: the body is read by the caller, at its own pace.
+ */
+export async function timedOutbound<T extends { status: number }>(
+  target: string,
+  call: () => Promise<T>
+): Promise<T> {
+  const started = process.hrtime.bigint();
+  let status = 'error';
+  try {
+    const res = await call();
+    status = String(res.status);
+    return res;
+  } finally {
+    outboundRequestDuration.observe({ target, status }, secondsSince(started));
   }
 }
 

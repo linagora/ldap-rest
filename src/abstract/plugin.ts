@@ -3,11 +3,13 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 import type { Express } from 'express';
+import fetch, { type RequestInit, type Response } from 'node-fetch';
 import type winston from 'winston';
 
 import type { Config, DM } from '../bin';
 import type { Hooks, MaybePromise } from '../hooks';
 import type { HealthStatus } from '../lib/health';
+import { timedOutbound } from '../lib/metrics';
 import {
   neverReturnAttributes,
   withoutAttributes,
@@ -131,6 +133,14 @@ export default abstract class DmPlugin {
 
   /* Uniq name of this plugin */
   abstract name: string;
+
+  /**
+   * Call another service: `fetch`, timed into the outbound metrics under
+   * this plugin's name, see `docs/usage/operations.md#metrics`.
+   */
+  protected fetch(url: string, init?: RequestInit): Promise<Response> {
+    return timedOutbound(this.name, () => fetch(url, init));
+  }
 
   /**
    * Constructor

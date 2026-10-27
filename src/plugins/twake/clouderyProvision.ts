@@ -25,7 +25,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import type { Request } from 'express';
-import fetch from 'node-fetch';
 
 import DmPlugin, { type Role, escapeDnValue } from '../../abstract/plugin';
 import type { DM } from '../../bin';
@@ -719,7 +718,7 @@ export default class ClouderyProvision extends DmPlugin {
       event: 'createInstance',
       url: `${this.managerUrl}/api/v1/instances`,
     });
-    const res = await fetch(`${this.managerUrl}/api/v1/instances`, {
+    const res = await this.fetch(`${this.managerUrl}/api/v1/instances`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -765,7 +764,7 @@ export default class ClouderyProvision extends DmPlugin {
     });
     for (let attempt = 1; attempt <= this.maxPollAttempts; attempt++) {
       try {
-        const res = await fetch(
+        const res = await this.fetch(
           `${this.managerUrl}/api/v1/workflows/${encodeURIComponent(
             workflowId
           )}`,
@@ -867,7 +866,7 @@ export default class ClouderyProvision extends DmPlugin {
     url.searchParams.set('fqdn', fqdn);
     if (only) url.searchParams.set('only', only);
     url.searchParams.set('limit', '1');
-    const res = await fetch(url.toString(), {
+    const res = await this.fetch(url.toString(), {
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });
     if (!res.ok) {
@@ -910,7 +909,7 @@ export default class ClouderyProvision extends DmPlugin {
       uuid,
       url: url.toString(),
     });
-    const res = await fetch(url.toString(), {
+    const res = await this.fetch(url.toString(), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${this.managerToken}` },
     });

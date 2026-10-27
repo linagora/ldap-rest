@@ -19,8 +19,6 @@
  */
 import { Buffer } from 'buffer';
 
-import fetch from 'node-fetch';
-
 import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { Hooks } from '../../hooks';
@@ -160,7 +158,7 @@ export default class CozyProvision extends DmPlugin {
     };
 
     try {
-      const res = await fetch(url, {
+      const res = await this.fetch(url, {
         method: 'POST',
         headers: {
           Authorization: this.cozyAdminAuthHeader,
@@ -220,7 +218,7 @@ export default class CozyProvision extends DmPlugin {
       domain,
     };
     try {
-      const res = await fetch(url, {
+      const res = await this.fetch(url, {
         method: 'PATCH',
         headers: {
           Authorization: this.cozyAdminAuthHeader,
@@ -281,7 +279,7 @@ export default class CozyProvision extends DmPlugin {
     };
 
     try {
-      const res = await fetch(url, {
+      const res = await this.fetch(url, {
         method: 'DELETE',
         headers: {
           Authorization: this.cozyAdminAuthHeader,
