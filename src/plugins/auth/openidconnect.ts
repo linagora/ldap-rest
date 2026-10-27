@@ -16,7 +16,7 @@ const { auth, requiresAuth } = oidc;
 
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import { type Role } from '../../abstract/plugin';
-import { launchHooksChained } from '../../lib/utils';
+import { launchHooksChained, runAsHookOwner } from '../../lib/utils';
 import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
@@ -117,7 +117,7 @@ const walkSubscribers = async <T>(
   for (const subscriber of subscribers ?? []) {
     if (!subscriber) continue;
     try {
-      await subscriber(payload);
+      await runAsHookOwner(subscriber, () => subscriber(payload));
     } catch (err) {
       firstError ??= err instanceof Error ? err : new Error(String(err));
     }

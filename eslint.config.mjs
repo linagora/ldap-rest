@@ -150,6 +150,11 @@ export default [
           message:
             'ldap.move is never judged, request or not: it is the trash moving what a judged delete removed. Move for a caller with ldap.rename.',
         },
+        {
+          selector: "ImportExpression[source.value='node-fetch']",
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
+        },
       ],
     },
   },

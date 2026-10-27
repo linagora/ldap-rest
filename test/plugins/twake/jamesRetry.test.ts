@@ -296,6 +296,32 @@ describe('James Plugin - replication lag', () => {
     expect(order).to.deep.equal(['slow:404', 'other:204', 'slow:204']);
   });
 
+  it('times a call from the moment it is sent, the wait for a slot left out', async () => {
+    const doneSeconds = async (): Promise<number> =>
+      (await outboundRequestDuration.get()).values.find(
+        v =>
+          v.metricName === 'ldap_rest_outbound_request_duration_seconds_sum' &&
+          v.labels.target === 'james' &&
+          v.labels.status === '204'
+      )?.value ?? 0;
+    const before = await doneSeconds();
+    dm.config.james_concurrency = 1;
+    james = Object.assign(new James(dm), { logger: james.logger });
+    nock(url)
+      .put('/quota/users/slow@test.org/size')
+      .delay(300)
+      .reply(204)
+      .put('/quota/users/other@test.org/size')
+      .reply(204);
+    const slow = james.hooks.onLdapQuotaChange!(dn, 'slow@test.org', 0, 1);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const other = james.hooks.onLdapQuotaChange!(dn, 'other@test.org', 0, 1);
+    await Promise.all([slow, other]);
+    const spent = (await doneSeconds()) - before;
+    expect(spent, 'the slow answer').to.be.at.least(0.3);
+    expect(spent, 'the queued call waited outside its timing').to.be.below(0.5);
+  });
+
   it('retries the identity of a user James does not know yet', async () => {
     const saved = dm.config.james_signature_template;
     dm.config.james_signature_template = '';

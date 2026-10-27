@@ -81,8 +81,15 @@ const hookLabel = (hook: Function): string => {
   return hook.name ? ` in ${hook.name}` : '';
 };
 
-/** Run a hook under its plugin's name and its own, for the lines it logs */
-const asOwner = <T>(hook: Function, fn: () => T): T => {
+/**
+ * Run a hook under its plugin's name and its own, for the lines it logs:
+ * what `launchHooks` does, for a caller walking the hooks itself.
+ *
+ * @param hook the registered function
+ * @param fn its run
+ * @returns what `fn` returns
+ */
+export const runAsHookOwner = <T>(hook: Function, fn: () => T): T => {
   const owner = hookOwner(hook);
   return runAsPlugin(owner?.plugin, owner?.hook, fn);
 };
@@ -113,7 +120,7 @@ export const launchHooks = async (
   if (hooks) {
     for (const hook of hooks) {
       if (!hook) continue;
-      await asOwner(hook, async () => {
+      await runAsHookOwner(hook, async () => {
         try {
           await outsideRequest(() =>
             (hook as (...a: unknown[]) => unknown)(...args)
@@ -227,7 +234,7 @@ export const launchHooksChained = async <T>(
   if (hooks) {
     for (const hook of hooks) {
       if (!hook) continue;
-      args = await asOwner(hook, async () => {
+      args = await runAsHookOwner(hook, async () => {
         try {
           return await outsideRequest(() =>
             (hook as (a: T) => T | Promise<T>)(args)

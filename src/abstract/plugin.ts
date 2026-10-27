@@ -138,7 +138,10 @@ export default abstract class DmPlugin {
    * Call another service: `fetch`, timed into the outbound metrics under
    * this plugin's name, see `docs/usage/operations.md#metrics`.
    */
-  protected fetch(url: string, init?: RequestInit): Promise<Response> {
+  protected fetch(
+    url: Parameters<typeof fetch>[0],
+    init?: RequestInit
+  ): Promise<Response> {
     return timedOutbound(this.name, () => fetch(url, init));
   }
 

@@ -83,9 +83,9 @@ under the request that started it.
 A line a hook writes carries `plugin`, the plugin that registered the hook,
 and `op`, the hook's name, the `Hook error` line of a hook that threw
 included: in the JSON console output as fields, in the log file as
-`[<plugin> <op>]` after the request id. A line naming a `plugin` itself
-keeps its own, and reads `[<plugin>]` in the file wherever it is written.
-These are the labels of `ldap_rest_hook_failures_total`.
+`[<plugin> <op>]` after the request id. A line naming another `plugin`
+itself keeps it, with no `op`, and reads `[<plugin>]` in the file wherever
+it is written. These are the labels of `ldap_rest_hook_failures_total`.
 
 ## Metrics
 

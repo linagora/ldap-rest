@@ -1746,6 +1746,7 @@ describe('Twake instances plugin', function () {
     });
 
     it('finishes the onboarding of an instance found unfinished', async () => {
+      const answered = await outboundCalls('cozy-stack', '200');
       const scope = nock(COZY)
         .get('/instances/in-alice.example.org')
         .reply(200, instance('in-alice@example.org', 'in-alice', false))
@@ -1754,6 +1755,7 @@ describe('Twake instances plugin', function () {
         .reply(200, {});
       await dm.ldap.add(dnOf('in-alice'), person('in-alice'), rest());
       expect(scope.isDone()).to.equal(true);
+      expect(await outboundCalls('cozy-stack', '200')).to.equal(answered + 2);
       expect(await read(dm, dnOf('in-alice'))).to.have.property(
         'description',
         'in-alice.example.org'
