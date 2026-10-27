@@ -62,6 +62,7 @@ describe('Request id', () => {
           this.logger.info('in the hook');
           this.logger.info({ message: 'as another plugin', plugin: 'other' });
           this.logger.info({ message: 'as itself', plugin: 'probe' });
+          this.logger.info({ message: 'on its own op', op: 'mine' });
           await launchHooks([
             function unregistered(): void {
               server.logger.info('in a hook no plugin registered');
@@ -137,6 +138,7 @@ describe('Request id', () => {
     ]);
     expect(fields('Hook error')).to.deep.equal(['probe', 'probedone']);
     expect(fields('as itself')).to.deep.equal(['probe', 'probedone']);
+    expect(fields('on its own op')).to.deep.equal(['probe', 'mine']);
     expect(fields('as another plugin'), 'its own name kept').to.deep.equal([
       'other',
       undefined,

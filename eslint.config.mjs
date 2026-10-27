@@ -194,8 +194,13 @@ export default [
       'src/abstract/plugin.ts',
       'src/lib/instanceProviders.ts',
     ],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
     rules: {
-      'no-restricted-imports': [
+      // Its own rule key: `no-restricted-imports` above is replaced, not
+      // merged, by a later block
+      '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           paths: [
@@ -205,6 +210,14 @@ export default [
                 'Call other services through this.fetch (DmPlugin), which times them.',
             },
           ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
         },
       ],
     },

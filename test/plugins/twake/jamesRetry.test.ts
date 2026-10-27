@@ -163,15 +163,25 @@ describe('James Plugin - replication lag', () => {
   });
 
   it('counts each attempt under its status, the wait between them left out', async () => {
+    const refusedSeconds = async (): Promise<number> =>
+      (await outboundRequestDuration.get()).values.find(
+        v =>
+          v.metricName === 'ldap_rest_outbound_request_duration_seconds_sum' &&
+          v.labels.target === 'james' &&
+          v.labels.status === '404'
+      )?.value ?? 0;
     const before = {
       refused: await outboundCalls('james', '404'),
+      refusedSeconds: await refusedSeconds(),
       done: await outboundCalls('james', '204'),
     };
+    // Long enough to show in the sum were it counted with the attempt
+    dm.config.james_retry_delay = 200;
+    james = Object.assign(new James(dm), { logger: james.logger });
     nock(url)
       .put('/address/aliases/lag@test.org/sources/a@test.org')
       .reply(404)
       .put('/address/aliases/lag@test.org/sources/a@test.org')
-      .delay(50)
       .reply(204);
     const started = Date.now();
     await james.hooks.onLdapAliasChange!(
@@ -180,18 +190,13 @@ describe('James Plugin - replication lag', () => {
       [],
       ['a@test.org']
     );
-    expect(Date.now() - started).to.be.at.least(50);
+    expect(Date.now() - started, 'the retry waited').to.be.at.least(200);
     expect(await outboundCalls('james', '404')).to.equal(before.refused + 1);
     expect(await outboundCalls('james', '204')).to.equal(before.done + 1);
-    const sum = (await outboundRequestDuration.get()).values.find(
-      v =>
-        v.metricName === 'ldap_rest_outbound_request_duration_seconds_sum' &&
-        v.labels.target === 'james' &&
-        v.labels.status === '404'
-    )!.value;
-    expect(sum, 'the retry delay is not the call').to.be.below(
-      Date.now() - started
-    );
+    expect(
+      (await refusedSeconds()) - before.refusedSeconds,
+      'the wait is not the call'
+    ).to.be.below(0.2);
   });
 
   it('does not retry a server error', async () => {
