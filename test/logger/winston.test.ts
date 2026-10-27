@@ -66,12 +66,20 @@ describe('buildLogger', () => {
       runAsPlugin('james', 'ldapadddone', () => logger.info('in the hook'));
     });
     logger.info({ message: 'named', plugin: 'drive' });
+    logger.warn({
+      message: 'failed',
+      plugin: 'rabbitmq',
+      error: 'Error: broker down',
+    });
+    logger.warn({ message: 'failed too', error: { code: 406 } });
     await new Promise<void>(resolve => logger.on('finish', resolve).end());
     const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
     expect(lines.map(l => l.replace(/^\S+ /, ''))).to.deep.equal([
       '[info] [R1]: serving',
       '[info] [R1] [james ldapadddone]: in the hook',
       '[info] [drive]: named',
+      '[warn] [rabbitmq]: failed (Error: broker down)',
+      '[warn]: failed too ({"code":406})',
     ]);
   });
 

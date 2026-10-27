@@ -70,15 +70,19 @@ export const buildLogger = (config: Config): winston.Logger => {
       winston.format.timestamp(),
       withContext(),
       winston.format.printf(
-        ({ timestamp, level, message, requestId, plugin, op }) => {
+        ({ timestamp, level, message, requestId, plugin, op, error }) => {
           const request =
             typeof requestId === 'string' ? ` [${requestId}]` : '';
           const where =
             typeof plugin === 'string'
               ? ` [${plugin}${typeof op === 'string' ? ` ${op}` : ''}]`
               : '';
+          const reason =
+            error === undefined
+              ? ''
+              : ` (${typeof error === 'string' ? error : error instanceof Error ? String(error) : JSON.stringify(error)})`;
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          return `${timestamp} [${level}]${request}${where}: ${message}`;
+          return `${timestamp} [${level}]${request}${where}: ${message}${reason}`;
         }
       )
     ),

@@ -257,9 +257,7 @@ export default class RabbitMq extends DmPlugin {
         this.logger.log(level, message, {
           plugin: this.name,
           ...rest,
-          ...(error !== undefined && {
-            error: error instanceof Error ? String(error) : error,
-          }),
+          ...(error !== undefined && { error: describeError(error) }),
         });
       };
     return {
@@ -291,6 +289,21 @@ export default class RabbitMq extends DmPlugin {
       });
     });
   }
+}
+
+/**
+ * An error on one line. Node refuses a host whose every address refused
+ * with an `AggregateError` holding the refusals and an empty message: the
+ * refusals are the line. An error with no message is named by its code.
+ */
+function describeError(error: unknown): unknown {
+  if (!(error instanceof Error)) return error;
+  const { errors, code } = error as { errors?: unknown; code?: unknown };
+  if (Array.isArray(errors) && errors.length)
+    return errors.map(describeError).join('; ');
+  if (!error.message && typeof code === 'string')
+    return `${error.name}: ${code}`;
+  return String(error);
 }
 
 /**

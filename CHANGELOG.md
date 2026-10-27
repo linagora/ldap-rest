@@ -102,11 +102,13 @@
   connection is closed, or after 10 seconds. Its signal listener returned
   without exiting, so a pod lived on until the end of its termination grace
   period ([#425](https://github.com/linagora/ldap-rest/issues/425))
-- `core/rabbitmq`: the lines its client writes, connection attempts,
-  channel errors, handler failures, are server lines under
-  `plugin: rabbitmq`, following `--logger` and `--log-level`, an error as
-  text; they went to the console in the client's own format, every publish
-  included ([#465](https://github.com/linagora/ldap-rest/pull/465))
+- `core/rabbitmq`: its client's lines are server lines under
+  `plugin: rabbitmq`, following `--logger` and `--log-level`: a connection
+  or channel failure at `warn` or `error` with the reason as text, a
+  publish at `info`, message bodies at `debug`. They went to standard
+  output in the client's own JSON, a publish included. With `--logger file`,
+  a line carrying an `error` writes it after the message, on every plugin;
+  it was dropped ([#465](https://github.com/linagora/ldap-rest/pull/465))
 - The error middleware and the routes answering through `serverError` send
   the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
   the latter sent `{"error":"check logs"}`. `--debug` names the failure in

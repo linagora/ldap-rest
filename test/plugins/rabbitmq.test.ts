@@ -232,10 +232,10 @@ describe('RabbitMq plugin', () => {
 
     interface ClientOptions {
       url: string;
-      logger: {
-        warn(message: string, context?: unknown): void;
-        error(message: string, context?: unknown): void;
-      };
+      logger: Record<
+        'debug' | 'info' | 'warn' | 'error',
+        (message: string, context?: unknown) => void
+      >;
     }
 
     it('logs through the plugin logger, under the plugin name, an error as text', async () => {
@@ -265,6 +265,24 @@ describe('RabbitMq plugin', () => {
           "PRECONDITION_FAILED - inequivalent arg 'x-queue-type'"
         ),
       });
+      // What Node throws for a host whose IPv6 and IPv4 addresses both refused
+      const refused = Object.assign(new Error(''), {
+        name: 'AggregateError',
+        code: 'ECONNREFUSED',
+        errors: [
+          new Error('connect ECONNREFUSED ::1:1'),
+          new Error('connect ECONNREFUSED 127.0.0.1:1'),
+        ],
+      });
+      built?.logger.error('Connection failed after maximum attempts', {
+        error: refused,
+      });
+      built?.logger.warn('Connection error', {
+        error: Object.assign(new Error(''), { code: 'ECONNRESET' }),
+      });
+      dm.logger.level = 'debug';
+      built?.logger.info('Published message', { exchange: 'auth' });
+      built?.logger.debug('Message received', { payload: { twakeId: 'a' } });
       built?.logger.warn('Connection attempt failed, retrying...', {
         attempt: 1,
       });
@@ -276,6 +294,35 @@ describe('RabbitMq plugin', () => {
           message: 'Channel error',
           plugin: 'rabbitmq',
           error: "Error: PRECONDITION_FAILED - inequivalent arg 'x-queue-type'",
+          attempt: undefined,
+        },
+        {
+          level: 'error',
+          message: 'Connection failed after maximum attempts',
+          plugin: 'rabbitmq',
+          error:
+            'Error: connect ECONNREFUSED ::1:1; Error: connect ECONNREFUSED 127.0.0.1:1',
+          attempt: undefined,
+        },
+        {
+          level: 'warn',
+          message: 'Connection error',
+          plugin: 'rabbitmq',
+          error: 'Error: ECONNRESET',
+          attempt: undefined,
+        },
+        {
+          level: 'info',
+          message: 'Published message',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: undefined,
+        },
+        {
+          level: 'debug',
+          message: 'Message received',
+          plugin: 'rabbitmq',
+          error: undefined,
           attempt: undefined,
         },
         {
