@@ -102,6 +102,11 @@
   connection is closed, or after 10 seconds. Its signal listener returned
   without exiting, so a pod lived on until the end of its termination grace
   period ([#425](https://github.com/linagora/ldap-rest/issues/425))
+- `core/rabbitmq`: the lines its client writes, connection attempts,
+  channel errors, handler failures, are server lines under
+  `plugin: rabbitmq`, following `--logger` and `--log-level`, an error as
+  text; they went to the console in the client's own format, every publish
+  included ([#465](https://github.com/linagora/ldap-rest/pull/465))
 - The error middleware and the routes answering through `serverError` send
   the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
   the latter sent `{"error":"check logs"}`. `--debug` names the failure in
