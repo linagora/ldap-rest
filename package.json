@@ -800,7 +800,7 @@
     "typescript": "^5.9.2"
   },
   "optionalDependencies": {
-    "@linagora/rabbitmq-client": "^0.1.2",
+    "@linagora/rabbitmq-client": "^0.7.2",
     "express-openid-connect": "^2.19.2",
     "iovalkey": "^0.4.0",
     "lemonldap-ng-handler": "^0.7.3",
