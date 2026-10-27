@@ -106,9 +106,11 @@
   `plugin: rabbitmq`, following `--logger` and `--log-level`: a connection
   or channel failure at `warn` or `error` with the reason as text, a
   publish at `info`, message bodies at `debug`. They went to standard
-  output in the client's own JSON, a publish included. With `--logger file`,
-  a line carrying an `error` writes it after the message, on every plugin;
-  it was dropped ([#465](https://github.com/linagora/ldap-rest/pull/465))
+  output in the client's own JSON, a publish included
+  ([#465](https://github.com/linagora/ldap-rest/pull/465))
+- `--logger file`: a line's `error` follows its message, in parentheses;
+  it was dropped, [docs](docs/usage/operations.md#request-id)
+  ([#465](https://github.com/linagora/ldap-rest/pull/465))
 - The error middleware and the routes answering through `serverError` send
   the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
   the latter sent `{"error":"check logs"}`. `--debug` names the failure in

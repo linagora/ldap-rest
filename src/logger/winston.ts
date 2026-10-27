@@ -1,3 +1,5 @@
+import { inspect } from 'util';
+
 import winston from 'winston';
 
 import { Config } from '../bin';
@@ -77,10 +79,12 @@ export const buildLogger = (config: Config): winston.Logger => {
             typeof plugin === 'string'
               ? ` [${plugin}${typeof op === 'string' ? ` ${op}` : ''}]`
               : '';
+          // inspect never throws, where JSON.stringify does on a cycle: a
+          // log line must not
           const reason =
             error === undefined
               ? ''
-              : ` (${typeof error === 'string' ? error : error instanceof Error ? String(error) : JSON.stringify(error)})`;
+              : ` (${typeof error === 'string' ? error : error instanceof Error ? String(error) : inspect(error, { breakLength: Infinity })})`;
           // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
           return `${timestamp} [${level}]${request}${where}: ${message}${reason}`;
         }
