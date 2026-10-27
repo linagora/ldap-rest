@@ -63,7 +63,8 @@ export default class MyPlugin extends DmPlugin {
 - **this.registeredHooks**: Access to global hook registry
 - **this.fetch**: `fetch` timed into the
   [outbound metrics](../usage/operations.md#metrics) under the plugin's
-  name; the lint refuses a bare `fetch` or `node-fetch` in `src/plugins`
+  name; the lint refuses a bare `fetch` or `node-fetch` under `src`, and a
+  plugin with a `fetch` member of its own has to rename it
 
 ### Error Handling and Server Resilience
 

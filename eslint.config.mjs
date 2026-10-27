@@ -126,6 +126,8 @@ export default [
   // made for, or `ldap.system` for the server's own work, with the reason.
   // An operation naming neither is judged as the request being served, if
   // any — but which one was meant is for the code to say, not the context.
+  // A later block for the same files replaces this rule's options rather
+  // than adding to them: the SCIM block below repeats the fetch selector.
   {
     files: ['src/**/*.ts'],
     ignores: ['src/browser/**', 'src/lib/ldapActions.ts'],
@@ -242,6 +244,11 @@ export default [
             "CallExpression[callee.object.property.name='ldap'][callee.property.name=/^(search|add|modify|delete|rename)$/]",
           message:
             'Use ldap.forRequest(req).<method>() so the authorization hooks see the request.',
+        },
+        {
+          selector: "ImportExpression[source.value='node-fetch']",
+          message:
+            'Call other services through this.fetch (DmPlugin), which times them.',
         },
       ],
     },
