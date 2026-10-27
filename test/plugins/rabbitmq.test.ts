@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import Transport from 'winston-transport';
 
 import { DM } from '../../src/bin';
 import RabbitMq from '../../src/plugins/rabbitmq';
@@ -215,6 +216,130 @@ describe('RabbitMq plugin', () => {
 
     it('no-ops unsubscribe without throwing', async () => {
       await plugin.unsubscribe('q');
+    });
+  });
+
+  describe('the client it opens', () => {
+    /** Keeps what the logger wrote, as the console transport would see it */
+    class Captured extends Transport {
+      lines: Array<Record<string, unknown>> = [];
+      log(info: Record<string, unknown>, next: () => void): void {
+        const { level, message, plugin, error, attempt } = info;
+        this.lines.push({ level, message, plugin, error, attempt });
+        next();
+      }
+    }
+
+    interface ClientOptions {
+      url: string;
+      logger: Record<
+        'debug' | 'info' | 'warn' | 'error',
+        (message: string, context?: unknown) => void
+      >;
+    }
+
+    it('logs through the plugin logger, under the plugin name, an error as text', async () => {
+      const dm = new DM();
+      dm.config.rabbitmq_url = 'amqp://guest:guest@rabbitmq:5672/';
+      await dm.ready;
+      const captured = new Captured();
+      dm.logger.add(captured);
+      let built: ClientOptions | undefined;
+      class Recording {
+        constructor(options: ClientOptions) {
+          built = options;
+        }
+        async init(): Promise<void> {}
+      }
+      class Opening extends RabbitMq {
+        openWith(Client: typeof Recording): Promise<unknown> {
+          return this.open(Client);
+        }
+      }
+
+      await new Opening(dm).openWith(Recording);
+
+      expect(built?.url).to.equal(dm.config.rabbitmq_url);
+      built?.logger.error('Channel error', {
+        error: new Error(
+          "PRECONDITION_FAILED - inequivalent arg 'x-queue-type'"
+        ),
+      });
+      // What Node throws for a host whose IPv6 and IPv4 addresses both refused
+      const refused = Object.assign(new Error(''), {
+        name: 'AggregateError',
+        code: 'ECONNREFUSED',
+        errors: [
+          new Error('connect ECONNREFUSED ::1:1'),
+          new Error('connect ECONNREFUSED 127.0.0.1:1'),
+        ],
+      });
+      built?.logger.error('Connection failed after maximum attempts', {
+        error: refused,
+      });
+      built?.logger.warn('Connection error', {
+        error: Object.assign(new Error(''), { code: 'ECONNRESET' }),
+      });
+      dm.logger.level = 'debug';
+      built?.logger.info('Published message', { exchange: 'auth' });
+      built?.logger.debug('Message received', { payload: { twakeId: 'a' } });
+      built?.logger.warn('Connection attempt failed, retrying...', {
+        attempt: 1,
+      });
+      built?.logger.warn('Connection closed');
+      dm.logger.remove(captured);
+      expect(captured.lines).to.deep.equal([
+        {
+          level: 'error',
+          message: 'Channel error',
+          plugin: 'rabbitmq',
+          error: "Error: PRECONDITION_FAILED - inequivalent arg 'x-queue-type'",
+          attempt: undefined,
+        },
+        {
+          level: 'error',
+          message: 'Connection failed after maximum attempts',
+          plugin: 'rabbitmq',
+          error:
+            'Error: connect ECONNREFUSED ::1:1; Error: connect ECONNREFUSED 127.0.0.1:1',
+          attempt: undefined,
+        },
+        {
+          level: 'warn',
+          message: 'Connection error',
+          plugin: 'rabbitmq',
+          error: 'Error: ECONNRESET',
+          attempt: undefined,
+        },
+        {
+          level: 'info',
+          message: 'Published message',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: undefined,
+        },
+        {
+          level: 'debug',
+          message: 'Message received',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: undefined,
+        },
+        {
+          level: 'warn',
+          message: 'Connection attempt failed, retrying...',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: 1,
+        },
+        {
+          level: 'warn',
+          message: 'Connection closed',
+          plugin: 'rabbitmq',
+          error: undefined,
+          attempt: undefined,
+        },
+      ]);
     });
   });
 });
