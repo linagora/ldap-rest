@@ -90,7 +90,7 @@ file wherever it is written. These are the labels of
 
 A line carrying an `error`, the reason of a failure, has it as a field of
 the JSON console output and in parentheses after the message in the log
-file; the file keeps no other field.
+file; the file keeps no field other than these.
 
 ## Metrics
 
