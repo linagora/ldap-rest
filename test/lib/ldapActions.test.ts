@@ -146,15 +146,14 @@ describe('ldapActions', function () {
         expect(said.debug.join('\n')).to.match(/nothing to apply/);
       });
 
-      it('warns when the caller asked for something and none of it was emitted', async () => {
-        // Every change named here is dropped while the request is built, so
-        // nothing reaches the directory — and the call still answers. Under
-        // one debug line shared with the routine case, a translation bug
-        // upstream was invisible from the outside.
-        const said = capture();
-        expect(await ldapActions.modify(testDN, { delete: [''] })).to.be.false;
-        expect(said.warn.join('\n')).to.match(/emitted none/);
-        expect(said.warn.join('\n')).to.include(testDN);
+      it('refuses an empty attribute name instead of dropping it', async () => {
+        let status: number | undefined;
+        try {
+          await ldapActions.modify(testDN, { delete: [''] });
+        } catch (err) {
+          status = (err as { statusCode?: number }).statusCode;
+        }
+        expect(status).to.equal(400);
       });
     });
 
