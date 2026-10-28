@@ -26,6 +26,7 @@ import type {
 import {
   escapeDnValue,
   escapeLdapFilter,
+  fillPattern,
   isDummyMemberDn,
   isAuthzRefusal,
   normalizeDn,
@@ -60,13 +61,8 @@ export const read = (
 
 export const ORG = '{org}';
 
-/**
- * A `{org}` pattern filled with an organization, as the value of one RDN.
- * Not `String.replace`: `$'`, `` $` ``, `$&` and `$$` in the id would be
- * expanded into the pattern.
- */
 export function withOrg(pattern: string, org: string): string {
-  return pattern.split(ORG).join(escapeDnValue(org));
+  return fillPattern(pattern, ORG, escapeDnValue(org));
 }
 
 const GROUP_SORT = ['displayName', 'description', 'createdAt'];
@@ -245,8 +241,8 @@ export default class TwakeGroups extends LdapGroups {
       ['--twake-group-base', this.groupBase],
       ['--twake-group-user-base', this.userBase],
     ])
-      if (!pattern.includes(ORG))
-        throw new Error(`${this.name}: ${option} must hold ${ORG}`);
+      if (pattern.split(ORG).length !== 2)
+        throw new Error(`${this.name}: ${option} must hold ${ORG} once`);
     this.groupPattern = branchPattern(this.groupBase);
     this.attrs = lifecycleAttributes(this.config);
     this.orgPattern = this.config.twake_group_organization_dn || '';

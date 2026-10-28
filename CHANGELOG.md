@@ -4,9 +4,11 @@
 
 ### Fixed
 
-- An organization whose id holds `$'`, `` $` ``, `$&` or `$$` is read and
-  written under its own branch: the id was expanded into the configured
-  `{org}` pattern as a replacement string
+- An organization or a SCIM user whose id holds `$'`, `` $` ``, `$&` or
+  `$$` is read and written under its own branch, where the id was taken as
+  a replacement pattern for the configured `{org}` or `{user}` template.
+  `--twake-group-base`, `--twake-group-user-base` and `--twake-space-base`
+  must hold `{org}` exactly once
   ([#472](https://github.com/linagora/ldap-rest/issues/472))
 
 ## v1.2.0 (2026-10-28)

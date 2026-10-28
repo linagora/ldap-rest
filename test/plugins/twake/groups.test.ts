@@ -116,6 +116,19 @@ describe('Twake groups plugin', function () {
     expect(withOrg(pattern, 'a,b')).to.equal(
       'ou=groups,o=a\\,b,dc=example,dc=com'
     );
+    const groups = new TwakeGroups(dm);
+    expect(groups.groupBaseOf("$'1")).to.equal(`ou=groups,ou=$'1,${ORGS}`);
+    expect(groups.userBaseOf('a$$b')).to.equal(`ou=users,ou=a$$b,${ORGS}`);
+  });
+
+  it('refuses a pattern holding {org} twice', () => {
+    const base = dm.config.twake_group_base;
+    dm.config.twake_group_base = `ou={org},ou={org},${ORGS}`;
+    try {
+      expect(() => new TwakeGroups(dm)).to.throw(/must hold \{org\} once/);
+    } finally {
+      dm.config.twake_group_base = base;
+    }
   });
 
   it('reads the organization of a group off its DN', () => {

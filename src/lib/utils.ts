@@ -349,6 +349,19 @@ export function substringSearchFilter(
 }
 
 /**
+ * `pattern` with every `placeholder` replaced by `value`, taken literally:
+ * `String.replace` would expand `$&`, `$'`, `` $` `` and `$$` in a value
+ * that a request chose.
+ */
+export function fillPattern(
+  pattern: string,
+  placeholder: string,
+  value: string
+): string {
+  return pattern.split(placeholder).join(value);
+}
+
+/**
  * Escape special characters in LDAP DN attribute values according to RFC 4514
  * Prevents LDAP injection attacks by escaping characters that have special meaning in DNs
  *

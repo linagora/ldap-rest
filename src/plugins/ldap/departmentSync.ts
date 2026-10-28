@@ -364,7 +364,7 @@ export default class LdapDepartmentSync extends DmPlugin {
           // Example: "ou=Dev,ou=IT,ou=Departments" -> "ou=Dev,ou=IT,ou=Tech"
           const newLink = oldLinkStr.replace(
             `,${oldParentDn}`,
-            `,${newParentDn}`
+            () => `,${newParentDn}`
           );
 
           // Get the new department path from the new organization

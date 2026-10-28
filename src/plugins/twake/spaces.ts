@@ -248,8 +248,8 @@ export default class TwakeSpaces extends DmPlugin {
   constructor(server: DM) {
     super(server);
     this.spaceBase = this.config.twake_space_base || '';
-    if (!this.spaceBase.includes(ORG))
-      throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
+    if (this.spaceBase.split(ORG).length !== 2)
+      throw new Error(`${this.name}: --twake-space-base must hold ${ORG} once`);
     this.spacePattern = branchPattern(this.spaceBase);
     this.userPattern = branchPattern(this.config.twake_group_user_base!);
     this.lifecycle = lifecycleAttributes(this.config);
