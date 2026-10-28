@@ -55,9 +55,13 @@ describe('LDAP Utils', () => {
         expect(unescapeDnValue(escapeDnValue(v))).to.equal(v);
     });
 
-    it('writes the other ASCII whitespace at either end in hex', () => {
+    it('writes a control character in hex', () => {
       expect(escapeDnValue('\tx\t')).to.equal('\\09x\\09');
       expect(escapeDnValue('\n')).to.equal('\\0a');
+      expect(escapeDnValue('a\u0001b\u007f')).to.equal('a\\01b\\7f');
+      expect(unescapeDnValue(escapeDnValue('a\u0001b\u007f'))).to.equal(
+        'a\u0001b\u007f'
+      );
       expect(parseDn(`cn=${escapeDnValue('x\t')},dc=x`)[0]).to.equal(
         'cn=x\\09'
       );

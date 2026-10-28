@@ -367,19 +367,16 @@ export function substringSearchFilter(
 export function escapeDnValue(value: string): string {
   let escaped = value
     .replace(/[\\,+"<>;=]/g, char => `\\${char}`)
-    .replace(/\0/g, '\\00');
-  // At either end, a space is escaped (RFC 4514 §2.4) and the other ASCII
-  // whitespace, which the directory would drop, written in hex; a Unicode
-  // space is a character of the value. Both ends are judged on the original
+    // Control characters are the point of this class, hence the exemption
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\0-\x1f\x7f]/g, char => `\\${hexByte(char.charCodeAt(0))}`);
+  // Only a space is special at either end (RFC 4514 §2.4); a Unicode space
+  // is a character of the value. Both ends are judged on the original
   // value, so a lone space is escaped once.
-  const end = (char: string): string =>
-    char === ' ' ? '\\ ' : `\\${hexByte(char.charCodeAt(0))}`;
-  const first = value[0];
-  const last = value[value.length - 1];
-  if (asciiSpace(first)) escaped = end(first) + escaped.slice(1);
-  if (value.length > 1 && asciiSpace(last))
-    escaped = escaped.slice(0, -1) + end(last);
-  if (first === '#') escaped = `\\${escaped}`;
+  if (value.startsWith(' ')) escaped = `\\${escaped}`;
+  if (value.length > 1 && value.endsWith(' '))
+    escaped = `${escaped.slice(0, -1)}\\ `;
+  if (value.startsWith('#')) escaped = `\\${escaped}`;
   return escaped;
 }
 
@@ -846,14 +843,13 @@ function hexByte(byte: number): string {
  */
 function utf8Chars(bytes: number[]): (string | number)[] {
   const out: (string | number)[] = [];
+  const buffer = Uint8Array.from(bytes);
   for (let i = 0; i < bytes.length; ) {
     const length = utf8Length(bytes[i]);
     let decoded: string | undefined;
     if (length && i + length <= bytes.length)
       try {
-        decoded = utf8Decoder.decode(
-          Uint8Array.from(bytes.slice(i, i + length))
-        );
+        decoded = utf8Decoder.decode(buffer.subarray(i, i + length));
       } catch {
         // not a sequence
       }
