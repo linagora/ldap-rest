@@ -17,7 +17,9 @@
   written or any hook runs. `userName`, `displayName` and `id` must be
   strings; a simple attribute takes a string, a number or a boolean, or a
   list of them; a complex attribute takes an object and a multi-valued one
-  a list of objects whose `value` is a scalar. An object or a list of
+  a list of objects whose `value` is a scalar
+  ([details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior)).
+  An object or a list of
   objects in a simple attribute, which was stored as `[object Object]` or
   as JSON text, is refused with 400 `invalidValue`: a custom mapping that
   put a complex attribute on a plain `ldap` attribute stops working

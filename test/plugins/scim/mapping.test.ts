@@ -329,6 +329,39 @@ describe('SCIM mapping', () => {
         );
     });
 
+    it('reads a reference sub-attribute by its value', () => {
+      const mapping = {
+        ...DEFAULT_USER_MAPPING,
+        entries: [
+          ...DEFAULT_USER_MAPPING.entries,
+          { scim: 'enterprise', sub: { department: 'ou', manager: 'manager' } },
+        ],
+      };
+      const { attributes } = scimUserToLdap(
+        {
+          userName: 'alice',
+          enterprise: { department: 'Ops', manager: { value: 'uid=bob' } },
+        } as never,
+        mapping,
+        userCtx,
+        ['inetOrgPerson']
+      );
+      expect(attributes.ou).to.equal('Ops');
+      expect(attributes.manager).to.equal('uid=bob');
+      refused(() =>
+        scimUserToLdap(
+          {
+            userName: 'alice',
+            enterprise: { manager: { value: {} } },
+          } as never,
+          mapping,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      expect(scimPathToLdapAttribute(1 as never, mapping)).to.equal(undefined);
+    });
+
     it('reads a scalar element value as a PATCH does, and skips a null one', () => {
       const { attributes } = scimUserToLdap(
         {

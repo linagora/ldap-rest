@@ -312,8 +312,10 @@ mapping contains an entry with `scim: "department"`; otherwise the server return
 A User or Group body is checked against RFC 7643 before anything is written
 and before any hook reads it: `userName`, `displayName` and `id` are
 strings; a simple attribute takes a string, a number or a boolean, or a list
-of them; a complex attribute takes an object; a multi-valued attribute takes
-a list of objects whose `value` is a scalar. Anything else is answered
+of them; a complex attribute takes an object whose sub-attributes are scalars
+(or, for a reference such as `manager`, an object whose `value` is one); a
+multi-valued complex attribute such as `emails` takes a list of objects whose
+`value` is a scalar. Anything else is answered
 `400 invalidValue`, as is a PATCH operation that is not an object or whose
 `op` is not a string.
 
@@ -378,7 +380,7 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 | `not (a eq "x")`                 | `(!(a=x))`                                |
 
 Unknown SCIM attributes raise `400 invalidFilter`, as does a filter nested
-more than 32 levels deep (parentheses and `not` both count).
+more than 32 levels deep (a parenthesis and a `not (` each count one).
 
 ## Pagination
 

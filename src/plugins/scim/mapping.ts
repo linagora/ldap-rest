@@ -500,13 +500,12 @@ export function scimUserToLdap(
           `${m.scim} must be an object, got ${kindOf(value)}`
         );
       for (const [scimKey, ldapKey] of Object.entries(m.sub)) {
-        const sv = (value as Record<string, unknown>)[scimKey];
-        if (sv == null || sv === '') continue;
-        if (!isScalar(sv))
-          throw scimInvalidValue(
-            `${m.scim}.${scimKey} must be a string, got ${kindOf(sv)}`
-          );
-        attributes[ldapKey] = String(sv);
+        // `manager: { value }`: a reference is an object whose `value` names it
+        const sv = scalarOrValue(
+          (value as Record<string, unknown>)[scimKey],
+          `${m.scim}.${scimKey}`
+        );
+        if (sv !== undefined && sv !== '') attributes[ldapKey] = sv;
       }
       continue;
     }
@@ -637,6 +636,20 @@ function namingValue(body: object, attribute: string): string {
   return value;
 }
 
+/**
+ * A scalar, or the scalar `value` of an object such as a reference, as text;
+ * undefined for nothing
+ */
+function scalarOrValue(v: unknown, attribute: string): string | undefined {
+  const value =
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? (v as { value?: unknown }).value
+      : v;
+  if (value == null) return undefined;
+  if (isScalar(value)) return String(value);
+  throw scimInvalidValue(`${attribute} must be a string, got ${kindOf(value)}`);
+}
+
 const isScalar = (v: unknown): v is string | number | boolean =>
   typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 
@@ -695,7 +708,7 @@ export function scimPathToLdapAttribute(
   path: string,
   mapping: ResourceMapping
 ): string | undefined {
-  // Special: id, userName, displayName, active
+  if (typeof path !== 'string') return undefined;
   const top = path.split('.')[0];
   const sub = path.includes('.') ? path.split('.').slice(1).join('.') : '';
 
