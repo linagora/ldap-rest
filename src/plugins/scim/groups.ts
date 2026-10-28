@@ -21,6 +21,7 @@ import {
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  unescapeDnValue,
   validateDnValue,
 } from '../../lib/utils';
 
@@ -176,7 +177,7 @@ export class ScimGroups {
       // Extract RDN value from DN
       const rdnMatch = /^([^=]+)=((?:\\.|[^,])+)/.exec(dn);
       if (!rdnMatch) return undefined;
-      const rdnValue = rdnMatch[2].replace(/\\(.)/g, '$1');
+      const rdnValue = unescapeDnValue(rdnMatch[2]);
       const lower = dn.toLowerCase();
       let type: 'User' | 'Group' | undefined;
       if (userBase && lower.endsWith(userBase.toLowerCase())) type = 'User';

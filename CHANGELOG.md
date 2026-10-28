@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A name read from a DN (organization path, group member, SCIM member)
+  decodes its hex escapes: `ou=Sales\2C EMEA` is `Sales, EMEA`, not
+  `Sales2C EMEA` ([#469](https://github.com/linagora/ldap-rest/issues/469))
+- A value starting or ending with a whitespace character other than a space
+  is written as sent, and a value made of one space is one escaped space
+  ([#473](https://github.com/linagora/ldap-rest/issues/473))
+- Two spellings of one DN compare equal in more cases: a `#` value ending
+  in an escaped space keeps its RDNs, and a hex run that is not UTF-8 is
+  read the same way however many times
+  ([#474](https://github.com/linagora/ldap-rest/issues/474),
+  [#475](https://github.com/linagora/ldap-rest/issues/475))
+
 ## v1.2.0 (2026-10-28)
 
 Five changes need a check before deploying,

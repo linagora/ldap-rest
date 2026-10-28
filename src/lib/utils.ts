@@ -365,19 +365,17 @@ export function substringSearchFilter(
  * ```
  */
 export function escapeDnValue(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\') // backslash (must be first)
-    .replace(/,/g, '\\,') // comma
-    .replace(/\+/g, '\\+') // plus
-    .replace(/"/g, '\\"') // double quote
-    .replace(/</g, '\\<') // less than
-    .replace(/>/g, '\\>') // greater than
-    .replace(/;/g, '\\;') // semicolon
-    .replace(/=/g, '\\=') // equals (in value only)
-    .replace(/\0/g, '\\00') // null
-    .replace(/^\s/, '\\ ') // leading space
-    .replace(/\s$/, '\\ ') // trailing space
-    .replace(/^#/, '\\#'); // leading hash
+  let escaped = value
+    .replace(/[\\,+"<>;=]/g, char => `\\${char}`)
+    .replace(/\0/g, '\\00');
+  // Only U+0020 is special at either end (RFC 4514 §2.4): another whitespace
+  // character is a character of the value. Both ends are judged on the
+  // original value, so a lone space is escaped once.
+  if (value.startsWith(' ')) escaped = `\\${escaped}`;
+  if (value.length > 1 && value.endsWith(' '))
+    escaped = `${escaped.slice(0, -1)}\\ `;
+  if (value.startsWith('#')) escaped = `\\${escaped}`;
+  return escaped;
 }
 
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -699,8 +697,9 @@ export function getRdn(dn: string): string {
  * ```
  */
 export function rdnValue(dn: string): string {
-  const match = /^[^=]+=((?:\\.|[^,])*)/.exec(dn);
-  return match ? match[1].replace(/\\(.)/g, '$1') : '';
+  const [rdn] = parseDn(dn);
+  const eq = rdn ? rdn.indexOf('=') : -1;
+  return eq > 0 ? unescapeDnValue(rdn.slice(eq + 1).trim()) : '';
 }
 
 /**
@@ -754,12 +753,10 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  * @param raw the value as written, after its `=`
  */
 function canonicalValue(raw: string): string {
-  let from = 0;
-  let to = raw.length;
-  while (from < to && asciiSpace(raw[from])) from++;
-  while (to > from && asciiSpace(raw[to - 1])) to--;
-  const trimmed = raw.slice(from, to);
-  if (trimmed.startsWith('#')) return trimmed;
+  const trimmed = trimUnescaped(raw);
+  // BER (RFC 4514 §2.4): `#` and hex pairs, nothing else. A `#` followed by
+  // anything else is a character of the value, and is escaped as such.
+  if (/^#(?:[0-9a-fA-F]{2})+$/.test(trimmed)) return trimmed;
   // LDAPv2: in double quotes, every character is the value's
   // The closing quote is not escaped: an even run of backslashes before it
   let backslashes = 0;
@@ -789,16 +786,28 @@ function canonicalValue(raw: string): string {
       .split('\\')
       .filter(Boolean)
       .map(pair => parseInt(pair, 16));
-    try {
-      plain(
-        new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes))
-      );
-    } catch {
-      // Not UTF-8: each pair alone
-      for (const byte of bytes)
-        chars.push(
-          byte < 0x80 ? String.fromCharCode(byte) : `\\${hexByte(byte)}`
-        );
+    // Sequence by sequence: a byte that starts no UTF-8 sequence stays hex,
+    // and only that one. Decoding the run all or nothing kept, next to it,
+    // valid sequences a second pass would then decode, so the result was
+    // not a fixed point.
+    for (let i = 0; i < bytes.length; ) {
+      const length = utf8Length(bytes[i]);
+      let decoded: string | undefined;
+      if (length && i + length <= bytes.length)
+        try {
+          decoded = utf8Decoder.decode(
+            Uint8Array.from(bytes.slice(i, i + length))
+          );
+        } catch {
+          // not a sequence: the lead byte stays hex
+        }
+      if (decoded === undefined) {
+        chars.push(`\\${hexByte(bytes[i])}`);
+        i++;
+      } else {
+        plain(decoded);
+        i += length;
+      }
     }
   }
   // A lone trailing backslash escapes nothing: it is one
@@ -842,6 +851,15 @@ function canonicalValue(raw: string): string {
 
 function hexByte(byte: number): string {
   return byte.toString(16).padStart(2, '0');
+}
+
+/** The length of the UTF-8 sequence a lead byte announces, 0 for none. */
+function utf8Length(lead: number): number {
+  if (lead < 0x80) return 1;
+  if (lead >> 5 === 0b110) return 2;
+  if (lead >> 4 === 0b1110) return 3;
+  if (lead >> 3 === 0b11110) return 4;
+  return 0;
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   getParentDn,
   getRdn,
   isChildOf,
+  rdnValue,
   normalizeDn,
   isDnInBranch,
   organizationLink,
@@ -47,6 +48,18 @@ describe('LDAP Utils', () => {
     it('should escape quotes and angle brackets', () => {
       expect(escapeDnValue('"test"')).to.equal('\\"test\\"');
       expect(escapeDnValue('<tag>')).to.equal('\\<tag\\>');
+    });
+
+    it('keeps leading and trailing whitespace other than a space', () => {
+      for (const v of ['\nsh<b', ' Alice', 'Alice\u3000', '\tx\t', '\u00a0x'])
+        expect(unescapeDnValue(escapeDnValue(v))).to.equal(v);
+    });
+
+    it('escapes a value made of one space as that space', () => {
+      expect(escapeDnValue(' ')).to.equal('\\ ');
+      expect(parseDn(`cn=${escapeDnValue(' ')},dc=example,dc=com`)[0]).to.equal(
+        'cn=\\ '
+      );
     });
 
     it('should handle normal strings without escaping', () => {
@@ -294,6 +307,27 @@ describe('LDAP Utils', () => {
     });
   });
 
+  describe('rdnValue', () => {
+    it('decodes hex escapes', () => {
+      expect(rdnValue('ou=Sales\\2C EMEA,dc=example,dc=com')).to.equal(
+        'Sales, EMEA'
+      );
+      expect(rdnValue('ou=R\\C3\\A9seau,dc=example,dc=com')).to.equal('Réseau');
+      expect(
+        rdnValue(`cn=${escapeDnValue('a\0b')},ou=users,dc=example,dc=com`)
+      ).to.equal('a\0b');
+    });
+
+    it('decodes the escapes escapeDnValue writes', () => {
+      expect(rdnValue('ou=Test\\, Org,dc=example,dc=com')).to.equal(
+        'Test, Org'
+      );
+      expect(rdnValue('dc=example')).to.equal('example');
+      expect(rdnValue('')).to.equal('');
+      expect(rdnValue('nonsense')).to.equal('');
+    });
+  });
+
   describe('isChildOf', () => {
     it('should return true for direct child', () => {
       expect(
@@ -413,6 +447,25 @@ describe('LDAP Utils', () => {
       expect(normalizeDn('ou=#0c0178,dc=x')).to.not.equal(
         normalizeDn('ou=\\#0c0178,dc=x')
       );
+    });
+
+    it('keeps the RDNs of a BER value ending in an escaped space', () => {
+      const dn = 'dc=#0c0178\\ ,ou=x,dc=example,dc=com';
+      expect(parseDn(normalizeDn(dn))).to.have.length(4);
+      expect(normalizeDn(normalizeDn(dn))).to.equal(normalizeDn(dn));
+      expect(normalizeDn('dc=#0c0178 ,ou=x')).to.equal('dc=#0c0178,ou=x');
+    });
+
+    it('is idempotent on a hex run that is not UTF-8', () => {
+      for (const dn of [
+        'cn=\\FF\\2C\\EF\\BC\\8C',
+        'mail="\\FF\\5C\\EF\\BC\\8C"',
+        'commonName=\\E1\\9A\\80\\2c\\2c\\FF',
+      ]) {
+        const once = normalizeDn(dn);
+        expect(normalizeDn(once)).to.equal(once);
+      }
+      expect(normalizeDn('cn=\\FF\\2C\\EF\\BC\\8C')).to.equal('cn=\\ff\\,\\,');
     });
 
     it('is idempotent', () => {
