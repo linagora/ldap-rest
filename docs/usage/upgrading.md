@@ -4,7 +4,7 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
-## Unreleased
+## From 1.1 to 1.2.0
 
 ### The process stops on an uncaught exception
 

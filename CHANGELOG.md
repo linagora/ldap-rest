@@ -1,140 +1,94 @@
 # Changelog
 
-## Unreleased
+## v1.2.0 (2026-10-28)
+
+Five changes need a check before deploying,
+[upgrading](docs/usage/upgrading.md#from-11-to-120).
 
 ### Breaking Changes
 
-- An exception nothing caught shuts the server down and exits with 1,
-  where the process kept serving,
-  [upgrading](docs/usage/upgrading.md#the-process-stops-on-an-uncaught-exception)
-  ([#423](https://github.com/linagora/ldap-rest/issues/423))
+- An exception nothing caught ends the process with 1, where it kept
+  serving in an unknown state ([#423](https://github.com/linagora/ldap-rest/issues/423))
 - `--ldap-dn` and `--ldap-pwd` have no default: the server stops at startup
-  without them, where it bound as `cn=admin,dc=example,dc=com` / `admin`,
-  and the Docker image no longer carries that password in its `ENV`,
-  [upgrading](docs/usage/upgrading.md#unreleased)
+  without them, and the Docker image no longer carries `admin` in its `ENV`
   ([#431](https://github.com/linagora/ldap-rest/issues/431))
 - Every entity route, flat, group and organization, checks the shape of a
-  value the same way: two values or more for a single-valued attribute,
-  text that is not a number for a `number`, and deleting a `required`
-  attribute as a whole answer 400, where they were written as sent; `null`
-  clears an attribute in a `replace` and is refused in an `add` and on a
-  creation, instead of answering 500; an attribute the schema does not
-  declare is refused by name in a change too; the group routes refuse a
-  fixed attribute in a change, which they dropped, and write a fixed
-  attribute on a creation, at its default, which they left out; the group
-  and organization routes take a list of one for a single value, the group
-  routes one value for an `array`, and both word their refusals as the flat
-  routes do,
-  [upgrading](docs/usage/upgrading.md#every-entity-route-checks-the-shape-of-a-value)
-  ([#416](https://github.com/linagora/ldap-rest/issues/416),
-  [#448](https://github.com/linagora/ldap-rest/issues/448))
+  value the same way and answers 400 where it wrote what it was sent: a
+  list for a single-valued attribute, text for a `number`, the deletion of
+  a `required` attribute, an undeclared attribute or a `fixed` one in a
+  change; `null` clears an attribute in a `replace` and is refused
+  elsewhere, where it answered 500; a group creation writes its `fixed`
+  attributes at their default ([#416](https://github.com/linagora/ldap-rest/issues/416), [#448](https://github.com/linagora/ldap-rest/issues/448))
 
 ### Features
 
 - On `SIGTERM` and `SIGINT`, the server leaves the endpoints, finishes what
   is in flight within `--shutdown-timeout` (20 s), closes the broker, the
-  storage backend and the directory connections, then ends;
-  `/readyz` answers `stopping` meanwhile,
-  [docs](docs/usage/operations.md#shutdown)
+  storage backend and the directory connections, then ends; `/readyz`
+  answers `stopping` meanwhile, [docs](docs/usage/operations.md#shutdown)
   ([#423](https://github.com/linagora/ldap-rest/issues/423))
 - `GET /healthz` and `GET /readyz`, outside the API prefix and without
-  authentication: the first answers as long as the process serves, the
-  second 200 once the plugins are loaded and the directory answers, 503
-  otherwise; the `storage`, `rabbitmq` and `james` plugins report their
-  own backend there, `degraded` when it cannot be reached (a configured
-  broker until the first publish opens it),
-  [what they report](docs/usage/operations.md#what-the-shipped-plugins-report).
-  The Helm chart probes
-  them over HTTP, so a pod leaves the endpoints while the directory does not
-  answer, [upgrading](docs/usage/upgrading.md#the-readiness-of-a-pod-follows-the-directory)
+  authentication: `/readyz` answers 200 once the plugins are loaded and the
+  directory answers, 503 otherwise; `storage`, `rabbitmq`, `james` and
+  `migrationProxy` report their backend there, `degraded` when it cannot be
+  reached. The Helm chart probes them over HTTP,
+  [docs](docs/usage/operations.md#health-and-readiness) ([#423](https://github.com/linagora/ldap-rest/issues/423))
+- `core/metrics` serves Prometheus metrics on `--metrics-port` (9464): the
+  requests, the directory operations, the pool, the cache, the calls to
+  Twake, the Cloudery, cozy-stack and CrowdSec, the hooks that fail and the
+  process; the Helm chart exposes the port and renders a `ServiceMonitor` on
+  request. A plugin of your own calls its services through `this.fetch` to
+  be counted, [docs](docs/usage/operations.md#metrics) ([#423](https://github.com/linagora/ldap-rest/issues/423))
+- Every answer carries an `X-Request-Id`, and every line logged while the
+  request is served carries it as `requestId`; a line a hook writes names
+  its plugin and the hook, [docs](docs/usage/operations.md#request-id)
   ([#423](https://github.com/linagora/ldap-rest/issues/423))
-- `core/metrics` serves Prometheus metrics on `--metrics-port` (9464), a
-  port of its own: the requests, the directory operations, the pool, the
-  cache, the calls the plugins make to Twake, the Cloudery, cozy-stack and
-  CrowdSec, the hooks that fail and the process; the Helm chart exposes the
-  port and renders a `ServiceMonitor` on request; a plugin of your own
-  calls its services through `this.fetch` to be counted, and one
-  declaring a `fetch` member of its own has to rename it,
-  [docs](docs/usage/operations.md#metrics)
-  ([#423](https://github.com/linagora/ldap-rest/issues/423))
-- Every answer carries an `X-Request-Id`, generated by the server, and every
-  line logged while the request is served carries it as `requestId`, the
-  `core/weblogs` line included; a line a hook writes names its plugin and
-  the hook, `plugin` and `op`, [docs](docs/usage/operations.md#request-id)
-  ([#423](https://github.com/linagora/ldap-rest/issues/423))
-
 - `core/twake/migrationProxy` keeps the migrated-users list of the Twake
-  Mail migration proxy in step with the entries of `--migration-proxy-branch`:
-  an entry gaining its mail is put on the list with its addresses, the
-  addresses of a migrated one follow it, a deleted one is taken off;
-  `GET /api/v1/users/:user/mail-migration` says where an account lives,
-  [docs](docs/usage/plugins/integrations/mail-migration.md)
+  Mail migration proxy in step with the entries of
+  `--migration-proxy-branch`: an entry gaining its mail is put on the list
+  with its addresses, the addresses of a migrated one follow it, a deleted
+  one is taken off; `GET /api/v1/users/:user/mail-migration` says where an
+  account lives, [docs](docs/usage/plugins/integrations/mail-migration.md)
   ([#466](https://github.com/linagora/ldap-rest/issues/466))
-- Every Twake plugin takes its webadmin URL with a trailing slash
+- The Twake plugins take their webadmin URL with a trailing slash
 
 ### Fixes
 
 - On every route, a `required` number takes `0` and a `required` boolean
-  `false`; they were refused as missing
-  ([#416](https://github.com/linagora/ldap-rest/issues/416))
+  `false`; they were refused as missing ([#416](https://github.com/linagora/ldap-rest/issues/416))
 - A group schema declaring an `array` attribute without `items` no longer
-  makes every creation answer 500; its values are checked as strings, as
-  on the other routes
-  ([#448](https://github.com/linagora/ldap-rest/issues/448))
-- `ldap/bulkImport`: a row with a value under a fixed attribute of the
-  schema, such as `objectClass`, fails with "is fixed and cannot be
-  imported"; the value replaced the fixed one,
+  makes every creation answer 500 ([#448](https://github.com/linagora/ldap-rest/issues/448))
+- `ldap/bulkImport`: a row with a value under a `fixed` attribute of the
+  schema fails, where the value replaced the fixed one,
   [docs](docs/usage/plugins/ldap/bulk-import.md#fixed-attributes)
   ([#445](https://github.com/linagora/ldap-rest/issues/445))
-- The flat routes store the classes of the entity on a creation whatever
-  `objectClass` the request carried, and whatever the schema says of that
-  attribute, as the organization routes do: a body naming other classes had
-  them written
+- The flat routes write the classes of the entity on a creation whatever
+  `objectClass` the request carried, as the organization routes do
   ([#441](https://github.com/linagora/ldap-rest/issues/441))
-- `--logger` takes `console` or `file`, with `--log-file` naming the file;
-  an empty value is `console`, any other stops the server at startup,
-  [upgrading](docs/usage/upgrading.md#--logger-console-or-file)
-  ([#432](https://github.com/linagora/ldap-rest/issues/432))
-- Organizations enforce the `fixed` attributes of their schema: on a
-  creation a fixed attribute takes its default and `objectClass` the classes
-  of `--ldap-organization-class`, whatever the request carried, as for
-  groups; a change naming a fixed attribute answers 400, as on the flat
-  routes ([#430](https://github.com/linagora/ldap-rest/issues/430))
-- The flat routes check an empty string against the schema, as the group
-  and organization routes do: it was accepted unchecked, and
-  `{"replace":{"mail":""}}` stored an empty value. An empty DN is refused
-  for every pointer attribute, on the group and organization routes too: a
-  pointer without a branch stored it. A replace with `[]` is still how an
-  attribute is cleared
-  ([#429](https://github.com/linagora/ldap-rest/issues/429))
+- `--logger` takes `console` or `file`; an empty value is `console`, any
+  other stops the server at startup,
+  [upgrading](docs/usage/upgrading.md#--logger-console-or-file) ([#432](https://github.com/linagora/ldap-rest/issues/432))
+- Organizations write the `fixed` attributes of their schema at their
+  default on a creation and refuse them in a change, as groups and the flat
+  routes do ([#430](https://github.com/linagora/ldap-rest/issues/430))
+- The flat routes check an empty string against the schema, and every
+  route refuses an empty DN for a pointer attribute; `[]` in a `replace` is
+  still how an attribute is cleared ([#429](https://github.com/linagora/ldap-rest/issues/429))
 - `core/rabbitmq`: SIGTERM and SIGINT end the process once the broker
-  connection is closed, or after 10 seconds. Its signal listener returned
-  without exiting, so a pod lived on until the end of its termination grace
-  period ([#425](https://github.com/linagora/ldap-rest/issues/425))
+  connection is closed, or after 10 seconds; a pod lived on until the end
+  of its grace period ([#425](https://github.com/linagora/ldap-rest/issues/425))
 - `core/rabbitmq`: its client's lines are server lines under
-  `plugin: rabbitmq`, following `--logger` and `--log-level`: a connection
-  or channel failure at `warn` or `error` with the reason as text, a
-  publish at `info`, message bodies at `debug`. They went to standard
-  output in the client's own JSON, a publish included
-  ([#465](https://github.com/linagora/ldap-rest/pull/465))
-- `--logger file`: a line's `error` follows its message, in parentheses;
-  it was dropped, [docs](docs/usage/operations.md#request-id)
+  `plugin: rabbitmq`, following `--logger` and `--log-level`; they went to
+  standard output in the client's own format ([#465](https://github.com/linagora/ldap-rest/pull/465))
+- `--logger file`: a line's `error` follows its message; it was dropped
   ([#465](https://github.com/linagora/ldap-rest/pull/465))
 - The error middleware and the routes answering through `serverError` send
-  the same 5xx body, `{"error":"Internal Server Error","message":"An error occurred"}`;
-  the latter sent `{"error":"check logs"}`. `--debug` names the failure in
-  that message on both paths; `DM_DEBUG` is now read, and `--debug` no
-  longer takes the next argument as its value
-  ([#426](https://github.com/linagora/ldap-rest/issues/426))
-- `groups`, `organizations` and `flatGeneric` give their schema file
-  (`schemaUrl` in `GET /config`) the URL where a static plugin serves it
-  merged, as SCIM does since 1.1.0: a static plugin with a `static_name`
-  override had it announced under `/static`, which answered 404; one loaded
-  under another name had none. It is left out where no static plugin
-  serves the very file, as a `--group-schema` left at its default under a
-  `--static-path` of your own holding its own copy, and, for SCIM too, where
-  express.static
-  would send it as it stands, outside `schemas/` or not named `.json`
+  the same 5xx body; `--debug` names the failure in it on both paths,
+  `DM_DEBUG` is read, and `--debug` no longer takes the next argument as
+  its value ([#426](https://github.com/linagora/ldap-rest/issues/426))
+- `groups`, `organizations` and `flatGeneric` announce their schema file
+  (`schemaUrl` in `GET /config`) at the URL where a static plugin serves it
+  merged, as SCIM does since 1.1.0, and leave it out where none does
   ([#413](https://github.com/linagora/ldap-rest/issues/413))
 
 ## v1.1.0 (2026-10-25)
