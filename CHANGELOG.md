@@ -1,66 +1,34 @@
 # Changelog
 
-## Unreleased
+## v1.2.1 (2026-10-28)
+
+Fifteen fuzzing findings, no new option. One check before deploying,
+[upgrading](docs/usage/upgrading.md#from-120-to-121).
 
 ### Fixed
 
-- An organization or a SCIM user whose id holds `$'`, `` $` ``, `$&` or
-  `$$` is read and written under its own branch, where the id was taken as
-  a replacement pattern for the configured `{org}` or `{user}` template.
-  `--twake-group-base`, `--twake-group-user-base` and `--twake-space-base`
-  must hold `{org}` exactly once,
-  [upgrading](docs/usage/upgrading.md#org-once-in-a-twake-branch-pattern)
-  ([#472](https://github.com/linagora/ldap-rest/issues/472))
-- A name read from a DN decodes its hex escapes: an organization spelled
-  `ou=Sales\2C EMEA` gets the path `Sales, EMEA`, not `Sales2C EMEA`. The
-  Twake Calendar resource id and the Cozy instance uid read from such a DN
-  change the same way
-  ([#469](https://github.com/linagora/ldap-rest/issues/469))
-- A name starting or ending with a tab, a newline or a Unicode space is
-  stored as sent, where the directory received a space in its place
-  ([#473](https://github.com/linagora/ldap-rest/issues/473))
-- Two spellings of one DN compare equal in more cases, among them a value
-  holding hex escapes that are not UTF-8, or a letter and a combining mark
-  ([#474](https://github.com/linagora/ldap-rest/issues/474),
-  [#475](https://github.com/linagora/ldap-rest/issues/475))
-- A write naming an attribute by something that is neither a descriptor
-  (letters, digits and hyphens, RFC 4512) nor a numeric OID is refused with
-  400, where the name was silently changed or dropped. A directory schema
-  declaring a name outside that grammar, with an underscore for instance,
-  is not reachable through this server any more
-  ([#476](https://github.com/linagora/ldap-rest/issues/476),
-  [#477](https://github.com/linagora/ldap-rest/issues/477))
-- The directory schema is read whatever whitespace separates its tokens:
-  a definition holding a vertical tab stopped the server, and one cut after
-  a keyword made the whole schema unreadable
-  ([#470](https://github.com/linagora/ldap-rest/issues/470),
-  [#478](https://github.com/linagora/ldap-rest/issues/478))
-- SCIM: a `filter` nested more than 32 levels deep is answered 400
-  `invalidFilter`, where the server answered 500
-  ([#471](https://github.com/linagora/ldap-rest/issues/471))
-- SCIM PATCH: an operation that is not an object, an `op` that is not a
-  string, an empty attribute name and a value nested too deeply are
-  answered 400, where they were answered 500; the same for a Bulk body
-  nested too deeply
-  ([#480](https://github.com/linagora/ldap-rest/issues/480),
-  [#481](https://github.com/linagora/ldap-rest/issues/481))
-- SCIM POST/PUT: a body is checked against RFC 7643 before anything is
-  written or any hook runs. `userName`, `displayName` and `id` must be
-  strings; a simple attribute takes a string, a number or a boolean, or a
-  list of them; a complex attribute takes an object and a multi-valued one
-  a list of objects whose `value` is a scalar
-  ([details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior)).
-  An object or a list of
-  objects in a simple attribute, which was stored as `[object Object]` or
-  as JSON text, is refused with 400 `invalidValue`: a custom mapping that
-  put a complex attribute on a plain `ldap` attribute stops working
-  ([#479](https://github.com/linagora/ldap-rest/issues/479))
-- SCIM: a sub-attribute path naming an inherited property (`name.toString`)
-  is an unknown path, where it reached the directory as a function's
-  source ([#482](https://github.com/linagora/ldap-rest/issues/482))
-- SCIM: `excludedAttributes` naming every sub-attribute of a multi-valued
-  attribute drops the elements it leaves empty, as `attributes` does
-  ([#483](https://github.com/linagora/ldap-rest/issues/483))
+- A name read from a DN decodes its hex escapes (`ou=Sales\2C EMEA` is
+  `Sales, EMEA`), a name starting or ending with a tab, a newline or a
+  Unicode space is stored as sent, and more spellings of one DN compare
+  equal ([#469](https://github.com/linagora/ldap-rest/issues/469), [#473](https://github.com/linagora/ldap-rest/issues/473), [#474](https://github.com/linagora/ldap-rest/issues/474), [#475](https://github.com/linagora/ldap-rest/issues/475))
+- An organization whose id holds `$'`, `` $` ``, `$&` or `$$` is read and
+  written under its own branch; the Twake branch patterns must hold `{org}`
+  exactly once ([#472](https://github.com/linagora/ldap-rest/issues/472))
+- A write naming an attribute by something that is neither a descriptor nor
+  a numeric OID (`OID.OID.2.5.4.4`, `__proto__`) is refused with 400
+  ([#476](https://github.com/linagora/ldap-rest/issues/476), [#477](https://github.com/linagora/ldap-rest/issues/477))
+- The directory schema is read whatever whitespace separates its tokens, and
+  a definition cut after a keyword no longer discards the whole schema
+  ([#470](https://github.com/linagora/ldap-rest/issues/470), [#478](https://github.com/linagora/ldap-rest/issues/478))
+- SCIM: a malformed request is answered 400 where it was answered 500 or
+  written as sent: a filter nested more than 32 levels deep, a PATCH or
+  Bulk operation of the wrong shape or nested too deeply, a body whose
+  `userName`, `displayName`, `id` or attributes are not of their RFC 7643
+  type (an object was stored as `[object Object]`), a sub-attribute path
+  naming an inherited property; `excludedAttributes` drops the elements it
+  leaves empty
+  ([details](docs/usage/plugins/integrations/scim.md#filter-and-patch-behavior);
+  [#471](https://github.com/linagora/ldap-rest/issues/471), [#479](https://github.com/linagora/ldap-rest/issues/479), [#480](https://github.com/linagora/ldap-rest/issues/480), [#481](https://github.com/linagora/ldap-rest/issues/481), [#482](https://github.com/linagora/ldap-rest/issues/482), [#483](https://github.com/linagora/ldap-rest/issues/483))
 
 ## v1.2.0 (2026-10-28)
 
