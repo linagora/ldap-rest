@@ -4,9 +4,11 @@
 
 ### Fixed
 
-- A write naming an attribute by something that is neither a descriptor nor
-  a numeric OID (`OID.OID.2.5.4.4`, `__proto__`) is refused with 400, where
-  it was silently renamed or dropped
+- A write naming an attribute by something that is neither a descriptor
+  (letters, digits and hyphens, RFC 4512) nor a numeric OID is refused with
+  400, where the name was silently changed or dropped. A directory schema
+  declaring a name outside that grammar, with an underscore for instance,
+  is not reachable through this server any more
   ([#476](https://github.com/linagora/ldap-rest/issues/476),
   [#477](https://github.com/linagora/ldap-rest/issues/477))
 

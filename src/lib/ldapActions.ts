@@ -1515,10 +1515,12 @@ class ldapActions {
    * the directory applies both, and only one would have been judged.
    *
    * Without the schema, the case is still set, and a name given as an OID,
-   * which nothing here could resolve, is refused.
+   * which nothing here could resolve, is refused. So is, with or without
+   * it, a name that is neither a descriptor nor a numeric OID.
    *
    * @param entry attributes of an add, or one part of a modify
-   * @throws BadRequestError on an option, or on one attribute named twice
+   * @throws BadRequestError on an option, on a name that describes no
+   * attribute, or on one attribute named twice
    */
   async canonicalAttributes(entry: AttributesList | undefined): Promise<void> {
     if (!entry) return;
