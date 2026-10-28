@@ -276,6 +276,7 @@ export interface Config {
   // Twake Mail migration proxy plugin
   migration_proxy_url?: string;
   migration_proxy_token?: string;
+  migration_proxy_branch?: string[];
   migration_proxy_concurrency?: number;
   migration_proxy_retry_attempts?: number;
   migration_proxy_retry_delay?: number;
@@ -792,6 +793,14 @@ const configArgs: ConfigTemplate = [
   // Twake Mail migration proxy plugin
   ['--migration-proxy-url', 'DM_MIGRATION_PROXY_URL', ''],
   ['--migration-proxy-token', 'DM_MIGRATION_PROXY_TOKEN', ''],
+  [
+    '--migration-proxy-branch',
+    'DM_MIGRATION_PROXY_BRANCHES',
+    [],
+    'array',
+    '--migration-proxy-branches',
+    'dns',
+  ],
   [
     '--migration-proxy-concurrency',
     'DM_MIGRATION_PROXY_CONCURRENCY',

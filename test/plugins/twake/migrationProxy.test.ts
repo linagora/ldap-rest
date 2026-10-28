@@ -34,11 +34,15 @@ const capture = (plugin: MigrationProxy, logs: Log[]): void => {
 
 describe('Migration proxy plugin', () => {
   const url = 'http://migration-proxy.test:8000';
-  const dn = 'uid=alice,ou=users,dc=example,dc=com';
+  const users = 'ou=users,dc=example,dc=com';
+  const dn = `uid=alice,${users}`;
   const user = { objectClass: ['top', 'inetOrgPerson'], uid: 'alice' };
+  const alice = { ...user, mail: 'alice@example.com' };
   let dm: DM;
   let plugin: MigrationProxy;
   let logs: Log[];
+  /** The calls the proxy received, in order */
+  let calls: string[];
 
   before(() => {
     nock.disableNetConnect();
@@ -54,10 +58,12 @@ describe('Migration proxy plugin', () => {
     await dm.ready;
     dm.config.migration_proxy_url = `${url}/`;
     dm.config.migration_proxy_token = 'secret';
+    dm.config.migration_proxy_branch = [users];
     dm.config.migration_proxy_retry_attempts = 3;
     dm.config.migration_proxy_retry_delay = 10;
     plugin = new MigrationProxy(dm);
     logs = [];
+    calls = [];
     capture(plugin, logs);
   });
 
@@ -66,18 +72,27 @@ describe('Migration proxy plugin', () => {
   });
 
   const at = (level: string): Log[] => logs.filter(l => l.level === level);
-  const entryChange = (
+  const proxy = (): nock.Scope => {
+    const scope = nock(url, { reqheaders: { authorization: 'Bearer secret' } });
+    scope.on('request', req => calls.push(`${req.method} ${req.path}`));
+    return scope;
+  };
+  const change = (
     before: Record<string, unknown> | null,
-    after: Record<string, unknown> | null
+    after: Record<string, unknown> | null,
+    at = dn
   ): Promise<void> =>
     Promise.resolve(
-      plugin.hooks.onLdapEntryChange!(dn, before as never, after as never, {})
+      plugin.hooks.onLdapEntryChange!(at, before as never, after as never, {})
     );
 
   describe('configuration', () => {
-    it('refuses to start without the proxy URL', () => {
+    it('refuses to start without the proxy URL or a branch', () => {
       delete dm.config.migration_proxy_url;
       expect(() => new MigrationProxy(dm)).to.throw(/migration_proxy_url/);
+      dm.config.migration_proxy_url = url;
+      dm.config.migration_proxy_branch = [];
+      expect(() => new MigrationProxy(dm)).to.throw(/--migration-proxy-branch/);
     });
 
     it('reads its defaults: 5 attempts, 1 s apart and growing', () => {
@@ -92,17 +107,13 @@ describe('Migration proxy plugin', () => {
     });
   });
 
-  describe('an account gaining a mail', () => {
-    it('is put on the migrated list when created, with the token', async () => {
-      const scope = nock(url, {
-        reqheaders: { authorization: 'Bearer secret' },
-      })
-        .put('/migratedUsers/alice%40example.com')
-        .reply(204);
+  describe('an entry gaining its address', () => {
+    it('is put on the list when created, with the token', async () => {
+      proxy().put('/migratedUsers/alice%40example.com').reply(204);
 
-      await entryChange(null, { ...user, mail: 'alice@example.com' });
+      await change(null, alice);
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls).to.deep.equal(['PUT /migratedUsers/alice%40example.com']);
       expect(at('error')).to.have.length(0);
       expect(
         at('info').map(l => [l.entry.event, l.entry.result])
@@ -110,53 +121,53 @@ describe('Migration proxy plugin', () => {
     });
 
     it('is put on the list when the mail comes later', async () => {
-      const scope = nock(url)
+      proxy().put('/migratedUsers/alice%40example.com').reply(204);
+
+      await change(user, alice);
+
+      expect(calls).to.have.length(1);
+    });
+
+    it('is put on the list with every address: other mails and aliases', async () => {
+      proxy()
         .put('/migratedUsers/alice%40example.com')
+        .reply(204)
+        .put('/migratedUsers/a%40example.com')
+        .reply(204)
+        .put('/migratedUsers/alias%40example.com')
         .reply(204);
 
-      await entryChange(user, { ...user, mail: 'alice@example.com' });
-
-      expect(scope.isDone()).to.equal(true);
-    });
-
-    it('takes the first mail value only', async () => {
-      const scope = nock(url).put('/migratedUsers/a%40example.com').reply(204);
-
-      await entryChange(null, {
+      await change(null, {
         ...user,
-        mail: ['a@example.com', 'b@example.com'],
+        mail: ['alice@example.com', 'a@example.com'],
+        mailAlternateAddress: 'smtp:alias@example.com',
       });
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls.sort()).to.deep.equal([
+        'PUT /migratedUsers/a%40example.com',
+        'PUT /migratedUsers/alias%40example.com',
+        'PUT /migratedUsers/alice%40example.com',
+      ]);
     });
 
-    it('leaves a group alone', async () => {
-      await entryChange(null, {
-        objectClass: ['top', 'groupOfNames'],
-        cn: 'list',
-        mail: 'list@example.com',
-        member: [dn],
-      });
+    it('is left alone outside the branches', async () => {
+      await change(null, alice, 'uid=alice,ou=applicative,dc=example,dc=com');
 
       expect(logs).to.have.length(0);
     });
 
     it('is left alone when nothing but another attribute changed', async () => {
-      const before = { ...user, mail: 'alice@example.com', sn: 'A' };
-      await entryChange(before, { ...before, sn: 'B' });
+      await change({ ...alice, sn: 'A' }, { ...alice, sn: 'B' });
 
       expect(logs).to.have.length(0);
     });
 
     it('retries the call while the proxy answers 503, then logs the error', async () => {
-      const scope = nock(url)
-        .put('/migratedUsers/alice%40example.com')
-        .times(3)
-        .reply(503);
+      proxy().put('/migratedUsers/alice%40example.com').times(3).reply(503);
 
-      await entryChange(null, { ...user, mail: 'alice@example.com' });
+      await change(null, alice);
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls).to.have.length(3);
       expect(at('warn').map(l => l.entry.attempt)).to.deep.equal([1, 2]);
       expect(at('error')).to.have.length(1);
       expect(at('error')[0].entry).to.include({
@@ -167,24 +178,24 @@ describe('Migration proxy plugin', () => {
     });
 
     it('logs a refusal without retrying it', async () => {
-      const scope = nock(url)
+      proxy()
         .put('/migratedUsers/alice%40example.com')
         .reply(400, { message: 'Invalid username' });
 
-      await entryChange(null, { ...user, mail: 'alice@example.com' });
+      await change(null, alice);
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls).to.have.length(1);
       expect(at('warn')).to.have.length(0);
       expect(at('error')).to.have.length(1);
     });
 
     it('logs an unreachable proxy, the call counted', async () => {
       const before = await outboundCalls('migrationProxy', 'error');
-      nock(url)
+      proxy()
         .put('/migratedUsers/alice%40example.com')
         .replyWithError('connection refused');
 
-      await entryChange(null, { ...user, mail: 'alice@example.com' });
+      await change(null, alice);
 
       expect(at('error')).to.have.length(1);
       expect(await outboundCalls('migrationProxy', 'error')).to.equal(
@@ -193,24 +204,20 @@ describe('Migration proxy plugin', () => {
     });
   });
 
-  describe('an account changing its mail', () => {
-    const before = { ...user, mail: 'alice@example.com' };
-    const after = { ...user, mail: 'alice@new.example.com' };
+  describe('an entry keeping its address', () => {
+    const renamed = { ...user, mail: 'alice@new.example.com' };
 
     it('follows a migrated user: the new address put first, the old one taken off', async () => {
-      const calls: string[] = [];
-      const scope = nock(url)
+      proxy()
         .head('/migratedUsers/alice%40example.com')
         .reply(204)
         .put('/migratedUsers/alice%40new.example.com')
         .reply(204)
         .delete('/migratedUsers/alice%40example.com')
         .reply(204);
-      scope.on('request', req => calls.push(`${req.method} ${req.path}`));
 
-      await entryChange(before, after);
+      await change(alice, renamed);
 
-      expect(scope.isDone()).to.equal(true);
       expect(calls).to.deep.equal([
         'HEAD /migratedUsers/alice%40example.com',
         'PUT /migratedUsers/alice%40new.example.com',
@@ -219,92 +226,139 @@ describe('Migration proxy plugin', () => {
       expect(at('error')).to.have.length(0);
     });
 
-    it('leaves a user of the old system to the migration', async () => {
-      const scope = nock(url)
+    it('keeps the old address when the new one could not be put', async () => {
+      proxy()
         .head('/migratedUsers/alice%40example.com')
-        .reply(404);
+        .reply(204)
+        .put('/migratedUsers/alice%40new.example.com')
+        .reply(400);
 
-      await entryChange(before, after);
+      await change(alice, renamed);
 
-      expect(scope.isDone()).to.equal(true);
-      expect(nock.pendingMocks()).to.have.length(0);
+      expect(calls).to.deep.equal([
+        'HEAD /migratedUsers/alice%40example.com',
+        'PUT /migratedUsers/alice%40new.example.com',
+      ]);
+      expect(at('error')).to.have.length(1);
+    });
+
+    it('leaves a user of the old system to the migration', async () => {
+      proxy().head('/migratedUsers/alice%40example.com').reply(404);
+
+      await change(alice, renamed);
+
+      expect(calls).to.deep.equal(['HEAD /migratedUsers/alice%40example.com']);
       expect(at('debug').map(l => l.entry.result)).to.deep.equal(['ignored']);
       expect(at('error')).to.have.length(0);
     });
 
-    it('changes nothing when the proxy cannot say, and logs it', async () => {
-      nock(url).head('/migratedUsers/alice%40example.com').reply(500);
+    it('asks again while the proxy answers 503, and changes nothing once it has not said', async () => {
+      proxy().head('/migratedUsers/alice%40example.com').times(3).reply(503);
 
-      await entryChange(before, after);
+      await change(alice, renamed);
 
+      expect(calls).to.have.length(3);
       expect(at('error')).to.have.length(1);
       expect(at('error')[0].entry).to.include({
-        event: 'onLdapEntryChange:rename',
-        oldmail: 'alice@example.com',
-        newmail: 'alice@new.example.com',
+        event: 'onLdapEntryChange:update',
+        mail: 'alice@example.com',
       });
+      expect(at('error')[0].entry.added).to.deep.equal([
+        'alice@new.example.com',
+      ]);
     });
 
-    it('ignores a change of case alone as the proxy does not', async () => {
-      // James usernames are case-insensitive, the list is keyed by the
-      // string: the proxy is told, so that the key follows the directory
-      const scope = nock(url)
+    it('takes a change of case alone as no change', async () => {
+      await change(alice, { ...user, mail: 'Alice@Example.com' });
+
+      expect(calls).to.have.length(0);
+      expect(logs).to.have.length(0);
+    });
+
+    it('puts an alias gained by a migrated user, takes off one lost', async () => {
+      proxy()
         .head('/migratedUsers/alice%40example.com')
         .reply(204)
-        .put('/migratedUsers/Alice%40example.com')
+        .put('/migratedUsers/new%40example.com')
+        .reply(204)
+        .delete('/migratedUsers/old%40example.com')
+        .reply(204);
+
+      await change(
+        { ...alice, mailAlternateAddress: ['old@example.com'] },
+        { ...alice, mailAlternateAddress: ['new@example.com'] }
+      );
+
+      expect(calls).to.deep.equal([
+        'HEAD /migratedUsers/alice%40example.com',
+        'PUT /migratedUsers/new%40example.com',
+        'DELETE /migratedUsers/old%40example.com',
+      ]);
+    });
+
+    it('handles the writes of one entry one after the other', async () => {
+      // The add's PUT is slow: the rename's HEAD must still come after it
+      proxy()
+        .put('/migratedUsers/alice%40example.com')
+        .delay(50)
+        .reply(204)
+        .head('/migratedUsers/alice%40example.com')
+        .reply(204)
+        .put('/migratedUsers/alice%40new.example.com')
         .reply(204)
         .delete('/migratedUsers/alice%40example.com')
         .reply(204);
 
-      await entryChange(before, { ...user, mail: 'Alice@example.com' });
+      await Promise.all([change(null, alice), change(alice, renamed)]);
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls).to.deep.equal([
+        'PUT /migratedUsers/alice%40example.com',
+        'HEAD /migratedUsers/alice%40example.com',
+        'PUT /migratedUsers/alice%40new.example.com',
+        'DELETE /migratedUsers/alice%40example.com',
+      ]);
     });
   });
 
-  describe('an account losing its mail', () => {
-    it('is taken off the list when deleted', async () => {
-      const scope = nock(url)
+  describe('an entry losing its address', () => {
+    it('is taken off the list when deleted, every address', async () => {
+      proxy()
         .delete('/migratedUsers/alice%40example.com')
+        .reply(204)
+        .delete('/migratedUsers/alias%40example.com')
         .reply(204);
 
-      await entryChange({ ...user, mail: 'alice@example.com' }, null);
+      await change(
+        { ...alice, mailAlternateAddress: 'alias@example.com' },
+        null
+      );
 
-      expect(scope.isDone()).to.equal(true);
+      expect(calls.sort()).to.deep.equal([
+        'DELETE /migratedUsers/alias%40example.com',
+        'DELETE /migratedUsers/alice%40example.com',
+      ]);
       expect(at('info').map(l => l.entry.event)).to.deep.equal([
+        'onLdapEntryChange:delete',
         'onLdapEntryChange:delete',
       ]);
     });
 
     it('is taken off the list when the mail is removed', async () => {
-      const scope = nock(url)
-        .delete('/migratedUsers/alice%40example.com')
-        .reply(204);
+      proxy().delete('/migratedUsers/alice%40example.com').reply(204);
 
-      await entryChange({ ...user, mail: 'alice@example.com' }, user);
+      await change(alice, user);
 
-      expect(scope.isDone()).to.equal(true);
-    });
-
-    it('does nothing for a deleted group', async () => {
-      await entryChange(
-        { objectClass: ['groupOfNames'], mail: 'list@example.com' },
-        null
-      );
-
-      expect(logs).to.have.length(0);
+      expect(calls).to.deep.equal([
+        'DELETE /migratedUsers/alice%40example.com',
+      ]);
     });
   });
 
   describe('health', () => {
     it('is ok when the proxy says so', async () => {
-      const scope = nock(url, {
-        reqheaders: { authorization: 'Bearer secret' },
-      })
-        .get('/healthcheck')
-        .reply(200, { status: 'healthy' });
+      proxy().get('/healthcheck').reply(200, { status: 'healthy' });
       expect(await plugin.health()).to.equal('ok');
-      expect(scope.isDone()).to.equal(true);
+      expect(calls).to.deep.equal(['GET /healthcheck']);
     });
 
     it('is degraded when the proxy says so or does not answer', async () => {
@@ -326,6 +380,7 @@ describe('Migration proxy plugin', () => {
     let base: string;
     let aliceDn: string;
     let bobDn: string;
+    let scope: nock.Scope;
 
     before(function () {
       skipIfMissingEnvVars(this, [...LDAP_ENV_VARS]);
@@ -340,8 +395,18 @@ describe('Migration proxy plugin', () => {
     });
 
     beforeEach(async () => {
+      dm.config.migration_proxy_branch = [base];
+      plugin = new MigrationProxy(dm);
+      capture(plugin, logs);
       await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
       await dm.registerPlugin('migrationProxy', plugin);
+      // Every write of the tests reaches the proxy, the teardown's included
+      scope = proxy()
+        .persist()
+        .put(/^\/migratedUsers\//)
+        .reply(204)
+        .delete(/^\/migratedUsers\//)
+        .reply(204);
     });
 
     afterEach(async () => {
@@ -351,33 +416,31 @@ describe('Migration proxy plugin', () => {
         } catch {
           // not there
         }
+      await waitFor(
+        () =>
+          (plugin as unknown as { queues: Map<string, unknown> }).queues
+            .size === 0,
+        { what: 'the teardown calls' }
+      );
+      scope.persist(false);
     });
 
-    it('tells the proxy about an account written, renamed and deleted', async () => {
-      const calls: string[] = [];
-      const scope = nock(url)
-        .persist()
-        .put(/^\/migratedUsers\//)
-        .reply(204)
-        .head(/^\/migratedUsers\//)
-        .reply(204)
-        .delete(/^\/migratedUsers\//)
-        .reply(204);
-      scope.on('request', req => calls.push(`${req.method} ${req.path}`));
-
-      await dm.ldap.add(aliceDn, {
+    const add = (target: string, attributes: Record<string, unknown>) =>
+      dm.ldap.add(target, {
         objectClass: ['top', 'inetOrgPerson'],
-        uid: 'migalice',
-        cn: 'Alice',
-        sn: 'A',
-        mail: 'migalice@test.org',
+        cn: 'Someone',
+        sn: 'S',
+        ...attributes,
       });
+
+    it('tells the proxy about an account written, renamed and deleted', async () => {
+      scope.head(/^\/migratedUsers\//).reply(204);
+
+      await add(aliceDn, { uid: 'migalice', mail: 'migalice@test.org' });
       await waitFor(() => calls.length === 1, { what: 'the PUT' });
       expect(calls).to.deep.equal(['PUT /migratedUsers/migalice%40test.org']);
 
-      await dm.ldap.modify(aliceDn, {
-        replace: { mail: 'alice.m@test.org' },
-      });
+      await dm.ldap.modify(aliceDn, { replace: { mail: 'alice.m@test.org' } });
       await waitFor(() => calls.length === 4, { what: 'the rename calls' });
       expect(calls.slice(1)).to.deep.equal([
         'HEAD /migratedUsers/migalice%40test.org',
@@ -388,46 +451,26 @@ describe('Migration proxy plugin', () => {
       await dm.ldap.delete(aliceDn);
       await waitFor(() => calls.length === 5, { what: 'the DELETE' });
       expect(calls[4]).to.equal('DELETE /migratedUsers/alice.m%40test.org');
-      scope.persist(false);
     });
 
     it('says nothing of an account without mail', async () => {
-      await dm.ldap.add(bobDn, {
-        objectClass: ['top', 'inetOrgPerson'],
-        uid: 'migbob',
-        cn: 'Bob',
-        sn: 'B',
-      });
+      await add(bobDn, { uid: 'migbob' });
       await dm.ldap.modify(bobDn, { replace: { sn: 'C' } });
+      await dm.ldap.delete(bobDn);
       await new Promise(resolve => setTimeout(resolve, 200));
-      expect(nock.pendingMocks()).to.have.length(0);
-      expect(at('error')).to.have.length(0);
-      expect(at('info')).to.have.length(0);
+      expect(calls).to.have.length(0);
+      expect(logs).to.have.length(0);
     });
 
     describe('GET /api/v1/users/:user/mail-migration', () => {
       beforeEach(async () => {
-        const added = nock(url)
-          .put('/migratedUsers/migalice%40test.org')
-          .reply(204);
-        await dm.ldap.add(aliceDn, {
-          objectClass: ['top', 'inetOrgPerson'],
-          uid: 'migalice',
-          cn: 'Alice',
-          sn: 'A',
-          mail: 'migalice@test.org',
-        });
-        await dm.ldap.add(bobDn, {
-          objectClass: ['top', 'inetOrgPerson'],
-          uid: 'migbob',
-          cn: 'Bob',
-          sn: 'B',
-        });
-        await waitFor(() => added.isDone(), { what: 'the PUT of the add' });
+        await add(aliceDn, { uid: 'migalice', mail: 'migalice@test.org' });
+        await add(bobDn, { uid: 'migbob' });
+        await waitFor(() => calls.length === 1, { what: 'the PUT of the add' });
       });
 
       it('answers true for a migrated user', async () => {
-        nock(url).head('/migratedUsers/migalice%40test.org').reply(204);
+        scope.head('/migratedUsers/migalice%40test.org').reply(204);
         const res = await request(dm.app)
           .get('/api/v1/users/migalice/mail-migration')
           .set('Accept', 'application/json');
@@ -436,7 +479,7 @@ describe('Migration proxy plugin', () => {
       });
 
       it('answers false for a user of the old system', async () => {
-        nock(url).head('/migratedUsers/migalice%40test.org').reply(404);
+        scope.head('/migratedUsers/migalice%40test.org').reply(404);
         const res = await request(dm.app)
           .get('/api/v1/users/migalice/mail-migration')
           .set('Accept', 'application/json');
@@ -455,12 +498,13 @@ describe('Migration proxy plugin', () => {
         expect(noMail.status).to.equal(400);
       });
 
-      it('answers 502 when the proxy fails', async () => {
-        nock(url).head('/migratedUsers/migalice%40test.org').reply(500);
+      it('answers 502 when the proxy fails, without asking again', async () => {
+        scope.head('/migratedUsers/migalice%40test.org').reply(503);
         const res = await request(dm.app)
           .get('/api/v1/users/migalice/mail-migration')
           .set('Accept', 'application/json');
         expect(res.status).to.equal(502);
+        expect(calls.filter(c => c.startsWith('HEAD'))).to.have.length(1);
         expect(at('error').map(l => l.entry.event)).to.deep.equal([
           'getMigrationStatus',
         ]);

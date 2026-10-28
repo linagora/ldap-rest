@@ -3,10 +3,13 @@
  * Provides common HTTP request handling, concurrency control, and LDAP utilities
  * @author Xavier Guimard <xguimard@linagora.com>
  */
+import type { Request } from 'express';
 import pLimit from 'p-limit';
 
 import type { DM } from '../bin';
+import { PROBE_TIMEOUT_MS, type HealthStatus } from '../lib/health';
 import type { AttributesList, SearchResult } from '../lib/ldapActions';
+import { escapeLdapFilter } from '../lib/utils';
 
 import DmPlugin, { type Role } from './plugin';
 
@@ -47,8 +50,10 @@ export abstract class TwakePlugin extends DmPlugin {
   ) {
     super(server);
 
-    // Initialize HTTP client configuration
-    this.webadminUrl = (this.config[urlConfig] as string) || '';
+    this.webadminUrl = ((this.config[urlConfig] as string) || '').replace(
+      /\/+$/,
+      ''
+    );
     this.webadminToken = (this.config[tokenConfig] as string) || '';
 
     // Validate required configuration
@@ -108,6 +113,8 @@ export abstract class TwakePlugin extends DmPlugin {
    * @param fields Additional fields for logging
    * @param retryOn HTTP statuses worth another attempt, up to
    *   `retryAttempts` in all; none by default
+   * @returns whether the call succeeded, an ignored error counting as a
+   *   success; a failure is logged here, the caller decides what follows
    */
   protected async callWebAdminApi(
     hookname: string,
@@ -117,7 +124,7 @@ export abstract class TwakePlugin extends DmPlugin {
     body: string | null,
     fields: object,
     retryOn: readonly number[] = []
-  ): Promise<void> {
+  ): Promise<boolean> {
     const log = {
       plugin: this.name,
       event: hookname,
@@ -154,6 +161,7 @@ export abstract class TwakePlugin extends DmPlugin {
             http_status: res.status,
             url,
           });
+          return true;
         } else if (this.shouldRetry(res.status, retryOn, attempt)) {
           this.logger.warn({
             ...log,
@@ -174,6 +182,7 @@ export abstract class TwakePlugin extends DmPlugin {
             http_status_text: res.statusText,
             url,
           });
+          return true;
         } else {
           this.logger.error({
             ...log,
@@ -190,8 +199,53 @@ export abstract class TwakePlugin extends DmPlugin {
           url,
         });
       }
-      return;
+      return false;
     }
+  }
+
+  /**
+   * The service's own health check, for the readiness probe: `degraded`
+   * when it answers an error, or not under the probe's budget, so that a
+   * mute service reads as degraded rather than leaving the probe to time out
+   */
+  protected async webadminHealth(): Promise<HealthStatus> {
+    try {
+      const res = await this.fetch(`${this.webadminUrl}/healthcheck`, {
+        headers: this.createHeaders(),
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS - 500),
+      });
+      return res.ok ? 'ok' : 'degraded';
+    } catch {
+      return 'degraded';
+    }
+  }
+
+  /**
+   * The user a route is asked about, by `uid` across the directory, with
+   * `attributes`; null when there is none the caller may read, so that a
+   * user the caller cannot read gets the answer a user that is not there
+   * gets
+   */
+  protected async findReadableUser(
+    username: string,
+    req: Request,
+    attributes: string[]
+  ): Promise<AttributesList | null> {
+    // As the server: found across branches, then answered only if the
+    // caller can read it
+    const found = (await this.server.ldap.system.search(
+      {
+        scope: 'sub',
+        filter: `(uid=${escapeLdapFilter(username)})`,
+        paged: false,
+        attributes,
+      },
+      this.config.ldap_base || ''
+    )) as SearchResult;
+    for (const entry of found.searchEntries ?? [])
+      if (await this.server.ldap.readableBy(String(entry.dn), req))
+        return entry as AttributesList;
+    return null;
   }
 
   /**

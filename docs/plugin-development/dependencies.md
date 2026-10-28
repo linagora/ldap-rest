@@ -208,10 +208,9 @@ overrides builds a second instance, and it needs a name of its own.
 
 - **Dependencies**:
   - `onLdapChange: 'core/ldap/onChange'` ⚠️ **Required**
-- **Provides Hooks**:
-  - `onLdapEntryChange` - Keeps the migrated-users list of the Twake Mail migration proxy
-- **Consumes Hooks**: (Hooks provided by `onLdapChange`)
-- **Notes**: See [mail-migration](../usage/plugins/integrations/mail-migration.md)
+- **Provides Hooks**: None
+- **Consumes Hooks**: `onLdapEntryChange` (provided by `onLdapChange`)
+- **Notes**: Keeps the migrated-users list of the Twake Mail migration proxy, see [mail-migration](../usage/plugins/integrations/mail-migration.md)
 
 #### `calendar` (twake/calendar)
 

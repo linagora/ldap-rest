@@ -360,6 +360,7 @@ describe('Authorization before the checks that read the directory', function () 
       await server.registerPlugin('ldapGroups', new LdapGroups(server));
       await server.registerPlugin('james', new James(server));
       server.config.migration_proxy_url = webadmin;
+      server.config.migration_proxy_branch = [base];
       await server.registerPlugin('migrationProxy', new MigrationProxy(server));
       await server.registerPlugin(
         'appAccountsConsistency',

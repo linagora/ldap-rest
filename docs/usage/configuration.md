@@ -503,13 +503,14 @@ The wait before each retry grows with the attempt, so the total wait is `--james
 
 Keeps the migrated-users list of the Twake Mail migration proxy in step with the accounts, [details](plugins/integrations/mail-migration.md).
 
-| CLI                                | Env                                 | Default | Description                                     |
-| ---------------------------------- | ----------------------------------- | ------- | ----------------------------------------------- |
-| `--migration-proxy-url`            | `DM_MIGRATION_PROXY_URL`            |         | Webadmin URL of the proxy (required)            |
-| `--migration-proxy-token`          | `DM_MIGRATION_PROXY_TOKEN`          |         | Bearer token                                    |
-| `--migration-proxy-concurrency`    | `DM_MIGRATION_PROXY_CONCURRENCY`    | `10`    | Calls to the proxy at once                      |
-| `--migration-proxy-retry-attempts` | `DM_MIGRATION_PROXY_RETRY_ATTEMPTS` | `5`     | Attempts in all of a call the proxy answers 5xx |
-| `--migration-proxy-retry-delay`    | `DM_MIGRATION_PROXY_RETRY_DELAY`    | `1000`  | Base retry delay (ms), growing with the attempt |
+| CLI                                | Plural                       | Env                                 | Default | Description                                                      |
+| ---------------------------------- | ---------------------------- | ----------------------------------- | ------- | ---------------------------------------------------------------- |
+| `--migration-proxy-url`            |                              | `DM_MIGRATION_PROXY_URL`            |         | Webadmin URL of the proxy (required)                             |
+| `--migration-proxy-token`          |                              | `DM_MIGRATION_PROXY_TOKEN`          |         | Bearer token                                                     |
+| `--migration-proxy-branch`         | `--migration-proxy-branches` | `DM_MIGRATION_PROXY_BRANCHES`       | `[]`    | Branches whose entries are followed, `;`-separated (required)    |
+| `--migration-proxy-concurrency`    |                              | `DM_MIGRATION_PROXY_CONCURRENCY`    | `10`    | Calls to the proxy at once                                       |
+| `--migration-proxy-retry-attempts` |                              | `DM_MIGRATION_PROXY_RETRY_ATTEMPTS` | `5`     | Attempts in all of a call the proxy answers 500, 502, 503 or 504 |
+| `--migration-proxy-retry-delay`    |                              | `DM_MIGRATION_PROXY_RETRY_DELAY`    | `1000`  | Base retry delay (ms), growing with the attempt                  |
 
 #### `core/twake/calendar`
 
