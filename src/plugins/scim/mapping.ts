@@ -641,10 +641,9 @@ function namingValue(body: object, attribute: string): string {
  * undefined for nothing
  */
 function scalarOrValue(v: unknown, attribute: string): string | undefined {
-  const value =
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? (v as { value?: unknown }).value
-      : v;
+  const reference =
+    v && typeof v === 'object' && !Array.isArray(v) && 'value' in v;
+  const value = reference ? (v as { value: unknown }).value : v;
   if (value == null) return undefined;
   if (isScalar(value)) return String(value);
   throw scimInvalidValue(`${attribute} must be a string, got ${kindOf(value)}`);
