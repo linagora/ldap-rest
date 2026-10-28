@@ -176,8 +176,12 @@ export interface FilterOptions {
   supportsActive?: boolean;
 }
 
+/** Deeper than any provider nests a filter; the stack is finite. */
+const MAX_DEPTH = 32;
+
 class Parser {
   private pos = 0;
+  private depth = 0;
   constructor(
     private tokens: Token[],
     private mapping: ResourceMapping,
@@ -245,17 +249,27 @@ class Parser {
       this.peek().value.toLowerCase() === 'not'
     ) {
       this.consume();
-      const expr = this.parsePrimary();
+      const expr = this.nested(() => this.parsePrimary());
       return `(!${expr})`;
     }
     return this.parsePrimary();
+  }
+
+  private nested<T>(parse: () => T): T {
+    if (++this.depth > MAX_DEPTH)
+      throw scimInvalidFilter('Filter nested too deeply');
+    try {
+      return parse();
+    } finally {
+      this.depth--;
+    }
   }
 
   private parsePrimary(): string {
     const tok = this.peek();
     if (tok.kind === 'LPAREN') {
       this.consume();
-      const inner = this.parseOr();
+      const inner = this.nested(() => this.parseOr());
       this.expect('RPAREN');
       return inner;
     }

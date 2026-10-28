@@ -357,7 +357,7 @@ export function readActive(value: unknown): boolean | undefined {
     if (v === 'true') return true;
     if (v === 'false') return false;
   }
-  throw scimInvalidValue(`Cannot read ${JSON.stringify(value)} as active`);
+  throw scimInvalidValue(`Cannot read a ${typeof value} as active`);
 }
 
 /**
@@ -488,7 +488,7 @@ export function scimUserToLdap(
   objectClass: string[]
 ): { rdn: string; attributes: AttributesList; active?: boolean } {
   const attributes: AttributesList = { objectClass };
-  const rdnValue = user.userName || user.id || '';
+  const rdnValue = namingValue(user, 'userName') || namingValue(user, 'id');
 
   for (const m of mapping.entries) {
     if (m.readOnly || m.operational) continue;
@@ -503,7 +503,7 @@ export function scimUserToLdap(
     }
     if (m.ldapPrimary || m.ldapSecondary) {
       if (!Array.isArray(value)) continue;
-      const mv = value as MultiValued[];
+      const mv = value.map(v => multiValued(v, m.scim));
       const primary = mv.find(v => v.primary === true) || mv[0];
       const others = mv.filter(v => v !== primary);
       if (m.ldapPrimary && primary && primary.value) {
@@ -514,13 +514,7 @@ export function scimUserToLdap(
       }
       continue;
     }
-    if (m.ldap) {
-      if (Array.isArray(value)) {
-        attributes[m.ldap] = value.map(v => String(v));
-      } else if (typeof value === 'string' || typeof value === 'number') {
-        attributes[m.ldap] = String(value);
-      }
-    }
+    if (m.ldap) attributes[m.ldap] = scalarValues(value, m.scim);
   }
 
   // `active` is not a mapping entry: false writes the lock attribute. True,
@@ -535,7 +529,9 @@ export function scimUserToLdap(
   // Ensure required inetOrgPerson attributes have sensible defaults
   if (!attributes.cn && rdnValue) attributes.cn = rdnValue;
   if (!attributes.sn) {
-    const sn = user.name?.familyName || user.displayName || rdnValue;
+    const sn = [user.name?.familyName, user.displayName, rdnValue].find(
+      (v): v is string => typeof v === 'string' && v.length > 0
+    );
     if (sn) attributes.sn = sn;
   }
 
@@ -601,21 +597,54 @@ export function scimGroupToLdap(
   objectClass: string[]
 ): { rdn: string; attributes: AttributesList } {
   const attributes: AttributesList = { objectClass };
-  const rdnValue = group.displayName || group.id || '';
+  const rdnValue =
+    namingValue(group, 'displayName') || namingValue(group, 'id');
   for (const m of mapping.entries) {
     if (m.readOnly || m.operational) continue;
     if (!m.ldap) continue;
     const v = (group as Record<string, unknown>)[m.scim];
     if (v == null) continue;
-    if (Array.isArray(v)) {
-      attributes[m.ldap] = v.map(x =>
-        typeof x === 'string' ? x : JSON.stringify(x)
-      );
-    } else if (typeof v === 'string' || typeof v === 'number') {
-      attributes[m.ldap] = String(v);
-    }
+    attributes[m.ldap] = scalarValues(v, m.scim);
   }
   return { rdn: rdnValue, attributes };
+}
+
+/**
+ * A naming attribute of a body (`userName`, `displayName`, `id`): a string
+ * or nothing, as RFC 7643 declares them.
+ */
+function namingValue(body: object, attribute: string): string {
+  const value = (body as Record<string, unknown>)[attribute];
+  if (value == null) return '';
+  if (typeof value !== 'string')
+    throw scimInvalidValue(`${attribute} must be a string`);
+  return value;
+}
+
+const isScalar = (v: unknown): v is string | number | boolean =>
+  typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+/** The values of a simple attribute: scalars, alone or in a list */
+function scalarValues(value: unknown, attribute: string): string | string[] {
+  if (isScalar(value)) return String(value);
+  if (Array.isArray(value) && value.every(isScalar)) return value.map(String);
+  throw scimInvalidValue(
+    `${attribute} must be a string, a number, a boolean or a list of them`
+  );
+}
+
+/** An element of a multi-valued attribute: an object whose `value` is a string */
+function multiValued(value: unknown, attribute: string): MultiValued {
+  if (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    (!('value' in value) || typeof value.value === 'string')
+  )
+    return value as MultiValued;
+  throw scimInvalidValue(
+    `Each element of ${attribute} must be an object whose value is a string`
+  );
 }
 
 /**
@@ -656,7 +685,9 @@ export function scimPathToLdapAttribute(
   for (const m of mapping.entries) {
     if (m.scim !== top) continue;
     if (m.sub && sub) {
-      return m.sub[sub];
+      return Object.prototype.hasOwnProperty.call(m.sub, sub)
+        ? m.sub[sub]
+        : undefined;
     }
     // Multi-valued: emails.value → primary attr
     if ((m.ldapPrimary || m.ldapSecondary) && (sub === 'value' || !sub)) {

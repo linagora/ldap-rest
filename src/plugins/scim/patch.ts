@@ -208,7 +208,9 @@ function activeValue(value: unknown): boolean {
   return read;
 }
 
-function normalizeOp(op: string): 'add' | 'remove' | 'replace' {
+function normalizeOp(op: unknown): 'add' | 'remove' | 'replace' {
+  if (typeof op !== 'string')
+    throw scimInvalidValue(`Patch op must be a string, got ${describe(op)}`);
   const lower = op.toLowerCase();
   if (lower === 'add' || lower === 'remove' || lower === 'replace')
     return lower;
@@ -278,6 +280,11 @@ function parsePath(path: string): {
   return { top, filter, sub };
 }
 
+/** The kind of a client value, for an error message that quotes none of it */
+function describe(v: unknown): string {
+  return v === null ? 'null' : Array.isArray(v) ? 'an array' : typeof v;
+}
+
 function coerceValue(v: unknown): string | string[] | undefined {
   if (v == null) return undefined;
   if (typeof v === 'string') return v;
@@ -298,7 +305,7 @@ function coerceValue(v: unknown): string | string[] | undefined {
         return String((x as { value: unknown }).value);
       }
       throw scimInvalidValue(
-        `Unsupported array element in PATCH value: ${JSON.stringify(x)}`
+        `Unsupported array element in PATCH value: ${describe(x)}`
       );
     });
   }
@@ -334,6 +341,8 @@ async function applyOperation(
     }
     const valueObj = op.value as Record<string, unknown>;
     for (const [scimAttr, v] of Object.entries(valueObj)) {
+      // An empty name would come back here with no path, once per level
+      if (!scimAttr) throw scimInvalidPath('Empty attribute name');
       await applyOperation({ op: op.op, path: scimAttr, value: v }, entry, ctx);
     }
     return;
@@ -467,6 +476,10 @@ export async function patchToModifyRequest(
   }
   const entry = new WorkingEntry(ctx.current);
   for (const op of patch.Operations) {
+    if (!op || typeof op !== 'object' || Array.isArray(op))
+      throw scimInvalidValue(
+        `Each operation must be an object, got ${describe(op)}`
+      );
     await applyOperation(op, entry, ctx);
   }
   return entry.diff();

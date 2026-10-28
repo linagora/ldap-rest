@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- SCIM: a malformed request is answered 400 where it was answered 500 or
+  written as sent: a `filter` nested more than 32 levels deep, a PATCH
+  whose `op` is missing or not a string, an operation that is not an
+  object, a value nested too deeply to quote, a `userName`, `displayName`
+  or `id` that is not a string, an object where a string is expected (which
+  was stored as `[object Object]`), a sub-attribute path naming an
+  inherited property such as `name.toString`
+  ([#471](https://github.com/linagora/ldap-rest/issues/471),
+  [#479](https://github.com/linagora/ldap-rest/issues/479),
+  [#480](https://github.com/linagora/ldap-rest/issues/480),
+  [#481](https://github.com/linagora/ldap-rest/issues/481),
+  [#482](https://github.com/linagora/ldap-rest/issues/482))
+- SCIM: `excludedAttributes` naming every sub-attribute of a multi-valued
+  attribute drops the elements it leaves empty, as `attributes` does
+  ([#483](https://github.com/linagora/ldap-rest/issues/483))
+
 ## v1.2.0 (2026-10-28)
 
 Five changes need a check before deploying,

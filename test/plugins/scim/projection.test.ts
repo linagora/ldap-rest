@@ -23,6 +23,17 @@ const user = {
 };
 
 describe('SCIM attribute projection (RFC 7644 section 3.9)', () => {
+  it('drops the elements an exclusion leaves empty', () => {
+    const out = projectResource(user, {
+      excludedAttributes: ['emails.value', 'EMAILS.type'],
+    });
+    expect(out.emails).to.deep.equal([{ primary: true }]);
+    const none = projectResource(user, {
+      excludedAttributes: ['emails.value', 'emails.type', 'emails.primary'],
+    });
+    expect(none).not.to.have.property('emails');
+  });
+
   it('returns the resource untouched with no parameter', () => {
     expect(projectResource(user, {})).to.equal(user);
   });
