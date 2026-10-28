@@ -60,6 +60,15 @@ export const read = (
 
 export const ORG = '{org}';
 
+/**
+ * A `{org}` pattern filled with an organization, as the value of one RDN.
+ * Not `String.replace`: `$'`, `` $` ``, `$&` and `$$` in the id would be
+ * expanded into the pattern.
+ */
+export function withOrg(pattern: string, org: string): string {
+  return pattern.split(ORG).join(escapeDnValue(org));
+}
+
 const GROUP_SORT = ['displayName', 'description', 'createdAt'];
 const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle'];
 
@@ -356,7 +365,7 @@ export default class TwakeGroups extends LdapGroups {
       if (valueOf(searchEntries[0] ?? {}, attribute) === undefined) return;
       await this.ldap.system.modify(newDn, {
         replace: {
-          [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
+          [attribute]: withOrg(this.orgPattern, org),
         },
       });
     },
@@ -424,7 +433,7 @@ export default class TwakeGroups extends LdapGroups {
     const attribute = this.config.ldap_organization_link_attribute;
     if (!attribute || !this.orgPattern || !this.judgedByAttachment())
       return entry;
-    const orgDn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const orgDn = withOrg(this.orgPattern, org);
     const given = read(entry, attribute);
     if (given !== undefined) {
       if (dnKey(given) !== dnKey(orgDn))
@@ -464,7 +473,7 @@ export default class TwakeGroups extends LdapGroups {
       !this.judgedByAttachment()
     )
       return;
-    const orgDn = dnKey(this.orgPattern.replace(ORG, escapeDnValue(org)));
+    const orgDn = dnKey(withOrg(this.orgPattern, org));
     const named = (list?: AttributesList): string[] =>
       Object.keys(list ?? {}).filter(
         key => key.toLowerCase() === attribute.toLowerCase()
@@ -506,11 +515,11 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   groupBaseOf(org: string): string {
-    return this.groupBase.replace(ORG, escapeDnValue(org));
+    return withOrg(this.groupBase, org);
   }
 
   userBaseOf(org: string): string {
-    return this.userBase.replace(ORG, escapeDnValue(org));
+    return withOrg(this.userBase, org);
   }
 
   /**
@@ -711,7 +720,7 @@ export default class TwakeGroups extends LdapGroups {
     if (!this.orgPattern) return;
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
-    const dn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const dn = withOrg(this.orgPattern, org);
     // First, so that an organization the caller cannot read costs the same
     // as one that is not there
     if (!(await this.ldap.readableBy(dn, req))) throw notFound('organization');

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- An organization whose id holds `$'`, `` $` ``, `$&` or `$$` is read and
+  written under its own branch: the id was expanded into the configured
+  `{org}` pattern as a replacement string
+  ([#472](https://github.com/linagora/ldap-rest/issues/472))
+
 ## v1.2.0 (2026-10-28)
 
 Five changes need a check before deploying,
