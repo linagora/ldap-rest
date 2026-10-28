@@ -378,19 +378,19 @@ export function fillPattern(
  * ```
  */
 export function escapeDnValue(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\') // backslash (must be first)
-    .replace(/,/g, '\\,') // comma
-    .replace(/\+/g, '\\+') // plus
-    .replace(/"/g, '\\"') // double quote
-    .replace(/</g, '\\<') // less than
-    .replace(/>/g, '\\>') // greater than
-    .replace(/;/g, '\\;') // semicolon
-    .replace(/=/g, '\\=') // equals (in value only)
-    .replace(/\0/g, '\\00') // null
-    .replace(/^\s/, '\\ ') // leading space
-    .replace(/\s$/, '\\ ') // trailing space
-    .replace(/^#/, '\\#'); // leading hash
+  let escaped = value
+    .replace(/[\\,+"<>;=]/g, char => `\\${char}`)
+    // Control characters are the point of this class, hence the exemption
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\0-\x1f\x7f]/g, char => `\\${hexByte(char.charCodeAt(0))}`);
+  // Only a space is special at either end (RFC 4514 §2.4); a Unicode space
+  // is a character of the value. Both ends are judged on the original
+  // value, so a lone space is escaped once.
+  if (value.startsWith(' ')) escaped = `\\${escaped}`;
+  if (value.length > 1 && value.endsWith(' '))
+    escaped = `${escaped.slice(0, -1)}\\ `;
+  if (value.startsWith('#')) escaped = `\\${escaped}`;
+  return escaped;
 }
 
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -427,13 +427,10 @@ export function unescapeDnValue(value: string): string {
   let bytes: number[] = [];
   const flushBytes = (): void => {
     if (bytes.length) {
-      try {
-        result += utf8Decoder.decode(new Uint8Array(bytes));
-      } catch {
-        // Not valid UTF-8 (e.g. a Latin-1 escape from a legacy writer): keep
-        // one char per byte rather than collapsing distinct values to U+FFFD.
-        result += bytes.map(b => String.fromCharCode(b)).join('');
-      }
+      // A byte that is not UTF-8 (a Latin-1 escape from a legacy writer) is
+      // one char rather than U+FFFD, which would collapse distinct values
+      for (const char of utf8Chars(bytes))
+        result += typeof char === 'number' ? String.fromCharCode(char) : char;
       bytes = [];
     }
   };
@@ -712,8 +709,13 @@ export function getRdn(dn: string): string {
  * ```
  */
 export function rdnValue(dn: string): string {
-  const match = /^[^=]+=((?:\\.|[^,])*)/.exec(dn);
-  return match ? match[1].replace(/\\(.)/g, '$1') : '';
+  const [rdn] = parseDn(dn);
+  const eq = rdn ? rdn.indexOf('=') : -1;
+  if (eq <= 0) return '';
+  // parseDn trimmed the end, keeping the space a backslash escapes
+  let start = eq + 1;
+  while (start < rdn.length && asciiSpace(rdn[start])) start++;
+  return unescapeDnValue(rdn.slice(start));
 }
 
 /**
@@ -755,9 +757,9 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  * and its insignificant spaces dropped (at either end, and all but one of
  * a run). The characters that need it are escaped again with a
  * backslash: the specials anywhere, a `#` at the start. A control
- * character, or hex pairs that are not UTF-8, stay hex. A value starting with an unescaped `#` is the
- * BER form, which is not decoded; one in double quotes (LDAPv2) is read
- * as it stands.
+ * character, or a hex pair that is not UTF-8, stays hex. A BER value (`#`
+ * and hex pairs) is not decoded; one in double quotes (LDAPv2) is read as
+ * it stands.
  *
  * It covers the spellings of the naming attributes, not the whole of RFC
  * 4518: the authorization hooks judge writes on the DN the directory
@@ -767,12 +769,8 @@ const DN_ESCAPE = /((?:\\[0-9a-fA-F]{2})+)|\\([^])/g;
  * @param raw the value as written, after its `=`
  */
 function canonicalValue(raw: string): string {
-  let from = 0;
-  let to = raw.length;
-  while (from < to && asciiSpace(raw[from])) from++;
-  while (to > from && asciiSpace(raw[to - 1])) to--;
-  const trimmed = raw.slice(from, to);
-  if (trimmed.startsWith('#')) return trimmed;
+  const trimmed = trimUnescaped(raw);
+  if (/^#(?:[0-9a-fA-F]{2})+$/.test(trimmed)) return trimmed;
   // LDAPv2: in double quotes, every character is the value's
   // The closing quote is not escaped: an even run of backslashes before it
   let backslashes = 0;
@@ -783,7 +781,7 @@ function canonicalValue(raw: string): string {
     trimmed.startsWith('"') &&
     trimmed.endsWith('"') &&
     backslashes % 2 === 0;
-  if (quoted) raw = trimmed.slice(1, -1);
+  raw = quoted ? trimmed.slice(1, -1) : trimmed;
   // Each character, decoded; hex pairs that are not, kept as `\xx`
   const chars: string[] = [];
   let last = 0;
@@ -802,33 +800,26 @@ function canonicalValue(raw: string): string {
       .split('\\')
       .filter(Boolean)
       .map(pair => parseInt(pair, 16));
-    try {
-      plain(
-        new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bytes))
-      );
-    } catch {
-      // Not UTF-8: each pair alone
-      for (const byte of bytes)
-        chars.push(
-          byte < 0x80 ? String.fromCharCode(byte) : `\\${hexByte(byte)}`
-        );
-    }
+    for (const char of utf8Chars(bytes))
+      if (typeof char === 'number') chars.push(`\\${hexByte(char)}`);
+      else plain(char);
   }
   // A lone trailing backslash escapes nothing: it is one
   if (last < raw.length) plain(raw.slice(last));
 
-  // Unicode equivalence (NFKC), as the directory's matching rules fold it:
-  // `cafe\u0301` is `café`, `ﬁ` is `fi`, a no-break space or an
-  // ideographic one is a space
+  // Case, then Unicode equivalence (NFKC), in the order of RFC 4518 §2 and
+  // of the directory's matching rules: `cafe\u0301` is `café`, `ﬁ` is
+  // `fi`, a no-break space or an ideographic one is a space. Lower-casing
+  // after NFKC would leave `T\u0308` as `t\u0308`, which NFKC composes
   const kept = (char: string): boolean => char.length === 3 && char[0] === '\\';
   const tokens: string[] = [];
   let run = '';
   for (const char of chars)
     if (kept(char)) {
-      tokens.push(...run.normalize('NFKC'), char);
+      tokens.push(...run.toLowerCase().normalize('NFKC'), char);
       run = '';
     } else run += char;
-  tokens.push(...run.normalize('NFKC'));
+  tokens.push(...run.toLowerCase().normalize('NFKC'));
 
   // Insignificant spaces (RFC 4518 §2.6.1): none at either end, and one
   // for a run of them
@@ -855,6 +846,42 @@ function canonicalValue(raw: string): string {
 
 function hexByte(byte: number): string {
   return byte.toString(16).padStart(2, '0');
+}
+
+/**
+ * The characters the bytes of a hex-escape run encode, sequence by
+ * sequence: a byte that starts no valid UTF-8 sequence is given as a number,
+ * and only that one, so that what a caller keeps as hex never holds a
+ * sequence a second reading would decode.
+ */
+function utf8Chars(bytes: number[]): (string | number)[] {
+  const out: (string | number)[] = [];
+  const buffer = Uint8Array.from(bytes);
+  for (let i = 0; i < bytes.length; ) {
+    const length = utf8Length(bytes[i]);
+    let decoded: string | undefined;
+    if (length && i + length <= bytes.length)
+      try {
+        decoded = utf8Decoder.decode(buffer.subarray(i, i + length));
+      } catch {
+        // not a sequence
+      }
+    if (decoded === undefined) out.push(bytes[i++]);
+    else {
+      out.push(...decoded);
+      i += length;
+    }
+  }
+  return out;
+}
+
+/** The length of the UTF-8 sequence a lead byte announces, 0 for none. */
+function utf8Length(lead: number): number {
+  if (lead < 0x80) return 1;
+  if (lead >> 5 === 0b110) return 2;
+  if (lead >> 4 === 0b1110) return 3;
+  if (lead >> 3 === 0b11110) return 4;
+  return 0;
 }
 
 /**

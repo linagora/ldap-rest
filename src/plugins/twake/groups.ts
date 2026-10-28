@@ -31,6 +31,7 @@ import {
   isAuthzRefusal,
   normalizeDn,
   parseDn,
+  rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
 import LdapGroups from '../ldap/groups';
@@ -166,13 +167,6 @@ export function dnKey(dn: string): string {
 
 export function parentOf(dn: string): string {
   return parseDn(dn).slice(1).join(',');
-}
-
-/** The RDN value of a DN, unescaped, or the DN itself if it has none. */
-export function rdnValue(dn: string): string {
-  const [rdn] = parseDn(dn);
-  const eq = rdn.indexOf('=');
-  return eq > 0 ? unescapeDnValue(rdn.slice(eq + 1).trim()) : dn;
 }
 
 /**

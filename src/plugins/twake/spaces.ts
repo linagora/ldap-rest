@@ -27,6 +27,7 @@ import {
   escapeDnValue,
   escapeLdapFilter,
   parseDn,
+  rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
@@ -45,7 +46,6 @@ import {
   ORG,
   organizationIn,
   parentOf,
-  rdnValue,
   read,
   RouteError,
   values,
