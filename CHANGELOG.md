@@ -11,6 +11,11 @@
   is not reachable through this server any more
   ([#476](https://github.com/linagora/ldap-rest/issues/476),
   [#477](https://github.com/linagora/ldap-rest/issues/477))
+- The directory schema is read whatever whitespace separates its tokens:
+  a definition holding a vertical tab stopped the server, and one cut after
+  a keyword made the whole schema unreadable
+  ([#470](https://github.com/linagora/ldap-rest/issues/470),
+  [#478](https://github.com/linagora/ldap-rest/issues/478))
 
 ## v1.2.0 (2026-10-28)
 
