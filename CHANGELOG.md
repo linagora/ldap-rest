@@ -63,6 +63,15 @@
   the hook, `plugin` and `op`, [docs](docs/usage/operations.md#request-id)
   ([#423](https://github.com/linagora/ldap-rest/issues/423))
 
+- `core/twake/migrationProxy` keeps the migrated-users list of the Twake
+  Mail migration proxy in step with the entries of `--migration-proxy-branch`:
+  an entry gaining its mail is put on the list with its addresses, the
+  addresses of a migrated one follow it, a deleted one is taken off;
+  `GET /api/v1/users/:user/mail-migration` says where an account lives,
+  [docs](docs/usage/plugins/integrations/mail-migration.md)
+  ([#466](https://github.com/linagora/ldap-rest/issues/466))
+- Every Twake plugin takes its webadmin URL with a trailing slash
+
 ### Fixes
 
 - On every route, a `required` number takes `0` and a `required` boolean

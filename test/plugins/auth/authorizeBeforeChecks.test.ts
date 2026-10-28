@@ -32,6 +32,7 @@ import LdapOrganizations from '../../../src/plugins/ldap/organizations';
 import ExternalUsersInGroups from '../../../src/plugins/ldap/externalUsersInGroups';
 import TwakeTombstone from '../../../src/plugins/twake/tombstone';
 import James from '../../../src/plugins/twake/james';
+import MigrationProxy from '../../../src/plugins/twake/migrationProxy';
 import OnLdapChange from '../../../src/plugins/ldap/onChange';
 import AppAccountsApi from '../../../src/plugins/twake/appAccountsApi';
 import AppAccountsConsistency from '../../../src/plugins/twake/appAccountsConsistency';
@@ -358,6 +359,9 @@ describe('Authorization before the checks that read the directory', function () 
       await server.registerPlugin('onLdapChange', new OnLdapChange(server));
       await server.registerPlugin('ldapGroups', new LdapGroups(server));
       await server.registerPlugin('james', new James(server));
+      server.config.migration_proxy_url = webadmin;
+      server.config.migration_proxy_branch = [base];
+      await server.registerPlugin('migrationProxy', new MigrationProxy(server));
       await server.registerPlugin(
         'appAccountsConsistency',
         new AppAccountsConsistency(server)
@@ -370,7 +374,13 @@ describe('Authorization before the checks that read the directory', function () 
       nock(webadmin)
         .persist()
         .get(`/quota/users/${HOLDER}@test.org`)
-        .reply(200, { global: {}, user: { size: 1000 } });
+        .reply(200, { global: {}, user: { size: 1000 } })
+        .put(/^\/migratedUsers\//)
+        .reply(204)
+        .delete(/^\/migratedUsers\//)
+        .reply(204)
+        .head(`/migratedUsers/${HOLDER}%40test.org`)
+        .reply(204);
     });
 
     after(async () => {
@@ -393,6 +403,22 @@ describe('Authorization before the checks that read the directory', function () 
         .set('X-Test-User', ADMIN)
         .set('Accept', 'application/json');
       expect(allowed.status, JSON.stringify(allowed.body)).to.equal(200);
+    });
+
+    it('answers the mail migration of an account the caller cannot read as of none', async () => {
+      const res = await request
+        .get(`/api/v1/users/${HOLDER}/mail-migration`)
+        .set('X-Test-User', OUTSIDER)
+        .set('Accept', 'application/json');
+      expect(res.status, JSON.stringify(res.body)).to.equal(404);
+      expect(res.body).to.not.have.property('migrated');
+
+      const allowed = await request
+        .get(`/api/v1/users/${HOLDER}/mail-migration`)
+        .set('X-Test-User', ADMIN)
+        .set('Accept', 'application/json');
+      expect(allowed.status, JSON.stringify(allowed.body)).to.equal(200);
+      expect(allowed.body).to.deep.equal({ migrated: true });
     });
 
     it('refuses to create or delete an app account before saying it is there', async () => {

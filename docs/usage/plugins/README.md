@@ -57,6 +57,7 @@ Connect to external systems:
 | ---------------------------------------------------- | ------------------------------------ |
 | [james-mail](integrations/james-mail.md)             | Apache James synchronization         |
 | [james-mailboxes](integrations/james-mailboxes.md)   | Apache James team mailboxes          |
+| [mail-migration](integrations/mail-migration.md)     | Twake Mail migration proxy           |
 | [calendar](integrations/calendar.md)                 | Twake Calendar resources and users   |
 | [app-accounts](integrations/app-accounts.md)         | Applicative accounts API             |
 | [lifecycle-events](integrations/lifecycle-events.md) | Account lifecycle events to RabbitMQ |

@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express';
 
 import TwakePlugin from '../../abstract/twakePlugin';
-import { PROBE_TIMEOUT_MS, type HealthStatus } from '../../lib/health';
+import type { HealthStatus } from '../../lib/health';
 import { type Role, asyncHandler } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type {
@@ -25,9 +25,6 @@ import {
   normalizeDn,
   parseDn,
 } from '../../lib/utils';
-
-/** Under the probe's budget, so that a mute James reads as degraded */
-const HEALTHCHECK_TIMEOUT_MS = PROBE_TIMEOUT_MS - 500;
 
 /**
  * What James WebAdmin answers about a user missing from its users
@@ -216,17 +213,8 @@ export default class James extends TwakePlugin {
     ldapGroups: 'core/ldap/groups',
   };
 
-  /** James's own health check, asked by the readiness probe outside the request queue */
-  async health(): Promise<HealthStatus> {
-    try {
-      const res = await this.fetch(`${this.webadminUrl}/healthcheck`, {
-        headers: this.createHeaders(),
-        signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
-      });
-      return res.ok ? 'ok' : 'degraded';
-    } catch {
-      return 'degraded';
-    }
+  health(): Promise<HealthStatus> {
+    return this.webadminHealth();
   }
 
   // James-specific configuration attributes
@@ -344,27 +332,9 @@ export default class James extends TwakePlugin {
     const username = req.params.user as string;
 
     try {
-      // Get user's mail from LDAP (escape username to prevent LDAP injection)
-      const escapedUsername = escapeLdapFilter(username);
-      // As the server: found across branches, then answered only if the caller can read it (readableBy)
-      const userResult = await this.server.ldap.system.search(
-        {
-          scope: 'sub',
-          filter: `(uid=${escapedUsername})`,
-          paged: false,
-          attributes: [this.mailAttr],
-        },
-        this.config.ldap_base || ''
-      );
-
-      // Found as the server, across branches: a user the caller cannot read
-      // gets the answer a user that is not there gets
-      let userEntry: SearchResult['searchEntries'][number] | undefined;
-      for (const entry of (userResult as SearchResult).searchEntries ?? [])
-        if (await this.server.ldap.readableBy(String(entry.dn), req)) {
-          userEntry = entry;
-          break;
-        }
+      const userEntry = await this.findReadableUser(username, req, [
+        this.mailAttr,
+      ]);
       if (!userEntry) {
         res.status(404).json({ error: `User ${username} not found` });
         return;
@@ -624,7 +594,7 @@ export default class James extends TwakePlugin {
       // James reads a user quota of 0 as a 0 byte mailbox: without one, the
       // user falls back on the domain or global quota
       const set = newQuota > 0;
-      return this.callWebAdminApi(
+      await this.callWebAdminApi(
         'onLdapQuotaChange',
         `${this.webadminUrl}/quota/users/${mail}/size`,
         set ? 'PUT' : 'DELETE',
@@ -833,7 +803,7 @@ export default class James extends TwakePlugin {
     const is = this.domainsOf(after);
     if (!was.length && !is.length) return;
     const dn = String((after ?? before)!.dn);
-    const call = (domain: string, method: 'PUT' | 'DELETE'): Promise<void> =>
+    const call = (domain: string, method: 'PUT' | 'DELETE'): Promise<boolean> =>
       this.callWebAdminApi(
         method === 'PUT' ? 'domain:create' : 'domain:delete',
         `${this.webadminUrl}/domains/${domain}`,
@@ -891,11 +861,14 @@ export default class James extends TwakePlugin {
    */
   private async inDomainOrder(
     domain: string,
-    step: () => Promise<void>
+    step: () => Promise<unknown>
   ): Promise<void> {
     const previous = this.domainQueue.get(domain) ?? Promise.resolve();
     // A failed step does not hold back the next one
-    const current = previous.then(step, step);
+    const run = async (): Promise<void> => {
+      await step();
+    };
+    const current = previous.then(run, run);
     this.domainQueue.set(domain, current);
     try {
       await current;
@@ -2048,7 +2021,7 @@ export default class James extends TwakePlugin {
     ]);
 
     // Process additions and removals in parallel
-    const operations: Promise<void>[] = [];
+    const operations: Promise<boolean>[] = [];
 
     for (const { dn: delegateDN, email: delegateEmail } of addedResults) {
       if (delegateEmail) {

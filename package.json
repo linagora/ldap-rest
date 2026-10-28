@@ -292,6 +292,10 @@
       "types": "./dist/src/plugins/twake/lifecycleEvents.d.ts",
       "import": "./dist/plugins/twake/lifecycleEvents.js"
     },
+    "./plugin-twake-migrationproxy": {
+      "types": "./dist/src/plugins/twake/migrationProxy.d.ts",
+      "import": "./dist/plugins/twake/migrationProxy.js"
+    },
     "./plugin-twake-spaces": {
       "types": "./dist/src/plugins/twake/spaces.d.ts",
       "import": "./dist/plugins/twake/spaces.js"

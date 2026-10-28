@@ -4,10 +4,11 @@ Plugins for connecting LDAP-Rest to external systems.
 
 ## Apache James
 
-| Plugin                                | Description                     |
-| ------------------------------------- | ------------------------------- |
-| [james-mail](james-mail.md)           | User and domain synchronization |
-| [james-mailboxes](james-mailboxes.md) | Team mailbox management         |
+| Plugin                                | Description                      |
+| ------------------------------------- | -------------------------------- |
+| [james-mail](james-mail.md)           | User and domain synchronization  |
+| [james-mailboxes](james-mailboxes.md) | Team mailbox management          |
+| [mail-migration](mail-migration.md)   | Migrated-users list of the proxy |
 
 ## Twake
 
@@ -43,6 +44,9 @@ core/twake/james
   └─ requires: core/ldap/onChange
 
 core/twake/calendar
+  └─ requires: core/ldap/onChange
+
+core/twake/migrationProxy
   └─ requires: core/ldap/onChange
 
 core/twake/lifecycleEvents
