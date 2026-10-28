@@ -1955,18 +1955,13 @@ class ldapActions {
 
     if (changes.delete) {
       if (Array.isArray(changes.delete)) {
-        for (const attr of changes.delete) {
-          if (attr)
-            ldapChanges.push(
-              new Change({
-                operation: 'delete',
-                modification: new Attribute({
-                  type: attr,
-                  values: [],
-                }),
-              })
-            );
-        }
+        for (const attr of changes.delete)
+          ldapChanges.push(
+            new Change({
+              operation: 'delete',
+              modification: new Attribute({ type: attr, values: [] }),
+            })
+          );
       } else {
         for (const [key, value] of Object.entries(changes.delete)) {
           const change = new Change({
@@ -2085,11 +2080,10 @@ class ldapActions {
       // run, and an empty modify touches the directory not at all.
       //
       // A caller that asked for something and got nothing emitted: every
-      // change it named was dropped while building the request — an array
-      // `delete` holding only empty strings, for instance. Nothing reaches
-      // the directory and the call still answers, so a translation bug
-      // upstream is invisible from the outside. That is worth a line someone
-      // will see.
+      // change it named was dropped while building the request. Nothing
+      // reaches the directory and the call still answers, so a translation
+      // bug upstream is invisible from the outside. That is worth a line
+      // someone will see.
       const asked =
         Object.keys(changes.add || {}).length > 0 ||
         Object.keys(changes.replace || {}).length > 0 ||
