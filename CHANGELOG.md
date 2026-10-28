@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- An organization or a SCIM user whose id holds `$'`, `` $` ``, `$&` or
+  `$$` is read and written under its own branch, where the id was taken as
+  a replacement pattern for the configured `{org}` or `{user}` template.
+  `--twake-group-base`, `--twake-group-user-base` and `--twake-space-base`
+  must hold `{org}` exactly once,
+  [upgrading](docs/usage/upgrading.md#org-once-in-a-twake-branch-pattern)
+  ([#472](https://github.com/linagora/ldap-rest/issues/472))
 - A name read from a DN decodes its hex escapes: an organization spelled
   `ou=Sales\2C EMEA` gets the path `Sales, EMEA`, not `Sales2C EMEA`. The
   Twake Calendar resource id and the Cozy instance uid read from such a DN

@@ -4,6 +4,19 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 1.2.0 to the next release
+
+### `{org}` once in a Twake branch pattern
+
+**Who is affected:** a deployment whose `--twake-group-base`,
+`--twake-group-user-base` or `--twake-space-base` holds `{org}` more than
+once. None is known.
+
+The server refuses to start on such a pattern. It filled the first `{org}`
+only and read the organization back from the first one, so a second
+occurrence never worked; now that every occurrence is filled, the two
+readings would disagree.
+
 ## From 1.1 to 1.2.0
 
 ### The process stops on an uncaught exception

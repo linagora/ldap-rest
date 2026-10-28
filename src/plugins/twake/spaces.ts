@@ -49,6 +49,7 @@ import {
   read,
   RouteError,
   values,
+  withOrg,
 } from './groups';
 import {
   isTombstone,
@@ -247,8 +248,8 @@ export default class TwakeSpaces extends DmPlugin {
   constructor(server: DM) {
     super(server);
     this.spaceBase = this.config.twake_space_base || '';
-    if (!this.spaceBase.includes(ORG))
-      throw new Error(`${this.name}: --twake-space-base must hold ${ORG}`);
+    if (this.spaceBase.split(ORG).length !== 2)
+      throw new Error(`${this.name}: --twake-space-base must hold ${ORG} once`);
     this.spacePattern = branchPattern(this.spaceBase);
     this.userPattern = branchPattern(this.config.twake_group_user_base!);
     this.lifecycle = lifecycleAttributes(this.config);
@@ -472,7 +473,7 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   spaceBaseOf(org: string): string {
-    return this.spaceBase.replace(ORG, escapeDnValue(org));
+    return withOrg(this.spaceBase, org);
   }
 
   spaceDn(org: string, id: string): string {
@@ -1553,10 +1554,7 @@ export default class TwakeSpaces extends DmPlugin {
     if (domain === undefined) {
       const attribute = this.domainAttribute;
       try {
-        const entry = await this.entry(
-          pattern.replace(ORG, escapeDnValue(org)),
-          [attribute]
-        );
+        const entry = await this.entry(withOrg(pattern, org), [attribute]);
         domain = entry && read(entry, attribute);
       } catch (err) {
         this.logger.warn({

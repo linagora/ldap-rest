@@ -4,7 +4,7 @@ import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
 import Scim from '../../../src/plugins/scim/scim';
-import TwakeGroups from '../../../src/plugins/twake/groups';
+import TwakeGroups, { withOrg } from '../../../src/plugins/twake/groups';
 
 const ORGS = `ou=tg-orgs,${process.env.DM_LDAP_BASE}`;
 const orgDn = (org: string): string => `ou=${org},${ORGS}`;
@@ -102,6 +102,35 @@ describe('Twake groups plugin', function () {
       expect(() => new TwakeGroups(dm)).to.throw(
         /--twake-group-base must hold \{org\}/
       );
+    } finally {
+      dm.config.twake_group_base = base;
+    }
+  });
+
+  it('builds the base of an organization whose id holds $ sequences', () => {
+    const pattern = 'ou=groups,o={org},dc=example,dc=com';
+    for (const org of ["$'1", '$`', '$&', 'a$$b', '$'])
+      expect(withOrg(pattern, org)).to.equal(
+        `ou=groups,o=${org},dc=example,dc=com`
+      );
+    expect(withOrg(pattern, 'a,b')).to.equal(
+      'ou=groups,o=a\\,b,dc=example,dc=com'
+    );
+    const groups = new TwakeGroups(dm);
+    expect(groups.groupBaseOf("$'1")).to.equal(`ou=groups,ou=$'1,${ORGS}`);
+    expect(groups.userBaseOf('a$$b')).to.equal(`ou=users,ou=a$$b,${ORGS}`);
+    for (const org of ["$'1", 'a$$b', 'a+b', 'a"b', 'a\\b', '#x', ' x', 'x '])
+      expect(
+        groups.organizationOf(`cn=g,${groups.groupBaseOf(org)}`),
+        JSON.stringify(org)
+      ).to.equal(org);
+  });
+
+  it('refuses a pattern holding {org} twice', () => {
+    const base = dm.config.twake_group_base;
+    dm.config.twake_group_base = `ou={org},ou={org},${ORGS}`;
+    try {
+      expect(() => new TwakeGroups(dm)).to.throw(/must hold \{org\} once/);
     } finally {
       dm.config.twake_group_base = base;
     }

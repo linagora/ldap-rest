@@ -29,7 +29,7 @@ import {
   identityFor,
   type DmRequest,
 } from '../../lib/auth/base';
-import { escapeDnValue, isChildOf } from '../../lib/utils';
+import { escapeDnValue, fillPattern, isChildOf } from '../../lib/utils';
 
 export interface BaseMapEntry {
   userBase?: string;
@@ -86,8 +86,7 @@ export class BaseResolver {
   }
 
   private applyTemplate(template: string, user: string | undefined): string {
-    const safe = user ? escapeDnValue(user) : '';
-    return template.replace(/\{user\}/g, safe);
+    return fillPattern(template, '{user}', user ? escapeDnValue(user) : '');
   }
 
   /** Read a request header by name, tolerating Express req or a plain object. */

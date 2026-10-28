@@ -131,7 +131,7 @@ export default class Drive extends TwakePlugin {
           // Missing attribute, can't build domain from template
           return null;
         }
-        domain = domain.replace(`{${attr}}`, value);
+        domain = domain.replace(`{${attr}}`, () => value);
       }
       return domain;
     }
