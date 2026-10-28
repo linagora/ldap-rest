@@ -26,10 +26,12 @@ import type {
 import {
   escapeDnValue,
   escapeLdapFilter,
+  fillPattern,
   isDummyMemberDn,
   isAuthzRefusal,
   normalizeDn,
   parseDn,
+  rdnValue,
   unescapeDnValue,
 } from '../../lib/utils';
 import LdapGroups from '../ldap/groups';
@@ -59,6 +61,10 @@ export const read = (
 ): string | undefined => first(valueOf(entry, attribute));
 
 export const ORG = '{org}';
+
+export function withOrg(pattern: string, org: string): string {
+  return fillPattern(pattern, ORG, escapeDnValue(org));
+}
 
 const GROUP_SORT = ['displayName', 'description', 'createdAt'];
 const MEMBER_SORT = ['uid', 'displayName', 'mail', 'jobTitle'];
@@ -163,13 +169,6 @@ export function parentOf(dn: string): string {
   return parseDn(dn).slice(1).join(',');
 }
 
-/** The RDN value of a DN, unescaped, or the DN itself if it has none. */
-export function rdnValue(dn: string): string {
-  const [rdn] = parseDn(dn);
-  const eq = rdn.indexOf('=');
-  return eq > 0 ? unescapeDnValue(rdn.slice(eq + 1).trim()) : dn;
-}
-
 /**
  * The entries one level under a DN pattern holding `{org}`, the organization
  * captured as one RDN value: `(?:\\.|[^,])+` keeps an escaped comma inside it.
@@ -236,8 +235,8 @@ export default class TwakeGroups extends LdapGroups {
       ['--twake-group-base', this.groupBase],
       ['--twake-group-user-base', this.userBase],
     ])
-      if (!pattern.includes(ORG))
-        throw new Error(`${this.name}: ${option} must hold ${ORG}`);
+      if (pattern.split(ORG).length !== 2)
+        throw new Error(`${this.name}: ${option} must hold ${ORG} once`);
     this.groupPattern = branchPattern(this.groupBase);
     this.attrs = lifecycleAttributes(this.config);
     this.orgPattern = this.config.twake_group_organization_dn || '';
@@ -356,7 +355,7 @@ export default class TwakeGroups extends LdapGroups {
       if (valueOf(searchEntries[0] ?? {}, attribute) === undefined) return;
       await this.ldap.system.modify(newDn, {
         replace: {
-          [attribute]: this.orgPattern.replace(ORG, escapeDnValue(org)),
+          [attribute]: withOrg(this.orgPattern, org),
         },
       });
     },
@@ -424,7 +423,7 @@ export default class TwakeGroups extends LdapGroups {
     const attribute = this.config.ldap_organization_link_attribute;
     if (!attribute || !this.orgPattern || !this.judgedByAttachment())
       return entry;
-    const orgDn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const orgDn = withOrg(this.orgPattern, org);
     const given = read(entry, attribute);
     if (given !== undefined) {
       if (dnKey(given) !== dnKey(orgDn))
@@ -464,7 +463,7 @@ export default class TwakeGroups extends LdapGroups {
       !this.judgedByAttachment()
     )
       return;
-    const orgDn = dnKey(this.orgPattern.replace(ORG, escapeDnValue(org)));
+    const orgDn = dnKey(withOrg(this.orgPattern, org));
     const named = (list?: AttributesList): string[] =>
       Object.keys(list ?? {}).filter(
         key => key.toLowerCase() === attribute.toLowerCase()
@@ -506,11 +505,11 @@ export default class TwakeGroups extends LdapGroups {
   }
 
   groupBaseOf(org: string): string {
-    return this.groupBase.replace(ORG, escapeDnValue(org));
+    return withOrg(this.groupBase, org);
   }
 
   userBaseOf(org: string): string {
-    return this.userBase.replace(ORG, escapeDnValue(org));
+    return withOrg(this.userBase, org);
   }
 
   /**
@@ -711,7 +710,7 @@ export default class TwakeGroups extends LdapGroups {
     if (!this.orgPattern) return;
     const status =
       this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
-    const dn = this.orgPattern.replace(ORG, escapeDnValue(org));
+    const dn = withOrg(this.orgPattern, org);
     // First, so that an organization the caller cannot read costs the same
     // as one that is not there
     if (!(await this.ldap.readableBy(dn, req))) throw notFound('organization');

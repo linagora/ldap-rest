@@ -643,8 +643,8 @@ Extends `core/ldap/groups`, whose options it reads too.
 
 | CLI                                           | Env                                            | Default            | Description                                           |
 | --------------------------------------------- | ---------------------------------------------- | ------------------ | ----------------------------------------------------- |
-| `--twake-group-base`                          | `DM_TWAKE_GROUP_BASE`                          |                    | Group branch of an organization, with `{org}`         |
-| `--twake-group-user-base`                     | `DM_TWAKE_GROUP_USER_BASE`                     |                    | User branch of an organization, with `{org}`          |
+| `--twake-group-base`                          | `DM_TWAKE_GROUP_BASE`                          |                    | Group branch of an organization, holding `{org}` once |
+| `--twake-group-user-base`                     | `DM_TWAKE_GROUP_USER_BASE`                     |                    | User branch of an organization, holding `{org}` once  |
 | `--twake-group-organization-dn`               | `DM_TWAKE_GROUP_ORGANIZATION_DN`               |                    | Organization entry, with `{org}` (empty: not checked) |
 | `--twake-group-organization-status-attribute` | `DM_TWAKE_GROUP_ORGANIZATION_STATUS_ATTRIBUTE` | `twakeOrgStatus`   | Organization status attribute                         |
 | `--twake-group-organization-deleted-value`    | `DM_TWAKE_GROUP_ORGANIZATION_DELETED_VALUE`    | `deleted`          | Status of a deleted organization                      |
@@ -663,17 +663,17 @@ organization entry, and `core/ldap/onChange`; with `--rabbitmq-url`, it
 requires `core/rabbitmq` and reads the organization domain from
 `--twake-instance-organization-domain-attribute`.
 
-| CLI                                    | Env                                     | Default                                | Description                                        |
-| -------------------------------------- | --------------------------------------- | -------------------------------------- | -------------------------------------------------- |
-| `--twake-space-base`                   | `DM_TWAKE_SPACE_BASE`                   |                                        | Space branch of an organization, with `{org}`      |
-| `--twake-space-class`                  | `DM_TWAKE_SPACE_CLASS`                  | `top,twakeSpace`                       | Object classes of a space                          |
-| `--twake-space-display-name-attribute` | `DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE` | `twakeDisplayName`                     | Space name attribute                               |
-| `--twake-space-admin-attribute`        | `DM_TWAKE_SPACE_ADMIN_ATTRIBUTE`        | `twakeSpaceAdmin`                      | DNs holding the admin role                         |
-| `--twake-space-editor-attribute`       | `DM_TWAKE_SPACE_EDITOR_ATTRIBUTE`       | `twakeSpaceEditor`                     | DNs holding the editor role                        |
-| `--twake-space-viewer-attribute`       | `DM_TWAKE_SPACE_VIEWER_ATTRIBUTE`       | `twakeSpaceViewer`                     | DNs holding the viewer role                        |
-| `--twake-space-user-role-attribute`    | `DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE`    |                                        | User attribute holding `<space id>:<role>`, if set |
-| `--twake-space-exchange`               | `DM_TWAKE_SPACE_EXCHANGE`               | `space`                                | Topic exchange of the space events                 |
-| `--twake-space-sync-queue`             | `DM_TWAKE_SPACE_SYNC_QUEUE`             | `twake.space.sync.requested.ldap-rest` | Queue of the space sync requests                   |
+| CLI                                    | Env                                     | Default                                | Description                                           |
+| -------------------------------------- | --------------------------------------- | -------------------------------------- | ----------------------------------------------------- |
+| `--twake-space-base`                   | `DM_TWAKE_SPACE_BASE`                   |                                        | Space branch of an organization, holding `{org}` once |
+| `--twake-space-class`                  | `DM_TWAKE_SPACE_CLASS`                  | `top,twakeSpace`                       | Object classes of a space                             |
+| `--twake-space-display-name-attribute` | `DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE` | `twakeDisplayName`                     | Space name attribute                                  |
+| `--twake-space-admin-attribute`        | `DM_TWAKE_SPACE_ADMIN_ATTRIBUTE`        | `twakeSpaceAdmin`                      | DNs holding the admin role                            |
+| `--twake-space-editor-attribute`       | `DM_TWAKE_SPACE_EDITOR_ATTRIBUTE`       | `twakeSpaceEditor`                     | DNs holding the editor role                           |
+| `--twake-space-viewer-attribute`       | `DM_TWAKE_SPACE_VIEWER_ATTRIBUTE`       | `twakeSpaceViewer`                     | DNs holding the viewer role                           |
+| `--twake-space-user-role-attribute`    | `DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE`    |                                        | User attribute holding `<space id>:<role>`, if set    |
+| `--twake-space-exchange`               | `DM_TWAKE_SPACE_EXCHANGE`               | `space`                                | Topic exchange of the space events                    |
+| `--twake-space-sync-queue`             | `DM_TWAKE_SPACE_SYNC_QUEUE`             | `twake.space.sync.requested.ldap-rest` | Queue of the space sync requests                      |
 
 See [spaces](plugins/integrations/spaces.md).
 

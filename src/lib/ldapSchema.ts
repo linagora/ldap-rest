@@ -127,7 +127,9 @@ function tokenize(definition: string): string[] {
   let i = 0;
   while (i < definition.length) {
     const c = definition[i];
-    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') {
+    // The same whitespace as the word loop below: a character one skips and
+    // the other stops at would never be consumed
+    if (/\s/.test(c)) {
       i++;
     } else if (c === '(' || c === ')') {
       tokens.push(c);
@@ -174,6 +176,9 @@ function readList(
   tokens: string[],
   start: number
 ): { values: string[]; next: number } {
+  if (start >= tokens.length || tokens[start] === ')') {
+    return { values: [], next: start };
+  }
   if (tokens[start] !== '(') {
     return { values: [tokens[start]], next: start + 1 };
   }

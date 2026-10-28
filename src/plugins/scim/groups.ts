@@ -21,6 +21,8 @@ import {
   isDummyMemberDn,
   launchHooks,
   launchHooksChained,
+  parseDn,
+  rdnValue,
   validateDnValue,
 } from '../../lib/utils';
 
@@ -174,23 +176,24 @@ export class ScimGroups {
       // a DN: the directory's own spelling of the configured placeholder is
       // still the placeholder.
       if (isDummyMemberDn(dn, placeholder)) return undefined;
-      // Extract RDN value from DN
-      const rdnMatch = /^([^=]+)=((?:\\.|[^,])+)/.exec(dn);
-      if (!rdnMatch) return undefined;
-      const rdnValue = rdnMatch[2].replace(/\\(.)/g, '$1');
+      const [rdn] = parseDn(dn);
+      const eq = rdn ? rdn.indexOf('=') : -1;
+      if (eq <= 0) return undefined;
+      const rdnType = rdn.slice(0, eq).trim();
+      const value = rdnValue(dn);
       const lower = dn.toLowerCase();
       let type: 'User' | 'Group' | undefined;
       if (userBase && lower.endsWith(userBase.toLowerCase())) type = 'User';
       else if (groupBase && lower.endsWith(groupBase.toLowerCase()))
         type = 'Group';
-      else if (rdnMatch[1] === userRdn) type = 'User';
-      else if (rdnMatch[1] === groupRdn) type = 'Group';
-      const result: MultiValued = { value: rdnValue };
+      else if (rdnType === userRdn) type = 'User';
+      else if (rdnType === groupRdn) type = 'Group';
+      const result: MultiValued = { value };
       if (type) {
         result.type = type;
         if (baseUrl) {
           const endpoint = type === 'User' ? 'Users' : 'Groups';
-          result.$ref = `${baseUrl.replace(/\/$/, '')}${scimPrefix}/${endpoint}/${encodeURIComponent(rdnValue)}`;
+          result.$ref = `${baseUrl.replace(/\/$/, '')}${scimPrefix}/${endpoint}/${encodeURIComponent(value)}`;
         }
       }
       return result;

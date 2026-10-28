@@ -4,6 +4,37 @@
 
 ### Fixed
 
+- An organization or a SCIM user whose id holds `$'`, `` $` ``, `$&` or
+  `$$` is read and written under its own branch, where the id was taken as
+  a replacement pattern for the configured `{org}` or `{user}` template.
+  `--twake-group-base`, `--twake-group-user-base` and `--twake-space-base`
+  must hold `{org}` exactly once,
+  [upgrading](docs/usage/upgrading.md#org-once-in-a-twake-branch-pattern)
+  ([#472](https://github.com/linagora/ldap-rest/issues/472))
+- A name read from a DN decodes its hex escapes: an organization spelled
+  `ou=Sales\2C EMEA` gets the path `Sales, EMEA`, not `Sales2C EMEA`. The
+  Twake Calendar resource id and the Cozy instance uid read from such a DN
+  change the same way
+  ([#469](https://github.com/linagora/ldap-rest/issues/469))
+- A name starting or ending with a tab, a newline or a Unicode space is
+  stored as sent, where the directory received a space in its place
+  ([#473](https://github.com/linagora/ldap-rest/issues/473))
+- Two spellings of one DN compare equal in more cases, among them a value
+  holding hex escapes that are not UTF-8, or a letter and a combining mark
+  ([#474](https://github.com/linagora/ldap-rest/issues/474),
+  [#475](https://github.com/linagora/ldap-rest/issues/475))
+- A write naming an attribute by something that is neither a descriptor
+  (letters, digits and hyphens, RFC 4512) nor a numeric OID is refused with
+  400, where the name was silently changed or dropped. A directory schema
+  declaring a name outside that grammar, with an underscore for instance,
+  is not reachable through this server any more
+  ([#476](https://github.com/linagora/ldap-rest/issues/476),
+  [#477](https://github.com/linagora/ldap-rest/issues/477))
+- The directory schema is read whatever whitespace separates its tokens:
+  a definition holding a vertical tab stopped the server, and one cut after
+  a keyword made the whole schema unreadable
+  ([#470](https://github.com/linagora/ldap-rest/issues/470),
+  [#478](https://github.com/linagora/ldap-rest/issues/478))
 - SCIM: a `filter` nested more than 32 levels deep is answered 400
   `invalidFilter`, where the server answered 500
   ([#471](https://github.com/linagora/ldap-rest/issues/471))

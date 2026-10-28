@@ -69,6 +69,28 @@ describe('LDAP schema parser', () => {
       expect(at!.desc).to.equal("it's here");
     });
 
+    it('reads any whitespace as a separator', () => {
+      for (const ws of ['\u000b', '\f', ' ', '\u00a0', '\u3000']) {
+        const at = parseAttributeType(`( 2.5.4.3${ws}NAME 'cn' )`);
+        expect(at?.names).to.deep.equal(['cn']);
+      }
+    });
+
+    it('reads a definition cut after a keyword', () => {
+      expect(parseAttributeType('( 1.2.3 NAME')?.names).to.deep.equal([]);
+      expect(parseMatchingRule('( 1.2.3 NAME')?.names).to.deep.equal([]);
+      expect(parseObjectClass('( 1.2.3 MUST')?.must).to.deep.equal([]);
+      expect(parseObjectClass('( 1.2.3 MUST )')?.must).to.deep.equal([]);
+      expect(
+        () =>
+          new SchemaIndex(
+            parseSchema({
+              objectClasses: ["( 1.2.3 NAME 'x' )", '( 1.2.4 NAME'],
+            })
+          )
+      ).not.to.throw();
+    });
+
     it('should return null on garbage', () => {
       expect(parseAttributeType('not a definition')).to.equal(null);
       expect(parseAttributeType('')).to.equal(null);
