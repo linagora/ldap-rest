@@ -47,11 +47,12 @@ import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';
 import { patchToModifyRequest, writePatch } from './patch';
 import {
+  extractLdapCode,
+  kindOf,
+  ScimError,
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-  ScimError,
-  extractLdapCode,
 } from './errors';
 import type { ScimUsers } from './users';
 
@@ -302,6 +303,12 @@ export class ScimGroups {
     // RFC 7643 section 3.1: the client never chooses `id`. A
     // `scimgroupcreate` hook may assign one to name the entry, unless the
     // mapping already fills the RDN attribute, which the id would overwrite.
+    // The hooks read the body as a Group: refuse a malformed one before they do
+    scimGroupToLdap(
+      { ...resource, id: undefined },
+      this.mapping,
+      this.objectClass
+    );
     const hookInput = await launchHooksChained(this.hooks.scimgroupcreate, [
       { ...resource, id: undefined },
       req,
@@ -323,7 +330,11 @@ export class ScimGroups {
     const memberDns: string[] = [];
     if (group.members && Array.isArray(group.members)) {
       for (const m of group.members) {
-        if (!m || !m.value) continue;
+        if (!m || m.value == null) continue;
+        if (typeof m.value !== 'string')
+          throw scimInvalidValue(
+            `Each member value must be a string, got ${kindOf(m.value)}`
+          );
         const dn = await this.users.resolveRef(req, m.value);
         if (dn) memberDns.push(dn);
       }
@@ -375,7 +386,11 @@ export class ScimGroups {
     const memberDns: string[] = [];
     if (incoming.members && Array.isArray(incoming.members)) {
       for (const m of incoming.members) {
-        if (!m || !m.value) continue;
+        if (!m || m.value == null) continue;
+        if (typeof m.value !== 'string')
+          throw scimInvalidValue(
+            `Each member value must be a string, got ${kindOf(m.value)}`
+          );
         const dn = await this.users.resolveRef(req, m.value);
         if (dn) memberDns.push(dn);
       }

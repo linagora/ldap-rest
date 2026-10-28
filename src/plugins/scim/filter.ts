@@ -176,7 +176,6 @@ export interface FilterOptions {
   supportsActive?: boolean;
 }
 
-/** Deeper than any provider nests a filter; the stack is finite. */
 const MAX_DEPTH = 32;
 
 class Parser {

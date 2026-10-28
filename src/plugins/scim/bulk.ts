@@ -29,8 +29,9 @@ import {
   SCHEMA_BULK_RESPONSE,
 } from './types';
 import {
-  scimInvalidValue,
+  kindOf,
   scimErrorFromException,
+  scimInvalidValue,
   writeScimErrorFromException,
 } from './errors';
 
@@ -45,6 +46,8 @@ export interface ScimBulkOptions {
 }
 
 const BULK_REF_RE = /^bulkId:([A-Za-z0-9_-]+)$/;
+/** Deeper than any resource nests; the walk is recursive */
+const MAX_DATA_DEPTH = 64;
 
 export class ScimBulk {
   private readonly config: Config;
@@ -102,15 +105,27 @@ export class ScimBulk {
     op: BulkOperationRequest,
     refs: Map<string, { id: string; type: 'User' | 'Group' }>
   ): Promise<BulkOperationResponse> {
+    const shaped = !!op && typeof op === 'object' && !Array.isArray(op);
     const base: BulkOperationResponse = {
-      method: op.method,
-      bulkId: op.bulkId,
+      method: shaped ? op.method : undefined,
+      bulkId: shaped ? op.bulkId : undefined,
       status: '200',
     };
     try {
-      if (!op.method || !op.path) {
-        throw scimInvalidValue('method and path are required');
+      if (!shaped)
+        throw scimInvalidValue(
+          `Each operation must be an object, got ${kindOf(op)}`
+        );
+      if (typeof op.method !== 'string' || typeof op.path !== 'string') {
+        throw scimInvalidValue('method and path are required, as strings');
       }
+      if (
+        op.method !== 'DELETE' &&
+        (!op.data || typeof op.data !== 'object' || Array.isArray(op.data))
+      )
+        throw scimInvalidValue(
+          `data must be an object, got ${kindOf(op.data)}`
+        );
       // Resolve bulkId references inside data
       if (op.data && typeof op.data === 'object') {
         this.resolveRefs(op.data as Record<string, unknown>, refs);
@@ -197,8 +212,11 @@ export class ScimBulk {
 
   private resolveRefs(
     obj: Record<string, unknown>,
-    refs: Map<string, { id: string; type: 'User' | 'Group' }>
+    refs: Map<string, { id: string; type: 'User' | 'Group' }>,
+    depth = 0
   ): void {
+    if (depth > MAX_DATA_DEPTH)
+      throw scimInvalidValue('Operation data nested too deeply');
     for (const [k, v] of Object.entries(obj)) {
       if (typeof v === 'string') {
         const m = BULK_REF_RE.exec(v);
@@ -219,13 +237,13 @@ export class ScimBulk {
               if (ref) arr[i] = ref.id;
             }
           } else if (item && typeof item === 'object') {
-            this.resolveRefs(item as Record<string, unknown>, refs);
+            this.resolveRefs(item as Record<string, unknown>, refs, depth + 1);
           }
         }
         continue;
       }
       if (v && typeof v === 'object') {
-        this.resolveRefs(v as Record<string, unknown>, refs);
+        this.resolveRefs(v as Record<string, unknown>, refs, depth + 1);
       }
     }
   }

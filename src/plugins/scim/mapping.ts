@@ -13,7 +13,7 @@ import fs from 'fs';
 
 import type { AttributesList, AttributeValue } from '../../lib/ldapActions';
 
-import { scimInvalidValue } from './errors';
+import { kindOf, scimInvalidValue } from './errors';
 import {
   type ScimUser,
   type ScimGroup,
@@ -357,7 +357,7 @@ export function readActive(value: unknown): boolean | undefined {
     if (v === 'true') return true;
     if (v === 'false') return false;
   }
-  throw scimInvalidValue(`Cannot read a ${typeof value} as active`);
+  throw scimInvalidValue(`Cannot read ${kindOf(value)} as active`);
 }
 
 /**
@@ -494,16 +494,30 @@ export function scimUserToLdap(
     if (m.readOnly || m.operational) continue;
     const value = (user as Record<string, unknown>)[m.scim];
     if (value == null) continue;
-    if (m.sub && typeof value === 'object') {
+    if (m.sub) {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw scimInvalidValue(
+          `${m.scim} must be an object, got ${kindOf(value)}`
+        );
       for (const [scimKey, ldapKey] of Object.entries(m.sub)) {
         const sv = (value as Record<string, unknown>)[scimKey];
-        if (typeof sv === 'string' && sv.length > 0) attributes[ldapKey] = sv;
+        if (sv == null || sv === '') continue;
+        if (!isScalar(sv))
+          throw scimInvalidValue(
+            `${m.scim}.${scimKey} must be a string, got ${kindOf(sv)}`
+          );
+        attributes[ldapKey] = String(sv);
       }
       continue;
     }
     if (m.ldapPrimary || m.ldapSecondary) {
-      if (!Array.isArray(value)) continue;
-      const mv = value.map(v => multiValued(v, m.scim));
+      if (!Array.isArray(value))
+        throw scimInvalidValue(
+          `${m.scim} must be a list, got ${kindOf(value)}`
+        );
+      const mv = value
+        .map(v => multiValued(v, m.scim))
+        .filter(v => v.value != null);
       const primary = mv.find(v => v.primary === true) || mv[0];
       const others = mv.filter(v => v !== primary);
       if (m.ldapPrimary && primary && primary.value) {
@@ -617,7 +631,9 @@ function namingValue(body: object, attribute: string): string {
   const value = (body as Record<string, unknown>)[attribute];
   if (value == null) return '';
   if (typeof value !== 'string')
-    throw scimInvalidValue(`${attribute} must be a string`);
+    throw scimInvalidValue(
+      `${attribute} must be a string, got ${kindOf(value)}`
+    );
   return value;
 }
 
@@ -629,21 +645,22 @@ function scalarValues(value: unknown, attribute: string): string | string[] {
   if (isScalar(value)) return String(value);
   if (Array.isArray(value) && value.every(isScalar)) return value.map(String);
   throw scimInvalidValue(
-    `${attribute} must be a string, a number, a boolean or a list of them`
+    `${attribute} must be a string, a number, a boolean or a list of them, got ${kindOf(value)}`
   );
 }
 
-/** An element of a multi-valued attribute: an object whose `value` is a string */
-function multiValued(value: unknown, attribute: string): MultiValued {
-  if (
-    value &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    (!('value' in value) || typeof value.value === 'string')
-  )
-    return value as MultiValued;
+/**
+ * An element of a multi-valued attribute: an object whose `value`, when it
+ * has one, is a scalar, read as text as a PATCH reads it
+ */
+function multiValued(element: unknown, attribute: string): MultiValued {
+  if (element && typeof element === 'object' && !Array.isArray(element)) {
+    const { value } = element as { value?: unknown };
+    if (value == null) return element as MultiValued;
+    if (isScalar(value)) return { ...element, value: String(value) };
+  }
   throw scimInvalidValue(
-    `Each element of ${attribute} must be an object whose value is a string`
+    `Each element of ${attribute} must be an object whose value is a scalar, got ${kindOf(element)}`
   );
 }
 

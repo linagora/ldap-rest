@@ -31,6 +31,10 @@ export class ScimError extends HttpError {
   }
 }
 
+/** The kind of a client value, for an error that quotes none of it */
+export const kindOf = (v: unknown): string =>
+  v === null ? 'null' : Array.isArray(v) ? 'an array' : `a ${typeof v}`;
+
 export const scimInvalidFilter = (detail = 'Invalid filter'): ScimError =>
   new ScimError(400, detail, 'invalidFilter');
 export const scimInvalidPath = (detail = 'Invalid path'): ScimError =>

@@ -4,18 +4,27 @@
 
 ### Fixed
 
-- SCIM: a malformed request is answered 400 where it was answered 500 or
-  written as sent: a `filter` nested more than 32 levels deep, a PATCH
-  whose `op` is missing or not a string, an operation that is not an
-  object, a value nested too deeply to quote, a `userName`, `displayName`
-  or `id` that is not a string, an object where a string is expected (which
-  was stored as `[object Object]`), a sub-attribute path naming an
-  inherited property such as `name.toString`
-  ([#471](https://github.com/linagora/ldap-rest/issues/471),
-  [#479](https://github.com/linagora/ldap-rest/issues/479),
-  [#480](https://github.com/linagora/ldap-rest/issues/480),
-  [#481](https://github.com/linagora/ldap-rest/issues/481),
-  [#482](https://github.com/linagora/ldap-rest/issues/482))
+- SCIM: a `filter` nested more than 32 levels deep is answered 400
+  `invalidFilter`, where the server answered 500
+  ([#471](https://github.com/linagora/ldap-rest/issues/471))
+- SCIM PATCH: an operation that is not an object, an `op` that is not a
+  string, an empty attribute name and a value nested too deeply are
+  answered 400, where they were answered 500; the same for a Bulk body
+  nested too deeply
+  ([#480](https://github.com/linagora/ldap-rest/issues/480),
+  [#481](https://github.com/linagora/ldap-rest/issues/481))
+- SCIM POST/PUT: a body is checked against RFC 7643 before anything is
+  written or any hook runs. `userName`, `displayName` and `id` must be
+  strings; a simple attribute takes a string, a number or a boolean, or a
+  list of them; a complex attribute takes an object and a multi-valued one
+  a list of objects whose `value` is a scalar. An object or a list of
+  objects in a simple attribute, which was stored as `[object Object]` or
+  as JSON text, is refused with 400 `invalidValue`: a custom mapping that
+  put a complex attribute on a plain `ldap` attribute stops working
+  ([#479](https://github.com/linagora/ldap-rest/issues/479))
+- SCIM: a sub-attribute path naming an inherited property (`name.toString`)
+  is an unknown path, where it reached the directory as a function's
+  source ([#482](https://github.com/linagora/ldap-rest/issues/482))
 - SCIM: `excludedAttributes` naming every sub-attribute of a multi-valued
   attribute drops the elements it leaves empty, as `attributes` does
   ([#483](https://github.com/linagora/ldap-rest/issues/483))

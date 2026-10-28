@@ -151,7 +151,8 @@ export interface BulkRequest {
 }
 
 export interface BulkOperationResponse {
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  /** Absent when the operation was not even an object */
+  method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   bulkId?: string;
   version?: string;
   location?: string;

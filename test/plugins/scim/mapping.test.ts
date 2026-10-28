@@ -314,32 +314,36 @@ describe('SCIM mapping', () => {
       );
     });
 
-    it('takes the sn default from strings only', () => {
+    it('refuses a complex or multi-valued attribute of the wrong shape', () => {
+      for (const body of [
+        { userName: 'alice', name: 'Doe' },
+        { userName: 'alice', name: ['Doe'] },
+        { userName: 'alice', emails: { value: 'a@b.c' } },
+        { userName: 'alice', emails: 'a@b.c' },
+        { userName: 'alice', name: { familyName: { x: 1 } } },
+      ])
+        refused(() =>
+          scimUserToLdap(body as never, DEFAULT_USER_MAPPING, userCtx, [
+            'inetOrgPerson',
+          ])
+        );
+    });
+
+    it('reads a scalar element value as a PATCH does, and skips a null one', () => {
       const { attributes } = scimUserToLdap(
-        { userName: 'alice', name: 'Doe' } as never,
+        {
+          userName: 'alice',
+          phoneNumbers: [
+            { type: 'work', value: 33612345678 },
+            { type: 'home', value: null },
+          ],
+        } as never,
         DEFAULT_USER_MAPPING,
         userCtx,
         ['inetOrgPerson']
       );
-      expect(attributes.sn).to.equal('alice');
-    });
-  });
-
-  describe('scimPathToLdapAttribute', () => {
-    it('resolves no inherited property as a sub-attribute', () => {
-      for (const path of [
-        'name.hasOwnProperty',
-        'name.toString',
-        'name.valueOf',
-        'name.__proto__',
-      ])
-        expect(
-          scimPathToLdapAttribute(path, DEFAULT_USER_MAPPING),
-          path
-        ).to.equal(undefined);
-      expect(
-        scimPathToLdapAttribute('name.familyName', DEFAULT_USER_MAPPING)
-      ).to.equal('sn');
+      expect(attributes.telephoneNumber).to.equal('33612345678');
+      expect(attributes).not.to.have.property('mobile');
     });
   });
 
@@ -611,6 +615,21 @@ describe('SCIM mapping', () => {
   });
 
   describe('scimPathToLdapAttribute', () => {
+    it('resolves no inherited property as a sub-attribute', () => {
+      for (const path of [
+        'name.hasOwnProperty',
+        'name.toString',
+        'name.valueOf',
+        'name.__proto__',
+      ])
+        expect(
+          scimPathToLdapAttribute(path, DEFAULT_USER_MAPPING),
+          path
+        ).to.equal(undefined);
+      expect(
+        scimPathToLdapAttribute('name.familyName', DEFAULT_USER_MAPPING)
+      ).to.equal('sn');
+    });
     it('resolves simple attribute', () => {
       expect(
         scimPathToLdapAttribute('userName', DEFAULT_USER_MAPPING)

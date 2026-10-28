@@ -205,6 +205,10 @@ describe('SCIM Users (integration)', function () {
         .NaN;
     });
 
+    it('answers 404, not 500, to an id Express decoded to a lone percent', async () => {
+      await supertest(server.app).get('/scim/v2/Users/%25').expect(404);
+    });
+
     it('returns 404 in SCIM envelope for unknown User', async () => {
       const res = await supertest(server.app)
         .get('/scim/v2/Users/doesnotexist')

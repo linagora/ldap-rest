@@ -275,6 +275,8 @@ export class ScimUsers {
     if (!resource.userName) {
       throw scimInvalidValue('userName is required');
     }
+    // The hooks read the body as a User: refuse a malformed one before they do
+    scimUserToLdap(resource, this.mapping, this.ctx(req), this.objectClass);
     const hookInput = await launchHooksChained(this.hooks.scimusercreate, [
       resource,
       req,

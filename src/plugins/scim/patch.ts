@@ -28,6 +28,7 @@ import { extractLdapCode } from '../../lib/ldapCodes';
 
 import {
   ScimError,
+  kindOf,
   scimInvalidPath,
   scimNoTarget,
   scimInvalidValue,
@@ -210,7 +211,7 @@ function activeValue(value: unknown): boolean {
 
 function normalizeOp(op: unknown): 'add' | 'remove' | 'replace' {
   if (typeof op !== 'string')
-    throw scimInvalidValue(`Patch op must be a string, got ${describe(op)}`);
+    throw scimInvalidValue(`Patch op must be a string, got ${kindOf(op)}`);
   const lower = op.toLowerCase();
   if (lower === 'add' || lower === 'remove' || lower === 'replace')
     return lower;
@@ -280,9 +281,18 @@ function parsePath(path: string): {
   return { top, filter, sub };
 }
 
-/** The kind of a client value, for an error message that quotes none of it */
-function describe(v: unknown): string {
-  return v === null ? 'null' : Array.isArray(v) ? 'an array' : typeof v;
+/** A member as a PATCH names it: an id, alone or as the `value` of an object */
+function memberRef(v: unknown): string {
+  const value =
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? (v as { value?: unknown }).value
+      : v;
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number')
+    return String(value);
+  throw scimInvalidValue(
+    `Each member must be a string or an object whose value is one, got ${kindOf(value)}`
+  );
 }
 
 function coerceValue(v: unknown): string | string[] | undefined {
@@ -305,7 +315,7 @@ function coerceValue(v: unknown): string | string[] | undefined {
         return String((x as { value: unknown }).value);
       }
       throw scimInvalidValue(
-        `Unsupported array element in PATCH value: ${describe(x)}`
+        `Unsupported array element in PATCH value: ${kindOf(x)}`
       );
     });
   }
@@ -348,6 +358,8 @@ async function applyOperation(
     return;
   }
 
+  if (typeof op.path !== 'string')
+    throw scimInvalidPath(`Path must be a string, got ${kindOf(op.path)}`);
   const { top, sub, filter } = parsePath(op.path);
 
   // Special: members on Groups
@@ -360,12 +372,7 @@ async function applyOperation(
       const list = Array.isArray(value) ? value : [value];
       const dns: string[] = [];
       for (const v of list) {
-        const memberValue =
-          typeof v === 'string'
-            ? v
-            : typeof v === 'object' && v != null && 'value' in v
-              ? String((v as { value: unknown }).value)
-              : '';
+        const memberValue = memberRef(v);
         if (!memberValue) continue;
         const dn = await resolveMemberRef(memberValue);
         if (dn) dns.push(dn);
@@ -478,7 +485,7 @@ export async function patchToModifyRequest(
   for (const op of patch.Operations) {
     if (!op || typeof op !== 'object' || Array.isArray(op))
       throw scimInvalidValue(
-        `Each operation must be an object, got ${describe(op)}`
+        `Each operation must be an object, got ${kindOf(op)}`
       );
     await applyOperation(op, entry, ctx);
   }
