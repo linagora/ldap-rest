@@ -139,7 +139,9 @@ describe('SCIM Bulk (integration)', function () {
     expect(
       res.body.Operations.map((o: { status: string }) => o.status)
     ).to.deep.equal(['400', '400', '400', '400']);
-    // Built by hand: the serializer of the test client would overflow first
+    // Built by hand: the serializer of the test client would overflow first.
+    // Whether the server's does depends on the Node version: either the
+    // whole request is refused, or that operation is; never a 500.
     const deeper = '{"a":'.repeat(20000) + '1' + '}'.repeat(20000);
     const overflow = await supertest(server.app)
       .post('/scim/v2/Bulk')
@@ -147,9 +149,16 @@ describe('SCIM Bulk (integration)', function () {
       .send(
         '{"schemas":["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],' +
           `"Operations":[{"method":"POST","path":"/Users","data":${deeper}}]}`
-      )
-      .expect(400);
-    expect(overflow.body.scimType).to.equal('invalidValue');
+      );
+    expect([200, 400]).to.include(overflow.status);
+    if (overflow.status === 400) {
+      expect(overflow.body.scimType).to.equal('invalidValue');
+    } else {
+      expect(overflow.body.Operations[0].status).to.equal('400');
+      expect(overflow.body.Operations[0].response.scimType).to.equal(
+        'invalidValue'
+      );
+    }
   });
 
   it('honors failOnErrors', async () => {
