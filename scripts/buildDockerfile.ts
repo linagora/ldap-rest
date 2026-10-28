@@ -57,7 +57,7 @@ content += `
 
 USER node
 
-EXPOSE 8081
+EXPOSE 8081 9464
 CMD ["npx", "ldap-rest"]
 `;
 
