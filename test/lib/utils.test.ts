@@ -55,6 +55,17 @@ describe('LDAP Utils', () => {
         expect(unescapeDnValue(escapeDnValue(v))).to.equal(v);
     });
 
+    it('writes the other ASCII whitespace at either end in hex', () => {
+      expect(escapeDnValue('\tx\t')).to.equal('\\09x\\09');
+      expect(escapeDnValue('\n')).to.equal('\\0a');
+      expect(parseDn(`cn=${escapeDnValue('x\t')},dc=x`)[0]).to.equal(
+        'cn=x\\09'
+      );
+      expect(normalizeDn(`cn=${escapeDnValue('x\t')},dc=x`)).to.equal(
+        'cn=x\\09,dc=x'
+      );
+    });
+
     it('escapes a value made of one space as that space', () => {
       expect(escapeDnValue(' ')).to.equal('\\ ');
       expect(parseDn(`cn=${escapeDnValue(' ')},dc=example,dc=com`)[0]).to.equal(
@@ -122,6 +133,10 @@ describe('LDAP Utils', () => {
     it('should keep an escaped U+FEFF instead of stripping it as a BOM', () => {
       expect(unescapeDnValue('a\\EF\\BB\\BFb')).to.equal('a\uFEFFb');
       expect(unescapeDnValue('\\EF\\BB\\BFabc')).to.equal('\uFEFFabc');
+    });
+
+    it('reads a hex run sequence by sequence, as normalizeDn does', () => {
+      expect(unescapeDnValue('\\FF\\C3\\A9')).to.equal('\u00ffé');
     });
 
     it('should keep invalid UTF-8 hex escapes as one char per byte', () => {
@@ -322,7 +337,14 @@ describe('LDAP Utils', () => {
       expect(rdnValue('ou=Test\\, Org,dc=example,dc=com')).to.equal(
         'Test, Org'
       );
+      for (const v of ['Sales ', ' ', 'Alice\u3000', 'x\u1680', '\tx', '# '])
+        expect(
+          rdnValue(`cn=${escapeDnValue(v)},dc=x`),
+          JSON.stringify(v)
+        ).to.equal(v);
+      expect(rdnValue('ou=Sales\\20,dc=x')).to.equal('Sales ');
       expect(rdnValue('dc=example')).to.equal('example');
+      expect(rdnValue('cn = x , dc=x')).to.equal('x');
       expect(rdnValue('')).to.equal('');
       expect(rdnValue('nonsense')).to.equal('');
     });
@@ -454,6 +476,19 @@ describe('LDAP Utils', () => {
       expect(parseDn(normalizeDn(dn))).to.have.length(4);
       expect(normalizeDn(normalizeDn(dn))).to.equal(normalizeDn(dn));
       expect(normalizeDn('dc=#0c0178 ,ou=x')).to.equal('dc=#0c0178,ou=x');
+    });
+
+    it('drops the ASCII whitespace around a value as the directory does', () => {
+      expect(normalizeDn('ou=\tsecret,dc=x')).to.equal('ou=secret,dc=x');
+      expect(normalizeDn('cn=a\t+sn=b,dc=x')).to.equal('cn=a+sn=b,dc=x');
+    });
+
+    it('folds the case before the Unicode equivalence (RFC 4518 §2)', () => {
+      for (const dn of ['cn=T\u0308', 'cn=\u0130\u3099', 'cn=\u0386\u0345']) {
+        const once = normalizeDn(dn);
+        expect(normalizeDn(once), dn).to.equal(once);
+      }
+      expect(normalizeDn('cn=T\u0308')).to.equal('cn=\u1e97');
     });
 
     it('is idempotent on a hex run that is not UTF-8', () => {

@@ -4,15 +4,16 @@
 
 ### Fixed
 
-- A name read from a DN (organization path, group member, SCIM member)
-  decodes its hex escapes: `ou=Sales\2C EMEA` is `Sales, EMEA`, not
-  `Sales2C EMEA` ([#469](https://github.com/linagora/ldap-rest/issues/469))
-- A value starting or ending with a whitespace character other than a space
-  is written as sent, and a value made of one space is one escaped space
+- A name read from a DN decodes its hex escapes: an organization spelled
+  `ou=Sales\2C EMEA` gets the path `Sales, EMEA`, not `Sales2C EMEA`. The
+  Twake Calendar resource id and the Cozy instance uid read from such a DN
+  change the same way
+  ([#469](https://github.com/linagora/ldap-rest/issues/469))
+- A name starting or ending with a tab, a newline or a Unicode space is
+  stored as sent, where the directory received a space in its place
   ([#473](https://github.com/linagora/ldap-rest/issues/473))
-- Two spellings of one DN compare equal in more cases: a `#` value ending
-  in an escaped space keeps its RDNs, and a hex run that is not UTF-8 is
-  read the same way however many times
+- Two spellings of one DN compare equal in more cases, among them a value
+  holding hex escapes that are not UTF-8, or a letter and a combining mark
   ([#474](https://github.com/linagora/ldap-rest/issues/474),
   [#475](https://github.com/linagora/ldap-rest/issues/475))
 
