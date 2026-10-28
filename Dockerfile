@@ -21,9 +21,12 @@ RUN npm install --no-package-lock /tmp/app.tgz && rm -f /tmp/app.tgz && rm -rf /
 
 ENV NODE_ENV=production \
  DM_PORT="8081" \
+ DM_SHUTDOWN_TIMEOUT="20000" \
  DM_PLUGINS=core/static,core/helloworld \
  DM_LOG_LEVEL="notice" \
  DM_LOGGER="console" \
+ DM_DEBUG=false \
+ DM_LOG_FILE="error.log" \
  DM_API_PREFIX="/api" \
  DM_MAIL_DOMAIN= \
  DM_LDAP_BASE= \
@@ -53,6 +56,7 @@ ENV NODE_ENV=production \
  DM_ORGANIZATION_SCHEMA= \
  DM_ENTERPRISE_DOMAIN_NAME_ATTRIBUTE="associatedDomain" \
  DM_ENTERPRISE_DOMAIN_LINK_ATTRIBUTE= \
+ DM_METRICS_PORT="9464" \
  DM_STORAGE_BACKEND= \
  DM_STORAGE_SWEEP_INTERVAL="600" \
  DM_STORAGE_LDAP_BASE= \
