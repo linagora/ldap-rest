@@ -1515,10 +1515,12 @@ class ldapActions {
    * the directory applies both, and only one would have been judged.
    *
    * Without the schema, the case is still set, and a name given as an OID,
-   * which nothing here could resolve, is refused.
+   * which nothing here could resolve, is refused. So is, with or without
+   * it, a name that is neither a descriptor nor a numeric OID.
    *
    * @param entry attributes of an add, or one part of a modify
-   * @throws BadRequestError on an option, or on one attribute named twice
+   * @throws BadRequestError on an option, on a name that describes no
+   * attribute, or on one attribute named twice
    */
   async canonicalAttributes(entry: AttributesList | undefined): Promise<void> {
     if (!entry) return;
@@ -1594,6 +1596,11 @@ class ldapActions {
       throw new BadRequestError(
         `Attribute option "${option}" of "${key}" is not accepted`
       );
+    // A descriptor or a numeric OID (RFC 4512 §1.4), nothing else: the names
+    // below are copied to a new key of the body, and `__proto__` would be
+    // its prototype
+    if (!/^(?:[A-Za-z][A-Za-z0-9-]*|\d+(?:\.\d+)+)$/.test(base))
+      throw new BadRequestError(`"${key}" is not an attribute description`);
     const type = index?.getAttributeType(base);
     // Without the schema, the names and OIDs this server knows of itself
     const builtIn = index ? undefined : knownAttributeName(base);
@@ -1948,18 +1955,13 @@ class ldapActions {
 
     if (changes.delete) {
       if (Array.isArray(changes.delete)) {
-        for (const attr of changes.delete) {
-          if (attr)
-            ldapChanges.push(
-              new Change({
-                operation: 'delete',
-                modification: new Attribute({
-                  type: attr,
-                  values: [],
-                }),
-              })
-            );
-        }
+        for (const attr of changes.delete)
+          ldapChanges.push(
+            new Change({
+              operation: 'delete',
+              modification: new Attribute({ type: attr, values: [] }),
+            })
+          );
       } else {
         for (const [key, value] of Object.entries(changes.delete)) {
           const change = new Change({
@@ -2078,11 +2080,10 @@ class ldapActions {
       // run, and an empty modify touches the directory not at all.
       //
       // A caller that asked for something and got nothing emitted: every
-      // change it named was dropped while building the request — an array
-      // `delete` holding only empty strings, for instance. Nothing reaches
-      // the directory and the call still answers, so a translation bug
-      // upstream is invisible from the outside. That is worth a line someone
-      // will see.
+      // change it named was dropped while building the request. Nothing
+      // reaches the directory and the call still answers, so a translation
+      // bug upstream is invisible from the outside. That is worth a line
+      // someone will see.
       const asked =
         Object.keys(changes.add || {}).length > 0 ||
         Object.keys(changes.replace || {}).length > 0 ||

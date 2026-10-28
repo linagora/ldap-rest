@@ -91,15 +91,18 @@ describe('Attribute names of a write', function () {
       await other.ldap.canonicalAttributes(entry);
       expect(Object.keys(entry), given).to.deep.equal([name]);
     }
-    let status: number | 'ok' = 'ok';
-    try {
-      await other.ldap.canonicalAttributes({
-        '1.3.6.1.4.1.10943.1.50.1.1': 'x',
-      });
-    } catch (err) {
-      status = (err as { statusCode?: number }).statusCode ?? 500;
+    for (const given of [
+      '1.3.6.1.4.1.10943.1.50.1.1',
+      'OID.OID.0.9.2342.19200300.100.1.25',
+    ]) {
+      let status: number | 'ok' = 'ok';
+      try {
+        await other.ldap.canonicalAttributes({ [given]: 'x' });
+      } catch (err) {
+        status = (err as { statusCode?: number }).statusCode ?? 500;
+      }
+      expect(status, given).to.equal(400);
     }
-    expect(status).to.equal(400);
   });
 
   it('warns of a second name for one attribute', async () => {
@@ -125,6 +128,26 @@ describe('Attribute names of a write', function () {
     ]);
     for (const given of ['member;lang-en', 'mail;x-tag', 'cn;binary;lang-fr'])
       expect(await refusal({ [given]: 'x' }), given).to.equal(400);
+  });
+
+  it('refuses a name that is not an attribute description', async () => {
+    for (const given of [
+      '__proto__',
+      'OID.__proto__',
+      'OID.OID.2.5.4.4',
+      'mail address',
+      '-mail',
+      'mail.x',
+      '2.5.4.',
+      '',
+    ])
+      expect(await refusal({ [given]: 'x' }), given).to.equal(400);
+    const entry = JSON.parse(
+      '{"rfc822Mailbox":"x","__proto__":{"objectClass":["top"]}}'
+    ) as AttributesList;
+    await server.ldap.canonicalAttributes(entry).catch(() => undefined);
+    expect(Object.getPrototypeOf(entry)).to.equal(Object.prototype);
+    expect(Object.keys(entry)).to.deep.equal(['rfc822Mailbox', '__proto__']);
   });
 
   it('refuses one attribute named twice in one part of a write', async () => {

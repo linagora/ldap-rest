@@ -16,6 +16,18 @@
   holding hex escapes that are not UTF-8, or a letter and a combining mark
   ([#474](https://github.com/linagora/ldap-rest/issues/474),
   [#475](https://github.com/linagora/ldap-rest/issues/475))
+- A write naming an attribute by something that is neither a descriptor
+  (letters, digits and hyphens, RFC 4512) nor a numeric OID is refused with
+  400, where the name was silently changed or dropped. A directory schema
+  declaring a name outside that grammar, with an underscore for instance,
+  is not reachable through this server any more
+  ([#476](https://github.com/linagora/ldap-rest/issues/476),
+  [#477](https://github.com/linagora/ldap-rest/issues/477))
+- The directory schema is read whatever whitespace separates its tokens:
+  a definition holding a vertical tab stopped the server, and one cut after
+  a keyword made the whole schema unreadable
+  ([#470](https://github.com/linagora/ldap-rest/issues/470),
+  [#478](https://github.com/linagora/ldap-rest/issues/478))
 
 ## v1.2.0 (2026-10-28)
 
