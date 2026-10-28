@@ -193,6 +193,23 @@ describe('SCIM filter parser', () => {
       const r = scimFilterToLdap('   ', m);
       expect(r.ldapFilter).to.equal('(objectClass=*)');
     });
+    it('refuses a filter nested deeper than it parses', () => {
+      for (const deep of [
+        '('.repeat(10000) + 'userName eq "a"' + ')'.repeat(10000),
+        'not ('.repeat(10000) + 'userName eq "a"' + ')'.repeat(10000),
+      ]) {
+        try {
+          scimFilterToLdap(deep, m);
+          expect.fail('should have thrown');
+        } catch (err) {
+          expect(err).to.be.instanceOf(ScimError);
+          expect((err as ScimError).scimType).to.equal('invalidFilter');
+        }
+      }
+      const fine = '('.repeat(20) + 'userName eq "a"' + ')'.repeat(20);
+      expect(scimFilterToLdap(fine, m).ldapFilter).to.equal('(uid=a)');
+    });
+
     it('null values', () => {
       const r = scimFilterToLdap('displayName eq null', m);
       expect(r.ldapFilter).to.equal('(!(displayName=*))');

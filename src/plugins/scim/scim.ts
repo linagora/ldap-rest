@@ -777,7 +777,7 @@ export default class Scim extends DmPlugin {
         const projection = this.parseProjection(req);
         const user = await this.users.get(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string)
+          req.params.id as string
         );
         this.scimJson(res, 200, projectResource(user, projection));
       })
@@ -924,7 +924,7 @@ export default class Scim extends DmPlugin {
         }
         const user = await this.users.replace(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string),
+          req.params.id as string,
           body as ScimUser
         );
         this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
@@ -983,7 +983,7 @@ export default class Scim extends DmPlugin {
         }
         const user = await this.users.patch(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string),
+          req.params.id as string,
           body as PatchRequest
         );
         this.scimResource(res, 200, user, 'Users', this.parseProjection(req));
@@ -1011,10 +1011,7 @@ export default class Scim extends DmPlugin {
     app.delete(
       `${prefix}/Users/:id`,
       scimAsyncHandler(async (req, res) => {
-        await this.users.delete(
-          req as DmRequest,
-          decodeURIComponent(req.params.id as string)
-        );
+        await this.users.delete(req as DmRequest, req.params.id as string);
         res.status(204).end();
       })
     );
@@ -1151,7 +1148,7 @@ export default class Scim extends DmPlugin {
         const projection = this.parseProjection(req);
         const group = await this.groups.get(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string)
+          req.params.id as string
         );
         this.scimJson(res, 200, projectResource(group, projection));
       })
@@ -1280,7 +1277,7 @@ export default class Scim extends DmPlugin {
         }
         const group = await this.groups.replace(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string),
+          req.params.id as string,
           body as ScimGroup
         );
         this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
@@ -1341,7 +1338,7 @@ export default class Scim extends DmPlugin {
         }
         const group = await this.groups.patch(
           req as DmRequest,
-          decodeURIComponent(req.params.id as string),
+          req.params.id as string,
           body as PatchRequest
         );
         this.scimResource(res, 200, group, 'Groups', this.parseProjection(req));
@@ -1369,10 +1366,7 @@ export default class Scim extends DmPlugin {
     app.delete(
       `${prefix}/Groups/:id`,
       scimAsyncHandler(async (req, res) => {
-        await this.groups.delete(
-          req as DmRequest,
-          decodeURIComponent(req.params.id as string)
-        );
+        await this.groups.delete(req as DmRequest, req.params.id as string);
         res.status(204).end();
       })
     );
@@ -1454,7 +1448,18 @@ export default class Scim extends DmPlugin {
         }
         const maxPayload =
           (this.config.scim_bulk_max_payload_size as number) || 1048576;
-        const size = JSON.stringify(body).length;
+        let size: number;
+        try {
+          size = JSON.stringify(body).length;
+        } catch {
+          // Deeper than the serializer's stack: no resource is
+          return writeScimError(
+            res,
+            400,
+            'Body nested too deeply',
+            'invalidValue'
+          );
+        }
         if (size > maxPayload) {
           return writeScimError(
             res,
@@ -1705,7 +1710,7 @@ export default class Scim extends DmPlugin {
       `${prefix}/Schemas/:id`,
       scimAsyncHandler((req, res) => {
         const s = this.discovery.schema(
-          decodeURIComponent(req.params.id as string),
+          req.params.id as string,
           req as DmRequest
         );
         if (!s) return writeScimError(res, 404, 'Schema not found');

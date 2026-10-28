@@ -46,11 +46,12 @@ import { scimFilterToLdap } from './filter';
 import { pagedSearch } from './list';
 import { patchToModifyRequest, writePatch } from './patch';
 import {
+  extractLdapCode,
+  kindOf,
+  ScimError,
   scimInvalidValue,
   scimNotFound,
   scimUniqueness,
-  ScimError,
-  extractLdapCode,
 } from './errors';
 
 export interface ListQuery {
@@ -275,6 +276,8 @@ export class ScimUsers {
     if (!resource.userName) {
       throw scimInvalidValue('userName is required');
     }
+    // The hooks read the body as a User: refuse a malformed one before they do
+    scimUserToLdap(resource, this.mapping, this.ctx(req), this.objectClass);
     const hookInput = await launchHooksChained(this.hooks.scimusercreate, [
       resource,
       req,
@@ -534,6 +537,10 @@ export class ScimUsers {
    * Used by Groups PATCH and Bulk reference resolution.
    */
   async resolveRef(req: DmRequest, value: string): Promise<string | undefined> {
+    if (typeof value !== 'string')
+      throw scimInvalidValue(
+        `A member value must be a string, got ${kindOf(value)}`
+      );
     if (!value) return undefined;
     const base = this.baseResolver.userBase(req);
     // Client-supplied DN: only accept when it falls under the tenant's base,

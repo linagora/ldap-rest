@@ -64,6 +64,12 @@ function groupPaths(paths: string[]): Map<string, Set<string> | null> {
   return out;
 }
 
+/** An element left with nothing is noise, not a value. */
+const nonEmpty = (elements: unknown[]): unknown[] =>
+  elements.filter(
+    v => !(v && typeof v === 'object' && Object.keys(v).length === 0)
+  );
+
 /** Keep only `subs` of a complex value, or of each element of a multi-valued one. */
 function narrow(value: unknown, subs: Set<string>): unknown {
   const pick = (obj: Record<string, unknown>): Record<string, unknown> => {
@@ -74,14 +80,12 @@ function narrow(value: unknown, subs: Set<string>): unknown {
     return kept;
   };
   if (Array.isArray(value)) {
-    const mapped = (value as unknown[]).map(v =>
-      v && typeof v === 'object' && !Array.isArray(v)
-        ? pick(v as Record<string, unknown>)
-        : v
-    );
-    // An element left with nothing is noise, not a value.
-    return mapped.filter(
-      v => !(v && typeof v === 'object' && Object.keys(v).length === 0)
+    return nonEmpty(
+      (value as unknown[]).map(v =>
+        v && typeof v === 'object' && !Array.isArray(v)
+          ? pick(v as Record<string, unknown>)
+          : v
+      )
     );
   }
   if (value && typeof value === 'object') {
@@ -102,10 +106,12 @@ function without(value: unknown, subs: Set<string>): unknown {
     return kept;
   };
   if (Array.isArray(value)) {
-    return (value as unknown[]).map(v =>
-      v && typeof v === 'object' && !Array.isArray(v)
-        ? drop(v as Record<string, unknown>)
-        : v
+    return nonEmpty(
+      (value as unknown[]).map(v =>
+        v && typeof v === 'object' && !Array.isArray(v)
+          ? drop(v as Record<string, unknown>)
+          : v
+      )
     );
   }
   if (value && typeof value === 'object') {

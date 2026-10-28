@@ -120,6 +120,38 @@ describe('SCIM Bulk (integration)', function () {
     expect(res.status).to.not.equal(413);
   });
 
+  it('answers 400 per operation to a malformed one, and to a body nested too deeply', async () => {
+    let deep: unknown = { userName: 'x' };
+    for (let i = 0; i < 100; i++) deep = { a: deep };
+    const res = await supertest(server.app)
+      .post('/scim/v2/Bulk')
+      .set('Content-Type', 'application/scim+json')
+      .send({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+        Operations: [
+          null,
+          { method: 'POST', path: 1, data: {} },
+          { method: 'POST', path: '/Users' },
+          { method: 'POST', path: '/Users', data: deep },
+        ],
+      })
+      .expect(200);
+    expect(
+      res.body.Operations.map((o: { status: string }) => o.status)
+    ).to.deep.equal(['400', '400', '400', '400']);
+    // Built by hand: the serializer of the test client would overflow first
+    const deeper = '{"a":'.repeat(20000) + '1' + '}'.repeat(20000);
+    const overflow = await supertest(server.app)
+      .post('/scim/v2/Bulk')
+      .set('Content-Type', 'application/scim+json')
+      .send(
+        '{"schemas":["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],' +
+          `"Operations":[{"method":"POST","path":"/Users","data":${deeper}}]}`
+      )
+      .expect(400);
+    expect(overflow.body.scimType).to.equal('invalidValue');
+  });
+
   it('honors failOnErrors', async () => {
     const res = await supertest(server.app)
       .post('/scim/v2/Bulk')

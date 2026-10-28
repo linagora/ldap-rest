@@ -28,6 +28,7 @@ import { extractLdapCode } from '../../lib/ldapCodes';
 
 import {
   ScimError,
+  kindOf,
   scimInvalidPath,
   scimNoTarget,
   scimInvalidValue,
@@ -208,7 +209,9 @@ function activeValue(value: unknown): boolean {
   return read;
 }
 
-function normalizeOp(op: string): 'add' | 'remove' | 'replace' {
+function normalizeOp(op: unknown): 'add' | 'remove' | 'replace' {
+  if (typeof op !== 'string')
+    throw scimInvalidValue(`Patch op must be a string, got ${kindOf(op)}`);
   const lower = op.toLowerCase();
   if (lower === 'add' || lower === 'remove' || lower === 'replace')
     return lower;
@@ -278,6 +281,20 @@ function parsePath(path: string): {
   return { top, filter, sub };
 }
 
+/** A member as a PATCH names it: an id, alone or as the `value` of an object */
+function memberRef(v: unknown): string {
+  const value =
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? (v as { value?: unknown }).value
+      : v;
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number')
+    return String(value);
+  throw scimInvalidValue(
+    `Each member must be a string or an object whose value is one, got ${kindOf(value)}`
+  );
+}
+
 function coerceValue(v: unknown): string | string[] | undefined {
   if (v == null) return undefined;
   if (typeof v === 'string') return v;
@@ -298,7 +315,7 @@ function coerceValue(v: unknown): string | string[] | undefined {
         return String((x as { value: unknown }).value);
       }
       throw scimInvalidValue(
-        `Unsupported array element in PATCH value: ${JSON.stringify(x)}`
+        `Unsupported array element in PATCH value: ${kindOf(x)}`
       );
     });
   }
@@ -334,11 +351,15 @@ async function applyOperation(
     }
     const valueObj = op.value as Record<string, unknown>;
     for (const [scimAttr, v] of Object.entries(valueObj)) {
+      // An empty name would come back here with no path, once per level
+      if (!scimAttr) throw scimInvalidPath('Empty attribute name');
       await applyOperation({ op: op.op, path: scimAttr, value: v }, entry, ctx);
     }
     return;
   }
 
+  if (typeof op.path !== 'string')
+    throw scimInvalidPath(`Path must be a string, got ${kindOf(op.path)}`);
   const { top, sub, filter } = parsePath(op.path);
 
   // Special: members on Groups
@@ -351,12 +372,7 @@ async function applyOperation(
       const list = Array.isArray(value) ? value : [value];
       const dns: string[] = [];
       for (const v of list) {
-        const memberValue =
-          typeof v === 'string'
-            ? v
-            : typeof v === 'object' && v != null && 'value' in v
-              ? String((v as { value: unknown }).value)
-              : '';
+        const memberValue = memberRef(v);
         if (!memberValue) continue;
         const dn = await resolveMemberRef(memberValue);
         if (dn) dns.push(dn);
@@ -467,6 +483,10 @@ export async function patchToModifyRequest(
   }
   const entry = new WorkingEntry(ctx.current);
   for (const op of patch.Operations) {
+    if (!op || typeof op !== 'object' || Array.isArray(op))
+      throw scimInvalidValue(
+        `Each operation must be an object, got ${kindOf(op)}`
+      );
     await applyOperation(op, entry, ctx);
   }
   return entry.diff();

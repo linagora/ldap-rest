@@ -443,6 +443,78 @@ describe('SCIM PATCH applicator', () => {
     });
   });
 
+  for (const op of [undefined, 1, ['add'], { op: 'add' }])
+    it(`refuses op ${JSON.stringify(op)} with invalidValue`, async () => {
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [{ op, path: 'displayName', value: 'x' } as never],
+          },
+          ctx
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).scimType).to.equal('invalidValue');
+      }
+    });
+
+  it('refuses an operation that is not an object', async () => {
+    for (const op of [null, 'add', 3, ['add']]) {
+      try {
+        await patchToModifyRequest(
+          {
+            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+            Operations: [op as never],
+          },
+          ctx
+        );
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).statusCode).to.equal(400);
+      }
+    }
+  });
+
+  it('refuses a deeply nested array element without reading it', async () => {
+    let deep: unknown = 1;
+    for (let i = 0; i < 200000; i++) deep = { a: deep };
+    try {
+      await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'add', path: 'emails', value: [deep] }],
+        },
+        ctx
+      );
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).to.be.instanceOf(ScimError);
+      expect((err as ScimError).scimType).to.equal('invalidValue');
+      expect((err as ScimError).message).not.to.include('{');
+    }
+  });
+
+  it('refuses an empty attribute name in a no-path value', async () => {
+    let deep: Record<string, unknown> = { '': 'x' };
+    for (let i = 0; i < 100000; i++) deep = { '': deep };
+    try {
+      await patchToModifyRequest(
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'add', value: deep }],
+        },
+        ctx
+      );
+      expect.fail('should have thrown');
+    } catch (err) {
+      expect(err).to.be.instanceOf(ScimError);
+      expect((err as ScimError).scimType).to.equal('invalidPath');
+    }
+  });
+
   it('unknown op throws invalidValue', async () => {
     try {
       await patchToModifyRequest(

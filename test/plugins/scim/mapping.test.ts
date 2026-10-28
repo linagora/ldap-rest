@@ -1,5 +1,7 @@
 import { expect } from 'chai';
 
+import { ScimError } from '../../../src/plugins/scim/errors';
+
 import {
   DEFAULT_USER_MAPPING,
   DEFAULT_GROUP_MAPPING,
@@ -235,6 +237,146 @@ describe('SCIM mapping', () => {
       );
       expect(attributes.cn).to.equal('ghost');
       expect(attributes.sn).to.equal('ghost');
+    });
+  });
+
+  describe('scimUserToLdap and scimGroupToLdap on a malformed body', () => {
+    const refused = (fn: () => unknown): void => {
+      try {
+        fn();
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ScimError);
+        expect((err as ScimError).scimType).to.equal('invalidValue');
+      }
+    };
+
+    it('refuses a naming attribute that is not a string', () => {
+      refused(() =>
+        scimGroupToLdap({ displayName: 2 } as never, DEFAULT_GROUP_MAPPING, [
+          'groupOfNames',
+        ])
+      );
+      refused(() =>
+        scimUserToLdap(
+          { userName: { familyName: 'e' } } as never,
+          DEFAULT_USER_MAPPING,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      refused(() =>
+        scimUserToLdap({ id: ['a'] } as never, DEFAULT_USER_MAPPING, userCtx, [
+          'inetOrgPerson',
+        ])
+      );
+    });
+
+    it('refuses objects where a string is expected', () => {
+      refused(() =>
+        scimUserToLdap(
+          { userName: 'alice', displayName: [{ type: 'x' }] } as never,
+          DEFAULT_USER_MAPPING,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      refused(() =>
+        scimUserToLdap(
+          { userName: 'alice', displayName: { x: 1 } } as never,
+          DEFAULT_USER_MAPPING,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      refused(() =>
+        scimUserToLdap(
+          { userName: 'alice', emails: [{ value: { x: 1 } }] } as never,
+          DEFAULT_USER_MAPPING,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      refused(() =>
+        scimUserToLdap(
+          { userName: 'alice', emails: ['a@b.c'] } as never,
+          DEFAULT_USER_MAPPING,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      refused(() =>
+        scimGroupToLdap(
+          { displayName: 'g', externalId: [{ a: 1 }] } as never,
+          withExternalId(DEFAULT_GROUP_MAPPING, 'twakeExternalId'),
+          ['groupOfNames']
+        )
+      );
+    });
+
+    it('refuses a complex or multi-valued attribute of the wrong shape', () => {
+      for (const body of [
+        { userName: 'alice', name: 'Doe' },
+        { userName: 'alice', name: ['Doe'] },
+        { userName: 'alice', emails: { value: 'a@b.c' } },
+        { userName: 'alice', emails: 'a@b.c' },
+        { userName: 'alice', name: { familyName: { x: 1 } } },
+      ])
+        refused(() =>
+          scimUserToLdap(body as never, DEFAULT_USER_MAPPING, userCtx, [
+            'inetOrgPerson',
+          ])
+        );
+    });
+
+    it('reads a reference sub-attribute by its value', () => {
+      const mapping = {
+        ...DEFAULT_USER_MAPPING,
+        entries: [
+          ...DEFAULT_USER_MAPPING.entries,
+          { scim: 'enterprise', sub: { department: 'ou', manager: 'manager' } },
+        ],
+      };
+      const { attributes } = scimUserToLdap(
+        {
+          userName: 'alice',
+          enterprise: { department: 'Ops', manager: { value: 'uid=bob' } },
+        } as never,
+        mapping,
+        userCtx,
+        ['inetOrgPerson']
+      );
+      expect(attributes.ou).to.equal('Ops');
+      expect(attributes.manager).to.equal('uid=bob');
+      refused(() =>
+        scimUserToLdap(
+          {
+            userName: 'alice',
+            enterprise: { manager: { value: {} } },
+          } as never,
+          mapping,
+          userCtx,
+          ['inetOrgPerson']
+        )
+      );
+      expect(scimPathToLdapAttribute(1 as never, mapping)).to.equal(undefined);
+    });
+
+    it('reads a scalar element value as a PATCH does, and skips a null one', () => {
+      const { attributes } = scimUserToLdap(
+        {
+          userName: 'alice',
+          phoneNumbers: [
+            { type: 'work', value: 33612345678 },
+            { type: 'home', value: null },
+          ],
+        } as never,
+        DEFAULT_USER_MAPPING,
+        userCtx,
+        ['inetOrgPerson']
+      );
+      expect(attributes.telephoneNumber).to.equal('33612345678');
+      expect(attributes).not.to.have.property('mobile');
     });
   });
 
@@ -506,6 +648,21 @@ describe('SCIM mapping', () => {
   });
 
   describe('scimPathToLdapAttribute', () => {
+    it('resolves no inherited property as a sub-attribute', () => {
+      for (const path of [
+        'name.hasOwnProperty',
+        'name.toString',
+        'name.valueOf',
+        'name.__proto__',
+      ])
+        expect(
+          scimPathToLdapAttribute(path, DEFAULT_USER_MAPPING),
+          path
+        ).to.equal(undefined);
+      expect(
+        scimPathToLdapAttribute('name.familyName', DEFAULT_USER_MAPPING)
+      ).to.equal('sn');
+    });
     it('resolves simple attribute', () => {
       expect(
         scimPathToLdapAttribute('userName', DEFAULT_USER_MAPPING)

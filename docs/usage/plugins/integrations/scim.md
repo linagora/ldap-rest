@@ -309,6 +309,16 @@ mapping contains an entry with `scim: "department"`; otherwise the server return
 `400 invalidFilter`. Same for PATCH: operations on unmapped paths produce
 `400 invalidPath`.
 
+A User or Group body is checked against RFC 7643 before anything is written
+and before any hook reads it: `userName`, `displayName` and `id` are
+strings; a simple attribute takes a string, a number or a boolean, or a list
+of them; a complex attribute takes an object whose sub-attributes are scalars
+(or, for a reference such as `manager`, an object whose `value` is one); a
+multi-valued complex attribute such as `emails` takes a list of objects whose
+`value` is a scalar. Anything else is answered
+`400 invalidValue`, as is a PATCH operation that is not an object or whose
+`op` is not a string.
+
 A PATCH `add`, or a `remove` naming values, changes only the values it names:
 values the caller's read did not show, such as group members an
 `ldapsearchfilter` hides, stay. Two PATCHes changing different values of
@@ -369,7 +379,8 @@ via `escapeLdapFilter()` — no LDAP injection is possible.
 | `a eq "x" and b eq "y"`          | `(&(a=x)(b=y))`                           |
 | `not (a eq "x")`                 | `(!(a=x))`                                |
 
-Unknown SCIM attributes raise `400 invalidFilter`.
+Unknown SCIM attributes raise `400 invalidFilter`, as does a filter nested
+more than 32 levels deep (a parenthesis and a `not (` each count one).
 
 ## Pagination
 
