@@ -204,6 +204,15 @@ overrides builds a second instance, and it needs a name of its own.
 - **Consumes Hooks**: (Hooks provided by `onLdapChange`)
 - **Notes**: Synchronizes LDAP users/groups with Apache James mail server
 
+#### `migrationProxy` (twake/migrationProxy)
+
+- **Dependencies**:
+  - `onLdapChange: 'core/ldap/onChange'` ⚠️ **Required**
+- **Provides Hooks**:
+  - `onLdapEntryChange` - Keeps the migrated-users list of the Twake Mail migration proxy
+- **Consumes Hooks**: (Hooks provided by `onLdapChange`)
+- **Notes**: See [mail-migration](../usage/plugins/integrations/mail-migration.md)
+
 #### `calendar` (twake/calendar)
 
 - **Dependencies**:

@@ -45,11 +45,12 @@ The Helm chart probes both routes over HTTP (`livenessProbe` and
 
 ### What the shipped plugins report
 
-| Plugin     | `degraded` when                                                                                                                                                                                             |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `storage`  | the backend refuses a `SELECT 1` or a `PING`, or the `file` backend's directory is not a directory this user may write in; the `ldap` backend has no answer of its own, the directory check above covers it |
-| `rabbitmq` | a broker is configured and no connection to it stands: until the first publish or subscription opens one, and while the client reconnects                                                                   |
-| `james`    | James answers its `GET /healthcheck` with 503, one of its own checks unhealthy, or not within 1.5 s; a James whose checks are only degraded answers 200, so `ok` here                                       |
+| Plugin           | `degraded` when                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storage`        | the backend refuses a `SELECT 1` or a `PING`, or the `file` backend's directory is not a directory this user may write in; the `ldap` backend has no answer of its own, the directory check above covers it |
+| `rabbitmq`       | a broker is configured and no connection to it stands: until the first publish or subscription opens one, and while the client reconnects                                                                   |
+| `james`          | James answers its `GET /healthcheck` with 503, one of its own checks unhealthy, or not within 1.5 s; a James whose checks are only degraded answers 200, so `ok` here                                       |
+| `migrationProxy` | the migration proxy answers its `GET /healthcheck` with an error, or not within 1.5 s                                                                                                                       |
 
 A check that leaves the probe to time out reads as `failed`.
 

@@ -273,6 +273,13 @@ export interface Config {
   james_sync_forwards?: boolean;
   james_team_mailbox_any_domain?: boolean;
 
+  // Twake Mail migration proxy plugin
+  migration_proxy_url?: string;
+  migration_proxy_token?: string;
+  migration_proxy_concurrency?: number;
+  migration_proxy_retry_attempts?: number;
+  migration_proxy_retry_delay?: number;
+
   // Drive (Cozy) plugin
   twake_drive_webadmin_url?: string;
   twake_drive_webadmin_token?: string;
@@ -780,6 +787,28 @@ const configArgs: ConfigTemplate = [
     'DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN',
     false,
     'boolean',
+  ],
+
+  // Twake Mail migration proxy plugin
+  ['--migration-proxy-url', 'DM_MIGRATION_PROXY_URL', ''],
+  ['--migration-proxy-token', 'DM_MIGRATION_PROXY_TOKEN', ''],
+  [
+    '--migration-proxy-concurrency',
+    'DM_MIGRATION_PROXY_CONCURRENCY',
+    10,
+    'number',
+  ],
+  [
+    '--migration-proxy-retry-attempts',
+    'DM_MIGRATION_PROXY_RETRY_ATTEMPTS',
+    5,
+    'number',
+  ],
+  [
+    '--migration-proxy-retry-delay',
+    'DM_MIGRATION_PROXY_RETRY_DELAY',
+    1000,
+    'number',
   ],
 
   // Drive (Cozy) plugin
