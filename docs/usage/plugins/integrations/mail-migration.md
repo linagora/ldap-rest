@@ -61,14 +61,14 @@ A call the proxy answers with 500, 502, 503 or 504 is made again,
 `--migration-proxy-retry-attempts` times in all, after
 `--migration-proxy-retry-delay` milliseconds times the number of attempts
 made. A refusal, such as 400 for an address the proxy does not take as a
-username, and a call the proxy does not answer at all, connection refused
-or reset, are not. Each failed attempt logs a warning, the last failure an
+username or 401 for a wrong token, and a call the proxy does not answer at
+all, connection refused or reset, are not. Each failed attempt logs a warning, the last failure an
 error naming the address, the call and the entry. Every call is counted in
 the [outbound metrics](../../operations.md#metrics), under the target
 `migrationProxy`.
 
-A failed `PUT` leaves the account routed to the old backend, where it does
-not exist: watch those errors, and put the address on the list by hand
+A failed `PUT` leaves the account routed to the old backend, which has no
+mailbox for it: watch those errors, and put the address on the list by hand
 through the proxy's webadmin. When the proxy has not said whether a renamed
 account is migrated, nothing is changed and the error is logged.
 

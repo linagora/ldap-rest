@@ -150,6 +150,25 @@ describe('Migration proxy plugin', () => {
       ]);
     });
 
+    it('sends an address once, however many attributes carry it', async () => {
+      proxy()
+        .put('/migratedUsers/alice%40example.com')
+        .reply(204)
+        .put('/migratedUsers/alias%40example.com')
+        .reply(204);
+
+      await change(null, {
+        ...user,
+        mail: ['smtp:alice@example.com', 'Alice@example.com'],
+        mailAlternateAddress: ['alice@example.com', 'alias@example.com'],
+      });
+
+      expect(calls.sort()).to.deep.equal([
+        'PUT /migratedUsers/alias%40example.com',
+        'PUT /migratedUsers/alice%40example.com',
+      ]);
+    });
+
     it('is left alone outside the branches', async () => {
       await change(null, alice, 'uid=alice,ou=applicative,dc=example,dc=com');
 
@@ -270,6 +289,20 @@ describe('Migration proxy plugin', () => {
 
     it('takes a change of case alone as no change', async () => {
       await change(alice, { ...user, mail: 'Alice@Example.com' });
+
+      expect(calls).to.have.length(0);
+      expect(logs).to.have.length(0);
+    });
+
+    it('neither puts nor takes off an alias equal to the mail', async () => {
+      await change(alice, {
+        ...alice,
+        mailAlternateAddress: 'ALICE@example.com',
+      });
+      await change(
+        { ...alice, mailAlternateAddress: 'alice@example.com' },
+        alice
+      );
 
       expect(calls).to.have.length(0);
       expect(logs).to.have.length(0);

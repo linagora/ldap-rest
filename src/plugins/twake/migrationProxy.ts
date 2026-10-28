@@ -154,17 +154,27 @@ export default class MigrationProxy extends TwakePlugin {
     });
   }
 
-  /** The address the entry logs in with, and the ones that reach it */
+  /**
+   * The address the entry logs in with, and the ones that reach it, each
+   * once: an alias repeating the mail would otherwise be put and taken off
+   * in the same breath
+   */
   private addresses(entry: AttributesList | null): {
     primary: string | null;
     all: string[];
   } {
     if (!entry) return { primary: null, all: [] };
     const mails = this.getAliases(entry[this.mailAttr]);
-    return {
-      primary: mails[0] ?? null,
-      all: [...mails, ...this.getAliases(entry[this.aliasAttr])],
-    };
+    const seen = new Set<string>();
+    const all = [...mails, ...this.getAliases(entry[this.aliasAttr])].filter(
+      address => {
+        const key = address.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }
+    );
+    return { primary: mails[0] ?? null, all };
   }
 
   /**
