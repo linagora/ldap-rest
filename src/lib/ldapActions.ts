@@ -1594,6 +1594,11 @@ class ldapActions {
       throw new BadRequestError(
         `Attribute option "${option}" of "${key}" is not accepted`
       );
+    // A descriptor or a numeric OID (RFC 4512 §1.4), nothing else: the names
+    // below are copied to a new key of the body, and `__proto__` would be
+    // its prototype
+    if (!/^(?:[A-Za-z][A-Za-z0-9-]*|\d+(?:\.\d+)+)$/.test(base))
+      throw new BadRequestError(`"${key}" is not an attribute description`);
     const type = index?.getAttributeType(base);
     // Without the schema, the names and OIDs this server knows of itself
     const builtIn = index ? undefined : knownAttributeName(base);

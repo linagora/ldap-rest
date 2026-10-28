@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A write naming an attribute by something that is neither a descriptor nor
+  a numeric OID (`OID.OID.2.5.4.4`, `__proto__`) is refused with 400, where
+  it was silently renamed or dropped
+  ([#476](https://github.com/linagora/ldap-rest/issues/476),
+  [#477](https://github.com/linagora/ldap-rest/issues/477))
+
 ## v1.2.0 (2026-10-28)
 
 Five changes need a check before deploying,
