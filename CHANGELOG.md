@@ -4,6 +4,18 @@
 
 ### Fixed
 
+- A name read from a DN decodes its hex escapes: an organization spelled
+  `ou=Sales\2C EMEA` gets the path `Sales, EMEA`, not `Sales2C EMEA`. The
+  Twake Calendar resource id and the Cozy instance uid read from such a DN
+  change the same way
+  ([#469](https://github.com/linagora/ldap-rest/issues/469))
+- A name starting or ending with a tab, a newline or a Unicode space is
+  stored as sent, where the directory received a space in its place
+  ([#473](https://github.com/linagora/ldap-rest/issues/473))
+- Two spellings of one DN compare equal in more cases, among them a value
+  holding hex escapes that are not UTF-8, or a letter and a combining mark
+  ([#474](https://github.com/linagora/ldap-rest/issues/474),
+  [#475](https://github.com/linagora/ldap-rest/issues/475))
 - A write naming an attribute by something that is neither a descriptor
   (letters, digits and hyphens, RFC 4512) nor a numeric OID is refused with
   400, where the name was silently changed or dropped. A directory schema
