@@ -119,6 +119,11 @@ describe('Twake groups plugin', function () {
     const groups = new TwakeGroups(dm);
     expect(groups.groupBaseOf("$'1")).to.equal(`ou=groups,ou=$'1,${ORGS}`);
     expect(groups.userBaseOf('a$$b')).to.equal(`ou=users,ou=a$$b,${ORGS}`);
+    for (const org of ["$'1", 'a$$b', 'a+b', 'a"b', 'a\\b', '#x', ' x', 'x '])
+      expect(
+        groups.organizationOf(`cn=g,${groups.groupBaseOf(org)}`),
+        JSON.stringify(org)
+      ).to.equal(org);
   });
 
   it('refuses a pattern holding {org} twice', () => {

@@ -8,7 +8,8 @@
   `$$` is read and written under its own branch, where the id was taken as
   a replacement pattern for the configured `{org}` or `{user}` template.
   `--twake-group-base`, `--twake-group-user-base` and `--twake-space-base`
-  must hold `{org}` exactly once
+  must hold `{org}` exactly once,
+  [upgrading](docs/usage/upgrading.md#org-once-in-a-twake-branch-pattern)
   ([#472](https://github.com/linagora/ldap-rest/issues/472))
 
 ## v1.2.0 (2026-10-28)

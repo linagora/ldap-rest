@@ -172,11 +172,13 @@ describe('Twake spaces plugin routes', function () {
     await dm.ldap.delete(ORGS).catch(() => undefined);
   });
 
-  it('refuses a space base without {org}', () => {
-    const config = { ...dm.config, twake_space_base: 'ou=spaces,dc=x' };
-    expect(() => new TwakeSpaces({ ...dm, config } as unknown as DM)).to.throw(
-      '--twake-space-base must hold {org}'
-    );
+  it('refuses a space base without {org}, or with it twice', () => {
+    for (const base of ['ou=spaces,dc=x', 'ou={org},ou={org},dc=x']) {
+      const config = { ...dm.config, twake_space_base: base };
+      expect(
+        () => new TwakeSpaces({ ...dm, config } as unknown as DM)
+      ).to.throw('--twake-space-base must hold {org} once');
+    }
   });
 
   it('answers 404 for an unknown organization and 410 for a deleted one', async () => {

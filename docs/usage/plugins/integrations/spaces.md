@@ -249,7 +249,7 @@ A space reads, strongest role first:
 The plugin loads [groups](groups.md), and reads its options for the
 organization's users, groups and organization entry.
 
-- `--twake-space-base`: required, with `{org}`.
+- `--twake-space-base`: required, holding `{org}` once.
 - `--twake-space-class` (default `top,twakeSpace`): the classes of a space
   created.
 - `--twake-space-display-name-attribute` (default `twakeDisplayName`).

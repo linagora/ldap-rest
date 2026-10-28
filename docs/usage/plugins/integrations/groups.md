@@ -137,8 +137,8 @@ for it.
   describes department groups and requires `twakeDepartmentLink`, which these
   groups do not have. Groups created through SCIM are written directly and
   are not checked against this schema.
-- `--twake-group-base`, `--twake-group-user-base`: required, each with
-  `{org}`.
+- `--twake-group-base`, `--twake-group-user-base`: required, each holding
+  `{org}` once.
 - `--twake-group-organization-dn`: the organization entry. Empty means no
   organization is checked.
 - `--twake-group-organization-status-attribute` (default `twakeOrgStatus`),
