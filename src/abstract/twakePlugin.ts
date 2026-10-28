@@ -50,10 +50,9 @@ export abstract class TwakePlugin extends DmPlugin {
   ) {
     super(server);
 
-    this.webadminUrl = ((this.config[urlConfig] as string) || '').replace(
-      /\/+$/,
-      ''
-    );
+    let url = (this.config[urlConfig] as string) || '';
+    while (url.endsWith('/')) url = url.slice(0, -1);
+    this.webadminUrl = url;
     this.webadminToken = (this.config[tokenConfig] as string) || '';
 
     // Validate required configuration
