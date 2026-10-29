@@ -76,6 +76,27 @@ describe('A flat entry created under a DN', function () {
     expect((await stored(dn)).searchEntries).to.deep.equal([]);
   });
 
+  it('writes a name whose escapes the DN decodes to itself', async () => {
+    const dn = `uid=caf${B}C3${B}A9,ou=users,${base}`;
+    const res = await request
+      .post(route)
+      .send({ uid: dn, cn: 'Café', sn: 'C' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    expect((await stored(dn)).searchEntries[0]?.uid).to.equal('café');
+    await server.ldap.delete(dn).catch(() => undefined);
+  });
+
+  it('writes the name as the DN spells it, spaces included', async () => {
+    // The DN names " a c", and that is what the entry is written with: read
+    // as `rdnValue` reads a name, it was written "a c" under a DN naming
+    // " a c", an entry the directory does not find under its own DN
+    const dn = `uid=${B} a c,ou=users,${base}`;
+    const res = await request.post(route).send({ uid: dn, cn: 'A C', sn: 'C' });
+    expect(res.status, JSON.stringify(res.body)).to.equal(201);
+    expect((await stored(dn)).searchEntries[0]?.uid).to.equal(' a c');
+    await server.ldap.delete(dn).catch(() => undefined);
+  });
+
   it('writes the name the DN gives, escapes decoded', async () => {
     const dn = `uid=Smith${B},John,ou=users,${base}`;
     const res = await request

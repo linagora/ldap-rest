@@ -63,6 +63,14 @@ describe('The name of a group', function () {
     expect(res.body.error).to.match(/must be a value, or a/);
   });
 
+  it('creates a group named as its DN spells it, spaces included', async () => {
+    // The DN names " c", and the group is written with that name
+    const dn = `cn=${B} c,ou=lists,ou=groups,${base}`;
+    const res = await request.post(route).send({ cn: dn, member: [] });
+    expect(res.status, JSON.stringify(res.body)).to.equal(200);
+    await server.ldap.delete(dn).catch(() => undefined);
+  });
+
   it('creates a group named by a DN whose value carries an escaped comma', async () => {
     // The route reads the DN as `addGroup` does: one comma is no separator
     const dn = `cn=Sales${B}, EMEA,ou=lists,ou=groups,${base}`;

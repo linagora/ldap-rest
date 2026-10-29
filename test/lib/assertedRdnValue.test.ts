@@ -16,11 +16,14 @@ describe('assertedRdnValue', () => {
     expect(assertedRdnValue(`uid=bob,${base}`, 'uid', base)).to.equal('bob');
   });
 
-  it('skips the spaces after the = as rdnValue reads them', () => {
-    // RFC 4514 allows them around the value; the entry is named "bob", not
-    // " bob"
-    expect(assertedRdnValue(`uid= bob,${base}`, 'uid', base)).to.equal(
-      rdnValue(`uid= bob,${base}`)
+  it('keeps the spaces a backslash puts in the value', () => {
+    // An escaped space is a space of the value: the entry is written with
+    // it, and it is what its DN names
+    expect(assertedRdnValue(`uid=${B} bob,${base}`, 'uid', base)).to.equal(
+      ' bob'
+    );
+    expect(assertedRdnValue(`uid=a${B} b,${base}`, 'uid', base)).to.equal(
+      'a b'
     );
   });
 
@@ -31,6 +34,13 @@ describe('assertedRdnValue', () => {
     expect(assertedRdnValue(`uid="a+b",${base}`, 'uid', base)).to.equal(
       '"a+b"'
     );
+  });
+
+  it('reads a value whose escapes decode to the name it names', () => {
+    // The hex pairs of UTF-8 and the character are one name
+    expect(
+      assertedRdnValue(`uid=caf${B}C3${B}A9,${base}`, 'uid', base)
+    ).to.equal('café');
   });
 
   it('decodes the escapes of the value, as the entry is named', () => {
