@@ -109,6 +109,19 @@ export function invalidValueMessage(
   return `Invalid value for attribute "${name}"${hint ? `: ${hint}` : ''}`;
 }
 
+/**
+ * Refusal of a value longer than its attribute accepts, for a
+ * `BadRequestError`. Said apart from {@link invalidValueMessage}: the value
+ * is not malformed, it is longer than the attribute may hold.
+ *
+ * @param name attribute name
+ * @param maxLength the length it may not exceed
+ * @returns the message
+ */
+export function tooLongMessage(name: string, maxLength: number): string {
+  return `Attribute "${name}" accepts at most ${maxLength} characters`;
+}
+
 /** Roles the core itself looks for. See {@link SchemaRole}. */
 export const CORE_ROLES = [
   'identifier',
@@ -195,10 +208,22 @@ export interface SchemaAttribute {
     test?: string | RegExp;
     hint?: LocalizedText;
     branch?: string[];
+    /** Longest value, in characters, before `test` runs on it */
+    maxLength?: number;
   };
   default?: AttributeValue;
   required?: boolean;
   test?: string | RegExp;
+  /**
+   * Longest value, in characters, accepted before `test` runs on it.
+   *
+   * A pattern judges a value it can read: handed one of several kilobytes, a
+   * pattern with overlapping parts walks it in quadratic time, on the single
+   * event loop that answers every other request meanwhile. A value past its
+   * length is refused before the pattern sees it. Without this field, the
+   * length is {@link DEFAULT_MAX_LENGTH}.
+   */
+  maxLength?: number;
   /**
    * Plain-language description of `test`, shown to the user *before* they get
    * a value wrong — "Expected pattern 999 9999". It travels with the
@@ -611,12 +636,29 @@ export async function checkDnValues(
 }
 
 /**
+ * Longest value a pattern is asked to judge, when the schema declares no
+ * `maxLength`: four times the longest attribute value LDAP itself accepts
+ * in practice, short of the multi-kilobyte values a pattern reads in
+ * quadratic time. A deployment with longer values declares its own
+ * `maxLength`.
+ */
+export const DEFAULT_MAX_LENGTH = 4096;
+
+/** The length a value is judged against: its own, or the default. */
+export function maxLengthOf(attr: SchemaAttribute | undefined): number {
+  return attr?.maxLength ?? attr?.items?.maxLength ?? DEFAULT_MAX_LENGTH;
+}
+
+/**
  * Tell whether every value of an attribute matches its pattern: `test`, or
  * `items.test` for the elements of an array.
  *
+ * A value longer than {@link maxLengthOf} is refused without running the
+ * pattern: see {@link SchemaAttribute.maxLength}.
+ *
  * @param attr schema definition
  * @param value value submitted
- * @returns false when one value does not match
+ * @returns false when one value does not match, or is too long
  */
 export function matchesPattern(
   attr: SchemaAttribute,
@@ -624,11 +666,13 @@ export function matchesPattern(
 ): boolean {
   const pattern = attr.test ?? attr.items?.test;
   if (!pattern) return true;
+  const maxLength = maxLengthOf(attr);
   const regex =
     typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
-  return (Array.isArray(value) ? value : [value]).every(item =>
-    regex.test(String(item))
-  );
+  return (Array.isArray(value) ? value : [value]).every(item => {
+    const text = String(item);
+    return text.length <= maxLength && regex.test(text);
+  });
 }
 
 /**

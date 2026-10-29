@@ -12,6 +12,14 @@
   where it used to be `Smith\,John`. Such a name is answered 400 when the
   DN gives none (empty, a control character, or a first RDN that is
   multi-valued).
+- A schema `test` pattern no longer reads a value longer than its attribute
+  accepts: the limit is 4096 characters, or the `maxLength` the schema
+  declares. Handed several kilobytes, the address patterns shipped with
+  every schema took seconds, during which the server answered no other
+  request; the name patterns of the `example` schemas did the same. Those
+  patterns now read a long value in one pass, and a value past the limit is
+  answered 400 without the pattern seeing it
+  ([details](docs/client-development/schemas/README.md#maxlength-optional)).
 
 ## v1.2.1 (2026-10-28)
 

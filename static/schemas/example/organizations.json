@@ -24,7 +24,7 @@
     "ou": {
       "type": "string",
       "searchable": true,
-      "test": "^[A-ZÀ-ÖØ-Þ]((?!.*([-,’'()&]{2}|\\s{2}|\\s[-,’')]|[-’'(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-’'()&])*[a-zà-öø-ÿ)]$",
+      "test": "^[A-ZÀ-ÖØ-Þ](?!.*([-,’'()&]{2}|\\s{2}|\\s[-,’')]|[-’'(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-’'()&]*[a-zà-öø-ÿ)]$",
       "hint": "Starts with a capital and ends with a lowercase letter or ), no repeated punctuation",
       "required": true,
       "unique": true,
@@ -60,7 +60,7 @@
     },
     "postalAddress": {
       "type": "string",
-      "test": "^[A-Z0-9À-ÖØ-öø-ÿ]((?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.])*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
+      "test": "^[A-Z0-9À-ÖØ-öø-ÿ](?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.]*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
       "hint": "Starts with a capital or a digit, no repeated punctuation, ends with a letter, a digit or )",
       "required": false,
       "label": "Address"

@@ -4,6 +4,25 @@ What to check before deploying, newest first. Only releases that need a
 decision or a configuration change appear here; see the
 [CHANGELOG](../../CHANGELOG.md) for everything else.
 
+## From 1.2.1
+
+### Values past 4096 characters, and an address with an empty label
+
+**Who is affected:** a deployment whose schemas accept values longer than
+4096 characters, or an address such as `a@b..c` in the `mail` patterns
+shipped with the schemas.
+
+A schema `test` pattern is no longer run on a value longer than 4096
+characters: the value is answered 400 before the pattern sees it, so that a
+pattern cannot be made to walk several kilobytes. An attribute holding longer
+values declares its own `maxLength`
+([details](../../docs/client-development/schemas/README.md#maxlength-optional)).
+
+The address patterns shipped with the schemas no longer accept an empty
+label: `a@b..c` is refused, as the directory itself would. A deployment that
+copied one keeps its own copy, and the patterns to use are in the same
+document.
+
 ## From 1.2.0 to 1.2.1
 
 ### `{org}` once in a Twake branch pattern

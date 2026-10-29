@@ -66,7 +66,7 @@ A complete schema consists of two main sections: entity metadata and attribute d
     },
     "mail": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "required": false,
       "role": "primaryEmail"
     },
@@ -74,7 +74,7 @@ A complete schema consists of two main sections: entity metadata and attribute d
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+        "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
       },
       "required": false,
       "role": "emailAliases"
@@ -197,7 +197,7 @@ Simple text values.
   },
   "mail": {
     "type": "string",
-    "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+    "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
     "required": false,
     "role": "primaryEmail"
   },
@@ -237,7 +237,7 @@ Multi-valued attributes containing multiple items of the same type.
     "type": "array",
     "items": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
     },
     "required": false,
     "role": "emailAliases"
@@ -345,6 +345,7 @@ Complete reference for all attribute properties.
 | `fixed`    | boolean         | All                 | Whether the attribute value cannot be changed after creation                          | `true`                              |
 | `role`     | string/string[] | String              | Semantic role, or roles, for special handling (see [Semantic Roles](#semantic-roles)) | `"identifier"`                      |
 | `test`     | string/regex    | String, Array items | Regular expression for validation                                                     | `"^[a-zA-Z0-9._-]{1,255}$"`         |
+| `maxLength` | number | String, Array items | Longest value, in characters, before `test` runs on it (default 4096)                | `255`                               |
 | `branch`   | string[]        | Pointer             | LDAP branches where referenced entries exist                                          | `["ou=users,dc=example,dc=com"]`    |
 | `ui`       | object          | Pointer             | UI configuration for pointer selection (future feature)                               | `{}`                                |
 | `hint`     | text            | String, Array items | What a valid value looks like, shown under the field and quoted in refusals           | `"Expected pattern 999 9999"`       |
@@ -461,7 +462,7 @@ Regular expression pattern for validating attribute values.
   },
   "mail": {
     "type": "string",
-    "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
   }
 }
 ```
@@ -474,8 +475,30 @@ Regular expression pattern for validating attribute values.
     "type": "array",
     "items": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
     }
+  }
+}
+```
+
+#### `maxLength` (Optional)
+
+Longest value, in characters, accepted before `test` runs on it. A value past
+it is refused with 400, and the pattern never reads it.
+
+A pattern is written for values of its attribute, not for a payload of any
+size: handed several kilobytes, a pattern whose parts overlap walks the value
+in quadratic time, on the event loop that answers every other request
+meanwhile. The limit keeps the pattern within what it was written for. It is
+**4096** unless the schema says otherwise; an attribute holding longer values
+— a description, a public key — declares its own.
+
+```json
+{
+  "description": {
+    "type": "string",
+    "maxLength": 8192,
+    "test": "^[^\\r\\n]*$"
   }
 }
 ```
@@ -594,7 +617,7 @@ Email-related roles help applications handle email addresses consistently across
 {
   "mail": {
     "type": "string",
-    "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+    "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
     "required": false,
     "role": "primaryEmail"
   }
@@ -609,7 +632,7 @@ Email-related roles help applications handle email addresses consistently across
     "type": "array",
     "items": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
     },
     "required": false,
     "role": "emailAliases"
@@ -1045,7 +1068,7 @@ Start with the schema that most closely matches your directory type:
   "attributes": {
     "mail": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "required": false,
       "role": "primaryEmail"
     },
@@ -1238,7 +1261,7 @@ Use `test` patterns to enforce data quality:
   },
   "mail": {
     "type": "string",
-    "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$"
   }
 }
 ```
