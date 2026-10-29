@@ -39,6 +39,52 @@ describe('lib/schemaFile', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  describe('maxLength', () => {
+    // Written to a temporary directory: what a deployment hands the server
+    const withAttributes = (attributes: unknown): string => {
+      const dir = fs.mkdtempSync(join(os.tmpdir(), 'schema-maxlength-'));
+      const file = join(dir, 'schema.json');
+      fs.writeFileSync(file, JSON.stringify({ attributes }));
+      return file;
+    };
+
+    for (const bad of [-1, 0, 2.5, '10']) {
+      it(`refuses ${JSON.stringify(bad)}, at load, on the attribute fault`, () => {
+        // Read as is, a negative length refuses every value on each request,
+        // where the mistake is the schema's
+        const file = withAttributes({
+          cn: { type: 'string', maxLength: bad },
+        });
+        expect(() => loadSchemaFile(file)).to.throw(
+          /cn\.maxLength must be a positive integer/
+        );
+      });
+    }
+
+    it('refuses one declared under items', async () => {
+      const file = withAttributes({
+        member: { type: 'array', items: { type: 'string', maxLength: -5 } },
+      });
+      try {
+        await loadSchemaFileAsync(file);
+        expect.fail('the schema should be refused');
+      } catch (err) {
+        expect((err as Error).message).to.match(
+          /member\.items\.maxLength must be a positive integer/
+        );
+      }
+    });
+
+    it('takes a whole number, and an attribute without one', () => {
+      const file = withAttributes({
+        cn: { type: 'string', maxLength: 64 },
+        sn: { type: 'string' },
+        member: { type: 'array', items: { type: 'string', maxLength: 255 } },
+      });
+      expect(() => loadSchemaFile(file)).not.to.throw();
+    });
+  });
+
   describe('mergeSchema', () => {
     it('deletes a key set to null', () => {
       expect(

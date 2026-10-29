@@ -59,7 +59,7 @@
     "mail": {
       "type": "string",
       "searchable": true,
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "hint": {
         "en": "Expected an email address, e.g. all-staff@lists.example.org",
         "fr": "Une adresse électronique est attendue, par ex. all-staff@lists.example.org",

@@ -156,7 +156,7 @@
     "mail": {
       "type": "string",
       "searchable": true,
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "hint": {
         "en": "Expected an email address, e.g. jane.doe@example.org",
         "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
@@ -179,7 +179,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+        "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
         "hint": {
           "en": "Expected an email address, e.g. jane.doe@example.org",
           "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",
@@ -203,7 +203,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+        "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
         "hint": {
           "en": "Expected an email address, e.g. jane.doe@example.org",
           "fr": "Une adresse électronique est attendue, par ex. jane.doe@example.org",

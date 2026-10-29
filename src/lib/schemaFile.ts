@@ -148,6 +148,34 @@ class SchemaChain {
 }
 
 /**
+ * Refuse a schema whose `maxLength` is not a positive whole number: read as
+ * is, a negative one refuses every value of its attribute on each request,
+ * where the mistake is the schema's.
+ *
+ * @throws Error naming the attribute at fault
+ */
+function assertMaxLengths(schema: unknown, file: string): void {
+  const attributes = (schema as { attributes?: Record<string, unknown> })
+    ?.attributes;
+  if (!attributes || typeof attributes !== 'object') return;
+  for (const [name, attr] of Object.entries(attributes)) {
+    for (const [where, value] of [
+      [name, (attr as { maxLength?: unknown })?.maxLength],
+      [
+        `${name}.items`,
+        (attr as { items?: { maxLength?: unknown } })?.items?.maxLength,
+      ],
+    ] as const) {
+      if (value === undefined) continue;
+      if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0)
+        throw new Error(
+          `${file}: ${where}.maxLength must be a positive integer`
+        );
+    }
+  }
+}
+
+/**
  * Read a schema file and the files it extends, synchronously
  *
  * @param file path of the schema
@@ -168,7 +196,9 @@ export function loadSchemaFile<T = unknown>(
     }
     next = chain.add(next, fs.realpathSync(next), raw);
   }
-  return chain.result() as T;
+  const schema = chain.result();
+  assertMaxLengths(schema, file);
+  return schema as T;
 }
 
 /**
@@ -192,7 +222,9 @@ export async function loadSchemaFileAsync<T = unknown>(
     }
     next = chain.add(next, await fs.promises.realpath(next), raw);
   }
-  return chain.result() as T;
+  const schema = chain.result();
+  assertMaxLengths(schema, file);
+  return schema as T;
 }
 
 /**

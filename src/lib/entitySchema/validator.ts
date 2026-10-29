@@ -9,10 +9,13 @@ import {
   checkDnValues,
   invalidValueMessage,
   matchesPattern,
+  maxLengthOf,
   missingRequiredAttribute,
   schemaAttribute,
   toDirectoryChanges,
   toDirectoryEntry,
+  tooLongMessage,
+  tooLongValue,
 } from '../../config/schema';
 
 export interface EntityValidatorDeps {
@@ -163,6 +166,10 @@ export class EntityValidator {
       if (!(attr.normalize && typeof shaped === 'string'))
         assertScalar(field, shaped, attr.type);
     }
+    // Before the lookups: a pointer is not searched for, nor a DN asked to the
+    // directory, when the value is too long to be kept anyway
+    if (tooLongValue(attr, shaped) !== undefined)
+      throw new BadRequestError(tooLongMessage(field, maxLengthOf(attr)));
     await checkDnValues(field, attr, shaped, this.deps.entryExists);
     if (!matchesPattern(attr, shaped))
       throw new BadRequestError(invalidValueMessage(field, attr));

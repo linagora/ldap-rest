@@ -109,6 +109,19 @@ export function invalidValueMessage(
   return `Invalid value for attribute "${name}"${hint ? `: ${hint}` : ''}`;
 }
 
+/**
+ * Refusal of a value longer than its attribute accepts, for a
+ * `BadRequestError`. Said apart from {@link invalidValueMessage}: the value
+ * is not malformed, it is longer than the attribute may hold.
+ *
+ * @param name attribute name
+ * @param maxLength the length it may not exceed
+ * @returns the message
+ */
+export function tooLongMessage(name: string, maxLength: number): string {
+  return `Attribute "${name}" accepts at most ${maxLength} characters`;
+}
+
 /** Roles the core itself looks for. See {@link SchemaRole}. */
 export const CORE_ROLES = [
   'identifier',
@@ -195,10 +208,19 @@ export interface SchemaAttribute {
     test?: string | RegExp;
     hint?: LocalizedText;
     branch?: string[];
+    /** Longest value, in UTF-16 code units, before `test` runs on it */
+    maxLength?: number;
   };
   default?: AttributeValue;
   required?: boolean;
   test?: string | RegExp;
+  /**
+   * Longest value, in UTF-16 code units, `test` is asked to judge: a longer one is
+   * refused before the pattern reads it. Without it, the length is
+   * {@link DEFAULT_MAX_LENGTH}; an attribute holding longer values declares
+   * it here, the reason being in `docs/client-development/schemas/README.md`.
+   */
+  maxLength?: number;
   /**
    * Plain-language description of `test`, shown to the user *before* they get
    * a value wrong — "Expected pattern 999 9999". It travels with the
@@ -611,12 +633,29 @@ export async function checkDnValues(
 }
 
 /**
+ * Longest value a pattern is asked to judge when the schema declares no
+ * `maxLength`. See `docs/client-development/schemas/README.md`.
+ */
+export const DEFAULT_MAX_LENGTH = 4096;
+
+/**
+ * The length a value is judged against: `maxLength` on the attribute, else
+ * the one on its `items`, else {@link DEFAULT_MAX_LENGTH}.
+ */
+export function maxLengthOf(attr: SchemaAttribute | undefined): number {
+  return attr?.maxLength ?? attr?.items?.maxLength ?? DEFAULT_MAX_LENGTH;
+}
+
+/**
  * Tell whether every value of an attribute matches its pattern: `test`, or
  * `items.test` for the elements of an array.
  *
+ * A value longer than {@link maxLengthOf} is refused without running the
+ * pattern: see {@link SchemaAttribute.maxLength}.
+ *
  * @param attr schema definition
  * @param value value submitted
- * @returns false when one value does not match
+ * @returns false when one value does not match, or is too long
  */
 export function matchesPattern(
   attr: SchemaAttribute,
@@ -624,10 +663,37 @@ export function matchesPattern(
 ): boolean {
   const pattern = attr.test ?? attr.items?.test;
   if (!pattern) return true;
+  const maxLength = maxLengthOf(attr);
   const regex =
     typeof pattern === 'string' ? getCompiledRegex(pattern) : pattern;
-  return (Array.isArray(value) ? value : [value]).every(item =>
-    regex.test(String(item))
+  // The pattern never sees a value past the length, as `tooLongValue` says
+  return (Array.isArray(value) ? value : [value]).every(
+    item => String(item).length <= maxLength && regex.test(String(item))
+  );
+}
+
+/**
+ * The value past the length its attribute accepts, if one is: what a refusal
+ * says, where the pattern would only have said the value is wrong.
+ *
+ * The default length applies to an attribute carrying a pattern, which it
+ * keeps within what the pattern was written for; an attribute without one is
+ * bounded only by the `maxLength` its schema declares.
+ *
+ * @param attr schema definition
+ * @param value value submitted
+ * @returns the too long value, or undefined when none is
+ */
+export function tooLongValue(
+  attr: SchemaAttribute,
+  value: AttributeValue
+): AttributeValue | undefined {
+  const declared = attr.maxLength ?? attr.items?.maxLength;
+  if (declared === undefined && !(attr.test ?? attr.items?.test))
+    return undefined;
+  const maxLength = declared ?? DEFAULT_MAX_LENGTH;
+  return (Array.isArray(value) ? value : [value]).find(
+    item => String(item).length > maxLength
   );
 }
 

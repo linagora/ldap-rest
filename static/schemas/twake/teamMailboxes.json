@@ -59,7 +59,7 @@
     "mail": {
       "type": "string",
       "searchable": true,
-      "test": "^[#a-zA-Z0-9_-]{1,255}@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[#a-zA-Z0-9_-]{1,255}@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "hint": {
         "en": "Expected an email address whose name holds only letters, digits, # - and _, e.g. support@example.org",
         "fr": "Une adresse électronique est attendue, dont le nom ne contient que lettres, chiffres, # - et _, par ex. support@example.org",

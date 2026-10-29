@@ -27,7 +27,7 @@
     },
     "mail": {
       "type": "string",
-      "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
       "required": false
     },
     "member": {

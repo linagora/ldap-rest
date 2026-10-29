@@ -126,7 +126,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "test": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+        "test": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
         "hint": "Expected an external email address"
       },
       "required": false,
@@ -156,7 +156,7 @@
     },
     "postalAddress": {
       "type": "string",
-      "test": "^[A-Z0-9À-ÖØ-öø-ÿ]((?!.*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.])*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
+      "test": "^[A-Z0-9À-ÖØ-öø-ÿ](?![\\s\\S]*([-,'’()&/.]{2}|\\s{2}|\\s[,'’.)]|['’.(]\\s|\\)[^\\s]|[^\\s]\\())[a-zA-ZÀ-ÖØ-öø-ÿ0-9,\\s\\-'’()&/.]*[A-Za-zÀ-ÖØ-öø-ÿ0-9)]$",
       "hint": "Starts with a capital or a digit, no repeated punctuation, ends with a letter, a digit or )",
       "required": false,
       "label": "Address"
