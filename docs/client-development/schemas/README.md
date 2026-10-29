@@ -338,20 +338,20 @@ Complete reference for all attribute properties.
 
 ### Attribute Properties Table
 
-| Property   | Type            | Applies To          | Description                                                                           | Example                             |
-| ---------- | --------------- | ------------------- | ------------------------------------------------------------------------------------- | ----------------------------------- |
-| `type`     | string          | All                 | `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"`, `"boolean"`, `"date"`    | `"string"`                          |
-| `required` | boolean         | All                 | Whether the attribute must be present                                                 | `true`                              |
-| `fixed`    | boolean         | All                 | Whether the attribute value cannot be changed after creation                          | `true`                              |
-| `role`     | string/string[] | String              | Semantic role, or roles, for special handling (see [Semantic Roles](#semantic-roles)) | `"identifier"`                      |
-| `test`     | string/regex    | String, Array items | Regular expression for validation                                                     | `"^[a-zA-Z0-9._-]{1,255}$"`         |
-| `maxLength` | number | String, Array items | Longest value, in characters, before `test` runs on it (default 4096)                | `255`                               |
-| `branch`   | string[]        | Pointer             | LDAP branches where referenced entries exist                                          | `["ou=users,dc=example,dc=com"]`    |
-| `ui`       | object          | Pointer             | UI configuration for pointer selection (future feature)                               | `{}`                                |
-| `hint`     | text            | String, Array items | What a valid value looks like, shown under the field and quoted in refusals           | `"Expected pattern 999 9999"`       |
-| `group`    | text            | All                 | Form section the attribute is shown in                                                | `"Mailbox Settings"`                |
-| `default`  | any             | All                 | Default value for new entries                                                         | `["top", "person"]`                 |
-| `items`    | object          | Array               | Schema for array element validation                                                   | `{"type": "string", "test": "..."}` |
+| Property    | Type            | Applies To          | Description                                                                           | Example                             |
+| ----------- | --------------- | ------------------- | ------------------------------------------------------------------------------------- | ----------------------------------- |
+| `type`      | string          | All                 | `"string"`, `"array"`, `"pointer"`, `"number"`, `"integer"`, `"boolean"`, `"date"`    | `"string"`                          |
+| `required`  | boolean         | All                 | Whether the attribute must be present                                                 | `true`                              |
+| `fixed`     | boolean         | All                 | Whether the attribute value cannot be changed after creation                          | `true`                              |
+| `role`      | string/string[] | String              | Semantic role, or roles, for special handling (see [Semantic Roles](#semantic-roles)) | `"identifier"`                      |
+| `test`      | string/regex    | String, Array items | Regular expression for validation                                                     | `"^[a-zA-Z0-9._-]{1,255}$"`         |
+| `maxLength` | number          | String, Array items | Longest value accepted, in characters; a longer one is refused before `test` (4096)   | `255`                               |
+| `branch`    | string[]        | Pointer             | LDAP branches where referenced entries exist                                          | `["ou=users,dc=example,dc=com"]`    |
+| `ui`        | object          | Pointer             | UI configuration for pointer selection (future feature)                               | `{}`                                |
+| `hint`      | text            | String, Array items | What a valid value looks like, shown under the field and quoted in refusals           | `"Expected pattern 999 9999"`       |
+| `group`     | text            | All                 | Form section the attribute is shown in                                                | `"Mailbox Settings"`                |
+| `default`   | any             | All                 | Default value for new entries                                                         | `["top", "person"]`                 |
+| `items`     | object          | Array               | Schema for array element validation                                                   | `{"type": "string", "test": "..."}` |
 
 A _text_ is a plain string or a map keyed by language tag,
 `{ "en": "Mailbox Settings", "fr": "Paramètres de messagerie" }`, picked as
@@ -452,7 +452,10 @@ Assigns semantic meaning to attributes for special handling by the application. 
 
 #### `test` (Optional)
 
-Regular expression pattern for validating attribute values.
+Regular expression pattern for validating attribute values. The value is
+judged only up to its attribute's length: see
+[`maxLength`](#maxlength-optional) below, which a deployment writing its own
+pattern should read.
 
 ```json
 {
@@ -484,7 +487,11 @@ Regular expression pattern for validating attribute values.
 #### `maxLength` (Optional)
 
 Longest value, in characters, accepted before `test` runs on it. A value past
-it is refused with 400, and the pattern never reads it.
+it is refused with 400, and the pattern never reads it — whether or not it
+would have matched. On an array, `maxLength` on the attribute governs every
+item; one declared under `items` is read only when the attribute declares
+none. It is a positive whole number of characters: the server refuses to load
+a schema where it is not.
 
 A pattern is written for values of its attribute, not for a payload of any
 size: handed several kilobytes, a pattern whose parts overlap walks the value
@@ -495,10 +502,13 @@ meanwhile. The limit keeps the pattern within what it was written for. It is
 
 ```json
 {
-  "description": {
-    "type": "string",
-    "maxLength": 8192,
-    "test": "^[^\\r\\n]*$"
+  "sshPublicKey": {
+    "type": "array",
+    "items": {
+      "type": "string",
+      "maxLength": 16384,
+      "test": "^[^\\r\\n]*$"
+    }
   }
 }
 ```
@@ -709,8 +719,13 @@ Common validation patterns:
 **Email:**
 
 ```regex
-^[^@\s]+@[^@\s]+\.[^@\s]+$
+^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$
 ```
+
+The domain part holds no dot of its own: where it did, the pattern tried every
+dot as the last separator and read the value again each time — seconds for a
+value of a few kilobytes. The result is that a trailing dot (`a@b.c.`) is
+refused, where the older form accepted it.
 
 **DN (Distinguished Name):**
 

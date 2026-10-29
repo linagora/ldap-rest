@@ -38,17 +38,19 @@ const patternsOf = (file: string): [string, string][] => {
 };
 
 /**
- * Values of `length` characters a pattern is asked to read: the shapes that
- * made the shipped patterns quadratic — a run of dots after the `@` of an
- * address, a run of space pairs inside a name — and one plain run.
+ * Values a pattern is asked to read, in the shapes that made the shipped
+ * ones quadratic: the value matching right up to a final character the
+ * pattern refuses, at the length the bound lets through — the case a probe
+ * of 20 000 characters never reaches, since it is refused on length alone.
  */
-const longValues = (length: number): string[] => {
-  const half = Math.floor(length / 2);
+const longValues = (): string[] => {
+  const half = Math.floor(DEFAULT_MAX_LENGTH / 2);
   return [
     `a@${'.a'.repeat(half)}@`,
     `Ressources${' humaines'.repeat(Math.floor(half / 9))}s`,
-    `Ressources${' x'.repeat(half)}S`,
-    `${'a'.repeat(length)}@`,
+    `Ressources${' ab'.repeat(half)}s`,
+    `R${'Abcdefghij'.repeat(Math.floor(half / 10))}s`,
+    `${'a'.repeat(DEFAULT_MAX_LENGTH)}@`,
   ];
 };
 
@@ -89,6 +91,47 @@ describe('Schema patterns and long values', () => {
     ).to.equal(false);
   });
 
+  it('refuses a trailing dot and an empty label, as the shipped patterns do', () => {
+    // The rewrite that makes the address pattern linear also drops those two
+    // shapes: pinned here, as an administrator sees them
+    const mail = new RegExp(
+      JSON.parse(readFileSync(join(schemaDir, 'twake/users.json'), 'utf-8'))
+        .attributes.mail.test as string
+    );
+    for (const refused of ['a@b.c.', 'a@b..c', 'a@.b.c'])
+      expect(mail.test(refused), refused).to.equal(false);
+    for (const accepted of ['a@b.c', 'jane.doe@example.org', 'a@b.c.d'])
+      expect(mail.test(accepted), accepted).to.equal(true);
+  });
+
+  it('bounds an attribute that declares a maxLength but no pattern', async () => {
+    // Nothing else bounds a free-text attribute: a declared length must be
+    // honoured, and the default must not apply where no pattern runs
+    const validator = new EntityValidator(
+      {
+        attributes: {
+          cn: { type: 'string', maxLength: 8 },
+          sn: { type: 'string' },
+        },
+      } as unknown as Schema,
+      {
+        entryExists: async (): Promise<boolean> => true,
+        loadedPlugins: {},
+        singularName: 'person',
+      }
+    );
+    try {
+      await validator.validateChanges({ replace: { cn: 'a'.repeat(9) } });
+      expect.fail('a value past the declared length should be refused');
+    } catch (err) {
+      expect((err as Error).message).to.match(/at most 8 characters/);
+    }
+    // No pattern, no declared length: the default does not apply
+    for (const length of [10000, DEFAULT_MAX_LENGTH * 4]) {
+      await validator.validateChanges({ replace: { sn: 'a'.repeat(length) } });
+    }
+  });
+
   it('names the length in the validator message, not the pattern', async () => {
     const validator = new EntityValidator(
       {
@@ -109,23 +152,58 @@ describe('Schema patterns and long values', () => {
       expect.fail('a value past the length should be refused');
     } catch (err) {
       expect((err as Error).message).to.match(/at most 16 characters/);
+      expect((err as Error).message).not.to.match(/Invalid value/);
     }
+  });
+
+  it('accepts the addresses and names the shipped patterns are meant for', () => {
+    // The rewrite is a hardening, not a change of what a real value is: a
+    // pattern that refused one of these would be caught here
+    const schema = (path: string): Schema =>
+      JSON.parse(readFileSync(join(schemaDir, path), 'utf-8')) as Schema;
+    const accepts = (
+      path: string,
+      attribute: string,
+      values: string[]
+    ): void => {
+      const attr = schema(path).attributes[attribute];
+      for (const value of values)
+        expect(
+          matchesPattern(attr, value),
+          `${path}#${attribute}: ${value}`
+        ).to.equal(true);
+    };
+    accepts('twake/users.json', 'mail', [
+      'jane.doe@example.org',
+      'j@example.org',
+      'jane@sub.example.org',
+      'jean+tag@example.org',
+    ]);
+    accepts('twake/teamMailboxes.json', 'mail', ['team@example.org']);
+    accepts('example/users.json', 'twakeOtherMailbox', ['box@example.org']);
+    accepts('example/organizations.json', 'ou', [
+      'Ressources humaines',
+      'The Judiciary',
+      'National Audit Office',
+      'Ministry',
+    ]);
   });
 
   for (const file of schemaFiles()) {
     const patterns = patternsOf(file);
     if (patterns.length === 0) continue;
-    it(`reads a long value in linear time: ${file.slice(schemaDir.length + 1)}`, () => {
-      const start = process.hrtime.bigint();
-      for (const [, pattern] of patterns) {
+    // Every pattern of the file, each with its own budget: a failure names
+    // the attribute, where a total for the schema would only say "slow"
+    for (const [attribute, pattern] of patterns) {
+      it(`reads a long value in linear time: ${file.slice(schemaDir.length + 1)}#${attribute}`, () => {
         const regex = new RegExp(pattern, 'u');
-        for (const length of [20000, 40000])
-          for (const value of longValues(length)) regex.test(value);
-      }
-      const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-      // A quadratic pattern needs seconds here: the shipped ones take under a
-      // millisecond
-      expect(elapsed).to.be.below(500);
-    });
+        const start = process.hrtime.bigint();
+        for (const value of longValues()) regex.test(value);
+        const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
+        // A quadratic pattern takes tens to thousands of milliseconds on
+        // these values; the shipped ones under a millisecond
+        expect(elapsed).to.be.below(20);
+      });
+    }
   }
 });

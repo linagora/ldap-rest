@@ -15,6 +15,7 @@ import {
   toDirectoryChanges,
   toDirectoryEntry,
   tooLongMessage,
+  tooLongValue,
 } from '../../config/schema';
 
 export interface EntityValidatorDeps {
@@ -166,15 +167,14 @@ export class EntityValidator {
         assertScalar(field, shaped, attr.type);
     }
     await checkDnValues(field, attr, shaped, this.deps.entryExists);
-    // Judged apart from a malformed value: what is refused is the length,
-    // before any pattern reads a value of it
-    const maxLength = maxLengthOf(attr);
-    const values = Array.isArray(shaped) ? shaped : [shaped];
-    if (
-      (attr.test ?? attr.items?.test) &&
-      values.some(item => String(item).length > maxLength)
-    )
-      throw new BadRequestError(tooLongMessage(field, maxLength));
+    if (tooLongValue(attr, shaped) !== undefined) {
+      // What the refusal names: the declared length, or the one a pattern
+      // keeps the value within
+      const declared = attr.maxLength ?? attr.items?.maxLength;
+      throw new BadRequestError(
+        tooLongMessage(field, declared ?? maxLengthOf(attr))
+      );
+    }
     if (!matchesPattern(attr, shaped))
       throw new BadRequestError(invalidValueMessage(field, attr));
     return shaped;

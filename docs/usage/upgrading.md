@@ -6,22 +6,33 @@ decision or a configuration change appear here; see the
 
 ## From 1.2.1
 
-### Values past 4096 characters, and an address with an empty label
+### Values past 4096 characters, and an address with a trailing or empty label
 
-**Who is affected:** a deployment whose schemas accept values longer than
-4096 characters, or an address such as `a@b..c` in the `mail` patterns
-shipped with the schemas.
+**Who is affected:** a deployment whose schemas accept a value longer than
+4096 characters, or an address such as `a@b.c.` or `a@b..c` in an attribute
+whose pattern came with the shipped schemas.
 
 A schema `test` pattern is no longer run on a value longer than 4096
-characters: the value is answered 400 before the pattern sees it, so that a
-pattern cannot be made to walk several kilobytes. An attribute holding longer
-values declares its own `maxLength`
-([details](../../docs/client-development/schemas/README.md#maxlength-optional)).
+characters; the value is answered 400, naming the length, before the pattern
+sees it, so that a pattern cannot be made to walk several kilobytes. An
+attribute holding longer values declares its own `maxLength`:
 
-The address patterns shipped with the schemas no longer accept an empty
-label: `a@b..c` is refused, as the directory itself would. A deployment that
-copied one keeps its own copy, and the patterns to use are in the same
-document.
+```json
+{
+  "sshPublicKey": {
+    "type": "array",
+    "items": { "type": "string", "maxLength": 16384, "test": "^[^\\r\\n]*$" }
+  }
+}
+```
+
+The address patterns shipped with the schemas no longer accept a trailing dot
+or an empty label: `a@b.c.` and `a@b..c` are refused. Entries already holding
+such a value stay as they are; the value is refused the next time that
+attribute is written. A deployment that copied one of these patterns keeps
+its own copy, unbounded only if it declares no `maxLength`; the patterns to
+use are in the
+[schema reference](../../docs/client-development/schemas/README.md#test-optional).
 
 ## From 1.2.0 to 1.2.1
 
