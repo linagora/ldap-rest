@@ -48,14 +48,15 @@ describe('lib/version', () => {
   });
 
   it('ignores a package.json naming another package', () => {
-    // A dependency's package.json would otherwise claim its version
+    // A dependency's package.json would otherwise claim its version: the
+    // walk starts on it and must climb past it to the package above
     write(
       'package.json',
-      JSON.stringify({ name: 'some-dependency', version: '0.0.1' })
+      JSON.stringify({ name: 'ldap-rest', version: '1.2.1' })
     );
     write(
       'nested/package.json',
-      JSON.stringify({ name: 'ldap-rest', version: '1.2.1' })
+      JSON.stringify({ name: 'some-dependency', version: '0.0.1' })
     );
     expect(walk('nested')).to.equal('1.2.1');
   });
@@ -69,20 +70,23 @@ describe('lib/version', () => {
   });
 
   it('keeps walking past a version that is only whitespace', () => {
-    write('package.json', JSON.stringify({ name: 'ldap-rest', version: ' ' }));
+    write(
+      'package.json',
+      JSON.stringify({ name: 'ldap-rest', version: '1.2.1' })
+    );
     write(
       'nested/package.json',
-      JSON.stringify({ name: 'ldap-rest', version: '1.2.1' })
+      JSON.stringify({ name: 'ldap-rest', version: ' ' })
     );
     expect(walk('nested')).to.equal('1.2.1');
   });
 
   it('keeps walking past a package.json it cannot parse', () => {
-    write('package.json', '{ not json');
     write(
-      'nested/package.json',
+      'package.json',
       JSON.stringify({ name: 'ldap-rest', version: '1.2.1' })
     );
+    write('nested/package.json', '{ not json');
     expect(walk('nested')).to.equal('1.2.1');
   });
 
