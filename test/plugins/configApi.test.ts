@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import supertest from 'supertest';
 import { DM } from '../../src/bin';
-import ConfigApi from '../../src/plugins/configApi';
+import ConfigApi, { configApiResponse } from '../../src/plugins/configApi';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganization from '../../src/plugins/ldap/organizations';
@@ -53,6 +53,19 @@ describe('ConfigApi Plugin', () => {
       .get('/api/v1/config')
       .set('Accept', 'application/json');
     expect(response.body.version).to.equal(pkg.version);
+  });
+
+  it('leaves the version out when it could not be read at start-up', () => {
+    // The CHANGELOG and the plugin documentation promise the field is
+    // absent, not empty, when the server cannot tell its version
+    const body = configApiResponse('/api', 'dc=example,dc=com', {}, undefined);
+    expect(body).not.to.have.property('version');
+    expect(body).to.have.all.keys('apiPrefix', 'ldapBase', 'features');
+  });
+
+  it('leaves the version out when it is empty', () => {
+    const body = configApiResponse('/api', 'dc=example,dc=com', {}, '');
+    expect(body).not.to.have.property('version');
   });
 
   it('should include flatResources when ldapFlatGeneric is loaded', async () => {

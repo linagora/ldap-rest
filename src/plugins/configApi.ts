@@ -22,16 +22,32 @@ interface ConfigApiResponse {
   version?: string;
 }
 
+/** The body of `GET /v1/config`, `version` left out when it is unknown. */
+export function configApiResponse(
+  apiPrefix: string,
+  ldapBase: string,
+  features: Record<string, unknown>,
+  version: string | undefined
+): ConfigApiResponse {
+  return {
+    apiPrefix,
+    ldapBase,
+    features,
+    ...(version ? { version } : {}),
+  };
+}
+
 /**
  * @openapi-component
  * Config:
  *   type: object
  *   description: |
- *     Aggregated server configuration. The top-level fields are always
- *     present; `features` is a dynamic map whose keys are the names of
- *     loaded plugins that declare the `configurable` role.  Each plugin
- *     contributes an arbitrary sub-object — consult the individual plugin
- *     documentation for its exact shape.
+ *     Aggregated server configuration. `apiPrefix`, `ldapBase` and
+ *     `features` are always present; `version` is present unless the server
+ *     could not read it at start-up; `features` is a dynamic map whose keys
+ *     are the names of loaded plugins that declare the `configurable` role.
+ *     Each plugin contributes an arbitrary sub-object — consult the
+ *     individual plugin documentation for its exact shape.
  *   additionalProperties: true
  *   properties:
  *     apiPrefix:
@@ -71,6 +87,7 @@ interface ConfigApiResponse {
  *   example:
  *     apiPrefix: /api
  *     ldapBase: dc=example,dc=com
+ *     version: 1.2.1
  *     features:
  *       ldapGroups:
  *         enabled: true
@@ -132,14 +149,14 @@ export default class ConfigApi extends DmPlugin {
       asyncHandler(async (req: Request, res: Response) => {
         if (!wantJson(req, res)) return;
 
-        const config: ConfigApiResponse = {
-          apiPrefix: apiPrefix,
-          ldapBase: this.config.ldap_base || '',
-          features: await this.collectPluginConfigs(),
-          ...(SERVER_VERSION ? { version: SERVER_VERSION } : {}),
-        };
-
-        res.json(config);
+        res.json(
+          configApiResponse(
+            apiPrefix,
+            this.config.ldap_base || '',
+            await this.collectPluginConfigs(),
+            SERVER_VERSION
+          )
+        );
       })
     );
 

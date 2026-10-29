@@ -5,8 +5,9 @@
 ### Added
 
 - `GET /v1/config` answers the server's `version`, so a client can tell an
-  administrator the server is older than it supports. The field is absent
-  when the version cannot be read at start-up.
+  administrator the server is older than it supports. Only an installation
+  that moved the `package.json` outside the package leaves the field out
+  ([details](docs/client-development/api/rest-api.md#get-configuration)).
 
 ### Security
 
