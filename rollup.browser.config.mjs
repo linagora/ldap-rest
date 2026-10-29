@@ -1,4 +1,3 @@
-import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
@@ -28,9 +27,6 @@ export default async () => {
         preserveModulesRoot: 'src',
       },
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         postcss({
           extract: false,
@@ -75,9 +71,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
@@ -115,9 +108,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
@@ -160,9 +150,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
@@ -205,9 +192,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
@@ -250,9 +234,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
@@ -295,9 +276,6 @@ export default async () => {
         },
       ],
       plugins: [
-        resolve({
-          browser: true,
-        }),
         commonjs(),
         typescript({
           tsconfig: './tsconfig.browser.json',
