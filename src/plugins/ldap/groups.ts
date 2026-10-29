@@ -32,6 +32,7 @@ import { loadSchemaFileAsync } from '../../lib/schemaFile';
 import { staticSchemaUrl } from '../../lib/staticFiles';
 import {
   asyncHandler,
+  assertedRdnValue,
   escapeDnValue,
   escapeLdapFilter,
   isAuthzRefusal,
@@ -40,10 +41,12 @@ import {
   isDnSyntax,
   isDummyMemberDn,
   launchHooks,
+  namesByDn,
   normalizeDn,
   launchHooksChained,
   movedToTrash,
   organizationLink,
+  parseDn,
   substringSearchFilter,
   validateDnValue,
 } from '../../lib/utils';
@@ -737,12 +740,9 @@ export default class LdapGroups extends DmPlugin {
     await this.server.ldap.canonicalAttributes(body as AttributesList);
     assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
-    // Given as a DN, it is created in the groups branch or not at all
-    // A DN as addGroup reads one: a comma, or the groups' main attribute
-    if (
-      typeof cn === 'string' &&
-      (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
-    )
+    // Given as a DN, it is created in the groups branch or not at all; a
+    // bare RDN lies there as a name does, and is read as `addGroup` reads it
+    if (typeof cn === 'string' && namesByDn(cn, this.cn))
       this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
     // One member is a list of one, as for any `array`
     const members: string[] = !body.member
@@ -813,17 +813,29 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<boolean> {
     await this.server.ldap.canonicalAttributes(additional);
     let dn: string;
-    if (new RegExp(`^${this.cn}=`, 'i').test(cn)) {
-      // A bare RDN lies in the groups branch, as a name does
-      dn = /,/.test(cn) ? cn : `${cn},${this.base as string}`;
-      // Extract the RDN value, correctly handling escaped commas
-      cn = cn.replace(
-        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
-        '$1'
-      );
+    if (namesByDn(cn, this.cn)) {
+      // A bare RDN lies in the groups branch, as a name does; an escaped
+      // comma is one RDN, so the separators are counted, not the commas
+      dn = parseDn(cn).length > 1 ? cn : `${cn},${this.base as string}`;
+      const name = assertedRdnValue(cn, this.cn);
+      // As on a flat entry: a DN that cannot name the group is refused, not
+      // kept whole as its name
+      if (name === null)
+        throw new BadRequestError(
+          `${this.cn} must be a value, or a "${this.cn}=…,${this.base as string}" DN`
+        );
+      cn = name;
     } else {
-      validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    }
+    try {
+      validateDnValue(cn, this.cn);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error: without this, a name the
+      // directory cannot take came back as a 500 on a wrong request
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid name'
+      );
     }
     let entry = this.candidateGroup(cn, members, additional);
 
@@ -1342,7 +1354,10 @@ export default class LdapGroups extends DmPlugin {
    * @returns its DN
    */
   protected toGroupDn(cn: string): string {
-    if (!/,/.test(cn)) return `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    // A DN, as `addGroup` reads one: a separator, not any comma (an escaped
+    // comma is one RDN), or the main attribute asserted by the first RDN
+    if (!/[,;]/.test(cn) && !namesByDn(cn, this.cn))
+      return `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     if (!isDnSyntax(cn)) throw new BadRequestError(`${cn} is not a valid DN`);
     return cn;
   }

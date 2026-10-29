@@ -38,6 +38,8 @@ import {
   launchHooks,
   launchHooksChained,
   normalizeDn,
+  assertedRdnValue,
+  namesByDn,
   substringSearchFilter,
   validateDnValue,
 } from '../lib/utils';
@@ -1389,8 +1391,10 @@ export default abstract class LdapFlat extends DmPlugin {
    * @throws BadRequestError if the provided DN is not a direct child of this.base
    */
   protected resolveDn(id: string): string {
-    const dnPrefix = new RegExp(`^${escapeRegex(this.mainAttribute)}=`, 'i');
-    if (dnPrefix.test(id)) {
+    // The same test as `namesByDn`, which decides in `addEntry` whether the
+    // identifier is a DN: two readers disagreeing on one input would read it
+    // as a DN there and as a bare name here
+    if (namesByDn(id, this.mainAttribute)) {
       const parent = getParentDn(id);
       // If the DN has a single RDN, getParentDn returns the DN itself; treat
       // that as "missing parent" rather than "parent equals base".
@@ -1414,18 +1418,28 @@ export default abstract class LdapFlat extends DmPlugin {
     // Checked below under the names the write will give them
     await this.ldap.canonicalAttributes(additional);
     let dn: string;
-    if (new RegExp(`^${this.mainAttribute}=`, 'i').test(id)) {
-      // DN provided - validate it's in the correct flat branch
+    if (namesByDn(id, this.mainAttribute)) {
+      // A DN naming the entry: its first RDN gives the name. A DN that cannot
+      // name it — another branch, a multi-valued RDN — is refused, since read
+      // as a bare name it would be written whole in the naming attribute
       dn = this.resolveDn(id);
-      // Extract the RDN value, correctly handling escaped commas
-      // e.g. uid=Smith\,John,ou=users -> id = "Smith\,John"
-      id = id.replace(
-        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
-        '$1'
-      );
+      const name = assertedRdnValue(id, this.mainAttribute, this.base);
+      if (name === null)
+        throw new BadRequestError(
+          `${this.mainAttribute} must be a value, or a "${this.mainAttribute}=…,${this.base}" DN`
+        );
+      id = name;
     } else {
-      validateDnValue(id, this.mainAttribute);
       dn = this.resolveDn(id);
+    }
+    try {
+      validateDnValue(id, this.mainAttribute);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error: without this, a name the
+      // directory cannot take came back as a 500 on a wrong request
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid identifier'
+      );
     }
     let entry = this.candidateEntry(id, additional);
     // Before the checks reading the directory: a pointer leading nowhere, a
