@@ -171,9 +171,7 @@ export class EntityValidator {
       // What the refusal names: the declared length, or the one a pattern
       // keeps the value within
       const declared = attr.maxLength ?? attr.items?.maxLength;
-      throw new BadRequestError(
-        tooLongMessage(field, declared ?? maxLengthOf(attr))
-      );
+      throw new BadRequestError(tooLongMessage(field, maxLengthOf(attr)));
     }
     if (!matchesPattern(attr, shaped))
       throw new BadRequestError(invalidValueMessage(field, attr));

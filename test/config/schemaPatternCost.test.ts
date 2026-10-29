@@ -46,6 +46,9 @@ const patternsOf = (file: string): [string, string][] => {
 const longValues = (): string[] => {
   const half = Math.floor(DEFAULT_MAX_LENGTH / 2);
   return [
+    // All points after the `@`: every one of them is a candidate separator for
+    // the address patterns, which read the rest of the value at each
+    `a@${'.'.repeat(DEFAULT_MAX_LENGTH - 2)}@`,
     `a@${'.a'.repeat(half)}@`,
     `Ressources${' humaines'.repeat(Math.floor(half / 9))}s`,
     `Ressources${' ab'.repeat(half)}s`,
@@ -196,13 +199,15 @@ describe('Schema patterns and long values', () => {
     // the attribute, where a total for the schema would only say "slow"
     for (const [attribute, pattern] of patterns) {
       it(`reads a long value in linear time: ${file.slice(schemaDir.length + 1)}#${attribute}`, () => {
-        const regex = new RegExp(pattern, 'u');
+        // Compiled as the server does: `getCompiledRegex` adds no flag
+        const regex = new RegExp(pattern);
         const start = process.hrtime.bigint();
         for (const value of longValues()) regex.test(value);
         const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-        // A quadratic pattern takes tens to thousands of milliseconds on
-        // these values; the shipped ones under a millisecond
-        expect(elapsed).to.be.below(20);
+        // A quadratic pattern takes tens of milliseconds at least on these
+        // values — 26 ms for the address pattern this replaces — and the
+        // shipped ones under a millisecond, with room for a slow runner
+        expect(elapsed).to.be.below(5);
       });
     }
   }

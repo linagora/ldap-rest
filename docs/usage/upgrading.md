@@ -30,7 +30,7 @@ whole number of characters, or the server refuses to load the schema:
 ```
 
 The address patterns shipped with the schemas no longer accept a trailing dot
-or an empty label: `a@b.c.` and `a@b..c` are refused. Entries already holding
+or an empty label: `a@b.c.`, `a@b..c` and `a@.b.c` are refused. Entries already holding
 such a value stay as they are; the value is refused the next time that
 attribute is written. A deployment that copied one of these patterns keeps
 its own copy, unbounded only if it declares no `maxLength`; the patterns to

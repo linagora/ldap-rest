@@ -18,7 +18,7 @@
   pattern is concerned, a deployment's own included, and none of the shipped
   schemas declares a longer one; a `maxLength` that is not a whole number of
   characters makes the server refuse the schema at load. The address
-  patterns shipped with the schemas are rewritten to read a long value in
+  patterns shipped with the schemas are rewritten so that a long value costs
   one pass, and now refuse a trailing dot and an empty label (`a@b.c.`,
   `a@b..c`), which they used to accept; the name patterns of the `example`
   schemas accept the same values as before
