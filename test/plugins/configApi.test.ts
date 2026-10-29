@@ -6,6 +6,7 @@ import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganization from '../../src/plugins/ldap/organizations';
 import Static from '../../src/plugins/static';
+import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS } from '../helpers/env';
@@ -35,6 +36,23 @@ describe('ConfigApi Plugin', () => {
     expect(response.body).to.have.property('apiPrefix');
     expect(response.body).to.have.property('ldapBase');
     expect(response.body).to.have.property('features');
+  });
+
+  it('advertises the version its package declares', async () => {
+    // What a client compares with the range it supports: the version of the
+    // package.json that ships with the server, never a hard-coded copy
+    const pkg = JSON.parse(
+      readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), '../../package.json'),
+        'utf-8'
+      )
+    ) as { version: string };
+    const configApi = new ConfigApi(dm);
+    dm.registerPlugin('configApi', configApi);
+    const response = await supertest(dm.app)
+      .get('/api/v1/config')
+      .set('Accept', 'application/json');
+    expect(response.body.version).to.equal(pkg.version);
   });
 
   it('should include flatResources when ldapFlatGeneric is loaded', async () => {

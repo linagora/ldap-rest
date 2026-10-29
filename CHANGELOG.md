@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- `GET /v1/config` answers the server's `version`, so a client can tell an
+  administrator the server is older than it supports. The field is absent
+  when the version cannot be read at start-up.
+
 ### Security
 
 - A name sent as a DN, when creating a flat entry or a group, is no longer

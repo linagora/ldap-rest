@@ -12,11 +12,14 @@ import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { type Role, asyncHandler } from '../abstract/plugin';
 import { wantJson } from '../lib/expressFormatedResponses';
+import { SERVER_VERSION } from '../lib/version';
 
 interface ConfigApiResponse {
   apiPrefix: string;
   ldapBase: string;
   features: Record<string, unknown>;
+  /** Absent when the version could not be read at start-up */
+  version?: string;
 }
 
 /**
@@ -39,6 +42,13 @@ interface ConfigApiResponse {
  *       type: string
  *       description: The root LDAP suffix used by this server.
  *       example: dc=example,dc=com
+ *     version:
+ *       type: string
+ *       description: |
+ *         The server's version, as its package declares it. A client reads it
+ *         to tell an administrator the server is older than it supports; a
+ *         server that cannot tell its version leaves the field out.
+ *       example: 1.2.1
  *     features:
  *       type: object
  *       description: |
@@ -103,6 +113,7 @@ export default class ConfigApi extends DmPlugin {
      *         example:
      *           apiPrefix: /api
      *           ldapBase: dc=example,dc=com
+     *           version: 1.2.1
      *           features:
      *             ldapGroups:
      *               enabled: true
@@ -125,6 +136,7 @@ export default class ConfigApi extends DmPlugin {
           apiPrefix: apiPrefix,
           ldapBase: this.config.ldap_base || '',
           features: await this.collectPluginConfigs(),
+          ...(SERVER_VERSION ? { version: SERVER_VERSION } : {}),
         };
 
         res.json(config);
