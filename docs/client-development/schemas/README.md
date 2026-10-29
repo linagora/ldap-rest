@@ -486,7 +486,9 @@ pattern should read.
 
 #### `maxLength` (Optional)
 
-Longest value, in characters, accepted before `test` runs on it. A value past
+Longest value, in UTF-16 code units (what `.length` counts, so an emoji or an
+accented letter outside the basic plane counts as two), accepted before `test`
+runs on it. A value past
 it is refused with 400, and the pattern never reads it — whether or not it
 would have matched. On an array, `maxLength` on the attribute governs every
 item; one declared under `items` is read only when the attribute declares

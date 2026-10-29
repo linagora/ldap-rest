@@ -208,14 +208,14 @@ export interface SchemaAttribute {
     test?: string | RegExp;
     hint?: LocalizedText;
     branch?: string[];
-    /** Longest value, in characters, before `test` runs on it */
+    /** Longest value, in UTF-16 code units, before `test` runs on it */
     maxLength?: number;
   };
   default?: AttributeValue;
   required?: boolean;
   test?: string | RegExp;
   /**
-   * Longest value, in characters, `test` is asked to judge: a longer one is
+   * Longest value, in UTF-16 code units, `test` is asked to judge: a longer one is
    * refused before the pattern reads it. Without it, the length is
    * {@link DEFAULT_MAX_LENGTH}; an attribute holding longer values declares
    * it here, the reason being in `docs/client-development/schemas/README.md`.

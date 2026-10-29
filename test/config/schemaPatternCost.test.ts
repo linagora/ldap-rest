@@ -159,6 +159,33 @@ describe('Schema patterns and long values', () => {
     }
   });
 
+  for (const file of schemaFiles()) {
+    it(`accepts its own classes: ${file.slice(schemaDir.length + 1)}`, () => {
+      // A pattern moved to the wrong attribute is caught here: every schema
+      // names its own default classes, which its objectClass pattern must take
+      const schema = JSON.parse(readFileSync(file, 'utf-8')) as Schema;
+      const classes = schema.attributes?.objectClass?.default;
+      if (!classes) return;
+      expect(
+        matchesPattern(schema.attributes.objectClass, classes),
+        JSON.stringify(classes)
+      ).to.equal(true);
+      // A class is a definition name: `x-custom1` is one, a sentence is not.
+      // Only checked where the schema declares a pattern at all, since a
+      // schema may leave objectClass unconstrained
+      const pattern = schema.attributes.objectClass.items?.test;
+      if (!pattern) return;
+      expect(
+        matchesPattern(schema.attributes.objectClass, 'x-custom1'),
+        'x-custom1'
+      ).to.equal(true);
+      expect(
+        matchesPattern(schema.attributes.objectClass, 'twakePositionX'),
+        'twakePositionX'
+      ).to.equal(matchesPattern(schema.attributes.objectClass, 'top'));
+    });
+  }
+
   it('accepts the addresses and names the shipped patterns are meant for', () => {
     // The rewrite is a hardening, not a change of what a real value is: a
     // pattern that refused one of these would be caught here
