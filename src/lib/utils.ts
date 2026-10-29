@@ -719,6 +719,59 @@ export function rdnValue(dn: string): string {
 }
 
 /**
+ * Read the name of an entry written as a DN: the value of its first RDN when
+ * that RDN asserts `attribute` alone, under `base` when one is given.
+ *
+ * The value is decoded, as {@link rdnValue} decodes it: it is the naming
+ * attribute's value, the one a write puts back in `attribute=…,base`.
+ *
+ * @param dn - The DN to read
+ * @param attribute - The attribute the first RDN must assert
+ * @param base - The branch the entry belongs to, when the DN names it whole
+ * @returns The name, or `null` when the RDN asserts another attribute, names
+ * another branch, or is no DN
+ *
+ * @example
+ * ```typescript
+ * assertedRdnValue('uid=Smith\\,John,ou=users,dc=example,dc=com', 'uid')
+ * // => 'Smith,John'
+ * ```
+ */
+export function assertedRdnValue(
+  dn: string,
+  attribute: string,
+  base?: string
+): string | null {
+  // Splits once, on the first unescaped comma, and decodes one short RDN: a
+  // cost linear in the input, where a pattern of `\\.` against `[^,]` would
+  // try every way of splitting a run of escapes before failing
+  const [rdn, ...parent] = parseDn(dn);
+  const eq = rdn ? rdn.indexOf('=') : -1;
+  if (eq <= 0) return null;
+  if (rdn.slice(0, eq).trim().toLowerCase() !== attribute.toLowerCase())
+    return null;
+  const raw = rdn.slice(eq + 1);
+  // A multi-valued RDN (`uid=a+cn=b`) is not what a naming attribute names
+  if (isUnescaped(raw, '+')) return null;
+  if (base !== undefined && normalizeDn(parent.join(',')) !== normalizeDn(base))
+    return null;
+  return unescapeDnValue(raw);
+}
+
+/**
+ * Whether `text` holds `char` outside the escapes of a DN value.
+ */
+function isUnescaped(text: string, char: string): boolean {
+  let escaped = false;
+  for (const current of text) {
+    if (escaped) escaped = false;
+    else if (current === '\\') escaped = true;
+    else if (current === char) return true;
+  }
+  return false;
+}
+
+/**
  * Check if a DN is a child of another DN
  *
  * @param dn - The DN to check

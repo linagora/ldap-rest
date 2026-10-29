@@ -32,6 +32,7 @@ import { loadSchemaFileAsync } from '../../lib/schemaFile';
 import { staticSchemaUrl } from '../../lib/staticFiles';
 import {
   asyncHandler,
+  assertedRdnValue,
   escapeDnValue,
   escapeLdapFilter,
   isAuthzRefusal,
@@ -813,14 +814,13 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<boolean> {
     await this.server.ldap.canonicalAttributes(additional);
     let dn: string;
-    if (new RegExp(`^${this.cn}=`, 'i').test(cn)) {
+    const assertedCn = assertedRdnValue(cn, this.cn);
+    if (assertedCn !== null) {
       // A bare RDN lies in the groups branch, as a name does
       dn = /,/.test(cn) ? cn : `${cn},${this.base as string}`;
-      // Extract the RDN value, correctly handling escaped commas
-      cn = cn.replace(
-        new RegExp(`^${this.cn}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
-        '$1'
-      );
+      // The name the DN gives the group
+      cn = assertedCn;
+      validateDnValue(cn, this.cn);
     } else {
       validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;

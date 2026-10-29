@@ -38,6 +38,7 @@ import {
   launchHooks,
   launchHooksChained,
   normalizeDn,
+  assertedRdnValue,
   substringSearchFilter,
   validateDnValue,
 } from '../lib/utils';
@@ -1414,15 +1415,13 @@ export default abstract class LdapFlat extends DmPlugin {
     // Checked below under the names the write will give them
     await this.ldap.canonicalAttributes(additional);
     let dn: string;
-    if (new RegExp(`^${this.mainAttribute}=`, 'i').test(id)) {
-      // DN provided - validate it's in the correct flat branch
+    const assertedId = assertedRdnValue(id, this.mainAttribute, this.base);
+    if (assertedId !== null) {
       dn = this.resolveDn(id);
-      // Extract the RDN value, correctly handling escaped commas
-      // e.g. uid=Smith\,John,ou=users -> id = "Smith\,John"
-      id = id.replace(
-        new RegExp(`^${this.mainAttribute}=((?:\\\\.|[^,])+)(?:,.*)?$`, 'i'),
-        '$1'
-      );
+      // The name the DN gives the entry, escapes decoded; one carrying a
+      // comma is written back escaped, since `resolveDn` escapes it
+      id = assertedId;
+      validateDnValue(id, this.mainAttribute);
     } else {
       validateDnValue(id, this.mainAttribute);
       dn = this.resolveDn(id);
