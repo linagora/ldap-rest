@@ -710,7 +710,13 @@ export function getRdn(dn: string): string {
  */
 export function rdnValue(dn: string): string {
   const [rdn] = parseDn(dn);
-  const eq = rdn ? rdn.indexOf('=') : -1;
+  return rdnValueOf(rdn);
+}
+
+/** The value of one RDN, trimmed as `parseDn` leaves it and decoded. */
+function rdnValueOf(rdn: string | undefined): string {
+  if (!rdn) return '';
+  const eq = rdn.indexOf('=');
   if (eq <= 0) return '';
   // parseDn trimmed the end, keeping the space a backslash escapes
   let start = eq + 1;
@@ -722,8 +728,9 @@ export function rdnValue(dn: string): string {
  * Read the name of an entry written as a DN: the value of its first RDN when
  * that RDN asserts `attribute` alone, under `base` when one is given.
  *
- * The value is decoded, as {@link rdnValue} decodes it: it is the naming
- * attribute's value, the one a write puts back in `attribute=…,base`.
+ * The value is decoded exactly as {@link rdnValue} decodes it: it is the
+ * naming attribute's value, the one a write puts back in
+ * `attribute=…,base`.
  *
  * @param dn - The DN to read
  * @param attribute - The attribute the first RDN must assert
@@ -750,25 +757,33 @@ export function assertedRdnValue(
   if (eq <= 0) return null;
   if (rdn.slice(0, eq).trim().toLowerCase() !== attribute.toLowerCase())
     return null;
-  const raw = rdn.slice(eq + 1);
-  // A multi-valued RDN (`uid=a+cn=b`) is not what a naming attribute names
-  if (isUnescaped(raw, '+')) return null;
+  // A multi-valued RDN (`uid=a+cn=b`) is not what a naming attribute names;
+  // `splitRdn` reads `uid="a+b"` as one assertion, as the rest of the code
+  if (splitRdn(rdn).length > 1) return null;
   if (base !== undefined && normalizeDn(parent.join(',')) !== normalizeDn(base))
     return null;
-  return unescapeDnValue(raw);
+  return rdnValueOf(rdn);
 }
 
 /**
- * Whether `text` holds `char` outside the escapes of a DN value.
+ * Whether `attribute=` starts `id`: the caller sent a DN rather than a bare
+ * naming value.
+ *
+ * Deciding this before `assertedRdnValue` matters: a string it refuses — a
+ * multi-valued RDN, another branch — is still a DN, and read as a bare value
+ * it would be written whole.
  */
-function isUnescaped(text: string, char: string): boolean {
-  let escaped = false;
-  for (const current of text) {
-    if (escaped) escaped = false;
-    else if (current === '\\') escaped = true;
-    else if (current === char) return true;
+export function namesByDn(id: string, attribute: string): boolean {
+  try {
+    const [rdn] = parseDn(id);
+    const eq = rdn ? rdn.indexOf('=') : -1;
+    return (
+      eq > 0 &&
+      rdn.slice(0, eq).trim().toLowerCase() === attribute.toLowerCase()
+    );
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**

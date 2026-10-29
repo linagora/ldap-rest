@@ -39,6 +39,7 @@ import {
   launchHooksChained,
   normalizeDn,
   assertedRdnValue,
+  namesByDn,
   substringSearchFilter,
   validateDnValue,
 } from '../lib/utils';
@@ -1415,16 +1416,24 @@ export default abstract class LdapFlat extends DmPlugin {
     // Checked below under the names the write will give them
     await this.ldap.canonicalAttributes(additional);
     let dn: string;
-    const assertedId = assertedRdnValue(id, this.mainAttribute, this.base);
-    if (assertedId !== null) {
+    if (namesByDn(id, this.mainAttribute)) {
+      // A DN the helper cannot read as `attribute=value,base` — another
+      // branch, a multi-valued RDN — is still a DN: it must not fall back to
+      // being read as a bare name, which would write the whole DN as one
       dn = this.resolveDn(id);
-      // The name the DN gives the entry, escapes decoded; one carrying a
-      // comma is written back escaped, since `resolveDn` escapes it
-      id = assertedId;
-      validateDnValue(id, this.mainAttribute);
+      const name = assertedRdnValue(id, this.mainAttribute, this.base);
+      if (name !== null) id = name;
     } else {
-      validateDnValue(id, this.mainAttribute);
       dn = this.resolveDn(id);
+    }
+    try {
+      validateDnValue(id, this.mainAttribute);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error: without this, a name the
+      // directory cannot take came back as a 500 on a wrong request
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid identifier'
+      );
     }
     let entry = this.candidateEntry(id, additional);
     // Before the checks reading the directory: a pointer leading nowhere, a

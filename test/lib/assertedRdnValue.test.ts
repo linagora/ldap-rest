@@ -6,7 +6,7 @@
  */
 import { expect } from 'chai';
 
-import { assertedRdnValue } from '../../src/lib/utils';
+import { assertedRdnValue, namesByDn, rdnValue } from '../../src/lib/utils';
 
 const B = String.fromCharCode(92);
 const base = 'ou=users,dc=example,dc=com';
@@ -14,6 +14,23 @@ const base = 'ou=users,dc=example,dc=com';
 describe('assertedRdnValue', () => {
   it('reads the value of a DN in the branch', () => {
     expect(assertedRdnValue(`uid=bob,${base}`, 'uid', base)).to.equal('bob');
+  });
+
+  it('skips the spaces after the = as rdnValue reads them', () => {
+    // RFC 4514 allows them around the value; the entry is named "bob", not
+    // " bob"
+    expect(assertedRdnValue(`uid= bob,${base}`, 'uid', base)).to.equal(
+      rdnValue(`uid= bob,${base}`)
+    );
+  });
+
+  it('reads a quoted value holding a + as one assertion', () => {
+    // LDAPv2 quotes a whole value: `splitRdn` and `normalizeDn` see one
+    // assertion here, and so does this reader, which keeps the quotes as
+    // `rdnValue` does
+    expect(assertedRdnValue(`uid="a+b",${base}`, 'uid', base)).to.equal(
+      '"a+b"'
+    );
   });
 
   it('decodes the escapes of the value, as the entry is named', () => {
@@ -58,5 +75,20 @@ describe('assertedRdnValue', () => {
     expect(assertedRdnValue(dn, 'uid', base)).to.equal('a'.repeat(20000));
     const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
     expect(elapsed).to.be.below(50);
+  });
+});
+
+describe('namesByDn', () => {
+  it('tells a DN from a bare name', () => {
+    expect(namesByDn(`uid=bob,${base}`, 'uid')).to.equal(true);
+    expect(namesByDn('bob', 'uid')).to.equal(false);
+    expect(namesByDn(`cn=bob,${base}`, 'uid')).to.equal(false);
+  });
+
+  it('still tells a DN whose value it would refuse', () => {
+    // What `assertedRdnValue` reads as no name is not a bare name: a caller
+    // deciding on it must keep the two apart
+    expect(namesByDn(`uid=a+cn=b,${base}`, 'uid')).to.equal(true);
+    expect(assertedRdnValue(`uid=a+cn=b,${base}`, 'uid', base)).to.equal(null);
   });
 });

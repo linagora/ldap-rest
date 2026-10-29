@@ -41,10 +41,12 @@ import {
   isDnSyntax,
   isDummyMemberDn,
   launchHooks,
+  namesByDn,
   normalizeDn,
   launchHooksChained,
   movedToTrash,
   organizationLink,
+  parseDn,
   substringSearchFilter,
   validateDnValue,
 } from '../../lib/utils';
@@ -814,16 +816,23 @@ export default class LdapGroups extends DmPlugin {
   ): Promise<boolean> {
     await this.server.ldap.canonicalAttributes(additional);
     let dn: string;
-    const assertedCn = assertedRdnValue(cn, this.cn);
-    if (assertedCn !== null) {
-      // A bare RDN lies in the groups branch, as a name does
-      dn = /,/.test(cn) ? cn : `${cn},${this.base as string}`;
-      // The name the DN gives the group
-      cn = assertedCn;
-      validateDnValue(cn, this.cn);
+    if (namesByDn(cn, this.cn)) {
+      // A bare RDN lies in the groups branch, as a name does; an escaped
+      // comma is one RDN, so the separators are counted, not the commas
+      dn = parseDn(cn).length > 1 ? cn : `${cn},${this.base as string}`;
+      const name = assertedRdnValue(cn, this.cn);
+      if (name !== null) cn = name;
     } else {
-      validateDnValue(cn, this.cn);
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    }
+    try {
+      validateDnValue(cn, this.cn);
+    } catch (err) {
+      // `validateDnValue` throws a plain Error: without this, a name the
+      // directory cannot take came back as a 500 on a wrong request
+      throw new BadRequestError(
+        err instanceof Error ? err.message : 'Invalid name'
+      );
     }
     let entry = this.candidateGroup(cn, members, additional);
 
