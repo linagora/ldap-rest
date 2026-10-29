@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- A name sent as a DN, on a flat entry or a Twake group moved into another
+  organization, is no longer read with a pattern that backtracks over its
+  escapes: a DN of a few dozen escapes could keep the process from answering
+  any request until it was restarted. A flat entry named by a DN is refused
+  when the name holds a control character.
+
 ## v1.2.1 (2026-10-28)
 
 Fifteen fuzzing findings, no new option. One check before deploying,
