@@ -722,7 +722,7 @@ see [Storage](plugins/utilities/storage.md).
 
 #### `core/configApi`
 
-Exposes API configuration at `/api/v1/config` for client applications. Returns available features, schemas, and endpoints. No configuration options.
+Exposes API configuration at `/api/v1/config` for client applications. Returns available features, schemas, endpoints, and the server's `version` — read from the `package.json` that ships with it, so a client can tell an administrator the server is older than it supports. No configuration options.
 
 ## Configuration File
 

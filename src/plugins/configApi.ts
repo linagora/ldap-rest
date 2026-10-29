@@ -12,11 +12,29 @@ import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { type Role, asyncHandler } from '../abstract/plugin';
 import { wantJson } from '../lib/expressFormatedResponses';
+import { SERVER_VERSION } from '../lib/version';
 
 interface ConfigApiResponse {
   apiPrefix: string;
   ldapBase: string;
   features: Record<string, unknown>;
+  /** Absent when the version could not be read at start-up */
+  version?: string;
+}
+
+/** The body of `GET /v1/config`, `version` left out when it is unknown. */
+export function configApiResponse(
+  apiPrefix: string,
+  ldapBase: string,
+  features: Record<string, unknown>,
+  version: string | undefined
+): ConfigApiResponse {
+  return {
+    apiPrefix,
+    ldapBase,
+    features,
+    ...(version ? { version } : {}),
+  };
 }
 
 /**
@@ -24,11 +42,12 @@ interface ConfigApiResponse {
  * Config:
  *   type: object
  *   description: |
- *     Aggregated server configuration. The top-level fields are always
- *     present; `features` is a dynamic map whose keys are the names of
- *     loaded plugins that declare the `configurable` role.  Each plugin
- *     contributes an arbitrary sub-object — consult the individual plugin
- *     documentation for its exact shape.
+ *     Aggregated server configuration. `apiPrefix`, `ldapBase` and
+ *     `features` are always present; `version` is present unless the server
+ *     could not read it at start-up; `features` is a dynamic map whose keys
+ *     are the names of loaded plugins that declare the `configurable` role.
+ *     Each plugin contributes an arbitrary sub-object — consult the
+ *     individual plugin documentation for its exact shape.
  *   additionalProperties: true
  *   properties:
  *     apiPrefix:
@@ -39,6 +58,13 @@ interface ConfigApiResponse {
  *       type: string
  *       description: The root LDAP suffix used by this server.
  *       example: dc=example,dc=com
+ *     version:
+ *       type: string
+ *       description: |
+ *         The server's version, as its package declares it. A client reads it
+ *         to tell an administrator the server is older than it supports; a
+ *         server that cannot tell its version leaves the field out.
+ *       example: 1.2.1
  *     features:
  *       type: object
  *       description: |
@@ -61,6 +87,7 @@ interface ConfigApiResponse {
  *   example:
  *     apiPrefix: /api
  *     ldapBase: dc=example,dc=com
+ *     version: 1.2.1
  *     features:
  *       ldapGroups:
  *         enabled: true
@@ -103,6 +130,7 @@ export default class ConfigApi extends DmPlugin {
      *         example:
      *           apiPrefix: /api
      *           ldapBase: dc=example,dc=com
+     *           version: 1.2.1
      *           features:
      *             ldapGroups:
      *               enabled: true
@@ -121,13 +149,14 @@ export default class ConfigApi extends DmPlugin {
       asyncHandler(async (req: Request, res: Response) => {
         if (!wantJson(req, res)) return;
 
-        const config: ConfigApiResponse = {
-          apiPrefix: apiPrefix,
-          ldapBase: this.config.ldap_base || '',
-          features: await this.collectPluginConfigs(),
-        };
-
-        res.json(config);
+        res.json(
+          configApiResponse(
+            apiPrefix,
+            this.config.ldap_base || '',
+            await this.collectPluginConfigs(),
+            SERVER_VERSION
+          )
+        );
       })
     );
 

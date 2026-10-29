@@ -156,6 +156,7 @@ curl -H "Accept: application/json" \
 {
   "apiPrefix": "/api",
   "ldapBase": "dc=example,dc=com",
+  "version": "1.2.1",
   "features": {
     "flatResources": [
       {
@@ -242,6 +243,10 @@ curl -H "Accept: application/json" \
 
 - `apiPrefix`: API URL prefix (default: `/api`)
 - `ldapBase`: LDAP base DN
+- `version`: the server's version, as its `package.json` declares it. A client
+  compares it with the range it supports and tells an administrator when the
+  server is older. Optional: an installation that moved that file leaves it
+  out, and a client must then work without it
 - `features.ldapFlatGeneric.flatResources`: Array of flat LDAP resources (users, positions, etc.)
 - `features.ldapGroups`: Group management configuration (if enabled)
 - `features.ldapOrganizations`: Organization tree configuration (if enabled)
