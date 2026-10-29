@@ -821,7 +821,13 @@ export default class LdapGroups extends DmPlugin {
       // comma is one RDN, so the separators are counted, not the commas
       dn = parseDn(cn).length > 1 ? cn : `${cn},${this.base as string}`;
       const name = assertedRdnValue(cn, this.cn);
-      if (name !== null) cn = name;
+      // As on a flat entry: a DN that cannot name the group is refused, not
+      // kept whole as its name
+      if (name === null)
+        throw new BadRequestError(
+          `${this.cn} must be a value, or a "${this.cn}=…,${this.base as string}" DN`
+        );
+      cn = name;
     } else {
       dn = `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     }

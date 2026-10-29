@@ -1417,12 +1417,16 @@ export default abstract class LdapFlat extends DmPlugin {
     await this.ldap.canonicalAttributes(additional);
     let dn: string;
     if (namesByDn(id, this.mainAttribute)) {
-      // A DN the helper cannot read as `attribute=value,base` — another
-      // branch, a multi-valued RDN — is still a DN: it must not fall back to
-      // being read as a bare name, which would write the whole DN as one
+      // A DN naming the entry: its first RDN gives the name. A DN that cannot
+      // name it — another branch, a multi-valued RDN — is refused, since read
+      // as a bare name it would be written whole in the naming attribute
       dn = this.resolveDn(id);
       const name = assertedRdnValue(id, this.mainAttribute, this.base);
-      if (name !== null) id = name;
+      if (name === null)
+        throw new BadRequestError(
+          `${this.mainAttribute} must be a value, or a "${this.mainAttribute}=…,${this.base}" DN`
+        );
+      id = name;
     } else {
       dn = this.resolveDn(id);
     }

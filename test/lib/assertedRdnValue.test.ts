@@ -67,14 +67,24 @@ describe('assertedRdnValue', () => {
     expect(assertedRdnValue('bob.joe@example.org', 'uid', base)).to.equal(null);
   });
 
-  it('reads a run of escapes in linear time', () => {
-    // A pattern of `\\.` against `[^,]` read this in time doubling with each
-    // escape: every way of splitting the run between the two was tried
-    const dn = `uid=${`${B}a`.repeat(20000)},${base}`;
-    const start = process.hrtime.bigint();
-    expect(assertedRdnValue(dn, 'uid', base)).to.equal('a'.repeat(20000));
-    const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-    expect(elapsed).to.be.below(50);
+  it('reads a run of escapes in time linear in its length', () => {
+    // Read with a pattern, each escape could be part of either alternative:
+    // the cost then doubled with every escape. Timing a single long value
+    // would pass even for that pattern while it stays small, so two lengths
+    // are compared: linear reading stays in proportion, exponential one
+    // multiplies by 2^n.
+    const read = (n: number): number => {
+      const dn = `uid=${`${B}a`.repeat(n)},${base}`;
+      const start = process.hrtime.bigint();
+      expect(assertedRdnValue(dn, 'uid', base)).to.equal('a'.repeat(n));
+      return Number(process.hrtime.bigint() - start);
+    };
+    read(200); // warm-up: the first call pays for code paths and caches
+    const small = read(20000);
+    const large = read(40000);
+    // Doubling a linear read costs about twice, three times under load; an
+    // exponential one multiplies by 2^20000
+    expect(large).to.be.below(small * 4 + 1);
   });
 });
 

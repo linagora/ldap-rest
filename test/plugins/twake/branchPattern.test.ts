@@ -57,10 +57,17 @@ describe('branchPattern', () => {
     // organization, so the tail never matches. Every way of splitting the
     // run between an escape and a plain character is tried unless each
     // character is followed one way only
-    const dn = `cn=group,ou=groups,ou=${`${B}a`.repeat(30)},o=gov,c=other`;
-    const start = process.hrtime.bigint();
-    expect(organizationIn(pattern, dn)).to.equal(undefined);
-    const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-    expect(elapsed).to.be.below(50);
+    const read = (n: number): number => {
+      const dn = `cn=group,ou=groups,ou=${`${B}a`.repeat(n)},o=gov,c=other`;
+      const start = process.hrtime.bigint();
+      expect(organizationIn(pattern, dn)).to.equal(undefined);
+      return Number(process.hrtime.bigint() - start);
+    };
+    read(200); // warm-up
+    const small = read(20000);
+    const large = read(40000);
+    // Doubling a linear read costs about twice, three times under load; an
+    // exponential one multiplies by 2^20000
+    expect(large).to.be.below(small * 4 + 1);
   });
 });

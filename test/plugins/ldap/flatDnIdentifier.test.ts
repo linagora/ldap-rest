@@ -61,15 +61,18 @@ describe('A flat entry created under a DN', function () {
   it('answers 400 for an empty name', async () => {
     const res = await request
       .post(route)
-      .send({ uid: `uid=,ou=users,${base}`, cn: 'Bob' });
+      .send({ uid: `uid=,ou=users,${base}`, cn: 'Bob', sn: 'B' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/non-empty/);
   });
 
   it('refuses a multi-valued RDN instead of writing it as a name', async () => {
-    // Read as a bare name, the whole DN would be written in the uid column
+    // Every required attribute is sent, and the message is checked: a 400
+    // for a missing field would hide what this case is about
     const dn = `uid=a+cn=b,ou=users,${base}`;
-    const res = await request.post(route).send({ uid: dn, cn: 'Bob' });
+    const res = await request.post(route).send({ uid: dn, cn: 'Bob', sn: 'B' });
     expect(res.status, JSON.stringify(res.body)).to.equal(400);
+    expect(res.body.error).to.match(/must be a value, or a/);
     expect((await stored(dn)).searchEntries).to.deep.equal([]);
   });
 

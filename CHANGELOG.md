@@ -4,12 +4,14 @@
 
 ### Security
 
-- A name sent as a DN, when creating a flat entry or a group, and the
-  organization a Twake group is moved into, are no longer read with a pattern
-  that backtracks over escapes: a DN of a few dozen escapes could keep the
-  process from answering any request until it was restarted. Creating a
-  flat entry or a group under such a DN is answered 400, where the name it
-  gives is empty or holds a control character.
+- A name sent as a DN, when creating a flat entry or a group, is no longer
+  read with a pattern that backtracks over its escapes: a DN of a few dozen
+  escapes could keep the process from answering any request until it was
+  restarted. The name written is now the value of the DN's first RDN, with
+  its escapes decoded — `uid=Smith\,John,…` names the entry `Smith,John`,
+  where it used to be `Smith\,John`. Such a name is answered 400 when the
+  DN gives none (empty, a control character, or a first RDN that is
+  multi-valued).
 
 ## v1.2.1 (2026-10-28)
 
