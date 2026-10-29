@@ -171,14 +171,26 @@ export function parentOf(dn: string): string {
 
 /**
  * The entries one level under a DN pattern holding `{org}`, the organization
- * captured as one RDN value: `(?:\\.|[^,])+` keeps an escaped comma inside it.
+ * captured as one RDN value: an escaped comma stays inside it.
+ *
+ * A backslash and the character it escapes are read as one, and a comma ends
+ * the value: each character is followed one way, so a DN that does not match
+ * costs one pass. Where `\\.` and `[^,]` both take a backslash, a failing
+ * tail retries every way of splitting a run of escapes.
  */
 export function branchPattern(base: string): RegExp {
   const [before, after] = parseDn(base)
     .join(',')
     .split(ORG)
     .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(`^${before}(?<org>(?:\\\\.|[^,])+)${after}$`, 'i');
+  // A backslash is read with the one character it escapes (`.` takes the
+  // comma too), anything else as is; neither alternative starts with the
+  // other's character, so one pass reads the value. Built from the code
+  // point: a template turns each pair of backslashes into one, and the
+  // class must close on a single literal backslash.
+  const bs = String.fromCharCode(92);
+  const org = `(?:[^,${bs}${bs}]|${bs}${bs}.)+`;
+  return new RegExp(`^${before}(?<org>${org})${after}$`, 'i');
 }
 
 /**
