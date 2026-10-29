@@ -14,8 +14,11 @@ whose pattern came with the shipped schemas.
 
 A schema `test` pattern is no longer run on a value longer than 4096
 characters; the value is answered 400, naming the length, before the pattern
-sees it, so that a pattern cannot be made to walk several kilobytes. An
-attribute holding longer values declares its own `maxLength`:
+sees it, so that a pattern cannot be made to walk several kilobytes. This
+holds for every attribute in every schema which carries a pattern, a
+deployment's own included, and none of the shipped schemas declares a longer
+limit. An attribute holding longer values declares its own `maxLength`, a
+whole number of characters, or the server refuses to load the schema:
 
 ```json
 {

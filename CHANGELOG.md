@@ -15,11 +15,13 @@
 - A schema `test` pattern no longer reads a value longer than 4096
   characters, unless the schema declares a `maxLength`: a longer value is
   answered 400 with the length it may not exceed. Every attribute carrying a
-  pattern is concerned, and none of the shipped schemas declares a longer
-  one. The address patterns shipped with the schemas are rewritten to read a
-  long value in one pass, and now refuse a trailing dot and an empty label
-  (`a@b.c.`, `a@b..c`), which they used to accept; the name patterns of the
-  `example` schemas accept the same values as before
+  pattern is concerned, a deployment's own included, and none of the shipped
+  schemas declares a longer one; a `maxLength` that is not a whole number of
+  characters makes the server refuse the schema at load. The address
+  patterns shipped with the schemas are rewritten to read a long value in
+  one pass, and now refuse a trailing dot and an empty label (`a@b.c.`,
+  `a@b..c`), which they used to accept; the name patterns of the `example`
+  schemas accept the same values as before
   ([details](docs/client-development/schemas/README.md#maxlength-optional)).
 
 ## v1.2.1 (2026-10-28)
