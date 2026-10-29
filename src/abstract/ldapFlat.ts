@@ -1391,8 +1391,10 @@ export default abstract class LdapFlat extends DmPlugin {
    * @throws BadRequestError if the provided DN is not a direct child of this.base
    */
   protected resolveDn(id: string): string {
-    const dnPrefix = new RegExp(`^${escapeRegex(this.mainAttribute)}=`, 'i');
-    if (dnPrefix.test(id)) {
+    // The same test as `namesByDn`, which decides in `addEntry` whether the
+    // identifier is a DN: two readers disagreeing on one input would read it
+    // as a DN there and as a bare name here
+    if (namesByDn(id, this.mainAttribute)) {
       const parent = getParentDn(id);
       // If the DN has a single RDN, getParentDn returns the DN itself; treat
       // that as "missing parent" rather than "parent equals base".

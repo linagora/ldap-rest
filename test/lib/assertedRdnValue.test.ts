@@ -67,24 +67,19 @@ describe('assertedRdnValue', () => {
     expect(assertedRdnValue('bob.joe@example.org', 'uid', base)).to.equal(null);
   });
 
-  it('reads a run of escapes in time linear in its length', () => {
-    // Read with a pattern, each escape could be part of either alternative:
-    // the cost then doubled with every escape. Timing a single long value
-    // would pass even for that pattern while it stays small, so two lengths
-    // are compared: linear reading stays in proportion, exponential one
-    // multiplies by 2^n.
-    const read = (n: number): number => {
-      const dn = `uid=${`${B}a`.repeat(n)},${base}`;
-      const start = process.hrtime.bigint();
-      expect(assertedRdnValue(dn, 'uid', base)).to.equal('a'.repeat(n));
-      return Number(process.hrtime.bigint() - start);
-    };
-    read(200); // warm-up: the first call pays for code paths and caches
-    const small = read(20000);
-    const large = read(40000);
-    // Doubling a linear read costs about twice, three times under load; an
-    // exponential one multiplies by 2^20000
-    expect(large).to.be.below(small * 4 + 1);
+  it('reads a run of escapes in linear time', () => {
+    // The pattern it replaced backtracked on a value the optional `(?:,.*)?`
+    // could not end: the cost doubled with each escape. The run is kept small
+    // enough that such a reader finishes it, so a regression fails here.
+    const n = 26;
+    const dn = `uid=${`${B}a`.repeat(n)},${base}`;
+    // A line break the trailing group cannot cross, as in the advisory
+    const id = `${dn}${String.fromCharCode(10)}`;
+    assertedRdnValue(dn, 'uid', base); // warm-up
+    const start = process.hrtime.bigint();
+    expect(assertedRdnValue(id, 'uid', base)).to.equal('a'.repeat(n));
+    const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
+    expect(elapsed).to.be.below(50);
   });
 });
 

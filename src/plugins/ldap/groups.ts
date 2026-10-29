@@ -740,12 +740,9 @@ export default class LdapGroups extends DmPlugin {
     await this.server.ldap.canonicalAttributes(body as AttributesList);
     assertClientMaySet(this.schema, Object.keys(body), this.cn);
     const cn = body[this.cn];
-    // Given as a DN, it is created in the groups branch or not at all
-    // A DN as addGroup reads one: a comma, or the groups' main attribute
-    if (
-      typeof cn === 'string' &&
-      (/,/.test(cn) || new RegExp(`^${this.cn}=`, 'i').test(cn))
-    )
+    // Given as a DN, it is created in the groups branch or not at all; a
+    // bare RDN lies there as a name does, and is read as `addGroup` reads it
+    if (typeof cn === 'string' && namesByDn(cn, this.cn))
       this.routeGroupDn(/,/.test(cn) ? cn : `${cn},${this.base as string}`);
     // One member is a list of one, as for any `array`
     const members: string[] = !body.member
@@ -1357,7 +1354,10 @@ export default class LdapGroups extends DmPlugin {
    * @returns its DN
    */
   protected toGroupDn(cn: string): string {
-    if (!/,/.test(cn)) return `${this.cn}=${escapeDnValue(cn)},${this.base}`;
+    // A DN, as `addGroup` reads one: a separator, not any comma (an escaped
+    // comma is one RDN), or the main attribute asserted by the first RDN
+    if (!/[,;]/.test(cn) && !namesByDn(cn, this.cn))
+      return `${this.cn}=${escapeDnValue(cn)},${this.base}`;
     if (!isDnSyntax(cn)) throw new BadRequestError(`${cn} is not a valid DN`);
     return cn;
   }

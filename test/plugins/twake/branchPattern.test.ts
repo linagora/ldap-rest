@@ -53,21 +53,17 @@ describe('branchPattern', () => {
   });
 
   it('reads a DN that does not fit the branch in linear time', () => {
-    // A DN in the branch with a different tail: the run of escapes ends the
-    // organization, so the tail never matches. Every way of splitting the
-    // run between an escape and a plain character is tried unless each
-    // character is followed one way only
-    const read = (n: number): number => {
-      const dn = `cn=group,ou=groups,ou=${`${B}a`.repeat(n)},o=gov,c=other`;
-      const start = process.hrtime.bigint();
-      expect(organizationIn(pattern, dn)).to.equal(undefined);
-      return Number(process.hrtime.bigint() - start);
-    };
-    read(200); // warm-up
-    const small = read(20000);
-    const large = read(40000);
-    // Doubling a linear read costs about twice, three times under load; an
-    // exponential one multiplies by 2^20000
-    expect(large).to.be.below(small * 4 + 1);
+    // A DN whose tail does not match: every way of splitting the run of
+    // escapes is tried unless each character is followed one way. The run is
+    // kept small enough that a backtracking reader finishes it (998 ms at 26
+    // escapes), so a regression fails here instead of hanging the run.
+    const n = 26;
+    const dn = `cn=group,ou=groups,ou=${`${B}a`.repeat(n)},o=gov,c=other`;
+    organizationIn(pattern, dn); // warm-up
+    const start = process.hrtime.bigint();
+    expect(organizationIn(pattern, dn)).to.equal(undefined);
+    const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
+    // 26 escapes cost 998 ms to a backtracking reader, and under 0.1 ms here
+    expect(elapsed).to.be.below(50);
   });
 });
