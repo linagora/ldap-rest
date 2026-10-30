@@ -18,7 +18,8 @@
   its escapes decoded — `uid=Smith\,John,…` names the entry `Smith,John`,
   where it used to be `Smith\,John`. Such a name is answered 400 when the
   DN gives none (empty, a control character, or a first RDN that is
-  multi-valued).
+  multi-valued)
+  ([details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
 - A schema `test` pattern no longer reads a value longer than 4096
   characters, unless the schema declares a `maxLength`: a longer value is
   answered 400 with the length it may not exceed. Every attribute carrying a

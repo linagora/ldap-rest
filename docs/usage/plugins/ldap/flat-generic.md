@@ -451,6 +451,10 @@ Content-Type: application/json
 }
 ```
 
+The identifier may also be the whole DN of the entry, in the entity's
+branch: `"uid": "uid=Smith\\,John,ou=users,dc=example,dc=com"` creates the
+entry `Smith,John`, whose DN spells the name with its escapes.
+
 ### Modify Entry
 
 ```bash
