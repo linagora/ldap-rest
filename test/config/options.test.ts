@@ -18,6 +18,7 @@ import {
   scimOptionsOf,
 } from '../../src/plugins/scim/scim.options';
 import {
+  perBranchOptions,
   crowdsecOptionsOf,
   dynamicOptionsOf,
   hmacOptionsOf,
@@ -602,6 +603,9 @@ describe('plugin options', () => {
         default: { read: true, write: false, delete: false },
       });
       expect(config.authz_per_branch_cache_ttl).to.equal(60);
+      expect(
+        readOptions(perBranchOptions, config).ldap_group_member_attribute
+      ).to.equal('member');
       expect(config.authz_dynamic_token_attribute).to.equal('userPassword');
       expect(config.authz_local_admin_attribute).to.equal(
         'twakeLocalAdminLink'
@@ -619,10 +623,13 @@ describe('plugin options', () => {
       const saved = {
         DM_AUTH_TOKENS: process.env.DM_AUTH_TOKENS,
         DM_AUTHZ_GLOBAL_BRANCHES: process.env.DM_AUTHZ_GLOBAL_BRANCHES,
+        DM_LDAP_GROUP_MEMBER_ATTRIBUTE:
+          process.env.DM_LDAP_GROUP_MEMBER_ATTRIBUTE,
       };
       process.env.DM_AUTH_TOKENS = 't1;t2';
       process.env.DM_AUTHZ_GLOBAL_BRANCHES =
         'ou=global,dc=example,dc=com;ou=other,dc=example,dc=com';
+      process.env.DM_LDAP_GROUP_MEMBER_ATTRIBUTE = 'uniqueMember';
       try {
         const config = parse([
           'node',
@@ -635,6 +642,9 @@ describe('plugin options', () => {
           '30',
         ]);
         expect(config.auth_token).to.deep.equal(['t1', 't2']);
+        expect(
+          readOptions(perBranchOptions, config).ldap_group_member_attribute
+        ).to.equal('uniqueMember');
         expect(config.authz_global_branch).to.deep.equal([
           'ou=global,dc=example,dc=com',
           'ou=other,dc=example,dc=com',
@@ -928,7 +938,7 @@ describe('plugin options', () => {
     it('reads the configuration again when it changed', () => {
       const dm = new DM();
       const plugin = new Sample(dm);
-      dm.config.sample_size = 4;
+      (dm.config as unknown as Record<string, unknown>).sample_size = 4;
       expect(plugin.options(definitions).sample_size).to.equal(4);
     });
 

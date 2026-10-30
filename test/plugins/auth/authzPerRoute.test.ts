@@ -297,7 +297,9 @@ describe('AuthzPerRoute', () => {
       const dm = new DM();
       await dm.ready;
       // Inject the whitespace-containing entry directly, bypassing env-var splitting
-      (dm.config as Record<string, unknown>).authz_per_route = [' user :*'];
+      (dm.config as unknown as Record<string, unknown>).authz_per_route = [
+        ' user :*',
+      ];
       await dm.registerPlugin('authToken', new AuthToken(dm));
       await dm.registerPlugin('authzPerRoute', new AuthzPerRoute(dm));
       await dm.registerPlugin('helloWorld', new HelloWorld(dm));
@@ -315,7 +317,7 @@ describe('AuthzPerRoute', () => {
       const dm = new DM();
       await dm.ready;
       // Inject the entry with a space before the path
-      (dm.config as Record<string, unknown>).authz_per_route = [
+      (dm.config as unknown as Record<string, unknown>).authz_per_route = [
         'user:GET: /api/hello',
       ];
       await dm.registerPlugin('authToken', new AuthToken(dm));

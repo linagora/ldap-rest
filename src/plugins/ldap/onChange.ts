@@ -248,12 +248,13 @@ class OnLdapChange extends DmPlugin {
     // mail one fires: it says the address is gone, and appAccountsConsistency
     // removes the accounts derived from it on that
     const deleted = after === null;
-    for (const [configParam, hookName] of Object.entries(events)) {
+    for (const [configParam, hookName] of Object.entries(events) as [
+      keyof typeof events,
+      AttributeHook,
+    ][]) {
       if (deleted && hookName !== 'onLdapMailChange') continue;
-      if (
-        this.config[configParam] &&
-        changes[this.config[configParam] as string]
-      ) {
+      const attribute = this.config[configParam];
+      if (attribute && changes[attribute]) {
         // Special handling for hooks that need mail parameter
         if (
           hookName === 'onLdapQuotaChange' ||
@@ -261,7 +262,7 @@ class OnLdapChange extends DmPlugin {
           hookName === 'onLdapAliasChange'
         ) {
           this.notifyAttributeChangeWithMail(
-            this.config[configParam] as string,
+            attribute,
             hookName,
             dn,
             changes,
@@ -270,15 +271,14 @@ class OnLdapChange extends DmPlugin {
         } else if (hookName === 'onLdapMailChange') {
           // Only mail change uses the simple notification
           this.notifyAttributeChange(
-            this.config[configParam] as string,
+            attribute,
             'onLdapMailChange',
             dn,
             changes
           );
         } else if (hookName === 'onLdapDriveQuotaChange') {
           // Drive quota change - expects numbers, no mail needed
-          const [oldValue, newValue] =
-            changes[this.config[configParam] as string] || [];
+          const [oldValue, newValue] = changes[attribute] || [];
           const oldQuota = oldValue ? Number(oldValue) : null;
           const newQuota = newValue ? Number(newValue) : null;
           if (oldQuota !== newQuota) {

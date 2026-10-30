@@ -101,10 +101,9 @@ export default class AuthzPerBranch extends AuthzBase {
     };
   }
 
-  /** The group member attribute, which no option set declares yet */
+  /** The attribute a group lists its members in */
   private get memberAttribute(): string {
-    const configured = this.config.ldap_group_member_attribute;
-    return typeof configured === 'string' ? configured : 'member';
+    return this.options(perBranchOptions).ldap_group_member_attribute;
   }
 
   /**

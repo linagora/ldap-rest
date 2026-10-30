@@ -158,11 +158,13 @@ export class ConfigParser {
     // Store additional arguments
     this.unknownArgs = [];
     cliArgs.forEach((v, k) => {
-      if (result[k]) {
+      if ((result as unknown as Record<string, unknown>)[k]) {
         throw new Error(`Error in command line: ${k} redefined`);
       }
       this.unknownArgs.push(k);
-      result[k.replace(/^-+/, '').replace(/-/g, '_')] = v;
+      (result as unknown as Record<string, unknown>)[
+        k.replace(/^-+/, '').replace(/-/g, '_')
+      ] = v;
     });
 
     return result;

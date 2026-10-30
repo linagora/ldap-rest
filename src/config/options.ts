@@ -16,6 +16,8 @@ import {
   type ConfigTemplate,
 } from '../lib/parseConfig';
 
+import type { Config } from './args';
+
 export type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
 export interface OptionSpec<T> {
@@ -283,15 +285,16 @@ function valueFromEnvironment(
  */
 export function readOptions<T extends OptionSet>(
   options: T,
-  config: Record<string, unknown>,
+  config: Config | Record<string, unknown>,
   parsedKeys: ReadonlySet<string> = new Set()
 ): OptionsOf<T> {
+  const source = config as Record<string, unknown>;
   const result: Record<string, unknown> = {};
   for (const [key, spec] of Object.entries(options)) {
     const configured =
-      config[key] ??
+      source[key] ??
       (!parsedKeys.has(key) &&
-      !(key in config) &&
+      !(key in source) &&
       spec.env &&
       process.env[spec.env] !== undefined
         ? valueFromEnvironment(key, spec, process.env[spec.env] as string)

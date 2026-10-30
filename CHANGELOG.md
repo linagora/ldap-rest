@@ -58,6 +58,9 @@
   groups plugin never read. Use `--groups-allow-unexistent-members` or
   `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin now reads
   ([upgrading](docs/usage/upgrading.md#the-group-member-check-option)).
+- `Config` has no index signature any more: a plugin reading an option it did
+  not declare no longer compiles. Declare it with `defineOptions`
+  ([upgrading](docs/usage/upgrading.md#a-config-key-a-plugin-did-not-declare)).
 - `TwakePlugin` takes the WebAdmin URL, token and concurrency instead of the
   names of the options holding them: a plugin built outside this repository
   that extends it must update its `super()` call

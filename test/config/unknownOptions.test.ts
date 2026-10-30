@@ -22,7 +22,9 @@ describe('unknown options', () => {
       '8080',
     ]);
     expect(parser.unknownOptions).to.deep.equal(['--not-an-option']);
-    expect(config.not_an_option).to.equal('value');
+    expect(
+      (config as unknown as Record<string, unknown>).not_an_option
+    ).to.equal('value');
   });
 
   it('names the DM_* variables no entry reads', () => {
