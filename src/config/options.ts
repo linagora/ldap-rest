@@ -33,6 +33,11 @@ export interface StringOption extends OptionSpec<string> {
   readonly choices?: readonly string[];
 }
 
+export interface StringOrFalseOption extends OptionSpec<string | false> {
+  readonly type: 'string';
+  readonly allowFalse: true;
+}
+
 export interface NumberOption extends OptionSpec<number> {
   readonly type: 'number';
   readonly min?: number;
@@ -86,6 +91,13 @@ export const opt = {
   }),
   array: (options: Omit<ArrayOption, 'type'> = {}): ArrayOption => ({
     type: 'array',
+    ...options,
+  }),
+  stringOrFalse: (
+    options: Omit<StringOrFalseOption, 'type' | 'allowFalse'> = {}
+  ): StringOrFalseOption => ({
+    type: 'string',
+    allowFalse: true,
     ...options,
   }),
   json: <T = Record<string, unknown>>(
@@ -147,13 +159,17 @@ function empty(value: unknown): boolean {
   );
 }
 
-function checkNumber(key: string, spec: NumberOption, value: unknown): void {
+function checkNumber(name: string, spec: NumberOption, value: unknown): void {
   if (typeof value !== 'number' || !Number.isInteger(value))
-    throw new Error(`Option ${key} must be an integer, got "${String(value)}"`);
+    throw new Error(
+      `Option ${name} must be an integer, got "${String(value)}"`
+    );
   if (spec.min !== undefined && value < spec.min)
-    throw new Error(`Option ${key} must be at least ${spec.min}, got ${value}`);
+    throw new Error(
+      `Option ${name} must be at least ${spec.min}, got ${value}`
+    );
   if (spec.max !== undefined && value > spec.max)
-    throw new Error(`Option ${key} must be at most ${spec.max}, got ${value}`);
+    throw new Error(`Option ${name} must be at most ${spec.max}, got ${value}`);
 }
 
 function checkValue(
@@ -161,35 +177,40 @@ function checkValue(
   spec: OptionSpec<unknown>,
   value: unknown
 ): void {
+  const name = cliName(key);
   if (spec.required && empty(value))
-    throw new Error(`Option ${key} is required`);
+    throw new Error(`Option ${name} is required`);
   switch (spec.type) {
     case 'string':
-      if (typeof value !== 'string')
-        throw new Error(`Option ${key} must be a string`);
       if (
+        typeof value !== 'string' &&
+        !(value === false && (spec as StringOrFalseOption).allowFalse)
+      )
+        throw new Error(`Option ${name} must be a string`);
+      if (
+        typeof value === 'string' &&
         (spec as StringOption).choices &&
         !(spec as StringOption).choices?.includes(value)
       )
         throw new Error(
-          `Option ${key} must be one of ` +
+          `Option ${name} must be one of ` +
             (spec as StringOption).choices?.join(', ')
         );
       break;
     case 'number':
-      checkNumber(key, spec as NumberOption, value);
+      checkNumber(name, spec as NumberOption, value);
       break;
     case 'boolean':
       if (typeof value !== 'boolean')
-        throw new Error(`Option ${key} must be true or false`);
+        throw new Error(`Option ${name} must be true or false`);
       break;
     case 'array':
       if (!Array.isArray(value) || value.some(item => typeof item !== 'string'))
-        throw new Error(`Option ${key} must be a list of strings`);
+        throw new Error(`Option ${name} must be a list of strings`);
       break;
     case 'json':
       if (value === null || typeof value !== 'object' || Array.isArray(value))
-        throw new Error(`Option ${key} must be a JSON object`);
+        throw new Error(`Option ${name} must be a JSON object`);
       break;
   }
 }

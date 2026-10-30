@@ -11,6 +11,8 @@ import { ConfigParser } from '../../src/lib/parseConfig';
 import DmPlugin from '../../src/abstract/plugin';
 import { TwakePlugin } from '../../src/abstract/twakePlugin';
 import { DM } from '../../src/bin';
+import { bclOptions } from '../../src/plugins/bcl.options';
+import { storageOptions } from '../../src/plugins/storage.options';
 import {
   scimOptions,
   scimOptionsOf,
@@ -312,7 +314,7 @@ describe('plugin options', () => {
     it('refuses a concurrency below 1 when the plugin reads it', () => {
       process.env.DM_JAMES_CONCURRENCY = '0';
       expect(() => jamesOptionsOf(parse())).to.throw(
-        /james_concurrency must be at least 1/
+        /--james-concurrency must be at least 1/
       );
     });
   });
@@ -794,6 +796,50 @@ describe('plugin options', () => {
     });
   });
 
+  describe('utility plugin options', () => {
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.metrics_port).to.equal(9464);
+      expect(config.storage_backend).to.equal('');
+      expect(config.storage_sweep_interval).to.equal(600);
+      expect(config.storage_ldap_object_class).to.equal('applicationProcess');
+      expect(config.storage_postgres_table).to.equal('ldap_rest_storage');
+      expect(config.storage_valkey_prefix).to.equal('ldap-rest:');
+      expect(config.bcl_retention).to.equal(604800);
+      expect(config.static_name).to.equal('static');
+      expect(config.static_csp).to.equal("frame-ancestors 'self'");
+      expect(config.static_frame_options).to.equal('SAMEORIGIN');
+      expect(config.static_path).to.match(/static$/);
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      const saved = {
+        DM_METRICS_PORT: process.env.DM_METRICS_PORT,
+        DM_STORAGE_BACKEND: process.env.DM_STORAGE_BACKEND,
+      };
+      process.env.DM_METRICS_PORT = '9999';
+      process.env.DM_STORAGE_BACKEND = 'file';
+      try {
+        const config = parse([
+          'node',
+          'ldap-rest',
+          '--bcl-retention',
+          '60',
+          '--storage-valkey-prefix',
+          'x:',
+        ]);
+        expect(config.metrics_port).to.equal(9999);
+        expect(config.storage_backend).to.equal('file');
+        expect(config.bcl_retention).to.equal(60);
+        expect(config.storage_valkey_prefix).to.equal('x:');
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
+    });
+  });
+
   describe('reading and checking values', () => {
     const definitions = defineOptions({
       name: opt.string({ required: true }),
@@ -847,6 +893,17 @@ describe('plugin options', () => {
         readOptions(definitions, { name: 'n', count: '2' })
       ).to.throw(/integer/);
     });
+
+    it('accepts a false only where the option allows it', () => {
+      const withFalse = defineOptions({
+        header: opt.stringOrFalse({ default: 'x' }),
+        plain: opt.string({ default: 'x' }),
+      });
+      expect(readOptions(withFalse, { header: false }).header).to.equal(false);
+      expect(() =>
+        readOptions(withFalse, { header: 'x', plain: false })
+      ).to.throw(/--plain must be a string/);
+    });
   });
 
   describe('DmPlugin.options', () => {
@@ -892,7 +949,7 @@ describe('plugin options', () => {
         name = 'refused';
       }
       expect(() => new Refused(new DM())).to.throw(
-        /required_value is required/
+        /--required-value is required/
       );
     });
   });

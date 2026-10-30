@@ -29,13 +29,14 @@
  */
 import DmPlugin from '../abstract/plugin';
 import type { DM } from '../bin';
-import type Store from '../lib/storage/store';
 import type { HealthStatus } from '../lib/health';
+import type Store from '../lib/storage/store';
 
 import FileStore from './storage/file';
 import LdapStore from './storage/ldap';
 import PostgresStore from './storage/postgres';
 import ValkeyStore from './storage/valkey';
+import { storageOptions } from './storage.options';
 
 /**
  * The one instance, if there is one.
@@ -52,6 +53,8 @@ let onlyInstance: Storage | undefined;
 const KNOWN = 'ldap, file, postgres, valkey';
 
 export default class Storage extends DmPlugin {
+  static optionDefinitions = storageOptions;
+
   name = 'storage';
   store: Store;
 
@@ -65,11 +68,12 @@ export default class Storage extends DmPlugin {
           'which answers. Load one, and let its consumers share it.'
       );
     }
-    const backend = (server.config.storage_backend as string) || '';
+    const settings = this.options(storageOptions);
+    const backend = settings.storage_backend;
 
     switch (backend) {
       case 'ldap': {
-        const base = server.config.storage_ldap_base as string;
+        const base = settings.storage_ldap_base;
         if (!base)
           throw new Error(
             'storage: the ldap backend needs --storage-ldap-base, the branch ' +
@@ -79,13 +83,12 @@ export default class Storage extends DmPlugin {
         this.store = new LdapStore(
           server,
           base,
-          (server.config.storage_ldap_object_class as string) ||
-            'applicationProcess'
+          settings.storage_ldap_object_class
         );
         break;
       }
       case 'file': {
-        const dir = server.config.storage_file_directory as string;
+        const dir = settings.storage_file_directory;
         if (!dir)
           throw new Error(
             'storage: the file backend needs --storage-file-directory, the ' +
@@ -95,12 +98,12 @@ export default class Storage extends DmPlugin {
         this.store = new FileStore(
           server.logger,
           dir,
-          (server.config.storage_sweep_interval as number) || 600
+          settings.storage_sweep_interval
         );
         break;
       }
       case 'postgres': {
-        const url = server.config.storage_postgres_url as string;
+        const url = settings.storage_postgres_url;
         if (!url)
           throw new Error(
             'storage: the postgres backend needs --storage-postgres-url, ' +
@@ -109,13 +112,12 @@ export default class Storage extends DmPlugin {
         this.store = new PostgresStore(
           server.logger,
           url,
-          (server.config.storage_postgres_table as string) ||
-            'ldap_rest_storage'
+          settings.storage_postgres_table
         );
         break;
       }
       case 'valkey': {
-        const url = server.config.storage_valkey_url as string;
+        const url = settings.storage_valkey_url;
         if (!url)
           throw new Error(
             'storage: the valkey backend needs --storage-valkey-url, the ' +
@@ -124,7 +126,7 @@ export default class Storage extends DmPlugin {
         this.store = new ValkeyStore(
           server.logger,
           url,
-          (server.config.storage_valkey_prefix as string) ?? ''
+          settings.storage_valkey_prefix
         );
         break;
       }
@@ -149,9 +151,7 @@ export default class Storage extends DmPlugin {
       .catch(err =>
         this.logger.error(err instanceof Error ? err.message : String(err))
       );
-    this.store.startSweeping(
-      (server.config.storage_sweep_interval as number) || 0
-    );
+    this.store.startSweeping(settings.storage_sweep_interval);
   }
 
   async close(): Promise<void> {

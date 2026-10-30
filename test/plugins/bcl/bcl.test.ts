@@ -181,11 +181,12 @@ describe('Back-Channel Logout, over the shared store', function () {
     // The configuration is read when the server is built, so the environment
     // is the wrong lever here: the retention is changed on the object the
     // plugin reads.
-    server.config.bcl_retention = -1;
+    server.config.bcl_retention = 1;
     const shortLived = new Bcl(server);
     shortLived.api();
     server.config.bcl_retention = 3600;
     await shortLived.hooks.oidclogouttoken!({ iss: ISS, sid: 'S5' });
+    await new Promise(resolve => setTimeout(resolve, 1100));
     expect(
       await alive({ iss: ISS, sid: 'S5' }),
       'an expired mark must not keep anyone out'
