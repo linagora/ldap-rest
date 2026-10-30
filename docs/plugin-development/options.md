@@ -101,5 +101,9 @@ const configArgs: ConfigTemplate = [
 The `Config` interface keeps the hand-written fields until every plugin has
 moved. A migrated plugin no longer reads them: it uses `options()`.
 
-Plugins outside the repository cannot add to `args.ts` yet. They keep reading
-`this.config.<name>`, which the parser fills from unknown `--key value` pairs.
+Plugins outside the repository cannot add to `args.ts` yet, but they can
+declare options the same way and name them in `optionDefinitions`: the startup
+report subtracts those keys, and `options()` reads a declared `env` variable
+when the parser did not carry the key. An option without a declaration still
+reaches `this.config` from an unknown `--key value` pair, and the startup
+report names it.

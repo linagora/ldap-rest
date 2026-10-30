@@ -595,7 +595,9 @@ describe('Enterprise rules', () => {
           await create('rules.uniq@example.com').expect(201);
           // As another tool may store it, which this server refuses to: the
           // address under a tagged name
-          const client = new Client({ url: process.env.DM_LDAP_URI as string });
+          const client = new Client({
+            url: process.env.DM_TEST_LDAP_URI as string,
+          });
           try {
             await client.bind(
               process.env.DM_LDAP_DN as string,

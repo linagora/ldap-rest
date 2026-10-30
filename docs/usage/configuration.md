@@ -149,6 +149,11 @@ of the environment variable. An empty value on the command line, such as an
 unset variable expanding to nothing, stops the server: leave the option out
 to keep the default.
 
+An option or `DM_*` variable that no declared option reads is named in a
+warning at startup. `--strict-options` refuses it instead. Kubernetes injects
+`DM_*` variables for services whose name starts with `dm`; leave the flag off
+where those names are in use.
+
 ## General Options
 
 | CLI                  | Plural           | Env                   | Default          | Description                                                                                       |
@@ -160,6 +165,7 @@ to keep the default.
 | `--logger`           |                  | `DM_LOGGER`           | `console`        | `console` or `file`, see [Logger](#logger---logger)                                               |
 | `--log-file`         |                  | `DM_LOG_FILE`         | `error.log`      | File `--logger file` writes to                                                                    |
 | `--debug`            |                  | `DM_DEBUG`            | `false`          | Name the failure in the 5xx answers of the error middleware and `serverError`; not for production |
+| `--strict-options`   |                  | `DM_STRICT_OPTIONS`   | `false`          | Refuse an option or `DM_*` variable no declared option reads                                      |
 | `--api-prefix`       |                  | `DM_API_PREFIX`       | `/api`           | API URL prefix                                                                                    |
 | `--mail-domain`      | `--mail-domains` | `DM_MAIL_DOMAIN`      | `[]`             | Mail domains                                                                                      |
 | `--schemas-path`     |                  | `DM_SCHEMAS_PATH`     | `static/schemas` | Path to JSON schemas                                                                              |

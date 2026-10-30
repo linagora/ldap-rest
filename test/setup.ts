@@ -15,6 +15,10 @@ import {
 } from './helpers/ldapServer';
 import { hasExternalLdap } from './helpers/env';
 
+// Mocha has read its own arguments by now; a server built in a test sees the
+// command line an operator would, not the runner's options.
+process.argv.length = 2;
+
 // Mocha loads every spec file, running its describe bodies, before the root
 // beforeAll below starts the embedded server. Everything about that directory
 // but its URL is known now: set it, so a describe body or a module constant

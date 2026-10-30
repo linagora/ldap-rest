@@ -8,7 +8,13 @@
  *
  * See `docs/plugin-development/options.md`.
  */
-import type { ArrayKind, ConfigEntry } from '../lib/parseConfig';
+import {
+  parseNumber,
+  splitValue,
+  type ArrayKind,
+  type ConfigEntry,
+  type ConfigTemplate,
+} from '../lib/parseConfig';
 
 export type OptionType = 'string' | 'number' | 'boolean' | 'array' | 'json';
 
@@ -216,17 +222,80 @@ function checkValue(
 }
 
 /**
+ * `DM_*` variables no declared option reads. Test-only variables are left
+ * out: a suite sets its own infrastructure through the same prefix.
+ */
+export function unknownEnvironmentOptions(
+  entries: ConfigTemplate,
+  env: Record<string, string | undefined> = process.env,
+  extra: OptionSet[] = []
+): string[] {
+  const known = new Set(
+    entries
+      .map(entry => entry[1])
+      .filter((name): name is string => Boolean(name))
+  );
+  for (const definitions of extra)
+    for (const spec of Object.values(definitions))
+      if (spec.env) known.add(spec.env);
+  return Object.keys(env).filter(
+    name =>
+      name.startsWith('DM_') && !name.startsWith('DM_TEST_') && !known.has(name)
+  );
+}
+
+function valueFromEnvironment(
+  key: string,
+  spec: OptionSpec<unknown>,
+  raw: string
+): unknown {
+  if (spec.type === 'array') {
+    const items = splitValue(raw, (spec as ArrayOption).kind, 'plural');
+    return items.length > 0 ? items : undefined;
+  }
+  if (spec.type === 'number') {
+    if (!raw.trim()) return undefined;
+    const number = parseNumber(raw);
+    if (Number.isNaN(number))
+      throw new Error(
+        `Option ${key}: environment value "${raw}" is not a number`
+      );
+    return number;
+  }
+  if (spec.type === 'boolean') return raw.toLowerCase() === 'true';
+  if (spec.type === 'json') {
+    if (!raw.trim()) return undefined;
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch (error) {
+      throw new Error(
+        `Option ${key}: environment value is not JSON: ${String(error)}`
+      );
+    }
+  }
+  return raw;
+}
+
+/**
  * Read a plugin's options from a parsed configuration, applying the declared
  * defaults and checking the values. Called once per instance by
  * `DmPlugin.options()`.
  */
 export function readOptions<T extends OptionSet>(
   options: T,
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
+  parsedKeys: ReadonlySet<string> = new Set()
 ): OptionsOf<T> {
   const result: Record<string, unknown> = {};
   for (const [key, spec] of Object.entries(options)) {
-    const configured = config[key];
+    const configured =
+      config[key] ??
+      (!parsedKeys.has(key) &&
+      !(key in config) &&
+      spec.env &&
+      process.env[spec.env] !== undefined
+        ? valueFromEnvironment(key, spec, process.env[spec.env] as string)
+        : undefined);
     const emptyString =
       spec.type === 'string' &&
       !spec.emptyIsValue &&

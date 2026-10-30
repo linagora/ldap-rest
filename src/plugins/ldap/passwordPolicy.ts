@@ -1727,26 +1727,29 @@ export default class PasswordPolicy extends DmPlugin {
    */
   private validateComplexity(password: string): ValidationResult {
     const errors: string[] = [];
-    const cfg = this.config;
+    const settings = this.settings;
 
-    const minLength = (cfg.ppolicy_min_length as number) || 12;
+    const minLength = settings.ppolicy_min_length;
     if (password.length < minLength) {
       errors.push(`Minimum ${minLength} characters required`);
     }
 
-    if (cfg.ppolicy_require_uppercase && !/[A-Z]/.test(password)) {
+    if (settings.ppolicy_require_uppercase && !/[A-Z]/.test(password)) {
       errors.push('At least one uppercase letter required');
     }
 
-    if (cfg.ppolicy_require_lowercase && !/[a-z]/.test(password)) {
+    if (settings.ppolicy_require_lowercase && !/[a-z]/.test(password)) {
       errors.push('At least one lowercase letter required');
     }
 
-    if (cfg.ppolicy_require_digit && !/\d/.test(password)) {
+    if (settings.ppolicy_require_digit && !/\d/.test(password)) {
       errors.push('At least one digit required');
     }
 
-    if (cfg.ppolicy_require_special && !SPECIAL_CHARS_REGEX.test(password)) {
+    if (
+      settings.ppolicy_require_special &&
+      !SPECIAL_CHARS_REGEX.test(password)
+    ) {
       errors.push('At least one special character required');
     }
 

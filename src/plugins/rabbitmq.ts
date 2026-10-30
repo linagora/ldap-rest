@@ -23,6 +23,8 @@ import type { DM } from '../bin';
 import { outsideAnyRequest } from '../lib/requestContext';
 import type { HealthStatus } from '../lib/health';
 
+import { rabbitmqOptions } from './rabbitmq.options';
+
 /** JSON-serialisable message payload. */
 export type RabbitMessage = Record<string, unknown>;
 
@@ -82,6 +84,8 @@ interface RabbitClientOptions {
 }
 
 export default class RabbitMq extends DmPlugin {
+  static optionDefinitions = rabbitmqOptions;
+
   name = 'rabbitmq';
 
   private readonly rabbitmqUrl: string;
@@ -92,7 +96,7 @@ export default class RabbitMq extends DmPlugin {
   constructor(server: DM) {
     super(server);
 
-    this.rabbitmqUrl = (this.config.rabbitmq_url as string) || '';
+    this.rabbitmqUrl = this.options(rabbitmqOptions).rabbitmq_url;
 
     if (!this.rabbitmqUrl) {
       this.logger.warn(

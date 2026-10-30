@@ -99,7 +99,7 @@ export function parseOptions(argv: string[]): Options {
   const schema = flags.schema;
   if (!schema) throw new Error('--schema <file> is required');
 
-  const url = flags.url || process.env.DM_LDAP_URL || process.env.DM_LDAP_URI;
+  const url = flags.url || process.env.DM_LDAP_URL;
   if (!url) throw new Error('--url or DM_LDAP_URL is required');
 
   return {

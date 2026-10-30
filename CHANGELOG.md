@@ -8,6 +8,9 @@
   administrator the server is older than it supports. Only an installation
   that moved the `package.json` outside the package leaves the field out
   ([details](docs/client-development/api/rest-api.md#get-configuration)).
+- An option or `DM_*` variable no declared option reads is named in a startup
+  warning; `--strict-options` refuses it instead
+  ([details](docs/usage/configuration.md#general-options)).
 - The published image declares a `HEALTHCHECK` that calls `GET /healthz`
   ([details](docs/usage/operations.md#health-and-readiness)).
 

@@ -16,6 +16,11 @@ import {
   type Schema,
 } from '../config/schema';
 import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
+import configArgs from '../config/args';
+
+const parsedOptionKeys = new Set(
+  configArgs.map(entry => entry[0].replace(/^--?/, '').replace(/-/g, '_'))
+);
 
 export {
   asyncHandler,
@@ -173,7 +178,7 @@ export default abstract class DmPlugin {
         `${this.constructor.name}: options() takes the definitions the ` +
           'plugin declares'
       );
-    return readOptions(declared, this.config) as OptionsOf<T>;
+    return readOptions(declared, this.config, parsedOptionKeys) as OptionsOf<T>;
   }
 
   /**
