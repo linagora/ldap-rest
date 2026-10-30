@@ -126,7 +126,9 @@ export class EntityValidator {
     for (const [field, value] of Object.entries(values))
       if (
         (value === null || value === undefined) &&
-        !schemaAttribute(this.schema, field)
+        // `attribute` refuses an undeclared name, so a strict schema still
+        // answers 400 here rather than losing the key to a drop
+        !this.attribute(field)
       )
         delete values[field];
   }

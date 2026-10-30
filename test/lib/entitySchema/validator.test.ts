@@ -76,6 +76,28 @@ describe('EntityValidator', () => {
       ).to.equal('Unknown attribute "x" for person');
     });
 
+    // A `null` is dropped only where no schema declares the name: a strict
+    // one still names the attribute rather than losing it to the drop
+    it('names an undeclared attribute sent with null to a strict schema', async () => {
+      expect(
+        await refusal(validator().validateNew(entry({ title: null })))
+      ).to.equal('Unknown attribute "title" for person');
+      expect(
+        await refusal(
+          validator().validateChanges({
+            add: { title: null },
+          } as unknown as ModifyRequest)
+        )
+      ).to.equal('Unknown attribute "title" for person');
+      expect(
+        await refusal(
+          validator().validateChanges({
+            replace: { title: null },
+          } as unknown as ModifyRequest)
+        )
+      ).to.equal('Unknown attribute "title" for person');
+    });
+
     it('calls an empty required value missing before checking it', async () => {
       expect(
         await refusal(validator().validateNew(entry({ uid: '' })))

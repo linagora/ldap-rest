@@ -192,6 +192,12 @@ describe('Entity schema contract', function () {
       title: 'an attribute the schema does not declare, in another case',
       attributes: () => ({ TELEPHONENUMBER: '+33 1 00 00 00 00' }),
     },
+    // A strict schema names the attribute whatever it is sent with: a `null`
+    // is dropped only where no schema declares the name
+    {
+      title: 'an attribute the schema does not declare, sent with null',
+      attributes: () => ({ title: null }),
+    },
     {
       title: 'a read-only attribute',
       attributes: () => ({ employeeType: 'contractor' }),
@@ -349,6 +355,28 @@ describe('Entity schema contract', function () {
         .send({ add: { title: null } });
       expect(res.status, JSON.stringify(res.body)).to.equal(200);
       expect(await stored(dn(), 'title')).to.be.undefined;
+    });
+
+    // "As if the key were left out" reaches a default the entity configures
+    // under the same name: the drop must not take the default with it
+    it('writes the configured default for a null it drops', async () => {
+      const instance = (
+        server.loadedPlugins['ldapFlatGeneric'] as LdapFlatGeneric
+      ).instances.find(other => other.pluralName === 'loosePeople');
+      const defaults = (instance as unknown as { defaultAttributes: Body })
+        .defaultAttributes;
+      const previous = defaults.title;
+      defaults.title = 'from-config';
+      try {
+        created(await request.post(route).send({ ...body, title: null }));
+        expect(await stored(dn(), 'title')).to.equal('from-config');
+        await server.ldap.delete(dn());
+        created(await request.post(route).send(body));
+        expect(await stored(dn(), 'title')).to.equal('from-config');
+      } finally {
+        if (previous === undefined) delete defaults.title;
+        else defaults.title = previous;
+      }
     });
   });
 
