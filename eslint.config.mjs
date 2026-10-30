@@ -4,7 +4,6 @@ import tsparser from '@typescript-eslint/parser';
 import prettier from 'eslint-plugin-prettier';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
-import nodePlugin from 'eslint-plugin-node';
 import globals from 'globals';
 
 export default [
@@ -31,7 +30,6 @@ export default [
       '@typescript-eslint': tseslint,
       prettier: prettier,
       import: importPlugin,
-      node: nodePlugin,
     },
     rules: {
       // TS rules
@@ -50,11 +48,6 @@ export default [
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-var-requires': 'error',
-
-      // Node.js rules
-      'node/no-missing-import': 'off',
-      'node/no-unsupported-features/es-syntax': 'off',
-      'node/no-unpublished-import': 'off',
 
       // Import rules
       'import/order': [
