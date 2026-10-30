@@ -402,7 +402,7 @@ describe('Migration proxy plugin', () => {
     });
 
     it('is degraded when the proxy takes too long', async () => {
-      nock(url).get('/healthcheck').delayConnection(2500).reply(200);
+      nock(url).get('/healthcheck').delay(2500).reply(200);
       const started = Date.now();
       expect(await plugin.health()).to.equal('degraded');
       expect(Date.now() - started).to.be.below(2000);

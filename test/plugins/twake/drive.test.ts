@@ -201,7 +201,7 @@ describe('Drive Plugin', () => {
           return query.FromCloudery === 'true' && !!query.PublicName;
         })
         .times(2) // Allow up to 2 calls (creation + modification)
-        .reply(200, function (uri) {
+        .reply(200, function (uri: string) {
           callCount++;
           const url = new URL(uri, 'http://localhost');
           lastPublicName = url.searchParams.get('PublicName') || '';

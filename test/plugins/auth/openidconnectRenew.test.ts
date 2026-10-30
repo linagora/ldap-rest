@@ -15,6 +15,10 @@ import {
   login,
 } from '../../helpers/oidcProvider';
 
+/** Long enough for a one-second access token to be past, as v6 reads it */
+const expire = (): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, 1100));
+
 /** A route the plugin guards, answering who it found */
 const ping = (server: DM): void => {
   server.app.get('/api/admin/ping', (req, res: Response) =>
@@ -58,9 +62,10 @@ describe('OpenID Connect, access token expiry', function () {
     const issuer = 'http://renew-refresh.example.test';
     const request = await build(issuer, true, undefined, ping);
     const { cookie } = await login(request, issuer, {
-      expires_in: 0,
+      expires_in: 1,
       refresh_token: 'rt',
     });
+    await expire();
     let asked: string | undefined;
     const renewal = nock(issuer)
       .post('/token', body => {
@@ -94,7 +99,8 @@ describe('OpenID Connect, access token expiry', function () {
   it('should end the session when there is no refresh token', async () => {
     const issuer = 'http://renew-none.example.test';
     const request = await build(issuer, true, undefined, ping);
-    const { cookie } = await login(request, issuer, { expires_in: 0 });
+    const { cookie } = await login(request, issuer, { expires_in: 1 });
+    await expire();
 
     const api = await request
       .get('/api/admin/ping')
@@ -115,9 +121,10 @@ describe('OpenID Connect, access token expiry', function () {
     const issuer = 'http://renew-refused.example.test';
     const request = await build(issuer, true, undefined, ping);
     const { cookie } = await login(request, issuer, {
-      expires_in: 0,
+      expires_in: 1,
       refresh_token: 'rt',
     });
+    await expire();
     nock(issuer).post('/token').reply(400, { error: 'invalid_grant' });
 
     const res = await request

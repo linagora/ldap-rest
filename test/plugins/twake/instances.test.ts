@@ -1967,7 +1967,7 @@ describe('Twake instances plugin', function () {
       nock(CLOUDERY)
         .get('/api/v2/instances')
         .query(true)
-        .delayBody(500)
+        .delay(500)
         .reply(200, { items: [] });
       const cloudery = new ClouderyProvider(
         CLOUDERY,

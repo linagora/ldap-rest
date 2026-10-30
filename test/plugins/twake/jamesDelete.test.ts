@@ -27,7 +27,7 @@ describe('James Plugin - user deletion', () => {
     for (const method of ['GET', 'PUT', 'POST', 'DELETE'])
       scope
         .intercept(() => true, method)
-        .reply(function (uri) {
+        .reply(function (uri: string) {
           calls.push(`${method} ${uri}`);
           return method === 'GET' ? [200, []] : [204, ''];
         });
