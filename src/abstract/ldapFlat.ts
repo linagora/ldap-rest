@@ -26,7 +26,6 @@ import {
   jsonBody,
   multiStatus,
   tryMethod,
-  wantJson,
   WriteResponse,
 } from '../lib/expressFormatedResponses';
 import {
@@ -1155,7 +1154,6 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     try {
       const dn = this.resolveDn(id);
@@ -1222,7 +1220,6 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.deleteEntry.bind(this), id, req);
   }
@@ -1260,8 +1257,6 @@ export default abstract class LdapFlat extends DmPlugin {
    * @param res response
    */
   async apiRename(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
     const body = req.body as Record<string, unknown> & { newId: string };
     const newId = body.newId;
 
