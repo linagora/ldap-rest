@@ -11,6 +11,7 @@ import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
 import { calendarOptions } from '../plugins/twake/calendar.options';
+import { driveOptions } from '../plugins/twake/drive.options';
 import { jamesOptions } from '../plugins/twake/james.options';
 
 import { toConfigEntries } from './options';
@@ -801,19 +802,7 @@ const configArgs: ConfigTemplate = [
   ],
 
   // Drive (Cozy) plugin
-  ['--twake-drive-webadmin-url', 'DM_TWAKE_DRIVE_WEBADMIN_URL', ''],
-  ['--twake-drive-webadmin-token', 'DM_TWAKE_DRIVE_WEBADMIN_TOKEN', ''],
-  ['--twake-drive-concurrency', 'DM_TWAKE_DRIVE_CONCURRENCY', 10, 'number'],
-  [
-    '--twake-drive-domain-attribute',
-    'DM_TWAKE_DRIVE_DOMAIN_ATTRIBUTE',
-    'twakeCozyDomain',
-  ],
-  [
-    '--twake-drive-default-domain-template',
-    'DM_TWAKE_DRIVE_DEFAULT_DOMAIN_TEMPLATE',
-    '',
-  ],
+  ...toConfigEntries(driveOptions),
 
   // Twake Calendar plugin
   ...toConfigEntries(calendarOptions),

@@ -83,11 +83,11 @@ values beside what they already require.
 
 **Who is affected:** a deployment setting a SCIM limit to zero or a negative
 number, giving a per-instance override of the wrong JSON type, or setting the
-James or Calendar concurrency to the wrong type.
+James, Calendar or Drive concurrency to the wrong type.
 
-These SCIM limits now refuse a value below 1 when the plugin loads: a zero
-used to be silently replaced by the default, and a negative value used as it
-was. Remove the option to keep the default, or give it a positive number.
+These options now refuse a value below 1 when the plugin loads: a zero used
+to be silently replaced by the default, and a negative value used as it was.
+Remove the option to keep the default, or give it a positive number.
 
 A per-instance override (`--plugin core/scim:name:{...}`) must also use the
 option's JSON type: `{"scim_max_results": "50"}` and `{"scim_user_base":
@@ -96,9 +96,9 @@ treated as unset. The applicative accounts options refuse the same:
 `{"max_app_accounts": "5"}` used to be kept as the string, and
 `{"applicative_account_attribute": "cn"}` was spread into `['c', 'n']`.
 
-The James and Calendar concurrency used to replace a value that was not a
-number with `10`, and now refuses it. A zero or a negative value was already
-refused by `p-limit`, and the message now names the option.
+The James, Calendar and Drive concurrency used to replace a value that was
+not a number with `10`, and now refuses it. A zero or a negative value was
+already refused by `p-limit`, and the message now names the option.
 
 ### Node 22 or later is required
 

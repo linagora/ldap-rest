@@ -280,6 +280,10 @@
       "types": "./dist/src/plugins/twake/cozyProvision.d.ts",
       "import": "./dist/plugins/twake/cozyProvision.js"
     },
+    "./plugin-twake-drive.options": {
+      "types": "./dist/src/plugins/twake/drive.options.d.ts",
+      "import": "./dist/plugins/twake/drive.options.js"
+    },
     "./plugin-twake-drive": {
       "types": "./dist/src/plugins/twake/drive.d.ts",
       "import": "./dist/plugins/twake/drive.js"
