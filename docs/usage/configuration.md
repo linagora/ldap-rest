@@ -523,7 +523,7 @@ Formerly `core/twake/calendarResources`, still accepted as a deprecated alias.
 | `--calendar-concurrency`          | `DM_CALENDAR_CONCURRENCY`          | `10`                    | API concurrency               |
 | `--calendar-resource-base`        | `DM_CALENDAR_RESOURCE_BASE`        |                         | Resource base DN              |
 | `--calendar-resource-objectclass` | `DM_CALENDAR_RESOURCE_OBJECTCLASS` |                         | Resource objectClass          |
-| `--calendar-resource-creator`     | `DM_CALENDAR_RESOURCE_CREATOR`     |                         | Resource creator              |
+| `--calendar-resource-creator`     | `DM_CALENDAR_RESOURCE_CREATOR`     | `admin@example.com`     | Resource creator              |
 | `--calendar-resource-domain`      | `DM_CALENDAR_RESOURCE_DOMAIN`      |                         | Resource domain               |
 | `--calendar-firstname-attribute`  | `DM_CALENDAR_FIRSTNAME_ATTRIBUTE`  | `givenName`             | Registered user first name    |
 | `--calendar-lastname-attribute`   | `DM_CALENDAR_LASTNAME_ATTRIBUTE`   | `sn`                    | Registered user last name     |

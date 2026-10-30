@@ -325,6 +325,71 @@ describe('plugin options', () => {
     });
   });
 
+  describe('Calendar options in the configuration', () => {
+    const names = [
+      'DM_CALENDAR_WEBADMIN_URL',
+      'DM_CALENDAR_WEBADMIN_TOKEN',
+      'DM_CALENDAR_CONCURRENCY',
+      'DM_CALENDAR_RESOURCE_BASE',
+      'DM_CALENDAR_RESOURCE_OBJECTCLASS',
+      'DM_CALENDAR_RESOURCE_CREATOR',
+      'DM_CALENDAR_RESOURCE_DOMAIN',
+      'DM_CALENDAR_FIRSTNAME_ATTRIBUTE',
+      'DM_CALENDAR_LASTNAME_ATTRIBUTE',
+    ];
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = {};
+      for (const name of names) {
+        saved[name] = process.env[name];
+        delete process.env[name];
+      }
+    });
+    afterEach(() => {
+      for (const name of names)
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+    });
+
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.calendar_webadmin_url).to.equal('http://localhost:8080');
+      expect(config.calendar_webadmin_token).to.equal('');
+      expect(config.calendar_concurrency).to.equal(10);
+      expect(config.calendar_resource_base).to.equal('');
+      expect(config.calendar_resource_objectclass).to.equal('');
+      expect(config.calendar_resource_creator).to.equal('admin@example.com');
+      expect(config.calendar_resource_domain).to.equal('');
+      expect(config.calendar_firstname_attribute).to.equal('givenName');
+      expect(config.calendar_lastname_attribute).to.equal('sn');
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      process.env.DM_CALENDAR_CONCURRENCY = '4';
+      process.env.DM_CALENDAR_RESOURCE_BASE = 'ou=resources,dc=example,dc=com';
+      const config = parse([
+        'node',
+        'ldap-rest',
+        '--calendar-resource-objectclass',
+        'calendarResource',
+        '--calendar-resource-creator',
+        'resources@example.com',
+        '--calendar-firstname-attribute',
+        'cn',
+      ]);
+      expect(config.calendar_concurrency).to.equal(4);
+      expect(config.calendar_resource_base).to.equal(
+        'ou=resources,dc=example,dc=com'
+      );
+      expect(config.calendar_resource_objectclass).to.equal('calendarResource');
+      expect(config.calendar_resource_creator).to.equal(
+        'resources@example.com'
+      );
+      expect(config.calendar_firstname_attribute).to.equal('cn');
+    });
+  });
+
   describe('reading and checking values', () => {
     const definitions = defineOptions({
       name: opt.string({ required: true }),
