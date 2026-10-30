@@ -11,6 +11,12 @@
 
 ### Fixed
 
+- A creation or an `add` carrying `null` for an attribute the entity's schema
+  does not declare, or for every attribute when it has no schema, is no
+  longer answered 500: the attribute is written as if the key were left out.
+  The same applies to a `replace` of such an entry, where `null` clears the
+  attribute
+  ([#495](https://github.com/linagora/ldap-rest/issues/495)).
 - A size normalised with `byteSize` is answered 400 when it exceeds
   2⁵³ − 1 bytes (`53687 TB`, a too large `default`), where it was stored as
   `53687000000000000`, `1e+21` or `Infinity`

@@ -1,0 +1,22 @@
+{
+  "strict": false,
+  "entity": {
+    "name": "loosePerson",
+    "mainAttribute": "uid",
+    "objectClass": ["top", "inetOrgPerson", "extensibleObject"],
+    "singularName": "loosePerson",
+    "pluralName": "loosePeople",
+    "base": "ou=users,__LDAP_BASE__"
+  },
+  "attributes": {
+    "objectClass": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true,
+      "fixed": true
+    },
+    "uid": { "type": "string", "required": true }
+  }
+}

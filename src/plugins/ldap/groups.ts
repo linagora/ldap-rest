@@ -852,10 +852,18 @@ export default class LdapGroups extends DmPlugin {
       ...additional,
     });
     // The entry holds the placeholder member too; what else was validated
-    // is written in the shape it was given, over the entry judged, and the
-    // defaults `candidateGroup` added on top are converted here
+    // is written over the entry judged, and the defaults `candidateGroup`
+    // added on top are converted here. Rebuilt rather than merged: see
+    // `addEntry` in `ldapFlat`.
     delete candidate.member;
-    Object.assign(entry, candidate);
+    entry = {
+      ...Object.fromEntries(
+        Object.entries(entry).filter(
+          ([field]) => field === 'member' || !(field in additional)
+        )
+      ),
+      ...candidate,
+    };
     toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,

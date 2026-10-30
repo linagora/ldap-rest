@@ -7,6 +7,7 @@ import { expect } from 'chai';
 import type { Schema } from '../../../src/config/schema';
 import { BadRequestError } from '../../../src/lib/errors';
 import { EntityValidator } from '../../../src/lib/entitySchema/validator';
+import type { ModifyRequest } from '../../../src/lib/ldapActions';
 
 const users = 'ou=users,dc=example,dc=com';
 const bob = `uid=bob,${users}`;
@@ -97,10 +98,57 @@ describe('EntityValidator', () => {
       expect(candidate.b).to.equal('FALSE');
     });
 
-    it('leaves no null in the entry', async () => {
+    it('leaves no null in a declared attribute', async () => {
       const candidate = entry({ businessCategory: null });
       expect(await refusal(validator().validateNew(candidate))).to.be.undefined;
       expect(candidate.businessCategory).to.deep.equal([]);
+    });
+
+    it('refuses an empty list for a declared attribute, not by dropping it', async () => {
+      expect(
+        await refusal(validator().validateNew(entry({ description: [] })))
+      ).to.equal('Attribute "description" is required');
+    });
+
+    // A fuzzer sent a creation with `DN: null` to an entity without a
+    // schema: the null reached ldapts, which threw outside any LDAP code and
+    // answered 500
+    it('drops a null no schema turns into an empty list', async () => {
+      for (const loaded of [null, { ...schema, strict: false } as Schema])
+        for (const value of [null, undefined]) {
+          const candidate = entry({
+            businessCategory: value,
+            description: 'd',
+            title: value,
+            DN: value,
+          }) as Record<string, unknown>;
+          expect(
+            await refusal(validator(loaded).validateNew(candidate as never)),
+            JSON.stringify(value)
+          ).to.be.undefined;
+          expect(candidate).to.not.have.property('title');
+          expect(candidate).to.not.have.property('DN');
+          for (const kept of Object.values(candidate))
+            expect(kept === null || kept === undefined).to.equal(false);
+        }
+      // A declared attribute keeps its null until the schema reads it
+      const declared: Record<string, unknown> = entry({
+        businessCategory: null,
+        title: 'x',
+      });
+      await validator({ ...schema, strict: false } as Schema).validateNew(
+        declared as never
+      );
+      expect(declared.businessCategory).to.deep.equal([]);
+    });
+
+    it('keeps a fixed attribute with a default sent with no value', async () => {
+      for (const l of [null, undefined, []]) {
+        const candidate = entry({ l });
+        expect(await refusal(validator().validateNew(candidate))).to.be
+          .undefined;
+        expect(candidate.l).to.equal('paris');
+      }
     });
 
     it('names the first required attribute left out', async () => {
@@ -185,6 +233,38 @@ describe('EntityValidator', () => {
           })
         )
       ).to.equal('Invalid value for attribute "businessCategory"');
+    });
+
+    // Without a schema, nothing else refuses or converts it: an `add`
+    // carrying `null` reached ldapts as `[null]`
+    it('drops a null an add carries under a name no schema declares', async () => {
+      const added = {
+        add: { businessCategory: null, title: null },
+      } as unknown as ModifyRequest;
+      await validator(null).validateChanges(added);
+      expect(added.add).to.deep.equal({});
+      const loose = {
+        add: { businessCategory: null, title: null },
+      } as unknown as ModifyRequest;
+      await validator({ ...schema, strict: false } as Schema).validateChanges(
+        loose
+      );
+      // A declared attribute is left to the schema, which stores []
+      expect(loose.add).to.deep.equal({ businessCategory: [] });
+    });
+
+    it('clears a replace, declared or not', async () => {
+      for (const loaded of [null, { ...schema, strict: false } as Schema]) {
+        const changed = {
+          replace: { businessCategory: null, title: null },
+        } as unknown as ModifyRequest;
+        expect(await refusal(validator(loaded).validateChanges(changed))).to.be
+          .undefined;
+        expect(changed.replace).to.deep.equal({
+          businessCategory: [],
+          title: [],
+        });
+      }
     });
   });
 

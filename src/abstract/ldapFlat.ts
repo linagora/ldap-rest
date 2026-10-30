@@ -1451,9 +1451,15 @@ export default abstract class LdapFlat extends DmPlugin {
       objectClass: this.objectClass,
     };
     await this.validateNewEntry(dn, candidate);
-    // What was validated is written in the shape it was given; the defaults
-    // `candidateEntry` added on top are converted here
-    Object.assign(entry, candidate);
+    // Written from what validation left: `Object.assign` cannot remove a key
+    // the validator dropped, so the entry is rebuilt without the rest of the
+    // request, keeping only the defaults `candidateEntry` added
+    entry = {
+      ...Object.fromEntries(
+        Object.entries(entry).filter(([field]) => !(field in additional))
+      ),
+      ...candidate,
+    };
     toDirectoryEntry(this.schema, entry);
 
     // Note: LDAP attribute values with DNs do NOT need escaping

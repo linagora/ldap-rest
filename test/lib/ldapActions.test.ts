@@ -155,6 +155,26 @@ describe('ldapActions', function () {
         }
         expect(status).to.equal(400);
       });
+
+      it('answers 400 for no value in an add', async () => {
+        for (const value of [[], null, [null], ['a', null]]) {
+          let error: unknown;
+          try {
+            await ldapActions.modify(testDN, {
+              add: { description: value } as never,
+            });
+          } catch (err) {
+            error = err;
+          }
+          expect(
+            (error as { statusCode?: number })?.statusCode,
+            String(value)
+          ).to.equal(400);
+          expect((error as Error)?.message).to.equal(
+            'Attribute "description" has no value'
+          );
+        }
+      });
     });
 
     describe('add', () => {
