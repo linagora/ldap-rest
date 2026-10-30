@@ -7,6 +7,7 @@ import { Attribute, Change, Client } from 'ldapts';
 import supertest from 'supertest';
 
 import { DM } from '../../../src/bin';
+import { BadRequestError } from '../../../src/lib/errors';
 import LdapFlatGeneric from '../../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../../src/plugins/ldap/organizations';
@@ -35,8 +36,27 @@ describe('Enterprise rules', () => {
 
     it('should refuse anything that is not a size', () => {
       for (const value of ['', 'GB', '5PB', '-1', 'five']) {
-        expect(() => parseByteSize(value), value).to.throw();
+        expect(() => parseByteSize(value), value).to.throw(BadRequestError);
       }
+    });
+
+    it('should refuse a size it cannot write as a safe integer', () => {
+      const tooLarge = [
+        '53687 TB',
+        '1000000000 TB',
+        `${'9'.repeat(400)} MB`,
+        '9'.repeat(323) + 'mB ',
+        String(Number.MAX_SAFE_INTEGER + 1),
+      ];
+      for (const value of tooLarge) {
+        expect(() => parseByteSize(value), String(value)).to.throw(
+          BadRequestError
+        );
+      }
+      expect(parseByteSize('5GB')).to.equal(5_000_000_000);
+      expect(parseByteSize('9007199254740991')).to.equal(
+        Number.MAX_SAFE_INTEGER
+      );
     });
   });
 
@@ -695,6 +715,34 @@ describe('Enterprise rules', () => {
         // The path follows the move, the size is counted in bytes
         expect(stored.twakeDepartmentPath).to.equal('RulesOrg');
         expect(stored.mailQuotaSize).to.equal('5000000000');
+      });
+
+      it('should refuse a size it cannot write as a safe integer', async () => {
+        const res = await request.post('/api/v1/ldap/users').type('json').send({
+          cn: 'Rules Domain',
+          sn: 'Domain',
+          mail: 'rules.domain@example.com',
+          twakeDepartmentLink: subOrgDn,
+          employeeNumber: 'ENT0053',
+          givenName: 'Test',
+          displayName: 'Test Person',
+        });
+        expect(res.status, JSON.stringify(res.body)).to.equal(201);
+        for (const size of [
+          '53687 TB',
+          '1000000000 TB',
+          `${'9'.repeat(400)} MB`,
+        ])
+          await request
+            .put(`/api/v1/ldap/users/rules.domain`)
+            .type('json')
+            .send({ replace: { mailQuotaSize: size } })
+            .then(r => {
+              expect(r.status, size).to.equal(400);
+              expect(r.body.error).to.match(
+                /Invalid value for attribute "mailQuotaSize"/
+              );
+            });
       });
 
       it('should list a domain linked at several levels once', async () => {

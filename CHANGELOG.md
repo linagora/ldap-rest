@@ -9,6 +9,13 @@
   that moved the `package.json` outside the package leaves the field out
   ([details](docs/client-development/api/rest-api.md#get-configuration)).
 
+### Fixed
+
+- A size normalised with `byteSize` is answered 400 when it exceeds
+  2⁵³ − 1 bytes (`53687 TB`, a too large `default`), where it was stored as
+  `53687000000000000`, `1e+21` or `Infinity`
+  ([#493](https://github.com/linagora/ldap-rest/issues/493)).
+
 ### Security
 
 - A name sent as a DN, when creating a flat entry or a group, is no longer
@@ -18,7 +25,8 @@
   its escapes decoded — `uid=Smith\,John,…` names the entry `Smith,John`,
   where it used to be `Smith\,John`. Such a name is answered 400 when the
   DN gives none (empty, a control character, or a first RDN that is
-  multi-valued).
+  multi-valued)
+  ([details](docs/usage/plugins/ldap/flat-generic.md#create-entry)).
 - A schema `test` pattern no longer reads a value longer than 4096
   characters, unless the schema declares a `maxLength`: a longer value is
   answered 400 with the length it may not exceed. Every attribute carrying a
