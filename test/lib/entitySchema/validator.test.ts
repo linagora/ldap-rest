@@ -308,8 +308,14 @@ describe('EntityValidator', () => {
           validator().validateChanges({ delete: { description: ['old'] } })
         )
       ).to.be.undefined;
-      // The directory applies the `add` after the `delete`: what it names is
-      // there again, and under the schema's spelling
+      // One value, given as it is or as a list of one
+      expect(
+        await refusal(
+          validator().validateChanges({ delete: { description: 'old' } })
+        )
+      ).to.be.undefined;
+      // The directory applies an `add` and a `replace` before the `delete`:
+      // the value they give is removed by it
       for (const changes of [
         { delete: ['description'], add: { DESCRIPTION: 'new' } },
         { delete: { description: [] }, replace: { Description: 'new' } },
@@ -317,7 +323,22 @@ describe('EntityValidator', () => {
         expect(
           await refusal(validator().validateChanges(changes)),
           JSON.stringify(changes)
-        ).to.be.undefined;
+        ).to.equal('Attribute "description" is required');
+      // A `replace` of another attribute leaves the `delete` whole
+      expect(
+        await refusal(
+          validator().validateChanges({
+            delete: ['description'],
+            replace: { businessCategory: 'x' },
+          })
+        )
+      ).to.equal('Attribute "description" is required');
+    });
+
+    it('keeps the parts it was given as they were given', async () => {
+      const changes = { replace: { businessCategory: 'x' } } as ModifyRequest;
+      await validator().validateChanges(changes);
+      expect(Object.keys(changes)).to.deep.equal(['replace']);
     });
 
     it('clears an optional attribute with null, as the directory reads []', async () => {

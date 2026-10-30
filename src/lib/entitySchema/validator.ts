@@ -87,9 +87,8 @@ export class EntityValidator {
    * @returns the same change, under the schema's spellings
    */
   async validateChanges(changes: ModifyRequest): Promise<ModifyRequest> {
-    // Every part before any check: what one names, another may give a value
-    changes.add = changes.add && this.renameDeclared(changes.add);
-    changes.replace = changes.replace && this.renameDeclared(changes.replace);
+    if (changes.add) changes.add = this.renameDeclared(changes.add);
+    if (changes.replace) changes.replace = this.renameDeclared(changes.replace);
     if (changes.delete)
       changes.delete = Array.isArray(changes.delete)
         ? this.renameDeclaredNames(changes.delete)
@@ -105,6 +104,16 @@ export class EntityValidator {
       return changes;
     }
     if (changes.delete) {
+      // A required attribute is refused to a delete of the whole attribute:
+      // named in the list, or under a name with no value, as the directory
+      // layer reads it. Named with values, some may remain. An `add` or a
+      // `replace` of the same change does not save it: the directory applies
+      // them before the `delete`
+      const whole = (field: string): boolean => {
+        if (Array.isArray(changes.delete)) return true;
+        const value = (changes.delete as AttributesList)[field];
+        return !value || isNoValue(value);
+      };
       const fields = Array.isArray(changes.delete)
         ? changes.delete
         : Object.keys(changes.delete);
@@ -114,33 +123,12 @@ export class EntityValidator {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
           );
-        if (attr?.required && this.deletesWhole(changes, field))
+        if (attr?.required && whole(field))
           throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
     toDirectoryChanges(this.schema, changes);
     return changes;
-  }
-
-  /**
-   * Whether a change removes every value of an attribute: a `delete` naming
-   * it, in the list or under a name with no value as the directory layer
-   * reads it, and nothing in the same change giving it a value again, in an
-   * `add` or a `replace` that the directory applies after the `delete`. A
-   * `delete` naming some values leaves the others.
-   */
-  private deletesWhole(changes: ModifyRequest, field: string): boolean {
-    const deletePart = changes.delete as string[] | AttributesList;
-    const named = Array.isArray(deletePart) ? undefined : deletePart[field];
-    // An empty list clears the attribute, as a name alone does
-    if (Array.isArray(named) && named.length > 0) return false;
-    const base = field.split(';')[0].toLowerCase();
-    return ![changes.add, changes.replace].some(part =>
-      Object.entries(part ?? {}).some(
-        ([key, value]) =>
-          key.split(';')[0].toLowerCase() === base && !isNoValue(value)
-      )
-    );
   }
 
   /**

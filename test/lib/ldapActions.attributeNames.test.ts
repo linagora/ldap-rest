@@ -50,6 +50,46 @@ describe('Attribute names of a write', function () {
     await server?.ldap.delete(dn).catch(() => undefined);
   });
 
+  // The entity schemas refuse a `delete` of a whole `required` attribute in
+  // a change that gives it a value again, so the directory has to apply
+  // that value first. It is the order RFC 4511 §4.6 gives, and the order
+  // `applyModify` builds its changes in.
+  it('applies an add and a replace before a delete of the same change', async () => {
+    const target = `uid=names-order,ou=users,${base}`;
+    await server.ldap.delete(target).catch(() => undefined);
+    await server.ldap.add(target, {
+      objectClass: ['top', 'inetOrgPerson'],
+      uid: 'names-order',
+      cn: 'Order',
+      sn: 'Test',
+      description: 'old',
+    });
+    const description = async (): Promise<unknown> => {
+      const found = (
+        (await server.ldap.search(
+          { paged: false, scope: 'base', attributes: ['description'] },
+          target
+        )) as SearchResult
+      ).searchEntries[0];
+      return found?.description;
+    };
+    try {
+      await server.ldap.modify(target, {
+        delete: ['description'],
+        add: { description: 'new' },
+      });
+      expect(await description()).to.deep.equal([]);
+      await server.ldap.modify(target, { replace: { description: 'old' } });
+      await server.ldap.modify(target, {
+        delete: ['description'],
+        replace: { description: 'new' },
+      });
+      expect(await description()).to.deep.equal([]);
+    } finally {
+      await server.ldap.delete(target).catch(() => undefined);
+    }
+  });
+
   it('names an attribute as the server does, whatever its case, alias or OID', async () => {
     for (const [given, name] of [
       ['MAIL', 'mail'],
