@@ -77,7 +77,25 @@ where it cannot apply here, and remove the entry once it is fixed.
 2. Add tests: a fix comes with a test that fails without it.
 3. Commit following [Conventional Commits](https://www.conventionalcommits.org/):
    `fix(authz): …`, `docs(upgrading): …`.
-4. Open a pull request on GitHub.
+4. Open a pull request on GitHub, filling the template: it records the
+   reviews below.
+
+## Reviewing changes
+
+Every pull request gets two independent reviews from distinct AI assistants,
+in addition to the author's own reading. They look for correctness bugs,
+security issues, missing tests and drift from [AGENTS.md](./AGENTS.md). Their
+findings are discussed in the pull request, not applied silently.
+
+They do not replace an owner. An assistant has no stake in the code,
+does not arbitrate architectural decisions, and cannot take over a path when
+its maintainer leaves. A change to a path listed in `.github/CODEOWNERS`
+therefore still needs a human code owner's approval, from someone other than
+the author.
+
+The pull request records who performed which review. A merged change without
+that record is a gap: fill it in the next pull request, and prefer a visible
+review over an undocumented one.
 
 ## License
 
