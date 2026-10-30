@@ -36,6 +36,32 @@ field, getter or method named `options`, or a static field named
 through `optionDefinitions`. Rename the plugin's own `options` member; a
 plugin that does not declare options keeps reading `this.config` as before.
 
+### A plugin extending `TwakePlugin`
+
+**Who is affected:** a plugin built outside this repository whose class extends
+`TwakePlugin`.
+
+The base constructor takes the WebAdmin URL, token and concurrency instead of
+the names of the options holding them:
+
+```ts
+import { jamesOptionsOf } from 'ldap-rest/plugin-twake-james.options';
+
+const options = jamesOptionsOf(server.config);
+super(server, {
+  url: options.james_webadmin_url,
+  token: options.james_webadmin_token,
+  concurrency: options.james_concurrency,
+  urlOption: 'james_webadmin_url',
+  tokenOption: 'james_webadmin_token',
+  concurrencyOption: 'james_concurrency',
+});
+```
+
+The three `*Option` fields only name the option in the startup error and the
+missing-token warning. `concurrency` must be a positive integer; the base
+refuses anything else, naming `concurrencyOption`.
+
 ### A plugin building SCIM's exported helpers
 
 **Who is affected:** a plugin built outside this repository that constructs

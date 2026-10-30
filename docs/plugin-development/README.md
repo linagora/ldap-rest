@@ -61,7 +61,7 @@ export default class MyPlugin extends DmPlugin {
 - **this.server**: DM server instance
 - **this.config**: Complete configuration object
 - **this.options(declarations)**: Values of the options the plugin declares,
-  typed and checked once, see [plugin options](options.md)
+  typed and checked, see [plugin options](options.md)
 - **this.logger**: Winston logger instance
 - **this.hookBus**: The server's hooks: chain, notify and wait on them, see
   [hooks](hooks.md#the-bus)

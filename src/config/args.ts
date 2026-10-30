@@ -10,6 +10,7 @@ import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
+import { jamesOptions } from '../plugins/twake/james.options';
 
 import { toConfigEntries } from './options';
 
@@ -765,34 +766,8 @@ const configArgs: ConfigTemplate = [
   ['--bulk-import-batch-size', 'DM_BULK_IMPORT_BATCH_SIZE', '100'],
 
   // James plugin
-  ['--james-webadmin-url', 'DM_JAMES_WEBADMIN_URL', 'http://localhost:8000'],
-  ['--james-webadmin-token', 'DM_JAMES_WEBADMIN_TOKEN', ''],
-  ['--james-signature-template', 'DM_JAMES_SIGNATURE_TEMPLATE', ''],
   ['--ldap-concurrency', 'DM_LDAP_CONCURRENCY', 10, 'number'],
-  ['--james-concurrency', 'DM_JAMES_CONCURRENCY', 10, 'number'],
-  ['--james-init-delay', 'DM_JAMES_INIT_DELAY', 1000, 'number'],
-  ['--james-retry-attempts', 'DM_JAMES_RETRY_ATTEMPTS', 5, 'number'],
-  ['--james-retry-delay', 'DM_JAMES_RETRY_DELAY', 1000, 'number'],
-  [
-    '--james-mailing-list-branch',
-    'DM_JAMES_MAILING_LIST_BRANCHES',
-    [],
-    'array',
-    '--james-mailing-list-branches',
-    'dns',
-  ],
-  [
-    '--james-mailbox-type-attribute',
-    'DM_JAMES_MAILBOX_TYPE_ATTRIBUTE',
-    'twakeMailboxType',
-  ],
-  ['--james-sync-forwards', 'DM_JAMES_SYNC_FORWARDS', false, 'boolean'],
-  [
-    '--james-team-mailbox-any-domain',
-    'DM_JAMES_TEAM_MAILBOX_ANY_DOMAIN',
-    false,
-    'boolean',
-  ],
+  ...toConfigEntries(jamesOptions),
 
   // Twake Mail migration proxy plugin
   ['--migration-proxy-url', 'DM_MIGRATION_PROXY_URL', ''],

@@ -28,12 +28,14 @@ export default class Drive extends TwakePlugin {
   private driveQuotaAttr: string;
 
   constructor(server: DM) {
-    super(
-      server,
-      'twake_drive_webadmin_url',
-      'twake_drive_webadmin_token',
-      'twake_drive_concurrency'
-    );
+    super(server, {
+      url: server.config.twake_drive_webadmin_url || '',
+      token: server.config.twake_drive_webadmin_token || '',
+      concurrency: server.config.twake_drive_concurrency ?? 10,
+      urlOption: 'twake_drive_webadmin_url',
+      tokenOption: 'twake_drive_webadmin_token',
+      concurrencyOption: 'twake_drive_concurrency',
+    });
 
     // LDAP attribute that stores the Cozy instance domain (e.g., "john.mycozy.cloud")
     this.cozyDomainAttr =

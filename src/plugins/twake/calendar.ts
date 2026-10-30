@@ -65,12 +65,14 @@ export default class Calendar extends TwakePlugin {
   private lastnameAttr: string;
 
   constructor(server: import('../../bin').DM) {
-    super(
-      server,
-      'calendar_webadmin_url',
-      'calendar_webadmin_token',
-      'calendar_concurrency'
-    );
+    super(server, {
+      url: server.config.calendar_webadmin_url || '',
+      token: server.config.calendar_webadmin_token || '',
+      concurrency: server.config.calendar_concurrency ?? 10,
+      urlOption: 'calendar_webadmin_url',
+      tokenOption: 'calendar_webadmin_token',
+      concurrencyOption: 'calendar_concurrency',
+    });
 
     // Initialize Calendar-specific configuration attributes
     this.resourceBase = (this.config.calendar_resource_base as string) || '';

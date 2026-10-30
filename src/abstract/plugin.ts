@@ -165,9 +165,7 @@ export default abstract class DmPlugin {
     this.options((this.constructor as typeof DmPlugin).optionDefinitions);
   }
 
-  /** Values of the options this plugin declares, read and checked once */
-  private optionValues?: Record<string, unknown>;
-
+  /** Values of the options this plugin declares, read and checked */
   options<T extends OptionSet>(definitions: T): OptionsOf<T> {
     const declared = (this.constructor as typeof DmPlugin).optionDefinitions;
     if (definitions !== declared)
@@ -175,10 +173,7 @@ export default abstract class DmPlugin {
         `${this.constructor.name}: options() takes the definitions the ` +
           'plugin declares'
       );
-    if (!this.optionValues) {
-      this.optionValues = readOptions(declared, this.config);
-    }
-    return this.optionValues as OptionsOf<T>;
+    return readOptions(declared, this.config) as OptionsOf<T>;
   }
 
   /**
