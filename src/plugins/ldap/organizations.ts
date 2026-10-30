@@ -1313,7 +1313,7 @@ export default class LdapOrganizations extends DmPlugin {
     // Before the checks reading the directory: a pointer leading nowhere is
     // not for a caller who may not create here
     await this.server.ldap.authorize('ldapaddrequest', [dn, entry, req]);
-    await this.validator().validateNew(entry);
+    entry = await this.validator().validateNew(entry);
     // Hooks will validate the organization link and path
     return await this.server.ldap.add(dn, entry, req);
   }

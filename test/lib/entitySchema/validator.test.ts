@@ -186,6 +186,62 @@ describe('EntityValidator', () => {
         await refusal(validator().validateNew(entry({ uid: 'Alice' })))
       ).to.equal('Invalid value for attribute "uid": lower-case letters');
     });
+
+    // A fuzzer sent `{"add":{"PWDRESET":true}}` and a creation with `Cn`:
+    // the schema checks read the name, the conversion and the required
+    // check only its own spelling
+    it('reads an attribute under the spelling validateValue accepted', async () => {
+      const people = {
+        attributes: {
+          ...schema.attributes,
+          pwdReset: { type: 'boolean' },
+          cn: { type: 'string', required: true },
+        },
+      } as unknown as Schema;
+      const v = new EntityValidator(people, {
+        entryExists: async dn => dn === bob,
+        loadedPlugins: {},
+        singularName: 'person',
+      });
+      const changes = { add: { PWDRESET: true } } as unknown as ModifyRequest;
+      await v.validateChanges(changes);
+      expect(Object.values(changes.add ?? {})).to.deep.equal(['TRUE']);
+      expect(
+        await refusal(
+          v.validateNew(
+            entry({ DESCRIPTIONS: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
+          )
+        )
+      ).to.be.undefined;
+    });
+
+    it('writes a declared attribute under the schema spelling, keeping ;binary', async () => {
+      const v = validator();
+      const written = await v.validateNew(
+        entry({ BusinessCategory: 'd', 'manager;binary': bob })
+      );
+      expect(written.businessCategory).to.equal('d');
+      expect(written['manager;binary']).to.equal(bob);
+      expect(written).to.not.have.property('BusinessCategory');
+      expect(written).to.not.have.property('manager');
+    });
+
+    it('refuses two keys naming one attribute', async () => {
+      for (const sent of [
+        { description: 'a', DESCRIPTION: 'b' },
+        { secretary: [bob], SECRETARY: [bob] },
+      ])
+        expect(
+          await refusal(validator().validateNew(entry(sent))),
+          JSON.stringify(sent)
+        ).to.equal(
+          `"${Object.keys(sent)[0]}" and "${Object.keys(sent)[1]}" name the same attribute`
+        );
+      // `;binary` names a transfer syntax, not a value of its own
+      expect(
+        await refusal(validator().validateNew(entry({ 'l;binary': 'lyon' })))
+      ).to.be.undefined;
+    });
   });
 
   describe('validateChanges', () => {

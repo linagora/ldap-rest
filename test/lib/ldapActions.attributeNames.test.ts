@@ -175,9 +175,11 @@ describe('Attribute names of a write', function () {
       surname: 'Test',
       rfc822Mailbox: 'names-test@example.com',
     });
-    await server.ldap.modify(dn, {
+    // Each part is renamed in place: the write reads the body it was given
+    const changes = {
       replace: { '0.9.2342.19200300.100.1.3': 'names-other@example.com' },
-    });
+    };
+    await server.ldap.modify(dn, changes);
     const entry = (
       (await server.ldap.search(
         { paged: false, scope: 'base', attributes: ['mail', 'sn'] },
@@ -185,6 +187,7 @@ describe('Attribute names of a write', function () {
       )) as SearchResult
     ).searchEntries[0];
     expect(entry.mail).to.equal('names-other@example.com');
+    expect(changes.replace).to.deep.equal({ mail: 'names-other@example.com' });
     expect(entry.sn).to.equal('Test');
   });
 

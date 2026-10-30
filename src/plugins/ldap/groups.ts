@@ -1534,8 +1534,7 @@ export default class LdapGroups extends DmPlugin {
       this.server.hooks.ldapgroupvalidatenew,
       [dn, entry]
     );
-    await this.validator().validateNew(entry);
-    return entry;
+    return await this.validator().validateNew(entry);
   }
 
   /**
