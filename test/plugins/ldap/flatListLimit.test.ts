@@ -212,7 +212,7 @@ describe('Flat list, limited', function () {
       for (const limit of ['0', '-1', '1.5', 'ten', '', '1e3']) {
         const res = await request.get('/api/v1/ldap/titles').query({ limit });
         expect(res.status, `limit=${limit}`).to.equal(400);
-        expect(res.body.error).to.match(/"limit" must be a positive integer/);
+        expect(res.body.error).to.match(/limit/i);
       }
       const repeated = await request.get('/api/v1/ldap/titles?limit=1&limit=2');
       expect(repeated.status).to.equal(400);

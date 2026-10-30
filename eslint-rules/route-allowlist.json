@@ -1,5 +1,4 @@
 [
-  "src/abstract/ldapFlat.ts",
   "src/plugins/ldap/bulkImport.ts",
   "src/plugins/scim/scim.ts",
   "src/plugins/static.ts",

@@ -273,6 +273,26 @@ describe('Write bodies the directory cannot take as they are', function () {
       );
     });
 
+    it('should refuse a flat move whose target is not a DN', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users/shapes.alice/move')
+        .send({ targetOrgDn: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.targetOrgDn: Expected string'
+      );
+    });
+
+    it('should refuse a flat rename whose name is not text', async () => {
+      const res = await request
+        .post('/api/v1/ldap/users/shapes.alice/rename')
+        .send({ newId: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.newId: Expected string'
+      );
+    });
+
     it('should still apply a well-formed modification', async () => {
       const res = await request
         .put('/api/v1/ldap/users/shapes.alice')
