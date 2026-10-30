@@ -208,6 +208,10 @@
       "types": "./dist/src/plugins/scim/projection.d.ts",
       "import": "./dist/plugins/scim/projection.js"
     },
+    "./plugin-scim-scim.options": {
+      "types": "./dist/src/plugins/scim/scim.options.d.ts",
+      "import": "./dist/plugins/scim/scim.options.js"
+    },
     "./plugin-scim-scim": {
       "types": "./dist/src/plugins/scim/scim.d.ts",
       "import": "./dist/plugins/scim/scim.js"

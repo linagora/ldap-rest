@@ -30,6 +30,11 @@
   A plugin built outside this repository needs updating
   ([details](docs/usage/upgrading.md#from-121))
   ([#415](https://github.com/linagora/ldap-rest/issues/415)).
+- The SCIM options are checked when the plugin loads: a value outside its
+  range or of the wrong JSON type in a per-instance override, such as
+  `--scim-max-results 0` or `{"scim_max_results": "50"}`, stops the server
+  instead of being replaced by the default or coerced
+  ([details](docs/plugin-development/options.md)).
 
 ### Fixed
 

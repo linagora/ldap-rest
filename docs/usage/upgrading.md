@@ -26,6 +26,48 @@ as it was stops reacting without saying so. `ldapgroupdeletemember` threads
 A test waiting for a hook to land waits on `await server.hookBus.settled()`
 rather than sleeping. See [hooks](../plugin-development/hooks.md#the-bus).
 
+### A plugin with its own `options` or `optionDefinitions` member
+
+**Who is affected:** a plugin built outside this repository that declares a
+field, getter or method named `options`, or a static field named
+`optionDefinitions`.
+
+`DmPlugin` now has `options()`, which returns the values a plugin declared
+through `optionDefinitions`. Rename the plugin's own `options` member; a
+plugin that does not declare options keeps reading `this.config` as before.
+
+### A plugin building SCIM's exported helpers
+
+**Who is affected:** a plugin built outside this repository that constructs
+`ScimUsers`, `ScimGroups`, `ScimBulk`, `ScimDiscovery` or `BaseResolver`, or
+calls `scimBodyParser`.
+
+These take the SCIM options instead of a plain `Config`:
+
+```ts
+import { scimOptionsOf } from 'ldap-rest/plugin-scim-scim.options';
+
+const options = scimOptionsOf(config);
+```
+
+`BaseResolver` keeps its `(config, options)` form; the others take the checked
+values beside what they already require.
+
+### An out-of-range SCIM value
+
+**Who is affected:** a deployment setting `--scim-max-results`,
+`--scim-max-scanned`, `--scim-bulk-max-operations` or
+`--scim-bulk-max-payload-size` to zero or a negative number.
+
+These options now refuse a value below 1 when the plugin loads: a zero used
+to be silently replaced by the default, and a negative value used as it was.
+Remove the option to keep the default, or give it a positive number.
+
+A per-instance override (`--plugin core/scim:name:{...}`) must also use the
+option's JSON type: `{"scim_max_results": "50"}` and `{"scim_user_base":
+null}` are refused, where the quoted number used to be coerced and the null
+treated as unset.
+
 ### Node 22 or later is required
 
 **Who is affected:** a deployment running on Node 20 (end of life

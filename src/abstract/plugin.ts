@@ -15,6 +15,7 @@ import {
   withoutAttributes,
   type Schema,
 } from '../config/schema';
+import { readOptions, type OptionsOf, type OptionSet } from '../config/options';
 
 export {
   asyncHandler,
@@ -50,6 +51,9 @@ export type Role =
   | 'configurable';
 
 export default abstract class DmPlugin {
+  /** Options this plugin declares, see `docs/plugin-development/options.md` */
+  static optionDefinitions: OptionSet = {};
+
   /**
    * Properties inherited from parent (DM)
    */
@@ -156,6 +160,24 @@ export default abstract class DmPlugin {
     this.hookBus = server.hookBus;
     this.logger = server.logger;
     this.registeredHooks = server.hooks;
+    // Check the declared options before the plugin reads one
+    this.options((this.constructor as typeof DmPlugin).optionDefinitions);
+  }
+
+  /** Values of the options this plugin declares, read and checked once */
+  private optionValues?: Record<string, unknown>;
+
+  options<T extends OptionSet>(definitions: T): OptionsOf<T> {
+    const declared = (this.constructor as typeof DmPlugin).optionDefinitions;
+    if (definitions !== declared)
+      throw new Error(
+        `${this.constructor.name}: options() takes the definitions the ` +
+          'plugin declares'
+      );
+    if (!this.optionValues) {
+      this.optionValues = readOptions(declared, this.config);
+    }
+    return this.optionValues as OptionsOf<T>;
   }
 
   /**

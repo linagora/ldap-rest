@@ -8,6 +8,7 @@ This guide will help you create powerful, production-ready plugins for LDAP-Rest
 - [Plugin Structure](#plugin-structure)
 - [Creating Your Plugin](#creating-your-plugin)
 - [Custom Configuration Options](#custom-configuration-options)
+  - [Plugin options](./options.md)
 - [Loading Your Plugin](#loading-your-plugin)
 - [Plugin Features](#plugin-features)
 - [Configuration Best Practices](#configuration-best-practices)
@@ -59,6 +60,8 @@ export default class MyPlugin extends DmPlugin {
 
 - **this.server**: DM server instance
 - **this.config**: Complete configuration object
+- **this.options(declarations)**: Values of the options the plugin declares,
+  typed and checked once, see [plugin options](options.md)
 - **this.logger**: Winston logger instance
 - **this.hookBus**: The server's hooks: chain, notify and wait on them, see
   [hooks](hooks.md#the-bus)
@@ -273,99 +276,15 @@ npx ldap-rest
 
 ## Custom Configuration Options
 
-LDAP-Rest automatically accepts and stores any unknown command-line options in the config object. This allows your plugin to define custom configuration without modifying core files.
+A core plugin declares its options next to its code, in a
+`<plugin>.options.ts` file, and reads them through `this.options()` with their
+types, defaults and checks. See [plugin options](options.md).
 
-### How It Works
-
-1. **Command-line option format**: `--option-name value`
-2. **Converted to config key**: `option_name` (dashes become underscores)
-3. **Environment variable format**: `DM_OPTION_NAME` (uppercase with underscores)
-4. **Access in plugin**: `this.config.option_name`
-
-### Single Value Options
-
-```bash
-# Command line
-npx ldap-rest \
-  --webhook-url https://example.com/webhook \
-  --webhook-timeout 5000 \
-  --webhook-retry true
-
-# Environment variables
-export DM_WEBHOOK_URL=https://example.com/webhook
-export DM_WEBHOOK_TIMEOUT=5000
-export DM_WEBHOOK_RETRY=true
-```
-
-In your plugin:
-
-```typescript
-constructor(server: DM) {
-  super(server);
-
-  // Access custom options (converted to snake_case)
-  const url = this.config.webhook_url;        // string
-  const timeout = this.config.webhook_timeout; // string (convert if needed)
-  const retry = this.config.webhook_retry;     // string 'true' (convert if needed)
-
-  // Type conversion
-  const timeoutNum = parseInt(timeout as string || '3000');
-  const retryBool = (retry as string) === 'true';
-}
-```
-
-### Multiple Value Options
-
-Repeat the same option multiple times to create an array:
-
-```bash
-# Command line
-npx ldap-rest \
-  --allowed-domain example.com \
-  --allowed-domain test.com \
-  --allowed-domain dev.com
-
-# Environment variable (comma or semicolon separated)
-export DM_ALLOWED_DOMAINS=example.com,test.com,dev.com
-```
-
-In your plugin:
-
-```typescript
-constructor(server: DM) {
-  super(server);
-
-  // Access as array (note: singular becomes plural in config key)
-  const domains = this.config.allowed_domain as string[];
-  // or sometimes stored as: this.config.allowed_domains
-
-  this.logger.info(`Allowed domains: ${domains.join(', ')}`);
-}
-```
-
-### Configuration Priority
-
-Values are resolved in this order (later overrides earlier):
-
-1. **Default value** in your plugin
-2. **Environment variable** (`DM_OPTION_NAME`)
-3. **Command-line argument** (`--option-name`)
-
-```typescript
-constructor(server: DM) {
-  super(server);
-
-  // Provide defaults for optional configuration
-  const webhookUrl = this.config.webhook_url || 'http://localhost:8080/webhook';
-  const webhookTimeout = parseInt(this.config.webhook_timeout as string || '3000');
-  const maxRetries = parseInt(this.config.max_retries as string || '3');
-
-  // Validate required configuration
-  if (!this.config.webhook_secret) {
-    throw new Error('--webhook-secret is required for authentication');
-  }
-}
-```
+A plugin outside the repository cannot add to `src/config/args.ts` yet. It keeps
+reading `this.config.<name>`: LDAP-Rest accepts and stores unknown
+`--option-name value` pairs under `option_name`, with `--option-name` and
+`DM_OPTION_NAME` overriding in that order. See
+[configuration](../usage/configuration.md#environment-variables).
 
 ---
 

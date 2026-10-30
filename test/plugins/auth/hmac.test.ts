@@ -6,6 +6,8 @@ import AuthHmac from '../../../src/plugins/auth/hmac';
 import HelloWorld from '../../../src/plugins/demo/helloworld';
 import { expect } from 'chai';
 import { scimBodyParser } from '../../../src/plugins/scim/scim';
+import { scimOptions } from '../../../src/plugins/scim/scim.options';
+import { readOptions } from '../../../src/config/options';
 import { createHmac, createHash } from 'crypto';
 
 /**
@@ -214,7 +216,10 @@ describe('AuthHmac', () => {
       dm = new DM();
       await dm.ready;
       // The parser core/scim registers, without its routes
-      dm.registerBodyParser('/scim/v2', scimBodyParser(dm.config));
+      dm.registerBodyParser(
+        '/scim/v2',
+        scimBodyParser(readOptions(scimOptions, dm.config))
+      );
       const p = new AuthHmac(dm);
       const h = new HelloWorld(dm);
       await dm.registerPlugin('authHmac', p);
