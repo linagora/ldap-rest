@@ -837,7 +837,7 @@
     "csv-parse": "^7.0.2",
     "express": "^5.1.0",
     "express-rate-limit": "^8.1.0",
-    "ldapts": "^8.0.9",
+    "ldapts": "^9.2.0",
     "lru-cache": "^11.2.2",
     "multer": "^2.0.2",
     "p-limit": "^7.1.1",
@@ -882,9 +882,9 @@
   },
   "optionalDependencies": {
     "@linagora/rabbitmq-client": "^0.7.2",
-    "express-openid-connect": "^2.19.2",
+    "express-openid-connect": "^3.4.0",
     "iovalkey": "^0.4.0",
-    "lemonldap-ng-handler": "^0.7.3",
+    "lemonldap-ng-handler": "^0.9.6",
     "pg": "^8.23.0",
     "re2": "^1.22.1"
   },
