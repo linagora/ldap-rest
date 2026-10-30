@@ -120,6 +120,7 @@ export class OpenAPIGenerator {
     'AuthBase',
     'AuthzBase',
     'TwakePlugin',
+    'LdapGroups',
   ]);
 
   /**
@@ -560,6 +561,9 @@ export class OpenAPIGenerator {
       }
     } else if (ts.isStringLiteral(pathArg)) {
       pathTemplate = pathArg.text;
+    } else if (ts.isIdentifier(pathArg)) {
+      // `const base = \`…/spaces\`` then `path: base`
+      pathTemplate = localVars.get(pathArg.text) ?? '';
     }
 
     if (!pathTemplate) return '';

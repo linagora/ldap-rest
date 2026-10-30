@@ -9,6 +9,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 import type { SearchOptions } from 'ldapts';
 
@@ -22,6 +23,7 @@ import {
   isAuthzRefusal,
 } from '../../lib/errors';
 import { extractLdapCode } from '../../lib/ldapCodes';
+import { defineRoute } from '../../lib/route';
 import type {
   AttributesList,
   AttributeValue,
@@ -226,6 +228,21 @@ export function organizationIn(
   const m = pattern.exec(parentOf(parseDn(dn).join(',')));
   return m?.groups ? unescapeDnValue(m.groups.org) : undefined;
 }
+
+export const OrganizationParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+});
+
+export const OrganizationGroupParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  groupId: Type.String({ minLength: 1 }),
+});
+
+export const OrganizationGroupMemberParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  groupId: Type.String({ minLength: 1 }),
+  userId: Type.String({ minLength: 1 }),
+});
 
 export default class TwakeGroups extends LdapGroups {
   static optionDefinitions = twakeGroupsOptions;
@@ -616,53 +633,89 @@ export default class TwakeGroups extends LdapGroups {
   api(app: Express): void {
     const base = `${this.config.api_prefix}/v1/organizations/:id/groups`;
     const route = this.organizationRoute.bind(this);
-    app.get(
-      base,
-      route('listing groups', (q, r, o) => this.listRoute(q, r, o))
-    );
-    app.post(
-      base,
-      route('creating group', (q, r, o) => this.createRoute(q, r, o))
-    );
-    app.get(
-      `${base}/:groupId`,
-      route('getting group', async (req, res, org) => {
-        const group = await this.readGroup(
-          org,
-          req.params.groupId as string,
-          req
-        );
-        if (!group) throw notFound('group');
-        res.json(group);
-      })
-    );
-    app.get(
-      `${base}/:groupId/members`,
-      route('listing group members', (q, r, o) => this.membersRoute(q, r, o))
-    );
-    app.patch(
-      `${base}/:groupId`,
-      route('updating group', (q, r, o) => this.updateRoute(q, r, o))
-    );
-    app.delete(
-      `${base}/:groupId`,
-      route('deleting group', async (req, res, org) => {
-        await this.onGroup(() =>
-          this.deleteGroup(this.groupDn(org, req.params.groupId as string), req)
-        );
-        res.json({ success: true });
-      })
-    );
-    app.post(
-      `${base}/:groupId/members`,
-      route('adding group members', (q, r, o) => this.addMembersRoute(q, r, o))
-    );
-    app.delete(
-      `${base}/:groupId/members/:userId`,
-      route('removing group member', (q, r, o) =>
-        this.removeMemberRoute(q, r, o)
-      )
-    );
+
+    defineRoute(app, {
+      method: 'get',
+      path: base,
+      params: OrganizationParams,
+      handler: async ({ req, res }) =>
+        route('listing groups', (q, r, o) => this.listRoute(q, r, o))(req, res),
+    });
+    defineRoute(app, {
+      method: 'post',
+      path: base,
+      params: OrganizationParams,
+      handler: async ({ req, res }) =>
+        route('creating group', (q, r, o) => this.createRoute(q, r, o))(
+          req,
+          res
+        ),
+    });
+    defineRoute(app, {
+      method: 'get',
+      path: `${base}/:groupId`,
+      params: OrganizationGroupParams,
+      handler: async ({ req, res }) =>
+        route('getting group', async (q, r, org) => {
+          const group = await this.readGroup(
+            org,
+            q.params.groupId as string,
+            q
+          );
+          if (!group) throw notFound('group');
+          r.json(group);
+        })(req, res),
+    });
+    defineRoute(app, {
+      method: 'get',
+      path: `${base}/:groupId/members`,
+      params: OrganizationGroupParams,
+      handler: async ({ req, res }) =>
+        route('listing group members', (q, r, o) => this.membersRoute(q, r, o))(
+          req,
+          res
+        ),
+    });
+    defineRoute(app, {
+      method: 'patch',
+      path: `${base}/:groupId`,
+      params: OrganizationGroupParams,
+      handler: async ({ req, res }) =>
+        route('updating group', (q, r, o) => this.updateRoute(q, r, o))(
+          req,
+          res
+        ),
+    });
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:groupId`,
+      params: OrganizationGroupParams,
+      handler: async ({ req, res }) =>
+        route('deleting group', async (q, r, org) => {
+          await this.onGroup(() =>
+            this.deleteGroup(this.groupDn(org, q.params.groupId as string), q)
+          );
+          r.json({ success: true });
+        })(req, res),
+    });
+    defineRoute(app, {
+      method: 'post',
+      path: `${base}/:groupId/members`,
+      params: OrganizationGroupParams,
+      handler: async ({ req, res }) =>
+        route('adding group members', (q, r, o) =>
+          this.addMembersRoute(q, r, o)
+        )(req, res),
+    });
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:groupId/members/:userId`,
+      params: OrganizationGroupMemberParams,
+      handler: async ({ req, res }) =>
+        route('removing group member', (q, r, o) =>
+          this.removeMemberRoute(q, r, o)
+        )(req, res),
+    });
   }
 
   /** A route of the organization `:id`; see `RouteError` for refusals. */
