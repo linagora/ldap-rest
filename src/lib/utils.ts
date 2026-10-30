@@ -728,8 +728,9 @@ function rdnValueOf(rdn: string | undefined): string {
  * Read the name of an entry written as a DN: the value of its first RDN when
  * that RDN asserts `attribute` alone, under `base` when one is given.
  *
- * The value comes back with its escapes decoded, and otherwise as written:
- * it is what a write puts back in `attribute=…,base`.
+ * The value is decoded exactly as {@link rdnValue} decodes it: it is the
+ * naming attribute's value, the one a write puts back in
+ * `attribute=…,base`.
  *
  * @param dn - The DN to read
  * @param attribute - The attribute the first RDN must assert
@@ -761,7 +762,7 @@ export function assertedRdnValue(
   if (splitRdn(rdn).length > 1) return null;
   if (base !== undefined && normalizeDn(parent.join(',')) !== normalizeDn(base))
     return null;
-  return unescapeDnValue(rdn.slice(eq + 1));
+  return rdnValueOf(rdn);
 }
 
 /**
