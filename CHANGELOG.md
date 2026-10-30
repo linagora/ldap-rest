@@ -24,9 +24,6 @@
 - The published image loads `core/demo/helloworld` as its second plugin and
   starts without `DM_PLUGINS`
   ([details](docs/usage/operations.md#health-and-readiness)).
-
-### Changed
-
 - A plugin raises hooks through `this.hookBus` (`chain`, `notify`,
   `notifyAndWait`, `notifyStrict`, `has`, `subscribers`, `settled`) instead
   of `launchHooks` / `launchHooksChained`, every hook is declared in
@@ -104,6 +101,13 @@
 - The French labels and hints of the Twake schemas use the typographic
   apostrophe (`’`), as the rest of the French text does
   ([#462](https://github.com/linagora/ldap-rest/issues/462)).
+- A `number` or `integer` sent as a JSON number is answered 400 by the
+  schema when the text written for it is not a plain decimal, so `1e21` and
+  `1e-7` are refused like the text `"1e+21"` already was instead of reaching
+  the directory, and so is a whole number beyond 2⁵³, whose digits the JSON
+  parser has already lost
+  ([details](docs/client-development/schemas/README.md#what-a-value-must-look-like),
+  [#496](https://github.com/linagora/ldap-rest/issues/496)).
 
 ### Security
 
@@ -127,16 +131,11 @@
   `a@b..c`), which they used to accept; the name patterns of the `example`
   schemas accept the same values as before
   ([details](docs/client-development/schemas/README.md#maxlength-optional)).
-
-### Fixed
-
-- A `number` or `integer` sent as a JSON number is answered 400 by the
-  schema when the text written for it is not a plain decimal, so `1e21` and
-  `1e-7` are refused like the text `"1e+21"` already was instead of reaching
-  the directory, and so is a whole number beyond 2⁵³, whose digits the JSON
-  parser has already lost
-  ([details](docs/client-development/schemas/README.md#what-a-value-must-look-like),
-  [#496](https://github.com/linagora/ldap-rest/issues/496))
+- An attribute name the schema does not declare, such as `constructor`,
+  `toString` or `__proto__`, is refused by a strict schema like any other
+  unknown name, where it was taken for a declared attribute and written to
+  the directory
+  ([#543](https://github.com/linagora/ldap-rest/issues/543)).
 
 ## v1.2.1 (2026-10-28)
 

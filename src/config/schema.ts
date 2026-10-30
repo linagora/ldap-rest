@@ -423,7 +423,9 @@ export function schemaAttribute(
 ): [string, SchemaAttribute] | undefined {
   if (!schema) return undefined;
   const base = name.split(';')[0];
-  const exact = schema.attributes[base];
+  const exact = Object.hasOwn(schema.attributes, base)
+    ? schema.attributes[base]
+    : undefined;
   if (exact) return [base, exact];
   const lower = base.toLowerCase();
   for (const [key, attr] of Object.entries(schema.attributes)) {
