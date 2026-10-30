@@ -59,9 +59,7 @@ export function mergeSchema(base: unknown, patch: unknown): unknown {
     // assigning it would replace the prototype of the result.
     Object.defineProperty(merged, key, {
       value: mergeSchema(
-        Object.prototype.hasOwnProperty.call(merged, key)
-          ? merged[key]
-          : undefined,
+        Object.hasOwn(merged, key) ? merged[key] : undefined,
         value
       ),
       enumerable: true,
@@ -176,6 +174,24 @@ function assertMaxLengths(schema: unknown, file: string): void {
 }
 
 /**
+ * Give a schema's attributes a null prototype, so a lookup by a name a
+ * request sent (`constructor`, `__proto__`, …) cannot resolve an
+ * `Object.prototype` member. A name the schema really declares is an own key
+ * of the parsed JSON, and is copied as it is.
+ */
+function detachAttributes(schema: unknown): void {
+  const holder = schema as { attributes?: unknown } | undefined;
+  const attributes = holder?.attributes;
+  if (
+    !attributes ||
+    typeof attributes !== 'object' ||
+    Array.isArray(attributes)
+  )
+    return;
+  holder.attributes = Object.assign(Object.create(null), attributes);
+}
+
+/**
  * Read a schema file and the files it extends, synchronously
  *
  * @param file path of the schema
@@ -198,6 +214,7 @@ export function loadSchemaFile<T = unknown>(
   }
   const schema = chain.result();
   assertMaxLengths(schema, file);
+  detachAttributes(schema);
   return schema as T;
 }
 
@@ -224,6 +241,7 @@ export async function loadSchemaFileAsync<T = unknown>(
   }
   const schema = chain.result();
   assertMaxLengths(schema, file);
+  detachAttributes(schema);
   return schema as T;
 }
 

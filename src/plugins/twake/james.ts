@@ -1522,7 +1522,7 @@ export default class James extends TwakePlugin {
           typeof attrName === 'string' &&
           entry &&
           typeof entry === 'object' &&
-          Object.prototype.hasOwnProperty.call(entry, attrName)
+          Object.hasOwn(entry, attrName)
         ) {
           return (
             this.attributeToString(
