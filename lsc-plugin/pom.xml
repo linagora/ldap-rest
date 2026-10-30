@@ -23,7 +23,7 @@
         <lsc.version>2.2</lsc.version>
         <jackson.version>2.22.3</jackson.version>
         <junit.version>5.10.2</junit.version>
-        <wiremock.version>3.9.1</wiremock.version>
+        <wiremock.version>3.13.2</wiremock.version>
     </properties>
 
     <dependencies>
