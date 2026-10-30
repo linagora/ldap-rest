@@ -6,7 +6,6 @@
  * @author Generated with Claude Code
  */
 
-import fetch from 'node-fetch';
 import { DM } from '../dist/bin/index.js';
 
 // Parse command line arguments

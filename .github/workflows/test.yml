@@ -143,6 +143,7 @@ jobs:
   package:
     runs-on: ubuntu-latest
     name: Helm chart and Docker image
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -159,7 +160,8 @@ jobs:
 
       # The Dockerfile is generated from src and the build scripts, and the
       # image is built from what is committed: one that drifted builds the
-      # previous commit
+      # previous commit. A diff here is fixed by committing what
+      # `npm run build:dockerfile` wrote in the runner, not in the Dockerfile.
       - name: Check the Dockerfile is up to date
         run: |
           npm run build:dockerfile
@@ -185,11 +187,14 @@ jobs:
           load: true
           tags: ldap-rest:ci
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # The gha cache refuses a second write to a key it holds, which
+          # every run of the same pull request after the first is
+          cache-to: type=gha,mode=max,ignore-error=true
 
       # The image carries no LDAP settings, so the run gives them, pointing
-      # at nothing: the server serves `/healthz` with no directory to bind
-      # to, which is what the image's HEALTHCHECK asks as well.
+      # at nothing. `/healthz` answering means the image starts with its
+      # default plugins; `/readyz` answering 503 names the directory it
+      # cannot reach, as a 200 would mean it reached something.
       - name: Run the image
         run: |
           docker run -d --name ci -p 8081:8081 \
@@ -198,9 +203,10 @@ jobs:
             -e DM_LDAP_PWD=admin \
             -e DM_LDAP_BASE=dc=example,dc=com \
             ldap-rest:ci
+          trap 'docker logs --tail 40 ci; docker rm -f ci' EXIT
           for i in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:8081/healthz && exit 0
+            curl -fsS http://127.0.0.1:8081/healthz > /dev/null && break
             sleep 2
           done
-          docker logs --tail 40 ci
-          exit 1
+          curl -fsS http://127.0.0.1:8081/healthz
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/readyz)" = 503

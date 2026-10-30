@@ -2,10 +2,10 @@
  * Fail on a high or critical advisory in a production dependency.
  *
  * An allowlist entry names the package npm reports the advisory under, or
- * any of the ids the advisory carries (a GHSA or CVE id), and the date it is
- * to be revisited. An entry past that date, or matching nothing, is
- * reported too: neither is a decision anyone can rely on. See
- * `CONTRIBUTING.md#dependencies`.
+ * any of the ids the advisory carries (a GHSA or CVE id), and `until`, the
+ * last day (UTC) it applies. An entry past that day, one without a day, and
+ * one matching no advisory fail the build as well: none is a decision
+ * anyone can rely on. See `CONTRIBUTING.md#dependencies`.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -140,23 +140,42 @@ const run = (): void => {
     if (!out.trim()) throw err;
   }
 
+  let report: unknown;
+  try {
+    report = JSON.parse(out);
+  } catch {
+    throw new Error(`npm audit did not answer a report: ${out.slice(0, 200)}`);
+  }
+  // npm answers a failure, a registry it cannot reach among them, in the
+  // same JSON, without a report to read
+  const failure = report as { error?: { summary?: string }; message?: string };
+  // The reason, a registry that does not answer among them, is in `message`:
+  // `error.summary` is empty for one
+  if (failure.error || failure.message)
+    throw new Error(
+      `npm audit failed: ${failure.message || failure.error?.summary || 'no reason given'}`
+    );
+  if ((report as { auditReportVersion?: unknown }).auditReportVersion !== 2)
+    throw new Error('unexpected npm audit report version');
+
   const allowlist: AllowlistEntry[] = fs.existsSync(allowlistPath)
     ? (JSON.parse(fs.readFileSync(allowlistPath, 'utf8')) as AllowlistEntry[])
     : [];
   const { blocked, expired, unused, invalid } = gate(
-    advisories(JSON.parse(out)),
+    advisories(report),
     allowlist,
     new Date()
   );
 
   for (const entry of invalid)
-    console.warn(`allowlist: ${entry.id} has no valid "until" date`);
+    console.error(`allowlist: ${entry.id} has no "until" day (YYYY-MM-DD)`);
   for (const entry of expired)
-    console.warn(
+    console.error(
       `allowlist: ${entry.id} (${entry.reason}) expired on ${entry.until}`
     );
   for (const entry of unused)
-    console.warn(`allowlist: ${entry.id} matches no advisory, remove it`);
+    console.error(`allowlist: ${entry.id} matches no advisory, remove it`);
+  if (invalid.length + expired.length + unused.length > 0) process.exit(1);
 
   if (blocked.length === 0) {
     console.log('No blocking advisory in the production dependencies.');

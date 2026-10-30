@@ -63,10 +63,12 @@ reports everything in `coverage/index.html`.
 ### Dependencies
 
 Dependabot opens the updates (`.github/dependabot.yml`), grouped for npm.
-CI fails on a `high` or `critical` advisory in a production dependency, as
-`npm run audit:prod` reports it. Fix, or if the advisory does not apply, add
-an entry to `.github/audit-allowlist.json` naming the advisory and the date
-it is to be revisited; remove it when it expires.
+`npm run audit:prod`, run by CI, fails on a `high` or `critical` advisory in a
+production dependency, and on an entry of `.github/audit-allowlist.json`
+that is past its day or matches no advisory. An allowlist entry names the
+package or a GHSA/CVE id, `until`, the last day (UTC) it applies, and
+`reason`. Fix the advisory; allow it only where it cannot apply here, and
+remove the entry once it is fixed.
 
 ## Submitting changes
 

@@ -30,7 +30,8 @@ updates:
     open-pull-requests-limit: 5
 
   # The base image of the Dockerfile, which scripts/buildDockerfile.ts
-  # generates: an update it opens has to be made in the script
+  # generates: an update it opens edits the Dockerfile, and has to be made
+  # to the script before a run keeps it
   - package-ecosystem: docker
     directory: /
     schedule:

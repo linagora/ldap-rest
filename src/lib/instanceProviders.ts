@@ -135,9 +135,12 @@ abstract class HttpProvider {
   }
 
   private timedOut(err: unknown, url: string): unknown {
-    // The deadline is the only signal fetch is given, so both DOMException
-    // names an abort raises mean it ran out
-    return ['AbortError', 'TimeoutError'].includes((err as Error).name)
+    // The deadline is the only signal fetch is given, and it aborts the
+    // headers as TimeoutError and the body as AbortError: both mean it ran
+    // out
+    return ['AbortError', 'TimeoutError'].includes(
+      (err as { name?: string }).name ?? ''
+    )
       ? new GatewayTimeoutError(
           `${new URL(url).host} did not answer within ${this.timeout} ms`
         )

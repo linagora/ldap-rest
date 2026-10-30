@@ -6,10 +6,10 @@ decision or a configuration change appear here; see the
 
 ## From 1.2.1
 
-### Node 22 is the floor
+### Node 22 or later is required
 
-**Who is affected:** a deployment running on Node 20, whose end of life is
-2026-04-30; the published image is built on Node 24 and is not.
+**Who is affected:** a deployment running on Node 20 (end of life
+2026-04-30). A deployment of the published image is not: it is built on Node 24.
 
 `engines` declares `>=22`, and the CI runs the suite on 22, 24 and 26. Node
 20 is neither tested nor supported.
