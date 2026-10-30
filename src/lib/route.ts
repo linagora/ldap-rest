@@ -79,6 +79,57 @@ const registries = new WeakMap<Express, RegisteredRoute[]>();
 export const registeredRoutes = (app: Express): readonly RegisteredRoute[] =>
   registries.get(app) ?? [];
 
+/** A route Express carries, as the stack spells it. */
+export interface StackRoute {
+  method: string;
+  path: string;
+}
+
+interface StackLayer {
+  route?: { path: string; methods: Record<string, boolean> };
+  handle?: { stack?: StackLayer[] };
+}
+
+/**
+ * The routes an app carries that `defineRoute` did not declare.
+ *
+ * The stack is walked at any depth, so a mounted router's routes are seen
+ * too. A route is matched on its method and path, which is what the
+ * declaration records; a router's routes are router-relative (`/nested`,
+ * whatever the mount path), as Express keeps no mount path on a router, and
+ * `app.all` comes back as `_ALL`.
+ *
+ * @param app the express app
+ * @returns the undeclared routes, in stack order
+ */
+export const unregisteredRoutes = (app: Express): StackRoute[] => {
+  const internal = app as unknown as {
+    router?: { stack?: StackLayer[] };
+    _router?: { stack?: StackLayer[] };
+  };
+  const declared = new Set(
+    registeredRoutes(app).map(
+      route => `${route.method.toUpperCase()} ${route.path}`
+    )
+  );
+  const found: StackRoute[] = [];
+
+  const walk = (layers: StackLayer[] | undefined): void => {
+    for (const layer of layers ?? []) {
+      if (layer.route)
+        for (const method of Object.keys(layer.route.methods)) {
+          const upper = method.toUpperCase();
+          if (!declared.has(`${upper} ${layer.route.path}`))
+            found.push({ method: upper, path: layer.route.path });
+        }
+      else walk(layer.handle?.stack);
+    }
+  };
+
+  walk((internal.router ?? internal._router)?.stack);
+  return found;
+};
+
 /** `body.member` rather than `body./member`, and `body` for the whole part */
 const label = (part: string, path: string): string =>
   !path || path === '/'

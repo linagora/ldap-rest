@@ -6,6 +6,8 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
+import noRawRoute from './eslint-rules/no-raw-route.mjs';
+
 export default [
   // Node.js config
   js.configs.recommended,
@@ -69,6 +71,19 @@ export default [
       // 'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
+    },
+  },
+
+  // A route is declared with `defineRoute`: see
+  // docs/plugin-development/routes.md. The files in
+  // eslint-rules/route-allowlist.json have not moved yet.
+  {
+    files: ['src/plugins/**/*.ts', 'src/abstract/**/*.ts'],
+    plugins: {
+      local: { rules: { 'no-raw-route': noRawRoute } },
+    },
+    rules: {
+      'local/no-raw-route': 'error',
     },
   },
 

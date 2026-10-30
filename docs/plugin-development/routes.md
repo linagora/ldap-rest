@@ -120,5 +120,14 @@ tighten it one route at a time.
 ## The registry
 
 Every declaration is recorded on the app, schemas included, without its
-handler. `registeredRoutes(app)` returns them. The route probe reads the
-registry to check that no Express route escapes it.
+handler. `registeredRoutes(app)` returns them, and `unregisteredRoutes(app)`
+lists what the Express stack carries that `defineRoute` did not declare.
+
+## The migration guard
+
+`npm run lint` refuses `app.<verb>(` under `src/plugins` and `src/abstract`,
+through `eslint-rules/no-raw-route.mjs`. The files still to migrate are
+listed in `eslint-rules/route-allowlist.json`; remove a file from it as its
+routes move. `test/scripts/routeAllowlist.test.ts` keeps the list exact: a
+file that no longer declares a raw route must leave it, and a raw route in an
+unlisted file fails.

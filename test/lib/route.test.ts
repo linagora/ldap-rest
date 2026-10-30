@@ -6,7 +6,11 @@ import { Type } from '@sinclair/typebox';
 
 import { BadRequestError } from '../../src/lib/errors';
 import { errorResponse } from '../../src/lib/expressFormatedResponses';
-import { defineRoute, registeredRoutes } from '../../src/lib/route';
+import {
+  defineRoute,
+  registeredRoutes,
+  unregisteredRoutes,
+} from '../../src/lib/route';
 
 const appWith = (): Express => {
   const app = express();
@@ -225,6 +229,41 @@ describe('defineRoute', () => {
 
     expect(registeredRoutes(one)).to.have.length(1);
     expect(registeredRoutes(other)).to.be.empty;
+  });
+
+  it('names the routes declared outside defineRoute', () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'get',
+      path: '/declared',
+      handler: ({ res }) => {
+        res.sendStatus(200);
+      },
+    });
+    app.get('/raw', (_req, res) => {
+      res.sendStatus(200);
+    });
+    app.post('/raw', (_req, res) => {
+      res.sendStatus(200);
+    });
+
+    expect(unregisteredRoutes(app)).to.deep.equal([
+      { method: 'GET', path: '/raw' },
+      { method: 'POST', path: '/raw' },
+    ]);
+  });
+
+  it('walks a mounted router', () => {
+    const app = appWith();
+    const router = express.Router();
+    router.get('/nested', (_req, res) => {
+      res.sendStatus(200);
+    });
+    app.use('/mount', router);
+
+    expect(unregisteredRoutes(app)).to.deep.equal([
+      { method: 'GET', path: '/nested' },
+    ]);
   });
 
   it('answers a handler’s rejection as any other error', async () => {
