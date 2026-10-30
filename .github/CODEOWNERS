@@ -1,0 +1,13 @@
+# A change to a path listed here needs the approval of a human code owner,
+# other than its author. See "Reviewing changes" in CONTRIBUTING.md.
+*                          @yadd @rezk2ll
+
+/src/bin/                  @yadd @rezk2ll
+/src/hooks.ts              @yadd @rezk2ll
+/src/lib/auth/             @yadd @rezk2ll
+/src/lib/authz/            @yadd @rezk2ll
+/src/lib/ldapActions.ts    @yadd @rezk2ll
+/src/lib/requestContext.ts @yadd @rezk2ll
+/src/config/               @yadd @rezk2ll
+/src/plugins/auth/         @yadd @rezk2ll
+/.github/                  @yadd @rezk2ll
