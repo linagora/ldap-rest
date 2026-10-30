@@ -131,6 +131,11 @@
   `a@b..c`), which they used to accept; the name patterns of the `example`
   schemas accept the same values as before
   ([details](docs/client-development/schemas/README.md#maxlength-optional)).
+- An attribute name the schema does not declare, such as `constructor`,
+  `toString` or `__proto__`, is refused by a strict schema like any other
+  unknown name, where it was taken for a declared attribute and written to
+  the directory
+  ([#543](https://github.com/linagora/ldap-rest/issues/543)).
 
 ## v1.2.1 (2026-10-28)
 

@@ -292,6 +292,28 @@ describe('EntityValidator', () => {
         );
     });
 
+    it('refuses an Object.prototype name on a strict schema', async () => {
+      for (const name of [
+        'constructor',
+        'toString',
+        'hasOwnProperty',
+        '__proto__',
+      ]) {
+        expect(
+          await refusal(
+            validator().validateChanges({ delete: [`${name};lang-fr`] })
+          ),
+          name
+        ).to.equal(`Unknown attribute "${name};lang-fr" for person`);
+        expect(
+          await refusal(
+            validator().validateChanges({ replace: { [name]: 'x' } })
+          ),
+          name
+        ).to.equal(`Unknown attribute "${name}" for person`);
+      }
+    });
+
     it('refuses deleting a required attribute as a whole, not some of its values', async () => {
       for (const changes of [
         { delete: ['description'] },
