@@ -64,7 +64,7 @@
       },
       "help": {
         "en": "The person's registration number, as the personnel records hold it. Unique in the directory, except UNIT, which the accounts of no one in particular (shared, technical) take.",
-        "fr": "Le matricule de la personne, tel que le tient la gestion du personnel. Unique dans l'annuaire, sauf UNIT, que prennent les comptes qui ne sont à personne en particulier (partagés, techniques).",
+        "fr": "Le matricule de la personne, tel que le tient la gestion du personnel. Unique dans l’annuaire, sauf UNIT, que prennent les comptes qui ne sont à personne en particulier (partagés, techniques).",
         "mn": "Хүний нөөцийн бүртгэлд байгаа ажилтны дугаар. Лавлахад давхцахгүй байх ёстой; хэн нэгэн хүнд хамааралгүй (дундын, техникийн) бүртгэлүүд UNIT утгыг авна."
       }
     },
@@ -85,7 +85,7 @@
       "required": false,
       "label": {
         "en": "Common name",
-        "fr": "Nom d'annuaire",
+        "fr": "Nom d’annuaire",
         "mn": "Лавлахын нэр"
       }
     },
@@ -229,7 +229,7 @@
       "normalize": "byteSize",
       "hint": {
         "en": "Expected pattern xGB, xMB, xKB or a number of bytes",
-        "fr": "Format attendu : xGB, xMB, xKB ou un nombre d'octets",
+        "fr": "Format attendu : xGB, xMB, xKB ou un nombre d’octets",
         "mn": "Хэлбэр: xGB, xMB, xKB эсвэл байтын тоо"
       },
       "group": {
@@ -371,7 +371,7 @@
       "role": "accountExpiry",
       "hint": {
         "en": "Expected a date not earlier than today",
-        "fr": "Une date à partir d'aujourd'hui est attendue",
+        "fr": "Une date à partir d’aujourd’hui est attendue",
         "mn": "Өнөөдөр эсвэл түүнээс хойших огноо оруулна уу"
       },
       "label": {

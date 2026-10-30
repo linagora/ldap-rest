@@ -37,6 +37,16 @@
   the class of what was thrown are read through the `cause` chain, so a
   refusal stays a 403 and a timeout a 504, where both surfaced as a 500
   ([details](docs/client-development/api/rest-api.md#error-handling)).
+- A burst of requests arriving with the connection pool empty used to open
+  one connection per request and keep them all, going past
+  `--ldap-pool-size`: a connection being opened now takes its place in the
+  pool, and the requests over the size wait for a free one. The new
+  `ldap_rest_ldap_pool_opening` reports the connections being opened. A
+  connection that fails to open fails the requests waiting for it with that
+  error, and a request waiting behind a connection discarded as expired
+  takes its place, instead of both waiting for the 30 s pool timeout
+  ([details](docs/usage/operations.md#metrics),
+  [#460](https://github.com/linagora/ldap-rest/issues/460)).
 - An attribute the schema declares is checked and written whatever its case
   or `;binary` option: a boolean sent as `PWDRESET` or `pwdReset;binary` is no
   longer answered 400 as not a string, a `required` attribute sent as `Cn` no
@@ -59,6 +69,9 @@
   and a leap second (`20991231235960Z`) no longer makes the date 400 as
   invalid
   ([details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
+- The French labels and hints of the Twake schemas use the typographic
+  apostrophe (`’`), as the rest of the French text does
+  ([#462](https://github.com/linagora/ldap-rest/issues/462)).
 
 ### Security
 

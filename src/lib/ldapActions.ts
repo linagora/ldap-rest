@@ -63,6 +63,16 @@ interface PooledConnection {
   inUse: boolean;
 }
 
+/**
+ * What a queued request is told when the pool changes: a connection handed
+ * over, a place freed with none to give (it takes the place again), or why
+ * it gets none.
+ */
+type WaiterOutcome =
+  | { connection: PooledConnection }
+  | { retry: true }
+  | { error: Error };
+
 // search
 const defaultSearchOptions: SearchOptions = {
   scope: 'sub',
@@ -510,8 +520,10 @@ class ldapActions {
   private currentUrlIndex: number = 0;
   // LRU cache for attribute signatures to prevent unbounded memory growth
   private attrSignatureCache: LRUCache<string, string>;
-  private waitingResolvers: Array<(conn?: PooledConnection) => void> = [];
+  private waitingResolvers: Array<(outcome: WaiterOutcome) => void> = [];
   private availableConnections: PooledConnection[] = [];
+  /** Connections being opened, not yet in `connectionPool` */
+  private opening = 0;
   private isCleaningUp = false;
   /** See {@link declareObjectClasses}. */
   private declaredClasses = new Map<
@@ -784,7 +796,7 @@ class ldapActions {
    */
   async close(): Promise<void> {
     this.closed = true;
-    for (const waiter of this.waitingResolvers.splice(0)) waiter(undefined);
+    this.refuseWaiters(new Error('LDAP connections closed'));
     const pooled = this.connectionPool.splice(0);
     this.availableConnections.length = 0;
     await Promise.allSettled(pooled.map(conn => conn.client.unbind()));
@@ -804,11 +816,18 @@ class ldapActions {
   }
 
   /** The pool as it is, for the metrics */
-  poolStats(): { busy: number; idle: number; waiting: number; max: number } {
+  poolStats(): {
+    busy: number;
+    idle: number;
+    waiting: number;
+    opening: number;
+    max: number;
+  } {
     return {
       busy: this.connectionPool.length - this.availableConnections.length,
       idle: this.availableConnections.length,
       waiting: this.waitingResolvers.length,
+      opening: this.opening,
       max: this.poolSize,
     };
   }
@@ -826,24 +845,37 @@ class ldapActions {
       return conn;
     }
 
-    // If pool is not full, create a new connection
-    if (this.connectionPool.length < this.poolSize) {
-      // Outside the request it is opened for: the connection outlives it
-      const client = await outsideAnyRequest(() => this.createConnection());
-      if (this.closed) {
-        await client.unbind().catch(() => undefined);
-        throw new Error('LDAP connections closed');
+    // The place is taken before the first `await`: on an empty pool, a
+    // burst of acquires all reach this check before any of them returns.
+    if (this.connectionPool.length + this.opening < this.poolSize) {
+      this.opening++;
+      try {
+        // Outside the request it is opened for: the connection outlives it
+        const client = await outsideAnyRequest(() => this.createConnection());
+        if (this.closed) {
+          await client.unbind().catch(() => undefined);
+          throw new Error('LDAP connections closed');
+        }
+        const pooled: PooledConnection = {
+          client,
+          createdAt: Date.now(),
+          inUse: true,
+        };
+        this.connectionPool.push(pooled);
+        this.logger.debug(
+          `Created new LDAP connection (pool: ${this.connectionPool.length}/${this.poolSize})`
+        );
+        return pooled;
+      } catch (error) {
+        // The place the open took is free again, but no release will hand it
+        // over: the waiters get the error instead of the timeout
+        this.refuseWaiters(
+          error instanceof Error ? error : new Error(String(error))
+        );
+        throw error;
+      } finally {
+        this.opening--;
       }
-      const pooled: PooledConnection = {
-        client,
-        createdAt: Date.now(),
-        inUse: true,
-      };
-      this.connectionPool.push(pooled);
-      this.logger.debug(
-        `Created new LDAP connection (pool: ${this.connectionPool.length}/${this.poolSize})`
-      );
-      return pooled;
     }
 
     // Pool is full, wait for an available connection using Promise with timeout
@@ -852,18 +884,29 @@ class ldapActions {
     );
     return new Promise<PooledConnection>((resolve, reject) => {
       const timeoutId = globalThis.setTimeout(() => {
-        const idx = this.waitingResolvers.indexOf(resolveWrapper);
+        const idx = this.waitingResolvers.indexOf(settle);
         if (idx !== -1) this.waitingResolvers.splice(idx, 1);
         reject(new Error('LDAP connection pool timeout after 30s'));
       }, 30000);
 
-      const resolveWrapper = (conn?: PooledConnection) => {
+      const settle = (outcome: WaiterOutcome): void => {
         globalThis.clearTimeout(timeoutId);
-        if (conn) resolve(conn);
-        else reject(new Error('LDAP connections closed'));
+        if ('error' in outcome) reject(outcome.error);
+        else if ('retry' in outcome) resolve(this.takeConnection());
+        else resolve(outcome.connection);
       };
-      this.waitingResolvers.push(resolveWrapper);
+      this.waitingResolvers.push(settle);
     });
+  }
+
+  /** Refuse every queued request with `error` */
+  private refuseWaiters(error: Error): void {
+    for (const waiter of this.waitingResolvers.splice(0)) waiter({ error });
+  }
+
+  /** Let one queued request take a place that freed with no connection */
+  private wakeWaiter(): void {
+    this.waitingResolvers.shift()?.({ retry: true });
   }
 
   /**
@@ -871,21 +914,29 @@ class ldapActions {
    * If there are waiting requests, hand off the connection directly
    */
   private releaseConnection(pooled: PooledConnection): void {
+    // A connection being opened when `close` ran, or returned by an
+    // operation still running after it, has no pool to go back to
+    if (this.closed) {
+      void pooled.client.unbind().catch(() => undefined);
+      return;
+    }
+
     // Check if connection has expired before reusing
     if (Date.now() - pooled.createdAt > this.connectionTtl) {
       const idx = this.connectionPool.indexOf(pooled);
       if (idx !== -1) this.connectionPool.splice(idx, 1);
       void pooled.client.unbind().catch(() => {});
       this.logger.debug('Released expired LDAP connection (discarded)');
+      this.wakeWaiter();
       return;
     }
 
     // If there are waiting requests, give them the connection directly (O(1))
     if (this.waitingResolvers.length > 0) {
-      const resolve = this.waitingResolvers.shift()!;
+      const waiter = this.waitingResolvers.shift()!;
       // Connection stays in use, just transfer ownership
       this.logger.debug('Released LDAP connection to waiting request');
-      resolve(pooled);
+      waiter({ connection: pooled });
       return;
     }
 

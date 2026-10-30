@@ -930,6 +930,211 @@ describe('ldapActions', function () {
     });
   });
 
+  describe('the connection pool', function () {
+    const build = (size: number): LdapActions => {
+      const server = new DM();
+      server.config = { ...server.config, ldap_pool_size: size };
+      return new LdapActions(server);
+    };
+
+    let pool: LdapActions;
+
+    afterEach(async () => {
+      await pool?.close();
+    });
+
+    /** Count the connections opened at once, the most there were */
+    const watchOpening = (
+      target: LdapActions
+    ): { opened: () => number; most: () => number; stop: () => void } => {
+      const inner = target as unknown as {
+        createConnection: () => Promise<Client>;
+      };
+      const create = inner.createConnection;
+      let opened = 0;
+      let open = 0;
+      let most = 0;
+      inner.createConnection = async (): Promise<Client> => {
+        opened++;
+        open++;
+        most = Math.max(most, open);
+        try {
+          return await create.call(target);
+        } finally {
+          open--;
+        }
+      };
+      return {
+        opened: () => opened,
+        most: () => most,
+        stop: () => {
+          inner.createConnection = create;
+        },
+      };
+    };
+
+    it('keeps a burst of acquires within --ldap-pool-size', async () => {
+      const size = 3;
+      pool = build(size);
+      const opening = watchOpening(pool);
+      let seenOpening = 0;
+      let queued = 0;
+      const inner = pool as unknown as {
+        waitingResolvers: unknown[];
+      };
+      const push = inner.waitingResolvers.push.bind(inner.waitingResolvers);
+      inner.waitingResolvers.push = (...waiters: unknown[]): number => {
+        queued = Math.max(queued, inner.waitingResolvers.length + 1);
+        // Read while the over-size searches are still opening
+        seenOpening = Math.max(seenOpening, pool.poolStats().opening);
+        return push(...waiters);
+      };
+      try {
+        // Base reads, cached only when the cache is on, which it is not
+        const searches = [];
+        for (let i = 0; i < 10; i++)
+          searches.push(
+            pool.search({ paged: false, scope: 'base', attributes: ['1.1'] })
+          );
+        for (const search of await Promise.all(searches))
+          expect(search).to.have.property('searchEntries');
+      } finally {
+        opening.stop();
+      }
+      expect(queued, 'the over-size searches waited for a connection').to.equal(
+        10 - size
+      );
+      expect(seenOpening, 'the gauge saw them opening').to.be.above(0);
+      expect(opening.most(), 'opened at once').to.be.at.most(size);
+      expect(opening.opened(), 'opened for the pool').to.equal(size);
+      expect(pool.poolStats().busy + pool.poolStats().idle).to.equal(size);
+      expect(pool.poolStats().opening).to.equal(0);
+    });
+
+    it('opens once for two searches started together, sized at one', async () => {
+      pool = build(1);
+      const opening = watchOpening(pool);
+      try {
+        const [first, second] = await Promise.all([
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+        ]);
+        expect(first).to.have.property('searchEntries');
+        expect(second).to.have.property('searchEntries');
+      } finally {
+        opening.stop();
+      }
+      expect(opening.opened()).to.equal(1);
+      expect(pool.poolStats().busy + pool.poolStats().idle).to.equal(1);
+    });
+
+    it('tells the queued requests why the connection did not open', async function () {
+      // Without the fix, the queued search waits for a release that never
+      // comes and fails on the 30 s pool timeout
+      this.timeout(2000);
+      pool = build(1);
+      const inner = pool as unknown as {
+        createConnection: () => Promise<Client>;
+      };
+      const create = inner.createConnection;
+      inner.createConnection = async (): Promise<Client> => {
+        throw new Error('no directory answered');
+      };
+      try {
+        const searches = [
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+          pool.search({ paged: false, scope: 'base', attributes: ['1.1'] }),
+        ];
+        const errors = await Promise.all(
+          searches.map(search =>
+            search.then(
+              () => expect.fail('served without a connection'),
+              (error: Error) => error.message
+            )
+          )
+        );
+        expect(errors).to.deep.equal([
+          'no directory answered',
+          'no directory answered',
+        ]);
+      } finally {
+        inner.createConnection = create;
+      }
+      expect(pool.poolStats()).to.deep.include({
+        busy: 0,
+        idle: 0,
+        waiting: 0,
+        opening: 0,
+      });
+    });
+
+    it('lets a waiter take the place of an expired connection', async () => {
+      pool = build(1);
+      const inner = pool as unknown as {
+        takeConnection: () => Promise<{ createdAt: number }>;
+        releaseConnection: (conn: { createdAt: number }) => void;
+        connectionTtl: number;
+      };
+      const first = await inner.takeConnection();
+      const waiting = inner.takeConnection();
+      expect(pool.poolStats().waiting, 'queued behind the connection').to.equal(
+        1
+      );
+      first.createdAt = Date.now() - inner.connectionTtl - 1;
+      inner.releaseConnection(first);
+      const woken = await waiting;
+      expect(woken, 'a connection of its own').to.not.equal(first);
+      expect(pool.poolStats()).to.deep.include({ busy: 1, waiting: 0 });
+      inner.releaseConnection(woken);
+    });
+
+    it('unbinds the connection it opened while close ran', async () => {
+      pool = build(1);
+      // The pool is drained by close() before the connection it is opening
+      // is there: the pool holds no reference to it, only this call does
+      const inner = pool as unknown as {
+        createConnection: () => Promise<Client>;
+        connectionPool: unknown[];
+        opening: number;
+      };
+      let closeFirst!: () => void;
+      const closed = new Promise<void>(resolve => {
+        closeFirst = resolve;
+      });
+      const bound: Array<Promise<void>> = [];
+      const create = inner.createConnection;
+      inner.createConnection = async (): Promise<Client> => {
+        const client = await create.call(pool);
+        await closed;
+        const unbind = client.unbind.bind(client);
+        client.unbind = (): Promise<void> => {
+          const unbound = unbind();
+          bound.push(unbound);
+          return unbound;
+        };
+        return client;
+      };
+      const search = pool.search({
+        paged: false,
+        scope: 'base',
+        attributes: ['1.1'],
+      });
+      // The search reaches `takeConnection` and waits on `createConnection`
+      await new Promise(resolve => setImmediate(resolve));
+      const unbinding = pool.close();
+      closeFirst();
+      await unbinding;
+      await search.then(
+        () => expect.fail('served after close'),
+        (err: Error) => expect(err.message).to.match(/closed/)
+      );
+      expect(inner.connectionPool, 'not pooled').to.be.empty;
+      expect(bound, 'unbound by the search that opened it').to.have.length(1);
+      await bound[0];
+      expect(inner.opening).to.equal(0);
+    });
+  });
+
   describe('the LDAP base', function () {
     const settings = [
       'NODE_ENV',
