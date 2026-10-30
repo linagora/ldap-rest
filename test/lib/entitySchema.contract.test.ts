@@ -65,6 +65,7 @@ describe('Entity schema contract', function () {
     // extensibleObject lets the three kinds hold the same attributes
     server.config.ldap_flat_schema = [
       './test/fixtures/schemas/contractPeople.json',
+      './test/fixtures/schemas/loosePeople.json',
     ];
     server.config.group_class = ['top', 'groupOfNames', 'extensibleObject'];
     server.config.ldap_organization_class = [
@@ -191,6 +192,12 @@ describe('Entity schema contract', function () {
       title: 'an attribute the schema does not declare, in another case',
       attributes: () => ({ TELEPHONENUMBER: '+33 1 00 00 00 00' }),
     },
+    // A strict schema names the attribute whatever it is sent with: a `null`
+    // is dropped only where no schema declares the name
+    {
+      title: 'an attribute the schema does not declare, sent with null',
+      attributes: () => ({ title: null }),
+    },
     {
       title: 'a read-only attribute',
       attributes: () => ({ employeeType: 'contractor' }),
@@ -309,6 +316,69 @@ describe('Entity schema contract', function () {
       throw err;
     }
   };
+
+  /**
+   * A schema that declares no rule, as `standard/dhcpHosts.json` does, lets
+   * through what the schemas above refuse: what it lets through must still be
+   * written, and `null` is written by leaving the key out.
+   */
+  describe('a non-strict entity declaring few attributes', () => {
+    const dn = () => `uid=contract-loose,ou=users,${process.env.DM_LDAP_BASE}`;
+    const route = '/api/v1/ldap/loosePeople';
+    const body: Body = {
+      objectClass: ['top', 'inetOrgPerson', 'extensibleObject'],
+      uid: 'contract-loose',
+      cn: 'Loose',
+      sn: 'Contract',
+    };
+
+    afterEach(async () => {
+      await server.ldap.delete(dn()).catch(() => undefined);
+    });
+
+    // The fuzzer's creation carried `DN: null`, answered 500
+    it('drops a null under a name it does not declare', async () => {
+      created(await request.post(route).send({ ...body, title: null }));
+      expect(await stored(dn(), 'title')).to.be.undefined;
+    });
+
+    it('refuses an empty list under a name it does not declare', async () => {
+      const res = await request.post(route).send({ ...body, title: [] });
+      expect(res.status, JSON.stringify(res.body)).to.equal(400);
+      expect(await stored(dn(), 'title')).to.be.undefined;
+    });
+
+    it('adds nothing for a null under a name it does not declare', async () => {
+      created(await request.post(route).send(body));
+      const res = await request
+        .put(`${route}/contract-loose`)
+        .send({ add: { title: null } });
+      expect(res.status, JSON.stringify(res.body)).to.equal(200);
+      expect(await stored(dn(), 'title')).to.be.undefined;
+    });
+
+    // "As if the key were left out" reaches a default the entity configures
+    // under the same name: the drop must not take the default with it
+    it('writes the configured default for a null it drops', async () => {
+      const instance = (
+        server.loadedPlugins['ldapFlatGeneric'] as LdapFlatGeneric
+      ).instances.find(other => other.pluralName === 'loosePeople');
+      const defaults = (instance as unknown as { defaultAttributes: Body })
+        .defaultAttributes;
+      const previous = defaults.title;
+      defaults.title = 'from-config';
+      try {
+        created(await request.post(route).send({ ...body, title: null }));
+        expect(await stored(dn(), 'title')).to.equal('from-config');
+        await server.ldap.delete(dn());
+        created(await request.post(route).send(body));
+        expect(await stored(dn(), 'title')).to.equal('from-config');
+      } finally {
+        if (previous === undefined) delete defaults.title;
+        else defaults.title = previous;
+      }
+    });
+  });
 
   for (const entity of entities) {
     /**
@@ -673,6 +743,20 @@ describe('Entity schema contract', function () {
         .send(group.create({ member: pointee }));
       created(res);
       expect(await stored(group.dn(), 'member')).to.include(pointee);
+    });
+
+    // `objectClass` is the entity's whatever the body carries, a `null` under
+    // it included: the key is dropped like any undeclared one, and the
+    // classes written are the configured ones. This asserts an invariant, not
+    // the fix: it held before too, through `candidateGroup`.
+    it('writes the entity’s own classes for a null objectClass', async () => {
+      const res = await request
+        .post(group.route)
+        .send(group.create({ objectClass: null }));
+      created(res);
+      expect(await stored(group.dn(), 'objectClass')).to.have.members(
+        group.classes()
+      );
     });
   });
 });

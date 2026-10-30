@@ -37,6 +37,20 @@ its own copy, unbounded only if it declares no `maxLength`; the patterns to
 use are in the
 [schema reference](../../docs/client-development/schemas/README.md#test-optional).
 
+### A `null` under a name the schema does not declare
+
+**Who is affected:** a client sending `null` to an entity whose schema does
+not declare the attribute, or to an entity without a schema — the
+`dhcpHosts` and `dnsRecords` schemas shipped with `"strict": false` among
+them.
+
+Such a write answered 500, with nothing written. It now succeeds: the key is
+left out of a creation or an `add`, and clears the attribute in a `replace`.
+No action is required. A strict schema still answers 400 for such a name, and
+the value is written as if the key were left out, so a client relying on the
+500 to notice a misspelt attribute no longer hears about it — see
+[what a value must look like](../client-development/schemas/README.md#what-a-value-must-look-like).
+
 ## From 1.2.0 to 1.2.1
 
 ### `{org}` once in a Twake branch pattern

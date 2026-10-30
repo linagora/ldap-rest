@@ -851,11 +851,16 @@ export default class LdapGroups extends DmPlugin {
       member: members,
       ...additional,
     });
-    // The entry holds the placeholder member too; what else was validated
-    // is written in the shape it was given, over the entry judged, and the
-    // defaults `candidateGroup` added on top are converted here
+    // Written from what validation left, as `addEntry` in `ldapFlat` does:
+    // the defaults are built without the request, so one under a name the
+    // validator dropped is kept as for a key left out. The placeholder member
+    // keeps the `groupOfNames` valid, so it survives.
     delete candidate.member;
-    Object.assign(entry, candidate);
+    entry = {
+      ...this.candidateGroup(cn, [], {}),
+      member: entry.member,
+      ...candidate,
+    };
     toDirectoryEntry(this.schema, entry);
     [dn, entry] = await launchHooksChained(this.registeredHooks.ldapgroupadd, [
       dn,

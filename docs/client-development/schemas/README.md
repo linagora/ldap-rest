@@ -387,12 +387,16 @@ already lost its digits. Anything else for them, and
 anything but text for a `string`, `date` or `pointer`, is refused; an
 attribute with `normalize` takes any text, read after validation. In a
 `replace`, `null` or `[]` clears an attribute; in an `add` or on a creation
-they are refused as no value. A `delete` naming the attribute, or naming it
-with no value, removes it, unless it is `required`; naming values removes
-those, every value it holds included, as the server does not read what
-remains, and `''` names no value. An empty string sent as a value is
-checked against `test`, refused for a pointer, and missing for a `required`
-attribute. Every refusal answers 400 with the attribute's name.
+they are refused as no value when the schema declares the attribute. A
+`null` under a name the schema does not declare — and, for an entity without
+a schema, under any name — is dropped from a creation and from an `add`, as
+if the key were left out, and clears the attribute in a `replace`. A
+`delete` naming the attribute, or naming it with no value, removes it,
+unless it is `required`; naming values removes those, every value it holds
+included, as the server does not read what remains, and `''` names no
+value. An empty string sent as a value is checked against `test`, refused
+for a pointer, and missing for a `required` attribute. Every refusal answers
+400 with the attribute's name.
 
 Every entity route applies these rules; `test/lib/entitySchema.contract.test.ts`
 asserts them on a flat entity, a group and an organization alike. In the

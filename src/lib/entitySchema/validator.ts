@@ -48,6 +48,7 @@ export class EntityValidator {
    * @param entry entry as the client sent it, `objectClass` included
    */
   async validateNew(entry: AttributesList): Promise<void> {
+    this.dropUndeclaredEmpty(entry);
     if (!this.schema) {
       toDirectoryEntry(undefined, entry);
       return;
@@ -55,15 +56,7 @@ export class EntityValidator {
     // Checked at the default, not at what was sent
     applyFixedDefaults(this.schema, entry);
 
-    for (const [field, value] of Object.entries(entry)) {
-      const attr = this.attribute(field);
-      if (!attr) continue;
-      // Before the value checks: an empty required value is missing, not
-      // invalid
-      if (attr.required && isMissing(value) && !attr.generated)
-        throw new BadRequestError(`Attribute "${field}" is required`);
-      entry[field] = asStored(await this.validateValue(field, value));
-    }
+    await this.checkValues(entry);
     // A `generated` attribute is exempt only when something will fill it,
     // see `missingRequiredAttribute`
     const missing = missingRequiredAttribute(
@@ -77,27 +70,24 @@ export class EntityValidator {
   }
 
   /**
-   * Check the parts of a change, then convert them in place. No value under
-   * a name is the empty list for the directory layer, which clears the
-   * attribute in a `replace` and refuses it in an `add`.
+   * Check the parts of a change, then convert them in place. Under a name
+   * the schema declares, no value becomes the empty list, which clears the
+   * attribute in a `replace` and is refused in an `add`; under a name it
+   * does not declare, a `null` is dropped from an `add` and becomes that
+   * empty list in a `replace`.
    *
    * @param changes change as the client sent it
    */
   async validateChanges(changes: ModifyRequest): Promise<void> {
-    if (!this.schema) {
-      toDirectoryChanges(undefined, changes);
-      return;
-    }
     for (const part of ['add', 'replace'] as const) {
       const values = changes[part];
       if (!values) continue;
-      for (const [field, value] of Object.entries(values)) {
-        if (this.attribute(field)?.fixed)
-          throw new BadRequestError(
-            `Attribute "${field}" is fixed and cannot be modified`
-          );
-        values[field] = asStored(await this.validateValue(field, value));
-      }
+      if (part === 'add') this.dropUndeclaredEmpty(values);
+      await this.checkValues(values, part);
+    }
+    if (!this.schema) {
+      toDirectoryChanges(undefined, changes);
+      return;
     }
     if (changes.delete) {
       // A required attribute is refused to a delete of the whole attribute:
@@ -122,6 +112,54 @@ export class EntityValidator {
       }
     }
     toDirectoryChanges(this.schema, changes);
+  }
+
+  /**
+   * Drop, in place, the keys a creation or an `add` carries with `null` or
+   * `undefined` under a name the schema does not declare. A declared
+   * attribute is left to the schema, which turns no value into the empty
+   * list, refused for a `required` one; an undeclared one has no such step,
+   * and without a schema none exists. The write would otherwise carry
+   * `[null]`, which ldapts cannot send.
+   */
+  private dropUndeclaredEmpty(values: AttributesList): void {
+    for (const [field, value] of Object.entries(values))
+      if (
+        (value === null || value === undefined) &&
+        // `attribute` refuses an undeclared name, so a strict schema still
+        // answers 400 here rather than losing the key to a drop
+        !this.attribute(field)
+      )
+        delete values[field];
+  }
+
+  /**
+   * Check every value of a creation or of a part of a change, then write the
+   * shape each one is stored in, in place: no value becomes the empty list,
+   * which clears the attribute in a `replace`. A value the schema does not
+   * declare is left as sent on a change, and on a creation as the directory
+   * layer takes it.
+   *
+   * @param values entry of a creation, or `add` / `replace` of a change
+   * @param part the part of a change, undefined for a creation
+   */
+  private async checkValues(
+    values: AttributesList,
+    part?: 'add' | 'replace'
+  ): Promise<void> {
+    for (const [field, value] of Object.entries(values)) {
+      const attr = this.attribute(field);
+      if (attr?.fixed && part)
+        throw new BadRequestError(
+          `Attribute "${field}" is fixed and cannot be modified`
+        );
+      // Before the value checks: an empty required value is missing, not
+      // invalid
+      if (attr?.required && !part && isMissing(value) && !attr.generated)
+        throw new BadRequestError(`Attribute "${field}" is required`);
+      if (attr || part)
+        values[field] = asStored(await this.validateValue(field, value));
+    }
   }
 
   /**
