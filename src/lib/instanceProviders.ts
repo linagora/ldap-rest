@@ -5,8 +5,6 @@
  * answers at once and builds the instance afterwards, and the cozy-stack
  * admin API, which builds it before answering.
  */
-import fetch, { type RequestInit, type Response } from 'node-fetch';
-
 import { BadGatewayError, ConflictError, GatewayTimeoutError } from './errors';
 import { timedOutbound } from './metrics';
 
@@ -137,8 +135,12 @@ abstract class HttpProvider {
   }
 
   private timedOut(err: unknown, url: string): unknown {
-    // node-fetch names the timeout AbortError; the only signal is ours
-    return ['AbortError', 'TimeoutError'].includes((err as Error).name)
+    // The deadline is the only signal fetch is given. Node 22 answers a
+    // TimeoutError at every stage; AbortError covers the runtimes that name
+    // an abort of the body so
+    return ['AbortError', 'TimeoutError'].includes(
+      (err as { name?: string }).name ?? ''
+    )
       ? new GatewayTimeoutError(
           `${new URL(url).host} did not answer within ${this.timeout} ms`
         )

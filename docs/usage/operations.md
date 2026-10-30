@@ -41,7 +41,17 @@ and `/readyz` names the loaded plugins that report: on an ingress exposing
 the server to the internet, keep the two paths to the cluster.
 
 The Helm chart probes both routes over HTTP (`livenessProbe` and
-`readinessProbe` in `values.yaml`).
+`readinessProbe` in `values.yaml`). The published image also declares a
+`HEALTHCHECK` calling `GET /healthz` from inside the container, on `DM_PORT`:
+`docker ps` reports the container unhealthy when it stops answering, and a
+`--restart` policy restarts it as it would after a crash, while an
+orchestrator with probes of its own ignores the declaration. A port given
+any other way (`--port` in a configuration file, a plugin) leaves the check
+on 8081.
+
+The image runs as its unprivileged `node` user: with `docker run`, a
+`DM_PORT` below 1024 stops the server at startup, where the default 8081
+changes nothing.
 
 ### What the shipped plugins report
 
@@ -128,9 +138,9 @@ James's does, is a call like another. A plugin calling a service through
 `this.fetch` has its calls counted under its name; the OpenID Connect
 client's calls to its provider are made by its library, and not timed.
 
-The instruments come from `prom-client` 15, kept while the server supports
-Node 20, which its successor `@prometheus-io/client` dropped: the
-deprecation notice `npm install` prints is expected.
+The instruments come from `prom-client` 15, which `npm install` reports as
+deprecated: its successor `@prometheus-io/client` is the migration to make,
+and the notice is expected until it is done.
 
 The port listens on every interface. What to alert on: `/readyz` for a
 replica out of rotation, `result="error"` in

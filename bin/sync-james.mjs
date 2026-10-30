@@ -6,7 +6,6 @@
  * @author Generated with Claude Code
  */
 
-import fetch from 'node-fetch';
 import { DM } from '../dist/bin/index.js';
 
 // Parse command line arguments
@@ -57,6 +56,18 @@ function normalizeAlias(alias) {
     return alias.substring(5);
   }
   return alias;
+}
+
+/**
+ * What to log about a failure: a refused connection says `fetch failed`,
+ * and the host and port are in its cause.
+ * @param {unknown} err
+ * @returns {string}
+ */
+function errorMessage(err) {
+  if (!(err instanceof Error)) return String(err);
+  const cause = /** @type {{ message?: string }} */ (err.cause);
+  return cause?.message ? `${err.message}: ${cause.message}` : err.message;
 }
 
 /**
@@ -335,7 +346,7 @@ async function syncJames() {
           // are removed even when the LDAP attribute has been cleared.
           await syncAliases(dn, mail, entry[aliasAttr]);
         } catch (err) {
-          dm.logger.error(`Error processing ${mail}: ${err.message}`);
+          dm.logger.error(`Error processing ${mail}: ${errorMessage(err)}`);
           stats.errors++;
         }
       }

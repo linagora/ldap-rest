@@ -716,6 +716,7 @@
   ],
   "scripts": {
     "audit:directory": "tsx scripts/audit-directory.ts",
+    "audit:prod": "tsx scripts/audit-prod.ts",
     "build": "npm run build:prod",
     "build:browser": "rollup -c rollup.browser.config.mjs",
     "build:dev": "./.dev.mk builddev",
@@ -760,7 +761,6 @@
     "ldapts": "^8.0.9",
     "lru-cache": "^11.2.2",
     "multer": "^2.0.2",
-    "node-fetch": "^3.3.2",
     "p-limit": "^7.1.1",
     "prom-client": "^15.1.3",
     "winston": "^3.17.0"
@@ -785,7 +785,6 @@
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^14.0.0",
     "js-yaml": "^4.1.1",
@@ -811,6 +810,6 @@
     "re2": "^1.22.1"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

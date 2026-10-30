@@ -26,7 +26,7 @@ jobs:
       # that version, not cancel the verdict of the others.
       fail-fast: false
       matrix:
-        node-version: [20.x, 22.x, 24.x, 26.x]
+        node-version: [22.x, 24.x, 26.x]
 
     # Docker Hub limits anonymous pulls per address, and the runners share
     # theirs: every test job failed at "Initialize containers" with
@@ -64,6 +64,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Reads the advisory database, not the Node version
+      - name: Audit production dependencies
+        if: matrix.node-version == '24.x'
+        run: npm run audit:prod
 
       - name: Run rollup build to check typescript compilation
         run: npm run build
@@ -131,3 +136,83 @@ jobs:
           name: lsc-ldaprest-plugin-jar
           path: lsc-plugin/target/lsc-ldaprest-plugin-*-with-deps.jar
           if-no-files-found: error
+
+  # What the release publishes, checked on every pull request: the chart
+  # release.yml lints after the image is pushed, and the image it builds,
+  # from the Dockerfile committed here.
+  package:
+    runs-on: ubuntu-latest
+    name: Helm chart and Docker image
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The Dockerfile is generated from src and the build scripts, and the
+      # image is built from what is committed: one that drifted builds the
+      # previous commit. A diff here is fixed by committing what the
+      # generator wrote in the runner, not by editing the Dockerfile.
+      #
+      # The generator is called rather than `npm run build:dockerfile`: that
+      # goes through make, which rebuilds the Dockerfile only when a source
+      # is newer, so a checkout that kept its dates would prove nothing.
+      - name: Check the Dockerfile is up to date
+        run: |
+          npx tsx scripts/buildDockerfile.ts
+          git diff --exit-code Dockerfile
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.16.0
+
+      - name: Lint the Helm chart
+        run: helm lint helm/ldap-rest
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the image to a local tar
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ldap-rest:ci
+          cache-from: type=gha
+          # The gha cache refuses a second write to a key it holds, which
+          # every run of the same pull request after the first is
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      # The image carries no LDAP settings, so the run gives them, pointing
+      # at nothing. `/healthz` answering means the image starts with its
+      # default plugins; `/readyz` answering 503 names the directory it
+      # cannot reach, as a 200 would mean it reached something.
+      - name: Run the image
+        run: |
+          trap 'docker logs --tail 40 ci || true; docker rm -f ci || true' EXIT
+          docker run -d --name ci -p 8081:8081 \
+            -e DM_LDAP_URL=ldap://127.0.0.1 \
+            -e DM_LDAP_DN=cn=admin,dc=example,dc=com \
+            -e DM_LDAP_PWD=admin \
+            -e DM_LDAP_BASE=dc=example,dc=com \
+            ldap-rest:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8081/healthz > /dev/null && break
+            test "$(docker inspect -f '{{.State.Running}}' ci)" = true ||
+              { echo 'The container stopped'; exit 1; }
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8081/healthz
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/readyz)" = 503
