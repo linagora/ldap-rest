@@ -17,7 +17,7 @@ const document = path.join(root, 'openapi.json');
 const main = async (): Promise<void> => {
   const generator = new OpenAPIGenerator(root);
   await generator.analyze();
-  const generated = JSON.stringify(generator.generateSpec(), null, 2);
+  const generated = JSON.stringify(generator.generateSpec(), null, 2) + '\n';
 
   let committed = '';
   try {
@@ -38,7 +38,8 @@ const main = async (): Promise<void> => {
   );
   const before = committed.split('\n');
   const after = generated.split('\n');
-  const at = before.findIndex((line, index) => line !== after[index]);
+  const difference = before.findIndex((line, index) => line !== after[index]);
+  const at = difference === -1 ? before.length : difference;
   console.error(`first difference at line ${at + 1}:`);
   console.error(`  committed: ${before[at] ?? '(end of file)'}`);
   console.error(`  generated: ${after[at] ?? '(end of file)'}`);
