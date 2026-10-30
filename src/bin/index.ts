@@ -42,6 +42,7 @@ import {
   LDAP_JUDGING_HOOKS,
 } from '../lib/authz/composition';
 import { registerAttributeTypes } from '../lib/utils';
+import { errorChain } from '../lib/errors';
 import HookBus, { recordHookOwner, type HookFn } from '../lib/hookBus';
 import { runForRequest, runWithLogContext } from '../lib/requestContext';
 import { requestId } from '../lib/changeContext';
@@ -56,6 +57,20 @@ import { registerProcessShutdown, shutdownTimeout } from '../lib/shutdown';
 import pluginPriority from '../plugins/priority.json';
 
 export type { Config };
+
+/**
+ * Every stack of a chain of `cause`s, the wrapper's first: the outer stack
+ * names the wrapper, and the reason is in `cause`.
+ *
+ * @param err what was thrown
+ * @returns the stacks, or nothing when it carries none
+ */
+const stackChain = (err: unknown): string | undefined => {
+  const stacks = errorChain(err)
+    .map(e => e.stack)
+    .filter((stack): stack is string => Boolean(stack));
+  return stacks.length ? stacks.join('\nCaused by: ') : undefined;
+};
 
 /**
  * The hooks an authorization plugin refuses a request from, which run before
@@ -692,7 +707,7 @@ export class DM {
   exitOnCrash(): void {
     process.on('uncaughtException', (err: Error) => {
       this.logger.error(`Uncaught exception: ${err.message}`, {
-        stack: err.stack,
+        stack: stackChain(err),
       });
       // Referenced: an empty event loop must not end the process with 0
       setTimeout(() => process.exit(1), this.config.shutdown_timeout as number);
@@ -703,7 +718,7 @@ export class DM {
       unhandledRejections.inc();
       this.logger.error(
         `Unhandled promise rejection: ${reason instanceof Error ? reason.message : String(reason)}`,
-        { stack: reason instanceof Error ? reason.stack : undefined }
+        { stack: stackChain(reason) }
       );
     });
   }

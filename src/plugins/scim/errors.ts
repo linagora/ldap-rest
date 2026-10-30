@@ -6,7 +6,12 @@
  */
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-import { AUTHZ_REFUSED, HttpError, isAuthzRefusal } from '../../lib/errors';
+import {
+  AUTHZ_REFUSED,
+  HttpError,
+  errorChain,
+  isAuthzRefusal,
+} from '../../lib/errors';
 import { messageOf } from '../../lib/expressFormatedResponses';
 // Moved to `lib`: nothing in it is SCIM's business, and an LDAP plugin needs
 // it too. Imported and re-exported, so this module stays the one SCIM reads
@@ -105,13 +110,16 @@ export function scimErrorFromException(
   if (err instanceof ScimError) {
     return body(err.statusCode, message, err.scimType);
   }
-  if (err instanceof HttpError) {
+  // A hook wraps what it caught with `cause`; the status and the directory's
+  // refusal are read through the chain, as the REST answers do.
+  const http = errorChain(err).find(e => e instanceof HttpError);
+  if (http) {
     // `ldapActions` answers a schema refusal with a 400 of its own
     const scimType =
-      err.statusCode === 400 && isSchemaRefusal(extractLdapCode(err))
+      http.statusCode === 400 && isSchemaRefusal(extractLdapCode(http))
         ? 'invalidValue'
         : undefined;
-    return body(err.statusCode, message, scimType);
+    return body(http.statusCode, message, scimType);
   }
   const ldapCode = extractLdapCode(err);
   if (ldapCode === 32) return body(404, 'Resource not found');

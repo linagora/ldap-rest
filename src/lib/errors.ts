@@ -96,6 +96,13 @@ export class ForbiddenError extends HttpError {
  * {@link isAuthzRefusal} — and the client is told {@link AUTHZ_REFUSED}.
  */
 export class AuthzRefusedError extends ForbiddenError {
+  /**
+   * Read instead of the class and the name: a plugin loaded from `dist` holds
+   * another copy of this module, where `instanceof` answers false, and a
+   * subclass may replace `name`.
+   */
+  readonly authzRefusal = true as const;
+
   constructor(message: string) {
     super(message);
     this.name = 'AuthzRefusedError';
@@ -131,39 +138,35 @@ export const errorChain = (err: unknown): Error[] => {
  * Whether an error is, or wraps through `cause`, an authorization plugin's
  * refusal.
  *
- * Read by class, and by name when the class is another copy of this module's:
- * a plugin loaded from `dist` while its caller runs from `src` throws a
- * `AuthzRefusedError` whose `instanceof` answers false, and the refusal would
- * be answered as the wrapper's own error.
+ * Read by the `authzRefusal` marker rather than by class: a plugin loaded
+ * from `dist` while its caller runs from `src` throws a `AuthzRefusedError`
+ * whose `instanceof` answers false, and a subclass that replaces `name`
+ * would escape a name test — the refusal would then be answered as the
+ * wrapper's own error.
  *
  * @param err what was thrown
  * @returns true for a refusal, or for an error wrapping one
  */
 export const isAuthzRefusal = (err: unknown): boolean =>
   errorChain(err).some(
-    e => e instanceof AuthzRefusedError || e.name === 'AuthzRefusedError'
+    e => (e as { authzRefusal?: unknown }).authzRefusal === true
   );
 
 /**
  * The status a thrown thing is answered with.
  *
- * The outermost error decides. A wrapper carries no status of its own, so
- * the innermost one the chain names is read instead: a gateway timeout a
- * plugin wrapped is still a 504. A 500 from inside a chain does not turn
- * the answer into the 403 it would be had the outer error carried it.
+ * The first error from the outside that names one decides: a wrapper names
+ * none, so the error it wraps is read; a layer that translates an inner error
+ * keeps its own status.
  *
  * @param err what was thrown
  * @returns its status code, 500 when it names none
  */
 export const statusCodeOf = (err: unknown): number => {
-  const chain = errorChain(err);
-  const outer = (chain[0] as { statusCode?: unknown } | undefined)?.statusCode;
-  if (typeof outer === 'number') return outer;
-  const inner = chain
-    .map(e => (e as { statusCode?: unknown }).statusCode)
-    .filter((code): code is number => typeof code === 'number')
-    .pop();
-  return inner ?? 500;
+  const named = errorChain(err).find(
+    e => typeof (e as { statusCode?: unknown }).statusCode === 'number'
+  ) as { statusCode?: number } | undefined;
+  return named?.statusCode ?? 500;
 };
 
 /**

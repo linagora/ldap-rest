@@ -11,7 +11,7 @@
  */
 import type { Hooks } from '../hooks';
 
-import { isAuthzRefusal } from './errors';
+import { isAuthzRefusal, statusCodeOf } from './errors';
 import { getLogger } from './expressFormatedResponses';
 import { hookFailures } from './metrics';
 import { outsideRequest, runAsPlugin } from './requestContext';
@@ -124,7 +124,7 @@ export const runAsHookOwner = <T>(hook: HookFn, fn: () => T): T => {
  * Whether an error is a refusal: an authorization plugin's, or any 403.
  */
 const isRefusal = (err: unknown): boolean =>
-  (err as { statusCode?: number })?.statusCode === 403 || isAuthzRefusal(err);
+  statusCodeOf(err) === 403 || isAuthzRefusal(err);
 
 /** Report a failing notified hook, and swallow it: its write happened */
 const report = (hook: HookFn, e: unknown): void => {
