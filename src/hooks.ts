@@ -9,6 +9,7 @@ import type {
   ModifyRequest,
   AttributesList,
   AttributeValue,
+  LdapList,
 } from './lib/ldapActions';
 import type { ChangesToNotify } from './plugins/ldap/onChange';
 import type { ChangeContext } from './lib/changeContext';
@@ -190,9 +191,9 @@ export interface Hooks {
   ldapgroupdelete?: ChainedHook<string>;
   ldapgroupdeletedone?: (dn: string) => MaybePromise<void>;
   ldapgroupaddmember?: ChainedHook<[string, string[]]>;
-  ldapgroupdeletemember?: ChainedHook<[string, string[]]>;
+  ldapgroupdeletemember?: ChainedHook<[string, string]>;
   // this hook is for low-level ldap listGroups method
-  _ldapgrouplist?: ChainedHook<AsyncGenerator<SearchResult>>;
+  _ldapgrouplist?: ChainedHook<LdapList>;
 
   /**
    * "onLdapChange"
@@ -263,9 +264,7 @@ export interface Hooks {
   afterAuth?: ChainedHook<[Request, Response]>;
 
   /** Organization hooks */
-  getOrganisationTop?: ChainedHook<
-    [Request | undefined, AttributesList | null]
-  >;
+  getOrganisationTop?: ChainedHook<[Request | undefined, AttributesList]>;
 
   /**
    * SCIM plugin hooks

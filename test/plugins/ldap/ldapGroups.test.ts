@@ -321,6 +321,25 @@ describe('LdapGroups Plugin', function () {
       });
     });
 
+    it('should list the groups a subscriber answers, not the ones it was given', async () => {
+      // The answer of a chained hook is what the chain threads on: a
+      // subscriber filtering the listing by answering a new object must
+      // have its answer used.
+      await plugin.addGroup('keeper', [user1]);
+      await plugin.addGroup('hidden', [user1]);
+      const filter: NonNullable<Hooks['_ldapgrouplist']> = list =>
+        Object.fromEntries(
+          Object.entries(list).filter(([cn]) => cn !== 'hidden')
+        );
+      server.hookBus.subscribe('_ldapgrouplist', filter);
+      try {
+        expect(Object.keys(await plugin.listGroups())).to.include('keeper');
+        expect(Object.keys(await plugin.listGroups())).to.not.include('hidden');
+      } finally {
+        server.hookBus.unsubscribe('_ldapgrouplist', filter);
+      }
+    });
+
     it('should read back no member at all for a group holding only the placeholder', async () => {
       await plugin.addGroup('testgroup');
       // Stored as the directory may hold it, not as the configuration spells

@@ -1151,16 +1151,10 @@ class ldapActions {
         this.parent.loadedPlugins[owner.plugin]?.roles?.includes('authz')
       );
     });
-    let value = judged as typeof args;
-    for (const judge of judges) {
-      // Only the judges: the other subscribers of the hook run with the
-      // operation, which runs every one of them again
-      const one = new HookBus({ [hook]: [judge] });
-      value = (await one.chain(
-        hook as 'ldapaddrequest',
-        value as never
-      )) as typeof args;
-    }
+    // Only the judges: the other subscribers of the hook run with the
+    // operation, which runs every one of them again
+    const one = new HookBus({ [hook]: judges });
+    await one.chain(hook as 'ldapaddrequest', judged as never);
   }
 
   /**

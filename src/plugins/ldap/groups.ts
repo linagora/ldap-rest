@@ -1063,13 +1063,10 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
-    // Declared with a list, handed one member: subscribers get the member
-    // itself, and the chain answers it.
-    const [, answered] = (await this.hookBus.chain('ldapgroupdeletemember', [
+    [cn, member] = await this.hookBus.chain('ldapgroupdeletemember', [
       cn,
-      member as unknown as string[],
-    ])) as unknown as [string, string];
-    member = answered;
+      member,
+    ]);
     // Refusing the placeholder is an answer to the client, not a fault:
     // a plain Error made it a 500.
     if (this.isDummyMember(member))
@@ -1293,7 +1290,7 @@ export default class LdapGroups extends DmPlugin {
       .catch(err => {
         throw new Error(`Failed to list groups from ${this.base}: ${err}`);
       })) as AsyncGenerator<SearchResult>;
-    const entries: LdapList = {};
+    let entries: LdapList = {};
     for await (const r of _res) {
       for (const entry of r.searchEntries) {
         // An entry under the group base holding no main attribute is not a
@@ -1312,10 +1309,7 @@ export default class LdapGroups extends DmPlugin {
       }
     }
 
-    await this.hookBus.chain(
-      '_ldapgrouplist',
-      entries as unknown as AsyncGenerator<SearchResult>
-    );
+    entries = await this.hookBus.chain('_ldapgrouplist', entries);
     return entries;
   }
 

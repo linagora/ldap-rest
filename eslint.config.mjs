@@ -152,7 +152,7 @@ export default [
         },
         {
           selector:
-            "CallExpression[callee.name=/^launchHooks/], MemberExpression[property.name='hooks'][object.property.name='server'], MemberExpression[object.property.name='server'][property.name='hooks'], MemberExpression[property.name='registeredHooks']",
+            "CallExpression[callee.name=/^launchHooks/], MemberExpression[property.name='hooks'][object.name='server'], MemberExpression[property.name='hooks'][object.property.name='server'], MemberExpression[property.name='registeredHooks']",
           message:
             'Raise and subscribe to hooks through this.hookBus (chain, notify), typed by Hooks: see docs/plugin-development/hooks.md.',
         },

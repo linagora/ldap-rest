@@ -974,7 +974,7 @@ export default class LdapOrganizations extends DmPlugin {
       org,
     ]);
 
-    return result ?? org;
+    return result;
   }
 
   async getOrganisationByDn(

@@ -355,10 +355,8 @@ export default abstract class LdapFlat extends DmPlugin {
   /**
    * @param server the server
    * @param config the entity, its hook prefix included
-   * @param hookPrefix the prefix its hooks are named under, when it differs
-   *   from the one it was configured with
    */
-  constructor(server: DM, config: LdapFlatConfig, hookPrefix?: string) {
+  constructor(server: DM, config: LdapFlatConfig) {
     super(server);
     this.ldap = server.ldap;
     this.base = config.base;
@@ -367,7 +365,7 @@ export default abstract class LdapFlat extends DmPlugin {
     this.defaultAttributes = config.defaultAttributes || {};
     this.singularName = config.singularName;
     this.pluralName = config.pluralName;
-    this.hookPrefix = hookPrefix ?? config.hookPrefix;
+    this.hookPrefix = config.hookPrefix;
     // Built here, where a subclass can name its prefix: one set at
     // construction would be too late for a class field
     this.ownHooks = this.hookBus.prefixed(this.hookPrefix);

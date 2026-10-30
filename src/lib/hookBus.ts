@@ -38,8 +38,7 @@ export type ChainedName = {
 /** The `Hooks` a notification fires: the ones whose subscriber answers nothing */
 export type NotifiedName = Exclude<keyof Hooks, ChainedName>;
 
-/** A chained hook is declared with the value it threads, except
- * `_ldapgrouplist`, which takes one and answers a list */
+/** A chained hook is declared with the value it threads */
 export type ChainedNameOf<K extends keyof Hooks> = K extends ChainedName
   ? K
   : never;
@@ -375,10 +374,11 @@ export default class HookBus implements FlatHookBus {
    * failure has to reach the library, which answers 400 and lets the
    * provider retry.
    *
-   * Every subscriber runs even when one fails, and the first failure is
-   * raised once they all have: stopping at the first would cost the others
-   * their turn — a session the provider considers closed would keep working
-   * against the store that would have killed it.
+   * Every subscriber runs even when one fails, one after the other as
+   * `notify` runs them, and the first failure is raised once they all have:
+   * stopping at the first would cost the others their turn — a session the
+   * provider considers closed would keep working against the store that
+   * would have killed it.
    *
    * @param name the hook
    * @param args what its subscribers are told
@@ -387,19 +387,22 @@ export default class HookBus implements FlatHookBus {
     name: K,
     ...args: Args<K>
   ): Promise<void> {
-    const failures: unknown[] = [];
-    await Promise.all(
-      this.subscribers(name).map(hook =>
-        runAsHookOwner(hook, async () => {
+    let failure: unknown;
+    for (const hook of this.subscribers(name)) {
+      await runAsHookOwner(hook, async () => {
+        try {
           await outsideRequest(() =>
             (hook as (...a: Args<K>) => unknown)(...args)
           );
-        }).then(undefined, (err: unknown) => {
-          failures.push(err);
-        })
-      )
-    );
-    if (failures.length > 0) throw failures[0];
+        } catch (err: unknown) {
+          failure ??= err;
+        }
+      });
+    }
+    // Rethrown as it came: a subscriber may throw anything, and the caller
+    // is the library that answered the provider
+    // eslint-disable-next-line @typescript-eslint/only-throw-error
+    if (failure !== undefined) throw failure;
   }
 
   /**

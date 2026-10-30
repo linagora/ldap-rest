@@ -1324,8 +1324,8 @@ export default abstract class AuthzBase extends DmPlugin {
 
     getOrganisationTop: async ([req, defaultTop]: [
       DmRequest | undefined,
-      AttributesList | null,
-    ]): Promise<[DmRequest | undefined, AttributesList | null]> => {
+      AttributesList,
+    ]): Promise<[DmRequest | undefined, AttributesList]> => {
       // If no user, return default
       if (this.shouldSkipAuthorization(req as DmRequest)) {
         return [req, defaultTop];

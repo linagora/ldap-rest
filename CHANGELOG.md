@@ -27,7 +27,8 @@
   `src/hooks.ts`, and every LDAP "done" hook gets its arguments one by one,
   where it used to get them as a tuple — a subscriber still reading a tuple
   receives the DN instead. A test waits on `settled()` rather than sleeping.
-  See [hooks](docs/plugin-development/hooks.md#the-bus)
+  A plugin built outside this repository needs updating
+  ([details](docs/usage/upgrading.md#from-121))
   ([#415](https://github.com/linagora/ldap-rest/issues/415)).
 
 ### Fixed

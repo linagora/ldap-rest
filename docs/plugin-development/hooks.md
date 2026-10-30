@@ -88,7 +88,7 @@ await server.hookBus.settled();
 - **ldapgroupdelete**: chained before a group is deleted, with its DN
 - **ldapgroupdeletedone**: notified once a group is deleted, with its DN
 - **ldapgroupaddmember**: chained before members are added, with `[cn, members]`
-- **ldapgroupdeletemember**: chained before a member is removed, with `[cn, members]`
+- **ldapgroupdeletemember**: chained before a member is removed, with `[cn, member]`
 - **ldapgroupvalidatemembers**: chained before a member is added, to judge the members, with `[dn, members]`
 - **\_ldapgrouplist**: chained around the list of groups, internal to the groups plugin
 - **onLdapEntryChange**: notified with the entry before and after any write, and who made it
