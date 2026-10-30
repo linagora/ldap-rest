@@ -232,29 +232,43 @@ const INTEGER = /^-?\d+$/;
 
 /**
  * Refuse a value the attribute's type cannot hold. A number may arrive as
- * text, a boolean as the directory's `TRUE` / `FALSE`.
+ * text, a boolean as the directory's `TRUE` / `FALSE`. A JSON number is
+ * judged on the text `String` writes for it, what the directory is sent, so
+ * that a value is accepted or refused like that text.
  */
 function assertScalar(field: string, value: unknown, type?: string): void {
-  const text = typeof value === 'string';
+  // `String` writes an exponent, which neither NUMBER nor INTEGER reads,
+  // outside `[1e-6, 1e21)`: `1e21` is written `1e+21`, `1e-7` as `1e-7`.
+  // Beyond 2^53 the JSON parser has already lost the digits
+  const written =
+    typeof value === 'number' && Number.isFinite(value)
+      ? String(value)
+      : undefined;
+  const reads = (pattern: RegExp): boolean =>
+    written !== undefined
+      ? pattern.test(written)
+      : typeof value === 'string' && pattern.test(value);
   const ok = (): boolean => {
     switch (type) {
       case 'number':
         return (
-          (typeof value === 'number' && Number.isFinite(value)) ||
-          (text && NUMBER.test(value))
+          reads(NUMBER) &&
+          (typeof value !== 'number' ||
+            !Number.isInteger(value) ||
+            Number.isSafeInteger(value))
         );
       case 'integer':
         return (
-          (typeof value === 'number' && Number.isInteger(value)) ||
-          (text && INTEGER.test(value))
+          reads(INTEGER) &&
+          (typeof value !== 'number' || Number.isSafeInteger(value))
         );
       case 'boolean':
         return (
           typeof value === 'boolean' ||
-          (text && (value === 'TRUE' || value === 'FALSE'))
+          (typeof value === 'string' && (value === 'TRUE' || value === 'FALSE'))
         );
       default:
-        return text || Buffer.isBuffer(value);
+        return typeof value === 'string' || Buffer.isBuffer(value);
     }
   };
   if (!ok()) {

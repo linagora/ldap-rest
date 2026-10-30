@@ -274,6 +274,54 @@ describe('EntityValidator', () => {
           `Attribute "${field}" must be ${message}`
         );
     });
+
+    it('judges a number on the text the directory is sent', async () => {
+      const numeric = {
+        attributes: { quota: { type: 'number' }, count: { type: 'integer' } },
+      } as unknown as Schema;
+      const v = validator(numeric);
+      // The fuzzer sent gidNumber: 1e21, which is written 1e+21
+      for (const [field, value, message] of [
+        ['count', 1e21, 'an integer'],
+        ['quota', 1e21, 'a number'],
+        ['quota', 1e-7, 'a number'],
+        ['quota', 4.2e-7, 'a number'],
+        ['count', 2 ** 53, 'an integer'],
+        ['quota', 2 ** 53, 'a number'],
+        ['quota', -(2 ** 53), 'a number'],
+      ] as Array<[string, number, string]>) {
+        expect(
+          await refusal(v.validateValue(field, value as never)),
+          `${field} ${value}`
+        ).to.equal(`Attribute "${field}" must be ${message}`);
+        expect(
+          await refusal(
+            v.validateChanges({ replace: { [field]: value } } as never)
+          ),
+          `${field} ${value}`
+        ).to.equal(`Attribute "${field}" must be ${message}`);
+      }
+    });
+
+    it('takes a number whose text is a plain decimal', async () => {
+      const numeric = {
+        attributes: { quota: { type: 'number' }, count: { type: 'integer' } },
+      } as unknown as Schema;
+      const v = validator(numeric);
+      for (const [field, value] of [
+        ['count', 0],
+        ['count', -7],
+        ['count', Number.MAX_SAFE_INTEGER],
+        ['quota', 4.2],
+        ['quota', -0.5],
+        ['quota', 1e-6],
+        ['quota', -1e10],
+      ] as Array<[string, number]>)
+        expect(
+          await refusal(v.validateValue(field, value as never)),
+          `${field} ${value}`
+        ).to.be.undefined;
+    });
   });
 
   it('checks nothing without a schema', async () => {
