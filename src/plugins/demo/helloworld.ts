@@ -4,63 +4,63 @@
  * @author Xavier Guimard <xguimard@linagora.com>
  */
 
-import type { Express, Request, Response } from 'express';
+import { Type } from '@sinclair/typebox';
+import type { Express } from 'express';
 
-import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 
 /**
- * @openapi-component
- * Hello:
- *   type: object
- *   description: Response returned by the hello-world demo endpoint.
- *   properties:
- *     message:
- *       type: string
- *       description: Static greeting string.
- *       example: Hello
- *     hookResults:
- *       type: array
- *       description: |
- *         Results collected from every function registered on the `hello`
- *         hook.  Empty when no hook listeners are installed.
- *       items: {}
- *       example: []
- *   example:
- *     message: Hello
- *     hookResults: []
+ * The answer of the hello-world endpoint.
+ *
+ * Exported because the OpenAPI generator reads it without running the
+ * plugin, as it reads every schema a route declares.
  */
+export const HelloResponse = Type.Object(
+  {
+    message: Type.String({
+      description: 'Static greeting string.',
+      example: 'Hello',
+    }),
+    hookResults: Type.Array(Type.Unknown(), {
+      description:
+        'Results collected from every function registered on the `hello` ' +
+        'hook. Empty when no hook listeners are installed.',
+      example: [],
+    }),
+  },
+  {
+    description: 'Response returned by the hello-world demo endpoint.',
+    example: { message: 'Hello', hookResults: [] },
+  }
+);
+
 export default class HelloWorld extends DmPlugin {
   name = 'hello';
   roles: Role[] = ['demo'] as const;
 
   api(app: Express): void {
-    /**
-     * @openapi
-     * summary: Demo hello-world endpoint
-     * description: |
-     *   Exists exclusively as a minimal example for plugin development.
-     *   The handler fires the `hello` hook and collects the results from
-     *   every registered listener into `hookResults`.  In a production
-     *   deployment this plugin is normally disabled; enabling it is safe
-     *   but adds no functional value.
-     * responses:
-     *   '200':
-     *     description: Greeting with hook results.
-     *     content:
-     *       application/json:
-     *         schema: { $ref: '#/components/schemas/Hello' }
-     *         example:
-     *           message: Hello
-     *           hookResults: []
-     */
-    app.get(
-      `${this.config.api_prefix}/hello`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/hello`,
+      responses: {
+        200: {
+          schema: HelloResponse,
+          description: 'Greeting with hook results.',
+        },
+      },
+      summary: 'Demo hello-world endpoint',
+      description:
+        'Exists exclusively as a minimal example for plugin ' +
+        'development. The handler fires the `hello` hook and collects the ' +
+        'results from every registered listener into `hookResults`. In a ' +
+        'production deployment this plugin is normally disabled; enabling ' +
+        'it is safe but adds no functional value.',
+      handler: async ({ res }) => {
         res.json({
           message: 'Hello',
           hookResults: await this.hookBus.call('hello'),
         });
-      })
-    );
+      },
+    });
   }
 }

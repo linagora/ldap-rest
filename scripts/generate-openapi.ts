@@ -12,7 +12,7 @@ import * as ts from 'typescript';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,7 +85,7 @@ interface OpenAPISpec {
   }>;
 }
 
-class OpenAPIGenerator {
+export class OpenAPIGenerator {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private routes: Map<string, OpenAPIRoute[]> = new Map();
@@ -122,6 +122,19 @@ class OpenAPIGenerator {
     'TwakePlugin',
   ]);
 
+  /**
+   * The plugin classes the file walk found. They are analyzed once the walk
+   * is over, because reading a declared schema imports its module.
+   */
+  private readonly pendingClasses: Array<{
+    classNode: ts.ClassDeclaration;
+    sourceFile: ts.SourceFile;
+    className: string;
+  }> = [];
+
+  /** Imported schema modules, by absolute file path. */
+  private readonly schemaModules = new Map<string, Promise<object>>();
+
   constructor(private rootDir: string) {
     // Create TypeScript program
     const configPath = ts.findConfigFile(
@@ -150,9 +163,19 @@ class OpenAPIGenerator {
    * the generic per-resource CRUD routes inherited by every flat
    * plugin) are documented too.
    */
-  public analyze(): void {
-    this.analyzeDirectory(path.join(this.rootDir, 'src', 'plugins'));
-    this.analyzeDirectory(path.join(this.rootDir, 'src', 'abstract'));
+  public async analyze(
+    dirs: string[] = [
+      path.join(this.rootDir, 'src', 'plugins'),
+      path.join(this.rootDir, 'src', 'abstract'),
+    ]
+  ): Promise<void> {
+    for (const dir of dirs) this.analyzeDirectory(dir);
+    for (const pending of this.pendingClasses)
+      await this.analyzePluginClass(
+        pending.classNode,
+        pending.sourceFile,
+        pending.className
+      );
   }
 
   private analyzeDirectory(dir: string): void {
@@ -192,7 +215,7 @@ class OpenAPIGenerator {
       );
       const baseName = heritage?.types[0]?.expression.getText(sourceFile);
       if (baseName && this.pluginBaseClasses.has(baseName)) {
-        this.analyzePluginClass(node, sourceFile, className);
+        this.pendingClasses.push({ classNode: node, sourceFile, className });
       }
     }
 
@@ -200,11 +223,11 @@ class OpenAPIGenerator {
     ts.forEachChild(node, child => this.visitNode(child, sourceFile));
   }
 
-  private analyzePluginClass(
+  private async analyzePluginClass(
     classNode: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
     className: string
-  ): void {
+  ): Promise<void> {
     // Find the api() method
     const apiMethod = classNode.members.find(
       member =>
@@ -242,9 +265,55 @@ class OpenAPIGenerator {
       pluginName,
       localVars
     );
+
+    for (const call of this.definedRouteCalls(classNode)) {
+      const route = await this.parseDefinedRoute(
+        call,
+        sourceFile,
+        pluginName,
+        localVars
+      );
+      if (route) routes.push(route);
+    }
+
     if (routes.length > 0) {
       this.routes.set(pluginName, routes);
     }
+  }
+
+  /**
+   * The `defineRoute(…)` calls of a plugin class, in source order.
+   *
+   * The whole class is walked, not only `api()`: a plugin may declare its
+   * routes in a helper method. The callee is resolved through the checker,
+   * so an aliased import (`import { defineRoute as route }`) is found too.
+   */
+  private definedRouteCalls(
+    classNode: ts.ClassDeclaration
+  ): ts.CallExpression[] {
+    const calls: ts.CallExpression[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && this.isDefineRoute(node.expression))
+        calls.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(classNode);
+    return calls;
+  }
+
+  /** Whether an expression names the `defineRoute` of `src/lib/route.ts`. */
+  private isDefineRoute(expr: ts.Expression): boolean {
+    let symbol = this.checker.getSymbolAtLocation(expr);
+    for (let depth = 0; symbol?.flags && depth < 8; depth++) {
+      if (!(symbol.flags & ts.SymbolFlags.Alias)) break;
+      symbol = this.checker.getAliasedSymbol(symbol);
+    }
+    if (!symbol || symbol.getName() !== 'defineRoute') return false;
+    const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+    return (
+      declaration?.getSourceFile().fileName ===
+      path.join(this.rootDir, 'src', 'lib', 'route.ts')
+    );
   }
 
   /**
@@ -446,17 +515,20 @@ class OpenAPIGenerator {
     return routes;
   }
 
-  private parseRoute(
-    callExpr: ts.CallExpression,
-    method: OpenAPIRoute['method'],
+  /**
+   * Turn a path expression into the OpenAPI path: resolve the template
+   * substitutions the generator knows, and spell `:param` `{param}`.
+   *
+   * @param pathArg the path expression, in the app call or the declaration
+   * @param sourceFile the file holding it
+   * @param localVars the `const X = '…'` of the `api()` body
+   * @returns the path, or an empty string when it cannot be resolved
+   */
+  private resolveRoutePath(
+    pathArg: ts.Expression,
     sourceFile: ts.SourceFile,
-    pluginName: string,
     localVars: Map<string, string>
-  ): OpenAPIRoute | null {
-    if (callExpr.arguments.length < 2) return null;
-
-    // First argument is the path
-    const pathArg = callExpr.arguments[0];
+  ): string {
     let pathTemplate = '';
 
     // Handle template literals with ${this.config.api_prefix}
@@ -490,13 +562,29 @@ class OpenAPIGenerator {
       pathTemplate = pathArg.text;
     }
 
-    if (!pathTemplate) return null;
+    if (!pathTemplate) return '';
 
     // Convert Express-style :param to OpenAPI {param}
     pathTemplate = pathTemplate.replace(/:(\w+)/g, '{$1}');
 
     // Clean up double slashes
-    pathTemplate = pathTemplate.replace(/\/\//g, '/');
+    return pathTemplate.replace(/\/\//g, '/');
+  }
+
+  private parseRoute(
+    callExpr: ts.CallExpression,
+    method: OpenAPIRoute['method'],
+    sourceFile: ts.SourceFile,
+    pluginName: string,
+    localVars: Map<string, string>
+  ): OpenAPIRoute | null {
+    if (callExpr.arguments.length < 2) return null;
+
+    // First argument is the path
+    const pathArg = callExpr.arguments[0];
+    const pathTemplate = this.resolveRoutePath(pathArg, sourceFile, localVars);
+
+    if (!pathTemplate) return null;
 
     // Extract parameters from path
     const pathParams = this.extractPathParameters(pathTemplate);
@@ -601,7 +689,7 @@ class OpenAPIGenerator {
 
     // Special handling for CSV template
     if (method === 'get' && pathTemplate.includes('template.csv')) {
-      route.responses['200'] = {
+      route.responses!['200'] = {
         description: 'CSV template',
         content: {
           'text/csv': {
@@ -611,38 +699,371 @@ class OpenAPIGenerator {
       };
     }
 
-    // Deep-merge author-provided overrides last so YAML wins over every
-    // generated default. We strip the `summary`/`description` keys because
-    // they were already consumed when constructing `route`.
-    if (Object.keys(overrides).length > 0) {
-      const { summary: _s, description: _d, ...rest } = overrides;
+    return this.applyOverrides(route, overrides);
+  }
 
-      // Special-case: if the author lists `parameters`, concatenate them
-      // with the auto-generated path parameters (deduplicated by `in`+
-      // `name`). Path params are mandatory in OpenAPI, so silently
-      // dropping them when a route only adds query params would be a
-      // footgun. The override still wins on duplicates.
-      if (Array.isArray(rest.parameters) && route.parameters) {
-        const seen = new Set(
-          (rest.parameters as Array<{ in?: string; name?: string }>).map(
-            p => `${p.in}:${p.name}`
-          )
-        );
-        const merged = [
-          ...route.parameters.filter(p => !seen.has(`${p.in}:${p.name}`)),
-          ...(rest.parameters as OpenAPIRoute['parameters']),
-        ];
-        rest.parameters = merged as unknown as Record<string, unknown>[];
-      }
+  /**
+   * Deep-merge an `@openapi` block over the generated route: YAML wins.
+   * Parameters are concatenated with the generated ones, deduplicated by
+   * `in` + `name`, because dropping a path parameter would produce an
+   * invalid document.
+   */
+  private applyOverrides(
+    route: OpenAPIRoute,
+    overrides: Record<string, unknown>
+  ): OpenAPIRoute {
+    if (Object.keys(overrides).length === 0) return route;
 
-      const merged = this.deepMerge(
-        route as unknown as Record<string, unknown>,
-        rest
+    const { summary: _s, description: _d, ...rest } = overrides;
+
+    if (Array.isArray(rest.parameters) && route.parameters) {
+      const seen = new Set(
+        (rest.parameters as Array<{ in?: string; name?: string }>).map(
+          p => `${p.in}:${p.name}`
+        )
       );
-      return merged as unknown as OpenAPIRoute;
+      const merged = [
+        ...route.parameters.filter(p => !seen.has(`${p.in}:${p.name}`)),
+        ...(rest.parameters as NonNullable<OpenAPIRoute['parameters']>),
+      ];
+      rest.parameters = merged as unknown as Record<string, unknown>[];
     }
 
-    return route;
+    const merged = this.deepMerge(
+      route as unknown as Record<string, unknown>,
+      rest
+    );
+    return merged as unknown as OpenAPIRoute;
+  }
+
+  /**
+   * Read the declaration of a `defineRoute` call.
+   *
+   * The declaration is the document: its schemas become the parameters and
+   * the request body, its `responses` the answer schemas, and its summary or
+   * description the operation's. An `@openapi` block above the call still
+   * wins, as it does over the generated defaults of an `app.<verb>` route.
+   */
+  private async parseDefinedRoute(
+    callExpr: ts.CallExpression,
+    sourceFile: ts.SourceFile,
+    pluginName: string,
+    localVars: Map<string, string>
+  ): Promise<OpenAPIRoute | null> {
+    const declaration = callExpr.arguments[1];
+    if (!declaration || !ts.isObjectLiteralExpression(declaration)) {
+      this.warnUnreadable(
+        callExpr,
+        sourceFile,
+        'the declaration is not an object literal'
+      );
+      return null;
+    }
+
+    const property = (name: string): ts.PropertyAssignment | undefined =>
+      this.propertyOf(declaration, name, sourceFile);
+
+    const methodProp = property('method');
+    const pathProp = property('path');
+    if (!methodProp || !pathProp) {
+      this.warnUnreadable(
+        callExpr,
+        sourceFile,
+        'the method or the path is missing'
+      );
+      return null;
+    }
+    if (!ts.isStringLiteral(methodProp.initializer)) {
+      this.warnUnreadable(callExpr, sourceFile, 'the method is not a literal');
+      return null;
+    }
+    const method = methodProp.initializer.text as OpenAPIRoute['method'];
+    if (!['get', 'post', 'put', 'patch', 'delete'].includes(method)) {
+      this.warnUnreadable(callExpr, sourceFile, `unknown method ${method}`);
+      return null;
+    }
+
+    const path = this.resolveRoutePath(
+      pathProp.initializer,
+      sourceFile,
+      localVars
+    );
+    if (!path) {
+      this.warnUnreadable(callExpr, sourceFile, 'the path cannot be resolved');
+      return null;
+    }
+
+    const overrides = this.extractRouteOverrides(callExpr, sourceFile);
+    const summary = this.stringProperty(property('summary'));
+    const description = this.stringProperty(property('description'));
+    const tags = this.stringArrayProperty(property('tags'));
+
+    const responses: NonNullable<OpenAPIRoute['responses']> = {
+      '200': { description: 'Successful response' },
+      '400': { description: 'Bad request' },
+      '401': { description: 'Unauthorized' },
+      '404': { description: 'Not found' },
+      '500': { description: 'Internal server error' },
+    };
+
+    const route: OpenAPIRoute = {
+      method,
+      path,
+      summary:
+        summary ||
+        (overrides.summary as string | undefined) ||
+        this.generateSummary(method, path),
+      description: description || (overrides.description as string | undefined),
+      parameters: this.mergeParameters(this.extractPathParameters(path), [
+        ...(await this.pathParametersOf(property('params'), path, sourceFile)),
+        ...(await this.parametersOf(property('query'), sourceFile, 'query')),
+      ]),
+      responses,
+      tags: tags.length
+        ? tags
+        : [this.pluginTags.get(pluginName) || pluginName],
+    };
+
+    const body = await this.schemaOf(property('body'), sourceFile);
+    if (body !== undefined) {
+      route.requestBody = {
+        required: true,
+        content: { 'application/json': { schema: body } },
+      };
+    }
+
+    const responsesProp = property('responses');
+    if (
+      responsesProp &&
+      ts.isObjectLiteralExpression(responsesProp.initializer)
+    ) {
+      for (const entry of responsesProp.initializer.properties) {
+        if (!ts.isPropertyAssignment(entry)) continue;
+        const code = entry.name.getText(sourceFile).replace(/^['"]|['"]$/g, '');
+        // `{ schema, description }` or a bare schema
+        const wrapper = ts.isObjectLiteralExpression(entry.initializer)
+          ? entry.initializer
+          : undefined;
+        const schemaProp = wrapper
+          ? this.propertyOf(wrapper, 'schema', sourceFile)
+          : undefined;
+        const schema = await this.resolveSchema(
+          schemaProp?.initializer ?? entry.initializer,
+          sourceFile
+        );
+        if (schema === undefined) continue;
+        const description = wrapper
+          ? this.stringProperty(
+              this.propertyOf(wrapper, 'description', sourceFile)
+            )
+          : undefined;
+        responses[code] = {
+          description:
+            description ?? responses[code]?.description ?? `${code} response`,
+          content: { 'application/json': { schema } },
+        };
+      }
+    }
+
+    return this.applyOverrides(route, overrides);
+  }
+
+  /** The property assignment `name` of an object literal, if any. */
+  private propertyOf(
+    object: ts.ObjectLiteralExpression,
+    name: string,
+    sourceFile: ts.SourceFile
+  ): ts.PropertyAssignment | undefined {
+    return object.properties.find(
+      (p): p is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(p) && p.name.getText(sourceFile) === name
+    );
+  }
+
+  private stringProperty(
+    prop: ts.PropertyAssignment | undefined
+  ): string | undefined {
+    if (!prop) return undefined;
+    return this.constantString(prop.initializer);
+  }
+
+  /** A string built from literals, `+` and parentheses. */
+  private constantString(expr: ts.Expression): string | undefined {
+    if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr))
+      return expr.text;
+    if (ts.isParenthesizedExpression(expr))
+      return this.constantString(expr.expression);
+    if (
+      ts.isBinaryExpression(expr) &&
+      expr.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = this.constantString(expr.left);
+      const right = this.constantString(expr.right);
+      if (left !== undefined && right !== undefined) return left + right;
+    }
+    return undefined;
+  }
+
+  private stringArrayProperty(
+    prop: ts.PropertyAssignment | undefined
+  ): string[] {
+    if (!prop || !ts.isArrayLiteralExpression(prop.initializer)) return [];
+    return prop.initializer.elements
+      .map(element => this.constantString(element))
+      .filter((value): value is string => Boolean(value));
+  }
+
+  /** The parameters a `params` or `query` schema declares. */
+  private async parametersOf(
+    prop: ts.PropertyAssignment | undefined,
+    sourceFile: ts.SourceFile,
+    where: 'path' | 'query'
+  ): Promise<NonNullable<OpenAPIRoute['parameters']>> {
+    const schema = await this.schemaOf(prop, sourceFile);
+    if (!schema) return [];
+    const object = schema as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    if (!object.properties) return [];
+    const required = new Set(object.required ?? []);
+    return Object.entries(object.properties).map(([name, value]) => ({
+      name,
+      in: where,
+      required: where === 'path' ? true : required.has(name),
+      schema: value as Record<string, unknown>,
+      description:
+        (value as { description?: string }).description ?? `${name} parameter`,
+    }));
+  }
+
+  /** The declared path parameters that the path actually carries. */
+  private async pathParametersOf(
+    prop: ts.PropertyAssignment | undefined,
+    routePath: string,
+    sourceFile: ts.SourceFile
+  ): Promise<NonNullable<OpenAPIRoute['parameters']>> {
+    const names = new Set(
+      [...routePath.matchAll(/\{(\w+)\}/g)].map(match => match[1])
+    );
+    const declared = await this.parametersOf(prop, sourceFile, 'path');
+    for (const parameter of declared)
+      if (!names.has(parameter.name)) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(
+          prop?.getStart() ?? 0
+        );
+        console.warn(
+          `⚠️  \`params.${parameter.name}\` is not in the path ${routePath} ` +
+            `(${path.relative(this.rootDir, sourceFile.fileName)}:${line + 1})`
+        );
+      }
+    return declared.filter(parameter => names.has(parameter.name));
+  }
+
+  /** Declared parameters win over the ones read from the path, by name. */
+  private mergeParameters(
+    base: OpenAPIRoute['parameters'],
+    declared: OpenAPIRoute['parameters']
+  ): OpenAPIRoute['parameters'] {
+    const merged = new Map(
+      (base ?? []).map(p => [`${p.in}:${p.name}`, p] as const)
+    );
+    for (const parameter of declared ?? [])
+      merged.set(`${parameter.in}:${parameter.name}`, parameter);
+    return merged.size ? [...merged.values()] : undefined;
+  }
+
+  private async schemaOf(
+    prop: ts.PropertyAssignment | undefined,
+    sourceFile: ts.SourceFile
+  ): Promise<unknown | undefined> {
+    if (!prop) return undefined;
+    return this.resolveSchema(prop.initializer, sourceFile);
+  }
+
+  /**
+   * Read the value of a schema expression.
+   *
+   * A declared schema is an exported constant — `export const Group =
+   * Type.Object(…)` — possibly imported from another module: the generator
+   * imports that module and reads the export, rather than running the
+   * plugin. The TypeBox value is JSON Schema already; stringifying it drops
+   * the TypeBox symbols.
+   */
+  private async resolveSchema(
+    expr: ts.Expression,
+    sourceFile: ts.SourceFile
+  ): Promise<unknown | undefined> {
+    const symbol = this.checker.getSymbolAtLocation(expr);
+    const target =
+      symbol && symbol.flags & ts.SymbolFlags.Alias
+        ? this.checker.getAliasedSymbol(symbol)
+        : symbol;
+    const declaration = target?.valueDeclaration ?? target?.declarations?.[0];
+    if (
+      !declaration ||
+      !ts.isVariableDeclaration(declaration) ||
+      !ts.isIdentifier(declaration.name)
+    ) {
+      this.warnSchema(expr, sourceFile);
+      return undefined;
+    }
+    const file = declaration.getSourceFile().fileName;
+    const module = await this.importModule(file);
+    const value = (module as Record<string, unknown>)[declaration.name.text];
+    if (value === undefined) {
+      this.warnSchema(expr, sourceFile);
+      return undefined;
+    }
+    return JSON.parse(JSON.stringify(value)) as unknown;
+  }
+
+  private importModule(file: string): Promise<object> {
+    let pending = this.schemaModules.get(file);
+    if (!pending) {
+      pending = this.loadModule(file);
+      this.schemaModules.set(file, pending);
+    }
+    return pending;
+  }
+
+  /**
+   * Import a TypeScript module from either kind of caller: the script run by
+   * `tsx` loads it itself, where a CJS caller (`tsx/cjs`, as the tests run)
+   * needs `tsx`'s importer.
+   */
+  private loadModule(file: string): Promise<object> {
+    const url = pathToFileURL(file).href;
+    if (typeof require === 'function') {
+      const { tsImport } = require('tsx/esm/api') as {
+        tsImport: (specifier: string, parent: string) => Promise<object>;
+      };
+      return tsImport(url, pathToFileURL(__filename).href);
+    }
+    return import(url) as Promise<object>;
+  }
+
+  private warnSchema(expr: ts.Expression, sourceFile: ts.SourceFile): void {
+    const { line } = sourceFile.getLineAndCharacterOfPosition(expr.getStart());
+    console.warn(
+      `⚠️  Cannot read schema \`${expr.getText(sourceFile)}\` ` +
+        `(${path.relative(this.rootDir, sourceFile.fileName)}:${line + 1}): ` +
+        'declare it as an exported constant'
+    );
+  }
+
+  private warnUnreadable(
+    node: ts.Node,
+    sourceFile: ts.SourceFile,
+    reason: string
+  ): void {
+    const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+    console.warn(
+      `⚠️  Skipping defineRoute ${path.relative(
+        this.rootDir,
+        sourceFile.fileName
+      )}:${line + 1}: ${reason}`
+    );
   }
 
   private extractPathParameters(path: string): OpenAPIRoute['parameters'] {
@@ -936,16 +1357,19 @@ class OpenAPIGenerator {
 }
 
 // Main
-const rootDir = path.join(__dirname, '..');
-const outputPath = path.join(rootDir, 'openapi.json');
-
-try {
+const main = async (): Promise<void> => {
   console.log('🔍 Analyzing LDAP-Rest plugins...');
-  const generator = new OpenAPIGenerator(rootDir);
-  generator.analyze();
-  generator.writeSpec(outputPath);
+  const generator = new OpenAPIGenerator(path.join(__dirname, '..'));
+  await generator.analyze();
+  generator.writeSpec(path.join(__dirname, '..', 'openapi.json'));
   console.log('✨ Done!');
-} catch (error) {
-  console.error('❌ Error:', error);
-  process.exit(1);
-}
+};
+
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
+  main().catch((error: unknown) => {
+    console.error('❌ Error:', error);
+    process.exit(1);
+  });

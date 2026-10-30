@@ -3,7 +3,14 @@
 The published API reference at <https://linagora.github.io/ldap-rest/api/> is
 generated from `openapi.json`, which itself is built statically by
 [`scripts/generate-openapi.ts`](../../scripts/generate-openapi.ts) — it walks
-every plugin's `api()` method and reads the JSDoc comments above each route.
+every plugin's `api()` method and reads the JSDoc comments above each route,
+and reads the declaration of every [`defineRoute`](routes.md) call.
+
+With `defineRoute` the declaration is the document: the generator takes its
+`summary`, `description`, `tags`, `params`, `query`, `body` and `responses`,
+and imports the exported schema constants it names. An `@openapi` block above
+the call still wins over what the declaration says, and a route registered
+with `app.<verb>(` still needs one.
 
 You don't need to touch the generator to enrich your plugin's documentation.
 Two JSDoc directives drive the entire pipeline:

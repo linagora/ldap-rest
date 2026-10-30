@@ -604,7 +604,15 @@ hooks: Hooks = {
 
 ### Exposing API Endpoints
 
-Create REST API endpoints for your plugin. **Important:** Always use the `asyncHandler` wrapper for async routes to ensure errors are properly handled and don't crash the server.
+Declare routes with [`defineRoute`](routes.md): it types and validates the
+request (`params`, `query`, `body`), answers a failing request with a 400
+naming the paths at fault, and records the route for the OpenAPI document.
+The `asyncHandler` form below remains for routes that have not been migrated
+yet.
+
+Create REST API endpoints for your plugin. Always use the `asyncHandler`
+wrapper for async routes, so that errors are properly handled and do not
+crash the server.
 
 ```typescript
 import DmPlugin, { asyncHandler } from '../../abstract/plugin';
