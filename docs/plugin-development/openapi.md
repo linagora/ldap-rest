@@ -9,8 +9,9 @@ and reads the declaration of every [`defineRoute`](routes.md) call.
 With `defineRoute` the declaration is the document: the generator takes its
 `summary`, `description`, `tags`, `params`, `query`, `body` and `responses`,
 and imports the exported schema constants it names. An `@openapi` block above
-the call still wins over what the declaration says, and a route registered
-with `app.<verb>(` still needs one.
+the call still wins over what the declaration says — a `requestBody` it
+describes replaces the declared `body` schema whole, rather than merging into
+it — and a route registered with `app.<verb>(` still needs one.
 
 You don't need to touch the generator to enrich your plugin's documentation.
 Two JSDoc directives drive the entire pipeline:

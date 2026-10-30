@@ -264,6 +264,17 @@ describe('App Accounts API Plugin', function () {
       expect(entry.description).to.equal('My Device');
     });
 
+    it('should refuse a name that is not a string', async () => {
+      const res = await request(dm.app)
+        .post(`/api/v1/users/${principalEmail}/app-accounts`)
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({ name: 5 });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.equal(
+        'Invalid request: body.name: Expected string'
+      );
+    });
+
     it('should create account without description if not provided', async () => {
       await dm.ldap.add(testUserDN, {
         objectClass: 'inetOrgPerson',

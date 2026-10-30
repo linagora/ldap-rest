@@ -131,6 +131,17 @@ describe('Account lifecycle', () => {
         );
       });
 
+      it('should refuse a state that is not a name', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/status')
+          .type('json')
+          .send({ state: 5 });
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.equal(
+          'Invalid request: body.state: Expected string'
+        );
+      });
+
       it('should name the states it knows when given an unknown one', async () => {
         const res = await request
           .post('/api/v1/ldap/users/lifecycle.user/status')
@@ -189,6 +200,17 @@ describe('Account lifecycle', () => {
         expect(res.status).to.equal(200);
         expect(res.body).to.have.property('generated', false);
         expect(res.body).to.not.have.property('password');
+      });
+
+      it('should refuse a forceChange that is not a boolean', async () => {
+        const res = await request
+          .post('/api/v1/ldap/users/lifecycle.user/password')
+          .type('json')
+          .send({ forceChange: 'yes' });
+        expect(res.status).to.equal(400);
+        expect(res.body.error).to.equal(
+          'Invalid request: body.forceChange: Expected boolean'
+        );
       });
 
       it('should refuse an empty password rather than generate one', async () => {
