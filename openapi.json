@@ -2047,7 +2047,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/PasswordPolicy"
                 },
                 "example": {
@@ -2103,6 +2102,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -2114,7 +2114,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/PasswordStatus"
                 },
                 "example": {
@@ -2170,6 +2169,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -2181,7 +2181,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "message"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
                 },
                 "example": {
                   "success": true,
@@ -2212,17 +2224,7 @@
         },
         "tags": [
           "Password Policy"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        }
+        ]
       }
     },
     "/api/v1/password-policy/expiring-soon": {
@@ -2404,14 +2406,7 @@
         "description": "Creates `cn=<cn>` under `--ppolicy-base` (else `--ldap-base`), applied\nto `userPassword`. The body holds `cn` and the attributes to set.\n",
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "201": {
             "description": "The policy created.",
@@ -2468,7 +2463,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "allOf": [
                   {
                     "$ref": "#/components/schemas/PasswordPolicyChanges"
@@ -2501,6 +2495,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -2512,7 +2507,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/PasswordPolicyEntry"
                 }
               }
@@ -2551,6 +2545,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -2562,7 +2557,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/PasswordPolicyEntry"
                 }
               }
@@ -2603,7 +2597,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/PasswordPolicyChanges"
               }
             }
@@ -2619,6 +2612,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "cn parameter"
@@ -2629,9 +2623,6 @@
             "description": "Policy deleted.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object"
-                },
                 "example": {
                   "success": true
                 }
@@ -2683,6 +2674,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -2693,9 +2685,6 @@
             "description": "The policy now applied.",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object"
-                },
                 "example": {
                   "dn": "uid=build,ou=users,dc=example,dc=com",
                   "policy": "cn=software,ou=policies,dc=example,dc=com"
@@ -2765,7 +2754,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/PasswordValidationResponse"
                 },
                 "example": {
@@ -2806,7 +2794,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/PasswordValidationRequest"
               }
             }
@@ -2871,7 +2858,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/RawEntry"
                 }
               }
@@ -3096,6 +3082,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -3169,6 +3156,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "dn parameter"
@@ -3180,7 +3168,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/RawEntry"
                 }
               }

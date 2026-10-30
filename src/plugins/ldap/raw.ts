@@ -15,19 +15,15 @@
  * read with the service account, so that a UI can render attribute names and
  * types even when the caller is restricted to a branch.
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request } from 'express';
 import { FilterParser } from 'ldapts';
 import type { SearchOptions, SearchResult } from 'ldapts';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import { tryMethodData } from '../../lib/expressFormatedResponses';
-import {
-  asyncHandler,
-  isDnInBranch,
-  getParentDn,
-  getRdn,
-} from '../../lib/utils';
+import { isDnInBranch, getParentDn, getRdn } from '../../lib/utils';
 import {
   BadRequestError,
   ForbiddenError,
@@ -153,6 +149,20 @@ const SECRET_ATTRIBUTES = [
   'userpkcs12',
   'authpassword',
 ];
+
+export const RawSearchQuery = Type.Object({
+  base: Type.Optional(Type.String()),
+  scope: Type.Optional(Type.String()),
+  filter: Type.Optional(Type.String()),
+  attributes: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Number({ minimum: 1 })),
+});
+
+export const RawDnParams = Type.Object({ dn: Type.String({ minLength: 1 }) });
+
+export const RawChildrenQuery = Type.Object({
+  children: Type.Optional(Type.String()),
+});
 
 export default class LdapRaw extends DmPlugin {
   name = 'ldapRaw';
@@ -553,12 +563,13 @@ export default class LdapRaw extends DmPlugin {
      *         example:
      *           bases: [dc=example,dc=com]
      */
-    app.get(
-      `${prefix}/bases`,
-      asyncHandler(async (req, res) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/bases`,
+      handler: async ({ res }) => {
         await tryMethodData(res, () => ({ bases: this.bases }));
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -579,12 +590,13 @@ export default class LdapRaw extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/rootdse`,
-      asyncHandler(async (req, res) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/rootdse`,
+      handler: async ({ res }) => {
         await tryMethodData(res, this.getRootDse.bind(this));
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -611,12 +623,13 @@ export default class LdapRaw extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/schema`,
-      asyncHandler(async (req, res) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/schema`,
+      handler: async ({ res }) => {
         await tryMethodData(res, this.getSchema.bind(this));
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -681,42 +694,35 @@ export default class LdapRaw extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/search`,
-      asyncHandler(async (req, res) => {
-        const scope = (req.query.scope as string) || 'sub';
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/search`,
+      query: RawSearchQuery,
+      handler: async ({ req, res, query }) => {
+        const scope = query.scope ?? 'sub';
         if (!VALID_SCOPES.includes(scope as Scope))
           throw new BadRequestError(
             `Invalid scope "${scope}", expected one of ${VALID_SCOPES.join(', ')}`
           );
-        const attributes =
-          typeof req.query.attributes === 'string'
-            ? req.query.attributes
-                .split(',')
-                .map(a => a.trim())
-                .filter(Boolean)
-            : undefined;
-        const limit =
-          typeof req.query.limit === 'string'
-            ? parseInt(req.query.limit, 10)
-            : undefined;
-        if (limit !== undefined && (isNaN(limit) || limit < 1))
-          throw new BadRequestError('limit must be a positive integer');
+        const attributes = query.attributes
+          ?.split(',')
+          .map(a => a.trim())
+          .filter(Boolean);
 
         await tryMethodData(
           res,
           this.search.bind(this),
           {
-            base: (req.query.base as string) || this.bases[0],
+            base: query.base || this.bases[0],
             scope: scope as Scope,
-            filter: (req.query.filter as string) || '(objectClass=*)',
+            filter: query.filter || '(objectClass=*)',
             attributes,
-            limit,
+            limit: query.limit,
           },
           req
         );
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -751,12 +757,15 @@ export default class LdapRaw extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/children/:dn`,
-      asyncHandler(async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn as string);
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/children/:dn`,
+      params: RawDnParams,
+      query: RawChildrenQuery,
+      handler: async ({ req, params, query, res }) => {
+        const dn = decodeURIComponent(params.dn);
         const withChildren =
-          req.query.children !== undefined && req.query.children !== 'false';
+          query.children !== undefined && query.children !== 'false';
         await tryMethodData(
           res,
           this.getChildren.bind(this),
@@ -764,8 +773,8 @@ export default class LdapRaw extends DmPlugin {
           withChildren,
           req
         );
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -791,13 +800,15 @@ export default class LdapRaw extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/entry/:dn`,
-      asyncHandler(async (req, res) => {
-        const dn = decodeURIComponent(req.params.dn as string);
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/entry/:dn`,
+      params: RawDnParams,
+      handler: async ({ req, params, res }) => {
+        const dn = decodeURIComponent(params.dn);
         await tryMethodData(res, this.getEntry.bind(this), dn, req);
-      })
-    );
+      },
+    });
   }
 
   /**

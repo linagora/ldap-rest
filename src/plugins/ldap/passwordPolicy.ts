@@ -12,11 +12,12 @@
  */
 import { isDeepStrictEqual } from 'node:util';
 
-import type { Express, Request, Response } from 'express';
+import { Type } from '@sinclair/typebox';
+import type { Express, Request } from 'express';
 
 import DmPlugin, {
+  defineRoute,
   type Role,
-  asyncHandler,
   BadRequestError,
   ConflictError,
   NotFoundError,
@@ -465,6 +466,29 @@ interface LdapUserEntry {
  *       description: List of failed rule descriptions (empty when valid).
  *       example: []
  */
+export const PolicyParams = Type.Object({ cn: Type.String({ minLength: 1 }) });
+
+export const PolicyUserParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+});
+
+export const ExpiringQuery = Type.Object({
+  days: Type.Optional(Type.Number({ minimum: 1 })),
+});
+
+export const AssignPolicyBody = Type.Object({
+  policy: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+});
+
+export const UnlockResponse = Type.Object({
+  success: Type.Boolean(),
+  message: Type.String(),
+});
+
+export const ValidatePasswordBody = Type.Object({
+  password: Type.String({ minLength: 1 }),
+});
+
 export default class PasswordPolicy extends DmPlugin {
   name = 'ldapPasswordPolicy';
   roles: Role[] = ['api', 'configurable'];
@@ -515,9 +539,10 @@ export default class PasswordPolicy extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // GET /password-policy - configuration
-    app.get(
-      `${prefix}/password-policy`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/password-policy`,
+      handler: async ({ req, res }) => {
         const policy = await this.readPolicyConfig();
         // Read through this plugin's cache: asked again as the caller, whom
         // an authorization plugin may keep from the policies
@@ -542,8 +567,8 @@ export default class PasswordPolicy extends DmPlugin {
           }
         }
         res.json(policy);
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -579,14 +604,15 @@ export default class PasswordPolicy extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // GET /users/:id/password-status
-    app.get(
-      `${prefix}/users/:id/password-status`,
-      asyncHandler(async (req: Request, res: Response) => {
-        const userId = this.param(req, 'id');
-        const status = await this.getPasswordStatus(userId, req);
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/users/:id/password-status`,
+      params: PolicyUserParams,
+      handler: async ({ req, res }) => {
+        const status = await this.getPasswordStatus(this.param(req, 'id'), req);
         res.json(status);
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -608,14 +634,16 @@ export default class PasswordPolicy extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // POST /users/:id/unlock
-    app.post(
-      `${prefix}/users/:id/unlock`,
-      asyncHandler(async (req: Request, res: Response) => {
-        const userId = this.param(req, 'id');
-        await this.unlockAccount(userId, req);
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/users/:id/unlock`,
+      params: PolicyUserParams,
+      responses: { 200: UnlockResponse },
+      handler: async ({ req, res }) => {
+        await this.unlockAccount(this.param(req, 'id'), req);
         res.json({ success: true, message: 'Account unlocked' });
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -654,17 +682,16 @@ export default class PasswordPolicy extends DmPlugin {
      *               daysUntilExpiration: 6
      */
     // GET /password-policy/expiring-soon
-    app.get(
-      `${prefix}/password-policy/expiring-soon`,
-      asyncHandler(async (req: Request, res: Response) => {
-        const days =
-          parseInt(req.query.days as string) ||
-          (this.config.ppolicy_warn_days as number) ||
-          14;
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/password-policy/expiring-soon`,
+      query: ExpiringQuery,
+      handler: async ({ req, res, query }) => {
+        const days = query.days ?? this.config.ppolicy_warn_days ?? 14;
         const users = await this.findExpiringPasswords(days, req);
         res.json({ warningDays: days, users });
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -695,13 +722,14 @@ export default class PasswordPolicy extends DmPlugin {
      *               failureCount: 5
      */
     // GET /password-policy/locked-accounts
-    app.get(
-      `${prefix}/password-policy/locked-accounts`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/password-policy/locked-accounts`,
+      handler: async ({ req, res }) => {
         const accounts = await this.findLockedAccounts(req);
         res.json({ accounts });
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -726,15 +754,16 @@ export default class PasswordPolicy extends DmPlugin {
      *               items: { type: string }
      *               example: [pwdMinAge, pwdMaxAge, pwdInHistory]
      */
-    app.get(
-      `${prefix}/password-policies`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/password-policies`,
+      handler: async ({ req, res }) => {
         res.json({
           policies: await this.listPolicies(req),
           attributes: await this.definedAttributes(),
         });
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -775,9 +804,10 @@ export default class PasswordPolicy extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.post(
-      `${prefix}/password-policies`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'post',
+      path: `${prefix}/password-policies`,
+      handler: async ({ req, res }) => {
         const body = jsonBody(req, res);
         if (!body) return;
         const policy = await this.createPolicy(
@@ -785,8 +815,8 @@ export default class PasswordPolicy extends DmPlugin {
           req
         );
         res.status(201).json(policy);
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -803,13 +833,15 @@ export default class PasswordPolicy extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.get(
-      `${prefix}/password-policies/:cn`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${prefix}/password-policies/:cn`,
+      params: PolicyParams,
+      handler: async ({ req, res }) => {
         const entry = await this.findPolicy(this.param(req, 'cn'), req);
         res.json(await this.toPolicyRecord(entry));
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -840,9 +872,11 @@ export default class PasswordPolicy extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.patch(
-      `${prefix}/password-policies/:cn`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'patch',
+      path: `${prefix}/password-policies/:cn`,
+      params: PolicyParams,
+      handler: async ({ req, res }) => {
         const body = jsonBody(req, res);
         if (!body) return;
         const policy = await this.updatePolicy(
@@ -851,8 +885,8 @@ export default class PasswordPolicy extends DmPlugin {
           req
         );
         res.json(policy);
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -877,13 +911,15 @@ export default class PasswordPolicy extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.delete(
-      `${prefix}/password-policies/:cn`,
-      asyncHandler(async (req: Request, res: Response) => {
+    defineRoute(app, {
+      method: 'delete',
+      path: `${prefix}/password-policies/:cn`,
+      params: PolicyParams,
+      handler: async ({ req, res }) => {
         await this.deletePolicy(this.param(req, 'cn'), req);
         res.json({ success: true });
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -920,17 +956,17 @@ export default class PasswordPolicy extends DmPlugin {
      *       application/json:
      *         schema: { $ref: '#/components/schemas/Error' }
      */
-    app.put(
-      `${prefix}/users/:id/password-policy`,
-      asyncHandler(async (req: Request, res: Response) => {
-        const body = jsonBody(req, res);
-        if (!body) return;
-        const { policy } = body as { policy?: unknown };
-        if (policy !== null && (typeof policy !== 'string' || !policy))
-          throw new BadRequestError('policy must be a policy name or null');
-        res.json(await this.assignPolicy(this.param(req, 'id'), policy, req));
-      })
-    );
+    defineRoute(app, {
+      method: 'put',
+      path: `${prefix}/users/:id/password-policy`,
+      params: PolicyUserParams,
+      body: AssignPolicyBody,
+      handler: async ({ req, res, body }) => {
+        res.json(
+          await this.assignPolicy(this.param(req, 'id'), body.policy, req)
+        );
+      },
+    });
 
     // POST /password/validate (optional)
     if (this.config.ppolicy_validate_complexity) {
@@ -964,18 +1000,14 @@ export default class PasswordPolicy extends DmPlugin {
        *       application/json:
        *         schema: { $ref: '#/components/schemas/Error' }
        */
-      app.post(
-        `${prefix}/password/validate`,
-        // eslint-disable-next-line @typescript-eslint/require-await
-        asyncHandler(async (req: Request, res: Response) => {
-          const body = jsonBody(req, res);
-          if (!body) return;
-          const { password } = body as { password?: string };
-          if (!password) throw new BadRequestError('password required');
-          const result = this.validateComplexity(password);
-          res.json(result);
-        })
-      );
+      defineRoute(app, {
+        method: 'post',
+        path: `${prefix}/password/validate`,
+        body: ValidatePasswordBody,
+        handler: ({ res, body }) => {
+          res.json(this.validateComplexity(body.password));
+        },
+      });
     }
   }
 
