@@ -94,12 +94,8 @@ export default class TwakeTombstone extends DmPlugin {
    */
   afterLoad(): void {
     for (const name of ['ldapdeleterequest', 'ldapaddrequest'] as const) {
-      const list = this.server.hooks[name];
-      const own = this.hooks[name];
-      const at = list && own ? list.indexOf(own) : -1;
-      if (at < 0) continue;
-      list!.splice(at, 1);
-      list!.push(own!);
+      const own = this.hooks?.[name];
+      if (own) this.hookBus.toLast(name, own);
     }
   }
 

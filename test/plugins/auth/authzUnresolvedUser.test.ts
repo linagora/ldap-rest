@@ -180,10 +180,11 @@ describe('An authenticated identity the model cannot resolve', function () {
     };
     await request.get('/api/v1/ldap/users').set('X-Test-User', STRANGER);
     expect(lookups).to.equal(1);
-    const renamed = server.hooks.ldaprenamedone as
-      | ((args: [string, string]) => void)[]
-      | undefined;
-    for (const hook of renamed ?? []) hook(['uid=a,dc=x', 'uid=b,dc=x']);
+    // Fired as the bus does, one argument at a time: called with a tuple,
+    // a subscriber reading `dn` would take its first character and still
+    // clear what it had to.
+    for (const hook of server.hookBus.subscribers('ldaprenamedone'))
+      (hook as (dn: string, newDn: string) => void)('uid=a,dc=x', 'uid=b,dc=x');
     await request.get('/api/v1/ldap/users').set('X-Test-User', STRANGER);
     expect(lookups, 'the rename dropped what was resolved').to.equal(2);
   });

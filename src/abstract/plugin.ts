@@ -63,9 +63,8 @@ export default abstract class DmPlugin {
   /* Logger */
   logger: winston.Logger;
 
-  /* Hooks registered into DM */
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  registeredHooks: { [K in keyof Hooks]?: Function[] } = {};
+  /* The hooks `registerPlugin` registered for this plugin */
+  registeredHooks: Hooks = {};
 
   /**
    * Interfaces

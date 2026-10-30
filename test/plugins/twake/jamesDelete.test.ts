@@ -40,12 +40,9 @@ describe('James Plugin - user deletion', () => {
     await dm.registerPlugin('onLdapChange', new OnLdapChange(dm));
     await dm.registerPlugin('ldapGroups', new LdapGroups(dm));
     await dm.registerPlugin('james', new James(dm));
-    dm.hooks.onLdapEntryChange = [
-      ...(dm.hooks.onLdapEntryChange || []),
-      (d: string, _before: Entry | null, after: Entry | null) => {
-        if (after === null) deleted.push(d);
-      },
-    ];
+    dm.hookBus.subscribe('onLdapEntryChange', (d, _before, after) => {
+      if (after === null) deleted.push(d);
+    });
   });
 
   after(async () => {

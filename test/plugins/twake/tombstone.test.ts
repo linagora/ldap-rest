@@ -165,11 +165,9 @@ describe('Twake tombstone plugin', function () {
     await dm.registerPlugin('core/ldap/groups', groups);
     await dm.registerPlugin('core/scim', new Scim(dm));
     plugin.afterLoad();
-    (dm.hooks.ldapaddafter ||= []).push(
-      ([dn, entry]: [string, AttributesList]) => {
-        added.push({ dn, entry });
-      }
-    );
+    dm.hookBus.subscribe('ldapaddafter', (dn, entry) => {
+      added.push({ dn, entry });
+    });
   });
 
   beforeEach(() => {
@@ -306,11 +304,11 @@ describe('Twake tombstone plugin', function () {
       const refuse = async (): Promise<never> => {
         throw new Error('refused');
       };
-      dm.hooks.ldapdeleterequest!.unshift(refuse);
+      dm.hookBus.insert('ldapdeleterequest', refuse, 0);
       try {
         await dm.ldap.delete(flat('ts-alice')).catch(() => undefined);
       } finally {
-        dm.hooks.ldapdeleterequest!.shift();
+        dm.hookBus.unsubscribe('ldapdeleterequest', refuse);
       }
       expect(await read(flat('ts-alice'))).not.to.have.property('employeeType');
     });

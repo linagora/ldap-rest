@@ -10,6 +10,7 @@
  */
 
 import * as fs from 'fs';
+import * as ts from 'typescript';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -21,23 +22,28 @@ const BEGIN =
   '<!-- hooks: generated from src/hooks.ts, do not edit by hand -->';
 const END = '<!-- /hooks -->';
 
-/** The hooks `Hooks` declares, in the order it declares them */
+/**
+ * The hooks `Hooks` declares, in the order it declares them.
+ *
+ * Read from TypeScript's own tree rather than the text: a declaration may
+ * share a line with another or with a nested type the text would mistake
+ * for it.
+ *
+ * @param source `src/hooks.ts`
+ * @returns their names
+ */
 export function declaredHooks(source: string): string[] {
-  const start = source.indexOf('export interface Hooks {');
-  if (start < 0) throw new Error('src/hooks.ts declares no Hooks interface');
-  let depth = 0;
-  let end = start;
-  for (let i = source.indexOf('{', start); i < source.length; i++) {
-    if (source[i] === '{') depth++;
-    else if (source[i] === '}' && --depth === 0) {
-      end = i;
-      break;
-    }
-  }
-  const body = source.slice(start, end);
-  const names = [...body.matchAll(/^\s{2}([\w_]+)\??:/gm)].map(
-    (match): string => match[1]!
+  const file = ts.createSourceFile(HOOKS, source, ts.ScriptTarget.Latest, true);
+  const declaration = file.statements.find(
+    (statement): statement is ts.InterfaceDeclaration =>
+      ts.isInterfaceDeclaration(statement) && statement.name.text === 'Hooks'
   );
+  if (!declaration) throw new Error('src/hooks.ts declares no Hooks interface');
+  const names: string[] = [];
+  for (const member of declaration.members) {
+    if (member.name && ts.isIdentifier(member.name))
+      names.push(member.name.text);
+  }
   return [...new Set(names)];
 }
 

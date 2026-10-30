@@ -39,6 +39,30 @@ describe('the hooks document', () => {
     expect(declared).to.deep.equal(['first', 'second']);
   });
 
+  it('reads hooks declared on one line, and ignores the nested types', () => {
+    const declared = declaredHooks(
+      [
+        'export interface Hooks {',
+        '  first?: (a: string) => void; second?: (b: { c: string }) => void;',
+        '  third?: (e: Entry<{ deep: number }>) => Promise<void>;',
+        '  wrap?: ChainedHook<{',
+        '    a: string;',
+        '  }>;',
+        '  /** documented */',
+        '  fourth?: () => void;',
+        '}',
+      ].join('\n')
+    );
+
+    expect(declared).to.deep.equal([
+      'first',
+      'second',
+      'third',
+      'wrap',
+      'fourth',
+    ]);
+  });
+
   it('drops the entries of hooks no longer declared, and nothing else', () => {
     const written = withoutCompiledAway(
       'export interface Hooks {\n  kept?: () => void;\n}\n',

@@ -361,12 +361,14 @@ describe('Branch rule precedence', function () {
           .catch((err: unknown) => (error = err));
         expect(String(error)).to.match(/forbidden/i);
         // The link alone is what a move between organizations writes
-        await plugin.hooks.ldapmodifyrequest([
-          `uid=prec-sales,${acme}`,
-          { replace: { [link]: payroll } },
-          0,
-          { user: USER, headers: {} } as unknown as DmRequest,
-        ]);
+        await Promise.resolve(
+          plugin.hooks.ldapmodifyrequest!([
+            `uid=prec-sales,${acme}`,
+            { replace: { [link]: payroll } },
+            0,
+            { user: USER, headers: {} } as unknown as DmRequest,
+          ])
+        );
       });
 
       it('holds the rules below a moved or deleted entry', async () => {
@@ -384,9 +386,15 @@ describe('Branch rule precedence', function () {
         const req = { user: USER, headers: {} } as unknown as DmRequest;
         for (const judge of [
           () =>
-            plugin.hooks.ldaprenamerequest([acme, `ou=precmoved,${base}`, req]),
+            Promise.resolve(
+              plugin.hooks.ldaprenamerequest!([
+                acme,
+                `ou=precmoved,${base}`,
+                req,
+              ])
+            ),
           // `trash` turns a delete into a move of the subtree
-          () => plugin.hooks.ldapdeleterequest([acme, req]),
+          () => Promise.resolve(plugin.hooks.ldapdeleterequest!([acme, req])),
         ]) {
           let error: unknown;
           await judge().catch((err: unknown) => (error = err));
@@ -421,21 +429,23 @@ describe('Branch rule precedence', function () {
         server.config.authz_filter_attached_entries = true;
         try {
           let error: unknown;
-          await plugin.hooks
-            .ldapmodifyrequest([
+          await Promise.resolve(
+            plugin.hooks.ldapmodifyrequest!([
               linked,
               { replace: { [link]: payroll, userPassword: 'Secret123!' } },
               0,
               req,
             ])
-            .catch((err: unknown) => (error = err));
+          ).catch((err: unknown) => (error = err));
           expect(String(error)).to.match(/forbidden/i);
-          await plugin.hooks.ldapmodifyrequest([
-            linked,
-            { replace: { [link]: payroll } },
-            0,
-            req,
-          ]);
+          await Promise.resolve(
+            plugin.hooks.ldapmodifyrequest!([
+              linked,
+              { replace: { [link]: payroll } },
+              0,
+              req,
+            ])
+          );
         } finally {
           server.config.authz_filter_attached_entries = previousMode;
           await server.ldap.delete(linked).catch(() => undefined);
@@ -465,13 +475,13 @@ describe('Branch rule precedence', function () {
           'ou=pr\u00e9c',
         ]) {
           let error: unknown;
-          await plugin.hooks
-            .ldapaddrequest([
+          await Promise.resolve(
+            plugin.hooks.ldapaddrequest!([
               `${rdn},${acme}`,
               { objectClass: ['top', 'organizationalUnit'], ou: 'precnew' },
               { user: USER, headers: {} } as unknown as DmRequest,
             ])
-            .catch((err: unknown) => (error = err));
+          ).catch((err: unknown) => (error = err));
           expect(String(error), rdn).to.match(/forbidden/i);
         }
       });
@@ -479,15 +489,17 @@ describe('Branch rule precedence', function () {
       it('judges an absent entry as spelled, and an unreadable one not at all', async () => {
         const req = { user: USER, headers: {} } as unknown as DmRequest;
         // Absent: judged on the spelling given, the write then fails on it
-        await plugin.hooks.ldapdeleterequest([`uid=prec-absent,${acme}`, req]);
+        await Promise.resolve(
+          plugin.hooks.ldapdeleterequest!([`uid=prec-absent,${acme}`, req])
+        );
         // Unreadable: refused as the outage it is
         const search = server.ldap.search.bind(server.ldap);
         server.ldap.search = () => Promise.reject(new Error('busy'));
         let error: unknown;
         try {
-          await plugin.hooks
-            .ldapdeleterequest([`uid=prec-sales,${acme}`, req])
-            .catch((err: unknown) => (error = err));
+          await Promise.resolve(
+            plugin.hooks.ldapdeleterequest!([`uid=prec-sales,${acme}`, req])
+          ).catch((err: unknown) => (error = err));
         } finally {
           server.ldap.search = search;
         }
@@ -506,13 +518,13 @@ describe('Branch rule precedence', function () {
           groups: {},
         };
         let error: unknown;
-        await plugin.hooks
-          .ldaprenamerequest([
+        await Promise.resolve(
+          plugin.hooks.ldaprenamerequest!([
             `uid=prec-sales,${acme}`,
             `ou=prectarget,${acme}`,
             { user: USER, headers: {} } as unknown as DmRequest,
           ])
-          .catch((err: unknown) => (error = err));
+        ).catch((err: unknown) => (error = err));
         expect(String(error)).to.match(/forbidden/i);
       });
 
@@ -543,11 +555,13 @@ describe('Branch rule precedence', function () {
             ],
             searchReferences: [],
           } as unknown as SearchResult;
-          const [filtered] = await plugin.hooks.ldapsearchfilter([
-            result,
-            { user: USER, headers: {} } as unknown as DmRequest,
-            { scope: 'sub' },
-          ]);
+          const [filtered] = await Promise.resolve(
+            plugin.hooks.ldapsearchfilter!([
+              result,
+              { user: USER, headers: {} } as unknown as DmRequest,
+              { scope: 'sub' },
+            ])
+          );
           expect(filtered.searchEntries.map(entry => entry.dn)).to.deep.equal([
             `uid=a,${base}`,
           ]);

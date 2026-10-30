@@ -7,7 +7,7 @@
  * @group Plugins
  */
 import type { DM } from '../../bin';
-import type { Hooks } from '../../hooks';
+import type { Hooks, MaybePromise } from '../../hooks';
 import type { ModifyRequest, SearchResult } from '../../lib/ldapActions';
 import type { AuthConfig, BranchPermissions } from '../../config/args';
 import type { DmRequest } from '../../lib/auth/base';
@@ -44,8 +44,12 @@ export default class AuthzPerBranch extends AuthzBase {
   declare hooks: AuthzBase['hooks'] &
     Pick<Hooks, 'ldapadddone' | 'ldapmodifydone' | 'ldapdeletedone'>;
 
+  /** What the classes above declared, read once this one is constructed */
+  private readonly declaredByBase: Hooks;
+
   constructor(server: DM) {
     super(server);
+    this.declaredByBase = { ...this.hooks };
 
     // Cache TTL in milliseconds (default: 1 minute, configurable)
     this.cacheTTL = (this.config.authz_per_branch_cache_ttl || 60) * 1000;
@@ -68,23 +72,26 @@ export default class AuthzPerBranch extends AuthzBase {
     // attribute or the one users are found by. Adds are not filtered — an
     // added user always carries that attribute, and may duplicate a uid.
     // Registered from the constructor because the server reads `hooks` once
-    // the plugin is built; the base's own rename and delete hooks keep
-    // running.
-    const inherited = this.hooks;
+    // the plugin is built. It replaces the base's map with one that keeps
+    // every hook the base declared: the server registers what this map holds,
+    // and the base has no other way to be subscribed.
+    const onDelete = this.declaredByBase.ldapdeletedone;
+    const onRename = this.declaredByBase.ldaprenamedone;
     const forget = (): void => this.forgetGroups();
+    // eslint-disable-next-line no-restricted-syntax -- replaces what the base declares
     this.hooks = {
-      ...inherited,
+      ...this.declaredByBase,
       ldapadddone: forget,
       ldapmodifydone: (_dn, changes): void => {
         if (this.touchesMembership(changes)) forget();
       },
-      ldapdeletedone: (): void => {
-        inherited.ldapdeletedone();
+      ldapdeletedone: (dn, context): MaybePromise<void> => {
         forget();
+        return onDelete?.(dn, context);
       },
-      ldaprenamedone: (): void => {
-        inherited.ldaprenamedone();
+      ldaprenamedone: (dn, newDn, context): MaybePromise<void> => {
         forget();
+        return onRename?.(dn, newDn, context);
       },
     };
   }

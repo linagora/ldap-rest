@@ -103,14 +103,11 @@ describe('Back-Channel Logout, over the shared store', function () {
     try {
       await other.registerPlugin('storage', late);
       expect(() => early.api()).to.not.throw();
-      await (
-        early.hooks.oidclogouttoken as (c: OidcSessionClaims) => Promise<void>
-      )({ iss: ISS, sid: 'S7' });
-      const [, valid] = await (
-        early.hooks.oidcsessionvalid as (
-          a: [OidcSessionClaims, boolean]
-        ) => Promise<[OidcSessionClaims, boolean]>
-      )([{ iss: ISS, sid: 'S7' }, true]);
+      await early.hooks.oidclogouttoken!({ iss: ISS, sid: 'S7' });
+      const [, valid] = await early.hooks.oidcsessionvalid!([
+        { iss: ISS, sid: 'S7' },
+        true,
+      ]);
       expect(
         valid,
         'a plugin built first still records what a token kills'
@@ -127,11 +124,9 @@ describe('Back-Channel Logout, over the shared store', function () {
     // is missing.
     const unregistered = new Bcl(server);
     let raised: Error | undefined;
-    await (
-      unregistered.hooks.oidclogouttoken as (
-        c: OidcSessionClaims
-      ) => Promise<void>
-    )({ iss: ISS, sid: 'S8' }).catch((err: Error) => (raised = err));
+    await Promise.resolve(
+      unregistered.hooks.oidclogouttoken!({ iss: ISS, sid: 'S8' })
+    ).catch((err: Error) => (raised = err));
     expect(raised?.message).to.match(/before api\(\)/);
   });
 
@@ -190,11 +185,7 @@ describe('Back-Channel Logout, over the shared store', function () {
     const shortLived = new Bcl(server);
     shortLived.api();
     server.config.bcl_retention = 3600;
-    await (
-      shortLived.hooks.oidclogouttoken as (
-        c: OidcSessionClaims
-      ) => Promise<void>
-    )({ iss: ISS, sid: 'S5' });
+    await shortLived.hooks.oidclogouttoken!({ iss: ISS, sid: 'S5' });
     expect(
       await alive({ iss: ISS, sid: 'S5' }),
       'an expired mark must not keep anyone out'

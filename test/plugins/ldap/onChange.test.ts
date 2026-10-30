@@ -11,6 +11,7 @@ import { waitFor } from '../../helpers/waitFor';
 import type { ChangeContext } from '../../../src/lib/changeContext';
 import type { Request } from 'express';
 import type DmPlugin from '../../../src/abstract/plugin';
+import HookBus from '../../../src/lib/hookBus';
 import type { Hooks } from '../../../src/hooks';
 
 type EntryChange = [string, Entry | null, Entry | null, ChangeContext];
@@ -153,17 +154,16 @@ describe('onChange', () => {
       after: Entry | null
     ): Record<string, unknown[]> => {
       const calls: Record<string, unknown[]> = {};
+      const hooks = Object.fromEntries(
+        derived.map(name => [
+          name,
+          [(...args: unknown[]) => (calls[name] = args)],
+        ])
+      );
       const fake = {
         config,
         logger: { debug: () => {}, warn: () => {}, error: () => {} },
-        server: {
-          hooks: Object.fromEntries(
-            derived.map(name => [
-              name,
-              [(...args: unknown[]) => (calls[name] = args)],
-            ])
-          ),
-        },
+        hookBus: new HookBus(hooks),
       };
       const self = Object.assign(Object.create(OnLdapChange.prototype), fake);
       OnLdapChange.prototype.notify.call(
@@ -268,21 +268,27 @@ describe('onChange', () => {
       await dm.ready;
       onChange = new OnLdapChange(dm);
       await dm.registerPlugin('onLdapChange', onChange);
-      dm.hooks.onLdapEntryChange = [
-        (
-          dn: string,
-          before: Entry | null,
-          after: Entry | null,
-          context: ChangeContext
-        ) => {
-          entryChanges.push([dn, before, after, context]);
-        },
-      ];
-      dm.hooks.onLdapChange = [
-        (dn: string, changes: ChangesToNotify) => {
-          ldapChanges.push([dn, changes]);
-        },
-      ];
+      dm.hookBus.set(
+        'onLdapEntryChange',
+        ...[
+          (
+            dn: string,
+            before: Entry | null,
+            after: Entry | null,
+            context: ChangeContext
+          ) => {
+            entryChanges.push([dn, before, after, context]);
+          },
+        ]
+      );
+      dm.hookBus.set(
+        'onLdapChange',
+        ...[
+          (dn: string, changes: ChangesToNotify) => {
+            ldapChanges.push([dn, changes]);
+          },
+        ]
+      );
     });
 
     beforeEach(() => {
@@ -406,10 +412,12 @@ describe('onChange', () => {
     describe('once a write is over, whatever became of it', () => {
       // A hook registered after onChange, as core/ldap/trash and
       // core/twake/tombstone are
-      const later = <K extends keyof Hooks>(name: K, hook: unknown) => {
-        const hooks = (dm.hooks[name] ??= []) as unknown[];
-        hooks.push(hook);
-        return () => hooks.splice(hooks.indexOf(hook), 1);
+      const later = <K extends keyof Hooks>(
+        name: K,
+        hook: NonNullable<Hooks[K]>
+      ) => {
+        dm.hookBus.subscribe(name, hook);
+        return () => dm.hookBus.unsubscribe(name, hook);
       };
       // Refuses once onChange has read the entry, and says how much it kept
       let keptWhenRefused = 0;
@@ -432,10 +440,10 @@ describe('onChange', () => {
 
       it('keeps nothing of a delete another plugin takes out of the request', async () => {
         const dn = await addUser('ochtaken');
-        const remove = later(
-          'ldapdeleterequest',
-          ([, req]: [string[], Request?]) => [[], req]
-        );
+        const remove = later('ldapdeleterequest', ([, req]) => [
+          [],
+          (req ?? undefined) as Request | undefined,
+        ]);
         try {
           await dm.ldap.delete(dn);
         } finally {
@@ -474,7 +482,7 @@ describe('onChange', () => {
           sn: 'Doe',
         });
         created.push(child, ou);
-        const remove = later('ldapdeleterequest', (args: unknown) => {
+        const remove = later('ldapdeleterequest', args => {
           keptWhenRefused = kept();
           return args;
         });
@@ -505,7 +513,7 @@ describe('onChange', () => {
 
       it('keeps nothing of a modify the directory refuses', async () => {
         const dn = await addUser('ochmodbad');
-        const remove = later('ldapmodifyrequest', (args: unknown) => {
+        const remove = later('ldapmodifyrequest', args => {
           keptWhenRefused = kept();
           return args;
         });
@@ -524,22 +532,19 @@ describe('onChange', () => {
         const allowed = {} as unknown as Request;
         const denied = {} as unknown as Request;
         // Ahead of onChange, as the authorization plugins are
-        const hooks = dm.hooks.ldapdeleterequest!;
-        const deny = ([d, req]: [string[], Request?]) => {
+        const deny: NonNullable<Hooks['ldapdeleterequest']> = ([d, req]) => {
           if (req === denied) throw new Error('refused');
           return [d, req];
         };
-        hooks.unshift(deny);
+        // Ahead of onChange, as the authorization plugins are
+        dm.hookBus.insert('ldapdeleterequest', deny, 0);
         // Holds the allowed delete once onChange has read the entry
         let open!: () => void;
         const gate = new Promise<void>(resolve => (open = resolve));
-        const remove = later(
-          'ldapdeleterequest',
-          async ([d, req]: [string[], Request?]) => {
-            if (req === allowed) await gate;
-            return [d, req];
-          }
-        );
+        const remove = later('ldapdeleterequest', async ([d, req]) => {
+          if (req === allowed) await gate;
+          return [d, req] as [string[], Request?];
+        });
         try {
           const write = dm.ldap.delete(dn, allowed);
           await waitFor(() => onChange.pendingDeletions.size === 1, {
@@ -555,7 +560,7 @@ describe('onChange', () => {
         } finally {
           // Released whatever failed, or the held delete would never end
           open();
-          hooks.splice(hooks.indexOf(deny), 1);
+          dm.hookBus.unsubscribe('ldapdeleterequest', deny);
           remove();
         }
         await waitFor(

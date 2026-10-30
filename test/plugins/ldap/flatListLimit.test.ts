@@ -178,8 +178,8 @@ describe('Flat list, limited', function () {
         },
         ...rest,
       ];
-      const saved = server.hooks.ldapsearchfilter;
-      server.hooks.ldapsearchfilter = [hide];
+      const saved = server.hookBus.subscribers('ldapsearchfilter');
+      server.hookBus.set('ldapsearchfilter', ...[hide]);
       try {
         const whole = await request.get('/api/v1/ldap/titles?limit=2');
         expect(whole.body).to.have.all.keys('Dr', 'Ms');
@@ -189,7 +189,10 @@ describe('Flat list, limited', function () {
         expect(cut.body).to.not.have.property('Mr');
         expect(cut.headers['x-result-truncated']).to.equal('true');
       } finally {
-        server.hooks.ldapsearchfilter = saved;
+        server.hookBus.set(
+          'ldapsearchfilter',
+          ...(saved as NonNullable<Hooks['ldapsearchfilter']>[])
+        );
       }
     });
 

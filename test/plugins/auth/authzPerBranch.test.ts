@@ -602,11 +602,13 @@ describe('AuthzPerBranch', function () {
         // Create a mock request with unauthorized user
         const mockReq = { user: 'unknownuser' } as any;
         if (plugin.hooks?.ldapsearchrequest) {
-          await plugin.hooks.ldapsearchrequest([
-            getUserBranch() as string,
-            { paged: false },
-            mockReq,
-          ]);
+          await Promise.resolve(
+            plugin.hooks.ldapsearchrequest!([
+              getUserBranch() as string,
+              { paged: false },
+              mockReq,
+            ])
+          );
         }
         expect.fail('Should have thrown an error');
       } catch (err: any) {
@@ -618,11 +620,13 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       const mockReq = { user: 'testuser1' } as any;
       if (plugin.hooks?.ldapsearchrequest) {
-        const result = await plugin.hooks.ldapsearchrequest([
-          getUserBranch() as string,
-          { paged: false },
-          mockReq,
-        ]);
+        const result = await Promise.resolve(
+          plugin.hooks.ldapsearchrequest!([
+            getUserBranch() as string,
+            { paged: false },
+            mockReq,
+          ])
+        );
 
         expect(result[0]).to.equal(getUserBranch());
         // When searching within authorized branch, filter should not be modified
@@ -647,12 +651,14 @@ describe('AuthzPerBranch', function () {
           : { searchEntries: [] }) as unknown as typeof search;
       try {
         let refused: Error | undefined;
-        await plugin.hooks!.ldapmodifyrequest!([
-          entryDn,
-          { replace: { [linkAttr]: getUserBranch() } },
-          0,
-          { user: 'testuser1' } as DmRequest,
-        ]).catch((err: Error) => {
+        await Promise.resolve(
+          plugin.hooks!.ldapmodifyrequest!([
+            entryDn,
+            { replace: { [linkAttr]: getUserBranch() } },
+            0,
+            { user: 'testuser1' } as DmRequest,
+          ])
+        ).catch((err: Error) => {
           refused = err;
         });
         expect(refused, 'refused').to.be.instanceOf(Error);
@@ -669,11 +675,13 @@ describe('AuthzPerBranch', function () {
       this.timeout(5000);
       const mockReq = {} as any;
       if (plugin.hooks?.ldapsearchrequest) {
-        const result = await plugin.hooks.ldapsearchrequest([
-          getUserBranch() as string,
-          { paged: false },
-          mockReq,
-        ]);
+        const result = await Promise.resolve(
+          plugin.hooks.ldapsearchrequest!([
+            getUserBranch() as string,
+            { paged: false },
+            mockReq,
+          ])
+        );
 
         expect(result[0]).to.equal(getUserBranch());
         expect(result[1]).to.deep.equal({ paged: false });

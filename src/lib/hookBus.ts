@@ -170,6 +170,25 @@ interface Tracked {
 }
 
 /**
+ * A hook's list, as `server.hooks` spells it: `undefined` when nothing is
+ * subscribed, a function for one subscriber, a list for several, and
+ * anything else when a test writes a list through the hook and walks it.
+ */
+export type HookValue<K extends keyof Hooks = keyof Hooks> =
+  | Hooks[K]
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  | Function[]
+  | undefined;
+
+/** The functions a subscriber value holds, one or many */
+export const asHooks = <K extends keyof Hooks>(
+  value: HookValue<K>
+): HookFn[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+/**
  * How a flat entity raises its own hooks, see `abstract/ldapFlat.ts`: the
  * prefix it names them under, added to the suffix of each. They are not
  * `Hooks`' own, see {@link FlatHookPrefix}.
@@ -183,24 +202,24 @@ export interface FlatHookBus {
 
 export default class HookBus implements FlatHookBus {
   /**
-   * The hooks, as `registerPlugin` stores them: `server.hooks`.
+   * What `server.hooks` holds, shared by reference. A plugin reaching it
+   * directly is not told by its type whether the hook exists, nor how it
+   * is called; this bus is.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  readonly hooks: { [K in keyof Hooks]?: Function[] };
+  private readonly hooks: { [K in keyof Hooks]?: HookValue<K> };
 
   private readonly tracked: Tracked = { pending: new Set() };
 
   /**
    * @param hooks the server's hook lists, shared by reference
    */
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  constructor(hooks: { [K in keyof Hooks]?: Function[] }) {
+  constructor(hooks: { [K in keyof Hooks]?: HookValue<K> }) {
     this.hooks = hooks;
   }
 
   /** Whether anything is subscribed to a hook */
   has(name: keyof Hooks): boolean {
-    return (this.hooks[name]?.length ?? 0) > 0;
+    return asHooks(this.hooks[name]).length > 0;
   }
 
   /**
@@ -210,7 +229,76 @@ export default class HookBus implements FlatHookBus {
    * @returns its subscribers, empty when nothing subscribed
    */
   subscribers(name: keyof Hooks): readonly HookFn[] {
-    return this.hooks[name] ?? [];
+    return [...asHooks(this.hooks[name])];
+  }
+
+  /**
+   * Subscribe a function to a hook, or forget its subscribers when given
+   * none, as a plugin declaring `hooks` would.
+   *
+   * @param name the hook
+   * @param fn what to run, none to unsubscribe every subscriber
+   */
+  set<K extends keyof Hooks>(name: K, ...fn: NonNullable<Hooks[K]>[]): void {
+    this.store(name, fn as unknown as HookFn[]);
+  }
+
+  /**
+   * Add a subscriber to a hook, after the ones already there.
+   *
+   * @param name the hook
+   * @param fn what to run
+   */
+  subscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void {
+    this.store(name, [...asHooks(this.hooks[name]), fn as unknown as HookFn]);
+  }
+
+  /**
+   * Put a subscriber at a given place in a hook's list, as
+   * `registerPlugin` does for an authorization hook.
+   *
+   * @param name the hook
+   * @param fn what to run
+   * @param at its place, the end when past it
+   */
+  insert<K extends keyof Hooks>(
+    name: K,
+    fn: NonNullable<Hooks[K]>,
+    at: number
+  ): void {
+    const list = asHooks(this.hooks[name]);
+    list.splice(at, 0, fn as unknown as HookFn);
+    this.store(name, list);
+  }
+
+  /**
+   * Remove a subscriber from a hook, wherever it sits.
+   *
+   * @param name the hook
+   * @param fn the subscriber
+   */
+  unsubscribe<K extends keyof Hooks>(name: K, fn: NonNullable<Hooks[K]>): void {
+    const own = fn as unknown as HookFn;
+    this.store(
+      name,
+      asHooks(this.hooks[name]).filter(hook => hook !== own)
+    );
+  }
+
+  /**
+   * Move a subscriber to the end of its hook's list, keeping it registered,
+   * for a plugin that must run after every other one.
+   *
+   * @param name the hook
+   * @param hook the subscriber
+   * @returns whether it was subscribed to the hook
+   */
+  toLast(name: keyof Hooks, hook: HookFn): boolean {
+    const list = asHooks(this.hooks[name]);
+    const at = list.indexOf(hook);
+    if (at < 0) return false;
+    this.store(name, [...list.slice(0, at), ...list.slice(at + 1), hook]);
+    return true;
   }
 
   /**
@@ -233,7 +321,7 @@ export default class HookBus implements FlatHookBus {
     value: ChainedValue<K>
   ): Promise<ChainedValue<K>> {
     let args = value;
-    for (const hook of this.hooks[name] ?? []) {
+    for (const hook of asHooks(this.hooks[name])) {
       if (!hook) continue;
       args = await runAsHookOwner(hook, async () => {
         try {
@@ -342,7 +430,7 @@ export default class HookBus implements FlatHookBus {
     ...args: Args<K>
   ): Promise<unknown[]> {
     const answers: unknown[] = [];
-    for (const hook of this.hooks[name] ?? []) {
+    for (const hook of asHooks(this.hooks[name])) {
       if (!hook) continue;
       answers.push(
         await runAsHookOwner(hook, () =>
@@ -386,9 +474,19 @@ export default class HookBus implements FlatHookBus {
     }
   }
 
+  /**
+   * Write a hook's subscribers the way `server.hooks` spells them: no entry
+   * when nothing is subscribed, the function itself for one subscriber.
+   */
+  private store(name: keyof Hooks, list: HookFn[]): void {
+    const storage = this.hooks as Record<string, unknown>;
+    if (list.length === 0) delete storage[name];
+    else storage[name] = list.length === 1 ? list[0] : list;
+  }
+
   private fire<K extends keyof Hooks>(name: K, args: Args<K>): Promise<void> {
     const running = (async () => {
-      for (const hook of this.hooks[name] ?? []) {
+      for (const hook of asHooks(this.hooks[name])) {
         if (!hook) continue;
         await runAsHookOwner(hook, async () => {
           try {

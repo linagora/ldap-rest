@@ -1,4 +1,4 @@
-import LdapActions from '../../src/lib/ldapActions';
+import LdapActions, { type AttributesList } from '../../src/lib/ldapActions';
 import { expect } from 'chai';
 import { Client, SearchResult } from 'ldapts';
 import type { Request } from 'express';
@@ -286,13 +286,11 @@ describe('ldapActions', function () {
       it('writes the entry an ldapaddrequest hook returns', async () => {
         const dm = new DM();
         ldapActions = new LdapActions(dm);
-        dm.hooks.ldapaddrequest = [
-          ([dn, entry, req]: [string, Record<string, unknown>, unknown]) => [
-            dn,
-            { ...entry, description: 'from the hook' },
-            req,
-          ],
-        ] as typeof dm.hooks.ldapaddrequest;
+        dm.hookBus.set('ldapaddrequest', ([dn, entry, req]) => [
+          dn,
+          { ...entry, description: 'from the hook' },
+          req,
+        ]);
         await ldapActions.add(testDN, {
           objectClass: ['inetOrgPerson', 'organizationalPerson', 'person'],
           cn: 'Test User',
@@ -373,9 +371,10 @@ describe('ldapActions', function () {
       const subscriber =
         (name: string, fail = false) =>
         async (
-          [dn, entry]: [string, { uid: string }],
+          dn: string,
+          entry: AttributesList,
           context?: ChangeContext
-        ) => {
+        ): Promise<void> => {
           const found = (await ldapActions.search(
             { scope: 'base', paged: false },
             dn
@@ -404,14 +403,14 @@ describe('ldapActions', function () {
       });
 
       it('awaits each subscriber in turn, with the submitted entry and the change context', async () => {
-        dm.hooks.ldapaddafter = [subscriber('a'), subscriber('b')];
+        dm.hookBus.set('ldapaddafter', subscriber('a'), subscriber('b'));
         const req = { user: 'jdoe' } as unknown as Request;
         expect(await ldapActions.add(testDN, person(), req)).to.be.true;
         expect(seen).to.deep.equal(['a:testuser:1:jdoe', 'b:testuser:1:jdoe']);
       });
 
       it('logs a failing subscriber, runs the next one, and answers the add as done', async () => {
-        dm.hooks.ldapaddafter = [subscriber('a', true), subscriber('b')];
+        dm.hookBus.set('ldapaddafter', subscriber('a', true), subscriber('b'));
         expect(await ldapActions.add(testDN, person())).to.be.true;
         expect(seen).to.deep.equal(['a:testuser:1:-', 'b:testuser:1:-']);
         const found = (await ldapActions.search(
@@ -423,27 +422,29 @@ describe('ldapActions', function () {
 
       it('leaves ldapadddone firing when a subscriber fails', async () => {
         const done: string[] = [];
-        dm.hooks.ldapaddafter = [subscriber('a', true)];
-        dm.hooks.ldapadddone = [
-          ([dn]: [string, unknown]) => void done.push(dn),
-        ];
+        dm.hookBus.set('ldapaddafter', subscriber('a', true));
+        dm.hookBus.set('ldapadddone', dn => void done.push(dn));
         await ldapActions.add(testDN, person());
+        // Nothing waits for `ldapadddone`, or a slow subscriber would hold
+        // the answer back until the client gave up and retried an add that
+        // happened.
+        await dm.hookBus.settled();
         expect(done).to.deep.equal([testDN]);
       });
 
       it('fires for an add without a request, with an empty context', async () => {
         const contexts: unknown[] = [];
-        dm.hooks.ldapaddafter = [
-          (_args: unknown, context?: ChangeContext) =>
-            void contexts.push(context),
-        ];
+        dm.hookBus.set(
+          'ldapaddafter',
+          (_dn, _entry, context) => void contexts.push(context)
+        );
         await ldapActions.add(testDN, person());
         expect(contexts).to.deep.equal([{}]);
       });
 
       it('is not called when the directory refuses the add', async () => {
         await ldapActions.add(testDN, person());
-        dm.hooks.ldapaddafter = [subscriber('a')];
+        dm.hookBus.set('ldapaddafter', subscriber('a'));
         await ldapActions.add(testDN, person()).catch(() => undefined);
         expect(seen).to.deep.equal([]);
       });
@@ -458,11 +459,9 @@ describe('ldapActions', function () {
       beforeEach(() => {
         moved = [];
         const dm = new DM();
-        dm.hooks.ldaprenamedone = [
-          ([dn, newDn]: [string, string], context?: ChangeContext): void => {
-            moved.push([dn, newDn, context]);
-          },
-        ];
+        dm.hookBus.set('ldaprenamedone', (dn, newDn, context) => {
+          moved.push([dn, newDn, context]);
+        });
         ldapActions = new LdapActions(dm);
       });
 
@@ -647,15 +646,13 @@ describe('ldapActions', function () {
       // — a write made through this instance runs its own invalidation
       // before the read below ever reaches its store.
       let overtaken = false;
-      dm.hooks.ldapsearchresult = [
-        async (result: SearchResult) => {
-          if (!overtaken) {
-            overtaken = true;
-            await cached.modify(dnA, { replace: { mail: 'after@test.org' } });
-          }
-          return result;
-        },
-      ];
+      dm.hookBus.set('ldapsearchresult', async result => {
+        if (!overtaken) {
+          overtaken = true;
+          await cached.modify(dnA, { replace: { mail: 'after@test.org' } });
+        }
+        return result;
+      });
 
       // This read is answered with the directory as it was when the server
       // replied, which is what has to be returned. What must not happen is

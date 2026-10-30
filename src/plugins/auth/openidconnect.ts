@@ -170,7 +170,7 @@ export default class OpenIDConnect extends AuthBase {
       // lets the session stay in the cookie: only what is dead is recorded.
       backchannelLogout: {
         onLogoutToken: async (decoded: object): Promise<void> => {
-          if (!this.server.hooks.oidclogouttoken) {
+          if (!this.server.hookBus.has('oidclogouttoken')) {
             // The route exists as soon as this plugin does, so without a
             // subscriber the provider is told the logout succeeded and
             // nothing acts on it. Say so rather than drop it in silence.
@@ -198,7 +198,7 @@ export default class OpenIDConnect extends AuthBase {
         // established. A mark on the `sub` kills every session of that
         // person, so left in place it would kill the ones created after it.
         onLogin: async (req: DmRequest): Promise<void> => {
-          if (!this.server.hooks.oidclogin) return;
+          if (!this.server.hookBus.has('oidclogin')) return;
           const claims = (
             req as unknown as { oidc: { idTokenClaims: OidcSessionClaims } }
           ).oidc?.idTokenClaims;
@@ -437,7 +437,7 @@ export default class OpenIDConnect extends AuthBase {
    * @returns true when a subscriber of `oidcsessionvalid` refuses it
    */
   private async loggedOut(req: DmRequest): Promise<boolean> {
-    if (!this.server.hooks.oidcsessionvalid) return false;
+    if (!this.server.hookBus.has('oidcsessionvalid')) return false;
     const claims = sessionClaims(req) as OidcSessionClaims;
     const [, valid] = await this.hookBus.chain('oidcsessionvalid', [
       claims,
@@ -519,7 +519,7 @@ export default class OpenIDConnect extends AuthBase {
       }
       return;
     }
-    if (!this.server.hooks.oidclogouttoken) {
+    if (!this.server.hookBus.has('oidclogouttoken')) {
       if (!this.warnedNoRecord) {
         this.warnedNoRecord = true;
         this.logger.warn(

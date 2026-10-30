@@ -8,6 +8,7 @@ import type { Response } from 'express';
 import AuthBase, { type DmRequest } from '../../../src/lib/auth/base';
 import type { Role } from '../../../src/abstract/plugin';
 import type { ChangeContext } from '../../../src/lib/changeContext';
+import type { Hooks } from '../../../src/hooks';
 import { waitFor } from '../../helpers/waitFor';
 
 const { DM_LDAP_GROUP_BASE } = process.env;
@@ -752,16 +753,15 @@ describe('LdapGroups Plugin', function () {
     });
 
     it('stays in its groups when another plugin keeps the entry', async () => {
-      const keep = async ([dn, req]: [string[], unknown]) => [
-        dn.filter(d => d !== leaver),
+      const keep: NonNullable<Hooks['ldapdeleterequest']> = async ([
+        dn,
         req,
-      ];
-      const hooks = (dm.hooks.ldapdeleterequest ||= []);
-      hooks.push(keep);
+      ]) => [(Array.isArray(dn) ? dn : [dn]).filter(d => d !== leaver), req];
+      dm.hookBus.subscribe('ldapdeleterequest', keep);
       try {
         await dm.ldap.delete(leaver);
       } finally {
-        hooks.splice(hooks.indexOf(keep), 1);
+        dm.hookBus.unsubscribe('ldapdeleterequest', keep);
       }
       expect(await members()).to.deep.equal([leaver, user1]);
     });
@@ -791,10 +791,14 @@ describe('LdapGroups Plugin', function () {
       // every `ldap*done` hook. The REST route used to call the write
       // without the request it held, and the context came out empty.
       const seen: ChangeContext[] = [];
-      const listener = (_args: unknown, context?: ChangeContext): void => {
+      const listener = (
+        _dn: string,
+        _entry: unknown,
+        context?: ChangeContext
+      ): void => {
         seen.push(context ?? {});
       };
-      (dm.hooks.ldapadddone ||= []).push(listener);
+      dm.hookBus.subscribe('ldapadddone', listener);
       try {
         await request
           .post('/api/v1/ldap/groups')
@@ -808,8 +812,7 @@ describe('LdapGroups Plugin', function () {
         expect(seen[0]).to.include({ actor, source: 'rest' });
         expect(seen[0].requestId).to.be.a('string');
       } finally {
-        const hooks = dm.hooks.ldapadddone as Function[];
-        hooks.splice(hooks.indexOf(listener), 1);
+        dm.hookBus.unsubscribe('ldapadddone', listener);
       }
     });
   });

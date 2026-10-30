@@ -7,7 +7,6 @@
 import type { Express, Request, Response } from 'express';
 
 import DmPlugin, { type Role, asyncHandler } from '../../abstract/plugin';
-import { runAsHookOwner } from '../../lib/utils';
 
 /**
  * @openapi-component
@@ -57,14 +56,10 @@ export default class HelloWorld extends DmPlugin {
     app.get(
       `${this.config.api_prefix}/hello`,
       asyncHandler(async (req: Request, res: Response) => {
-        const response = { message: 'Hello', hookResults: [] as unknown[] };
-        if (this.server.hooks && this.server.hooks['hello']) {
-          for (const hook of this.server.hooks['hello']) {
-            const run = hook as () => unknown;
-            response.hookResults.push(await runAsHookOwner(hook, () => run()));
-          }
-        }
-        res.json(response);
+        res.json({
+          message: 'Hello',
+          hookResults: await this.hookBus.call('hello'),
+        });
       })
     );
   }

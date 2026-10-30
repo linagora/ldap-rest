@@ -12,6 +12,7 @@ import DmPlugin, { type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { BranchPermissions } from '../../config/args';
 import { roleAttribute, type Schema } from '../../config/schema';
+import type { Hooks } from '../../hooks';
 import { assertIdentityMode, identityFor, type DmRequest } from '../auth/base';
 import type {
   AttributesList,
@@ -845,7 +846,7 @@ export default abstract class AuthzBase extends DmPlugin {
   /**
    * Common hooks for all authorization plugins
    */
-  hooks = {
+  hooks: Hooks = {
     /**
      * A rename moves the entry an identity resolves to, so what was
      * resolved is dropped.

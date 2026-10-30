@@ -46,9 +46,7 @@ function wireHooks(server: DM, plugin: { hooks?: Hooks }): void {
   if (!plugin.hooks) return;
   for (const [name, fn] of Object.entries(plugin.hooks)) {
     if (!fn) continue;
-    const hook = name as keyof Hooks;
-    const list = (server.hooks[hook] = server.hooks[hook] || []);
-    list.push(fn as unknown as never);
+    server.hookBus.subscribe(name as keyof Hooks, fn);
   }
 }
 
@@ -194,7 +192,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
     ) => {
       seen.push([dn, context]);
     };
-    server.hooks.onLdapEntryChange = [listener];
+    server.hookBus.set('onLdapEntryChange', ...[listener]);
     try {
       await createUser('writer', 'alice').expect(201);
       const dn = `uid=alice,${peopleBase}`;
@@ -203,7 +201,7 @@ describe('SCIM + authzPerBranch — per-branch write enforcement (#80)', functio
       expect(context).to.include({ actor: 'writer', source: 'scim' });
       expect(context.requestId).to.be.a('string');
     } finally {
-      server.hooks.onLdapEntryChange = [];
+      server.hookBus.set('onLdapEntryChange', ...[]);
     }
   });
 

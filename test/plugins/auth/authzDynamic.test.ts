@@ -47,9 +47,7 @@ describe('authzDynamic (integration)', function () {
     if (plugin.hooks) {
       for (const [name, fn] of Object.entries(plugin.hooks)) {
         if (!fn) continue;
-        const hook = name as keyof Hooks;
-        const list = (server.hooks[hook] = server.hooks[hook] || []);
-        list.push(fn as unknown as never);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     groupsPlugin = new LdapGroups(server);
@@ -57,9 +55,7 @@ describe('authzDynamic (integration)', function () {
     if (groupsPlugin.hooks) {
       for (const [name, fn] of Object.entries(groupsPlugin.hooks)) {
         if (!fn) continue;
-        const hook = name as keyof Hooks;
-        const list = (server.hooks[hook] = server.hooks[hook] || []);
-        list.push(fn as unknown as never);
+        server.hookBus.subscribe(name as keyof Hooks, fn);
       }
     }
     server.loadedPlugins['authzDynamic'] = plugin;

@@ -232,7 +232,7 @@ export default class LdapGroups extends DmPlugin {
       });
     },
 
-    ldaprenamedone: async ([oldDn, newDn]) => {
+    ldaprenamedone: async (oldDn, newDn) => {
       if (!movedToTrash(this.config.trash_base, oldDn, newDn)) return;
       await this.deleteMemberFromAll(oldDn).catch(err => {
         this.logger.error(
@@ -1063,10 +1063,13 @@ export default class LdapGroups extends DmPlugin {
     req?: Request
   ): Promise<boolean> {
     const dn = this.toGroupDn(cn);
-    [cn, [member]] = await this.hookBus.chain('ldapgroupdeletemember', [
+    // Declared with a list, handed one member: subscribers get the member
+    // itself, and the chain answers it.
+    const [, answered] = (await this.hookBus.chain('ldapgroupdeletemember', [
       cn,
-      [member],
-    ]);
+      member as unknown as string[],
+    ])) as unknown as [string, string];
+    member = answered;
     // Refusing the placeholder is an answer to the client, not a fault:
     // a plain Error made it a 500.
     if (this.isDummyMember(member))

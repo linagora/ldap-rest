@@ -3,6 +3,7 @@ import type { SearchOptions } from 'ldapts';
 import type winston from 'winston';
 
 import HookBus, { recordHookOwner } from '../../src/lib/hookBus';
+import type { Hooks } from '../../src/hooks';
 import { getLogger, setLogger } from '../../src/lib/expressFormatedResponses';
 
 /**
@@ -108,6 +109,25 @@ describe('HookBus', () => {
       expect(reported).to.have.lengthOf(1);
       expect(reported[0][0]).to.equal('Hook error');
       expect(reported[0][1]).to.equal(boom);
+    });
+
+    it('hands a notified hook its arguments one by one', async () => {
+      // A subscriber written for the packed form — `([dn, entry]) => …` —
+      // still compiles as one key of `Hooks`, the parameters being
+      // bivariant, and would then read the DN's first character as a DN:
+      // what the bus promises is the variadic call, and this says so.
+      const seen: unknown[] = [];
+      const packed = (args: [string, Record<string, unknown>]) =>
+        void seen.push(args);
+      const bus = new HookBus({});
+      bus.subscribe(
+        'ldapadddone',
+        packed as unknown as NonNullable<Hooks['ldapadddone']>
+      );
+
+      await bus.notifyAndWait('ldapadddone', 'cn=x', { cn: 'x' }, {});
+
+      expect(seen[0]).to.equal('cn=x');
     });
 
     it('runs the hooks that follow a failing one', async () => {

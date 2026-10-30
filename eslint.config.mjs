@@ -150,6 +150,34 @@ export default [
           message:
             'Call other services through this.fetch (DmPlugin), which times them.',
         },
+        {
+          selector:
+            "CallExpression[callee.name=/^launchHooks/], MemberExpression[property.name='hooks'][object.property.name='server'], MemberExpression[object.property.name='server'][property.name='hooks'], MemberExpression[property.name='registeredHooks']",
+          message:
+            'Raise and subscribe to hooks through this.hookBus (chain, notify), typed by Hooks: see docs/plugin-development/hooks.md.',
+        },
+      ],
+    },
+  },
+
+  // The bus is the one place that reaches the lists; `index.ts` builds the
+  // server's, `plugin.ts` hands them to every plugin, and the two below read
+  // what a plugin declared. See docs/plugin-development/hooks.md
+  {
+    files: [
+      'src/lib/hookBus.ts',
+      'src/abstract/plugin.ts',
+      'src/bin/index.ts',
+      'src/lib/authz/composition.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.name=/^launchHooks/]',
+          message:
+            'Raise hooks through this.hookBus (chain, notify): see docs/plugin-development/hooks.md.',
+        },
       ],
     },
   },
