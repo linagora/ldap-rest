@@ -681,7 +681,7 @@ export class DM {
       this.logger.error(
         `Server error ${status} in request ${req.method} ${req.path}: ${messageOf(err)}`,
         {
-          stack: err instanceof Error ? err.stack : undefined,
+          stack: stackChain(err),
           url: req.url,
           method: req.method,
         }
