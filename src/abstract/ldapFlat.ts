@@ -7,6 +7,7 @@
  * - modify entries
  * - validate with schema
  */
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
 import type { DM } from '../bin';
@@ -25,10 +26,9 @@ import {
   jsonBody,
   multiStatus,
   tryMethod,
-  wantJson,
+  WriteResponse,
 } from '../lib/expressFormatedResponses';
 import {
-  asyncHandler,
   escapeDnValue,
   escapeLdapFilter,
   escapeRegex,
@@ -64,7 +64,7 @@ import { extractLdapCode } from '../lib/ldapCodes';
 import type { FlatHookBus } from '../lib/hookBus';
 import { loadSchemaFile } from '../lib/schemaFile';
 
-import DmPlugin from './plugin';
+import DmPlugin, { defineRoute } from './plugin';
 
 /** RFC 4511 `maxInt`: the most a search request's size limit can say. */
 const LDAP_MAX_INT = 2147483647;
@@ -340,6 +340,33 @@ export interface LdapFlatConfig {
  *     dn: uid=bob,ou=users,dc=example,dc=com
  *     referencesUpdated: 3
  */
+export const FlatListQuery = Type.Object({
+  match: Type.Optional(Type.String()),
+  attribute: Type.Optional(Type.String()),
+  attributes: Type.Optional(Type.String()),
+  limit: Type.Optional(
+    Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+  ),
+});
+
+export const FlatEntryParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+});
+
+export const FlatMoveBody = Type.Object({
+  targetOrgDn: Type.String({ minLength: 1 }),
+});
+
+export const FlatMoveResponse = Type.Object({
+  success: Type.Boolean(),
+  departmentPath: Type.String(),
+  departmentLink: Type.String(),
+});
+
+export const FlatRenameBody = Type.Object({
+  newId: Type.String({ minLength: 1 }),
+});
+
 export default abstract class LdapFlat extends DmPlugin {
   base: string;
   ldap: ldapActions;
@@ -734,34 +761,18 @@ export default abstract class LdapFlat extends DmPlugin {
      *           error: "Too many entries to list at once: the directory's size limit was exceeded. Narrow the search, or pass `limit`."
      */
     // List entries
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
-      asyncHandler(async (req, res) => {
-        if (!wantJson(req, res)) return;
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
+      query: FlatListQuery,
+      handler: async ({ req, res, query }) => {
         const args: { filter?: string; attributes?: string[] } = {};
-        if (
-          req.query.match &&
-          typeof req.query.match === 'string' &&
-          req.query.attribute &&
-          typeof req.query.attribute === 'string'
-        ) {
-          args.filter = substringSearchFilter(
-            req.query.match,
-            req.query.attribute
-          );
+        if (query.match && query.attribute) {
+          args.filter = substringSearchFilter(query.match, query.attribute);
         }
-        if (req.query.attributes && typeof req.query.attributes === 'string') {
-          args.attributes = req.query.attributes.split(',');
-        }
-        let limit: number | undefined;
-        if (req.query.limit !== undefined) {
-          const raw = req.query.limit;
-          limit = typeof raw === 'string' && /^\d+$/.test(raw) ? +raw : NaN;
-          if (!Number.isSafeInteger(limit) || limit < 1)
-            throw new BadRequestError(
-              'Query parameter "limit" must be a positive integer'
-            );
-        }
+        if (query.attributes) args.attributes = query.attributes.split(',');
+        const limit = query.limit;
+
         let listed: { entries: LdapList; truncated: boolean };
         try {
           listed = await this.listEntriesLimited({ ...args, limit, req });
@@ -777,8 +788,8 @@ export default abstract class LdapFlat extends DmPlugin {
         }
         if (listed.truncated) res.set('X-Result-Truncated', 'true');
         res.json(this.projectList(listed.entries));
-      })
-    );
+      },
+    });
 
     /**
      * @openapi
@@ -825,10 +836,12 @@ export default abstract class LdapFlat extends DmPlugin {
      *           error: user not found
      */
     // Get entry by id or DN
-    app.get(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      asyncHandler(async (req, res) => this.apiGet(req, res))
-    );
+    defineRoute(app, {
+      method: 'get',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
+      params: FlatEntryParams,
+      handler: async ({ req, res }) => this.apiGet(req, res),
+    });
 
     /**
      * @openapi
@@ -882,10 +895,11 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Add entry
-    app.post(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
-      asyncHandler(async (req, res) => this.apiAdd(req, res))
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}`,
+      handler: async ({ req, res }) => this.apiAdd(req, res),
+    });
 
     /**
      * @openapi
@@ -918,10 +932,13 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Delete entry
-    app.delete(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      asyncHandler(async (req, res) => this.apiDelete(req, res))
-    );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
+      params: FlatEntryParams,
+      responses: { 200: WriteResponse },
+      handler: async ({ req, res }) => this.apiDelete(req, res),
+    });
 
     /**
      * @openapi
@@ -969,10 +986,13 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Modify entry
-    app.put(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
-      asyncHandler(async (req, res) => this.apiModify(req, res))
-    );
+    defineRoute(app, {
+      method: 'put',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
+      params: FlatEntryParams,
+      responses: { 200: WriteResponse },
+      handler: async ({ req, res }) => this.apiModify(req, res),
+    });
 
     /**
      * @openapi
@@ -1025,10 +1045,14 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Move entry to different organization
-    app.post(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
-      asyncHandler(async (req, res) => this.apiMove(req, res))
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/move`,
+      params: FlatEntryParams,
+      body: FlatMoveBody,
+      responses: { 200: FlatMoveResponse },
+      handler: async ({ req, res }) => this.apiMove(req, res),
+    });
 
     /**
      * @openapi
@@ -1120,14 +1144,16 @@ export default abstract class LdapFlat extends DmPlugin {
      *         schema: { $ref: '#/components/schemas/Error' }
      */
     // Rename entry (change its identifier)
-    app.post(
-      `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/rename`,
-      asyncHandler(async (req, res) => this.apiRename(req, res))
-    );
+    defineRoute(app, {
+      method: 'post',
+      path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id/rename`,
+      params: FlatEntryParams,
+      body: FlatRenameBody,
+      handler: async ({ req, res }) => this.apiRename(req, res),
+    });
   }
 
   async apiGet(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     try {
       const dn = this.resolveDn(id);
@@ -1194,7 +1220,6 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiDelete(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
     const id = decodeURIComponent(req.params.id as string);
     await tryMethod(res, this.deleteEntry.bind(this), id, req);
   }
@@ -1209,21 +1234,9 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiMove(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
-    const body = jsonBody(req, res, 'targetOrgDn') as
-      | { targetOrgDn: string }
-      | false;
-    if (!body) return;
-
+    const body = req.body as { targetOrgDn: string };
     const id = decodeURIComponent(req.params.id as string);
     const { targetOrgDn } = body;
-
-    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
-      throw new BadRequestError(
-        'Missing or invalid targetOrgDn in request body'
-      );
-    }
 
     const result = await this.moveEntry(id, targetOrgDn, req);
     res.json({
@@ -1244,15 +1257,8 @@ export default abstract class LdapFlat extends DmPlugin {
    * @param res response
    */
   async apiRename(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
-    const body = jsonBody(req, res, 'newId') as Record<string, unknown> | false;
-    if (!body) return;
-
+    const body = req.body as Record<string, unknown> & { newId: string };
     const newId = body.newId;
-    if (typeof newId !== 'string') {
-      throw new BadRequestError('Missing or invalid newId in request body');
-    }
 
     // Everything else in the body is an attribute name, and one the client is
     // not allowed to set is refused here as it is on a creation — a caller

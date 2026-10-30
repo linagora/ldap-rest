@@ -2,6 +2,7 @@
  * Standard express responses and express utilities
  * @author Xavier Guimard <xguimard@linagora.com>
  */
+import { Type } from '@sinclair/typebox';
 import type { Request, Response } from 'express';
 import type winston from 'winston';
 
@@ -158,6 +159,12 @@ const _rejectResponse = (
   _logger?.warn(`Client error ${code}: ${message}`);
   res.status(code).json({ error: message });
 };
+
+/**
+ * The answer of a route that changed something and returned nothing: the
+ * shape every write route declares as its 200.
+ */
+export const WriteResponse = Type.Object({ success: Type.Boolean() });
 
 // 20x responses
 export const ok = (res: Response, data: object = { success: true }): void => {

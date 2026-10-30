@@ -6045,10 +6045,20 @@
         "responses": {
           "200": {
             "description": "Map of entries keyed by mainAttribute value.",
+            "headers": {
+              "X-Result-Truncated": {
+                "description": "`true` when `limit` was given and the answer may not hold\nevery match (see `limit`). Absent otherwise.\n",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/FlatList"
                 },
                 "example": {
@@ -6064,17 +6074,6 @@
                     "cn": "Bob Jones",
                     "mail": "bob@example.com"
                   }
-                }
-              }
-            },
-            "headers": {
-              "X-Result-Truncated": {
-                "description": "`true` when `limit` was given and the answer may not hold\nevery match (see `limit`). Absent otherwise.\n",
-                "schema": {
-                  "type": "string",
-                  "enum": [
-                    "true"
-                  ]
                 }
               }
             }
@@ -6133,14 +6132,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Successful response"
           },
           "201": {
             "description": "Entry created; returns the new entry.",
@@ -6197,7 +6189,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/FlatCreate"
               },
               "example": {
@@ -6221,6 +6212,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -6242,7 +6234,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/FlatEntry"
                 },
                 "example": {
@@ -6298,6 +6289,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -6319,7 +6311,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -6360,6 +6360,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -6381,7 +6382,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  }
                 },
                 "example": {
                   "success": true
@@ -6424,7 +6433,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/FlatModify"
               },
               "example": {
@@ -6448,6 +6456,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -6469,7 +6478,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "departmentPath",
+                    "departmentLink"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "departmentPath": {
+                      "type": "string"
+                    },
+                    "departmentLink": {
+                      "type": "string"
+                    }
+                  }
                 },
                 "example": {
                   "success": true,
@@ -6514,7 +6539,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/FlatMoveRequest"
               },
               "example": {
@@ -6535,6 +6559,7 @@
             "in": "path",
             "required": true,
             "schema": {
+              "minLength": 1,
               "type": "string"
             },
             "description": "id parameter"
@@ -6556,7 +6581,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
                   "$ref": "#/components/schemas/FlatRenameResult"
                 },
                 "example": {
@@ -6643,7 +6667,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
                 "$ref": "#/components/schemas/FlatRenameRequest"
               },
               "example": {
