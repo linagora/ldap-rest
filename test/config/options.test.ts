@@ -16,6 +16,11 @@ import {
   scimOptionsOf,
 } from '../../src/plugins/scim/scim.options';
 import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
+import { calendarOptionsOf } from '../../src/plugins/twake/calendar.options';
+import { clouderyOptionsOf } from '../../src/plugins/twake/cloudery.options';
+import { cozyOptionsOf } from '../../src/plugins/twake/cozy.options';
+import { twakeGroupsOptionsOf } from '../../src/plugins/twake/twakeGroups.options';
+import { twakeInstancesOptionsOf } from '../../src/plugins/twake/twakeInstances.options';
 
 describe('plugin options', () => {
   const parse = (argv: string[] = ['node', 'ldap-rest']) =>
@@ -441,6 +446,130 @@ describe('plugin options', () => {
       expect(config.twake_drive_default_domain_template).to.equal(
         '{uid}.example.com'
       );
+    });
+  });
+
+  describe('Twake options in the configuration', () => {
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.migration_proxy_concurrency).to.equal(10);
+      expect(config.migration_proxy_branch).to.deep.equal([]);
+      expect(config.cozy_admin_user).to.equal('admin');
+      expect(config.cozy_apps).to.equal('home,drive,settings,notes,dataproxy');
+      expect(config.cloudery_offer).to.equal('b2b_twake_default');
+      expect(config.cloudery_org_id_header).to.equal('x-cloudery-org-id');
+      expect(config.cloudery_workflow_max_attempts).to.equal(60);
+      expect(config.twake_lifecycle_deleted_value).to.equal('TRUE');
+      expect(config.twake_lifecycle_member_attribute).to.equal('member');
+      expect(config.twake_group_max_page_limit).to.equal(1000);
+      expect(config.twake_group_member_fields).to.deep.equal({});
+      expect(config.twake_space_class).to.deep.equal(['top', 'twakeSpace']);
+      expect(config.twake_space_sync_queue).to.equal(
+        'twake.space.sync.requested.ldap-rest'
+      );
+      expect(config.twake_tombstone_default_reason).to.equal('deleted');
+      expect(config.twake_tombstone_erase_min_age).to.equal(2592000);
+      expect(config.twake_instance_provider).to.equal('cloudery');
+      expect(config.twake_instance_id).to.equal('{uid}');
+      expect(config.twake_instance_timeout).to.equal(30000);
+      expect(config.twake_instance_organization_id_attribute).to.equal('ou');
+    });
+
+    it('refuses a zero where the default used to apply', () => {
+      const cases: [string, () => unknown][] = [
+        ['DM_TWAKE_GROUP_MAX_PAGE_LIMIT', () => twakeGroupsOptionsOf(parse())],
+        ['DM_TWAKE_INSTANCE_TIMEOUT', () => twakeInstancesOptionsOf(parse())],
+        [
+          'DM_CLOUDERY_WORKFLOW_POLL_INTERVAL_MS',
+          () => clouderyOptionsOf(parse()),
+        ],
+        ['DM_CLOUDERY_WORKFLOW_MAX_ATTEMPTS', () => clouderyOptionsOf(parse())],
+      ];
+      for (const [name, read] of cases) {
+        const saved = process.env[name];
+        process.env[name] = '0';
+        try {
+          expect(read, name).to.throw(/must be at least 1/);
+        } finally {
+          if (saved === undefined) delete process.env[name];
+          else process.env[name] = saved;
+        }
+      }
+    });
+
+    it('keeps a declared default for an empty string, unless it is a value', () => {
+      const saved = {
+        DM_CALENDAR_FIRSTNAME_ATTRIBUTE:
+          process.env.DM_CALENDAR_FIRSTNAME_ATTRIBUTE,
+        DM_COZY_APPS: process.env.DM_COZY_APPS,
+        DM_TWAKE_INSTANCE_COZY_APPS: process.env.DM_TWAKE_INSTANCE_COZY_APPS,
+        DM_TWAKE_INSTANCE_COZY_CONTEXT:
+          process.env.DM_TWAKE_INSTANCE_COZY_CONTEXT,
+        DM_TWAKE_INSTANCE_CLOUDERY_OFFER:
+          process.env.DM_TWAKE_INSTANCE_CLOUDERY_OFFER,
+      };
+      try {
+        process.env.DM_CALENDAR_FIRSTNAME_ATTRIBUTE = '';
+        expect(
+          calendarOptionsOf(parse()).calendar_firstname_attribute
+        ).to.equal('givenName');
+        expect(
+          calendarOptionsOf(
+            parse(['node', 'ldap-rest', '--calendar-firstname-attribute', ''])
+          ).calendar_firstname_attribute
+        ).to.equal('givenName');
+
+        process.env.DM_COZY_APPS = '';
+        expect(cozyOptionsOf(parse()).cozy_apps).to.equal('');
+
+        const instanceEmpties = [
+          ['DM_TWAKE_INSTANCE_COZY_APPS', 'twake_instance_cozy_apps'],
+          ['DM_TWAKE_INSTANCE_COZY_CONTEXT', 'twake_instance_cozy_context'],
+          ['DM_TWAKE_INSTANCE_CLOUDERY_OFFER', 'twake_instance_cloudery_offer'],
+        ] as const;
+        for (const [name, key] of instanceEmpties) {
+          process.env[name] = '';
+          expect(twakeInstancesOptionsOf(parse())[key], name).to.equal('');
+        }
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      const saved = {
+        DM_TWAKE_TOMBSTONE_REASONS: process.env.DM_TWAKE_TOMBSTONE_REASONS,
+        DM_TWAKE_INSTANCE_PROVIDER: process.env.DM_TWAKE_INSTANCE_PROVIDER,
+      };
+      process.env.DM_TWAKE_TOMBSTONE_REASONS = 'gone;erased';
+      process.env.DM_TWAKE_INSTANCE_PROVIDER = 'cozy-stack';
+      try {
+        const config = parse([
+          'node',
+          'ldap-rest',
+          '--twake-group-member-fields',
+          '{"member":"uid"}',
+          '--twake-space-class',
+          'top',
+          '--twake-space-class',
+          'space',
+        ]);
+        expect(config.twake_tombstone_reasons).to.deep.equal([
+          'gone',
+          'erased',
+        ]);
+        expect(config.twake_instance_provider).to.equal('cozy-stack');
+        expect(config.twake_group_member_fields).to.deep.equal({
+          member: 'uid',
+        });
+        expect(config.twake_space_class).to.deep.equal(['top', 'space']);
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
     });
   });
 

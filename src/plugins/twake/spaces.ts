@@ -57,6 +57,15 @@ import {
   type LifecycleAttributes,
   valueOf,
 } from './lifecycleAttributes';
+import {
+  twakeGroupsOptionsOf,
+  type TwakeGroupsOptions,
+} from './twakeGroups.options';
+import {
+  twakeInstancesOptionsOf,
+  type TwakeInstancesOptions,
+} from './twakeInstances.options';
+import { twakeSpacesOptions } from './twakeSpaces.options';
 
 /** From the weakest to the strongest. */
 export const SPACE_ROLES = ['viewer', 'editor', 'admin'] as const;
@@ -191,6 +200,8 @@ function holdersOf(
 }
 
 export default class TwakeSpaces extends DmPlugin {
+  static optionDefinitions = twakeSpacesOptions;
+
   name = 'twakeSpaces';
   roles: Role[] = ['api'];
   dependencies: Record<string, string> = {
@@ -208,6 +219,8 @@ export default class TwakeSpaces extends DmPlugin {
   private readonly exchange: string;
   private readonly domainAttribute: string;
   private readonly orgPattern?: RegExp;
+  private readonly groupSettings: TwakeGroupsOptions;
+  private readonly instanceSettings: TwakeInstancesOptions;
   private readonly domains = new Map<string, string>();
   /**
    * Changes are followed one at a time, each from the directory as it is
@@ -247,25 +260,31 @@ export default class TwakeSpaces extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    this.spaceBase = this.config.twake_space_base || '';
+    const settings = this.options(twakeSpacesOptions);
+    this.groupSettings = twakeGroupsOptionsOf(server.config);
+    this.instanceSettings = twakeInstancesOptionsOf(server.config);
+    this.spaceBase = settings.twake_space_base;
     if (this.spaceBase.split(ORG).length !== 2)
       throw new Error(`${this.name}: --twake-space-base must hold ${ORG} once`);
     this.spacePattern = branchPattern(this.spaceBase);
-    this.userPattern = branchPattern(this.config.twake_group_user_base!);
+    this.userPattern = branchPattern(
+      this.groupSettings.twake_group_user_base || ''
+    );
     this.lifecycle = lifecycleAttributes(this.config);
-    this.displayName =
-      this.config.twake_space_display_name_attribute || 'twakeDisplayName';
+    this.displayName = settings.twake_space_display_name_attribute;
     this.roleAttributes = {
-      admin: this.config.twake_space_admin_attribute || 'twakeSpaceAdmin',
-      editor: this.config.twake_space_editor_attribute || 'twakeSpaceEditor',
-      viewer: this.config.twake_space_viewer_attribute || 'twakeSpaceViewer',
+      admin: settings.twake_space_admin_attribute,
+      editor: settings.twake_space_editor_attribute,
+      viewer: settings.twake_space_viewer_attribute,
     };
-    this.userRole = this.config.twake_space_user_role_attribute || '';
-    this.exchange = this.config.twake_space_exchange || 'space';
+    this.userRole = settings.twake_space_user_role_attribute;
+    this.exchange = settings.twake_space_exchange;
     this.domainAttribute =
-      this.config.twake_instance_organization_domain_attribute || 'twakeDomain';
-    if (this.config.twake_group_organization_dn)
-      this.orgPattern = branchPattern(this.config.twake_group_organization_dn);
+      this.instanceSettings.twake_instance_organization_domain_attribute;
+    if (this.groupSettings.twake_group_organization_dn)
+      this.orgPattern = branchPattern(
+        this.groupSettings.twake_group_organization_dn
+      );
     if (this.config.rabbitmq_url) this.dependencies.rabbitmq = 'core/rabbitmq';
   }
 
@@ -435,7 +454,7 @@ export default class TwakeSpaces extends DmPlugin {
               : dnKey(rdn) === dnKey(branch[i])
           );
     };
-    const branches = [this.config.twake_group_base || '', this.spaceBase].map(
+    const branches = [this.groupSettings.twake_group_base, this.spaceBase].map(
       holds
     );
     const watched = String(this.config.trash_watched_bases || '')
@@ -685,7 +704,7 @@ export default class TwakeSpaces extends DmPlugin {
     await this.rabbitmq?.subscribe(
       this.exchange,
       SYNC_REQUESTED,
-      this.config.twake_space_sync_queue || `${SYNC_REQUESTED}.ldap-rest`,
+      this.options(twakeSpacesOptions).twake_space_sync_queue,
       message => this.onSyncRequested(message)
     );
   }
@@ -852,7 +871,7 @@ export default class TwakeSpaces extends DmPlugin {
   }
 
   private get groupName(): string {
-    return this.config.twake_group_display_name_attribute || 'twakeDisplayName';
+    return this.groupSettings.twake_group_display_name_attribute;
   }
 
   /** Groups of the organization by id, read in pages of the size limit. */
@@ -1547,7 +1566,7 @@ export default class TwakeSpaces extends DmPlugin {
   private async domainOf(
     org: string
   ): Promise<{ organizationDomain?: string }> {
-    const pattern = this.config.twake_group_organization_dn;
+    const pattern = this.groupSettings.twake_group_organization_dn;
     if (!pattern) return {};
     const key = org.toLowerCase();
     let domain = this.domains.get(key);
@@ -1869,7 +1888,7 @@ export default class TwakeSpaces extends DmPlugin {
     ]);
     const id = randomUUID();
     const entry: AttributesList = {
-      objectClass: this.config.twake_space_class || ['top', 'twakeSpace'],
+      objectClass: this.options(twakeSpacesOptions).twake_space_class,
       cn: id,
       [this.displayName]: body.name,
     };

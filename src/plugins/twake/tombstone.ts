@@ -28,6 +28,7 @@ import { changeContext } from '../../lib/changeContext';
 import type { AttributesList, SearchResult } from '../../lib/ldapActions';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import { escapeLdapFilter, isDnInBranch } from '../../lib/utils';
+import { scimOptionsOf } from '../scim/scim.options';
 
 import {
   first,
@@ -38,6 +39,10 @@ import {
   valueOf,
   type LifecycleAttributes,
 } from './lifecycleAttributes';
+import {
+  twakeTombstoneOptions,
+  twakeTombstoneOptionsOf,
+} from './twakeTombstone.options';
 
 const REASON = /^[A-Za-z0-9_.-]{1,64}$/;
 
@@ -51,6 +56,8 @@ export const EraseTombstoneResponse = Type.Object({
 });
 
 export default class TwakeTombstone extends DmPlugin {
+  static optionDefinitions = twakeTombstoneOptions;
+
   name = 'twakeTombstone';
   roles: Role[] = ['consistency', 'api'] as const;
 
@@ -71,26 +78,26 @@ export default class TwakeTombstone extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    const cfg = this.config;
-    this.attrs = lifecycleAttributes(cfg);
+    const settings = twakeTombstoneOptionsOf(server.config);
+    this.attrs = lifecycleAttributes(server.config);
     if (!this.attrs.deleted)
       throw new Error(
         `${this.name}: --twake-lifecycle-deleted-attribute is required`
       );
-    this.patterns = (cfg.twake_tombstone_dn || []).map(p => new RegExp(p, 'i'));
-    this.reasons = cfg.twake_tombstone_reasons || [];
+    // Operator configuration, not request data: the option holds DN regular
+    // expressions by design, see the tombstone documentation.
+    this.patterns = settings.twake_tombstone_dn.map(p => new RegExp(p, 'i'));
+    this.reasons = settings.twake_tombstone_reasons;
     this.defaultReason = this.checkReason(
-      cfg.twake_tombstone_default_reason || 'deleted'
+      settings.twake_tombstone_default_reason
     );
-    this.reasonHeader = (
-      cfg.twake_tombstone_reason_header || 'x-deletion-reason'
-    ).toLowerCase();
-    this.clearAttributes = cfg.twake_tombstone_clear_attributes || [];
-    this.eraseMinAge = cfg.twake_tombstone_erase_min_age ?? 2592000;
-    this.groupBases = cfg.twake_tombstone_group_bases?.length
-      ? cfg.twake_tombstone_group_bases
-      : [cfg.ldap_group_base || cfg.ldap_base || ''];
-    this.scimPrefix = cfg.scim_prefix || '/scim/v2';
+    this.reasonHeader = settings.twake_tombstone_reason_header.toLowerCase();
+    this.clearAttributes = settings.twake_tombstone_clear_attributes;
+    this.eraseMinAge = settings.twake_tombstone_erase_min_age;
+    this.groupBases = settings.twake_tombstone_group_bases.length
+      ? settings.twake_tombstone_group_bases
+      : [server.config.ldap_group_base || server.config.ldap_base || ''];
+    this.scimPrefix = scimOptionsOf(server.config).scim_prefix;
     if (this.patterns.length === 0)
       this.logger.warn(
         `${this.name}: --twake-tombstone-dn is empty, every delete stays a delete`

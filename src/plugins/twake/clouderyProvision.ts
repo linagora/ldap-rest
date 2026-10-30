@@ -33,7 +33,11 @@ import { instanceSlug } from '../../lib/instanceProviders';
 import { isChildOf } from '../../lib/utils';
 import type RabbitMq from '../rabbitmq';
 import { BaseResolver } from '../scim/baseResolver';
+import { scimOptionsOf } from '../scim/scim.options';
 import type { ScimUser } from '../scim/types';
+
+import { clouderyOptions, clouderyOptionsOf } from './cloudery.options';
+import { cozyOptionsOf } from './cozy.options';
 
 type ReqWithUser = Request & { user?: string };
 
@@ -77,6 +81,8 @@ const VALID_ORG_ROLES = new Set(['admin', 'owner', 'member']);
 const MAX_LOG_BODY_LEN = 1000;
 
 export default class ClouderyProvision extends DmPlugin {
+  static optionDefinitions = clouderyOptions;
+
   name = 'clouderyProvision';
   roles: Role[] = ['consistency'] as const;
 
@@ -115,27 +121,21 @@ export default class ClouderyProvision extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    const cfg = this.config;
+    const settings = clouderyOptionsOf(server.config);
+    const cozy = cozyOptionsOf(server.config);
+    const scim = scimOptionsOf(server.config);
 
-    this.managerUrl = ((cfg.cloudery_manager_url as string) || '').replace(
-      /\/$/,
-      ''
-    );
-    this.managerToken = (cfg.cloudery_manager_token as string) || '';
-    this.offer = (cfg.cloudery_offer as string) || 'b2b_twake_default';
-    this.clouderyDomain = (cfg.cloudery_domain as string) || '';
-    this.userBranch = (cfg.cloudery_user_branch as string) || '';
-    this.orgIdHeader = (
-      (cfg.cloudery_org_id_header as string) || 'x-cloudery-org-id'
-    ).toLowerCase();
-    this.orgRoleHeader = (
-      (cfg.cloudery_org_role_header as string) || 'x-cloudery-org-role'
-    ).toLowerCase();
+    this.managerUrl = settings.cloudery_manager_url.replace(/\/$/, '');
+    this.managerToken = settings.cloudery_manager_token;
+    this.offer = settings.cloudery_offer;
+    this.clouderyDomain = settings.cloudery_domain;
+    this.userBranch = settings.cloudery_user_branch;
+    this.orgIdHeader = settings.cloudery_org_id_header.toLowerCase();
+    this.orgRoleHeader = settings.cloudery_org_role_header.toLowerCase();
     // The default is the fallback for an absent/unknown header, so it must be a
     // valid, lower-cased role itself; otherwise a misconfigured default would
     // bypass the same validation resolveRole() applies to header values.
-    const configuredRole =
-      (cfg.cloudery_default_org_role as string) || 'member';
+    const configuredRole = settings.cloudery_default_org_role;
     const normalizedRole = configuredRole.trim().toLowerCase();
     if (VALID_ORG_ROLES.has(normalizedRole)) {
       this.defaultOrgRole = normalizedRole;
@@ -147,29 +147,21 @@ export default class ClouderyProvision extends DmPlugin {
         ].join(', ')} — using "member"`
       );
     }
-    this.fqdnAttribute =
-      (cfg.cloudery_fqdn_attribute as string) || 'twakeWorkspaceUrl';
-    this.orgIdAttribute =
-      (cfg.cloudery_org_id_attribute as string) || 'twakeOrganizationId';
-    this.orgRoleAttribute =
-      (cfg.cloudery_org_role_attribute as string) || 'twakeOrganizationRole';
-    this.phonesAttribute =
-      (cfg.cloudery_phones_attribute as string) || 'twakePhones';
-    this.invitedAttribute =
-      (cfg.cloudery_invited_attribute as string) || 'twakeInvited';
-    this.defaultLocale = (cfg.cloudery_default_locale as string) || 'en';
-    this.rdnAttribute = (cfg.scim_user_rdn_attribute as string) || 'uid';
-    this.authExchange = (cfg.cozy_auth_exchange as string) || 'auth';
-    this.b2bExchange = (cfg.cozy_b2b_exchange as string) || 'b2b';
-    this.userCreatedRoutingKey =
-      (cfg.cozy_user_created_routing_key as string) || 'user.created';
+    this.fqdnAttribute = settings.cloudery_fqdn_attribute;
+    this.orgIdAttribute = settings.cloudery_org_id_attribute;
+    this.orgRoleAttribute = settings.cloudery_org_role_attribute;
+    this.phonesAttribute = settings.cloudery_phones_attribute;
+    this.invitedAttribute = settings.cloudery_invited_attribute;
+    this.defaultLocale = settings.cloudery_default_locale;
+    this.rdnAttribute = scim.scim_user_rdn_attribute;
+    this.authExchange = cozy.cozy_auth_exchange;
+    this.b2bExchange = cozy.cozy_b2b_exchange;
+    this.userCreatedRoutingKey = cozy.cozy_user_created_routing_key;
     // Empty turns the deletion event off, for a deployment that publishes it
     // elsewhere.
-    this.userDeletedRoutingKey =
-      cfg.cozy_user_deleted_routing_key ?? 'domain.user.deleted';
-    this.pollIntervalMs =
-      Number(cfg.cloudery_workflow_poll_interval_ms) || 2000;
-    this.maxPollAttempts = Number(cfg.cloudery_workflow_max_attempts) || 60;
+    this.userDeletedRoutingKey = cozy.cozy_user_deleted_routing_key;
+    this.pollIntervalMs = settings.cloudery_workflow_poll_interval_ms;
+    this.maxPollAttempts = settings.cloudery_workflow_max_attempts;
 
     this.baseResolver = new BaseResolver(this.config);
 

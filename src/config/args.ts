@@ -11,8 +11,16 @@ import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
 import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
 import { calendarOptions } from '../plugins/twake/calendar.options';
+import { clouderyOptions } from '../plugins/twake/cloudery.options';
+import { cozyOptions } from '../plugins/twake/cozy.options';
 import { driveOptions } from '../plugins/twake/drive.options';
 import { jamesOptions } from '../plugins/twake/james.options';
+import { migrationProxyOptions } from '../plugins/twake/migrationProxy.options';
+import { twakeGroupsOptions } from '../plugins/twake/twakeGroups.options';
+import { twakeInstancesOptions } from '../plugins/twake/twakeInstances.options';
+import { twakeLifecycleOptions } from '../plugins/twake/twakeLifecycle.options';
+import { twakeSpacesOptions } from '../plugins/twake/twakeSpaces.options';
+import { twakeTombstoneOptions } from '../plugins/twake/twakeTombstone.options';
 
 import { toConfigEntries } from './options';
 
@@ -772,34 +780,7 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(jamesOptions),
 
   // Twake Mail migration proxy plugin
-  ['--migration-proxy-url', 'DM_MIGRATION_PROXY_URL', ''],
-  ['--migration-proxy-token', 'DM_MIGRATION_PROXY_TOKEN', ''],
-  [
-    '--migration-proxy-branch',
-    'DM_MIGRATION_PROXY_BRANCHES',
-    [],
-    'array',
-    '--migration-proxy-branches',
-    'dns',
-  ],
-  [
-    '--migration-proxy-concurrency',
-    'DM_MIGRATION_PROXY_CONCURRENCY',
-    10,
-    'number',
-  ],
-  [
-    '--migration-proxy-retry-attempts',
-    'DM_MIGRATION_PROXY_RETRY_ATTEMPTS',
-    5,
-    'number',
-  ],
-  [
-    '--migration-proxy-retry-delay',
-    'DM_MIGRATION_PROXY_RETRY_DELAY',
-    1000,
-    'number',
-  ],
+  ...toConfigEntries(migrationProxyOptions),
 
   // Drive (Cozy) plugin
   ...toConfigEntries(driveOptions),
@@ -808,333 +789,20 @@ const configArgs: ConfigTemplate = [
   ...toConfigEntries(calendarOptions),
 
   // Cozy provisioning plugin (twake/cozyProvision)
-  ['--cozy-admin-url', 'DM_COZY_ADMIN_URL', ''],
-  ['--cozy-admin-user', 'DM_COZY_ADMIN_USER', 'admin'],
-  ['--cozy-admin-passphrase', 'DM_COZY_ADMIN_PASSPHRASE', ''],
-  ['--cozy-org-id', 'DM_COZY_ORG_ID', ''],
-  ['--cozy-org-domain', 'DM_COZY_ORG_DOMAIN', ''],
-  ['--cozy-default-locale', 'DM_COZY_DEFAULT_LOCALE', 'fr'],
-  ['--cozy-context-name', 'DM_COZY_CONTEXT_NAME', 'default'],
-  ['--cozy-apps', 'DM_COZY_APPS', 'home,drive,settings,notes,dataproxy'],
-  ['--cozy-auth-exchange', 'DM_COZY_AUTH_EXCHANGE', 'auth'],
-  ['--cozy-b2b-exchange', 'DM_COZY_B2B_EXCHANGE', 'b2b'],
-  [
-    '--cozy-user-created-routing-key',
-    'DM_COZY_USER_CREATED_ROUTING_KEY',
-    'user.created',
-  ],
-  [
-    '--cozy-user-deleted-routing-key',
-    'DM_COZY_USER_DELETED_ROUTING_KEY',
-    'domain.user.deleted',
-  ],
+  ...toConfigEntries(cozyOptions),
 
   // clouderyProvision plugin
-  ['--cloudery-manager-url', 'DM_CLOUDERY_MANAGER_URL', ''],
-  ['--cloudery-manager-token', 'DM_CLOUDERY_MANAGER_TOKEN', ''],
-  ['--cloudery-offer', 'DM_CLOUDERY_OFFER', 'b2b_twake_default'],
-  ['--cloudery-domain', 'DM_CLOUDERY_DOMAIN', ''],
-  ['--cloudery-user-branch', 'DM_CLOUDERY_USER_BRANCH', ''],
-  [
-    '--cloudery-org-id-header',
-    'DM_CLOUDERY_ORG_ID_HEADER',
-    'x-cloudery-org-id',
-  ],
-  [
-    '--cloudery-org-role-header',
-    'DM_CLOUDERY_ORG_ROLE_HEADER',
-    'x-cloudery-org-role',
-  ],
-  ['--cloudery-default-org-role', 'DM_CLOUDERY_DEFAULT_ORG_ROLE', 'member'],
-  [
-    '--cloudery-fqdn-attribute',
-    'DM_CLOUDERY_FQDN_ATTRIBUTE',
-    'twakeWorkspaceUrl',
-  ],
-  [
-    '--cloudery-org-id-attribute',
-    'DM_CLOUDERY_ORG_ID_ATTRIBUTE',
-    'twakeOrganizationId',
-  ],
-  [
-    '--cloudery-org-role-attribute',
-    'DM_CLOUDERY_ORG_ROLE_ATTRIBUTE',
-    'twakeOrganizationRole',
-  ],
-  [
-    '--cloudery-phones-attribute',
-    'DM_CLOUDERY_PHONES_ATTRIBUTE',
-    'twakePhones',
-  ],
-  [
-    '--cloudery-invited-attribute',
-    'DM_CLOUDERY_INVITED_ATTRIBUTE',
-    'twakeInvited',
-  ],
-  ['--cloudery-default-locale', 'DM_CLOUDERY_DEFAULT_LOCALE', 'en'],
-  [
-    '--cloudery-workflow-poll-interval-ms',
-    'DM_CLOUDERY_WORKFLOW_POLL_INTERVAL_MS',
-    2000,
-    'number',
-  ],
-  [
-    '--cloudery-workflow-max-attempts',
-    'DM_CLOUDERY_WORKFLOW_MAX_ATTEMPTS',
-    60,
-    'number',
-  ],
+  ...toConfigEntries(clouderyOptions),
 
-  // Account lifecycle attributes, shared by the twake lifecycle plugins
-  ['--twake-lifecycle-role-attribute', 'DM_TWAKE_LIFECYCLE_ROLE_ATTRIBUTE', ''],
-  ['--twake-lifecycle-lock-attribute', 'DM_TWAKE_LIFECYCLE_LOCK_ATTRIBUTE', ''],
-  ['--twake-lifecycle-lock-value', 'DM_TWAKE_LIFECYCLE_LOCK_VALUE', ''],
-  [
-    '--twake-lifecycle-deleted-attribute',
-    'DM_TWAKE_LIFECYCLE_DELETED_ATTRIBUTE',
-    '',
-  ],
-  [
-    '--twake-lifecycle-deleted-value',
-    'DM_TWAKE_LIFECYCLE_DELETED_VALUE',
-    'TRUE',
-  ],
-  [
-    '--twake-lifecycle-deleted-at-attribute',
-    'DM_TWAKE_LIFECYCLE_DELETED_AT_ATTRIBUTE',
-    '',
-  ],
-  [
-    '--twake-lifecycle-deleted-at-format',
-    'DM_TWAKE_LIFECYCLE_DELETED_AT_FORMAT',
-    'iso8601',
-  ],
-  [
-    '--twake-lifecycle-reason-attribute',
-    'DM_TWAKE_LIFECYCLE_REASON_ATTRIBUTE',
-    '',
-  ],
-  // twake/lifecycleEvents plugin
-  ['--twake-lifecycle-rules', 'DM_TWAKE_LIFECYCLE_RULES', ''],
-  [
-    '--twake-lifecycle-member-attribute',
-    'DM_TWAKE_LIFECYCLE_MEMBER_ATTRIBUTE',
-    'member',
-  ],
-  // twake/groups plugin
-  ['--twake-group-base', 'DM_TWAKE_GROUP_BASE', ''],
-  ['--twake-group-user-base', 'DM_TWAKE_GROUP_USER_BASE', ''],
-  ['--twake-group-organization-dn', 'DM_TWAKE_GROUP_ORGANIZATION_DN', ''],
-  [
-    '--twake-group-organization-status-attribute',
-    'DM_TWAKE_GROUP_ORGANIZATION_STATUS_ATTRIBUTE',
-    'twakeOrgStatus',
-  ],
-  [
-    '--twake-group-organization-deleted-value',
-    'DM_TWAKE_GROUP_ORGANIZATION_DELETED_VALUE',
-    'deleted',
-  ],
-  [
-    '--twake-group-display-name-attribute',
-    'DM_TWAKE_GROUP_DISPLAY_NAME_ATTRIBUTE',
-    'twakeDisplayName',
-  ],
-  [
-    '--twake-group-color-attribute',
-    'DM_TWAKE_GROUP_COLOR_ATTRIBUTE',
-    'twakeGroupColor',
-  ],
-  [
-    '--twake-group-created-at-attribute',
-    'DM_TWAKE_GROUP_CREATED_AT_ATTRIBUTE',
-    'twakeCreatedAt',
-  ],
-  [
-    '--twake-group-max-page-limit',
-    'DM_TWAKE_GROUP_MAX_PAGE_LIMIT',
-    1000,
-    'number',
-  ],
-  ['--twake-group-member-fields', 'DM_TWAKE_GROUP_MEMBER_FIELDS', {}, 'json'],
-  // twake/spaces plugin
-  ['--twake-space-base', 'DM_TWAKE_SPACE_BASE', ''],
-  [
-    '--twake-space-class',
-    'DM_TWAKE_SPACE_CLASS',
-    ['top', 'twakeSpace'],
-    'array',
-    null,
-    'identifiers',
-  ],
-  [
-    '--twake-space-display-name-attribute',
-    'DM_TWAKE_SPACE_DISPLAY_NAME_ATTRIBUTE',
-    'twakeDisplayName',
-  ],
-  [
-    '--twake-space-admin-attribute',
-    'DM_TWAKE_SPACE_ADMIN_ATTRIBUTE',
-    'twakeSpaceAdmin',
-  ],
-  [
-    '--twake-space-editor-attribute',
-    'DM_TWAKE_SPACE_EDITOR_ATTRIBUTE',
-    'twakeSpaceEditor',
-  ],
-  [
-    '--twake-space-viewer-attribute',
-    'DM_TWAKE_SPACE_VIEWER_ATTRIBUTE',
-    'twakeSpaceViewer',
-  ],
-  [
-    '--twake-space-user-role-attribute',
-    'DM_TWAKE_SPACE_USER_ROLE_ATTRIBUTE',
-    '',
-  ],
-  ['--twake-space-exchange', 'DM_TWAKE_SPACE_EXCHANGE', 'space'],
-  [
-    '--twake-space-sync-queue',
-    'DM_TWAKE_SPACE_SYNC_QUEUE',
-    'twake.space.sync.requested.ldap-rest',
-  ],
-  // twake/tombstone plugin
-  ['--twake-tombstone-dn', 'DM_TWAKE_TOMBSTONE_DN', [], 'array', null, 'dns'],
-  [
-    '--twake-tombstone-default-reason',
-    'DM_TWAKE_TOMBSTONE_DEFAULT_REASON',
-    'deleted',
-  ],
-  [
-    '--twake-tombstone-reason-header',
-    'DM_TWAKE_TOMBSTONE_REASON_HEADER',
-    'x-deletion-reason',
-  ],
-  [
-    '--twake-tombstone-reasons',
-    'DM_TWAKE_TOMBSTONE_REASONS',
-    [],
-    'array',
-    null,
-    'identifiers',
-  ],
-  [
-    '--twake-tombstone-clear-attributes',
-    'DM_TWAKE_TOMBSTONE_CLEAR_ATTRIBUTES',
-    [],
-    'array',
-    null,
-    'identifiers',
-  ],
-  [
-    '--twake-tombstone-erase-min-age',
-    'DM_TWAKE_TOMBSTONE_ERASE_MIN_AGE',
-    2592000,
-    'number',
-  ],
-  [
-    '--twake-tombstone-group-bases',
-    'DM_TWAKE_TOMBSTONE_GROUP_BASES',
-    [],
-    'array',
-    null,
-    'dns',
-  ],
+  // Account lifecycle, groups, spaces and tombstone options
+  ...toConfigEntries(twakeLifecycleOptions),
+  ...toConfigEntries(twakeGroupsOptions),
+  ...toConfigEntries(twakeSpacesOptions),
+  ...toConfigEntries(twakeTombstoneOptions),
 
   // twake/instances plugin
-  ['--twake-instance-dn', 'DM_TWAKE_INSTANCE_DN', [], 'array', null, 'dns'],
-  ['--twake-instance-skip-attribute', 'DM_TWAKE_INSTANCE_SKIP_ATTRIBUTE', ''],
-  ['--twake-instance-skip-value', 'DM_TWAKE_INSTANCE_SKIP_VALUE', ''],
-  ['--twake-instance-provider', 'DM_TWAKE_INSTANCE_PROVIDER', 'cloudery'],
-  ['--twake-instance-id', 'DM_TWAKE_INSTANCE_ID', '{uid}'],
-  [
-    '--twake-instance-fqdn-attribute',
-    'DM_TWAKE_INSTANCE_FQDN_ATTRIBUTE',
-    'twakeWorkspaceUrl',
-  ],
-  [
-    '--twake-instance-sent-attribute',
-    'DM_TWAKE_INSTANCE_SENT_ATTRIBUTE',
-    'twakeCreatedEventAt',
-  ],
-  ['--twake-instance-locale', 'DM_TWAKE_INSTANCE_LOCALE', ''],
-  ['--twake-instance-timeout', 'DM_TWAKE_INSTANCE_TIMEOUT', 30000, 'number'],
-  ['--twake-instance-cloudery-url', 'DM_TWAKE_INSTANCE_CLOUDERY_URL', ''],
-  ['--twake-instance-cloudery-token', 'DM_TWAKE_INSTANCE_CLOUDERY_TOKEN', ''],
-  [
-    '--twake-instance-cloudery-offer',
-    'DM_TWAKE_INSTANCE_CLOUDERY_OFFER',
-    'b2b_twake_default',
-  ],
-  ['--twake-instance-cloudery-domain', 'DM_TWAKE_INSTANCE_CLOUDERY_DOMAIN', ''],
-  [
-    '--twake-instance-cloudery-organization-offer',
-    'DM_TWAKE_INSTANCE_CLOUDERY_ORGANIZATION_OFFER',
-    '',
-  ],
-  ['--twake-instance-cozy-url', 'DM_TWAKE_INSTANCE_COZY_URL', ''],
-  ['--twake-instance-cozy-user', 'DM_TWAKE_INSTANCE_COZY_USER', 'admin'],
-  ['--twake-instance-cozy-passphrase', 'DM_TWAKE_INSTANCE_COZY_PASSPHRASE', ''],
-  ['--twake-instance-cozy-domain', 'DM_TWAKE_INSTANCE_COZY_DOMAIN', ''],
-  [
-    '--twake-instance-cozy-context',
-    'DM_TWAKE_INSTANCE_COZY_CONTEXT',
-    'default',
-  ],
-  [
-    '--twake-instance-cozy-apps',
-    'DM_TWAKE_INSTANCE_COZY_APPS',
-    'home,drive,settings,notes,dataproxy',
-  ],
-  ['--twake-instance-cozy-org-id', 'DM_TWAKE_INSTANCE_COZY_ORG_ID', ''],
-  ['--twake-instance-cozy-org-domain', 'DM_TWAKE_INSTANCE_COZY_ORG_DOMAIN', ''],
-  ['--twake-instance-auth-exchange', 'DM_TWAKE_INSTANCE_AUTH_EXCHANGE', 'auth'],
-  ['--twake-instance-b2b-exchange', 'DM_TWAKE_INSTANCE_B2B_EXCHANGE', 'b2b'],
-  [
-    '--twake-instance-user-created-key',
-    'DM_TWAKE_INSTANCE_USER_CREATED_KEY',
-    'user.created',
-  ],
-  [
-    '--twake-instance-organization-created-key',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_CREATED_KEY',
-    'organization.created',
-  ],
-  [
-    '--twake-instance-workplace-created-key',
-    'DM_TWAKE_INSTANCE_WORKPLACE_CREATED_KEY',
-    'workplace.created',
-  ],
-  [
-    '--twake-instance-queue',
-    'DM_TWAKE_INSTANCE_QUEUE',
-    'workplace.created.ldap-rest',
-  ],
-  [
-    '--twake-instance-organization-base',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_BASE',
-    '',
-  ],
-  [
-    '--twake-instance-organization-id-attribute',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_ID_ATTRIBUTE',
-    'ou',
-  ],
-  [
-    '--twake-instance-organization-domain-attribute',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_DOMAIN_ATTRIBUTE',
-    'twakeDomain',
-  ],
-  [
-    '--twake-instance-organization-name-attribute',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_NAME_ATTRIBUTE',
-    'description',
-  ],
-  [
-    '--twake-instance-organization-fqdn-attribute',
-    'DM_TWAKE_INSTANCE_ORGANIZATION_FQDN_ATTRIBUTE',
-    '',
-  ],
+  ...toConfigEntries(twakeInstancesOptions),
+
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
 
   // Applicative Accounts plugin

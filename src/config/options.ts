@@ -20,6 +20,11 @@ export interface OptionSpec<T> {
   readonly default?: T;
   /** Refuse an empty value rather than read it as unset */
   readonly required?: boolean;
+  /**
+   * A string option whose empty value means something: keep it instead of
+   * reading the declared default, as an empty environment or CLI value does.
+   */
+  readonly emptyIsValue?: boolean;
 }
 
 export interface StringOption extends OptionSpec<string> {
@@ -201,8 +206,14 @@ export function readOptions<T extends OptionSet>(
   const result: Record<string, unknown> = {};
   for (const [key, spec] of Object.entries(options)) {
     const configured = config[key];
+    const emptyString =
+      spec.type === 'string' &&
+      !spec.emptyIsValue &&
+      configured === '' &&
+      spec.default !== undefined &&
+      spec.default !== '';
     const value =
-      configured === undefined
+      configured === undefined || emptyString
         ? spec.default === undefined
           ? emptyValue(spec.type)
           : Array.isArray(spec.default)

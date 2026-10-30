@@ -45,6 +45,7 @@ import {
   loadMappingFile,
   mergeMapping,
 } from '../scim/mapping';
+import { scimOptionsOf } from '../scim/scim.options';
 import type { ScimGroup } from '../scim/types';
 import { outsideRequest } from '../../lib/requestContext';
 
@@ -54,6 +55,7 @@ import {
   valueOf,
   type LifecycleAttributes,
 } from './lifecycleAttributes';
+import { twakeGroupsOptions } from './twakeGroups.options';
 
 /**
  * An attribute's first value, whatever case its name is configured in: the
@@ -226,6 +228,8 @@ export function organizationIn(
 }
 
 export default class TwakeGroups extends LdapGroups {
+  static optionDefinitions = twakeGroupsOptions;
+
   name = 'twakeGroups';
 
   protected readonly groupBase: string;
@@ -241,8 +245,9 @@ export default class TwakeGroups extends LdapGroups {
 
   constructor(server: DM) {
     super(server);
-    this.groupBase = this.config.twake_group_base || '';
-    this.userBase = this.config.twake_group_user_base || '';
+    const settings = this.options(twakeGroupsOptions);
+    this.groupBase = settings.twake_group_base;
+    this.userBase = settings.twake_group_user_base;
     for (const [option, pattern] of [
       ['--twake-group-base', this.groupBase],
       ['--twake-group-user-base', this.userBase],
@@ -251,16 +256,14 @@ export default class TwakeGroups extends LdapGroups {
         throw new Error(`${this.name}: ${option} must hold ${ORG} once`);
     this.groupPattern = branchPattern(this.groupBase);
     this.attrs = lifecycleAttributes(this.config);
-    this.orgPattern = this.config.twake_group_organization_dn || '';
-    this.displayName =
-      this.config.twake_group_display_name_attribute || 'twakeDisplayName';
-    this.color = this.config.twake_group_color_attribute || 'twakeGroupColor';
-    this.createdAt =
-      this.config.twake_group_created_at_attribute || 'twakeCreatedAt';
-    this.maxPage = this.config.twake_group_max_page_limit || 1000;
+    this.orgPattern = settings.twake_group_organization_dn;
+    this.displayName = settings.twake_group_display_name_attribute;
+    this.color = settings.twake_group_color_attribute;
+    this.createdAt = settings.twake_group_created_at_attribute;
+    this.maxPage = settings.twake_group_max_page_limit;
     this.memberFields = {
       ...MEMBER_FIELDS,
-      ...this.config.twake_group_member_fields,
+      ...settings.twake_group_member_fields,
     };
   }
 
@@ -399,8 +402,9 @@ export default class TwakeGroups extends LdapGroups {
    */
   afterLoad(): void {
     if (!this.server.loadedPlugins.scim) return;
-    const rdn = (this.config.scim_group_rdn_attribute as string) || 'cn';
-    const override = (this.config.scim_group_mapping as string) || '';
+    const scim = scimOptionsOf(this.config);
+    const rdn = scim.scim_group_rdn_attribute;
+    const override = scim.scim_group_mapping;
     const writer = mergeMapping(
       DEFAULT_GROUP_MAPPING,
       override ? loadMappingFile(override) : undefined
@@ -720,8 +724,8 @@ export default class TwakeGroups extends LdapGroups {
    */
   async checkOrganization(org: string, req?: Request): Promise<void> {
     if (!this.orgPattern) return;
-    const status =
-      this.config.twake_group_organization_status_attribute || 'twakeOrgStatus';
+    const settings = this.options(twakeGroupsOptions);
+    const status = settings.twake_group_organization_status_attribute;
     const dn = withOrg(this.orgPattern, org);
     // First, so that an organization the caller cannot read costs the same
     // as one that is not there
@@ -738,8 +742,7 @@ export default class TwakeGroups extends LdapGroups {
       if (extractLdapCode(err) !== 32) throw err;
     }
     if (!entry) throw notFound('organization');
-    const deleted =
-      this.config.twake_group_organization_deleted_value || 'deleted';
+    const deleted = settings.twake_group_organization_deleted_value;
     if (read(entry, status) === deleted)
       throw new RouteError(
         410,
