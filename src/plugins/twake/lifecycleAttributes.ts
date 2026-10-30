@@ -12,6 +12,9 @@ import {
   holdsValue,
   resolveLockConfig,
 } from '../scim/mapping';
+import { scimOptionsOf } from '../scim/scim.options';
+
+import { twakeLifecycleOptionsOf } from './twakeLifecycle.options';
 
 export type DeletedAtFormat = 'iso8601' | 'generalizedTime';
 
@@ -27,22 +30,24 @@ export interface LifecycleAttributes {
 }
 
 export function lifecycleAttributes(config: Config): LifecycleAttributes {
-  const format = config.twake_lifecycle_deleted_at_format || 'iso8601';
+  const settings = twakeLifecycleOptionsOf(config);
+  const scimSettings = scimOptionsOf(config);
+  const format = settings.twake_lifecycle_deleted_at_format;
   if (format !== 'iso8601' && format !== 'generalizedTime') {
     throw new Error(
       `--twake-lifecycle-deleted-at-format must be iso8601 or generalizedTime, got '${format}'`
     );
   }
-  const own = config.twake_lifecycle_lock_attribute?.trim();
+  const own = settings.twake_lifecycle_lock_attribute.trim();
   const scim =
-    config.scim_user_lock_attribute?.trim() || DEFAULT_LOCK_ATTRIBUTE;
+    scimSettings.scim_user_lock_attribute.trim() || DEFAULT_LOCK_ATTRIBUTE;
   // SCIM's value goes with SCIM's attribute only: nsAccountLock falling back
   // to the ppolicy value would never read as locked
   const lock = resolveLockConfig(
     own || scim,
-    config.twake_lifecycle_lock_value?.trim() ||
+    settings.twake_lifecycle_lock_value.trim() ||
       (!own || own.toLowerCase() === scim.toLowerCase()
-        ? config.scim_user_lock_value || ''
+        ? scimSettings.scim_user_lock_value
         : ''),
     {
       attribute: '--twake-lifecycle-lock-attribute',
@@ -50,15 +55,15 @@ export function lifecycleAttributes(config: Config): LifecycleAttributes {
     }
   );
   return {
-    role: config.twake_lifecycle_role_attribute || '',
+    role: settings.twake_lifecycle_role_attribute,
     lock: lock.attribute,
     // The administrative lock only: a ppolicy lockout timestamp is not it
     lockValue: lock.value,
-    deleted: config.twake_lifecycle_deleted_attribute || '',
-    deletedValue: config.twake_lifecycle_deleted_value || 'TRUE',
-    deletedAt: config.twake_lifecycle_deleted_at_attribute || '',
+    deleted: settings.twake_lifecycle_deleted_attribute,
+    deletedValue: settings.twake_lifecycle_deleted_value,
+    deletedAt: settings.twake_lifecycle_deleted_at_attribute,
     deletedAtFormat: format,
-    reason: config.twake_lifecycle_reason_attribute || '',
+    reason: settings.twake_lifecycle_reason_attribute,
   };
 }
 

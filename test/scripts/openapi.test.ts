@@ -31,15 +31,24 @@ interface Operation {
   >;
 }
 
+interface Spec {
+  paths: Record<string, Record<string, Operation>>;
+}
+
 describe('OpenAPI generator', () => {
-  const specOf = async (
-    dir: string
-  ): Promise<{ paths: Record<string, Record<string, Operation>> }> => {
-    const generator = new OpenAPIGenerator(root);
-    await generator.analyze([dir]);
-    return generator.generateSpec() as unknown as {
-      paths: Record<string, Record<string, Operation>>;
-    };
+  // One TypeScript program per directory, however many tests read it: the
+  // generator compiles the whole project in its constructor.
+  const specs = new Map<string, Promise<Spec>>();
+  const specOf = (dir: string): Promise<Spec> => {
+    let pending = specs.get(dir);
+    if (!pending) {
+      const generator = new OpenAPIGenerator(root);
+      pending = generator
+        .analyze([dir])
+        .then(() => generator.generateSpec() as unknown as Spec);
+      specs.set(dir, pending);
+    }
+    return pending;
   };
 
   it('reads a defineRoute declaration, schemas included', async () => {
@@ -106,7 +115,7 @@ describe('OpenAPI generator', () => {
   });
 
   it('documents the demo route from its declaration', async () => {
-    const spec = await specOf(path.join(root, 'src', 'plugins'));
+    const spec = await specOf(path.join(root, 'src', 'plugins', 'demo'));
     const operation = spec.paths['/api/hello']?.get;
 
     expect(operation, 'the defineRoute route is in the spec').to.exist;

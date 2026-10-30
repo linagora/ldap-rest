@@ -272,9 +272,17 @@
       "types": "./dist/src/plugins/twake/calendarResources.d.ts",
       "import": "./dist/plugins/twake/calendarResources.js"
     },
+    "./plugin-twake-cloudery.options": {
+      "types": "./dist/src/plugins/twake/cloudery.options.d.ts",
+      "import": "./dist/plugins/twake/cloudery.options.js"
+    },
     "./plugin-twake-clouderyprovision": {
       "types": "./dist/src/plugins/twake/clouderyProvision.d.ts",
       "import": "./dist/plugins/twake/clouderyProvision.js"
+    },
+    "./plugin-twake-cozy.options": {
+      "types": "./dist/src/plugins/twake/cozy.options.d.ts",
+      "import": "./dist/plugins/twake/cozy.options.js"
     },
     "./plugin-twake-cozyprovision": {
       "types": "./dist/src/plugins/twake/cozyProvision.d.ts",
@@ -312,6 +320,10 @@
       "types": "./dist/src/plugins/twake/lifecycleEvents.d.ts",
       "import": "./dist/plugins/twake/lifecycleEvents.js"
     },
+    "./plugin-twake-migrationproxy.options": {
+      "types": "./dist/src/plugins/twake/migrationProxy.options.d.ts",
+      "import": "./dist/plugins/twake/migrationProxy.options.js"
+    },
     "./plugin-twake-migrationproxy": {
       "types": "./dist/src/plugins/twake/migrationProxy.d.ts",
       "import": "./dist/plugins/twake/migrationProxy.js"
@@ -323,6 +335,26 @@
     "./plugin-twake-tombstone": {
       "types": "./dist/src/plugins/twake/tombstone.d.ts",
       "import": "./dist/plugins/twake/tombstone.js"
+    },
+    "./plugin-twake-twakegroups.options": {
+      "types": "./dist/src/plugins/twake/twakeGroups.options.d.ts",
+      "import": "./dist/plugins/twake/twakeGroups.options.js"
+    },
+    "./plugin-twake-twakeinstances.options": {
+      "types": "./dist/src/plugins/twake/twakeInstances.options.d.ts",
+      "import": "./dist/plugins/twake/twakeInstances.options.js"
+    },
+    "./plugin-twake-twakelifecycle.options": {
+      "types": "./dist/src/plugins/twake/twakeLifecycle.options.d.ts",
+      "import": "./dist/plugins/twake/twakeLifecycle.options.js"
+    },
+    "./plugin-twake-twakespaces.options": {
+      "types": "./dist/src/plugins/twake/twakeSpaces.options.d.ts",
+      "import": "./dist/plugins/twake/twakeSpaces.options.js"
+    },
+    "./plugin-twake-twaketombstone.options": {
+      "types": "./dist/src/plugins/twake/twakeTombstone.options.d.ts",
+      "import": "./dist/plugins/twake/twakeTombstone.options.js"
     },
     "./plugin-weblogs": {
       "types": "./dist/src/plugins/weblogs.d.ts",

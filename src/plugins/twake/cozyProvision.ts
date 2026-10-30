@@ -25,7 +25,11 @@ import { Hooks } from '../../hooks';
 import type RabbitMq from '../rabbitmq';
 import type { ScimUser } from '../scim/types';
 
+import { cozyOptions, cozyOptionsOf } from './cozy.options';
+
 export default class CozyProvision extends DmPlugin {
+  static optionDefinitions = cozyOptions;
+
   name = 'cozyProvision';
   roles: Role[] = ['consistency'] as const;
 
@@ -47,29 +51,22 @@ export default class CozyProvision extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
+    const settings = cozyOptionsOf(server.config);
 
-    this.cozyAdminUrl = ((this.config.cozy_admin_url as string) || '').replace(
-      /\/$/,
-      ''
-    );
-    this.cozyAdminUser = (this.config.cozy_admin_user as string) || 'admin';
-    this.cozyAdminPassphrase =
-      (this.config.cozy_admin_passphrase as string) || '';
-    this.cozyOrgId = (this.config.cozy_org_id as string) || '';
-    this.cozyOrgDomain = (this.config.cozy_org_domain as string) || '';
-    this.cozyDefaultLocale =
-      (this.config.cozy_default_locale as string) || 'fr';
-    this.cozyContextName =
-      (this.config.cozy_context_name as string) || 'default';
-    this.cozyApps = (this.config.cozy_apps as string) ?? '';
-    this.authExchange = (this.config.cozy_auth_exchange as string) || 'auth';
-    this.b2bExchange = (this.config.cozy_b2b_exchange as string) || 'b2b';
-    this.userCreatedRoutingKey =
-      (this.config.cozy_user_created_routing_key as string) || 'user.created';
+    this.cozyAdminUrl = settings.cozy_admin_url.replace(/\/$/, '');
+    this.cozyAdminUser = settings.cozy_admin_user;
+    this.cozyAdminPassphrase = settings.cozy_admin_passphrase;
+    this.cozyOrgId = settings.cozy_org_id;
+    this.cozyOrgDomain = settings.cozy_org_domain;
+    this.cozyDefaultLocale = settings.cozy_default_locale;
+    this.cozyContextName = settings.cozy_context_name;
+    this.cozyApps = settings.cozy_apps;
+    this.authExchange = settings.cozy_auth_exchange;
+    this.b2bExchange = settings.cozy_b2b_exchange;
+    this.userCreatedRoutingKey = settings.cozy_user_created_routing_key;
     // Empty turns the deletion event off, for a deployment that publishes it
     // elsewhere.
-    this.userDeletedRoutingKey =
-      this.config.cozy_user_deleted_routing_key ?? 'domain.user.deleted';
+    this.userDeletedRoutingKey = settings.cozy_user_deleted_routing_key;
     this.cozyAdminAuthHeader = `Basic ${Buffer.from(
       `${this.cozyAdminUser}:${this.cozyAdminPassphrase}`
     ).toString('base64')}`;

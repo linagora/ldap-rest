@@ -33,6 +33,10 @@ import {
   lifecycleAttributes,
   type LifecycleAttributes,
 } from './lifecycleAttributes';
+import {
+  twakeInstancesOptions,
+  type TwakeInstancesOptions,
+} from './twakeInstances.options';
 
 export interface WorkplaceCreated {
   twakeId?: string;
@@ -66,11 +70,14 @@ export const EnsureInstanceResponse = Type.Object({
 });
 
 export default class TwakeInstances extends DmPlugin {
+  static optionDefinitions = twakeInstancesOptions;
+
   name = 'twakeInstances';
   roles: Role[] = ['consistency', 'api'] as const;
 
   dependencies = { rabbitmq: 'core/rabbitmq' };
 
+  private readonly settings: TwakeInstancesOptions;
   protected readonly patterns: RegExp[];
   protected readonly provider: InstanceProvider;
   protected readonly fqdnAttribute: string;
@@ -86,54 +93,54 @@ export default class TwakeInstances extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
-    const cfg = this.config;
-    const replaced = (cfg.plugin || []).find(p => REPLACED.test(p));
+    const settings = this.options(twakeInstancesOptions);
+    this.settings = settings;
+    const replaced = (server.config.plugin || []).find(p => REPLACED.test(p));
     if (replaced)
       throw new Error(
         `${this.name}: ${replaced} gives accounts their instance too; load one of them`
       );
-    this.patterns = (cfg.twake_instance_dn || []).map(p => new RegExp(p, 'i'));
+    this.patterns = settings.twake_instance_dn.map(p => new RegExp(p, 'i'));
     const groups = new Set(['uid']);
     for (const p of this.patterns)
       for (const [, name] of p.source.matchAll(/\(\?<(\w+)>/g))
         groups.add(name);
-    for (const [, name] of (cfg.twake_instance_id || '{uid}').matchAll(
-      /\{(\w+)\}/g
-    ))
+    for (const [, name] of settings.twake_instance_id.matchAll(/\{(\w+)\}/g))
       if (!groups.has(name))
         throw new Error(
           `${this.name}: --twake-instance-id names {${name}}, which no --twake-instance-dn group captures`
         );
-    this.lifecycle = lifecycleAttributes(cfg);
-    this.fqdnAttribute =
-      cfg.twake_instance_fqdn_attribute || 'twakeWorkspaceUrl';
-    this.sentAttribute =
-      cfg.twake_instance_sent_attribute || 'twakeCreatedEventAt';
-    const timeout = cfg.twake_instance_timeout || 30000;
-    if (cfg.twake_instance_provider === 'cozy-stack') {
-      if (!cfg.twake_instance_cozy_url || !cfg.twake_instance_cozy_domain)
+    this.lifecycle = lifecycleAttributes(server.config);
+    this.fqdnAttribute = settings.twake_instance_fqdn_attribute;
+    this.sentAttribute = settings.twake_instance_sent_attribute;
+    const timeout = settings.twake_instance_timeout;
+    if (settings.twake_instance_provider === 'cozy-stack') {
+      if (
+        !settings.twake_instance_cozy_url ||
+        !settings.twake_instance_cozy_domain
+      )
         throw new Error(
           `${this.name}: --twake-instance-cozy-url and --twake-instance-cozy-domain are required`
         );
       this.provider = new CozyStackProvider(
-        cfg.twake_instance_cozy_url.replace(/\/$/, ''),
-        cfg.twake_instance_cozy_user || 'admin',
-        cfg.twake_instance_cozy_passphrase || '',
-        cfg.twake_instance_cozy_domain,
-        cfg.twake_instance_cozy_context || '',
-        cfg.twake_instance_cozy_apps || '',
+        settings.twake_instance_cozy_url.replace(/\/$/, ''),
+        settings.twake_instance_cozy_user,
+        settings.twake_instance_cozy_passphrase,
+        settings.twake_instance_cozy_domain,
+        settings.twake_instance_cozy_context,
+        settings.twake_instance_cozy_apps,
         timeout
       );
-      this.locale = cfg.twake_instance_locale || 'fr';
-    } else if (cfg.twake_instance_provider === 'cloudery') {
+      this.locale = settings.twake_instance_locale || 'fr';
+    } else if (settings.twake_instance_provider === 'cloudery') {
       if (
-        !cfg.twake_instance_cloudery_url ||
-        !cfg.twake_instance_cloudery_domain
+        !settings.twake_instance_cloudery_url ||
+        !settings.twake_instance_cloudery_domain
       )
         throw new Error(
           `${this.name}: --twake-instance-cloudery-url and --twake-instance-cloudery-domain are required`
         );
-      const offers = (cfg.twake_instance_cloudery_offer || '')
+      const offers = settings.twake_instance_cloudery_offer
         .split(';')
         .map(o => o.trim());
       // Ends with `;` like the expressions of DM_TWAKE_INSTANCE_DN
@@ -144,13 +151,13 @@ export default class TwakeInstances extends DmPlugin {
         );
       if (offers.length > 1) this.offers = offers;
       this.provider = new ClouderyProvider(
-        cfg.twake_instance_cloudery_url.replace(/\/$/, ''),
-        cfg.twake_instance_cloudery_token || '',
-        cfg.twake_instance_cloudery_domain,
+        settings.twake_instance_cloudery_url.replace(/\/$/, ''),
+        settings.twake_instance_cloudery_token,
+        settings.twake_instance_cloudery_domain,
         offers.length > 1 ? '' : offers[0],
         timeout
       );
-      this.locale = cfg.twake_instance_locale || 'en';
+      this.locale = settings.twake_instance_locale || 'en';
     } else {
       throw new Error(
         `${this.name}: --twake-instance-provider must be cloudery or cozy-stack`
@@ -227,7 +234,7 @@ export default class TwakeInstances extends DmPlugin {
     const missing = [
       this.fqdnAttribute,
       this.sentAttribute,
-      ...(this.config.twake_instance_organization_base
+      ...(this.settings.twake_instance_organization_base
         ? [
             this.organizationDomain,
             this.organizationFqdn,
@@ -296,9 +303,9 @@ export default class TwakeInstances extends DmPlugin {
     });
     if (!(this.provider instanceof ClouderyProvider)) return;
     await rabbitmq.subscribe(
-      this.config.twake_instance_auth_exchange || 'auth',
-      this.config.twake_instance_workplace_created_key || 'workplace.created',
-      this.config.twake_instance_queue || 'workplace.created.ldap-rest',
+      this.settings.twake_instance_auth_exchange,
+      this.settings.twake_instance_workplace_created_key,
+      this.settings.twake_instance_queue,
       message => this.onWorkplaceCreated(message as WorkplaceCreated)
     );
   }
@@ -408,7 +415,7 @@ export default class TwakeInstances extends DmPlugin {
       locale: this.locale,
       orgId: org.id,
       orgDomain: org.domain,
-      offer: this.config.twake_instance_cloudery_organization_offer,
+      offer: this.settings.twake_instance_cloudery_organization_offer,
       organization: true,
     };
   }
@@ -560,8 +567,8 @@ export default class TwakeInstances extends DmPlugin {
     }
     const matrix = matrixId(account.email);
     await this.announce(
-      this.config.twake_instance_auth_exchange || 'auth',
-      this.config.twake_instance_user_created_key || 'user.created',
+      this.settings.twake_instance_auth_exchange,
+      this.settings.twake_instance_user_created_key,
       {
         twakeId: account.twakeId,
         internalEmail: account.email,
@@ -610,9 +617,8 @@ export default class TwakeInstances extends DmPlugin {
     const domain = first(this.value(entry, this.organizationDomain));
     const name = first(this.value(entry, this.organizationName));
     await this.announce(
-      this.config.twake_instance_b2b_exchange || 'b2b',
-      this.config.twake_instance_organization_created_key ||
-        'organization.created',
+      this.settings.twake_instance_b2b_exchange,
+      this.settings.twake_instance_organization_created_key,
       {
         organizationId: id,
         workplaceFqdn: fqdn,
@@ -689,23 +695,19 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   private get organizationId(): string {
-    return this.config.twake_instance_organization_id_attribute || 'ou';
+    return this.settings.twake_instance_organization_id_attribute;
   }
 
   private get organizationDomain(): string {
-    return (
-      this.config.twake_instance_organization_domain_attribute || 'twakeDomain'
-    );
+    return this.settings.twake_instance_organization_domain_attribute;
   }
 
   private get organizationName(): string {
-    return (
-      this.config.twake_instance_organization_name_attribute || 'description'
-    );
+    return this.settings.twake_instance_organization_name_attribute;
   }
 
   private get organizationFqdn(): string {
-    return this.config.twake_instance_organization_fqdn_attribute || '';
+    return this.settings.twake_instance_organization_fqdn_attribute;
   }
 
   private organizationMail(id: string, domain: string): string {
@@ -713,7 +715,7 @@ export default class TwakeInstances extends DmPlugin {
   }
 
   private isOrganization(dn: string): boolean {
-    const base = this.config.twake_instance_organization_base;
+    const base = this.settings.twake_instance_organization_base;
     if (!base) return false;
     const rest = dn.slice(dn.indexOf(',') + 1);
     return rest.toLowerCase() === base.toLowerCase();
@@ -722,7 +724,7 @@ export default class TwakeInstances extends DmPlugin {
   private async findOrganization(
     id: string
   ): Promise<AttributesList | undefined> {
-    const base = this.config.twake_instance_organization_base;
+    const base = this.settings.twake_instance_organization_base;
     if (!base) return undefined;
     // As the server: the instance provisioning finds its organization, whoever's write started it
     const res = (await this.server.ldap.system.search(
@@ -774,11 +776,11 @@ export default class TwakeInstances extends DmPlugin {
     if (!match) return undefined;
     // A tombstone put back (a refused SCIM create restores it) is no account
     if (isTombstone(entry, this.lifecycle)) return undefined;
-    const skip = this.config.twake_instance_skip_attribute;
+    const skip = this.settings.twake_instance_skip_attribute;
     if (
       skip &&
       first(this.value(entry, skip))?.toLowerCase() ===
-        (this.config.twake_instance_skip_value || '').toLowerCase()
+        this.settings.twake_instance_skip_value.toLowerCase()
     )
       return undefined;
     const email = first(this.value(entry, 'mail'));
@@ -790,11 +792,11 @@ export default class TwakeInstances extends DmPlugin {
     const cozy = this.provider instanceof CozyStackProvider;
     const orgId =
       match.groups?.org ||
-      (cozy ? this.config.twake_instance_cozy_org_id : '') ||
+      (cozy ? this.settings.twake_instance_cozy_org_id : '') ||
       undefined;
     const orgDomain = match.groups?.org
       ? email.split('@')[1]
-      : (cozy && this.config.twake_instance_cozy_org_domain) || undefined;
+      : (cozy && this.settings.twake_instance_cozy_org_domain) || undefined;
     const offer = this.offers[this.patterns.findIndex(p => p.test(dn))];
     const id = this.id(uid, match);
     if (!id) {
@@ -830,7 +832,7 @@ export default class TwakeInstances extends DmPlugin {
   private id(uid: string, match: RegExpExecArray): string {
     const groups: Record<string, string> = { uid, ...match.groups };
     return instanceSlug(
-      (this.config.twake_instance_id || '{uid}').replace(
+      this.settings.twake_instance_id.replace(
         /\{(\w+)\}/g,
         (_, name: string) => groups[name] ?? ''
       )

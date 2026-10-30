@@ -82,8 +82,7 @@ export default class Calendar extends TwakePlugin {
     // Initialize Calendar-specific configuration attributes
     this.resourceBase = settings.calendar_resource_base;
     this.resourceObjectClass = settings.calendar_resource_objectclass;
-    this.resourceCreator =
-      settings.calendar_resource_creator || 'admin@example.com';
+    this.resourceCreator = settings.calendar_resource_creator;
     this.resourceDomain = settings.calendar_resource_domain;
 
     // The resource base is compared to an entry's DN part by part, so it has

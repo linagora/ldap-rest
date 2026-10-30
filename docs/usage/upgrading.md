@@ -83,7 +83,7 @@ values beside what they already require.
 
 **Who is affected:** a deployment setting a SCIM limit to zero or a negative
 number, giving a per-instance override of the wrong JSON type, or setting the
-James, Calendar or Drive concurrency to the wrong type.
+James, Calendar, Drive or migration proxy concurrency to the wrong type.
 
 These options now refuse a value below 1 when the plugin loads: a zero used
 to be silently replaced by the default, and a negative value used as it was.
@@ -96,9 +96,25 @@ treated as unset. The applicative accounts options refuse the same:
 `{"max_app_accounts": "5"}` used to be kept as the string, and
 `{"applicative_account_attribute": "cn"}` was spread into `['c', 'n']`.
 
-The James, Calendar and Drive concurrency used to replace a value that was
-not a number with `10`, and now refuses it. A zero or a negative value was
-already refused by `p-limit`, and the message now names the option.
+The James, Calendar, Drive and migration proxy concurrency used to replace a
+value that was not a number with `10`, and now refuses it. A zero or a
+negative value was already refused by `p-limit`, and the message now names
+the option. The other Twake options also refuse a value of the wrong JSON
+type in an override.
+
+A zero `--twake-group-max-page-limit`, `--twake-instance-timeout`,
+`--cloudery-workflow-poll-interval-ms` or
+`--cloudery-workflow-max-attempts` used to be replaced by the default and is
+now refused.
+
+`ConfigParser` keeps an empty string for a string option. A plugin reads the
+declared default instead when that default is not empty, as its `|| default`
+used to: `DM_COZY_ADMIN_USER=` gives `admin`, `DM_CLOUDERY_OFFER=` gives
+`b2b_twake_default`. An option whose empty value means something says so in
+its declaration (`--cozy-apps`, `--cozy-user-deleted-routing-key`,
+`--twake-instance-cozy-apps`, `--twake-instance-cozy-context`,
+`--twake-instance-cloudery-offer`) and keeps it; an option whose default is
+empty keeps the empty string.
 
 ### Node 22 or later is required
 

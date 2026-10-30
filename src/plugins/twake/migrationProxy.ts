@@ -21,6 +21,11 @@ import type { AttributesList } from '../../lib/ldapActions';
 import { wantJson } from '../../lib/expressFormatedResponses';
 import { isDnInBranch, normalizeDn } from '../../lib/utils';
 
+import {
+  migrationProxyOptions,
+  migrationProxyOptionsOf,
+} from './migrationProxy.options';
+
 /** What the proxy answers while its storage does not */
 const PROXY_UNAVAILABLE: readonly number[] = [500, 502, 503, 504];
 
@@ -44,6 +49,8 @@ export const MailMigrationParams = Type.Object({
 });
 
 export default class MigrationProxy extends TwakePlugin {
+  static optionDefinitions = migrationProxyOptions;
+
   name = 'migrationProxy';
   roles: Role[] = ['consistency', 'api'] as const;
 
@@ -57,27 +64,21 @@ export default class MigrationProxy extends TwakePlugin {
   private readonly queues = new Map<string, Promise<void>>();
 
   constructor(server: DM) {
+    const settings = migrationProxyOptionsOf(server.config);
     super(server, {
-      url: server.config.migration_proxy_url || '',
-      token: server.config.migration_proxy_token || '',
-      concurrency: server.config.migration_proxy_concurrency ?? 10,
+      url: settings.migration_proxy_url,
+      token: settings.migration_proxy_token,
+      concurrency: settings.migration_proxy_concurrency,
       urlOption: 'migration_proxy_url',
       tokenOption: 'migration_proxy_token',
       concurrencyOption: 'migration_proxy_concurrency',
     });
-    this.branches = this.config.migration_proxy_branch || [];
+    this.branches = settings.migration_proxy_branch;
     if (!this.branches.length)
       throw new Error(`${this.name}: --migration-proxy-branch is required`);
-    this.aliasAttr =
-      (this.config.alias_attribute as string) || 'mailAlternateAddress';
-    this.retryAttempts =
-      typeof this.config.migration_proxy_retry_attempts === 'number'
-        ? Math.max(1, this.config.migration_proxy_retry_attempts)
-        : 5;
-    this.retryDelay =
-      typeof this.config.migration_proxy_retry_delay === 'number'
-        ? Math.max(0, this.config.migration_proxy_retry_delay)
-        : 1000;
+    this.aliasAttr = this.config.alias_attribute || 'mailAlternateAddress';
+    this.retryAttempts = Math.max(1, settings.migration_proxy_retry_attempts);
+    this.retryDelay = Math.max(0, settings.migration_proxy_retry_delay);
   }
 
   health(): Promise<HealthStatus> {

@@ -41,6 +41,7 @@ import {
   valueOf,
   type LifecycleAttributes,
 } from './lifecycleAttributes';
+import { twakeLifecycleOptions } from './twakeLifecycle.options';
 
 export const LIFECYCLE_EVENTS = [
   'created',
@@ -270,6 +271,8 @@ export function parseRules(source: string): Rule[] {
 }
 
 export default class TwakeLifecycleEvents extends DmPlugin {
+  static optionDefinitions = twakeLifecycleOptions;
+
   name = 'twakeLifecycleEvents';
   roles: Role[] = ['consistency'] as const;
 
@@ -284,10 +287,10 @@ export default class TwakeLifecycleEvents extends DmPlugin {
 
   constructor(server: DM) {
     super(server);
+    const settings = this.options(twakeLifecycleOptions);
     this.attrs = lifecycleAttributes(this.config);
-    this.memberAttribute =
-      this.config.twake_lifecycle_member_attribute || 'member';
-    this.rules = parseRules(this.config.twake_lifecycle_rules || '');
+    this.memberAttribute = settings.twake_lifecycle_member_attribute;
+    this.rules = parseRules(settings.twake_lifecycle_rules);
     // An operational attribute such as pwdAccountLockedTime or entryUUID is
     // in neither side of onLdapEntryChange unless asked for by name.
     this.followedOperationalAttributes = [
