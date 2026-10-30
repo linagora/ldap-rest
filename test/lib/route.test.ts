@@ -87,6 +87,27 @@ describe('defineRoute', () => {
     expect(called).to.equal(false);
   });
 
+  it('names the whole body when it is not an object', async () => {
+    const app = appWith();
+    defineRoute(app, {
+      method: 'post',
+      path: '/things',
+      body: Type.Object({ member: Type.String() }),
+      handler: ({ res }) => {
+        res.sendStatus(204);
+      },
+    });
+    serveErrors(app);
+
+    const array = await supertest(app).post('/things').send([1]).expect(400);
+    expect(array.body.error).to.equal('Invalid request: body: Expected object');
+
+    const missing = await supertest(app).post('/things').expect(400);
+    expect(missing.body.error).to.equal(
+      'Invalid request: body: Expected object'
+    );
+  });
+
   it('names every failing part at once', async () => {
     const app = appWith();
     defineRoute(app, {

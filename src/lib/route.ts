@@ -72,7 +72,9 @@ export const registeredRoutes = (app: Express): readonly RegisteredRoute[] =>
 
 /** `body.member` rather than `body./member`, and `body` for the whole part */
 const label = (part: string, path: string): string =>
-  path === '/' ? part : `${part}.${path.slice(1).replaceAll('/', '.')}`;
+  !path || path === '/'
+    ? part
+    : `${part}.${path.slice(1).replaceAll('/', '.')}`;
 
 /**
  * Check one part of the request against its schema.
