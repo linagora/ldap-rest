@@ -86,7 +86,20 @@ describe('PasswordPolicy Plugin', () => {
       );
       expect(response.status).to.equal(400);
       expect(response.body.error).to.equal(
-        'Invalid request: query.days: Expected number'
+        'Invalid request: query.days: Expected integer'
+      );
+    });
+
+    it('should refuse a days parameter below one', async () => {
+      const plugin = new PasswordPolicy(dm);
+      dm.registerPlugin('passwordPolicy', plugin);
+
+      const response = await supertest(dm.app).get(
+        '/api/v1/password-policy/expiring-soon?days=0'
+      );
+      expect(response.status).to.equal(400);
+      expect(response.body.error).to.equal(
+        'Invalid request: query.days: Expected integer to be greater or equal to 1'
       );
     });
 

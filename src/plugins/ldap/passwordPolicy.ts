@@ -473,7 +473,7 @@ export const PolicyUserParams = Type.Object({
 });
 
 export const ExpiringQuery = Type.Object({
-  days: Type.Optional(Type.Number({ minimum: 1 })),
+  days: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 export const AssignPolicyBody = Type.Object({
@@ -608,8 +608,8 @@ export default class PasswordPolicy extends DmPlugin {
       method: 'get',
       path: `${prefix}/users/:id/password-status`,
       params: PolicyUserParams,
-      handler: async ({ req, res }) => {
-        const status = await this.getPasswordStatus(this.param(req, 'id'), req);
+      handler: async ({ params, req, res }) => {
+        const status = await this.getPasswordStatus(params.id, req);
         res.json(status);
       },
     });
@@ -639,8 +639,8 @@ export default class PasswordPolicy extends DmPlugin {
       path: `${prefix}/users/:id/unlock`,
       params: PolicyUserParams,
       responses: { 200: UnlockResponse },
-      handler: async ({ req, res }) => {
-        await this.unlockAccount(this.param(req, 'id'), req);
+      handler: async ({ params, req, res }) => {
+        await this.unlockAccount(params.id, req);
         res.json({ success: true, message: 'Account unlocked' });
       },
     });
@@ -687,7 +687,8 @@ export default class PasswordPolicy extends DmPlugin {
       path: `${prefix}/password-policy/expiring-soon`,
       query: ExpiringQuery,
       handler: async ({ req, res, query }) => {
-        const days = query.days ?? this.config.ppolicy_warn_days ?? 14;
+        const days =
+          query.days || (this.config.ppolicy_warn_days as number) || 14;
         const users = await this.findExpiringPasswords(days, req);
         res.json({ warningDays: days, users });
       },
@@ -837,8 +838,8 @@ export default class PasswordPolicy extends DmPlugin {
       method: 'get',
       path: `${prefix}/password-policies/:cn`,
       params: PolicyParams,
-      handler: async ({ req, res }) => {
-        const entry = await this.findPolicy(this.param(req, 'cn'), req);
+      handler: async ({ params, req, res }) => {
+        const entry = await this.findPolicy(params.cn, req);
         res.json(await this.toPolicyRecord(entry));
       },
     });
@@ -876,11 +877,11 @@ export default class PasswordPolicy extends DmPlugin {
       method: 'patch',
       path: `${prefix}/password-policies/:cn`,
       params: PolicyParams,
-      handler: async ({ req, res }) => {
+      handler: async ({ params, req, res }) => {
         const body = jsonBody(req, res);
         if (!body) return;
         const policy = await this.updatePolicy(
-          this.param(req, 'cn'),
+          params.cn,
           body as Record<string, unknown>,
           req
         );
@@ -915,8 +916,8 @@ export default class PasswordPolicy extends DmPlugin {
       method: 'delete',
       path: `${prefix}/password-policies/:cn`,
       params: PolicyParams,
-      handler: async ({ req, res }) => {
-        await this.deletePolicy(this.param(req, 'cn'), req);
+      handler: async ({ params, req, res }) => {
+        await this.deletePolicy(params.cn, req);
         res.json({ success: true });
       },
     });
@@ -961,10 +962,8 @@ export default class PasswordPolicy extends DmPlugin {
       path: `${prefix}/users/:id/password-policy`,
       params: PolicyUserParams,
       body: AssignPolicyBody,
-      handler: async ({ req, res, body }) => {
-        res.json(
-          await this.assignPolicy(this.param(req, 'id'), body.policy, req)
-        );
+      handler: async ({ params, req, res, body }) => {
+        res.json(await this.assignPolicy(params.id, body.policy, req));
       },
     });
 
@@ -1706,11 +1705,6 @@ export default class PasswordPolicy extends DmPlugin {
       req
     );
     return { dn, policy: entry.dn };
-  }
-
-  private param(req: Request, name: string): string {
-    const value = req.params[name];
-    return Array.isArray(value) ? value[0] : value;
   }
 
   /**

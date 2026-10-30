@@ -155,7 +155,7 @@ export const RawSearchQuery = Type.Object({
   scope: Type.Optional(Type.String()),
   filter: Type.Optional(Type.String()),
   attributes: Type.Optional(Type.String()),
-  limit: Type.Optional(Type.Number({ minimum: 1 })),
+  limit: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 
 export const RawDnParams = Type.Object({ dn: Type.String({ minLength: 1 }) });

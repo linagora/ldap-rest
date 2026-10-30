@@ -438,7 +438,7 @@ describe('LDAP Raw Plugin', function () {
         .query({ limit: 'soon' });
       expect(res.status).to.equal(400);
       expect(res.body.error).to.equal(
-        'Invalid request: query.limit: Expected number'
+        'Invalid request: query.limit: Expected integer'
       );
     });
 
