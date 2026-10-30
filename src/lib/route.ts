@@ -95,7 +95,9 @@ interface StackLayer {
  *
  * The stack is walked at any depth, so a mounted router's routes are seen
  * too. A route is matched on its method and path, which is what the
- * declaration records.
+ * declaration records; a router's routes are router-relative (`/nested`,
+ * whatever the mount path), as Express keeps no mount path on a router, and
+ * `app.all` comes back as `_ALL`.
  *
  * @param app the express app
  * @returns the undeclared routes, in stack order

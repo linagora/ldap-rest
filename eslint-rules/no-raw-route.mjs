@@ -1,7 +1,6 @@
 /**
- * Refuse `app.<verb>(` in a plugin or an abstract base: a route is declared
- * with `defineRoute`, which validates its inputs and feeds the OpenAPI
- * document (docs/plugin-development/routes.md).
+ * Refuse `app.<verb>(` in a plugin or an abstract base: see
+ * docs/plugin-development/routes.md.
  *
  * The files still to migrate are listed in `route-allowlist.json`; remove a
  * file from it as its routes move.
@@ -11,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(here, '..');
 
 export const routeAllowlist = JSON.parse(
   readFileSync(path.join(here, 'route-allowlist.json'), 'utf8')
@@ -34,7 +34,7 @@ export default {
 
   create(context) {
     const file = path
-      .relative(process.cwd(), context.physicalFilename)
+      .relative(root, context.physicalFilename)
       .split(path.sep)
       .join('/');
     if (routeAllowlist.includes(file)) return {};

@@ -74,9 +74,9 @@ export default [
     },
   },
 
-  // A route is declared with `defineRoute` (#417), which checks its inputs
-  // and feeds the OpenAPI document: see docs/plugin-development/routes.md.
-  // The files in eslint-rules/route-allowlist.json have not moved yet.
+  // A route is declared with `defineRoute`: see
+  // docs/plugin-development/routes.md. The files in
+  // eslint-rules/route-allowlist.json have not moved yet.
   {
     files: ['src/plugins/**/*.ts', 'src/abstract/**/*.ts'],
     plugins: {
