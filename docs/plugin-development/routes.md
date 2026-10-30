@@ -146,3 +146,7 @@ names the files a raw route is tolerated in; it is empty, so every route in
 the tree is declared. `test/scripts/routeAllowlist.test.ts` keeps the list
 exact: a listed file must still declare a raw route, and an unlisted file
 must not.
+
+`test/security/routeValidation.test.ts` reads the registry and sends each
+declared query and body a value it must refuse, so a new declaration is
+probed without touching the test.
