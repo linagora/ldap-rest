@@ -3,6 +3,7 @@ dist/
 build/
 helm/
 package.json
+openapi.json
 
 # Dependencies
 node_modules/

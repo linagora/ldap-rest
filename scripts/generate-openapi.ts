@@ -179,7 +179,7 @@ export class OpenAPIGenerator {
   }
 
   private analyzeDirectory(dir: string): void {
-    const files = fs.readdirSync(dir);
+    const files = fs.readdirSync(dir).sort();
     for (const file of files) {
       const fullPath = path.join(dir, file);
       const stat = fs.statSync(fullPath);
