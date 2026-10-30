@@ -1,7 +1,5 @@
 [
   "src/plugins/ldap/bulkImport.ts",
   "src/plugins/scim/scim.ts",
-  "src/plugins/static.ts",
-  "src/plugins/twake/groups.ts",
-  "src/plugins/twake/spaces.ts"
+  "src/plugins/static.ts"
 ]

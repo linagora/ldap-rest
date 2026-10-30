@@ -8,9 +8,10 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import { Type } from '@sinclair/typebox';
 import type { Express, Request, Response } from 'express';
 
-import DmPlugin, { type Role } from '../../abstract/plugin';
+import DmPlugin, { defineRoute, type Role } from '../../abstract/plugin';
 import type { DM } from '../../bin';
 import type { Hooks } from '../../hooks';
 import type { ChangeContext } from '../../lib/changeContext';
@@ -198,6 +199,27 @@ function holdersOf(
     return { name, role };
   });
 }
+
+export const SpaceOrganizationParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+});
+
+export const SpaceParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  spaceId: Type.String({ minLength: 1 }),
+});
+
+export const SpaceMemberParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  spaceId: Type.String({ minLength: 1 }),
+  userId: Type.String({ minLength: 1 }),
+});
+
+export const SpaceGroupParams = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  spaceId: Type.String({ minLength: 1 }),
+  groupId: Type.String({ minLength: 1 }),
+});
 
 export default class TwakeSpaces extends DmPlugin {
   static optionDefinitions = twakeSpacesOptions;
@@ -554,54 +576,73 @@ export default class TwakeSpaces extends DmPlugin {
       res.json({ success: true });
     };
     const spaceId = (req: Request): string => req.params.spaceId as string;
-    app.get(
-      base,
-      route('listing spaces', (q, r, o) => this.listRoute(q, r, o))
+    const listingSpaces = route('listing spaces', (q, r, o) =>
+      this.listRoute(q, r, o)
     );
-    app.post(
-      base,
-      route('creating space', (q, r, o) => this.createRoute(q, r, o))
+    defineRoute(app, {
+      method: 'get',
+      path: base,
+      params: SpaceOrganizationParams,
+      handler: ({ req, res }) => listingSpaces(req, res),
+    });
+    const creatingSpace = route('creating space', (q, r, o) =>
+      this.createRoute(q, r, o)
     );
-    app.get(
-      `${base}/:spaceId`,
-      route('getting space', async (req, res, org) => {
-        res.json(this.spaceOf(org, await this.space(org, spaceId(req), req)));
-      })
-    );
-    app.patch(
-      `${base}/:spaceId`,
-      route('renaming space', async (req, res, org) => {
-        const body = bodyOf(req);
-        const unsupported = Object.keys(body).filter(k => k !== 'name');
-        if (unsupported.length)
-          throw invalid(
-            `Only "name" can be updated; unsupported field(s): ${unsupported.join(', ')}`
-          );
-        if (!isDisplayName(body.name)) throw invalid(NAME_RULE);
-        await this.write(
-          org,
-          spaceId(req),
-          { replace: { [this.displayName]: body.name } },
-          req
+    defineRoute(app, {
+      method: 'post',
+      path: base,
+      params: SpaceOrganizationParams,
+      handler: ({ req, res }) => creatingSpace(req, res),
+    });
+    const gettingSpace = route('getting space', async (req, res, org) => {
+      res.json(this.spaceOf(org, await this.space(org, spaceId(req), req)));
+    });
+    defineRoute(app, {
+      method: 'get',
+      path: `${base}/:spaceId`,
+      params: SpaceParams,
+      handler: ({ req, res }) => gettingSpace(req, res),
+    });
+    const renamingSpace = route('renaming space', async (req, res, org) => {
+      const body = bodyOf(req);
+      const unsupported = Object.keys(body).filter(k => k !== 'name');
+      if (unsupported.length)
+        throw invalid(
+          `Only "name" can be updated; unsupported field(s): ${unsupported.join(', ')}`
         );
-        done(res);
-      })
-    );
-    app.delete(
-      `${base}/:spaceId`,
-      route('deleting space', async (req, res, org) => {
-        try {
-          await this.server.ldap.delete(this.spaceDn(org, spaceId(req)), req);
-        } catch (err) {
-          if (extractLdapCode(err) === 32) throw notFound('space');
-          throw err;
-        }
-        done(res);
-      })
-    );
-    app.get(
-      `${base}/:spaceId/members`,
-      route('listing space members', async (req, res, org) => {
+      if (!isDisplayName(body.name)) throw invalid(NAME_RULE);
+      await this.write(
+        org,
+        spaceId(req),
+        { replace: { [this.displayName]: body.name } },
+        req
+      );
+      done(res);
+    });
+    defineRoute(app, {
+      method: 'patch',
+      path: `${base}/:spaceId`,
+      params: SpaceParams,
+      handler: ({ req, res }) => renamingSpace(req, res),
+    });
+    const deletingSpace = route('deleting space', async (req, res, org) => {
+      try {
+        await this.server.ldap.delete(this.spaceDn(org, spaceId(req)), req);
+      } catch (err) {
+        if (extractLdapCode(err) === 32) throw notFound('space');
+        throw err;
+      }
+      done(res);
+    });
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:spaceId`,
+      params: SpaceParams,
+      handler: ({ req, res }) => deletingSpace(req, res),
+    });
+    const listingSpaceMembers = route(
+      'listing space members',
+      async (req, res, org) => {
         const p = this.groups.page(req, MEMBER_SORT);
         const space = await this.space(org, spaceId(req), req);
         const members = space.holders.filter(h => h.kind === 'member');
@@ -617,11 +658,17 @@ export default class TwakeSpaces extends DmPlugin {
             req
           )),
         });
-      })
+      }
     );
-    app.post(
-      `${base}/:spaceId/members`,
-      route('adding space members', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${base}/:spaceId/members`,
+      params: SpaceParams,
+      handler: ({ req, res }) => listingSpaceMembers(req, res),
+    });
+    const addingSpaceMembers = route(
+      'adding space members',
+      async (req, res, org) => {
         const body = bodyOf(req);
         const usernames = namesOf(
           body.usernames,
@@ -632,25 +679,43 @@ export default class TwakeSpaces extends DmPlugin {
           this.liveUsers(org, usernames, req)
         );
         done(res);
-      })
+      }
     );
-    app.patch(
-      `${base}/:spaceId/members/:userId`,
-      route('changing space member role', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'post',
+      path: `${base}/:spaceId/members`,
+      params: SpaceParams,
+      handler: ({ req, res }) => addingSpaceMembers(req, res),
+    });
+    const changingSpaceMemberRole = route(
+      'changing space member role',
+      async (req, res, org) => {
         await this.change(req, org, 'member', roleOf(bodyOf(req)));
         done(res);
-      })
+      }
     );
-    app.delete(
-      `${base}/:spaceId/members/:userId`,
-      route('removing space member', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'patch',
+      path: `${base}/:spaceId/members/:userId`,
+      params: SpaceMemberParams,
+      handler: ({ req, res }) => changingSpaceMemberRole(req, res),
+    });
+    const removingSpaceMember = route(
+      'removing space member',
+      async (req, res, org) => {
         await this.change(req, org, 'member');
         done(res);
-      })
+      }
     );
-    app.get(
-      `${base}/:spaceId/groups`,
-      route('listing space groups', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:spaceId/members/:userId`,
+      params: SpaceMemberParams,
+      handler: ({ req, res }) => removingSpaceMember(req, res),
+    });
+    const listingSpaceGroups = route(
+      'listing space groups',
+      async (req, res, org) => {
         const space = await this.space(org, spaceId(req), req);
         const linked = space.holders.filter(h => h.kind === 'group');
         const names = new Map(
@@ -674,33 +739,57 @@ export default class TwakeSpaces extends DmPlugin {
           }))
           .sort((a, b) => a.name.localeCompare(b.name));
         res.json({ organizationId: org, id: space.id, groups });
-      })
+      }
     );
-    app.post(
-      `${base}/:spaceId/groups`,
-      route('linking space groups', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'get',
+      path: `${base}/:spaceId/groups`,
+      params: SpaceParams,
+      handler: ({ req, res }) => listingSpaceGroups(req, res),
+    });
+    const linkingSpaceGroups = route(
+      'linking space groups',
+      async (req, res, org) => {
         const body = bodyOf(req);
         const ids = namesOf(body.groupIds, 'groupIds', this.groups.maxPage);
         await this.add(req, org, 'group', roleOf(body), () =>
           this.groupDns(org, ids, req)
         );
         done(res);
-      })
+      }
     );
-    app.patch(
-      `${base}/:spaceId/groups/:groupId`,
-      route('changing space group role', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'post',
+      path: `${base}/:spaceId/groups`,
+      params: SpaceParams,
+      handler: ({ req, res }) => linkingSpaceGroups(req, res),
+    });
+    const changingSpaceGroupRole = route(
+      'changing space group role',
+      async (req, res, org) => {
         await this.change(req, org, 'group', roleOf(bodyOf(req)));
         done(res);
-      })
+      }
     );
-    app.delete(
-      `${base}/:spaceId/groups/:groupId`,
-      route('unlinking space group', async (req, res, org) => {
+    defineRoute(app, {
+      method: 'patch',
+      path: `${base}/:spaceId/groups/:groupId`,
+      params: SpaceGroupParams,
+      handler: ({ req, res }) => changingSpaceGroupRole(req, res),
+    });
+    const unlinkingSpaceGroup = route(
+      'unlinking space group',
+      async (req, res, org) => {
         await this.change(req, org, 'group');
         done(res);
-      })
+      }
     );
+    defineRoute(app, {
+      method: 'delete',
+      path: `${base}/:spaceId/groups/:groupId`,
+      params: SpaceGroupParams,
+      handler: ({ req, res }) => unlinkingSpaceGroup(req, res),
+    });
     await this.rabbitmq?.subscribe(
       this.exchange,
       SYNC_REQUESTED,
