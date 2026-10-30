@@ -36,6 +36,11 @@ import type {
 import { Hooks } from '../../hooks';
 import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
+import {
+  appAccountsOptions,
+  type AppAccountsOptions,
+} from './appAccounts.options';
+
 /**
  * Whether an error is the directory saying "that entry is not there".
  *
@@ -64,6 +69,8 @@ function isNoSuchObject(err: unknown): boolean {
 }
 
 export default class AppAccountsConsistency extends DmPlugin {
+  static optionDefinitions = appAccountsOptions;
+
   name = 'appAccountsConsistency';
   roles: Role[] = ['consistency'] as const;
 
@@ -72,6 +79,7 @@ export default class AppAccountsConsistency extends DmPlugin {
   };
 
   // Configuration
+  private readonly settings: AppAccountsOptions;
   private mailAttr: string;
   private applicativeAccountBase: string;
   private operationalAttributes: string[];
@@ -81,19 +89,17 @@ export default class AppAccountsConsistency extends DmPlugin {
     super(server);
 
     // Get configuration
-    this.mailAttr = (this.config.mail_attribute as string) || 'mail';
-    this.applicativeAccountBase = this.config
-      .applicative_account_base as string;
-    this.operationalAttributes =
-      (this.config.ldap_operational_attribute as string[]) || [];
+    this.settings = this.options(appAccountsOptions);
+    this.mailAttr = this.config.mail_attribute || 'mail';
+    this.applicativeAccountBase = this.settings.applicative_account_base;
+    this.operationalAttributes = this.settings.ldap_operational_attribute;
     // `objectClass` and the mail attribute are not optional: without the first
     // the directory rejects the `add`, without the second the entry cannot be
     // found again by the mail-keyed searches this plugin runs. Force them in
     // rather than let a partial list produce entries that fail to create or
     // become invisible — but say so, because silently ignoring configuration
     // is how an operator ends up debugging the wrong file.
-    const configured =
-      (this.config.applicative_account_attribute as string[]) || [];
+    const configured = this.settings.applicative_account_attribute;
     const required = ['objectClass', this.mailAttr];
     const missing = required.filter(attr => !configured.includes(attr));
     if (configured.length > 0 && missing.length > 0) {

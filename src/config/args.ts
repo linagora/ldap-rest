@@ -9,6 +9,7 @@ import { dirname, join } from 'path';
 import type { AttributesList } from '../lib/ldapActions';
 import type { ConfigTemplate } from '../lib/parseConfig';
 import { scimOptions } from '../plugins/scim/scim.options';
+import { appAccountsOptions } from '../plugins/twake/appAccounts.options';
 
 import { toConfigEntries } from './options';
 
@@ -1188,37 +1189,7 @@ const configArgs: ConfigTemplate = [
   ['--rabbitmq-url', 'DM_RABBITMQ_URL', ''],
 
   // Applicative Accounts plugin
-  ['--applicative-account-base', 'DM_APPLICATIVE_ACCOUNT_BASE', ''],
-  ['--max-app-accounts', 'DM_MAX_APP_ACCOUNTS', 5, 'number'],
-  ['--app-accounts-user-attribute', 'DM_APP_ACCOUNTS_USER_ATTRIBUTE', ''],
-  [
-    '--applicative-account-attribute',
-    'DM_APPLICATIVE_ACCOUNT_ATTRIBUTES',
-    ['objectClass', 'cn', 'sn', 'givenName', 'displayName', 'description'],
-    'array',
-    '--applicative-account-attributes',
-    'identifiers',
-  ],
-  [
-    '--ldap-operational-attribute',
-    'DM_LDAP_OPERATIONAL_ATTRIBUTES',
-    [
-      'dn',
-      'controls',
-      'structuralObjectClass',
-      'entryUUID',
-      'entryDN',
-      'subschemaSubentry',
-      'modifyTimestamp',
-      'modifiersName',
-      'createTimestamp',
-      'creatorsName',
-      'userPassword',
-    ],
-    'array',
-    '--ldap-operational-attributes',
-    'identifiers',
-  ],
+  ...toConfigEntries(appAccountsOptions),
 
   // Trash plugin
   ['--trash-base', 'DM_TRASH_BASE', ''],
