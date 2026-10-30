@@ -19,6 +19,8 @@ import {
 } from '../../lib/auth/base';
 import { authzFor, servesRequest } from '../../lib/authz/composition';
 
+import { perRouteOptions } from './auth.options';
+
 // Whitelist of characters permitted in a glob pattern.
 // Covers all characters needed for typical REST paths: alphanumerics, slash,
 // underscore, hyphen, dot, plus, and the glob wildcards (*).
@@ -63,6 +65,8 @@ interface MethodPathRule {
 type AuthzRule = WildcardRule | MethodPathRule;
 
 export default class AuthzPerRoute extends DmPlugin {
+  static optionDefinitions = perRouteOptions;
+
   name = 'authzPerRoute';
   roles: Role[] = ['authz'] as const;
   private rules: Map<string, AuthzRule[]> = new Map();
@@ -90,7 +94,7 @@ export default class AuthzPerRoute extends DmPlugin {
     assertIdentityMode(this.config, this.constructor.name);
     authzFor(this.config, this.constructor.name);
 
-    const entries = this.config.authz_per_route ?? [];
+    const entries = this.options(perRouteOptions).authz_per_route;
     for (const entry of entries) {
       this.parseEntry(entry);
     }

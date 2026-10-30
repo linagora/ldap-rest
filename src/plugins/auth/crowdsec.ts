@@ -17,6 +17,8 @@ import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { Role } from '../../abstract/plugin';
 
+import { crowdsecOptions } from './auth.options';
+
 interface CrowdSecDecision {
   duration: string;
   id: number;
@@ -33,6 +35,8 @@ interface DecisionCache {
 }
 
 export default class CrowdSec extends DmPlugin {
+  static optionDefinitions = crowdsecOptions;
+
   name = 'crowdsec';
   roles: Role[] = ['protect'] as const;
   private apiUrl: string;
@@ -42,10 +46,10 @@ export default class CrowdSec extends DmPlugin {
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
-    this.apiUrl =
-      this.config.crowdsec_url || 'http://localhost:8080/v1/decisions';
-    this.apiKey = this.config.crowdsec_api_key as string;
-    this.cacheTtl = (this.config.crowdsec_cache_ttl as number) || 60;
+    const settings = this.options(crowdsecOptions);
+    this.apiUrl = settings.crowdsec_url;
+    this.apiKey = settings.crowdsec_api_key;
+    this.cacheTtl = settings.crowdsec_cache_ttl;
 
     if (!this.apiKey) {
       throw new Error(

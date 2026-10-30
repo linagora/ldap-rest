@@ -1,7 +1,9 @@
 # Plugin options
 
 A core plugin declares its configuration options next to its code, in a
-`<plugin>.options.ts` file. `src/config/args.ts` concatenates those declarations,
+`<plugin>.options.ts` file. A family that shares imports and lifecycle keeps
+one set per plugin in a single `<family>.options.ts` file, named after the
+family. `src/config/args.ts` concatenates those declarations,
 so the parser, the command line and the environment variables see the same
 entries as before. The plugin then reads typed values instead of casting
 `this.config`.

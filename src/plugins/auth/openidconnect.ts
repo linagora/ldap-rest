@@ -20,6 +20,8 @@ import { serverError, unauthorized } from '../../lib/expressFormatedResponses';
 import { DM } from '../../bin';
 import type { OidcLogoutToken, OidcSessionClaims } from '../../hooks';
 
+import { openidconnectOptions } from './auth.options';
+
 /**
  * The routes this plugin answers itself: `/logout` in `authMethod`, the others
  * through `express-openid-connect`.
@@ -86,6 +88,8 @@ const subjectOf = (idToken: unknown): string | undefined => {
 };
 
 export default class OpenIDConnect extends AuthBase {
+  static optionDefinitions = openidconnectOptions;
+
   name = 'openidconnect';
   // A scoped instance must carry a name, and a front-end looks for the
   // logout route here whatever it is.
@@ -121,6 +125,7 @@ export default class OpenIDConnect extends AuthBase {
    * every login, with the session cookie already set.
    */
   buildConfig(): ConfigParams {
+    const settings = this.options(openidconnectOptions);
     const config: ConfigParams = {
       // The router reads the session and stops there. Whether a request
       // needs one is asked after it, by `requiresAuth()` in `authMethod`:
@@ -129,11 +134,11 @@ export default class OpenIDConnect extends AuthBase {
       // and the decision would be taken inside a layer the dispatcher
       // cannot order.
       authRequired: false,
-      issuerBaseURL: this.config.oidc_server,
-      clientID: this.config.oidc_client_id,
-      secret: this.config.oidc_client_secret as string,
-      baseURL: this.config.base_url as string,
-      clientSecret: this.config.oidc_client_secret as string,
+      issuerBaseURL: settings.oidc_server,
+      clientID: settings.oidc_client_id,
+      secret: settings.oidc_client_secret,
+      baseURL: settings.base_url,
+      clientSecret: settings.oidc_client_secret,
       authorizationParams: {
         response_type: 'code',
         scope: 'openid profile email',
@@ -240,7 +245,7 @@ export default class OpenIDConnect extends AuthBase {
   }
 
   protected identitySource(): string {
-    const claim = (this.config.oidc_username_claim as string) || 'sub';
+    const claim = this.options(openidconnectOptions).oidc_username_claim;
     return (
       'req.user: the OIDC sub, an opaque provider identifier; req.userName: ' +
       `the "${claim}" claim` +
@@ -335,7 +340,7 @@ export default class OpenIDConnect extends AuthBase {
         // logout URL, so what is left is the redirect it could not build.
         // The provider's session survives and will log the caller back in:
         // that is the provider's limit, and a 500 would not lift it.
-        return res.redirect(this.config.base_url as string);
+        return res.redirect(this.options(openidconnectOptions).base_url);
       if (err) return serverError(res, err as Error);
       if (
         (req.method === 'GET' || req.method === 'HEAD') &&
@@ -359,7 +364,7 @@ export default class OpenIDConnect extends AuthBase {
           const claims = (
             req as unknown as { oidc: { user: Record<string, unknown> } }
           ).oidc.user;
-          const claim = (this.config.oidc_username_claim as string) || 'sub';
+          const claim = this.options(openidconnectOptions).oidc_username_claim;
           const named = claims[claim];
           if (claim !== 'sub' && typeof named !== 'string')
             // Once per session rather than per request would need somewhere to

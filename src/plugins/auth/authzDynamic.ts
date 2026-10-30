@@ -43,6 +43,7 @@ import type { Hooks } from '../../hooks';
 import { ok, unauthorized } from '../../lib/expressFormatedResponses';
 import { getParentDn } from '../../lib/utils';
 
+import { dynamicOptions } from './auth.options';
 import { verifyLdapPassword } from './authzDynamicHash';
 
 export interface BranchAcl {
@@ -74,6 +75,7 @@ export interface AuthzDynamicRequest extends DmRequest {
 interface PendingRequest extends AuthzDynamicRequest {
   authzDynamicPending?: boolean;
   authzDynamicPendingReason?: string;
+  authzDynamicBypass?: string[];
 }
 
 function asString(v: AttributeValue | undefined): string | undefined {
@@ -100,6 +102,8 @@ function isAtOrUnder(dn: string, branch: string): boolean {
 }
 
 export default class AuthzDynamic extends AuthBase {
+  static optionDefinitions = dynamicOptions;
+
   name = 'authzDynamic';
   roles: Role[] = ['auth', 'authz', 'configurable'] as const;
 
@@ -117,19 +121,16 @@ export default class AuthzDynamic extends AuthBase {
 
   constructor(server: DM) {
     super(server);
-    this.base = (this.config.authz_dynamic_base as string) || '';
-    this.cacheTtlMs =
-      ((this.config.authz_dynamic_cache_ttl as number) || 60) * 1000;
+    const settings = this.options(dynamicOptions);
+    this.base = settings.authz_dynamic_base;
+    this.cacheTtlMs = settings.authz_dynamic_cache_ttl * 1000;
     // Backoff window after a failed reload, so that LDAP outages don't turn
     // into a per-request retry storm. Defaults to max(1/4 × TTL, 5s).
     this.failureBackoffMs = Math.max(Math.floor(this.cacheTtlMs / 4), 5000);
-    this.tokenAttr =
-      (this.config.authz_dynamic_token_attribute as string) || 'userPassword';
-    this.configAttr =
-      (this.config.authz_dynamic_config_attribute as string) || 'description';
-    this.tenantAttr =
-      (this.config.authz_dynamic_tenant_attribute as string) || 'cn';
-    this.reloadEndpoint = Boolean(this.config.authz_dynamic_reload_endpoint);
+    this.tokenAttr = settings.authz_dynamic_token_attribute;
+    this.configAttr = settings.authz_dynamic_config_attribute;
+    this.tenantAttr = settings.authz_dynamic_tenant_attribute;
+    this.reloadEndpoint = settings.authz_dynamic_reload_endpoint;
 
     if (!this.base) {
       throw new Error(
@@ -338,8 +339,7 @@ export default class AuthzDynamic extends AuthBase {
    * @param req request being authenticated
    * @returns what allowed it past, or undefined when nothing does
    */
-  private bypassReason(req: DmRequest): string | undefined {
-    const allowed = (this.config.authz_dynamic_bypass as string[]) || [];
+  private bypassReason(req: DmRequest, allowed: string[]): string | undefined {
     if (allowed.length === 0) return undefined;
     // `trustedProxy` marks the *address* it trusts, and fills
     // `proxyAuthUser` only when the proxy named someone. Accepting the mark
@@ -394,7 +394,7 @@ export default class AuthzDynamic extends AuthBase {
       )
       .map(plugin => plugin.name);
     if (sharing.length === 0) return;
-    const bypass = (this.config.authz_dynamic_bypass as string[]) || [];
+    const bypass = this.options(dynamicOptions).authz_dynamic_bypass;
     this.logger.warn(
       `authzDynamic: ${sharing.join(', ')} authenticate the same paths as ` +
         'this plugin, so a request can arrive already identified. It is ' +
@@ -434,7 +434,10 @@ export default class AuthzDynamic extends AuthBase {
     const pending = req as PendingRequest;
     if (!pending.authzDynamicPending) return next();
     pending.authzDynamicPending = false;
-    const bypass = this.bypassReason(pending);
+    const allowed =
+      pending.authzDynamicBypass ??
+      this.options(dynamicOptions).authz_dynamic_bypass;
+    const bypass = this.bypassReason(pending, allowed);
     if (bypass) {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
@@ -469,9 +472,10 @@ export default class AuthzDynamic extends AuthBase {
     req: DmRequest,
     res: Response,
     next: () => void,
-    warning: string
+    warning: string,
+    allowed: string[]
   ): void {
-    const bypass = this.bypassReason(req);
+    const bypass = this.bypassReason(req, allowed);
     if (bypass) {
       this.logger.info(
         `authzDynamic: request allowed past the token ACLs (${bypass})`
@@ -479,10 +483,7 @@ export default class AuthzDynamic extends AuthBase {
       this.passThrough(req, next);
       return;
     }
-    if (
-      !req.user &&
-      ((this.config.authz_dynamic_bypass as string[]) || []).length > 0
-    ) {
+    if (!req.user && allowed.length > 0) {
       // Including a bearer nobody here knows: that is what another
       // authenticator's own credential looks like from in here, and it is
       // the case the deferral exists for. The refusal is only postponed —
@@ -490,6 +491,7 @@ export default class AuthzDynamic extends AuthBase {
       const pending = req as PendingRequest;
       pending.authzDynamicPending = true;
       pending.authzDynamicPendingReason = warning;
+      pending.authzDynamicBypass = allowed;
       this.passThrough(req, next);
       return;
     }
@@ -498,7 +500,8 @@ export default class AuthzDynamic extends AuthBase {
   }
 
   authMethod(req: DmRequest, res: Response, next: () => void): void {
-    const bypass = this.bypassReason(req);
+    const allowed = this.options(dynamicOptions).authz_dynamic_bypass;
+    const bypass = this.bypassReason(req, allowed);
     if (bypass) {
       // No token, so no frame: the hooks find nothing and enforce nothing,
       // which is the point. Said out loud, since it is the one path where
@@ -517,7 +520,8 @@ export default class AuthzDynamic extends AuthBase {
             req,
             res,
             next,
-            'authzDynamic: missing or invalid Authorization header'
+            'authzDynamic: missing or invalid Authorization header',
+            allowed
           );
           return;
         }
@@ -527,7 +531,8 @@ export default class AuthzDynamic extends AuthBase {
             req,
             res,
             next,
-            'authzDynamic: empty bearer token'
+            'authzDynamic: empty bearer token',
+            allowed
           );
           return;
         }
@@ -552,7 +557,8 @@ export default class AuthzDynamic extends AuthBase {
             req,
             res,
             next,
-            `authzDynamic: unauthorized token ${masked}`
+            `authzDynamic: unauthorized token ${masked}`,
+            allowed
           );
           return;
         }

@@ -11,6 +11,8 @@ import type { Express, Response } from 'express';
 import AuthBase, { DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
+import { llngOptions } from './auth.options';
+
 // The ambient declaration for `lemonldap-ng-handler` lives in
 // src/types/lemonldap-ng-handler.d.ts. Written here, in a module, it would be
 // an augmentation of the package instead: conflicting with its types when it
@@ -37,6 +39,8 @@ type LlngHandler = typeof import('lemonldap-ng-handler');
 const initializedFrom = new WeakMap<LlngHandler, string>();
 
 export default class AuthLLNG extends AuthBase {
+  static optionDefinitions = llngOptions;
+
   name = 'authLemonldapNg';
   roles: Role[] = ['auth'] as const;
 
@@ -77,12 +81,9 @@ export default class AuthLLNG extends AuthBase {
     // every request, so the plugin used to answer 500 to all of them while
     // `--llng-ini` was parsed and never read.
     // `--llng-ini` defaults to `/etc/lemonldap-ng/lemonldap-ng.ini`
-    // (src/config/args.ts), so it names a real path in every deployment —
-    // there is no "default configuration" case distinct from a confFile to
-    // report. `Config` types every field optional regardless
-    // (src/config/args.ts), which `?? ''` satisfies for the type checker
-    // alone.
-    const confFile = this.config.llng_ini ?? '';
+    // (auth.options.ts), so it names a real path in every deployment — there
+    // is no "default configuration" case distinct from a confFile to report.
+    const confFile = this.options(llngOptions).llng_ini;
     const previouslyFrom = initializedFrom.get(handler);
     if (previouslyFrom !== undefined && previouslyFrom !== confFile) {
       throw new Error(
@@ -173,7 +174,7 @@ export default class AuthLLNG extends AuthBase {
   }
 
   protected identitySource(): string {
-    const header = (this.config.llng_username_header as string) || '';
+    const header = this.options(llngOptions).llng_username_header;
     return (
       "req.user: LemonLDAP::NG's whatToTrace, via Lm-Remote-User; " +
       (header
@@ -199,9 +200,8 @@ export default class AuthLLNG extends AuthBase {
     // the spelling LLNG's configuration gives it, and a lower-cased key
     // from the wire is a *different* key sitting earlier in the object,
     // which is the one a case-insensitive read finds first.
-    const usernameHeader = (
-      (this.config.llng_username_header as string) || ''
-    ).toLowerCase();
+    const usernameHeader =
+      this.options(llngOptions).llng_username_header.toLowerCase();
     AuthLLNG.dropForgedIdentity(req);
     if (usernameHeader) AuthLLNG.dropForgedIdentity(req, usernameHeader);
     this.handler.run(req, res, () => {

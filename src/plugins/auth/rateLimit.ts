@@ -16,12 +16,16 @@ import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 
+import { rateLimitOptions } from './auth.options';
+
 interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
 export default class RateLimit extends DmPlugin {
+  static optionDefinitions = rateLimitOptions;
+
   name = 'rateLimit';
   roles: Role[] = ['protect'] as const;
   private store: Map<string, RateLimitEntry> = new Map();
@@ -30,8 +34,9 @@ export default class RateLimit extends DmPlugin {
 
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
-    this.windowMs = this.config.rate_limit_window_ms || 15 * 60 * 1000; // 15 minutes
-    this.maxRequests = this.config.rate_limit_max || 100; // 100 requests per window
+    const settings = this.options(rateLimitOptions);
+    this.windowMs = settings.rate_limit_window_ms;
+    this.maxRequests = settings.rate_limit_max;
 
     this.logger.info(
       `Auth rate limiting enabled: ${this.maxRequests} failed attempts per ${this.windowMs / 1000} seconds`

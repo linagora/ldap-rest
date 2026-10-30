@@ -26,6 +26,8 @@ import { rawBodyOf } from '../../lib/rawBody';
 import AuthBase, { type DmRequest } from '../../lib/auth/base';
 import type { Role } from '../../abstract/plugin';
 
+import { hmacOptions } from './auth.options';
+
 interface HmacService {
   id: string;
   secret: string;
@@ -33,6 +35,8 @@ interface HmacService {
 }
 
 export default class AuthHmac extends AuthBase {
+  static optionDefinitions = hmacOptions;
+
   protected knownIdentities(): string[] {
     return [...this.services.values()].map(service => service.name);
   }
@@ -51,39 +55,38 @@ export default class AuthHmac extends AuthBase {
 
     // Parse HMAC configuration
     // Format: "service-id:secret:name"
-    const hmacConfig = this.config.auth_hmac as string[];
-    this.timeWindow = (this.config.auth_hmac_window as number) ?? 120000; // Default: 2 minutes
+    const settings = this.options(hmacOptions);
+    const hmacConfig = settings.auth_hmac;
+    this.timeWindow = settings.auth_hmac_window;
 
-    if (hmacConfig && Array.isArray(hmacConfig)) {
-      hmacConfig.forEach((entry, index) => {
-        const parts = entry.split(':');
-        const id = parts[0].trim();
-        const secret = (parts[1] ?? '').trim();
-        const name = parts.slice(2).join(':').trim(); // Allow colons in name
-        if (parts.length < 3 || !id || !secret || !name)
-          throw new Error(
-            `Invalid --auth-hmac entry at index ${index}: expected ` +
-              '"service-id:secret:name", none of them empty; entries are ' +
-              'separated by `,`, `;` or newlines'
-          );
+    hmacConfig.forEach((entry, index) => {
+      const parts = entry.split(':');
+      const id = parts[0].trim();
+      const secret = (parts[1] ?? '').trim();
+      const name = parts.slice(2).join(':').trim(); // Allow colons in name
+      if (parts.length < 3 || !id || !secret || !name)
+        throw new Error(
+          `Invalid --auth-hmac entry at index ${index}: expected ` +
+            '"service-id:secret:name", none of them empty; entries are ' +
+            'separated by `,`, `;` or newlines'
+        );
 
-        if (secret.length < 32) {
-          this.logger.warn(
-            `HMAC secret for service "${id}" is too short (minimum 32 characters recommended)`
-          );
-        }
+      if (secret.length < 32) {
+        this.logger.warn(
+          `HMAC secret for service "${id}" is too short (minimum 32 characters recommended)`
+        );
+      }
 
-        // A space-separated list read as one entry puts the other services in
-        // the name
-        if (parts.length > 4)
-          this.logger.warn(
-            `HMAC entry ${index} for service "${id}" has ${parts.length} ` +
-              'fields: if several services were given, separate them with `,` or `;`'
-          );
+      // A space-separated list read as one entry puts the other services in
+      // the name
+      if (parts.length > 4)
+        this.logger.warn(
+          `HMAC entry ${index} for service "${id}" has ${parts.length} ` +
+            'fields: if several services were given, separate them with `,` or `;`'
+        );
 
-        this.services.set(id, { id, secret, name });
-      });
-    }
+      this.services.set(id, { id, secret, name });
+    });
 
     if (this.services.size === 0) {
       this.logger.warn('No valid HMAC services configured');

@@ -27,6 +27,8 @@ import type { Express, Request, Response, NextFunction } from 'express';
 
 import DmPlugin, { type Role } from '../../abstract/plugin';
 
+import { trustedProxyOptions } from './auth.options';
+
 // Extend Express Request to include trusted proxy info
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -45,6 +47,8 @@ interface ParsedCIDR {
 }
 
 export default class TrustedProxy extends DmPlugin {
+  static optionDefinitions = trustedProxyOptions;
+
   name = 'trustedProxy';
   roles: Role[] = ['protect'] as const;
   private trustedNetworks: ParsedCIDR[] = [];
@@ -53,13 +57,10 @@ export default class TrustedProxy extends DmPlugin {
   constructor(...args: ConstructorParameters<typeof DmPlugin>) {
     super(...args);
 
-    const trustedProxies = this.config.trusted_proxy;
+    const settings = this.options(trustedProxyOptions);
+    const trustedProxies = settings.trusted_proxy;
 
-    if (
-      !trustedProxies ||
-      !Array.isArray(trustedProxies) ||
-      trustedProxies.length === 0
-    ) {
+    if (trustedProxies.length === 0) {
       throw new Error(
         'TrustedProxy plugin requires trusted_proxy configuration (array of IPs or CIDR ranges)'
       );
@@ -77,9 +78,7 @@ export default class TrustedProxy extends DmPlugin {
     }
 
     // Get auth header name (default: Auth-User)
-    this.authHeader = (
-      (this.config.trusted_proxy_auth_header as string) || 'Auth-User'
-    ).toLowerCase();
+    this.authHeader = settings.trusted_proxy_auth_header.toLowerCase();
 
     this.logger.info(
       `Trusted proxy validation enabled for ${trustedProxies.length} address(es): ${trustedProxies.join(', ')} (auth header: ${this.authHeader})`

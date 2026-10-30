@@ -15,6 +15,14 @@ import {
   scimOptions,
   scimOptionsOf,
 } from '../../src/plugins/scim/scim.options';
+import {
+  crowdsecOptionsOf,
+  dynamicOptionsOf,
+  hmacOptionsOf,
+  perBranchOptionsOf,
+  rateLimitOptionsOf,
+  totpOptionsOf,
+} from '../../src/plugins/auth/auth.options';
 import { jamesOptionsOf } from '../../src/plugins/twake/james.options';
 import { calendarOptionsOf } from '../../src/plugins/twake/calendar.options';
 import { clouderyOptionsOf } from '../../src/plugins/twake/cloudery.options';
@@ -569,6 +577,90 @@ describe('plugin options', () => {
         for (const [name, value] of Object.entries(saved))
           if (value === undefined) delete process.env[name];
           else process.env[name] = value;
+      }
+    });
+  });
+
+  describe('authentication and authorization options', () => {
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.auth_token).to.deep.equal([]);
+      expect(config.auth_fake_user).to.equal('');
+      expect(config.auth_totp_window).to.equal(1);
+      expect(config.auth_totp_step).to.equal(30);
+      expect(config.auth_hmac_window).to.equal(120000);
+      expect(config.llng_ini).to.equal('/etc/lemonldap-ng/lemonldap-ng.ini');
+      expect(config.authz_per_route).to.deep.equal([]);
+      expect(config.authz_per_branch_config).to.deep.equal({
+        default: { read: true, write: false, delete: false },
+      });
+      expect(config.authz_per_branch_cache_ttl).to.equal(60);
+      expect(config.authz_dynamic_token_attribute).to.equal('userPassword');
+      expect(config.authz_local_admin_attribute).to.equal(
+        'twakeLocalAdminLink'
+      );
+      expect(config.oidc_username_claim).to.equal('sub');
+      expect(config.rate_limit_window_ms).to.equal(15 * 60 * 1000);
+      expect(config.rate_limit_max).to.equal(100);
+      expect(config.crowdsec_url).to.equal(
+        'http://localhost:8080/v1/decisions'
+      );
+      expect(config.trusted_proxy_auth_header).to.equal('Auth-User');
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      const saved = {
+        DM_AUTH_TOKENS: process.env.DM_AUTH_TOKENS,
+        DM_AUTHZ_GLOBAL_BRANCHES: process.env.DM_AUTHZ_GLOBAL_BRANCHES,
+      };
+      process.env.DM_AUTH_TOKENS = 't1;t2';
+      process.env.DM_AUTHZ_GLOBAL_BRANCHES =
+        'ou=global,dc=example,dc=com;ou=other,dc=example,dc=com';
+      try {
+        const config = parse([
+          'node',
+          'ldap-rest',
+          '--auth-totp-step',
+          '60',
+          '--trusted-proxy',
+          '10.0.0.0/8',
+          '--crowdsec-cache-ttl',
+          '30',
+        ]);
+        expect(config.auth_token).to.deep.equal(['t1', 't2']);
+        expect(config.authz_global_branch).to.deep.equal([
+          'ou=global,dc=example,dc=com',
+          'ou=other,dc=example,dc=com',
+        ]);
+        expect(config.auth_totp_step).to.equal(60);
+        expect(config.trusted_proxy).to.deep.equal(['10.0.0.0/8']);
+        expect(config.crowdsec_cache_ttl).to.equal(30);
+      } finally {
+        for (const [name, value] of Object.entries(saved))
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+      }
+    });
+
+    it('refuses a zero where the default used to apply', () => {
+      const cases: [string, () => unknown][] = [
+        ['DM_AUTH_TOTP_STEP', () => totpOptionsOf(parse())],
+        ['DM_AUTH_HMAC_WINDOW', () => hmacOptionsOf(parse())],
+        ['DM_RATE_LIMIT_WINDOW_MS', () => rateLimitOptionsOf(parse())],
+        ['DM_RATE_LIMIT_MAX', () => rateLimitOptionsOf(parse())],
+        ['DM_CROWDSEC_CACHE_TTL', () => crowdsecOptionsOf(parse())],
+        ['DM_AUTHZ_PER_BRANCH_CACHE_TTL', () => perBranchOptionsOf(parse())],
+        ['DM_AUTHZ_DYNAMIC_CACHE_TTL', () => dynamicOptionsOf(parse())],
+      ];
+      for (const [name, read] of cases) {
+        const saved = process.env[name];
+        process.env[name] = '0';
+        try {
+          expect(read, name).to.throw(/must be at least 1/);
+        } finally {
+          if (saved === undefined) delete process.env[name];
+          else process.env[name] = saved;
+        }
       }
     });
   });

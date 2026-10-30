@@ -23,7 +23,11 @@ interface CachedGroups {
 
 type GroupRules = NonNullable<AuthConfig['groups']>[string];
 
+import { perBranchOptions } from './auth.options';
+
 export default class AuthzPerBranch extends AuthzBase {
+  static optionDefinitions = perBranchOptions;
+
   name = 'authzPerBranch';
   authConfig?: AuthConfig;
   groupCache: Map<string, CachedGroups> = new Map();
@@ -52,10 +56,11 @@ export default class AuthzPerBranch extends AuthzBase {
     this.declaredByBase = { ...this.hooks };
 
     // Cache TTL in milliseconds (default: 1 minute, configurable)
-    this.cacheTTL = (this.config.authz_per_branch_cache_ttl || 60) * 1000;
+    const settings = this.options(perBranchOptions);
+    this.cacheTTL = settings.authz_per_branch_cache_ttl * 1000;
 
     // Load authorization config from config object
-    this.authConfig = this.config.authz_per_branch_config;
+    this.authConfig = settings.authz_per_branch_config;
     if (this.authConfig) {
       this.logger.info('Authorization config loaded');
     }
@@ -78,7 +83,7 @@ export default class AuthzPerBranch extends AuthzBase {
     const onDelete = this.declaredByBase.ldapdeletedone;
     const onRename = this.declaredByBase.ldaprenamedone;
     const forget = (): void => this.forgetGroups();
-    // eslint-disable-next-line no-restricted-syntax -- replaces what the base declares
+
     this.hooks = {
       ...this.declaredByBase,
       ldapadddone: forget,
@@ -96,13 +101,19 @@ export default class AuthzPerBranch extends AuthzBase {
     };
   }
 
+  /** The group member attribute, which no option set declares yet */
+  private get memberAttribute(): string {
+    const configured = this.config.ldap_group_member_attribute;
+    return typeof configured === 'string' ? configured : 'member';
+  }
+
   /**
    * Whether a modify can change which groups a uid belongs to: it touches
    * the member attribute, or the attribute a uid is resolved by.
    */
   private touchesMembership(changes: ModifyRequest): boolean {
     const watched = [
-      (this.config.ldap_group_member_attribute as string) || 'member',
+      this.memberAttribute,
       this.config.ldap_user_main_attribute || 'uid',
     ].map(a => a.toLowerCase());
     const touched = [
@@ -367,8 +378,8 @@ export default class AuthzPerBranch extends AuthzBase {
     }
     if (!userDn) return [];
 
-    const memberAttr = this.config.ldap_group_member_attribute || 'member';
-    const filter = `(${memberAttr as string}=${escapeLdapFilter(userDn)})`;
+    const memberAttr = this.memberAttribute;
+    const filter = `(${memberAttr}=${escapeLdapFilter(userDn)})`;
     // As the server: the caller's groups decide what they may do: read before any judgement
     const searchResult = (await this.server.ldap.system.search(
       {
