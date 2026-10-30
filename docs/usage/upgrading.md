@@ -135,6 +135,16 @@ disabled member validation. The option is now `--groups-allow-unexistent-members
 and `DM_ALLOW_UNEXISTENT_MEMBERS`, which the plugin reads; the old spelling is
 gone.
 
+### A config key a plugin did not declare
+
+**Who is affected:** a plugin built outside this repository reading an option
+through `this.config.<name>` without declaring it.
+
+`Config` no longer has an index signature, so such a read does not compile.
+Declare the option with `defineOptions` and read it through `this.options()`
+(see [plugin options](../plugin-development/options.md)); the declaration also
+makes the option known to the startup report and its `env` variable read.
+
 ### Node 22 or later is required
 
 **Who is affected:** a deployment running on Node 20 (end of life

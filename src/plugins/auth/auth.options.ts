@@ -89,6 +89,10 @@ export const perBranchOptions = defineOptions({
     default: 60,
     min: 1,
   }),
+  ldap_group_member_attribute: opt.string({
+    env: 'DM_LDAP_GROUP_MEMBER_ATTRIBUTE',
+    default: 'member',
+  }),
 });
 export type PerBranchOptions = OptionsOf<typeof perBranchOptions>;
 

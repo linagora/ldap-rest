@@ -508,16 +508,6 @@ export interface Config {
   scim_bulk_max_payload_size?: number;
   scim_etag?: boolean;
   scim_base_url?: string;
-
-  // Accept additional config keys for non core plugins
-  [key: string]:
-    | string
-    | string[]
-    | boolean
-    | number
-    | AttributesList
-    | AuthConfig
-    | undefined;
 }
 
 /**

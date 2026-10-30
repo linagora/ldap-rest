@@ -111,7 +111,7 @@ export default class OpenIDConnect extends AuthBase {
       'oidc_client_id',
       'oidc_client_secret',
       'base_url',
-    ]) {
+    ] as const) {
       if (!this.config[p]) throw new Error(`Missing config parameter ${p}`);
     }
   }
