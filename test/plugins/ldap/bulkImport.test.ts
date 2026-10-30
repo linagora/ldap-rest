@@ -146,9 +146,9 @@ describe('LDAP Bulk Import Plugin', function () {
 
   describe('Template Generation', () => {
     it('should generate CSV template with editable attributes', async () => {
-      const res = await request.get(
-        '/api/v1/ldap/bulk-import/testusers/template.csv'
-      );
+      const res = await request
+        .get('/api/v1/ldap/bulk-import/testusers/template.csv')
+        .set('Accept', 'text/csv');
 
       expect(res.status).to.equal(200);
       expect(res.headers['content-type']).to.include('text/csv');

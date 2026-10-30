@@ -78,7 +78,9 @@ properties a `description`, or rely on what TypeBox emits.
 | `body`   | `req.body`   | as parsed  |
 
 A route that needs a route middleware — a multipart parser, say — passes it
-as `middleware`, and Express runs it before the handler.
+as `middleware`. Express runs it before the handler, and before the `Accept`
+and schema checks: a multipart body is read before the request may be
+refused.
 
 Path and query values always arrive as strings, so they are converted before
 being checked: a `Type.Number()` query accepts `?limit=10` and hands the
@@ -139,8 +141,8 @@ lists what the Express stack carries that `defineRoute` did not declare.
 ## The migration guard
 
 `npm run lint` refuses `app.<verb>(` under `src/plugins` and `src/abstract`,
-through `eslint-rules/no-raw-route.mjs`. The files still to migrate are
-listed in `eslint-rules/route-allowlist.json`, now empty: every route in the
-tree is declared. `test/scripts/routeAllowlist.test.ts` keeps the list exact: a
-file that no longer declares a raw route must leave it, and a raw route in an
-unlisted file fails.
+through `eslint-rules/no-raw-route.mjs`. `eslint-rules/route-allowlist.json`
+names the files a raw route is tolerated in; it is empty, so every route in
+the tree is declared. `test/scripts/routeAllowlist.test.ts` keeps the list
+exact: a listed file must still declare a raw route, and an unlisted file
+must not.

@@ -263,6 +263,7 @@ export default class LdapBulkImport extends DmPlugin {
       defineRoute(app, {
         method: 'get',
         path: `${this.config.api_prefix}/v1/ldap/bulk-import/${resourceName}/template.csv`,
+        json: false,
         handler: ({ req, res }) => this.getTemplate(req, res, resource),
       });
 
