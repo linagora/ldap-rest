@@ -73,6 +73,7 @@ describe('SCIM Users (integration)', function () {
     it('advertises capabilities', async () => {
       const res = await supertest(server.app)
         .get('/scim/v2/ServiceProviderConfig')
+        .set('Accept', 'application/scim+json')
         .expect(200);
       expect(res.headers['content-type']).to.match(/application\/scim\+json/);
       expect(res.body.schemas[0]).to.equal(

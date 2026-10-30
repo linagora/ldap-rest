@@ -116,7 +116,11 @@ failing path:
 
 A caller whose `Accept` excludes JSON is answered `400 Bad request` before
 the handler runs. A route serving another media type sets `json: false` and
-answers it itself; SCIM does, for `application/scim+json`.
+answers it itself; SCIM does, for `application/scim+json`. Its declared
+schemas are still checked first, and a failure there is answered in the REST
+shape (`Invalid request: …`): such a route validates the rest of its input
+itself. The handler also receives Express's `next`, for a route that falls
+through or has already answered.
 
 `Type.Object` accepts unknown keys unless the schema says
 `{ additionalProperties: false }`. A route migrated from hand-written checks
