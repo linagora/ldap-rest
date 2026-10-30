@@ -15,8 +15,13 @@ import LdapAccountLifecycle from '../../src/plugins/ldap/accountLifecycle';
 import LdapFlatGeneric from '../../src/plugins/ldap/flatGeneric';
 import LdapGroups from '../../src/plugins/ldap/groups';
 import LdapOrganizations from '../../src/plugins/ldap/organizations';
+import OnLdapChange from '../../src/plugins/ldap/onChange';
 import LdapPasswordPolicy from '../../src/plugins/ldap/passwordPolicy';
 import LdapRaw from '../../src/plugins/ldap/raw';
+import AppAccountsConsistency from '../../src/plugins/twake/appAccountsConsistency';
+import AppAccountsApi from '../../src/plugins/twake/appAccountsApi';
+import TwakeInstances from '../../src/plugins/twake/instances';
+import TwakeTombstone from '../../src/plugins/twake/tombstone';
 import { skipIfMissingEnvVars, LDAP_ENV_VARS_WITH_ORG } from '../helpers/env';
 
 /** A JSON schema, as the registry keeps it */
@@ -29,6 +34,21 @@ interface Schema {
 
 /** The path with every `:param` given a value the params schema accepts */
 const fill = (path: string): string => path.replace(/:\w+/g, 'probe');
+
+/** A value the schema takes */
+const valid = (schema: Schema): unknown => {
+  switch (schema?.type) {
+    case 'integer':
+    case 'number':
+      return 1;
+    case 'boolean':
+      return true;
+    case 'array':
+      return ['probe'];
+    default:
+      return 'probe';
+  }
+};
 
 /** A value the schema cannot take */
 const wrong = (schema: Schema): unknown => {
@@ -70,10 +90,34 @@ const badBodies = (schema: Schema): Array<{ body: unknown; why: string }> => {
       body: { [first]: wrong(properties[first]) },
       why: `${first} of the wrong type`,
     });
-  if (schema?.additionalProperties === false)
-    bodies.push({ body: { probeUnknown: true }, why: 'an unknown key' });
+  if (schema?.additionalProperties === false) {
+    // The required fields hold values it takes, so only the key is at fault
+    const filled = Object.fromEntries(
+      Object.entries(properties)
+        .filter(([name]) => required.has(name))
+        .map(([name, property]) => [name, valid(property)])
+    );
+    bodies.push({
+      body: { ...filled, probeUnknown: true },
+      why: 'an unknown key',
+    });
+  }
   return bodies;
 };
+
+/** A broker that takes every message, for the plugins requiring one */
+class StubRabbitMq {
+  name = 'rabbitmq';
+  getRawClient(): Promise<unknown> {
+    return Promise.resolve({});
+  }
+  subscribe(): Promise<void> {
+    return Promise.resolve();
+  }
+  publish(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 describe('Every route refuses the input it cannot take', function () {
   let server: DM;
@@ -87,6 +131,20 @@ describe('Every route refuses the input it cannot take', function () {
     server.config.ldap_flat_schema = ['./static/schemas/twake/users.json'];
     server.config.ppolicy_validate_complexity = true;
     server.config.mail_attribute = 'mail';
+    server.config.twake_lifecycle_deleted_attribute = 'employeeType';
+    server.config.twake_lifecycle_deleted_value = 'deleted';
+    server.config.twake_tombstone_dn = [
+      `^uid=probe-gone,ou=users,${process.env.DM_LDAP_BASE}$`,
+    ];
+    server.config.applicative_account_base = `ou=probeapplicative,${process.env.DM_LDAP_BASE}`;
+    Object.assign(server.config, {
+      twake_instance_provider: 'cozy-stack',
+      twake_instance_cozy_url: 'http://127.0.0.1:9',
+      twake_instance_cozy_domain: 'probe.example',
+      twake_instance_fqdn_attribute: 'carLicense',
+      twake_instance_sent_attribute: 'businessCategory',
+    });
+    server.loadedPlugins['rabbitmq'] = new StubRabbitMq() as never;
     for (const [name, Plugin] of [
       ['ldapFlatGeneric', LdapFlatGeneric],
       ['ldapAccountLifecycle', LdapAccountLifecycle],
@@ -94,6 +152,11 @@ describe('Every route refuses the input it cannot take', function () {
       ['ldapOrganizations', LdapOrganizations],
       ['ldapRaw', LdapRaw],
       ['ldapPasswordPolicy', LdapPasswordPolicy],
+      ['ldapOnChange', OnLdapChange],
+      ['appAccountsConsistency', AppAccountsConsistency],
+      ['appAccountsApi', AppAccountsApi],
+      ['twakeTombstone', TwakeTombstone],
+      ['twakeInstances', TwakeInstances],
     ] as [string, new (s: DM) => LdapFlatGeneric][])
       await server.registerPlugin(name, new Plugin(server));
     server.setupErrorMiddleware();
@@ -114,7 +177,10 @@ describe('Every route refuses the input it cannot take', function () {
       if (!route.query) continue;
       const query = badQuery(route.query as Schema);
       if (query === undefined) continue;
-      const res = await request.get(`${fill(route.path)}?${query}`);
+      const call = request[route.method](
+        `${fill(route.path)}?${query}`
+      ) as ReturnType<typeof request.get>;
+      const res = await call;
       expect(res.status, `${route.method} ${route.path}?${query}`).to.equal(
         400
       );
