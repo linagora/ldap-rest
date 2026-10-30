@@ -53,20 +53,23 @@ const options = scimOptionsOf(config);
 `BaseResolver` keeps its `(config, options)` form; the others take the checked
 values beside what they already require.
 
-### An out-of-range SCIM value
+### An invalid SCIM or applicative accounts value
 
 **Who is affected:** a deployment setting `--scim-max-results`,
 `--scim-max-scanned`, `--scim-bulk-max-operations` or
-`--scim-bulk-max-payload-size` to zero or a negative number.
+`--scim-bulk-max-payload-size` to zero or a negative number, or giving a
+per-instance override of the wrong JSON type.
 
-These options now refuse a value below 1 when the plugin loads: a zero used
-to be silently replaced by the default, and a negative value used as it was.
-Remove the option to keep the default, or give it a positive number.
+These SCIM limits now refuse a value below 1 when the plugin loads: a zero
+used to be silently replaced by the default, and a negative value used as it
+was. Remove the option to keep the default, or give it a positive number.
 
 A per-instance override (`--plugin core/scim:name:{...}`) must also use the
 option's JSON type: `{"scim_max_results": "50"}` and `{"scim_user_base":
 null}` are refused, where the quoted number used to be coerced and the null
-treated as unset.
+treated as unset. The applicative accounts options refuse the same:
+`{"max_app_accounts": "5"}` used to be kept as the string, and
+`{"applicative_account_attribute": "cn"}` was spread into `['c', 'n']`.
 
 ### Node 22 or later is required
 

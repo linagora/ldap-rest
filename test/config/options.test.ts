@@ -149,6 +149,80 @@ describe('plugin options', () => {
     });
   });
 
+  describe('applicative account options in the configuration', () => {
+    const names = [
+      'DM_APPLICATIVE_ACCOUNT_BASE',
+      'DM_MAX_APP_ACCOUNTS',
+      'DM_APP_ACCOUNTS_USER_ATTRIBUTE',
+      'DM_APPLICATIVE_ACCOUNT_ATTRIBUTES',
+      'DM_LDAP_OPERATIONAL_ATTRIBUTES',
+    ];
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = {};
+      for (const name of names) {
+        saved[name] = process.env[name];
+        delete process.env[name];
+      }
+    });
+    afterEach(() => {
+      for (const name of names)
+        if (saved[name] === undefined) delete process.env[name];
+        else process.env[name] = saved[name];
+    });
+
+    it('keeps the defaults the parser used to declare', () => {
+      const config = parse();
+      expect(config.applicative_account_base).to.equal('');
+      expect(config.max_app_accounts).to.equal(5);
+      expect(config.app_accounts_user_attribute).to.equal('');
+      expect(config.applicative_account_attribute).to.deep.equal([
+        'objectClass',
+        'cn',
+        'sn',
+        'givenName',
+        'displayName',
+        'description',
+      ]);
+      expect(config.ldap_operational_attribute).to.deep.equal([
+        'dn',
+        'controls',
+        'structuralObjectClass',
+        'entryUUID',
+        'entryDN',
+        'subschemaSubentry',
+        'modifyTimestamp',
+        'modifiersName',
+        'createTimestamp',
+        'creatorsName',
+        'userPassword',
+      ]);
+    });
+
+    it('reads the environment and the CLI as before', () => {
+      process.env.DM_MAX_APP_ACCOUNTS = '2';
+      process.env.DM_APPLICATIVE_ACCOUNT_ATTRIBUTES = 'cn;sn';
+      const config = parse([
+        'node',
+        'ldap-rest',
+        '--applicative-account-base',
+        'ou=applicative,dc=example,dc=com',
+        '--ldap-operational-attributes',
+        'dn,entryUUID',
+      ]);
+      expect(config.max_app_accounts).to.equal(2);
+      expect(config.applicative_account_attribute).to.deep.equal(['cn', 'sn']);
+      expect(config.applicative_account_base).to.equal(
+        'ou=applicative,dc=example,dc=com'
+      );
+      expect(config.ldap_operational_attribute).to.deep.equal([
+        'dn',
+        'entryUUID',
+      ]);
+    });
+  });
+
   describe('reading and checking values', () => {
     const definitions = defineOptions({
       name: opt.string({ required: true }),

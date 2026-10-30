@@ -20,6 +20,11 @@ import {
 } from '../../lib/errors';
 import { escapeDnValue, escapeLdapFilter, isDnInBranch } from '../../lib/utils';
 
+import {
+  appAccountsOptions,
+  type AppAccountsOptions,
+} from './appAccounts.options';
+
 /**
  * @openapi-component
  * AppAccount:
@@ -104,12 +109,15 @@ const answeredRefusal = (error: unknown, res: Response): boolean => {
 };
 
 export default class AppAccountsApi extends DmPlugin {
+  static optionDefinitions = appAccountsOptions;
+
   name = 'appAccountsApi';
   roles: Role[] = ['api', 'configurable'] as const;
   dependencies = {
     appAccountsConsistency: 'core/twake/appAccountsConsistency',
   };
 
+  private readonly settings: AppAccountsOptions;
   private applicativeAccountBase: string;
   private maxAppAccounts: number;
   private mailAttr: string;
@@ -123,12 +131,11 @@ export default class AppAccountsApi extends DmPlugin {
   constructor(server: DM) {
     super(server);
 
-    this.applicativeAccountBase = this.config
-      .applicative_account_base as string;
-    this.maxAppAccounts = (this.config.max_app_accounts as number) || 5;
-    this.mailAttr = (this.config.mail_attribute as string) || 'mail';
-    this.userAttr =
-      (this.config.app_accounts_user_attribute as string) || this.mailAttr;
+    this.settings = this.options(appAccountsOptions);
+    this.applicativeAccountBase = this.settings.applicative_account_base;
+    this.maxAppAccounts = this.settings.max_app_accounts || 5;
+    this.mailAttr = this.config.mail_attribute || 'mail';
+    this.userAttr = this.settings.app_accounts_user_attribute || this.mailAttr;
 
     if (!this.applicativeAccountBase) {
       throw new Error(
@@ -528,7 +535,7 @@ export default class AppAccountsApi extends DmPlugin {
       // and `description` carries the caller-supplied label.
       const attrsToCopy = [
         ...new Set([
-          ...((this.config.applicative_account_attribute as string[]) || []),
+          ...this.settings.applicative_account_attribute,
           this.mailAttr,
         ]),
       ].filter(attr => attr !== 'objectClass' && attr !== 'description');
