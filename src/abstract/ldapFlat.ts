@@ -27,6 +27,7 @@ import {
   multiStatus,
   tryMethod,
   wantJson,
+  WriteResponse,
 } from '../lib/expressFormatedResponses';
 import {
   escapeDnValue,
@@ -344,16 +345,18 @@ export const FlatListQuery = Type.Object({
   match: Type.Optional(Type.String()),
   attribute: Type.Optional(Type.String()),
   attributes: Type.Optional(Type.String()),
-  limit: Type.Optional(Type.String({ pattern: '^\\d+$' })),
+  limit: Type.Optional(
+    Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+  ),
 });
 
 export const FlatEntryParams = Type.Object({
   id: Type.String({ minLength: 1 }),
 });
 
-export const FlatMoveBody = Type.Object({ targetOrgDn: Type.String() });
-
-export const FlatWriteResponse = Type.Object({ success: Type.Boolean() });
+export const FlatMoveBody = Type.Object({
+  targetOrgDn: Type.String({ minLength: 1 }),
+});
 
 export const FlatMoveResponse = Type.Object({
   success: Type.Boolean(),
@@ -361,7 +364,9 @@ export const FlatMoveResponse = Type.Object({
   departmentLink: Type.String(),
 });
 
-export const FlatRenameBody = Type.Object({ newId: Type.String() });
+export const FlatRenameBody = Type.Object({
+  newId: Type.String({ minLength: 1 }),
+});
 
 export default abstract class LdapFlat extends DmPlugin {
   base: string;
@@ -767,12 +772,7 @@ export default abstract class LdapFlat extends DmPlugin {
           args.filter = substringSearchFilter(query.match, query.attribute);
         }
         if (query.attributes) args.attributes = query.attributes.split(',');
-        const limit =
-          query.limit === undefined ? undefined : Number(query.limit);
-        if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1))
-          throw new BadRequestError(
-            'Query parameter "limit" must be a positive integer'
-          );
+        const limit = query.limit;
 
         let listed: { entries: LdapList; truncated: boolean };
         try {
@@ -937,7 +937,7 @@ export default abstract class LdapFlat extends DmPlugin {
       method: 'delete',
       path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       params: FlatEntryParams,
-      responses: { 200: FlatWriteResponse },
+      responses: { 200: WriteResponse },
       handler: async ({ req, res }) => this.apiDelete(req, res),
     });
 
@@ -991,7 +991,7 @@ export default abstract class LdapFlat extends DmPlugin {
       method: 'put',
       path: `${this.config.api_prefix}/v1/ldap/${this.pluralName}/:id`,
       params: FlatEntryParams,
-      responses: { 200: FlatWriteResponse },
+      responses: { 200: WriteResponse },
       handler: async ({ req, res }) => this.apiModify(req, res),
     });
 
@@ -1237,21 +1237,9 @@ export default abstract class LdapFlat extends DmPlugin {
   }
 
   async apiMove(req: Request, res: Response): Promise<void> {
-    if (!wantJson(req, res)) return;
-
-    const body = jsonBody(req, res, 'targetOrgDn') as
-      | { targetOrgDn: string }
-      | false;
-    if (!body) return;
-
+    const body = req.body as { targetOrgDn: string };
     const id = decodeURIComponent(req.params.id as string);
     const { targetOrgDn } = body;
-
-    if (!targetOrgDn || typeof targetOrgDn !== 'string') {
-      throw new BadRequestError(
-        'Missing or invalid targetOrgDn in request body'
-      );
-    }
 
     const result = await this.moveEntry(id, targetOrgDn, req);
     res.json({
@@ -1274,13 +1262,8 @@ export default abstract class LdapFlat extends DmPlugin {
   async apiRename(req: Request, res: Response): Promise<void> {
     if (!wantJson(req, res)) return;
 
-    const body = jsonBody(req, res, 'newId') as Record<string, unknown> | false;
-    if (!body) return;
-
+    const body = req.body as Record<string, unknown> & { newId: string };
     const newId = body.newId;
-    if (typeof newId !== 'string') {
-      throw new BadRequestError('Missing or invalid newId in request body');
-    }
 
     // Everything else in the body is an attribute name, and one the client is
     // not allowed to set is refused here as it is on a creation — a caller

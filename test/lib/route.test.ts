@@ -151,6 +151,41 @@ describe('defineRoute', () => {
     expect(called).to.equal(false);
   });
 
+  it('reads an integer query only from its integer spelling', async () => {
+    const app = appWith();
+    let received: unknown;
+    defineRoute(app, {
+      method: 'get',
+      path: '/things',
+      query: Type.Object({
+        limit: Type.Optional(Type.Integer({ minimum: 1 })),
+      }),
+      handler: ({ query, res }) => {
+        received = query;
+        res.sendStatus(200);
+      },
+    });
+    serveErrors(app);
+
+    await supertest(app).get('/things?limit=10').expect(200);
+    expect(received).to.deep.equal({ limit: 10 });
+
+    for (const limit of ['1.5', '1e3', 'true', 'ten', '']) {
+      const res = await supertest(app)
+        .get('/things')
+        .query({ limit })
+        .expect(400);
+      expect(res.body.error, `limit=${limit}`).to.equal(
+        'Invalid request: query.limit: Expected integer'
+      );
+    }
+
+    const zero = await supertest(app).get('/things?limit=0').expect(400);
+    expect(zero.body.error).to.equal(
+      'Invalid request: query.limit: Expected integer to be greater or equal to 1'
+    );
+  });
+
   it('names every failing part at once', async () => {
     const app = appWith();
     defineRoute(app, {

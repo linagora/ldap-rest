@@ -16,6 +16,7 @@ import {
   tryMethod,
   jsonBody,
   wantJson,
+  WriteResponse,
 } from '../../lib/expressFormatedResponses';
 import {
   escapeDnValue,
@@ -139,8 +140,6 @@ import {
  *   example:
  *     description: Updated description for Marketing
  */
-export const WriteResponse = Type.Object({ success: Type.Boolean() });
-
 export const OrganizationParams = Type.Object({
   dn: Type.String({ minLength: 1 }),
 });

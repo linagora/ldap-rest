@@ -159,7 +159,26 @@ const check = <S extends TSchema>(
   convert: boolean,
   invalid: string[]
 ): unknown => {
+  // `Value.Convert` reads `1.5`, `1e3` and `true` as 1 for an integer, and
+  // mutates what it is given: keep the raw copy to put those back, so they
+  // fail as the non-integers they are.
+  const raw =
+    convert && value && typeof value === 'object' && !Array.isArray(value)
+      ? ({ ...value } as Record<string, unknown>)
+      : undefined;
   const checked = convert ? Value.Convert(schema, value) : value;
+  if (raw) {
+    const properties =
+      (schema as { properties?: Record<string, { type?: string }> })
+        .properties ?? {};
+    for (const [key, prop] of Object.entries(properties))
+      if (
+        prop.type === 'integer' &&
+        typeof raw[key] === 'string' &&
+        !/^[+-]?\d+$/.test(raw[key])
+      )
+        (checked as Record<string, unknown>)[key] = raw[key];
+  }
   for (const error of Value.Errors(schema, checked))
     invalid.push(`${label(part, error.path)}: ${error.message}`);
   return checked;

@@ -27,6 +27,7 @@ import {
   ok,
   tryMethod,
   wantJson,
+  WriteResponse,
 } from '../../lib/expressFormatedResponses';
 import { extractLdapCode } from '../../lib/ldapCodes';
 import { loadSchemaFileAsync } from '../../lib/schemaFile';
@@ -162,8 +163,6 @@ export type postModify = ModifyRequest;
  *     attribute: attribute
  *     value: value
  */
-export const WriteResponse = Type.Object({ success: Type.Boolean() });
-
 export const GroupsQuery = Type.Object({
   match: Type.Optional(Type.String()),
   attribute: Type.Optional(Type.String()),

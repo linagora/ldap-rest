@@ -209,13 +209,24 @@ describe('Flat list, limited', function () {
     });
 
     it('should refuse a `limit` that is not a positive integer', async () => {
-      for (const limit of ['0', '-1', '1.5', 'ten', '', '1e3']) {
+      const refused: Record<string, string> = {
+        '0': 'Invalid request: query.limit: Expected integer to be greater or equal to 1',
+        '-1': 'Invalid request: query.limit: Expected integer to be greater or equal to 1',
+        '1.5': 'Invalid request: query.limit: Expected integer',
+        ten: 'Invalid request: query.limit: Expected integer',
+        '': 'Invalid request: query.limit: Expected integer',
+        '1e3': 'Invalid request: query.limit: Expected integer',
+      };
+      for (const [limit, message] of Object.entries(refused)) {
         const res = await request.get('/api/v1/ldap/titles').query({ limit });
         expect(res.status, `limit=${limit}`).to.equal(400);
-        expect(res.body.error).to.match(/limit/i);
+        expect(res.body.error, `limit=${limit}`).to.equal(message);
       }
       const repeated = await request.get('/api/v1/ldap/titles?limit=1&limit=2');
       expect(repeated.status).to.equal(400);
+      expect(repeated.body.error).to.equal(
+        'Invalid request: query.limit: Expected integer'
+      );
     });
   });
 
