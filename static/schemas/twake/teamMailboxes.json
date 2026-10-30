@@ -100,7 +100,7 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "fr": "Le DN d’une entrée de cet annuaire est attendu",
           "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },
@@ -119,7 +119,7 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "fr": "Le DN d’une entrée de cet annuaire est attendu",
           "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },

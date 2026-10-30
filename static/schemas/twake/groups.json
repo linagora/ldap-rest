@@ -35,7 +35,7 @@
       "test": "^(?!.*\\.\\.)[a-zA-Z0-9!#$%&'*+/=?^_`{|}.-]{1,64}$",
       "hint": {
         "en": "Must match an email local part: letters, digits and ! # $ % & ' * + / = ? ^ _ ` { | } . -, no consecutive dots",
-        "fr": "Partie locale d'une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs",
+        "fr": "Partie locale d’une adresse électronique : lettres, chiffres et ! # $ % & ' * + / = ? ^ _ ` { | } . -, sans points consécutifs",
         "mn": "Имэйл хаягийн @-ээс өмнөх хэсэг: үсэг, тоо болон ! # $ % & ' * + / = ? ^ _ ` { | } . -, дараалсан цэггүй"
       },
       "required": true,
@@ -120,7 +120,7 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "fr": "Le DN d’une entrée de cet annuaire est attendu",
           "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },
@@ -139,7 +139,7 @@
         "test": "^[a-zA-Z]+=.*,__LDAP_BASE__$",
         "hint": {
           "en": "Expected the DN of an entry of this directory",
-          "fr": "Le DN d'une entrée de cet annuaire est attendu",
+          "fr": "Le DN d’une entrée de cet annuaire est attendu",
           "mn": "Энэ лавлахын бичлэгийн DN оруулна уу"
         }
       },
