@@ -405,10 +405,14 @@ not change the attribute it names, so `Cn`, `CN` and `cn;binary` all name
 `cn`. Each key the schema declares is written under the schema's spelling —
 `Cn` becomes `cn`, `L;binary` becomes `l;binary` — before any check, so that
 a `required` attribute counts as present wherever it was sent, and a `fixed`
-one is written once, at its default. Two keys of the same entry or of the
-same part of a change naming one attribute are refused, as they are for a
-name sent twice through the routes. A name the schema does not declare is
-left as sent, and a strict schema refuses it.
+one is written once, at its default. The attribute's type is read the same
+way when a value is converted, so a boolean sent as `pwdReset;binary` is
+written `TRUE`.
+
+Two keys of an entry or of one part of a change naming one attribute are
+refused; the option does not make them two, so `l` and `l;binary` are
+refused together. A name the schema does not declare is left as sent, and a
+strict schema refuses it.
 
 Every entity route applies these rules; `test/lib/entitySchema.contract.test.ts`
 asserts them on a flat entity, a group and an organization alike. In the

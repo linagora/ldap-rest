@@ -4,6 +4,7 @@ import type {
   ModifyRequest,
 } from '../ldapActions';
 import { BadRequestError } from '../errors';
+import { knownAttributeName } from '../utils';
 import type { Schema, SchemaAttribute } from '../../config/schema';
 import {
   checkDnValues,
@@ -83,12 +84,16 @@ export class EntityValidator {
    * in a `replace`.
    *
    * @param changes change as the client sent it
-   * @returns the same change, `delete` renamed where the schema spells an
-   *   attribute otherwise
+   * @returns the same change, under the schema's spellings
    */
   async validateChanges(changes: ModifyRequest): Promise<ModifyRequest> {
+    // Every part before any check: what one names, another may give a value
     changes.add = changes.add && this.renameDeclared(changes.add);
     changes.replace = changes.replace && this.renameDeclared(changes.replace);
+    if (changes.delete)
+      changes.delete = Array.isArray(changes.delete)
+        ? this.renameDeclaredNames(changes.delete)
+        : this.renameDeclared(changes.delete);
     for (const part of ['add', 'replace'] as const) {
       const values = changes[part];
       if (!values) continue;
@@ -100,17 +105,6 @@ export class EntityValidator {
       return changes;
     }
     if (changes.delete) {
-      changes.delete = Array.isArray(changes.delete)
-        ? this.renameDeclaredNames(changes.delete)
-        : this.renameDeclared(changes.delete);
-      // A required attribute is refused to a delete of the whole attribute:
-      // named in the list, or under a name with no value, as the directory
-      // layer reads it. Named with values, some may remain.
-      const whole = (field: string): boolean => {
-        if (Array.isArray(changes.delete)) return true;
-        const value = (changes.delete as AttributesList)[field];
-        return !value || isNoValue(value);
-      };
       const fields = Array.isArray(changes.delete)
         ? changes.delete
         : Object.keys(changes.delete);
@@ -120,12 +114,33 @@ export class EntityValidator {
           throw new BadRequestError(
             `Attribute "${field}" is fixed and cannot be deleted`
           );
-        if (attr?.required && whole(field))
+        if (attr?.required && this.deletesWhole(changes, field))
           throw new BadRequestError(`Attribute "${field}" is required`);
       }
     }
     toDirectoryChanges(this.schema, changes);
     return changes;
+  }
+
+  /**
+   * Whether a change removes every value of an attribute: a `delete` naming
+   * it, in the list or under a name with no value as the directory layer
+   * reads it, and nothing in the same change giving it a value again, in an
+   * `add` or a `replace` that the directory applies after the `delete`. A
+   * `delete` naming some values leaves the others.
+   */
+  private deletesWhole(changes: ModifyRequest, field: string): boolean {
+    const deletePart = changes.delete as string[] | AttributesList;
+    const named = Array.isArray(deletePart) ? undefined : deletePart[field];
+    // An empty list clears the attribute, as a name alone does
+    if (Array.isArray(named) && named.length > 0) return false;
+    const base = field.split(';')[0].toLowerCase();
+    return ![changes.add, changes.replace].some(part =>
+      Object.entries(part ?? {}).some(
+        ([key, value]) =>
+          key.split(';')[0].toLowerCase() === base && !isNoValue(value)
+      )
+    );
   }
 
   /**
@@ -143,37 +158,57 @@ export class EntityValidator {
     const keys = Object.keys(values);
     const names = this.renameDeclaredNames(keys);
     if (keys.every((key, i) => key === names[i])) return values;
-    // A new object rather than deletes and assignments: `__proto__` is a
-    // key like any other here, and only a strict schema refuses it
+    // A new object rather than deletes and assignments: the keys are copied
+    // from JSON, `__proto__` among them, and assigning that one would set
+    // the prototype instead
     const renamed: AttributesList = Object.create(null) as AttributesList;
     for (const [i, name] of names.entries()) renamed[name] = values[keys[i]];
     return renamed;
   }
 
-  /** {@link renameDeclared} on a list of names, such as a `delete` */
+  /**
+   * {@link renameDeclared} on a list of names, such as a `delete`.
+   *
+   * Two names of one attribute are refused as the routes refuse them: as
+   * the schema declares it, or as this server knows the attribute by its
+   * name, which makes `l;binary` and `L` one attribute.
+   */
   private renameDeclaredNames(keys: string[]): string[] {
     const seen = new Map<string, string>();
     return keys.map(key => {
-      const name = this.schemaSpelling(key);
-      const same = seen.get(name.toLowerCase());
+      const id = this.attributeIdentity(key);
+      const same = seen.get(id);
       if (same !== undefined && same !== key)
         throw new BadRequestError(
           `"${same}" and "${key}" name the same attribute`
         );
-      seen.set(name.toLowerCase(), key);
-      return name;
+      seen.set(id, key);
+      return this.schemaSpelling(key);
     });
   }
 
   /**
-   * The schema's spelling of a declared attribute, keeping the `;binary`
-   * option, which names a transfer syntax rather than a value of its own.
+   * The attribute a name holds, case and option aside: the option is a
+   * transfer syntax, and `l;binary` is the `l` a plain `L` names.
+   */
+  private attributeIdentity(field: string): string {
+    const base = split(field)[0];
+    return (
+      schemaAttribute(this.schema, base)?.[0] ??
+      knownAttributeName(base) ??
+      base
+    ).toLowerCase();
+  }
+
+  /**
+   * The schema's spelling of a declared attribute, with the `;binary`
+   * option, the only one a write takes, written as the directory writes it.
    */
   private schemaSpelling(field: string): string {
-    const named = schemaAttribute(this.schema, field)?.[0];
+    const [base, option] = split(field);
+    const named = schemaAttribute(this.schema, base)?.[0];
     if (named === undefined) return field;
-    const options = field.split(';').slice(1);
-    return options.length ? `${named};${options.join(';')}` : named;
+    return option ? `${named};${option}` : named;
   }
 
   /**
@@ -313,6 +348,16 @@ export function applyFixedDefaults(
     )
       entry[field] = attr.default;
 }
+
+/**
+ * An attribute description split between its type and its option, the
+ * latter lowercased: options are case-insensitive, and `;binary` is the only
+ * one a write takes.
+ */
+const split = (field: string): [string, string | undefined] => {
+  const [base, ...options] = field.split(';');
+  return [base, options.find(Boolean)?.toLowerCase()];
+};
 
 /** No value: what clears an attribute in a `replace` */
 const isNoValue = (value: unknown): value is null | undefined | [] =>

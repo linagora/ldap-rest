@@ -209,7 +209,7 @@ describe('EntityValidator', () => {
       expect(
         await refusal(
           v.validateNew(
-            entry({ DESCRIPTIONS: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
+            entry({ BUSINESS_PLACE: 'd', Cn: 'Alice', 'l;binary': 'lyon' })
           )
         )
       ).to.be.undefined;
@@ -226,10 +226,36 @@ describe('EntityValidator', () => {
       expect(written).to.not.have.property('manager');
     });
 
+    it('converts a value under every spelling of a declared attribute', async () => {
+      const people = {
+        attributes: { ...schema.attributes, pwdReset: { type: 'boolean' } },
+      } as unknown as Schema;
+      for (const field of ['pwdReset;binary', 'PWDRESET;BINARY', 'PWDRESET']) {
+        const written = await new EntityValidator(people, {
+          entryExists: async () => true,
+          loadedPlugins: {},
+          singularName: 'person',
+        }).validateNew(entry({ [field]: true }));
+        const named = field.toLowerCase().includes(';binary')
+          ? 'pwdReset;binary'
+          : 'pwdReset';
+        expect(written[named], field).to.equal('TRUE');
+        expect(Object.keys(written), field).to.deep.equal([
+          'objectClass',
+          'uid',
+          'description',
+          named,
+          'l',
+        ]);
+      }
+    });
+
     it('refuses two keys naming one attribute', async () => {
       for (const sent of [
         { description: 'a', DESCRIPTION: 'b' },
         { secretary: [bob], SECRETARY: [bob] },
+        // The option names a transfer syntax, not another value
+        { l: 'lyon', 'L;binary': 'paris' },
       ])
         expect(
           await refusal(validator().validateNew(entry(sent))),
@@ -237,10 +263,11 @@ describe('EntityValidator', () => {
         ).to.equal(
           `"${Object.keys(sent)[0]}" and "${Object.keys(sent)[1]}" name the same attribute`
         );
-      // `;binary` names a transfer syntax, not a value of its own
       expect(
-        await refusal(validator().validateNew(entry({ 'l;binary': 'lyon' })))
-      ).to.be.undefined;
+        await refusal(
+          validator().validateChanges({ delete: ['L;binary', 'l'] })
+        )
+      ).to.equal('"L;binary" and "l" name the same attribute');
     });
   });
 
@@ -281,6 +308,16 @@ describe('EntityValidator', () => {
           validator().validateChanges({ delete: { description: ['old'] } })
         )
       ).to.be.undefined;
+      // The directory applies the `add` after the `delete`: what it names is
+      // there again, and under the schema's spelling
+      for (const changes of [
+        { delete: ['description'], add: { DESCRIPTION: 'new' } },
+        { delete: { description: [] }, replace: { Description: 'new' } },
+      ] as any[])
+        expect(
+          await refusal(validator().validateChanges(changes)),
+          JSON.stringify(changes)
+        ).to.be.undefined;
     });
 
     it('clears an optional attribute with null, as the directory reads []', async () => {
@@ -487,5 +524,9 @@ describe('EntityValidator', () => {
       .undefined;
     expect(await refusal(validator(null).validateValue('x', ''))).to.be
       .undefined;
+    // No schema declares a name, so none is renamed or converted
+    const changes = { add: { PWDRESET: 'TRUE' } } as unknown as ModifyRequest;
+    await validator(null).validateChanges(changes);
+    expect(changes.add).to.deep.equal({ PWDRESET: 'TRUE' });
   });
 });
