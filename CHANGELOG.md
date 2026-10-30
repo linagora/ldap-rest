@@ -55,6 +55,9 @@
   and a leap second (`20991231235960Z`) no longer makes the date 400 as
   invalid
   ([details](docs/usage/plugins/ldap/enterprise-rules.md#scheduled-removal)).
+- The French labels and hints of the Twake schemas use the typographic
+  apostrophe (`’`), as the rest of the French text does
+  ([#462](https://github.com/linagora/ldap-rest/issues/462)).
 
 ### Security
 

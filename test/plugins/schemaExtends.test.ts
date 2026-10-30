@@ -34,7 +34,7 @@ describe('Schemas extending another', () => {
     expect(shipped.attributes).to.have.property('personalTitle');
     expect(shipped.attributes.cn.label).to.deep.equal({
       en: 'Common name',
-      fr: "Nom d'annuaire",
+      fr: 'Nom d’annuaire',
       mn: 'Лавлахын нэр',
     });
   });
