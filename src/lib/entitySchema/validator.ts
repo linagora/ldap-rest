@@ -237,8 +237,9 @@ const INTEGER = /^-?\d+$/;
  * that a value is accepted or refused like that text.
  */
 function assertScalar(field: string, value: unknown, type?: string): void {
-  // `String(1e21)` is `1e+21`, which no NUMBER syntax reads back as the
-  // number; beyond 2^53 the JSON parser has already lost the digits
+  // `String` writes an exponent, which neither NUMBER nor INTEGER reads,
+  // outside `[1e-6, 1e21)`: `1e21` is written `1e+21`, `1e-7` as `1e-7`.
+  // Beyond 2^53 the JSON parser has already lost the digits
   const written =
     typeof value === 'number' && Number.isFinite(value)
       ? String(value)

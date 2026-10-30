@@ -382,7 +382,7 @@ of an `array` follows `items.type`, text without `items`. A `number` or
 boolean or the directory's `TRUE` / `FALSE`. A JSON number is judged on the
 text written for it, what the directory is sent: `1e21` and `1e-7` are
 written `1e+21` and `1e-7`, so they are refused like that text, and a whole
-number beyond 2^53 is refused whatever the type, as the JSON parser has
+number beyond 2⁵³ is refused whatever the type, as the JSON parser has
 already lost its digits. Anything else for them, and
 anything but text for a `string`, `date` or `pointer`, is refused; an
 attribute with `normalize` takes any text, read after validation. In a

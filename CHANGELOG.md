@@ -44,9 +44,10 @@
 - A `number` or `integer` sent as a JSON number is answered 400 by the
   schema when the text written for it is not a plain decimal, so `1e21` and
   `1e-7` are refused like the text `"1e+21"` already was instead of reaching
-  the directory, and so is a whole number beyond 2^53, whose digits the JSON
+  the directory, and so is a whole number beyond 2⁵³, whose digits the JSON
   parser has already lost
-  ([#496](https://github.com/linagora/ldap-rest/issues/496))
+  ([details](docs/client-development/schemas/README.md#what-a-value-must-look-like),
+  [#496](https://github.com/linagora/ldap-rest/issues/496))
 
 ## v1.2.1 (2026-10-28)
 
